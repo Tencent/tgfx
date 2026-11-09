@@ -140,15 +140,15 @@ inline constexpr const Module* HairlineQuadGeometries[] = {&HairlineQuadGeometry
 inline constexpr Family HairlineQuadFamily = {"HairlineQuad", HairlineQuadGeometries, 1, nullptr,
                                               0};
 
-/// The Ellipse family (the former EllipseFillShader, minus its device-space mask form): an ellipse
-/// whose coverage is the analytic edge SDF with the analytic clip. The device mask keeps its old
-/// semantics and stays on the legacy family until ALWAYS and RUNTIME are split. Slot layout:
-/// Frame(0), EllipseGeometry(1), AnalyticClip(2), Xfer(3).
+/// The Ellipse family (the former EllipseFillShader): an ellipse whose coverage is the analytic
+/// edge SDF, with an optional device-space mask (the old FILL_DEVICE_MASK_ALWAYS form, so the mask
+/// is a compile-time dimension) and the analytic clip. Slot layout: Frame(0), EllipseGeometry(1),
+/// DeviceMask(2: PRESENT), AnalyticClip(3), Xfer(4).
 inline constexpr const Module* EllipseGeometries[] = {&EllipseGeometry};
 
-inline constexpr FamilyModule EllipseBody[] = {&AnalyticClip};
+inline constexpr FamilyModule EllipseBody[] = {&DeviceMask, &AnalyticClip};
 
-inline constexpr Family EllipseFamily = {"Ellipse", EllipseGeometries, 1, EllipseBody, 1};
+inline constexpr Family EllipseFamily = {"Ellipse", EllipseGeometries, 1, EllipseBody, 2};
 
 /// The array is the single source of truth for both the table pointer and its count: keeping them
 /// apart is how a family silently drops out of matching (or the count runs past the array) after

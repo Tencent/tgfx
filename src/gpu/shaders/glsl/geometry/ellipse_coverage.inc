@@ -1,4 +1,4 @@
-// Ellipse edge coverage, shared by EllipseFillShader and the pointwise chain kernel's
+// Ellipse edge coverage, shared by the Ellipse family and the pointwise chain kernel's
 // GP_LAYOUT==1 path. Evaluates the outer curve (and the inner curve for strokes) from the
 // ellipse varyings. The math is verbatim from the runtime EllipseGeometryProcessor emission;
 // keep it character-identical so the precompiled path stays byte-exact with JIT.

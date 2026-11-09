@@ -350,7 +350,7 @@ void main() {
   }
   vec4 outputColor = vec4(finalColor, srcAlpha);
 
-  // The initial coverage mirrors EllipseFillShader (analytic edge alpha) for the ellipse form and
+  // The initial coverage mirrors the Ellipse family (analytic edge alpha) for the ellipse form and
   // the quad's per-vertex edge coverage for the quad form; coverage_output.inc multiplies the clip
   // term on top and hands xp_output.inc the uncovered color plus the total coverage.
 #if GP_KIND == 1
