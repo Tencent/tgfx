@@ -21,6 +21,7 @@
 #include <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
 #include <atomic>
+#include <deque>
 #include <vector>
 #include "tgfx/gpu/CommandQueue.h"
 
@@ -57,6 +58,15 @@ class MetalCommandQueue : public CommandQueue {
   void writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, const void* pixels,
                     size_t rowBytes) override;
 
+  void beginTextureUploadBatch() override;
+  void endTextureUploadBatch() override;
+
+  /**
+   * Commits pending texture uploads before encoding commands that consume them, without waiting
+   * for GPU completion.
+   */
+  void flushTextureUploads();
+
   std::shared_ptr<Semaphore> insertSemaphore() override;
 
   void waitSemaphore(std::shared_ptr<Semaphore> semaphore) override;
@@ -74,9 +84,30 @@ class MetalCommandQueue : public CommandQueue {
   void schedulePresent(id<CAMetalDrawable> drawable);
 
  private:
+  static constexpr size_t MAX_UPLOAD_BATCH_BYTES = 16 * 1024 * 1024;
+  static constexpr size_t MAX_UPLOAD_BATCH_COPIES = 128;
+  static constexpr size_t MAX_IN_FLIGHT_UPLOAD_BYTES = 64 * 1024 * 1024;
+
+  struct TextureUploadSubmission {
+    id<MTLCommandBuffer> commandBuffer = nil;
+    size_t bytes = 0;
+  };
+
+  bool ensureTextureUploadEncoder();
+  void reserveTextureUploadBytes(size_t bytes);
+  void collectCompletedTextureUploads();
+  void waitForTextureUploads();
+
   MetalGPU* gpu = nullptr;
   id<MTLCommandQueue> commandQueue = nil;
   id<MTLCommandBuffer> lastSubmittedCommandBuffer = nil;
+  id<MTLCommandBuffer> pendingUploadCommandBuffer = nil;
+  id<MTLBlitCommandEncoder> pendingUploadEncoder = nil;
+  size_t textureUploadBatchDepth = 0;
+  size_t pendingUploadBytes = 0;
+  size_t pendingUploadCopies = 0;
+  size_t inFlightUploadBytes = 0;
+  std::deque<TextureUploadSubmission> uploadSubmissions = {};
   std::shared_ptr<MetalSemaphore> pendingSignalSemaphore = nullptr;
   std::shared_ptr<MetalSemaphore> pendingWaitSemaphore = nullptr;
   std::vector<id<CAMetalDrawable>> pendingDrawables = {};

@@ -17,6 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalCommandQueue.h"
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <utility>
 #include "MetalCommandBuffer.h"
 #include "MetalGPU.h"
 #include "MetalSemaphore.h"
@@ -30,11 +35,99 @@ MetalCommandQueue::MetalCommandQueue(MetalGPU* metalGPU) : gpu(metalGPU) {
   commandQueue = [metalGPU->device() newCommandQueue];
 }
 
+void MetalCommandQueue::beginTextureUploadBatch() {
+  ++textureUploadBatchDepth;
+}
+
+void MetalCommandQueue::endTextureUploadBatch() {
+  DEBUG_ASSERT(textureUploadBatchDepth > 0);
+  if (textureUploadBatchDepth == 0) {
+    return;
+  }
+  --textureUploadBatchDepth;
+  if (textureUploadBatchDepth == 0) {
+    flushTextureUploads();
+  }
+}
+
+bool MetalCommandQueue::ensureTextureUploadEncoder() {
+  if (pendingUploadEncoder != nil) {
+    return true;
+  }
+  id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
+  if (commandBuffer == nil) {
+    LOGE("MetalCommandQueue::writeTexture() failed to create command buffer.");
+    return false;
+  }
+  auto waitSemaphore = pendingWaitSemaphore;
+  encodePendingWait(commandBuffer);
+  id<MTLBlitCommandEncoder> encoder = [commandBuffer blitCommandEncoder];
+  if (encoder == nil) {
+    pendingWaitSemaphore = std::move(waitSemaphore);
+    LOGE("MetalCommandQueue::writeTexture() failed to create blit command encoder.");
+    return false;
+  }
+  pendingUploadCommandBuffer = [commandBuffer retain];
+  pendingUploadEncoder = [encoder retain];
+  return true;
+}
+
+void MetalCommandQueue::flushTextureUploads() {
+  if (pendingUploadCommandBuffer == nil) {
+    return;
+  }
+  @autoreleasepool {
+    [pendingUploadEncoder endEncoding];
+    [pendingUploadEncoder release];
+    pendingUploadEncoder = nil;
+    [pendingUploadCommandBuffer commit];
+    uploadSubmissions.push_back({pendingUploadCommandBuffer, pendingUploadBytes});
+    inFlightUploadBytes += pendingUploadBytes;
+    pendingUploadCommandBuffer = nil;
+    pendingUploadBytes = 0;
+    pendingUploadCopies = 0;
+  }
+}
+
+void MetalCommandQueue::reserveTextureUploadBytes(size_t bytes) {
+  DEBUG_ASSERT(bytes <= MAX_UPLOAD_BATCH_BYTES);
+  collectCompletedTextureUploads();
+  if (bytes > MAX_UPLOAD_BATCH_BYTES - pendingUploadBytes) {
+    flushTextureUploads();
+  }
+  if (bytes > MAX_IN_FLIGHT_UPLOAD_BYTES - inFlightUploadBytes - pendingUploadBytes) {
+    flushTextureUploads();
+    while (bytes > MAX_IN_FLIGHT_UPLOAD_BYTES - inFlightUploadBytes) {
+      [uploadSubmissions.front().commandBuffer waitUntilCompleted];
+      collectCompletedTextureUploads();
+    }
+  }
+}
+
+void MetalCommandQueue::collectCompletedTextureUploads() {
+  while (!uploadSubmissions.empty()) {
+    const auto& submission = uploadSubmissions.front();
+    auto status = submission.commandBuffer.status;
+    if (status != MTLCommandBufferStatusCompleted && status != MTLCommandBufferStatusError) {
+      break;
+    }
+    inFlightUploadBytes -= submission.bytes;
+    [submission.commandBuffer release];
+    uploadSubmissions.pop_front();
+  }
+}
+
+void MetalCommandQueue::waitForTextureUploads() {
+  while (!uploadSubmissions.empty()) {
+    [uploadSubmissions.front().commandBuffer waitUntilCompleted];
+    collectCompletedTextureUploads();
+  }
+}
+
 MetalCommandQueue::~MetalCommandQueue() {
   // Wait for the last submitted command buffer to complete before releasing, ensuring all
   // async completion handlers (which capture `this`) have fired before the object is destroyed.
-  [lastSubmittedCommandBuffer waitUntilCompleted];
-  [lastSubmittedCommandBuffer release];
+  waitUntilCompleted();
   // Release drawables that were never submitted.
   for (auto& drawable : pendingDrawables) {
     [drawable release];
@@ -47,6 +140,7 @@ void MetalCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   if (!commandBuffer) {
     return;
   }
+  flushTextureUploads();
   @autoreleasepool {
     auto metalCommandBuffer = std::static_pointer_cast<MetalCommandBuffer>(commandBuffer);
     if (metalCommandBuffer->metalCommandBuffer()) {
@@ -82,6 +176,7 @@ void MetalCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
 
   // Process unreferenced resources after submission
   gpu->processUnreferencedResources();
+  collectCompletedTextureUploads();
 }
 
 void MetalCommandQueue::writeBuffer(std::shared_ptr<GPUBuffer> buffer, size_t bufferOffset,
@@ -114,48 +209,91 @@ void MetalCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
     return;
   }
 
+  if (rect.isEmpty() || !Rect::MakeWH(texture->width(), texture->height()).contains(rect)) {
+    return;
+  }
+
   if (mtlTexture.storageMode == MTLStorageModePrivate) {
     @autoreleasepool {
       auto bytesPerPixel = MTLPixelFormatBytesPerPixel(mtlTexture.pixelFormat);
-      NSUInteger width = static_cast<NSUInteger>(rect.width());
-      NSUInteger height = static_cast<NSUInteger>(rect.height());
-      NSUInteger bytesPerRow =
-          rowBytes > 0 ? static_cast<NSUInteger>(rowBytes) : width * bytesPerPixel;
-      NSUInteger dataSize = bytesPerRow * height;
-
-      id<MTLBuffer> stagingBuffer = [gpu->device() newBufferWithBytes:pixels
-                                                               length:dataSize
-                                                              options:MTLResourceStorageModeShared];
-      id<MTLCommandBuffer> cmdBuffer = [commandQueue commandBuffer];
-      if (cmdBuffer == nil) {
-        LOGE("MetalCommandQueue::writeTexture() failed to create command buffer.");
-        [stagingBuffer release];
+      auto width = static_cast<size_t>(rect.width());
+      auto height = static_cast<size_t>(rect.height());
+      if (width == 0 || height == 0 || bytesPerPixel == 0 ||
+          width > MAX_UPLOAD_BATCH_BYTES / bytesPerPixel) {
         return;
       }
-      id<MTLBlitCommandEncoder> blitEncoder = [cmdBuffer blitCommandEncoder];
-      if (blitEncoder == nil) {
-        LOGE("MetalCommandQueue::writeTexture() failed to create blit command encoder.");
-        [stagingBuffer release];
+      auto bytesPerRow = width * bytesPerPixel;
+      auto sourceRowBytes = rowBytes > 0 ? rowBytes : bytesPerRow;
+      if (sourceRowBytes < bytesPerRow ||
+          height - 1 > (std::numeric_limits<size_t>::max() - bytesPerRow) / sourceRowBytes) {
+        LOGE("MetalCommandQueue::writeTexture() invalid pixel row layout.");
         return;
       }
 
-      MTLOrigin origin =
-          MTLOriginMake(static_cast<NSUInteger>(rect.x()), static_cast<NSUInteger>(rect.y()), 0);
-      MTLSize size = MTLSizeMake(width, height, 1);
-
-      [blitEncoder copyFromBuffer:stagingBuffer
-                     sourceOffset:0
-                sourceBytesPerRow:bytesPerRow
-              sourceBytesPerImage:dataSize
-                       sourceSize:size
-                        toTexture:mtlTexture
-                 destinationSlice:0
-                 destinationLevel:0
-                destinationOrigin:origin];
-      [blitEncoder endEncoding];
-      [cmdBuffer commit];
-      [cmdBuffer waitUntilCompleted];
-      [stagingBuffer release];
+      // Untracked textures need both prior GPU accesses and this upload to finish before reuse.
+      bool synchronize = mtlTexture.hazardTrackingMode == MTLHazardTrackingModeUntracked;
+      if (synchronize) {
+        waitUntilCompleted();
+      }
+      auto sourcePixels = static_cast<const uint8_t*>(pixels);
+      auto maxRows = MAX_UPLOAD_BATCH_BYTES / bytesPerRow;
+      size_t row = 0;
+      while (row < height) {
+        // Drain transient references per chunk so completed staging buffers can be reclaimed.
+        @autoreleasepool {
+          auto rows = std::min(height - row, maxRows);
+          auto dataSize = bytesPerRow * rows;
+          reserveTextureUploadBytes(dataSize);
+          id<MTLBuffer> stagingBuffer = nil;
+          if (sourceRowBytes == bytesPerRow) {
+            stagingBuffer = [gpu->device() newBufferWithBytes:sourcePixels + row * sourceRowBytes
+                                                       length:dataSize
+                                                      options:MTLResourceStorageModeShared];
+          } else {
+            // Packing rows bounds staging memory and avoids reading past the final row's pixels.
+            stagingBuffer = [gpu->device() newBufferWithLength:dataSize
+                                                       options:MTLResourceStorageModeShared];
+            if (stagingBuffer != nil) {
+              auto destination = static_cast<uint8_t*>(stagingBuffer.contents);
+              for (size_t index = 0; index < rows; ++index) {
+                memcpy(destination + index * bytesPerRow,
+                       sourcePixels + (row + index) * sourceRowBytes, bytesPerRow);
+              }
+            }
+          }
+          if (stagingBuffer == nil) {
+            LOGE("MetalCommandQueue::writeTexture() failed to create staging buffer.");
+            break;
+          }
+          if (!ensureTextureUploadEncoder()) {
+            [stagingBuffer release];
+            break;
+          }
+          auto origin = MTLOriginMake(static_cast<NSUInteger>(rect.x()),
+                                      static_cast<NSUInteger>(rect.y()) + row, 0);
+          auto size = MTLSizeMake(width, rows, 1);
+          [pendingUploadEncoder copyFromBuffer:stagingBuffer
+                                  sourceOffset:0
+                             sourceBytesPerRow:bytesPerRow
+                           sourceBytesPerImage:dataSize
+                                    sourceSize:size
+                                     toTexture:mtlTexture
+                              destinationSlice:0
+                              destinationLevel:0
+                             destinationOrigin:origin];
+          pendingUploadBytes += dataSize;
+          ++pendingUploadCopies;
+          [stagingBuffer release];
+          row += rows;
+          if (textureUploadBatchDepth == 0 || pendingUploadCopies >= MAX_UPLOAD_BATCH_COPIES ||
+              pendingUploadBytes >= MAX_UPLOAD_BATCH_BYTES) {
+            flushTextureUploads();
+          }
+        }
+      }
+      if (synchronize) {
+        waitUntilCompleted();
+      }
     }
   } else {
     MTLRegion region = MTLRegionMake2D(
@@ -169,6 +307,7 @@ void MetalCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
 }
 
 std::shared_ptr<Semaphore> MetalCommandQueue::insertSemaphore() {
+  flushTextureUploads();
   auto semaphore = MetalSemaphore::Make(gpu);
   if (semaphore == nullptr) {
     return nullptr;
@@ -187,6 +326,7 @@ void MetalCommandQueue::waitSemaphore(std::shared_ptr<Semaphore> semaphore) {
     return;
   }
 
+  flushTextureUploads();
   pendingWaitSemaphore = metalSemaphore;
 }
 
@@ -208,11 +348,13 @@ void MetalCommandQueue::schedulePresent(id<CAMetalDrawable> drawable) {
 }
 
 void MetalCommandQueue::waitUntilCompleted() {
+  flushTextureUploads();
   if (lastSubmittedCommandBuffer != nil) {
     [lastSubmittedCommandBuffer waitUntilCompleted];
     [lastSubmittedCommandBuffer release];
     lastSubmittedCommandBuffer = nil;
   }
+  waitForTextureUploads();
 }
 
 }  // namespace tgfx
