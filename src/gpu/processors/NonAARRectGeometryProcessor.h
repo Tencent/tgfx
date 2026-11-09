@@ -46,6 +46,11 @@ class NonAARRectGeometryProcessor : public GeometryProcessor {
     return commonColor.has_value();
   }
 
+  /// The exact common color a common-color batch uploads, or nullopt when the batches vary.
+  std::optional<PMColor> getCommonColor() const {
+    return commonColor;
+  }
+
  protected:
   NonAARRectGeometryProcessor(int width, int height, bool stroke,
                               std::optional<PMColor> commonColor);

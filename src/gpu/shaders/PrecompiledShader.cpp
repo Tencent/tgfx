@@ -26,6 +26,8 @@
 #include <utility>
 #include "core/utils/USE.h"
 #include "gpu/shaders/AllShaderFamilies.h"
+#include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 
 namespace tgfx {
 
@@ -51,6 +53,19 @@ struct RegisteredShader {
   ShaderRegistry::Enumerator enumerator;
 };
 
+/// The reachable set of the declaration-driven family at the table index: every enumerated
+/// variant's (ordinal, ordinal) pair. The template exists because the registry stores plain
+/// function pointers; a new family adds an instantiation.
+template <size_t Index>
+std::set<std::pair<uint32_t, uint32_t>> AssembledFamilyReachable() {
+  const auto variants = EnumerateVariants(Families()[Index], static_cast<uint16_t>(Index));
+  std::set<std::pair<uint32_t, uint32_t>> pairs = {};
+  for (const auto& variant : variants) {
+    pairs.insert({variant.ordinal, variant.ordinal});
+  }
+  return pairs;
+}
+
 const std::map<std::string, RegisteredShader>& ShaderInfos() {
   static const std::map<std::string, RegisteredShader> infos = [] {
     std::map<std::string, RegisteredShader> result;
@@ -65,6 +80,16 @@ const std::map<std::string, RegisteredShader>& ShaderInfos() {
       // info.name after the move would register an empty key.
       auto name = info.name;
       result.emplace(std::move(name), RegisteredShader{std::move(info), entry.enumerator});
+    }
+    // The declaration-driven families join the lookup tables (Find and the reachable-set
+    // enumerator) but never the factory list: the build tool assembles their text from the
+    // declarations, so the legacy per-family compile loop must not see them.
+    for (size_t index = 0; index < FamilyCount(); ++index) {
+      const Family& family = Families()[index];
+      auto info = AssembledFamilyInfo(family);
+      auto name = info.name;
+      result.emplace(std::move(name),
+                     RegisteredShader{std::move(info), &AssembledFamilyReachable<0>});
     }
     return result;
   }();

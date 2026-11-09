@@ -18,20 +18,30 @@
 
 #include "gpu/shaders/ProgramWriterFactory.h"
 #include "gpu/ProgramWriter.h"
+#include "gpu/shaders/Families.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 #include "gpu/shaders/kernels/YUVTextureFillShader.h"
 
 namespace tgfx {
 
+/// The RRect family's layout-addressed writer (RRectFamilyWriter.cpp).
+std::unique_ptr<ProgramWriter> MakeRRectProgramWriter();
+
 // The re-expressing chain family carries its own writer (it compiles the draw's whole expression
 // into the chain program); the YUV family appends its compiled tail records to the standard walk;
-// every other family uses the generic precompiled writer.
+// the declaration-driven families write through their derived layouts; every other family uses
+// the generic precompiled writer.
 std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shaderName) {
   if (shaderName == PointwiseChainShader::Name) {
     return std::make_unique<ChainProgramWriter>();
   }
   if (shaderName == YUVTextureFillShader::Name) {
     return std::make_unique<YUVProgramWriter>();
+  }
+  for (size_t index = 0; index < FamilyCount(); ++index) {
+    if (shaderName == Families()[index].name) {
+      return MakeRRectProgramWriter();
+    }
   }
   return std::make_unique<PrecompiledProgramWriter>();
 }

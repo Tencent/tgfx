@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <cstdio>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -42,6 +43,9 @@
 #include "compile/StageCompiler.h"
 #include "core/DiagnosticCodes.h"
 #include "core/Diagnostics.h"
+#include "emit/Assembler.h"
+#include "gpu/shaders/FamilyDomains.h"
+#include "gpu/shaders/Layout.h"
 #include "emit/ChainOpsGLSL.h"
 #include "emit/ProfileEmitter.h"
 #include "emit/StageEmitter.h"
@@ -540,6 +544,174 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options) {
   return true;
 }
 
+// The declaration-driven families. Each variant assembles to a self-contained text (locations,
+// bindings and block members are that variant's constants), compiles through the same stage
+// caches, and enters the bundle under its ordinal — the same mixed-radix index the runtime's
+// Select produces, so the bundle keys need no transitional scheme.
+namespace {
+
+/// The layout's view of one block's fields, in declaration order, against the reflection's.
+bool BlockMatchesReflection(const Layout& layout, uint8_t block,
+                            const std::vector<UniformEntry>& reflected) {
+  size_t index = 0;
+  for (size_t field = 0; field < layout.fields.size(); ++field) {
+    if (layout.fields[field].block != block) {
+      continue;
+    }
+    if (index >= reflected.size()) {
+      return false;
+    }
+    if (reflected[index].name != layout.fieldNames[field] ||
+        reflected[index].format != static_cast<uint8_t>(layout.fields[field].format) ||
+        reflected[index].arraySize != layout.fields[field].arraySize) {
+      return false;
+    }
+    index++;
+  }
+  return index == reflected.size();
+}
+
+/// The only interface check: the reflection of the assembled text must equal the derived layout
+/// (uniforms per block, samplers, vertex inputs), or the declaration and the assembly disagree.
+bool LayoutMatchesReflection(const Layout& layout, const ReflectionResult& reflection) {
+  if (!BlockMatchesReflection(layout, 0, reflection.vertexReflection.uniforms) ||
+      !BlockMatchesReflection(layout, 1, reflection.fragmentReflection.uniforms)) {
+    return false;
+  }
+  if (reflection.vertexReflection.samplers.size() != 0 ||
+      reflection.fragmentReflection.samplers.size() != layout.textures.size()) {
+    return false;
+  }
+  for (size_t index = 0; index < layout.textures.size(); ++index) {
+    if (reflection.fragmentReflection.samplers[index].name != layout.textures[index].name) {
+      return false;
+    }
+  }
+  if (reflection.vertexReflection.vertexInputs.size() != layout.attributes.size()) {
+    return false;
+  }
+  for (size_t index = 0; index < layout.attributes.size(); ++index) {
+    const auto& attribute = layout.attributes[index];
+    const auto& input = reflection.vertexReflection.vertexInputs[index];
+    if (input.name != attribute.name || input.location != attribute.location ||
+        input.format != static_cast<uint8_t>(attribute.format)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+}  // namespace
+
+void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compiler,
+                              BuildReport* report) {
+  if (options.shaderDir.empty()) {
+    return;
+  }
+  std::vector<std::pair<ShaderProfile, std::unique_ptr<ProfileEmitter>>> emitters;
+  for (auto profile : options.backends) {
+    emitters.emplace_back(profile, MakeProfileEmitter(profile));
+  }
+  for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
+    const Family& family = Families()[familyIndex];
+    const auto info = AssembledFamilyInfo(family);
+
+    ShaderReport shaderReport;
+    shaderReport.name = family.name;
+    shaderReport.rawCount = 0;
+    shaderReport.compiledCount = 0;
+    shaderReport.errorCount = 0;
+    const auto variants = EnumerateVariants(family, static_cast<uint16_t>(familyIndex));
+    shaderReport.rawCount = static_cast<uint32_t>(variants.size());
+    for (const auto& variant : variants) {
+      const auto assembled = AssembleVariant(family, variant);
+      // The assembled text carries module #includes; the compiler never sees one, so the same
+      // expansion the handwritten files get runs here first.
+      std::string expandError;
+      const auto vertText = ExpandStageIncludes(assembled.vertText, options.shaderDir, &expandError);
+      const auto fragText = ExpandStageIncludes(assembled.fragText, options.shaderDir, &expandError);
+      if (vertText.empty() || fragText.empty()) {
+        RecordBuildError(&report->diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
+                         info.name, "", static_cast<int>(variant.ordinal), -1,
+                         expandError.empty() ? "include expansion failed" : expandError);
+        continue;
+      }
+      auto vertDefines = assembled.vertDefines;
+      auto fragDefines = assembled.fragDefines;
+      for (const auto& contractDefine : BindingContractDefines()) {
+        vertDefines.push_back(contractDefine);
+        fragDefines.push_back(contractDefine);
+      }
+      const auto& vertResult =
+          compiler->compileSpirv(PrependDefines(vertText, vertDefines), ShaderStageType::Vertex,
+                                 info.name, variant.ordinal, false);
+      if (!vertResult.success) {
+        RecordBuildError(&report->diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl,
+                         info.name, "", static_cast<int>(variant.ordinal), -1, vertResult.error);
+        continue;
+      }
+      const auto& fragResult =
+          compiler->compileSpirv(PrependDefines(fragText, fragDefines), ShaderStageType::Fragment,
+                                 info.name, variant.ordinal, false);
+      if (!fragResult.success) {
+        RecordBuildError(&report->diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl,
+                         info.name, "", -1, static_cast<int>(variant.ordinal), fragResult.error);
+        continue;
+      }
+      const auto& reflection =
+          compiler->extractReflection(info.name, variant.ordinal, variant.ordinal,
+                                      vertResult.spirv, fragResult.spirv, &report->diagnostics);
+      const auto layout = DeriveLayout(variant);
+      if (!LayoutMatchesReflection(layout, reflection)) {
+        RecordBuildError(&report->diagnostics, Layer::Emit, DiagnosticCode::EmitFailed, info.name,
+                         "", static_cast<int>(variant.ordinal), static_cast<int>(variant.ordinal),
+                         "the assembled text's reflection does not match the derived layout");
+        continue;
+      }
+      shaderReport.compiledCount++;
+      for (auto& emitterEntry : emitters) {
+        if (!PermutationCompilesForBackend(info, variant.ordinal, variant.ordinal,
+                                           emitterEntry.first)) {
+          continue;
+        }
+        EmitInput input;
+        input.info = &info;
+        input.vertIndex = variant.ordinal;
+        input.fragIndex = variant.ordinal;
+        input.vertSource = &vertText;
+        input.fragSource = &fragText;
+        input.vertDefines = &vertDefines;
+        input.fragDefines = &fragDefines;
+        input.vertSpirv = &vertResult.spirv;
+        input.fragStage = &fragResult;
+        input.diagnostics = &report->diagnostics;
+        auto stages = emitterEntry.second->emit(input, compiler);
+        if (!stages) {
+          continue;
+        }
+        VariantData variantData;
+        variantData.shaderName = info.name;
+        variantData.vertPermutationIndex = variant.ordinal;
+        variantData.fragPermutationIndex = variant.ordinal;
+        variantData.profileTag = ProfileTag(emitterEntry.first);
+        variantData.payloadKind = stages->payloadKind;
+        variantData.vertexBlob = std::move(stages->vertexBlob);
+        variantData.fragmentBlob = std::move(stages->fragmentBlob);
+        variantData.vertexReflection = reflection.vertexReflection;
+        variantData.fragmentReflection = reflection.fragmentReflection;
+        report->variants.push_back(std::move(variantData));
+      }
+    }
+    std::cout << "[" << shaderReport.name << "] raw=" << shaderReport.rawCount
+              << " compiled=" << shaderReport.compiledCount;
+    if (shaderReport.errorCount > 0) {
+      std::cout << " errors=" << shaderReport.errorCount;
+    }
+    std::cout << "\n";
+    report->shaders.push_back(std::move(shaderReport));
+  }
+}
+
 int RunBuildCommand(const BuildOptions& options) {
   BuildReport report;
   for (auto profile : options.backends) {
@@ -639,6 +811,8 @@ int RunBuildCommand(const BuildOptions& options) {
     report.shaders.push_back(std::move(shaderReport));
   }
 
+  CompileAssembledFamilies(options, &stageCompiler, &report);
+
   if (!WriteReportJson(report, options.outDir)) {
     return 1;
   }
@@ -686,6 +860,9 @@ int RunBuildCommand(const BuildOptions& options) {
     sourceContext.shaderDir = options.shaderDir;
     for (auto factory : ShaderRegistry::All()) {
       sourceContext.registeredShaders.push_back(factory()->info().name);
+    }
+    for (size_t index = 0; index < FamilyCount(); ++index) {
+      sourceContext.registeredShaders.push_back(Families()[index].name);
     }
     for (const auto& rule : MakeSourceRules()) {
       rule->check(sourceContext, &report.diagnostics);

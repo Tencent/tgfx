@@ -18,6 +18,7 @@
 
 #include "utils/AOTClosureVerifier.h"
 #include <set>
+#include "gpu/shaders/Families.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 
@@ -45,19 +46,31 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
   // A bundle can carry a tag no profile has when it was parsed without a backend to check it
   // against. Such a bundle has no profile exclusion rules, so every reachable variant is expected.
   const auto profile = ParseProfileTag(profileTag);
+  // The shell families come from the factory list; the declaration-driven families ride the
+  // registry's lookup tables without a shell. Collect both into one name set and resolve each
+  // through EnumerateReachablePermutations, the shared single source of the reachable sets.
+  std::set<std::string> names;
   for (const auto& factory : ShaderRegistry::All()) {
     auto shader = factory();
-    if (shader == nullptr) {
+    if (shader != nullptr) {
+      names.insert(shader->info().name);
+    }
+  }
+  for (size_t index = 0; index < FamilyCount(); ++index) {
+    names.insert(Families()[index].name);
+  }
+  for (const auto& name : names) {
+    if (!ShaderSelected(name, shaderNames)) {
       continue;
     }
-    auto info = shader->info();
-    if (!ShaderSelected(info.name, shaderNames)) {
+    const auto* info = ShaderRegistry::Find(name);
+    if (info == nullptr) {
       continue;
     }
     // Reproduce the build tool's enumeration: the compile list is the matcher rule's reachable
     // set. Vertices are deduplicated by index because a vertex stage is compiled once per
     // vertIndex.
-    auto reachable = EnumerateReachablePermutations(info.name);
+    auto reachable = EnumerateReachablePermutations(info->name);
     if (!reachable) {
       continue;
     }
@@ -67,7 +80,7 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
       // Apply the same profile-specific exclusions as the bundle generator (the framebuffer fetch
       // variants); without this the verifier reports holes the runtime can never request.
       if (profile &&
-          !PermutationCompilesForBackend(info, permutation.first, permutation.second, *profile)) {
+          !PermutationCompilesForBackend(*info, permutation.first, permutation.second, *profile)) {
         continue;
       }
       vertIndices.insert(permutation.first);
@@ -75,18 +88,18 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
     }
     for (auto vi : vertIndices) {
       result.expectedCount++;
-      auto hash = ComputeVertexKeyHash(info.name, vi, profileTag);
+      auto hash = ComputeVertexKeyHash(info->name, vi, profileTag);
       if (cache->findVertex(hash.hi, hash.lo) == nullptr) {
         result.missingCount++;
-        result.missing.push_back({info.name, true, vi});
+        result.missing.push_back({info->name, true, vi});
       }
     }
     for (auto fi : fragIndices) {
       result.expectedCount++;
-      auto hash = ComputeFragmentKeyHash(info.name, fi, profileTag);
+      auto hash = ComputeFragmentKeyHash(info->name, fi, profileTag);
       if (cache->findFragment(hash.hi, hash.lo) == nullptr) {
         result.missingCount++;
-        result.missing.push_back({info.name, false, fi});
+        result.missing.push_back({info->name, false, fi});
       }
     }
   }

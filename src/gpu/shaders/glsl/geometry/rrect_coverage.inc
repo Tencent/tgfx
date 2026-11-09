@@ -1,4 +1,4 @@
-// Non-AA rounded-rect (uniform radii) edge coverage, shared by NonAARRectFillShader's fill and
+// Non-AA rounded-rect (uniform radii) edge coverage, shared by the RRect family's fill and
 // stroke variants. The math is verbatim from the family's geometry emission
 // (GLSLNonAARRectGeometryProcessor::emitCode): a rounded-rect SDF per pixel, a hard step for the
 // outer edge, and for strokes the inner edge SDF subtracted from it. Every caller passes a

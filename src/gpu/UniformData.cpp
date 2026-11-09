@@ -61,6 +61,12 @@ UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(un
   bufferSize = alignCursor(16);
 }
 
+#if DEBUG
+void UniformData::recordDebugWriteRange(size_t offset, size_t size) const {
+  _debugWriteRanges.emplace_back(offset, offset + size);
+}
+#endif
+
 void UniformData::writeBytes(size_t offset, const void* data, size_t size) const {
   memcpy(_buffer + offset, data, size);
 #if DEBUG

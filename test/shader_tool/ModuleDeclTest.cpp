@@ -174,7 +174,9 @@ TEST(ModuleDeclTest, TheChainInterfaceIsExpressible) {
   EXPECT_TRUE(text.find("uniform sampler2D TextureSampler_3;") != std::string::npos);
   EXPECT_TRUE(text.find("layout(set = TGFX_TEXTURE_SET, binding = NTEX) uniform sampler2D "
                         "MaskTextureSampler;") != std::string::npos);
-  EXPECT_TRUE(text.find("#define XP_DST_TEX_BINDING NTEX") != std::string::npos);
+  // With no leaves the mask owns binding 0, so the dst texture follows it (the binding conflict
+  // the Metal compiler used to reject).
+  EXPECT_TRUE(text.find("#define XP_DST_TEX_BINDING HAS_MASK_TEXTURE") != std::string::npos);
   EXPECT_TRUE(text.find("#define XP_DST_TEX_BINDING (NTEX + 1)") != std::string::npos);
 }
 

@@ -54,7 +54,9 @@ struct DefineNameOf {
 
 TEST(FamilyRegistryTest, EveryFamilyIsRegisteredOnceWithItsOwnFiles) {
   auto families = AllFamilies();
-  EXPECT_EQ(families.size(), 22u);
+  // The kernel-shell families: 21 after the RRect migration removed NonAARRectFillShader (the
+  // declaration-driven RRect joins Find/Enumerate without a shell, see ShaderPermutationTest).
+  EXPECT_EQ(families.size(), 21u);
   std::set<std::string> names;
   for (const auto& info : families) {
     EXPECT_TRUE(names.insert(info.name).second) << "duplicate family " << info.name;

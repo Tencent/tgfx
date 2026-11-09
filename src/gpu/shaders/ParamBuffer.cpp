@@ -1,0 +1,57 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions and
+//  limitations under the License.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "gpu/shaders/ParamBuffer.h"
+#include <cstring>
+#include "core/utils/Log.h"
+#include "gpu/UniformData.h"
+
+namespace tgfx {
+
+ParamBuffer::ParamBuffer(UniformData* vertexData, UniformData* fragmentData)
+    : vertexData(vertexData), fragmentData(fragmentData) {
+}
+
+void ParamBuffer::write(const Layout::Field& field, const void* data, size_t size) const {
+  UniformData* target = field.block == 0 ? vertexData : fragmentData;
+  if (target == nullptr || target->writableBytes() == nullptr) {
+    return;
+  }
+  if (static_cast<size_t>(field.offset) + size > target->size()) {
+    LOGE("ParamBuffer::write() field at %u (+%zu) exceeds the uniform block of %zu bytes",
+         field.offset, size, target->size());
+    return;
+  }
+  std::memcpy(target->writableBytes() + field.offset, data, size);
+#if DEBUG
+  target->recordDebugWriteRange(field.offset, size);
+#endif
+}
+
+void ParamBuffer::set(const Layout::Field& field, const Matrix& matrix) const {
+  float values[9] = {};
+  matrix.get9(values);
+  // The same column-major 12-float layout UniformData::setData writes for a mat3 field.
+  const float data[] = {
+      values[0], values[3], values[6], 0,         values[1], values[4],
+      values[7], 0,         values[2], values[5], values[8], 0,
+  };
+  write(field, data, sizeof(data));
+}
+
+}  // namespace tgfx

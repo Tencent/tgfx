@@ -75,6 +75,11 @@ class ProgramInfo {
     return geometryProcessor;
   }
 
+  /// The draw's render target: the engine-level writers (RTAdjust) read its size and origin.
+  RenderTarget* getRenderTarget() const {
+    return renderTarget;
+  }
+
   const FragmentProcessor* getFragmentProcessor(size_t idx) const {
     return fragmentProcessors[idx];
   }

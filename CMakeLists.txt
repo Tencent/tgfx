@@ -887,9 +887,13 @@ if (TGFX_EMBED_SHADER_BUNDLES)
   if (NOT CMAKE_CROSSCOMPILING)
     file(GLOB_RECURSE TGFX_SHADER_DECL_FILES
             src/gpu/shaders/BundleCodec.*
-            src/gpu/shaders/ShaderPermutation.*
+            src/gpu/shaders/Family.cpp
+            src/gpu/shaders/FamilyDomains.cpp
+            src/gpu/shaders/Layout.cpp
             src/gpu/shaders/PrecompiledShader.*
-            src/gpu/shaders/kernels/*.h)
+            src/gpu/shaders/ShaderPermutation.*
+            src/gpu/shaders/kernels/*.h
+            src/gpu/shaders/modules/*.h)
     add_library(tgfx_shader_declarations STATIC ${TGFX_SHADER_DECL_FILES})
     set_target_properties(tgfx_shader_declarations PROPERTIES PREFIX "")
     target_compile_options(tgfx_shader_declarations PRIVATE ${TGFX_COMPILE_OPTIONS})

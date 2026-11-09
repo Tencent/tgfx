@@ -102,32 +102,16 @@ struct PointwiseChainDecl {
       "pipeline/chain/pointwise_resource_eval.inc",
   };
 
-  static constexpr FragmentFamilyDecl Decl = {Name,
-                                              File,
-                                              Block,
-                                              std::size(Block),
-                                              Varyings,
-                                              std::size(Varyings),
-                                              Samplers,
-                                              std::size(Samplers),
-                                              nullptr,
-                                              0,
-                                              nullptr,
-                                              0,
-                                              0,
-                                              -1,
-                                              "NTEX > 0",
-                                              "NTEX",
-                                              "(NTEX + 1)",
-                                              Dispatches,
-                                              std::size(Dispatches),
-                                              "pipeline/chain/pointwise_fragment_main.inc",
-                                              ExtraIncludes,
-                                              std::size(ExtraIncludes),
-                                              PrologueIncludes,
-                                              std::size(PrologueIncludes),
-                                              Pragmas,
-                                              std::size(Pragmas)};
+  static constexpr FragmentFamilyDecl Decl = {
+      Name, File, Block, std::size(Block), Varyings, std::size(Varyings), Samplers,
+      std::size(Samplers), nullptr, 0, nullptr, 0, 0, -1, "NTEX > 0",
+      // The dst texture takes the slot after the mask slot. With leaves the mask owns binding
+      // NTEX and the dst follows at NTEX + 1; without leaves the mask (when present) owns
+      // binding 0 and the dst is HAS_MASK_TEXTURE. Sharing NTEX on both paths made the Metal
+      // compiler reject the location.
+      "HAS_MASK_TEXTURE", "(NTEX + 1)", Dispatches, std::size(Dispatches),
+      "pipeline/chain/pointwise_fragment_main.inc", ExtraIncludes, std::size(ExtraIncludes),
+      PrologueIncludes, std::size(PrologueIncludes), Pragmas, std::size(Pragmas)};
 };
 
 }  // namespace tgfx

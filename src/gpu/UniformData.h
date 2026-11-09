@@ -171,6 +171,18 @@ class UniformData {
    */
   void setBuffer(void* buffer);
 
+  /// The backing bytes the layout-addressed writers (ParamBuffer) memcpy into; null before
+  /// setBuffer. The offsets come from the same derived layout the assembled text declared.
+  uint8_t* writableBytes() const {
+    return _buffer;
+  }
+
+#if DEBUG
+  /// Records a layout-addressed write so dumpValues() shows its bytes as covered (the same
+  /// tracking writeBytes keeps for the name-addressed path).
+  void recordDebugWriteRange(size_t offset, size_t size) const;
+#endif
+
   /**
    * Returns the size of the uniform data in bytes.
    */

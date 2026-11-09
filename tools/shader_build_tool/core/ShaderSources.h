@@ -66,6 +66,12 @@ ShaderSourceSet LoadShaderSources(const std::string& shaderDir,
 /// The deepest include nesting LoadShaderSources accepts.
 inline constexpr int MaxIncludeDepth = 32;
 
+/// Expands every #include of an assembled stage text against shaderDir — the same expansion
+/// LoadShaderSources applies to the handwritten files, so the assembled variants and the legacy
+/// families compile through identical preprocessing. Returns an empty string on failure.
+std::string ExpandStageIncludes(const std::string& source, const std::string& shaderDir,
+                                std::string* error);
+
 /// The contract headers whose content the generated shader text derives from: the operator table
 /// and the data-pool field lists it expands into. They are C++ headers, so no stage includes them
 /// and the loader above never sees them; their text must still reach the source digest, or a

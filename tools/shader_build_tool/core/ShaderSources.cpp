@@ -256,4 +256,16 @@ ShaderSourceSet LoadShaderSources(const std::string& shaderDir,
   return set;
 }
 
+
+std::string ExpandStageIncludes(const std::string& source, const std::string& shaderDir,
+                                std::string* error) {
+  FileCache files;
+  std::vector<std::string> chain;
+  std::string result;
+  if (!ExpandIncludes(source, shaderDir, &files, &chain, &result, error)) {
+    return "";
+  }
+  return result;
+}
+
 }  // namespace tgfx

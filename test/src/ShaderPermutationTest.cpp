@@ -60,6 +60,7 @@
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/shaders/AllShaderFamilies.h"
+#include "gpu/shaders/Families.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
@@ -377,18 +378,18 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   const std::set<std::pair<uint32_t, uint32_t>> shapeCoveragePairs = {{0, 0}, {1, 1}};
   EXPECT_EQ(*EnumerateReachablePermutations("ShapeInstancedTextureCoverageShader"),
             shapeCoveragePairs);
-  // NonAARRectFill keeps 9 pairs: the 12 mirrored forms (HAS_COMMON_COLOR is gone — the color
-  // attribute is unconditional with the HasCommonColor runtime-uniform pick) minus the three
-  // TEXTURED && STROKE combinations the family never serves (one form times three XP kinds). The
-  // property check restates the policy independently of the shared Compose predicate.
-  const auto* nonAARRectInfo = ShaderRegistry::Find("NonAARRectFillShader");
-  ASSERT_NE(nonAARRectInfo, nullptr);
-  const auto nonAARRectPairs = EnumerateReachablePermutations("NonAARRectFillShader");
-  ASSERT_TRUE(nonAARRectPairs.has_value());
-  EXPECT_EQ(nonAARRectPairs->size(), 9u);
-  for (const auto& indices : *nonAARRectPairs) {
-    EXPECT_FALSE(nonAARRectInfo->fragDomain.valueOf(indices.second, "TEXTURED") != 0 &&
-                 nonAARRectInfo->fragDomain.valueOf(indices.second, "STROKE") != 0);
+  // The RRect family (the declaration-driven successor of NonAARRectFillShader) keeps 9 pairs:
+  // the 12 forms of [STROKE, PRESENT, HAS_XP] minus the three PRESENT && STROKE combinations the
+  // family never serves (one form times three XP kinds). The property check restates the allowed
+  // rule independently of the shared enumerator.
+  const auto* rrectInfo = ShaderRegistry::Find("RRect");
+  ASSERT_NE(rrectInfo, nullptr);
+  const auto rrectPairs = EnumerateReachablePermutations("RRect");
+  ASSERT_TRUE(rrectPairs.has_value());
+  EXPECT_EQ(rrectPairs->size(), 9u);
+  for (const auto& indices : *rrectPairs) {
+    EXPECT_FALSE(rrectInfo->fragDomain.valueOf(indices.second, "TiledTexture_PRESENT") != 0 &&
+                 rrectInfo->fragDomain.valueOf(indices.second, "RRectGeometry_STROKE") != 0);
   }
   EXPECT_EQ(ShaderRegistry::Find("UnknownShader"), nullptr);
   EXPECT_FALSE(ShaderRegistry::Enumerate("UnknownShader").has_value());
@@ -920,15 +921,24 @@ static void ExpectBundleEntryCounts(const PrecompiledShaderCache& cache,
   ASSERT_TRUE(profile.has_value()) << profileTag;
   size_t vertexCount = 0;
   size_t fragmentCount = 0;
+  // The shell families come from the factory list; the declaration-driven families join through
+  // the registry's lookup tables, so both sources feed the expectation.
+  std::set<std::string> names;
   for (const auto& factory : ShaderRegistry::All()) {
-    auto shader = factory();
-    auto info = shader->info();
-    auto reachable = EnumerateReachablePermutations(info.name);
-    ASSERT_TRUE(reachable.has_value()) << info.name;
+    names.insert(factory()->info().name);
+  }
+  for (size_t index = 0; index < FamilyCount(); ++index) {
+    names.insert(Families()[index].name);
+  }
+  for (const auto& name : names) {
+    const auto* info = ShaderRegistry::Find(name);
+    ASSERT_NE(info, nullptr) << name;
+    auto reachable = EnumerateReachablePermutations(info->name);
+    ASSERT_TRUE(reachable.has_value()) << info->name;
     std::set<uint32_t> vertexIndices;
     std::set<uint32_t> fragmentIndices;
     for (const auto& permutation : *reachable) {
-      if (!PermutationCompilesForBackend(info, permutation.first, permutation.second, *profile)) {
+      if (!PermutationCompilesForBackend(*info, permutation.first, permutation.second, *profile)) {
         continue;
       }
       vertexIndices.insert(permutation.first);

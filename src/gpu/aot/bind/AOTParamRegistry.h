@@ -16,6 +16,7 @@
 #include <vector>
 #include "gpu/Uniform.h"
 #include "gpu/aot/bind/ParamCatalog.h"
+#include "gpu/shaders/Families.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/BlendParams.h"
 #include "gpu/shaders/modules/BlurKernelModule.h"
@@ -87,6 +88,14 @@ inline const std::vector<std::pair<const ParamInfo*, size_t>>& ParamFieldTables(
 inline std::map<std::string, UniformFormat> BuildParamFormatTable(
     std::set<std::string>* conflicts) {
   std::map<std::string, UniformFormat> result;
+  auto declareName = [&result, conflicts](const std::string& name, UniformFormat format) {
+    auto existing = result.find(name);
+    if (existing == result.end()) {
+      result.emplace(name, format);
+    } else if (existing->second != format && conflicts != nullptr) {
+      conflicts->insert(name);
+    }
+  };
   for (const auto& table : ParamFieldTables()) {
     for (size_t index = 0; index < table.second; ++index) {
       const auto& field = table.first[index];
@@ -94,11 +103,32 @@ inline std::map<std::string, UniformFormat> BuildParamFormatTable(
       if (!ParamTypeToUniformFormat(field.type, &format)) {
         continue;
       }
-      auto existing = result.find(field.name);
-      if (existing == result.end()) {
-        result.emplace(field.name, format);
-      } else if (existing->second != format && conflicts != nullptr) {
-        conflicts->insert(field.name);
+      declareName(field.name, format);
+    }
+  }
+  // The declaration-driven families join the same reconciliation: their present elements name
+  // exactly what the assembled variants reflect.
+  for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
+    const Family& family = Families()[familyIndex];
+    for (const auto& variant : EnumerateVariants(family, static_cast<uint16_t>(familyIndex))) {
+      const auto modules = ModulesOf(family, variant);
+      for (uint8_t slot = 0; slot < modules.count; ++slot) {
+        const Module* module = modules.list[slot];
+        if (module == nullptr || !ModulePresent(family, variant, slot)) {
+          continue;
+        }
+        const uint8_t dimBase = DimOffsetOf(family, variant, slot);
+        for (uint8_t index = 0; index < module->elementCount; ++index) {
+          const Element& element = module->elements[index];
+          if (element.when >= 0 &&
+              variant.values[dimBase + static_cast<uint8_t>(element.when)] == 0) {
+            continue;
+          }
+          if (element.kind != Element::Kind::Param && element.kind != Element::Kind::VertexParam) {
+            continue;
+          }
+          declareName(ElementNameOf(module, element), ShaderTypeFormat(element.type));
+        }
       }
     }
   }

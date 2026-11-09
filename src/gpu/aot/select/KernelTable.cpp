@@ -20,7 +20,9 @@
 #include <cassert>
 #include <type_traits>
 #include "core/utils/Log.h"
+#include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/shaders/AllShaderFamilies.h"
+#include "gpu/shaders/Families.h"
 #include "gpu/shaders/ShaderFamily.h"
 
 namespace tgfx {
@@ -71,6 +73,14 @@ std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts,
 #if DEBUG
   AssertAtMostOneFamilyAccepts(facts);
 #endif
+  // The declaration-driven families match first (the transitional arrangement): their variants
+  // ride the same bundle under the ordinal the family table's domains encode.
+  if (auto assembled = MatchAssembledFamily(facts)) {
+    PermutationVariant variant = {};
+    variant.vertPermutationIndex = assembled->variant.ordinal;
+    variant.fragPermutationIndex = assembled->variant.ordinal;
+    return AOTKernelMatch{Families()[assembled->variant.family].name, variant};
+  }
   // Every family must either join the table (FillKernel) or be the named interpreter: a family
   // that forgets both would otherwise vanish from matching silently.
 #define TGFX_TRY_FAMILY(F)                                                                 \

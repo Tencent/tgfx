@@ -26,6 +26,7 @@
 #include "core/DiagnosticCodes.h"
 #include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/aot/bind/AOTParamRegistry.h"
+#include "gpu/shaders/Families.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
@@ -43,6 +44,38 @@ using contract_check::Report;
 // Every shader whose fragment block carries the clip contract marker (HasClip) must declare the
 // whole contract: a missing field means the onSetData writers (which reference the same
 // ClipContract constants) would silently skip their upload and the clip would read stale data.
+// The Texture element names of the declaration-driven families: the derived layout numbers
+// them, so the reflected set is legal exactly as declared.
+static const std::set<std::string>& DeclaredTextureNames() {
+  static const std::set<std::string> names = [] {
+    std::set<std::string> result;
+    for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
+      const Family& family = Families()[familyIndex];
+      for (const auto& variant : EnumerateVariants(family, static_cast<uint16_t>(familyIndex))) {
+        const auto modules = ModulesOf(family, variant);
+        for (uint8_t slot = 0; slot < modules.count; ++slot) {
+          const Module* module = modules.list[slot];
+          if (module == nullptr || !ModulePresent(family, variant, slot)) {
+            continue;
+          }
+          for (uint8_t index = 0; index < module->elementCount; ++index) {
+            const Element& element = module->elements[index];
+            if (element.kind == Element::Kind::Texture) {
+              result.insert(ElementNameOf(module, element));
+            }
+          }
+        }
+      }
+    }
+    return result;
+  }();
+  return names;
+}
+
+static bool IsDeclaredTextureName(const std::string& name) {
+  return DeclaredTextureNames().count(name) != 0;
+}
+
 size_t ValidateClipContractFields(const std::vector<VariantData>& variants,
                                   Diagnostics* diagnostics) {
   const std::string contractFields[] = {
@@ -125,6 +158,8 @@ size_t ValidateReflectionContracts(const std::vector<VariantData>& variants,
       // Ordinary texture bindings must use the generic TextureSampler_<N> pattern with N dense
       // from zero (a gap would shift every later binding on the runtime side); dedicated-purpose
       // samplers use their registered semantic names instead (SamplerContract in KernelContract.h).
+      // A declaration-driven family's Texture elements name their samplers <Module>_<name>, which
+      // the derived layout numbers, so those names are legal exactly as declared.
       int nextSamplerIndex = 0;
       for (const auto& sampler : reflection->samplers) {
         const std::string prefix = SamplerContract::TextureSamplerPrefix;
@@ -135,7 +170,8 @@ size_t ValidateReflectionContracts(const std::vector<VariantData>& variants,
           generic = !digits.empty() && std::all_of(digits.begin(), digits.end(),
                                                    [](char ch) { return ch >= '0' && ch <= '9'; });
         }
-        if (SamplerContract::IsSemanticSamplerName(sampler.name)) {
+        if (SamplerContract::IsSemanticSamplerName(sampler.name) ||
+            IsDeclaredTextureName(sampler.name)) {
           continue;
         }
         int parsed = -1;
