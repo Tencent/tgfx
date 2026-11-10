@@ -42,11 +42,7 @@ class GlassStyle : public LayerStyle {
   /**
    * Creates a new GlassStyle with the specified parameters.
    * @param refraction The amount of optical distortion along curved edges, range [0, 100].
-   * @param depth The inward refraction thickness from edges, in layer-space pixels. The supplied
-   *              value is stored unchanged; rendering computes the thickness as
-   *              clamp(depth, 0, min(halfWidth, halfHeight)). NaN renders as zero, while infinite
-   *              values clamp to the corresponding finite endpoint. A caller that scales geometry
-   *              must scale depth by the same factor; TGFX does not infer or apply that scale.
+   * @param depth The inward refraction thickness from the layer edge, in layer-space pixels.
    * @param frost The amount of background blur (frosted glass), range [0, 100].
    * @param dispersion The intensity of chromatic aberration (rainbow prism effect), range [0, 100].
    * @param splay The blend factor for the refraction direction, range [0, 100]. At 0, refraction
@@ -71,20 +67,12 @@ class GlassStyle : public LayerStyle {
   /** Sets the optical distortion strength. */
   void setRefraction(float value);
 
-  /**
-   * Inward refraction thickness from edges, in layer-space pixels. The value is stored as supplied.
-   * Rendering computes clamp(depth, 0, min(halfWidth, halfHeight)); NaN renders as zero and infinite
-   * values clamp to the corresponding finite endpoint. TGFX never applies an external scale factor.
-   */
+  /** Inward refraction thickness from the layer edge, in layer-space pixels. */
   float depth() const {
     return _depth;
   }
 
-  /**
-   * Sets the inward refraction thickness in layer-space pixels. The raw value is preserved; TGFX
-   * floors it at zero and caps it at min(halfWidth, halfHeight) at render time. A caller scaling the
-   * layer must scale this value by the same factor.
-   */
+  /** Sets the inward refraction thickness in layer-space pixels. */
   void setDepth(float value);
 
   /** Background blur amount (frosted glass). Range [0, 100]. */
