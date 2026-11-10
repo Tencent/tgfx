@@ -52,14 +52,7 @@ class CommandQueue {
    * afterwards. The pixel data must match the texture's pixel format, and the rectangle must be
    * fully contained within the texture's dimensions. If the texture has mipmaps, you should call
    * CommandEncoder's generateMipmapsForTexture() method after writing the pixels, as mipmaps will
-   * not be generated automatically. This call does not generally wait for GPU completion; backends
-   * may defer the upload and submit it together with later uploads at a command encoder, submission,
-   * or synchronization boundary. Deferred uploads are still copied before this call returns, and
-   * backends may synchronize uploads when the texture requires explicit hazard management.
-   * @param texture The texture to write to.
-   * @param rect The destination rectangle in texture pixels.
-   * @param pixels The pixel data to copy before this call returns.
-   * @param rowBytes The byte distance between consecutive rows of pixel data.
+   * not be generated automatically.
    */
   virtual void writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, const void* pixels,
                             size_t rowBytes) = 0;
