@@ -744,8 +744,8 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
   auto gpu = info.renderTarget->getContext()->gpu();
   auto* cache = info.renderTarget->getContext()->globalCache();
   // A precompiled kernel can leave a hole right after the supplied color samplers — an absent
-  // device mask, or the edge-lit-off UDF's always-declared edge-mask slot in GlassRefractionShader
-  // — so an expected/supplied gap means the dummy must be inserted there.
+  // device mask, or the edge-lit-off UDF's always-declared edge-mask slot in the declared
+  // GlassRefraction families — so an expected/supplied gap means the dummy must be inserted there.
   bool padHole = expected > samplers.size();
 #if DEBUG
   const char* unifDump = UnifDumpLabel();

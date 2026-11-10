@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cmath>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/Swizzle.h"
@@ -56,6 +57,8 @@
 #include "gpu/shaders/modules/EllipseGeometry.h"
 #include "gpu/shaders/modules/Frame.h"
 #include "gpu/shaders/modules/GaussianBlur.h"
+#include "gpu/shaders/modules/GlassLocalMask.h"
+#include "gpu/shaders/modules/GlassRefraction.h"
 #include "gpu/shaders/modules/GlassUDFTentBlur.h"
 #include "gpu/shaders/modules/Gradient.h"
 #include "gpu/shaders/modules/HairlineLineGeometry.h"
@@ -341,6 +344,103 @@ void WriteGaussianBlur(const AOTOpaqueKernelParameters& params, const AOTTexture
   put("Step", std::array<float, 2>{step.x, step.y});
   put("AlphaChild", static_cast<int32_t>(child != nullptr && child->isAlphaOnly ? 1 : 0));
   WriteChildSamplingFields(child, view.get(), "GaussianBlur", layout, slot, buffer);
+}
+
+// GlassRefraction: the optics and shape records, field for field the same values the runtime
+// GLSL processors' onSetData uploads (GLSLGlassRefractionFragmentProcessor and the two geometry
+// children), sourced from the IR node instead of the processor tree. The background-coordinate
+// transform is the tree's first coord transform (the standard helper upload).
+void WriteGlassRefraction(const AOTOpaqueKernelParameters& params, const ProgramInfo& info,
+                          const Layout& layout, uint8_t slot, ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  auto put = [&](const char* name, auto&& value) {
+    const auto index = layout.FieldIndexInSlice(slice, "GlassRefraction", name);
+    if (index < slice.count) {
+      buffer->set(slice.fields[index], value);
+    } else {
+      LOGE("WriteGlassRefraction: field %s is absent from the derived layout", name);
+      DEBUG_ASSERT(false);
+    }
+  };
+  WriteCoordMatrixAt(info, layout, "GlassRefraction", slot, buffer, 0);
+  if (params.glassSourceProxy == nullptr) {
+    LOGE("WriteGlassRefraction: the IR node carries no background source proxy");
+    return;
+  }
+  const float sourceWidth = static_cast<float>(params.glassSourceProxy->width());
+  const float sourceHeight = static_cast<float>(params.glassSourceProxy->height());
+  put("OpticsP0", std::array<float, 4>{1.0f / sourceWidth, 1.0f / sourceHeight,
+                                       params.glassDispersion, params.glassMaxDisplacement});
+  float layerToSourceX = params.glassLayerToSourceX;
+  float layerToSourceY = params.glassLayerToSourceY;
+  if (layerToSourceX <= 0.0f) {
+    layerToSourceX = params.glassOrigWidth > 0.0f ? sourceWidth / params.glassOrigWidth : 1.0f;
+  }
+  if (layerToSourceY <= 0.0f) {
+    layerToSourceY = params.glassOrigHeight > 0.0f ? sourceHeight / params.glassOrigHeight : 1.0f;
+  }
+  put("OpticsP1",
+      std::array<float, 2>{layerToSourceX / sourceWidth, layerToSourceY / sourceHeight});
+  const float glassUVScaleX =
+      params.glassUVScaleX > 0.0f ? params.glassUVScaleX : 1.0f / sourceWidth;
+  const float glassUVScaleY =
+      params.glassUVScaleY > 0.0f ? params.glassUVScaleY : 1.0f / sourceHeight;
+  put("OpticsP2", std::array<float, 4>{glassUVScaleX, glassUVScaleY, params.glassLightIntensity,
+                                       params.glassFrost / 100.0f});
+  put("OpticsP3", std::array<float, 4>{params.glassUVOffsetX, params.glassUVOffsetY, 0.0f, 0.0f});
+  put("LightingOn", static_cast<int32_t>(params.glassLightIntensity > 0.0f ? 1 : 0));
+  const auto& shape = params.glassShape;
+  const float angle = shape.lightAngle * static_cast<float>(M_PI) / 180.0f;
+  put("LightDir", std::array<float, 2>{std::sin(angle), std::cos(angle)});
+  put("ShapeP1", std::array<float, 4>{shape.refractionFactor, shape.splay, shape.depthRatio,
+                                      shape.edgeBandLayerPixels});
+  if (params.geometryKind == AOTGlassGeometryKind::Udf) {
+    put("ShapeP0", std::array<float, 4>{shape.halfW, shape.halfH, shape.udfPixelToLayerPixelX,
+                                        shape.udfPixelToLayerPixelY});
+    put("EdgeSpan", std::array<float, 2>{shape.edgeSpanX, shape.edgeSpanY});
+    if (shape.maskProxy == nullptr) {
+      // The UDF child's constructor guarantees the mask; reaching here means a malformed IR.
+      LOGE("WriteGlassRefraction: the UDF node carries no mask proxy");
+      return;
+    }
+    const float textureWidth = static_cast<float>(shape.maskProxy->width());
+    const float textureHeight = static_cast<float>(shape.maskProxy->height());
+    const float coreWidth = std::round(shape.halfW * 2.0f / shape.udfPixelToLayerPixelX);
+    const float coreHeight = std::round(shape.halfH * 2.0f / shape.udfPixelToLayerPixelY);
+    put("FineMaskUV", std::array<float, 4>{coreWidth / textureWidth, coreHeight / textureHeight,
+                                           -shape.textureOriginX / textureWidth,
+                                           -shape.textureOriginY / textureHeight});
+    float edgeScaleX = 1.0f;
+    float edgeScaleY = 1.0f;
+    float edgeOriginX = shape.edgeTextureOriginX;
+    float edgeOriginY = shape.edgeTextureOriginY;
+    if (shape.enableEdgeLighting && shape.edgeMaskProxy != nullptr) {
+      const float edgeTextureWidth = static_cast<float>(shape.edgeMaskProxy->width());
+      const float edgeTextureHeight = static_cast<float>(shape.edgeMaskProxy->height());
+      const float edgeCoreWidth = std::round(shape.halfW * 2.0f / shape.edgePixelToLayerPixelX);
+      const float edgeCoreHeight = std::round(shape.halfH * 2.0f / shape.edgePixelToLayerPixelY);
+      edgeScaleX = edgeCoreWidth / edgeTextureWidth;
+      edgeScaleY = edgeCoreHeight / edgeTextureHeight;
+      edgeOriginX = -shape.edgeTextureOriginX / edgeTextureWidth;
+      edgeOriginY = -shape.edgeTextureOriginY / edgeTextureHeight;
+    }
+    put("EdgeMaskUV", std::array<float, 4>{edgeScaleX, edgeScaleY, edgeOriginX, edgeOriginY});
+    put("EdgeMaskOn",
+        static_cast<int32_t>(shape.enableEdgeLighting && shape.edgeMaskProxy != nullptr ? 1 : 0));
+  } else {
+    put("ShapeP0",
+        std::array<float, 4>{shape.halfW, shape.halfH, shape.cornerRadius, shape.glassThickness});
+  }
+}
+
+// GlassLocalMask: the runtime gate (the legacy kernel's HasLocalMask branch) plus the mask's own
+// coordinate transform — the second one in the tree, the same matrix the standard helper uploads.
+void WriteGlassLocalMask(const ProgramInfo& info, const Layout& layout, uint8_t slot,
+                         ParamBuffer* buffer, bool hasMask) {
+  const auto slice = layout.SliceOf(slot);
+  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "GlassLocalMask", "HasMask")],
+              static_cast<int32_t>(hasMask ? 1 : 0));
+  WriteCoordMatrixAt(info, layout, "GlassLocalMask", slot, buffer, 1);
 }
 
 // The source coordinate matrix every texture leaf shares: the FP tree's first coord transform
@@ -1025,6 +1125,12 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       if (match->blurKernel != nullptr) {
         WriteGlassUDFTentBlur(*match->blurKernel, match->blurChild, layout, slot, &buffer);
       }
+    } else if (module == &GlassRefraction) {
+      if (match->glassKernel != nullptr) {
+        WriteGlassRefraction(*match->glassKernel, info, layout, slot, &buffer);
+      }
+    } else if (module == &GlassLocalMask) {
+      WriteGlassLocalMask(info, layout, slot, &buffer, match->maskLeaf != nullptr);
     } else if (module == &Gradient) {
       if (match->gradient != nullptr) {
         WriteGradient(*match->gradient, layout, slot, &buffer);

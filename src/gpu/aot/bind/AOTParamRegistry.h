@@ -18,7 +18,6 @@
 #include "gpu/aot/bind/ParamCatalog.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
-#include "gpu/shaders/modules/BlendParams.h"
 #include "gpu/shaders/modules/ChainParams.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
 #include "gpu/shaders/modules/EngineParams.h"
@@ -67,7 +66,6 @@ inline const std::vector<std::pair<const ParamInfo*, size_t>>& ParamFieldTables(
   static const std::vector<std::pair<const ParamInfo*, size_t>> tables = {
       {EngineParams::Fields, std::size(EngineParams::Fields)},
       {ChainParams::Fields, std::size(ChainParams::Fields)},
-      {BlendParams::Fields, std::size(BlendParams::Fields)},
       {ParamCatalog::Fields, std::size(ParamCatalog::Fields)},
       {AnalyticClipModule::Fields, std::size(AnalyticClipModule::Fields)},
       {DeviceMaskModule::Fields, std::size(DeviceMaskModule::Fields)},

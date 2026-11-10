@@ -382,6 +382,67 @@ bool MatchGlassUDFTentBlur(const DrawShape& shape, Variant* variant, FamilyMatch
   return true;
 }
 
+/// The glass families' shared rule, carried over from the former GlassRefractionShader: one color
+/// processor whose carried IR roots at the refraction opaque-kernel node with a known geometry
+/// kind and an affine background coordinate, never alpha-only, any xfer. The legacy GP_KIND
+/// dimension becomes the two families' geometries: the ellipse form requires the common color
+/// (the refraction output replaces the color entirely, so a per-vertex color would quantize
+/// through the UByte4 attribute for nothing), the quad form requires the uv-matrix layout (the
+/// quad vertex hook feeds the raw position to the background transform; a subset-carrying or
+/// projective quad keeps the fallback route). Only the quad family carries the local shape mask
+/// (the former runtime HasLocalMask branch): the sole coverage processor classifies as LocalMask
+/// with an affine mask transform. Slot layout, both: Frame(0), geometry(1), GlassRefraction(2:
+/// DISPERSION, SHAPE), [GlassLocalMask(3),] AnalyticClip, Xfer. The flattened dims are
+/// [DISPERSION, SHAPE, HAS_XP], so the ordinal is DISPERSION + 2 * SHAPE + 6 * HAS_XP — 18
+/// variants per family, the legacy kernel's 36 across the two.
+bool MatchGlassRefraction(const DrawShape& shape, GeometryKind kind, uint16_t family,
+                          Variant* variant, FamilyMatchResult* result) {
+  if (shape.geometry.kind != kind || shape.alphaOnlyTarget) {
+    return false;
+  }
+  if (kind == GeometryKind::Ellipse) {
+    if (!shape.geometry.hasCommonColor) {
+      return false;
+    }
+  } else {
+    if (!shape.geometry.hasCommonColor || !shape.geometry.hasUVMatrix || shape.geometry.hasSubset ||
+        shape.geometry.hasUVPerspective) {
+      return false;
+    }
+  }
+  if (shape.colorFPCount != 1 || shape.xpType() < XP_NONE) {
+    return false;
+  }
+  const AOTTextureParameters* mask = nullptr;
+  if (shape.fragmentCount != 1) {
+    // The quad form's optional local shape mask (a SrcIn ShaderMaskFilter over a
+    // hardware-tiled RGBA texture), the only coverage the legacy kernel took.
+    mask = LocalMaskCoverageLeaf(shape.ir);
+    if (kind != GeometryKind::QuadPerEdgeAA || shape.fragmentCount != 2 ||
+        !shape.coverage.has_value() || shape.coverage != Coverage::LocalMask || mask == nullptr ||
+        mask->hasPerspective) {
+      return false;
+    }
+  }
+  auto irShape = ReadOpaqueKernelIRShape(shape.ir, AOTOpaqueKernel::GlassRefraction,
+                                         /*requiresTextureChild=*/false);
+  if (!irShape || !irShape->kernel->geometryKind.has_value() || irShape->kernel->hasPerspective) {
+    return false;
+  }
+  const uint8_t dispersion = irShape->kernel->dispersionOn ? 1 : 0;
+  const uint8_t shapeKind = static_cast<uint8_t>(*irShape->kernel->geometryKind);
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  variant->family = family;
+  variant->geometry = 0;
+  variant->values[0] = dispersion;
+  variant->values[1] = shapeKind;
+  variant->values[2] = hasXp;
+  variant->ordinal = static_cast<uint32_t>(dispersion) + 2u * shapeKind + 6u * hasXp;
+  result->glassKernel = irShape->kernel;
+  result->maskLeaf = mask;
+  return true;
+}
+
 /// The ComplexRRect family's rule, carried over from the former ComplexNonAARRectFillShader: the
 /// per-corner-radius rounded rect with no fragment processor and any xfer. STROKE is the geometry's
 /// own flag, so the ordinal is STROKE + 2 * HAS_XP.
@@ -647,6 +708,12 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
     return result;
   }
   if (MatchGlassUDFTentBlur(shape, &result.variant, &result)) {
+    return result;
+  }
+  if (MatchGlassRefraction(shape, GeometryKind::Ellipse, 19, &result.variant, &result)) {
+    return result;
+  }
+  if (MatchGlassRefraction(shape, GeometryKind::QuadPerEdgeAA, 20, &result.variant, &result)) {
     return result;
   }
   if (MatchAtlasText(shape, &result.variant)) {

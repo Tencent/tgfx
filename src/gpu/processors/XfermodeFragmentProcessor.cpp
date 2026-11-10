@@ -85,9 +85,9 @@ void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
     int hasClip = 0;
     fragmentUniformData->setData(AnalyticClipModule::HasClip.name, hasClip);
   }
-  // A kernel that applies a SrcIn local mask through a runtime branch (GlassRefractionShader) only
-  // matches this processor as that mask, so its presence is what turns the branch on.
-  fragmentUniformData->setDataOptional(BlendParams::HasLocalMask.name, 1);
+  // The former HasLocalMask write left with the legacy glass kernel: the declared
+  // GlassRefractionQuad family reads the mask's presence off its IR match instead of a uniform
+  // this processor would turn on.
   // Populate the per-child subset uniforms for the precompiled blend path. Each plain
   // TextureEffect child that requires subset clamping writes its normalized subset rect into a
   // dedicated uniform (Child0Subset for child[0], Child1Subset for child[1]). Distinct names are

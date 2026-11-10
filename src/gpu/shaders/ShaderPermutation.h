@@ -74,7 +74,7 @@ namespace tgfx {
  *   3. Does it change the varying/attribute layout?                  -> dimension
  *   4. Must the compiled structure mirror the runtime emission exactly
  *      (one branch exists, never both) to keep pixels identical?     -> dimension
- *      (GlassRefractionShader's DISPERSION_ON is the precedent)
+ *      (the declared GlassRefraction module's DISPERSION is the precedent)
  *   5. None of the above                                             -> runtime uniform
  */
 

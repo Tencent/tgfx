@@ -261,6 +261,39 @@ enum class AOTGlassGeometryKind : int {
   Udf = 2,
 };
 
+// The glass geometry child's record-time parameters (GlassSDFGeometryParams and
+// GlassUDFGeometryParams in one record): the shared fields carry every kind, and the writer
+// selects the SDF or UDF half by geometryKind. The UDF mask proxies ride here because the UDF
+// bind-time factors (FineMaskUV, EdgeMaskUV) derive from the proxies' sizes — the same
+// derivation GLSLGlassUDFGeometryFragmentProcessor::onSetData performs at upload time.
+struct AOTGlassShapeParameters {
+  // Shared by both children (GlassGeometryParams).
+  float halfW = 0.0f;
+  float halfH = 0.0f;
+  float refractionFactor = 0.0f;
+  float splay = 0.0f;
+  float depthRatio = 0.0f;
+  float lightAngle = 0.0f;
+  float edgeBandLayerPixels = 1.0f;
+  // The SDF child's fields.
+  float cornerRadius = 0.0f;
+  float glassThickness = 0.0f;
+  // The UDF child's fields.
+  float udfPixelToLayerPixelX = 1.0f;
+  float udfPixelToLayerPixelY = 1.0f;
+  float edgeSpanX = 1.0f;
+  float edgeSpanY = 1.0f;
+  float textureOriginX = 0.0f;
+  float textureOriginY = 0.0f;
+  float edgeTextureOriginX = 0.0f;
+  float edgeTextureOriginY = 0.0f;
+  float edgePixelToLayerPixelX = 1.0f;
+  float edgePixelToLayerPixelY = 1.0f;
+  bool enableEdgeLighting = false;
+  std::shared_ptr<TextureProxy> maskProxy = nullptr;
+  std::shared_ptr<TextureProxy> edgeMaskProxy = nullptr;
+};
+
 // Opaque-kernel operand (see AOTEffectKind::OpaqueKernel). The shape-level facts the dedicated
 // families' matching needs ride here — the matcher reads them from the IR, not the processor tree.
 struct AOTOpaqueKernelParameters {
@@ -289,6 +322,29 @@ struct AOTOpaqueKernelParameters {
   // packed-input flag and the step's direction. The step vector itself is bind-time (it maps
   // through the child's coordinate transform, whose normalization needs the instantiated view),
   // so the writer derives it from the child leaf as the Gaussian blur's step is derived.
+  // GlassRefraction's record-time upload values (GlassRefractionParams). The optics block's
+  // source-relative factors (1/sourceWidth, 1/sourceHeight) stay bind-time, so the writer derives
+  // them from the background leaf's view; everything here is a draw-time constant.
+  float glassDispersion = 0.0f;
+  float glassLightIntensity = 0.0f;
+  float glassOrigWidth = 0.0f;
+  float glassOrigHeight = 0.0f;
+  float glassMaxDisplacement = 0.0f;
+  float glassUVScaleX = 0.0f;
+  float glassUVScaleY = 0.0f;
+  float glassUVOffsetX = 0.0f;
+  float glassUVOffsetY = 0.0f;
+  float glassLayerToSourceX = 0.0f;
+  float glassLayerToSourceY = 0.0f;
+  float glassFrost = 0.0f;
+  int glassShapeType = 0;
+  // The geometry child's record (see AOTGlassShapeParameters); geometryKind selects which half the
+  // writer reads.
+  AOTGlassShapeParameters glassShape = {};
+  // The background source proxy: the optics block's source-relative factors (1/sourceWidth,
+  // 1/sourceHeight and the glassUVScale fallbacks) derive from its size at bind time, exactly as
+  // GLSLGlassRefractionFragmentProcessor::onSetData did.
+  std::shared_ptr<TextureProxy> glassSourceProxy = nullptr;
   float tentFineRadius = 0.0f;
   float tentCoarseRadius = 0.0f;
   int tentField = 0;

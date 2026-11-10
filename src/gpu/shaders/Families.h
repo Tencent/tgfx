@@ -29,6 +29,8 @@
 #include "gpu/shaders/modules/DeviceMaskRuntime.h"
 #include "gpu/shaders/modules/EllipseGeometry.h"
 #include "gpu/shaders/modules/GaussianBlur.h"
+#include "gpu/shaders/modules/GlassLocalMask.h"
+#include "gpu/shaders/modules/GlassRefraction.h"
 #include "gpu/shaders/modules/GlassUDFTentBlur.h"
 #include "gpu/shaders/modules/Gradient.h"
 #include "gpu/shaders/modules/HairlineLineGeometry.h"
@@ -223,6 +225,27 @@ inline constexpr const Module* GlassUDFTentBlurGeometries[] = {&BlurSourceGeomet
 inline constexpr FamilyModule GlassUDFTentBlurBody[] = {&GlassUDFTentBlur, &DeviceMaskRuntime,
                                                         &AnalyticClip};
 
+/// The GlassRefraction family (the former GlassRefractionShader's ellipse form, GP_KIND == 0): the
+/// common-color ellipse filled with the refraction body over the background source. The legacy
+/// kernel's GP_KIND dimension becomes the two families' geometries, so each keeps the free dims
+/// [DISPERSION, SHAPE, HAS_XP] and 18 variants; the two rows total the legacy kernel's 36. The
+/// runtime clip contract rides the AnalyticClip module (the legacy kernel carried it
+/// unconditionally too). Slot layout: Frame(0), EllipseGeometry(1), GlassRefraction(2: DISPERSION,
+/// SHAPE), AnalyticClip(3), Xfer(4: HAS_XP).
+inline constexpr const Module* GlassRefractionGeometries[] = {&EllipseGeometry};
+
+inline constexpr FamilyModule GlassRefractionBody[] = {&GlassRefraction, &AnalyticClip};
+
+/// The GlassRefractionQuad family (the former GlassRefractionShader's quad form, GP_KIND == 1):
+/// the uv-matrix quad with the same refraction body plus the local shape mask branch (the legacy
+/// HasLocalMask runtime gate — the mask never widens the variant space) and the runtime clip.
+/// Slot layout: Frame(0), QuadGeometry(1), GlassRefraction(2: DISPERSION, SHAPE),
+/// GlassLocalMask(3), AnalyticClip(4), Xfer(5: HAS_XP).
+inline constexpr const Module* GlassRefractionQuadGeometries[] = {&QuadGeometry};
+
+inline constexpr FamilyModule GlassRefractionQuadBody[] = {&GlassRefraction, &GlassLocalMask,
+                                                           &AnalyticClip};
+
 /// The family table is the single definition site: a family exists by appearing here and nowhere
 /// else, so "defined but not registered" cannot happen — adding a row is the only way to add a
 /// family, and the match rules address the rows by position.
@@ -247,6 +270,8 @@ inline constexpr Family FamilyTableStorage[] = {
      ShapeInstancedTextureCoverageBody, 3, ShapeInstancedTextureCoverageVariantAllowed},
     {"GaussianBlur", GaussianBlurGeometries, 1, GaussianBlurBody, 3},
     {"GlassUDFTentBlur", GlassUDFTentBlurGeometries, 1, GlassUDFTentBlurBody, 3},
+    {"GlassRefraction", GlassRefractionGeometries, 1, GlassRefractionBody, 2},
+    {"GlassRefractionQuad", GlassRefractionQuadGeometries, 1, GlassRefractionQuadBody, 3},
 };
 
 inline const Family* FamilyTable() {

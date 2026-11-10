@@ -38,6 +38,7 @@ struct FamilyMatchResult {
   const AOTGradientParameters* gradient = nullptr;
   const AOTOpaqueKernelParameters* blurKernel = nullptr;
   const AOTTextureParameters* blurChild = nullptr;
+  const AOTOpaqueKernelParameters* glassKernel = nullptr;
 };
 
 /// Matches a draw against the declaration-driven family table (Families(), in table order).

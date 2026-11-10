@@ -71,16 +71,64 @@ bool GlassRefractionFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNo
   }
   AOTOpaqueKernelParameters parameters = {};
   parameters.kernel = AOTOpaqueKernel::GlassRefraction;
+  // The optics values are draw-time constants; the writer only adds the source-relative factors.
+  parameters.glassDispersion = params.dispersion;
+  parameters.glassLightIntensity = params.lightIntensity;
+  parameters.glassOrigWidth = params.origWidth;
+  parameters.glassOrigHeight = params.origHeight;
+  parameters.glassMaxDisplacement = params.maxDisplacement;
+  parameters.glassUVScaleX = params.glassUVScaleX;
+  parameters.glassUVScaleY = params.glassUVScaleY;
+  parameters.glassUVOffsetX = params.glassUVOffsetX;
+  parameters.glassUVOffsetY = params.glassUVOffsetY;
+  parameters.glassLayerToSourceX = params.layerPixelToSourcePixelX;
+  parameters.glassLayerToSourceY = params.layerPixelToSourcePixelY;
+  parameters.glassFrost = params.frost;
+  parameters.glassShapeType = static_cast<int>(params.shapeType);
+  parameters.glassSourceProxy = sourceProxy;
   auto child = childProcessor(0);
+  auto& shape = parameters.glassShape;
   if (IsProcessor<GlassSDFGeometryFragmentProcessor>(child)) {
     auto* sdf = static_cast<const GlassSDFGeometryFragmentProcessor*>(child);
     parameters.geometryKind = sdf->getShapeType() == GlassShapeType::RoundedRect
                                   ? AOTGlassGeometryKind::SdfRoundedRect
                                   : AOTGlassGeometryKind::SdfOther;
+    const auto& childParams = sdf->getParams();
+    shape.halfW = childParams.halfW;
+    shape.halfH = childParams.halfH;
+    shape.refractionFactor = childParams.refractionFactor;
+    shape.splay = childParams.splay;
+    shape.depthRatio = childParams.depthRatio;
+    shape.lightAngle = childParams.lightAngle;
+    shape.edgeBandLayerPixels = childParams.edgeBandLayerPixels;
+    shape.cornerRadius = childParams.cornerRadius;
+    shape.glassThickness = childParams.glassThickness;
   } else if (IsProcessor<GlassUDFGeometryFragmentProcessor>(child)) {
     // The UDF kind always declares the edge-light mask sampler; an edge-lit-off draw binds the
     // shared dummy texture there and clears the EdgeMaskOn runtime uniform.
     parameters.geometryKind = AOTGlassGeometryKind::Udf;
+    auto* udf = static_cast<const GlassUDFGeometryFragmentProcessor*>(child);
+    const auto& childParams = udf->getParams();
+    shape.halfW = childParams.halfW;
+    shape.halfH = childParams.halfH;
+    shape.refractionFactor = childParams.refractionFactor;
+    shape.splay = childParams.splay;
+    shape.depthRatio = childParams.depthRatio;
+    shape.lightAngle = childParams.lightAngle;
+    shape.edgeBandLayerPixels = childParams.edgeBandLayerPixels;
+    shape.udfPixelToLayerPixelX = childParams.udfPixelToLayerPixelX;
+    shape.udfPixelToLayerPixelY = childParams.udfPixelToLayerPixelY;
+    shape.edgeSpanX = childParams.edgeSpanX;
+    shape.edgeSpanY = childParams.edgeSpanY;
+    shape.textureOriginX = childParams.textureOriginX;
+    shape.textureOriginY = childParams.textureOriginY;
+    shape.edgeTextureOriginX = childParams.edgeTextureOriginX;
+    shape.edgeTextureOriginY = childParams.edgeTextureOriginY;
+    shape.edgePixelToLayerPixelX = childParams.edgePixelToLayerPixelX;
+    shape.edgePixelToLayerPixelY = childParams.edgePixelToLayerPixelY;
+    shape.enableEdgeLighting = udf->isEdgeLightingEnabled();
+    shape.maskProxy = udf->getMaskProxy();
+    shape.edgeMaskProxy = udf->getEdgeMaskProxy();
   } else {
     return false;
   }
