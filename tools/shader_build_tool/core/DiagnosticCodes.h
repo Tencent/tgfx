@@ -60,10 +60,8 @@ inline constexpr const char* ReflectUnknownType = "compile.reflection-unknown-ty
 
 /// A specialized uniform is read directly instead of through its SPEC_ accessor, so the read
 /// escapes the folding a specialized compile performs.
-inline constexpr const char* SpecRawRead = "spec.raw-read";
 
 /// A SPEC_ name has no matching int or ivec4 member in the uniform block.
-inline constexpr const char* SpecUnknownField = "spec.unknown-field";
 
 /// A source reads SPEC_ without declaring itself a reader (`#pragma tgfx_spec_reader`): the
 /// specialization surface of a family must stay a declared, reviewable set of files.
@@ -71,7 +69,6 @@ inline constexpr const char* SpecReader = "spec.reader-undeclared";
 
 /// A gate did not apply where it had to: twice-declared in one text, a pragma not followed by a
 /// stubbable function, or an expression the variant's spec table cannot evaluate.
-inline constexpr const char* SpecGateUnmatched = "spec.gate-unmatched";
 
 /// The uniform layout differs between the generic and the spec-dialect compile.
 inline constexpr const char* SpecLayoutDrift = "spec.layout-drift";
@@ -179,7 +176,7 @@ inline constexpr const char* AllCodes[] = {
     SourcesUnreadable,     PlanNoEnumerator,   PlanUnbuildable,
     CompileGlsl,           CompileCacheDisabled, ReflectUnknownType,
     EmitFailed,            EmitFormLeak,
-    SpecRawRead,           SpecUnknownField,  SpecReader,        SpecGateUnmatched,
+    SpecReader,
     SpecLayoutDrift,
     VerifyClipField,
     VerifySourceFile,      VerifySourceFamily, VerifyReflection,

@@ -61,6 +61,33 @@ namespace tgfx {
 
 namespace {
 
+/// The SpecId decorations the compiled fragment module carries (OpDecorate with the SpecId
+/// decoration). The declared families generate their constants from DeriveSpecFields; this reads
+/// back what the compiler actually saw, so a table that drifts from the text fails the build
+/// instead of silently specializing nothing.
+std::set<uint32_t> SpirvSpecIds(const std::vector<uint32_t>& spirv) {
+  std::set<uint32_t> ids = {};
+  size_t offset = 5;  // the SPIR-V header
+  while (offset < spirv.size()) {
+    const uint32_t word = spirv[offset];
+    const uint32_t opcode = word & 0xFFFFu;
+    const uint32_t wordCount = word >> 16;
+    if (wordCount == 0 || offset + wordCount > spirv.size()) {
+      break;
+    }
+    constexpr uint32_t OpDecorate = 71;
+    constexpr uint32_t DecorationSpecId = 1;
+    // OpDecorate: [target, decoration, literal...] after the opcode word — the SpecId literal
+    // sits in the first literal slot, not the target's id.
+    if (opcode == OpDecorate && wordCount >= 4 && spirv[offset + 2] == DecorationSpecId) {
+      ids.insert(spirv[offset + 3]);
+    }
+    offset += wordCount;
+  }
+  return ids;
+}
+
+
 void PrintUsage() {
   std::cerr
       << "Usage: shader_build_tool [options]\n"
@@ -140,22 +167,7 @@ static void RecordBuildError(Diagnostics* diagnostics, Layer layer, const char* 
                              diagnostics->report(std::move(diagnostic));
                              }
 
-                             // UniformEntry carries no operator==: the layout check compares the two reflections field by
-                             // field (name, format and array size are the whole layout contract a stage's reflection states).
-                             static bool SameReflectionEntries(const std::vector<UniformEntry>& left,
-                                         const std::vector<UniformEntry>& right) {
-                             if (left.size() != right.size()) {
-                             return false;
-                             }
-                             for (size_t i = 0; i < left.size(); ++i) {
-                             if (left[i].name != right[i].name || left[i].format != right[i].format ||
-                             left[i].arraySize != right[i].arraySize) {
-                             return false;
-                             }
-                             }
-                             return true;
-                             }
-
+                             
 // source is the shader's text from the build's single read of the sources (nullptr in report-only
 // mode); the bundle's source digest is computed from the same text. compiler owns the stage
 // caches of this build.
@@ -216,78 +228,17 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
   std::string vertSource = source != nullptr ? source->vertex : "";
   std::string fragSource = source != nullptr ? source->fragment : "";
 
-  // The unrolled executor's call sites are generated, not counted: every
-  // `#pragma tgfx_spec_unroll` line becomes one guarded call per slot of the largest declared
-  // capacity, so the template carries no site list to keep in sync with a profile. Both stages
-  // expand — a pragma the tool expanded in only one stage would silently drop the other stage's
-  // call sites, because a GLSL compiler ignores an unknown pragma.
+  // The chain data-pool layout rides in the same way: a stage carrying the marker receives the
+  // structs and readers generated from the C++ operator declarations.
   for (auto* stage : {&vertSource, &fragSource}) {
     if (stage->empty()) {
       continue;
     }
-    auto expanded = ExpandUnrollPragmas(*stage);
-    if (expanded.empty()) {
-      RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl, info.name, "",
-                       -1, -1, "malformed #pragma tgfx_spec_unroll (expected <fn> <capacity> "
-                               "<guard> (<args>))");
-      return report;
-    }
-    *stage = std::move(expanded);
     // The chain data-pool layout rides in the same way: a stage carrying the marker receives the
     // structs and readers generated from the C++ operator declarations.
     *stage = ExpandChainOpsPragma(*stage);
   }
 
-  // The specialization scan runs once per family: it collects the SPEC_<name>() fields the
-  // fragment reads and checks none of them is read directly (a direct read would escape the
-  // folding a specialized compile performs). A family without the include marker scans empty
-  // and every source below stays the template itself.
-  const auto specUsage = ScanSpecUsage(fragSource, info.name, diagnostics);
-
-  // The gates this family can evaluate: every field the expression reads must be a scanned
-  // scalar (a family without the marker cannot evaluate any gate). A gate the family cannot
-  // evaluate folds its guards to true, so the gated code stays in every form — ungated, never
-  // stubbed.
-  std::vector<SpecGateInfo> supportedGates = {};
-  for (const auto& gate : specUsage.gates) {
-    bool supported = specUsage.present;
-    if (supported) {
-      size_t at = 0;
-      while ((at = gate.expr.find(SpecContract::FieldAccessorPrefix, at)) != std::string::npos) {
-        const bool boundary =
-            at == 0 || !(std::isalnum(static_cast<unsigned char>(gate.expr[at - 1])) ||
-                         gate.expr[at - 1] == '_');
-        size_t end = at + 5;
-        while (end < gate.expr.size() &&
-               (std::isalnum(static_cast<unsigned char>(gate.expr[end])) || gate.expr[end] == '_')) {
-          ++end;
-        }
-        if (boundary && end > at + 5) {
-          const auto field = gate.expr.substr(at + 5, end - at - 5);
-          const auto found = std::find_if(
-              specUsage.fields.begin(), specUsage.fields.end(),
-              [&field](const SpecUsageField& f) { return f.name == field && !f.indexed; });
-          if (found == specUsage.fields.end()) {
-            supported = false;
-            break;
-          }
-        }
-        at = end;
-      }
-    }
-    if (supported) {
-      supportedGates.push_back(gate);
-    } else {
-      const auto guard = std::string(SpecContract::GateAccessorPrefix) + gate.name + "()";
-      for (auto at = fragSource.find(guard); at != std::string::npos;
-           at = fragSource.find(guard, at + 4)) {
-        fragSource.replace(at, guard.size(), "true");
-      }
-    }
-  }
-  // The stubbed gate bodies are type-checked once per family: a stub the call sites cannot
-  // accept fails the build here, not on a device.
-  bool gatesStubValidated = false;
 
   // The Compose-reachable set is the single source of truth the runtime matcher uses too. A pair
   // the declared domains cannot serve would compile against a broken vertex/fragment interface,
@@ -363,15 +314,9 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
     }
     const auto* vertSpirv = &vertResult.spirv;
 
-    // The specialization pipeline (families carrying the include marker): the stub pass compiles
-    // the marker replaced by pass-through macros — semantically today's source — and its
-    // reflection states the layout and the array sizes; the real forms are then generated from
-    // it (the generic include for the GL text emitters, the constant_id dialect for the
-    // Vulkan-family emitters). A family without the marker compiles the template itself.
-    std::string fragCompileSource = fragSource;
-    if (specUsage.present) {
-      fragCompileSource = ReplaceSpecMarker(fragSource, GenerateSpecStubInclude(specUsage));
-    }
+    // The legacy kernels compile their template as written; the declarations own the
+    // specialization prologue now (the declared families generate it per variant).
+    const std::string fragCompileSource = fragSource;
     const auto& fragResult =
         compiler->compileSpirv(PrependDefines(fragCompileSource, fragDefines),
                                ShaderStageType::Fragment, info.name, fi, false);
@@ -396,62 +341,8 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
     // independent of backend-level exclusions counted below.
     report.compiledCount++;
 
-    std::string genericFragSource = fragSource;
-    std::string specFragSource;
-    std::vector<SpecEntry> specEntries = {};
-    if (specUsage.present) {
-      specEntries = MakeSpecEntries(specUsage, reflection.fragmentReflection, info.name, fi,
-                                    diagnostics);
-      genericFragSource =
-          ReplaceSpecMarker(fragSource, GenerateSpecInclude(specEntries, false, supportedGates));
-      specFragSource =
-          ReplaceSpecMarker(fragSource, GenerateSpecInclude(specEntries, true, supportedGates));
-      // The spec dialect must not move a uniform or a sampler: the specialized program has to
-      // stay a drop-in replacement of the generic one, layout included. Reflect the spec compile
-      // and compare it against the stub pass's reflection.
-      const auto& specFragResult =
-          compiler->compileSpirv(PrependDefines(specFragSource, fragDefines),
-                                 ShaderStageType::Fragment, info.name, fi, false);
-      if (!specFragResult.success) {
-        RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl, info.name, "",
-                         static_cast<int>(vi), static_cast<int>(fi),
-                         "spec-dialect compile failed: " + specFragResult.error);
-        continue;
-      }
-      const auto& specReflection =
-          compiler->extractReflection(info.name, vi, fi, *vertSpirv, specFragResult.spirv,
-                                      diagnostics, true);
-      if (!SameReflectionEntries(specReflection.fragmentReflection.uniforms,
-                                 reflection.fragmentReflection.uniforms) ||
-          !SameReflectionEntries(specReflection.fragmentReflection.samplers,
-                                 reflection.fragmentReflection.samplers)) {
-        RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::SpecLayoutDrift, info.name,
-                         "", static_cast<int>(vi), static_cast<int>(fi),
-                         "the constant_id dialect changed the uniform block or the samplers "
-                         "against the generic compile");
-        continue;
-      }
-      if (!gatesStubValidated && !supportedGates.empty()) {
-        gatesStubValidated = true;
-        const auto stubbed = StubOutGatedFunctions(genericFragSource, supportedGates);
-        if (stubbed.empty()) {
-          RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::SpecGateUnmatched,
-                           info.name, "", static_cast<int>(vi), static_cast<int>(fi),
-                           "a gate pragma does not precede a stubbable function (scalar or vector "
-                           "return type required)");
-          continue;
-        }
-        const auto& stubResult =
-            compiler->compileSpirv(PrependDefines(stubbed, fragDefines),
-                                   ShaderStageType::Fragment, info.name, fi, false);
-        if (!stubResult.success) {
-          RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::SpecGateUnmatched,
-                           info.name, "", static_cast<int>(vi), static_cast<int>(fi),
-                           "the closed gates' stub form failed to compile: " + stubResult.error);
-          continue;
-        }
-      }
-    }
+    const std::string genericFragSource = fragSource;
+    const std::vector<SpecEntry> specEntries = {};
 
     for (auto& emitterEntry : emitters) {
       const ShaderProfile profile = emitterEntry.first;
@@ -471,9 +362,9 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
       input.fragDefines = &fragDefines;
       input.vertSpirv = vertSpirv;
       input.fragStage = &fragResult;
-      input.fragSpecSource = specFragSource.empty() ? nullptr : &specFragSource;
-      input.fragGates = supportedGates.empty() ? nullptr : &supportedGates;
-      input.fragSpecEntries = specUsage.present ? &specEntries : nullptr;
+      input.fragSpecSource = nullptr;
+      input.fragGates = nullptr;
+      input.fragSpecEntries = nullptr;
       input.diagnostics = diagnostics;
       auto stages = emitterEntry.second->emit(input, compiler);
       if (!stages) {
@@ -690,6 +581,37 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
           compiler->extractReflection(info.name, variant.ordinal, variant.ordinal,
                                       vertResult.spirv, fragResult.spirv, &report->diagnostics);
       const auto layout = DeriveLayout(variant);
+      if (!layout.specFields.empty()) {
+        // The declared spec ids must be exactly the ids the compiled module carries; a drift
+        // would leave the runtime injecting constants the text does not read (the pixels stay
+        // right, the specialization silently stops).
+        std::set<uint32_t> expected = {0};
+        const auto modules = ModulesOf(family, variant);
+        for (const auto& field : layout.specFields) {
+          const Module* module = modules.list[field.slot];
+          const Element& element = module->elements[field.element];
+          const uint16_t count =
+              ElementCountOf(element, DimOffsetOf(family, variant, field.slot), variant);
+          const uint32_t idCount = element.type == ShaderType::Int4 ? count * 4u : 1u;
+          for (uint32_t offset = 0; offset < idCount; ++offset) {
+            expected.insert(field.firstId + offset);
+          }
+        }
+        if (SpirvSpecIds(fragResult.spirv) != expected) {
+          std::string detail = "expected:";
+          for (uint32_t id : expected) detail += " " + std::to_string(id);
+          detail += " actual:";
+          for (uint32_t id : SpirvSpecIds(fragResult.spirv)) detail += " " + std::to_string(id);
+          // SpecLayoutDrift is the code the retired tool-side drift check reported; this is the
+          // declared path's replacement for exactly that failure mode.
+          RecordBuildError(&report->diagnostics, Layer::Emit, DiagnosticCode::SpecLayoutDrift,
+                           info.name, "", static_cast<int>(variant.ordinal),
+                           static_cast<int>(variant.ordinal),
+                           "the declared spec ids and the compiled constant_id set disagree: " +
+                               detail);
+          continue;
+        }
+      }
       if (!LayoutMatchesReflection(layout, reflection)) {
         RecordBuildError(&report->diagnostics, Layer::Emit, DiagnosticCode::EmitFailed, info.name,
                          "", static_cast<int>(variant.ordinal), static_cast<int>(variant.ordinal),
