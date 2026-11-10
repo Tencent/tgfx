@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/Family.h"
+#include <cassert>
 #include <cstring>
+#include <optional>
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/modules/Frame.h"
 #include "gpu/shaders/modules/Xfer.h"
@@ -60,6 +62,43 @@ void CollectSlotDims(const Module& module, const int8_t* pinned, uint8_t slot, V
       freeDims->push_back(free);
     }
   }
+}
+
+/// The seed variant of one geometry — every dim at its first-step value (the pinned dims at their
+/// declared value, the free dims at 0) — plus the family's free-dim list. EnumerateVariants,
+/// EncodeVariant and DecodeVariant all build their variants through it, so the flattened layout
+/// and the pinning exist in exactly one place.
+Variant BuildFamilySeed(const Family& family, uint16_t familyIndex, uint8_t geometry,
+                        std::vector<FreeDim>* freeDims) {
+  freeDims->clear();
+  Variant seed = {};
+  seed.family = familyIndex;
+  seed.geometry = geometry;
+  uint8_t flatIndex = 0;
+  CollectSlotDims(*family.geometries[geometry], nullptr, 1, &seed, &flatIndex, freeDims);
+  for (uint8_t index = 0; index < family.moduleCount; ++index) {
+    CollectSlotDims(*family.modules[index].module, family.modules[index].pinned,
+                    static_cast<uint8_t>(index + 2), &seed, &flatIndex, freeDims);
+  }
+  CollectSlotDims(XferModule(), nullptr, static_cast<uint8_t>(family.moduleCount + 2), &seed,
+                  &flatIndex, freeDims);
+  return seed;
+}
+
+/// The variant's ordinal: the geometry is the lowest radix (the family's geometry count), then
+/// the free dims in flattened order. The one definition of the rule — EnumerateVariants,
+/// EncodeVariant and DecodeVariant all compose through it, so a hand-rolled formula elsewhere
+/// cannot drift from the enumeration.
+uint32_t ComposeVariantOrdinal(const Family& family, const Variant& variant,
+                               const std::vector<FreeDim>& freeDims) {
+  uint32_t ordinal = variant.geometry;
+  uint32_t stride = family.geometryCount;
+  for (const auto& free : freeDims) {
+    const uint32_t value = variant.values[DimOffsetOf(family, variant, free.slot) + free.dim];
+    ordinal += value * stride;
+    stride *= free.iterations;
+  }
+  return ordinal;
 }
 
 }  // namespace
@@ -172,42 +211,90 @@ std::vector<Variant> EnumerateVariants(const Family& family, uint16_t familyInde
   std::vector<Variant> variants;
   std::vector<FreeDim> freeDims;
   for (uint8_t geometry = 0; geometry < family.geometryCount; ++geometry) {
-    freeDims.clear();
-    Variant seed = {};
-    seed.family = familyIndex;
-    seed.geometry = geometry;
-    uint8_t flatIndex = 0;
-    CollectSlotDims(*family.geometries[geometry], nullptr, 1, &seed, &flatIndex, &freeDims);
-    for (uint8_t index = 0; index < family.moduleCount; ++index) {
-      CollectSlotDims(*family.modules[index].module, family.modules[index].pinned,
-                      static_cast<uint8_t>(index + 2), &seed, &flatIndex, &freeDims);
-    }
-    CollectSlotDims(XferModule(), nullptr, static_cast<uint8_t>(family.moduleCount + 2), &seed,
-                    &flatIndex, &freeDims);
-
+    const Variant seed = BuildFamilySeed(family, familyIndex, geometry, &freeDims);
     size_t total = 1;
     for (const auto& free : freeDims) {
       total *= free.iterations;
     }
     for (size_t step = 0; step < total; ++step) {
       Variant variant = seed;
-      uint32_t ordinal = geometry;
-      uint32_t stride = family.geometryCount;
       size_t remainder = step;
       for (const auto& free : freeDims) {
         const uint8_t value = static_cast<uint8_t>(remainder % free.iterations);
         variant.values[DimOffsetOf(family, variant, free.slot) + free.dim] = value;
-        ordinal += static_cast<uint32_t>(value) * stride;
-        stride *= free.iterations;
         remainder /= free.iterations;
       }
-      variant.ordinal = ordinal;
+      variant.ordinal = ComposeVariantOrdinal(family, variant, freeDims);
       if (family.allowed == nullptr || family.allowed(variant, family)) {
         variants.push_back(variant);
       }
     }
   }
   return variants;
+}
+
+std::optional<Variant> EncodeVariant(uint16_t familyIndex, uint8_t geometry,
+                                     const std::vector<uint8_t>& freeValues) {
+  if (familyIndex >= FamilyCount()) {
+    return std::nullopt;
+  }
+  const Family& family = Families()[familyIndex];
+  if (geometry >= family.geometryCount) {
+    return std::nullopt;
+  }
+  std::vector<FreeDim> freeDims;
+  Variant variant = BuildFamilySeed(family, familyIndex, geometry, &freeDims);
+  // A count disagreement means the declaration changed under a match rule — a bug to fix at the
+  // call site, not a draw shape to reject. The plain assert (not the project's DEBUG_ASSERT)
+  // keeps this file inside the tool-side declarations library, which carries no tgfx includes.
+  assert(freeValues.size() == freeDims.size());
+  if (freeValues.size() != freeDims.size()) {
+    return std::nullopt;
+  }
+  for (size_t index = 0; index < freeDims.size(); ++index) {
+    const FreeDim& free = freeDims[index];
+    const uint8_t value = freeValues[index];
+    assert(value < free.iterations);
+    if (value >= free.iterations) {
+      return std::nullopt;
+    }
+    variant.values[DimOffsetOf(family, variant, free.slot) + free.dim] = value;
+  }
+  variant.ordinal = ComposeVariantOrdinal(family, variant, freeDims);
+  if (family.allowed != nullptr && !family.allowed(variant, family)) {
+    return std::nullopt;
+  }
+  return variant;
+}
+
+std::optional<Variant> DecodeVariant(uint16_t familyIndex, uint32_t ordinal) {
+  if (familyIndex >= FamilyCount()) {
+    return std::nullopt;
+  }
+  const Family& family = Families()[familyIndex];
+  if (family.geometryCount == 0) {
+    return std::nullopt;
+  }
+  uint32_t remainder = ordinal;
+  const uint8_t geometry = static_cast<uint8_t>(remainder % family.geometryCount);
+  remainder /= family.geometryCount;
+  std::vector<FreeDim> freeDims;
+  Variant variant = BuildFamilySeed(family, familyIndex, geometry, &freeDims);
+  for (const auto& free : freeDims) {
+    variant.values[DimOffsetOf(family, variant, free.slot) + free.dim] =
+        static_cast<uint8_t>(remainder % free.iterations);
+    remainder /= free.iterations;
+  }
+  if (remainder != 0) {
+    // The ordinal exceeds the family's variant space.
+    return std::nullopt;
+  }
+  variant.ordinal = ComposeVariantOrdinal(family, variant, freeDims);
+  assert(variant.ordinal == ordinal);
+  if (family.allowed != nullptr && !family.allowed(variant, family)) {
+    return std::nullopt;
+  }
+  return variant;
 }
 
 }  // namespace tgfx

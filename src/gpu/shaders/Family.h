@@ -20,6 +20,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <vector>
 #include "gpu/shaders/Module.h"
 
@@ -102,5 +103,20 @@ size_t FamilyCount();
 /// Enumerates the family's variants: the geometry choice crossed with every free dim (pinned
 /// single-value dims do not iterate), filtered by the family's allowed predicate when set.
 std::vector<Variant> EnumerateVariants(const Family& family, uint16_t familyIndex);
+
+/// Builds the family's variant from its geometry choice and free dim values, in flattened
+/// declaration order (geometry first, then body modules, Xfer last; pinned dims occupy no
+/// position). The pinned values come from the declaration and the ordinal is composed by the same
+/// radix rule EnumerateVariants uses, so no match rule hand-rolls its own encoding. Nullopt when
+/// the geometry or a value is out of range, the count disagrees with the declaration, or the
+/// family's allowed filter rejects the result — the draw then stays unmatched instead of
+/// producing a variant outside the reachable set.
+std::optional<Variant> EncodeVariant(uint16_t familyIndex, uint8_t geometry,
+                                     const std::vector<uint8_t>& freeValues);
+
+/// The inverse of EncodeVariant: rebuilds the full variant (pinned values included) from the
+/// family index and the ordinal. Nullopt when the ordinal exceeds the family's variant space or
+/// the allowed filter rejects it.
+std::optional<Variant> DecodeVariant(uint16_t familyIndex, uint32_t ordinal);
 
 }  // namespace tgfx

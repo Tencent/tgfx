@@ -27,6 +27,46 @@
 
 namespace tgfx {
 
+/// The table indices the match rules address their families by. Each is a constant expression, so
+/// a name that drifts from the family table fails the build here instead of silently matching
+/// another family's row at runtime.
+constexpr uint16_t SolidColorIndex = FamilyIndexOf("SolidColor");
+constexpr uint16_t MaskFillIndex = FamilyIndexOf("MaskFill");
+constexpr uint16_t TiledTextureFillIndex = FamilyIndexOf("TiledTextureFill");
+constexpr uint16_t QuadColorIndex = FamilyIndexOf("QuadColor");
+constexpr uint16_t RRectIndex = FamilyIndexOf("RRect");
+constexpr uint16_t MeshIndex = FamilyIndexOf("Mesh");
+constexpr uint16_t ShapeInstancedIndex = FamilyIndexOf("ShapeInstanced");
+constexpr uint16_t ComplexRRectIndex = FamilyIndexOf("ComplexRRect");
+constexpr uint16_t HairlineLineIndex = FamilyIndexOf("HairlineLine");
+constexpr uint16_t HairlineQuadIndex = FamilyIndexOf("HairlineQuad");
+constexpr uint16_t EllipseIndex = FamilyIndexOf("Ellipse");
+constexpr uint16_t ComplexEllipseIndex = FamilyIndexOf("ComplexEllipse");
+constexpr uint16_t RoundStrokeRectIndex = FamilyIndexOf("RoundStrokeRect");
+constexpr uint16_t QuadTextureIndex = FamilyIndexOf("QuadTexture");
+constexpr uint16_t YUVTextureIndex = FamilyIndexOf("YUVTexture");
+constexpr uint16_t AtlasTextIndex = FamilyIndexOf("AtlasText");
+constexpr uint16_t ShapeInstancedTextureCoverageIndex =
+    FamilyIndexOf("ShapeInstancedTextureCoverage");
+constexpr uint16_t GaussianBlurIndex = FamilyIndexOf("GaussianBlur");
+constexpr uint16_t GlassUDFTentBlurIndex = FamilyIndexOf("GlassUDFTentBlur");
+constexpr uint16_t GlassRefractionIndex = FamilyIndexOf("GlassRefraction");
+constexpr uint16_t GlassRefractionQuadIndex = FamilyIndexOf("GlassRefractionQuad");
+
+/// Encodes the matched family's variant: the match rule supplies the geometry choice and the
+/// free dim values in flattened declaration order, and EncodeVariant fills the pinned values and
+/// composes the ordinal by the enumeration's own radix rule. False means the draw stays
+/// unmatched (the value range, the free-value count or the allowed filter rejected it).
+bool EncodeMatch(uint16_t family, uint8_t geometry, const std::vector<uint8_t>& freeValues,
+                 Variant* variant) {
+  auto encoded = EncodeVariant(family, geometry, freeValues);
+  if (!encoded.has_value()) {
+    return false;
+  }
+  *variant = *encoded;
+  return true;
+}
+
 namespace {
 
 /// The SolidColor family's rule, carried over from the former SolidColorFillShader: the
@@ -44,11 +84,8 @@ bool MatchSolidColor(const DrawShape& shape, Variant* variant) {
   if (!noProcessorsOrDirectClip || shape.xpType() < XP_NONE) {
     return false;
   }
-  variant->family = 0;
-  variant->geometry = 0;
-  variant->values[0] = static_cast<uint8_t>(shape.xpType());
-  variant->ordinal = static_cast<uint32_t>(shape.xpType());
-  return true;
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  return EncodeMatch(SolidColorIndex, 0, {hasXp}, variant);
 }
 
 /// The MaskFill family's rule, carried over from the former MaskFillShader: the DefaultGP's rect
@@ -73,10 +110,10 @@ bool MatchMaskFill(const DrawShape& shape, Variant* variant, const AOTTexturePar
   if (shape.xpType() < XP_NONE) {
     return false;
   }
-  variant->family = 1;
-  variant->geometry = 0;
-  variant->values[0] = static_cast<uint8_t>(shape.xpType());
-  variant->ordinal = static_cast<uint32_t>(shape.xpType());
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  if (!EncodeMatch(MaskFillIndex, 0, {hasXp}, variant)) {
+    return false;
+  }
   *maskOut = mask;
   return true;
 }
@@ -110,14 +147,12 @@ bool MatchTiledTextureFill(const DrawShape& shape, Variant* variant,
   }
   const uint8_t geometry = shape.geometry.kind == GeometryKind::Default ? 0 : 1;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 2;
-  variant->geometry = geometry;
-  // The pinned dims carry their fixed values, exactly as EnumerateVariants spells them; leaving
-  // them at zero would make PRESENT read as "module absent" and skip every tiled uniform.
-  variant->values[0] = 1;
-  variant->values[1] = 1;
-  variant->values[2] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(geometry) + 2u * hasXp;
+  // The pinned dims (FULL and PRESENT at 1) are filled by EncodeVariant from the declaration;
+  // hand-rolling them at zero made PRESENT read as "module absent" and skip every tiled uniform
+  // (the c8c9c9e6d bug this helper exists to prevent).
+  if (!EncodeMatch(TiledTextureFillIndex, geometry, {hasXp}, variant)) {
+    return false;
+  }
   *leafOut = leaf;
   return true;
 }
@@ -145,12 +180,7 @@ bool MatchQuadColor(const DrawShape& shape, Variant* variant) {
     return false;
   }
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 3;
-  variant->geometry = 0;
-  variant->values[0] = present;
-  variant->values[1] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(present) + 2u * hasXp;
-  return true;
+  return EncodeMatch(QuadColorIndex, 0, {present, hasXp}, variant);
 }
 
 /// The RRect family's rule, carried over from the former NonAARRectFillShader: the non-AA
@@ -196,13 +226,10 @@ bool MatchRRect(const DrawShape& shape, Variant* variant, const AOTTextureParame
   const uint8_t stroke = shape.geometry.isStroke ? 1 : 0;
   const uint8_t present = tiledLeaf != nullptr ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 4;
-  variant->geometry = 0;
-  variant->values[0] = stroke;
-  variant->values[1] = 0;
-  variant->values[2] = present;
-  variant->values[3] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(stroke) + 2u * present + 4u * hasXp;
+  // The free values in flattened order: [STROKE, PRESENT, HAS_XP] (FULL is pinned to 0).
+  if (!EncodeMatch(RRectIndex, 0, {stroke, present, hasXp}, variant)) {
+    return false;
+  }
   *leaf = tiledLeaf;
   return true;
 }
@@ -232,29 +259,22 @@ bool MatchMesh(const DrawShape& shape, Variant* variant) {
   }
   const uint8_t texCoords = shape.geometry.hasTexCoords ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 5;
-  variant->geometry = 0;
-  variant->values[0] = texCoords;
-  variant->values[1] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(texCoords) + 2u * hasXp;
-  return true;
+  return EncodeMatch(MeshIndex, 0, {texCoords, hasXp}, variant);
 }
 
 /// The ShapeInstanced family's rule, carried over from the former ShapeInstancedFillShader: the
-/// instanced path-triangle geometry with no fragment processor and any xfer. VERTEX_COLOR is
-/// always 0 (the reserved stride slot is never read), so the ordinal is HAS_XP alone.
+/// instanced path-triangle geometry with no fragment processor and any xfer. VERTEX_COLOR stays
+/// at 0 (the reserved stride slot is never read; the allowed filter drops its 1 value), so the
+/// free values are [0, HAS_XP] and the ordinal is 2 * HAS_XP. The hand-rolled ordinal this rule
+/// carried before EncodeVariant was HAS_XP alone — an encoding outside the family's reachable
+/// set for every blended xfer.
 bool MatchShapeInstanced(const DrawShape& shape, Variant* variant) {
   if (shape.geometry.kind != GeometryKind::ShapeInstanced || shape.fragmentCount != 0 ||
       shape.xpType() < XP_NONE) {
     return false;
   }
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 6;
-  variant->geometry = 0;
-  variant->values[0] = 0;
-  variant->values[1] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(hasXp);
-  return true;
+  return EncodeMatch(ShapeInstancedIndex, 0, {0, hasXp}, variant);
 }
 
 /// The ShapeInstancedTextureCoverage family's rule, carried over from the former
@@ -308,12 +328,11 @@ bool MatchShapeInstancedTextureCoverage(const DrawShape& shape, Variant* variant
     return false;
   }
   const uint8_t gradientValue = gradient != nullptr ? 1 : 0;
-  variant->family = 16;
-  variant->geometry = 0;
-  variant->values[0] = 0;
-  variant->values[1] = gradientValue;
-  variant->values[2] = 0;
-  variant->ordinal = 2u * gradientValue;
+  // The free values in flattened order: [VERTEX_COLOR = 0, GRADIENT, HAS_XP = 0] (the allowed
+  // filter drops both non-zero ends).
+  if (!EncodeMatch(ShapeInstancedTextureCoverageIndex, 0, {0, gradientValue, 0}, variant)) {
+    return false;
+  }
   *coverageOut = coverage;
   *gradientOut = gradient;
   return true;
@@ -342,10 +361,9 @@ bool MatchGaussianBlur(const DrawShape& shape, Variant* variant, FamilyMatchResu
     return false;
   }
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 17;
-  variant->geometry = 0;
-  variant->values[0] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(hasXp);
+  if (!EncodeMatch(GaussianBlurIndex, 0, {hasXp}, variant)) {
+    return false;
+  }
   result->blurKernel = irShape->kernel;
   result->blurChild = irShape->childTexture;
   return true;
@@ -373,10 +391,9 @@ bool MatchGlassUDFTentBlur(const DrawShape& shape, Variant* variant, FamilyMatch
     return false;
   }
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 18;
-  variant->geometry = 0;
-  variant->values[0] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(hasXp);
+  if (!EncodeMatch(GlassUDFTentBlurIndex, 0, {hasXp}, variant)) {
+    return false;
+  }
   result->blurKernel = irShape->kernel;
   result->blurChild = irShape->childTexture;
   return true;
@@ -432,12 +449,9 @@ bool MatchGlassRefraction(const DrawShape& shape, GeometryKind kind, uint16_t fa
   const uint8_t dispersion = irShape->kernel->dispersionOn ? 1 : 0;
   const uint8_t shapeKind = static_cast<uint8_t>(*irShape->kernel->geometryKind);
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = family;
-  variant->geometry = 0;
-  variant->values[0] = dispersion;
-  variant->values[1] = shapeKind;
-  variant->values[2] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(dispersion) + 2u * shapeKind + 6u * hasXp;
+  if (!EncodeMatch(family, 0, {dispersion, shapeKind, hasXp}, variant)) {
+    return false;
+  }
   result->glassKernel = irShape->kernel;
   result->maskLeaf = mask;
   return true;
@@ -453,12 +467,7 @@ bool MatchComplexRRect(const DrawShape& shape, Variant* variant) {
   }
   const uint8_t stroke = shape.geometry.isStroke ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 7;
-  variant->geometry = 0;
-  variant->values[0] = stroke;
-  variant->values[1] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(stroke) + 2u * hasXp;
-  return true;
+  return EncodeMatch(ComplexRRectIndex, 0, {stroke, hasXp}, variant);
 }
 
 /// The hairline families' shared rule, carried over from the former HairlineLineShader and
@@ -478,11 +487,7 @@ bool MatchHairline(const DrawShape& shape, GeometryKind kind, uint16_t family, V
     return false;
   }
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = family;
-  variant->geometry = 0;
-  variant->values[0] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(hasXp);
-  return true;
+  return EncodeMatch(family, 0, {hasXp}, variant);
 }
 
 /// The Ellipse family's rule, carried over from the former EllipseFillShader: the ellipse geometry
@@ -496,12 +501,7 @@ bool MatchEllipse(const DrawShape& shape, Variant* variant) {
   }
   const uint8_t present = *shape.coverage == Coverage::DeviceMask ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 10;
-  variant->geometry = 0;
-  variant->values[0] = present;
-  variant->values[1] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(present) + 2u * hasXp;
-  return true;
+  return EncodeMatch(EllipseIndex, 0, {present, hasXp}, variant);
 }
 
 /// The ComplexEllipse family's rule, carried over from the former ComplexEllipseFillShader: the
@@ -517,13 +517,7 @@ bool MatchComplexEllipse(const DrawShape& shape, Variant* variant) {
   const uint8_t stroke = shape.geometry.isStroke ? 1 : 0;
   const uint8_t present = *shape.coverage == Coverage::DeviceMask ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 11;
-  variant->geometry = 0;
-  variant->values[0] = stroke;
-  variant->values[1] = present;
-  variant->values[2] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(stroke) + 2u * present + 4u * hasXp;
-  return true;
+  return EncodeMatch(ComplexEllipseIndex, 0, {stroke, present, hasXp}, variant);
 }
 
 /// The RoundStrokeRect family's rule, carried over from the former RoundStrokeRectFillShader: the
@@ -544,12 +538,7 @@ bool MatchRoundStrokeRect(const DrawShape& shape, Variant* variant) {
   }
   const uint8_t uvMatrix = shape.geometry.hasUVMatrix ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 12;
-  variant->geometry = 0;
-  variant->values[0] = uvMatrix;
-  variant->values[1] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(uvMatrix) + 2u * hasXp;
-  return true;
+  return EncodeMatch(RoundStrokeRectIndex, 0, {uvMatrix, hasXp}, variant);
 }
 
 /// The QuadTexture family's rule, carried over from the former QuadTextureFillShader: the
@@ -588,15 +577,11 @@ bool MatchQuadTexture(const DrawShape& shape, Variant* variant,
   const uint8_t uvCoord = shape.geometry.hasUVMatrix ? 0 : 1;
   const uint8_t subset = shape.geometry.hasSubset ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 13;
-  variant->geometry = 0;
-  variant->values[0] = uvCoord;
-  variant->values[1] = subset;
-  variant->values[2] = subset;
-  variant->values[3] = present;
-  variant->values[4] = hasXp;
-  variant->ordinal =
-      static_cast<uint32_t>(uvCoord) + 2u * subset + 4u * subset + 8u * present + 16u * hasXp;
+  // The free values in flattened order: [UV_COORD, SUBSET (geometry), SUBSET (texture), PRESENT,
+  // HAS_XP] — the geometry's and the texture's SUBSET move together (the allowed rule).
+  if (!EncodeMatch(QuadTextureIndex, 0, {uvCoord, subset, subset, present, hasXp}, variant)) {
+    return false;
+  }
   *leafOut = tail.leaf;
   return true;
 }
@@ -635,14 +620,12 @@ bool MatchYUVTexture(const DrawShape& shape, Variant* variant,
   }
   const uint8_t uvCoord = shape.geometry.hasUVMatrix ? 0 : 1;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 14;
-  variant->geometry = 0;
-  variant->values[0] = uvCoord;
-  variant->values[1] = 0;
-  variant->values[2] = static_cast<uint8_t>(format);
-  variant->values[3] = hasXp;
-  variant->ordinal =
-      static_cast<uint32_t>(uvCoord) + 4u * static_cast<uint32_t>(format) + 8u * hasXp;
+  // The free values in flattened order: [UV_COORD, SUBSET = 0, FORMAT, HAS_XP] — SUBSET is free in
+  // the geometry but the allowed filter keeps its 0 half only (the YUV path never carries one).
+  if (!EncodeMatch(YUVTextureIndex, 0, {uvCoord, 0, static_cast<uint8_t>(format), hasXp},
+                   variant)) {
+    return false;
+  }
   *leafOut = tail.leaf;
   return true;
 }
@@ -668,12 +651,7 @@ bool MatchAtlasText(const DrawShape& shape, Variant* variant) {
   }
   const uint8_t hasCoverage = shape.geometry.hasCoverage ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 15;
-  variant->geometry = 0;
-  variant->values[0] = hasCoverage;
-  variant->values[1] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(hasCoverage) + 2u * hasXp;
-  return true;
+  return EncodeMatch(AtlasTextIndex, 0, {hasCoverage, hasXp}, variant);
 }
 
 std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
@@ -710,10 +688,12 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
   if (MatchGlassUDFTentBlur(shape, &result.variant, &result)) {
     return result;
   }
-  if (MatchGlassRefraction(shape, GeometryKind::Ellipse, 19, &result.variant, &result)) {
+  if (MatchGlassRefraction(shape, GeometryKind::Ellipse, GlassRefractionIndex, &result.variant,
+                           &result)) {
     return result;
   }
-  if (MatchGlassRefraction(shape, GeometryKind::QuadPerEdgeAA, 20, &result.variant, &result)) {
+  if (MatchGlassRefraction(shape, GeometryKind::QuadPerEdgeAA, GlassRefractionQuadIndex,
+                           &result.variant, &result)) {
     return result;
   }
   if (MatchAtlasText(shape, &result.variant)) {
@@ -734,10 +714,10 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
   if (MatchEllipse(shape, &result.variant)) {
     return result;
   }
-  if (MatchHairline(shape, GeometryKind::HairlineLine, 8, &result.variant)) {
+  if (MatchHairline(shape, GeometryKind::HairlineLine, HairlineLineIndex, &result.variant)) {
     return result;
   }
-  if (MatchHairline(shape, GeometryKind::HairlineQuad, 9, &result.variant)) {
+  if (MatchHairline(shape, GeometryKind::HairlineQuad, HairlineQuadIndex, &result.variant)) {
     return result;
   }
   if (MatchComplexRRect(shape, &result.variant)) {

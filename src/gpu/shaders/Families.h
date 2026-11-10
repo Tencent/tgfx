@@ -282,4 +282,31 @@ inline constexpr size_t FamilyTableCount() {
   return sizeof(FamilyTableStorage) / sizeof(FamilyTableStorage[0]);
 }
 
+/// A family name the table does not carry. Only declared, never defined: an odr-use is a link
+/// error, so even a runtime lookup with a mistyped name fails to build.
+uint16_t FamilyNameNotFound();
+
+constexpr bool FamilyNameEquals(const char* left, const char* right) {
+  while (*left != '\0' && *right != '\0') {
+    if (*left != *right) {
+      return false;
+    }
+    ++left;
+    ++right;
+  }
+  return *left == '\0' && *right == '\0';
+}
+
+/// The table index of the named family. Evaluate it in a constant expression (the match rules'
+/// index constants): a name absent from the table then fails the build instead of silently
+/// addressing another family's row.
+constexpr uint16_t FamilyIndexOf(const char* name) {
+  for (size_t index = 0; index < FamilyTableCount(); ++index) {
+    if (FamilyNameEquals(FamilyTableStorage[index].name, name)) {
+      return static_cast<uint16_t>(index);
+    }
+  }
+  return FamilyNameNotFound();
+}
+
 }  // namespace tgfx
