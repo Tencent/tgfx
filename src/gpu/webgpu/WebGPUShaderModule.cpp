@@ -59,15 +59,13 @@ static std::string separateSamplerDeclarations(const std::string& source) {
   return detail::ReplaceAllMatches(source, samplerRegex, replaceSeparatedSampler, binding);
 }
 
-// Replaces texture lookup calls to use separated texture and sampler resources.
-// Input:  "texture(TextureSampler_0, coord)"
-// Output: "texture(sampler2D(TextureSampler_0, TextureSampler_0_Sampler), coord)"
+// 分离资源后，采样、尺寸查询和整数像素读取仍须使用组合采样器类型。
 static std::string separateTextureLookups(const std::string& source,
                                           const std::vector<std::string>& samplerNames) {
   auto result = source;
   for (const auto& name : samplerNames) {
-    std::regex lookupRegex("texture\\(" + name + "\\s*,");
-    std::string replacement = "texture(sampler2D(" + name + ", " + name + "_Sampler),";
+    std::regex lookupRegex("\\b(texture|textureSize|texelFetch)\\s*\\(\\s*" + name + "\\s*,");
+    std::string replacement = "$1(sampler2D(" + name + ", " + name + "_Sampler),";
     result = std::regex_replace(result, lookupRegex, replacement);
   }
   return result;
