@@ -415,7 +415,8 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, EncoderAndSemaphoreFlushUploads) {
   auto texture =
       MakeUploadTexture(gpu, 1, 1, MTLStorageModePrivate, MTLHazardTrackingModeTracked, false);
   ASSERT_TRUE(texture != nullptr);
-  TextureUploadGate gate(queue);
+  MetalCommandQueue dependencyQueue(gpu);
+  TextureUploadGate gate(&dependencyQueue);
   ASSERT_TRUE(gate.isValid());
   auto waitSemaphore = MetalSemaphore::MakeFrom(gpu, gate.metalEvent(), 1);
   ASSERT_TRUE(waitSemaphore != nullptr);
@@ -427,6 +428,14 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, EncoderAndSemaphoreFlushUploads) {
   auto signalSemaphore = queue->insertSemaphore();
   ASSERT_TRUE(signalSemaphore != nullptr);
   EXPECT_TRUE(queue->pendingUploadCommandBuffer == nil);
+
+  auto signalEvent = [gpu->device() newSharedEvent];
+  ASSERT_TRUE(signalEvent != nil);
+  auto observedSignal = MetalSemaphore::MakeFrom(gpu, signalEvent, 0);
+  [signalEvent release];
+  ASSERT_TRUE(observedSignal != nullptr);
+  queue->pendingSignalSemaphore = observedSignal;
+
   auto buffer = gpu->createBuffer(256, GPUBufferUsage::READBACK);
   auto encoder = gpu->createCommandEncoder();
   ASSERT_TRUE(buffer != nullptr);
@@ -436,10 +445,19 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, EncoderAndSemaphoreFlushUploads) {
   queue->submit(encoder->finish());
   EXPECT_TRUE(queue->pendingUploadCommandBuffer == nil);
   EXPECT_TRUE(queue->pendingSignalSemaphore == nullptr);
-  EXPECT_TRUE(gate.isClosed());
   queue->endTextureUploadBatch();
+
+  auto submitted = queue->lastSubmittedCommandBuffer;
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  EXPECT_TRUE(gate.isClosed());
+  EXPECT_NE(submitted.status, MTLCommandBufferStatusCompleted);
+  EXPECT_NE(submitted.status, MTLCommandBufferStatusError);
+  EXPECT_EQ(signalEvent.signaledValue, 0u);
+
   gate.release();
   queue->waitUntilCompleted();
+  EXPECT_GT(signalEvent.signaledValue, 0u);
+  EXPECT_EQ(signalEvent.signaledValue, observedSignal->signalValue());
   EXPECT_TRUE(BufferPixelMatches(buffer, pixel));
 }
 
