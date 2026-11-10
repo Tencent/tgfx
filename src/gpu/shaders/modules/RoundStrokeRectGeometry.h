@@ -35,7 +35,7 @@ inline constexpr Element RoundStrokeRectGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float, "InCoverage"},
     {Element::Kind::Attribute, ShaderType::Float2, "InEllipseOffset"},
     {Element::Kind::Attribute, ShaderType::Float2, "InEllipseRadii"},
-    {Element::Kind::Attribute, ShaderType::Float2, "InUVCoord", 1, 0, 0},
+    {Element::Kind::Attribute, ShaderType::Float2, "InUVCoord", 1, 0, 0x01},
     {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
     {Element::Kind::Varying, ShaderType::Float2, "Offsets"},
     {Element::Kind::Varying, ShaderType::Float, "Coverage"},

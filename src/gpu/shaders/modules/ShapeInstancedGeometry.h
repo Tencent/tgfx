@@ -34,7 +34,7 @@ inline constexpr ModuleDim ShapeInstancedGeometryDims[] = {{"VERTEX_COLOR", 2}};
 inline constexpr Element ShapeInstancedGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "Position"},
     {Element::Kind::Attribute, ShaderType::Float, "Coverage"},
-    {Element::Kind::Attribute, ShaderType::Float4, "VertexColor", 1, 0, 1},
+    {Element::Kind::Attribute, ShaderType::Float4, "VertexColor", 1, 0, 0x02},
     {Element::Kind::InstanceAttribute, ShaderType::Float2, "Offset"},
     {Element::Kind::InstanceAttribute, ShaderType::Float4, "InstanceColor"},
     {Element::Kind::Varying, ShaderType::Float2, "Coord"},

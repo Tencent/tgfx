@@ -53,14 +53,14 @@ inline constexpr Element GlassRefractionElements[] = {
     {Element::Kind::Param, ShaderType::Float2, "LightDir"},
     {Element::Kind::Param, ShaderType::Int, "LightingOn"},
     // The UDF kind's own fields (the SDF kinds never read them).
-    {Element::Kind::Param, ShaderType::Float4, "FineMaskUV", 1, 1, 2},
-    {Element::Kind::Param, ShaderType::Float2, "EdgeSpan", 1, 1, 2},
-    {Element::Kind::Param, ShaderType::Float4, "EdgeMaskUV", 1, 1, 2},
-    {Element::Kind::Param, ShaderType::Int, "EdgeMaskOn", 1, 1, 2},
+    {Element::Kind::Param, ShaderType::Float4, "FineMaskUV", 1, 1, 0x04},
+    {Element::Kind::Param, ShaderType::Float2, "EdgeSpan", 1, 1, 0x04},
+    {Element::Kind::Param, ShaderType::Float4, "EdgeMaskUV", 1, 1, 0x04},
+    {Element::Kind::Param, ShaderType::Int, "EdgeMaskOn", 1, 1, 0x04},
     // The background source; the UDF masks follow in the old kernel's binding order.
     {Element::Kind::Texture, ShaderType::Float4, "Sampler"},
-    {Element::Kind::Texture, ShaderType::Float4, "MaskSampler", 1, 1, 2},
-    {Element::Kind::Texture, ShaderType::Float4, "EdgeMaskSampler", 1, 1, 2},
+    {Element::Kind::Texture, ShaderType::Float4, "MaskSampler", 1, 1, 0x04},
+    {Element::Kind::Texture, ShaderType::Float4, "EdgeMaskSampler", 1, 1, 0x04},
 };
 
 inline constexpr Module GlassRefraction = {"GlassRefraction",

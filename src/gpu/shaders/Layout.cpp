@@ -17,8 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/Layout.h"
+#include <cassert>
+#include "gpu/shaders/contract/ChainOps.h"
 
 namespace tgfx {
+
+// The layout's 16-bit Field::arraySize must cover the widest declared array: the slot
+// interpreter's data pool (32 slots * 7 words + the 32-word block region) is exactly 256 today,
+// one past a byte. The assert lives here rather than in ChainOps.h because the tool's source
+// digest covers the chain contract headers — a digest change invalidates every bundle even when
+// the compiled text is identical, and this is a width fact of the layout, not of the pool.
+static_assert(32 * ChainISA::PoolSlotWords + ChainISA::BlockWords <= 0xFFFF,
+              "the chain data pool exceeds the layout's 16-bit array size");
 
 namespace {
 
@@ -28,28 +38,29 @@ size_t AlignCursor(size_t cursor, size_t alignment) {
 
 /// The total std140 size of an element: arrays stride each element up to a 16-byte multiple and
 /// align the array itself to 16, matching UniformData's packing of the reflected fields.
-size_t ElementTotalSize(const Element& element) {
+size_t ElementTotalSize(const Element& element, uint16_t count) {
   const size_t elementSize = ShaderTypeSize(element.type);
-  if (element.count <= 1) {
+  if (count <= 1) {
     return elementSize;
   }
   const size_t stride = (elementSize + 15) / 16 * 16;
-  return stride * element.count;
+  return stride * count;
 }
 
 bool ElementPresent(const Element& element, uint8_t dimBase, const Variant& variant) {
-  if (element.when < 0) {
-    return true;
-  }
-  const uint8_t value = variant.values[dimBase + static_cast<uint8_t>(element.when)];
-  return element.whenValue >= 0 ? value == static_cast<uint8_t>(element.whenValue) : value != 0;
+  // A gated element with an empty mask can never exist: a declaration bug the variant walk
+  // catches on its first evaluation (the bundle build derives every variant).
+  assert(element.when < 0 || element.whenMask != 0);
+  return ElementPresentInVariant(element, dimBase, variant);
 }
 
 }  // namespace
 
 Layout DeriveLayout(const Variant& variant) {
-  const auto* familyTable = Families();
-  const Family& family = familyTable[variant.family];
+  return DeriveLayout(Families()[variant.family], variant);
+}
+
+Layout DeriveLayout(const Family& family, const Variant& variant) {
   const auto modules = ModulesOf(family, variant);
 
   Layout layout;
@@ -106,13 +117,14 @@ Layout DeriveLayout(const Variant& variant) {
           }
           case Element::Kind::VertexParam:
           case Element::Kind::Param: {
+            const uint16_t count = ElementCountOf(element, dimBase, variant);
             Layout::Field field = {};
             field.block = element.kind == Element::Kind::VertexParam ? 0 : 1;
             field.format = ShaderTypeFormat(element.type);
-            field.arraySize = element.count;
-            field.size = static_cast<uint16_t>(ElementTotalSize(element));
+            field.arraySize = count;
+            field.size = static_cast<uint16_t>(ElementTotalSize(element, count));
             size_t alignment = ShaderTypeAlign(element.type);
-            if (element.count > 1 && alignment < 16) {
+            if (count > 1 && alignment < 16) {
               alignment = 16;
             }
             size_t& cursor = field.block == 0 ? vertexCursor : fragmentCursor;
@@ -138,7 +150,45 @@ Layout DeriveLayout(const Variant& variant) {
   }
   layout.vertexBlockSize = static_cast<uint16_t>(AlignCursor(vertexCursor, 16));
   layout.fragmentBlockSize = static_cast<uint16_t>(AlignCursor(fragmentCursor, 16));
+  layout.specFields = DeriveSpecFields(family, variant);
   return layout;
+}
+
+std::vector<Layout::SpecField> DeriveSpecFields(const Family& family, const Variant& variant) {
+  std::vector<Layout::SpecField> specFields;
+  const auto modules = ModulesOf(family, variant);
+  // Id 0 is the master switch; the fields follow in module order, then element order.
+  uint16_t nextId = 1;
+  for (uint8_t slot = 0; slot < modules.count; ++slot) {
+    const Module* module = modules.list[slot];
+    if (module == nullptr || !ModulePresent(family, variant, slot)) {
+      continue;
+    }
+    const uint8_t dimBase = DimOffsetOf(family, variant, slot);
+    for (uint8_t index = 0; index < module->elementCount; ++index) {
+      const Element& element = module->elements[index];
+      if (!element.spec) {
+        continue;
+      }
+      // A spec element is part of the program interface: it must be a present uniform field in
+      // every variant of the family (no `when` gate), delivered as an Int scalar or an Int4 array.
+      assert(element.when < 0);
+      assert(element.kind == Element::Kind::Param);
+      assert(element.type == ShaderType::Int || element.type == ShaderType::Int4);
+      const uint16_t count = ElementCountOf(element, dimBase, variant);
+      assert((element.type == ShaderType::Int && count == 1) ||
+             (element.type == ShaderType::Int4 && count > 1));
+      Layout::SpecField field = {};
+      field.firstId = nextId;
+      field.slot = slot;
+      field.element = index;
+      specFields.push_back(field);
+      // A scalar owns one id; an ivec4 array element owns four (the constant-id slots the
+      // backends specialize per component).
+      nextId = static_cast<uint16_t>(nextId + (element.type == ShaderType::Int4 ? count * 4 : 1));
+    }
+  }
+  return specFields;
 }
 
 Layout::Slice Layout::SliceOf(uint8_t slotIndex) const {

@@ -20,6 +20,10 @@
 
 #include <cstring>
 
+#include "gpu/shaders/Layout.h"
+#include "gpu/shaders/KernelContract.h"
+#include "gpu/shaders/contract/SpecContract.h"
+
 namespace tgfx {
 
 namespace {
@@ -31,25 +35,100 @@ std::string DimMacro(const Module* module, const ModuleDim& dim) {
   return std::string(module->name) + "_" + dim.name;
 }
 
-void AppendBlockMember(const Module* module, const Element& element, std::string* text) {
+void AppendBlockMember(const Module* module, const Element& element, uint16_t count,
+                       std::string* text) {
   *text += "  ";
   *text += ShaderTypeGlslName(element.type);
   *text += " ";
   *text += ElementNameOf(module, element);
-  if (element.count > 1) {
+  if (count > 1) {
     *text += "[";
-    *text += std::to_string(element.count);
+    *text += std::to_string(count);
     *text += "]";
   }
   *text += ";\n";
 }
 
-bool ElementInVariant(const Element& element, uint8_t dimBase, const Variant& variant) {
-  if (element.when < 0) {
-    return true;
+/// The variant's specialization prologue: the master switch, one constant per declared id, the
+/// per-field accessors (constant when the runtime injected the values, the uniform otherwise) and
+/// one unrolled executor macro per module declaring a site. The generated forms mirror the former
+/// SpecCodegen output field for field, so the injectors and every backend keep their contracts.
+void AppendSpecBlock(const Family& family, const Variant& variant, const VariantModules& modules,
+                     std::string* text) {
+  const auto specFields = DeriveSpecFields(family, variant);
+  if (specFields.empty()) {
+    return;
   }
-  const uint8_t value = variant.values[dimBase + static_cast<uint8_t>(element.when)];
-  return element.whenValue >= 0 ? value == static_cast<uint8_t>(element.whenValue) : value != 0;
+  *text += "// The specialization contract: id 0 is the master switch; the runtime injects 1 plus\n";
+  *text += "// the field values per draw shape, and the generic compile keeps the defaults.\n";
+  *text += std::string("layout(constant_id = 0) const int ") + SpecContract::MasterSwitch +
+           " = 0;\n";
+  uint16_t nextId = 1;
+  for (const auto& field : specFields) {
+    const Module* module = modules.list[field.slot];
+    const Element& element = module->elements[field.element];
+    const uint16_t count = ElementCountOf(element, DimOffsetOf(family, variant, field.slot), variant);
+    const uint32_t idCount = element.type == ShaderType::Int4 ? count * 4u : 1u;
+    for (uint32_t offset = 0; offset < idCount; ++offset) {
+      const std::string id = std::to_string(nextId + offset);
+      *text += "layout(constant_id = " + id + ") const int " + SpecContract::ConstantPrefix +
+               id + " = 0;\n";
+    }
+    nextId = static_cast<uint16_t>(nextId + idCount);
+  }
+  for (const auto& field : specFields) {
+    const Module* module = modules.list[field.slot];
+    const Element& element = module->elements[field.element];
+    const std::string accessor =
+        std::string(module->name) + "_" + SpecContract::FieldAccessorPrefix + element.name;
+    const std::string fieldName = ElementNameOf(module, element);
+    if (element.type == ShaderType::Int) {
+      *text += "int " + accessor + "() { int s = " + SpecContract::MasterSwitch +
+               "; if (s == 1) { return " + SpecContract::ConstantPrefix +
+               std::to_string(field.firstId) + "; } return " + fieldName + "; }\n";
+      continue;
+    }
+    const uint16_t count = ElementCountOf(element, DimOffsetOf(family, variant, field.slot), variant);
+    *text += "ivec4 " + accessor + "(int i) {\n";
+    *text += std::string("  int s = ") + SpecContract::MasterSwitch + ";\n";
+    *text += "  if (s == 1) {\n";
+    for (uint16_t member = 0; member < count; ++member) {
+      const uint16_t base = static_cast<uint16_t>(field.firstId + member * 4);
+      const std::string prefix = std::string("    if (i == ") + std::to_string(member) +
+                                 ") { int a = " + SpecContract::ConstantPrefix;
+      *text += prefix + std::to_string(base) + "; int b = " + SpecContract::ConstantPrefix +
+               std::to_string(base + 1) + "; int c = " + SpecContract::ConstantPrefix +
+               std::to_string(base + 2) + "; int d = " + SpecContract::ConstantPrefix +
+               std::to_string(base + 3) + "; return ivec4(a, b, c, d); }\n";
+    }
+    *text += "    return ivec4(" + std::to_string(Op::None) + ", -2, -2, 0);\n";
+    *text += "  }\n";
+    *text += "  return " + fieldName + "[i];\n";
+    *text += "}\n";
+  }
+}
+
+/// The unrolled executor's macro: one guarded call site per slot of the variant's declared
+/// capacity. A macro, not a function, so the sites stay statements in the calling hook's scope —
+/// the same expansion the former tool pragma produced, now derived from the declaration.
+void AppendUnrollMacro(const Family& family, const Variant& variant, const Module* module,
+                       uint8_t slot, std::string* text) {
+  const UnrollSite& site = *module->unroll;
+  const Element& countElement = module->elements[site.countElement];
+  const uint16_t capacity = ElementCountOf(module->elements[site.capacityElement],
+                                           DimOffsetOf(family, variant, slot), variant);
+  const std::string countAccessor =
+      std::string(module->name) + "_" + SpecContract::FieldAccessorPrefix + countElement.name;
+  *text += "#define " + std::string(module->name) + "_RUN_UNROLLED_SLOTS() \\\n";
+  for (uint16_t slotIndex = 0; slotIndex < capacity; ++slotIndex) {
+    *text += "  if (" + countAccessor + "() > " + std::to_string(slotIndex) + ") { " +
+             site.function + "(" + std::to_string(slotIndex);
+    if (site.arguments != nullptr && site.arguments[0] != '\0') {
+      *text += ", " + std::string(site.arguments);
+    }
+    *text += "); }";
+    *text += slotIndex + 1 < capacity ? " \\\n" : "\n";
+  }
 }
 
 }  // namespace
@@ -92,7 +171,7 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
     const uint8_t dimBase = DimOffsetOf(family, variant, slot);
     for (uint8_t index = 0; index < module->elementCount; ++index) {
       const Element& element = module->elements[index];
-      const bool present = ElementInVariant(element, dimBase, variant);
+      const bool present = ElementPresentInVariant(element, dimBase, variant);
       // Slotted kinds (attributes, instance attributes, varyings) number by their position among
       // all elements of the kind, so an absent one leaves a hole: the shader input then lands on
       // the geometry's own slot, mirroring GeometryProcessor::setVertexAttributes (a dropped
@@ -113,7 +192,8 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
         }
         varyingLocation++;
       } else if (present && element.kind == Element::Kind::VertexParam) {
-        AppendBlockMember(module, element, &vert);
+        AppendBlockMember(module, element, ElementCountOf(element, dimBase, variant),
+                        &vert);
       }
     }
     if (module->hasVertex) {
@@ -152,7 +232,7 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
     const uint8_t dimBase = DimOffsetOf(family, variant, slot);
     for (uint8_t index = 0; index < module->elementCount; ++index) {
       const Element& element = module->elements[index];
-      const bool present = ElementInVariant(element, dimBase, variant);
+      const bool present = ElementPresentInVariant(element, dimBase, variant);
       // Varyings follow the same hole rule as the vertex stage (the full-order ordinal on both
       // stages); textures stay compact because the runtime binds them sequentially by order, not
       // by the declared number.
@@ -164,7 +244,8 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
         }
         fragVaryingLocation++;
       } else if (present && element.kind == Element::Kind::Param) {
-        AppendBlockMember(module, element, &frag);
+        AppendBlockMember(module, element, ElementCountOf(element, dimBase, variant),
+                        &frag);
       } else if (present && element.kind == Element::Kind::Texture) {
         samplers += "layout(set = TGFX_TEXTURE_SET, binding = " + std::to_string(textureBinding) +
                     ") uniform sampler2D " + ElementNameOf(module, element) + ";\n";
@@ -180,6 +261,14 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
   frag += fragVaryings;
   frag += samplers;
   frag += "layout(location = 0) out vec4 fragColor;\n";
+  AppendSpecBlock(family, variant, modules, &frag);
+  for (uint8_t slot = 0; slot < modules.count; ++slot) {
+    const Module* module = modules.list[slot];
+    if (module == nullptr || !ModulePresent(family, variant, slot) || module->unroll == nullptr) {
+      continue;
+    }
+    AppendUnrollMacro(family, variant, module, slot, &frag);
+  }
   frag += includes;
   frag += "void main() {\n";
   frag += "  Fragment f;\n";

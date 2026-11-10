@@ -32,11 +32,11 @@ inline constexpr ModuleDim AtlasTextGeometryDims[] = {{"HAS_COVERAGE", 2}};
 
 inline constexpr Element AtlasTextGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "Position"},
-    {Element::Kind::Attribute, ShaderType::Float, "Coverage", 1, 0},
+    {Element::Kind::Attribute, ShaderType::Float, "Coverage", 1, 0, 0x02},
     {Element::Kind::Attribute, ShaderType::Float2, "MaskCoord"},
     {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
     {Element::Kind::Varying, ShaderType::Float2, "TexCoords"},
-    {Element::Kind::Varying, ShaderType::Float, "Coverage", 1, 0},
+    {Element::Kind::Varying, ShaderType::Float, "Coverage", 1, 0, 0x02},
     {Element::Kind::Varying, ShaderType::Float4, "Color"},
     {Element::Kind::VertexParam, ShaderType::Float2, "AtlasSizeInv"},
     {Element::Kind::Texture, ShaderType::Float4, "Sampler"},

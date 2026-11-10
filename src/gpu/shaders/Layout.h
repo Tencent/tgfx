@@ -38,8 +38,18 @@ struct Layout {
     /// The element's whole std140 footprint: an array of 17 vec4 is 272 bytes, so this is 16 bits
     /// (the first array element to exceed 255 bytes was the blur kernel table).
     uint16_t size = 0;
-    uint8_t arraySize = 1;
+    /// The element count: 16 bits because the slot interpreter's data pool reaches exactly 256
+    /// (32 slots * 7 words + the 32-word block region); the bundle codec already stores it wide.
+    uint16_t arraySize = 1;
     UniformFormat format = UniformFormat::Float;
+  };
+  /// One specialization field of the variant, in constant-id order (id 0 is the master switch).
+  /// `element` is the index in the slot's module declaration; the element's count says how many
+  /// ids it owns (an Int4 array takes four per element).
+  struct SpecField {
+    uint16_t firstId = 1;
+    uint8_t slot = 0;
+    uint8_t element = 0;
   };
   struct Attribute {
     std::string name;
@@ -75,6 +85,8 @@ struct Layout {
   std::vector<Attribute> attributes;
   std::vector<Varying> varyings;
   std::vector<Texture> textures;
+  /// The variant's specialization fields, in id order (see DeriveSpecFields).
+  std::vector<SpecField> specFields;
 
   /// The fields of the module at slotIndex (its slice of fields/moduleBase).
   struct Slice {
@@ -91,7 +103,17 @@ struct Layout {
                              const char* elementName) const;
 };
 
+/// Derives the layout of one variant of `family` (the explicit form the module tests use; the
+/// tool and the writer always pass the table row the variant names).
+Layout DeriveLayout(const Family& family, const Variant& variant);
+
 /// Derives the layout of one variant. The variant's family comes from Families() by index.
 Layout DeriveLayout(const Variant& variant);
+
+/// The variant's spec elements in id order: id 0 is the master switch, then one entry per spec
+/// element by module order, then element order (a scalar Int owns 1 id, an Int4 array four per
+/// element). The one allocation rule: DeriveLayout fills Layout::specFields through it and the
+/// assembler generates the constant declarations and accessors from it, so the two cannot drift.
+std::vector<Layout::SpecField> DeriveSpecFields(const Family& family, const Variant& variant);
 
 }  // namespace tgfx

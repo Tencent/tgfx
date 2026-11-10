@@ -224,6 +224,22 @@ std::string EmitDirectGLSL330Impl(const std::string& source, ShaderStageType sta
       cursor = lineEnd == std::string::npos ? result.size() : lineEnd + 1;
       continue;
     }
+    // The canonical assembled text spells the spec constants as `layout(constant_id = N) const
+    // int TGFX_SPEC_N = 0;` (the SPIRV-family dialect keeps them as OpSpecConstant). GL has no
+    // pipeline constants, so the qualifier is stripped and the declaration becomes the same
+    // idempotent macro default as the generic form below — the runtime specializes by inserting
+    // `#define TGFX_SPEC_N <value>` lines.
+    {
+      static const std::regex specQualifiedDefault(
+          R"(^layout\(constant_id = [0-9]+\) const int (TGFX_SPEC_[0-9]+) = 0;[ \t\r]*$)");
+      std::smatch specMatch;
+      if (std::regex_match(code, specMatch, specQualifiedDefault)) {
+        const auto macro = specMatch[1].str();
+        out += "#ifndef " + macro + "\n#define " + macro + " 0\n#endif\n";
+        cursor = lineEnd == std::string::npos ? result.size() : lineEnd + 1;
+        continue;
+      }
+    }
     // The generated spec constants (`const int TGFX_SPEC_<id> = 0;` from the generic spec
     // include) become idempotent macro defaults: the runtime specializes the text by inserting
     // `#define TGFX_SPEC_<id> <value>` lines after the #version line, and the preprocessor

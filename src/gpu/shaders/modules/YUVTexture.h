@@ -34,7 +34,7 @@ inline constexpr Element YUVTextureElements[] = {
     {Element::Kind::Varying, ShaderType::Float3, "Coord"},
     {Element::Kind::Texture, ShaderType::Float4, "SamplerY"},
     {Element::Kind::Texture, ShaderType::Float4, "SamplerUV"},
-    {Element::Kind::Texture, ShaderType::Float4, "SamplerV", 1, 0, 0},
+    {Element::Kind::Texture, ShaderType::Float4, "SamplerV", 1, 0, 0x01},
     {Element::Kind::Param, ShaderType::Float4, "Subset"},
     {Element::Kind::Param, ShaderType::Mat3, "ColorConversion"},
     {Element::Kind::Param, ShaderType::Int, "LimitedRange"},

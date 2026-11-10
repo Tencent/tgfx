@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 #include <set>
 #include <string>
+#include "TestDeclaredModules.h"
 #include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/Layout.h"
@@ -158,6 +159,68 @@ TEST(LayoutTest, DomainViewMatchesTheOrdinal) {
       }
     }
   }
+}
+
+namespace {
+
+const Layout::Field* FindField(const Layout& layout, const char* name) {
+  for (size_t index = 0; index < layout.fields.size(); ++index) {
+    if (layout.fieldNames[index] == name) {
+      return &layout.fields[index];
+    }
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+TEST(LayoutTest, SpecIdsFollowModuleThenElementOrder) {
+  const auto layout = DeriveLayout(test_modules::TestFamily, test_modules::TestVariant(1));  // CAP = 32
+  ASSERT_EQ(layout.specFields.size(), 2u);
+  // SlotCount: the scalar spec field, one id, in the body slot (Frame 0, geometry 1, body 2).
+  EXPECT_EQ(layout.specFields[0].firstId, 1u);
+  EXPECT_EQ(layout.specFields[0].slot, 2u);
+  // SlotPacked follows with four ids per element (32 elements => ids 2..129).
+  EXPECT_EQ(layout.specFields[1].firstId, 2u);
+}
+
+TEST(LayoutTest, PoolLengthsFollowTheCapacityDim) {
+  const uint16_t expected[] = {16, 32, 3};
+  const uint16_t expectedSize[] = {16 * 16, 32 * 16, 3 * 16};
+  for (uint8_t cap = 0; cap < 3; ++cap) {
+    const auto layout = DeriveLayout(test_modules::TestFamily, test_modules::TestVariant(cap));
+    // The spec Int4 pool and the plain Float4 payload both read their length from the CAP dim.
+    const auto* slotPacked = FindField(layout, "TestSpec_SlotPacked");
+    const auto* payload = FindField(layout, "TestSpec_Payload");
+    ASSERT_NE(slotPacked, nullptr);
+    ASSERT_NE(payload, nullptr);
+    EXPECT_EQ(slotPacked->arraySize, expected[cap]) << static_cast<int>(cap);
+    EXPECT_EQ(payload->arraySize, expected[cap]) << static_cast<int>(cap);
+    // The std140 footprint: one 16-byte stride per array element.
+    EXPECT_EQ(payload->size, expectedSize[cap]) << static_cast<int>(cap);
+  }
+}
+
+TEST(LayoutTest, WhenMaskSelectsExactlyTheMaskedValues) {
+  const Element& gated = test_modules::TestSpecElements[2];
+  // The gated element's mask is 0x02: it exists only at the dim value 1.
+  EXPECT_FALSE(ElementPresentInVariant(gated, 0));
+  EXPECT_TRUE(ElementPresentInVariant(gated, 1));
+  // The old "not zero" test over a dim of n values is every bit but the first.
+  EXPECT_EQ(WhenNotZero(2), 0x02u);
+  EXPECT_EQ(WhenNotZero(3), 0x06u);
+  EXPECT_EQ(WhenNotZero(5), 0x1Eu);
+}
+
+TEST(LayoutTest, SpecElementsLeaveTheUniformFieldIntact) {
+  const auto layout = DeriveLayout(test_modules::TestFamily, test_modules::TestVariant(0));
+  // A spec element is a uniform field like any other: the generic compile always reads it, and
+  // the bundle's reflection covers it. The field names carry the module prefix.
+  const auto body = layout.SliceOf(2);
+  ASSERT_GE(body.count, 3u);
+  EXPECT_EQ(body.names[0], "TestSpec_SlotCount");
+  EXPECT_EQ(body.names[1], "TestSpec_SlotPacked");
+  EXPECT_EQ(body.fields[1].arraySize, 16u);
 }
 
 }  // namespace tgfx

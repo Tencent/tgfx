@@ -32,15 +32,15 @@ namespace tgfx {
 inline constexpr ModuleDim GradientDims[] = {{"PRESENT", 2}};
 
 inline constexpr Element GradientElements[] = {
-    {Element::Kind::VertexParam, ShaderType::Mat3, "CoordMatrix", 1, 0},
-    {Element::Kind::Varying, ShaderType::Float2, "Coord", 1, 0},
-    {Element::Kind::Param, ShaderType::Float4, "LeftBorderColor", 1, 0},
-    {Element::Kind::Param, ShaderType::Float4, "RightBorderColor", 1, 0},
-    {Element::Kind::Param, ShaderType::Int, "LayoutType", 1, 0},
-    {Element::Kind::Param, ShaderType::Float, "Bias", 1, 0},
-    {Element::Kind::Param, ShaderType::Float, "Scale", 1, 0},
-    {Element::Kind::Param, ShaderType::Float4, "Start", 1, 0},
-    {Element::Kind::Param, ShaderType::Float4, "End", 1, 0},
+    {Element::Kind::VertexParam, ShaderType::Mat3, "CoordMatrix", 1, 0, 0x02},
+    {Element::Kind::Varying, ShaderType::Float2, "Coord", 1, 0, 0x02},
+    {Element::Kind::Param, ShaderType::Float4, "LeftBorderColor", 1, 0, 0x02},
+    {Element::Kind::Param, ShaderType::Float4, "RightBorderColor", 1, 0, 0x02},
+    {Element::Kind::Param, ShaderType::Int, "LayoutType", 1, 0, 0x02},
+    {Element::Kind::Param, ShaderType::Float, "Bias", 1, 0, 0x02},
+    {Element::Kind::Param, ShaderType::Float, "Scale", 1, 0, 0x02},
+    {Element::Kind::Param, ShaderType::Float4, "Start", 1, 0, 0x02},
+    {Element::Kind::Param, ShaderType::Float4, "End", 1, 0, 0x02},
 };
 
 inline constexpr Module Gradient = {

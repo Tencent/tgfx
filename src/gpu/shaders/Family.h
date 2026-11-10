@@ -96,6 +96,23 @@ bool ModulePresent(const Family& family, const Variant& variant, uint8_t slotInd
 /// The module sequence of the variant ([Frame, geometry, body..., Xfer]).
 VariantModules ModulesOf(const Family& family, const Variant& variant);
 
+/// Whether the element exists in the variant (dimBase is its slot's DimOffsetOf); the pure form
+/// taking the dim value directly lives in Module.h.
+inline bool ElementPresentInVariant(const Element& element, uint8_t dimBase,
+                                    const Variant& variant) {
+  return ElementPresentInVariant(
+      element, element.when < 0 ? 0 : variant.values[dimBase + static_cast<uint8_t>(element.when)]);
+}
+
+/// The element's array count in the variant (dimBase is its slot's DimOffsetOf); the pure form
+/// taking the dim value directly lives in Module.h.
+inline uint16_t ElementCountOf(const Element& element, uint8_t dimBase, const Variant& variant) {
+  return ElementCountOf(element,
+                        element.countWhen < 0
+                            ? 0
+                            : variant.values[dimBase + static_cast<uint8_t>(element.countWhen)]);
+}
+
 /// The fixed family table (Families.h); its order is the family index.
 const Family* Families();
 size_t FamilyCount();

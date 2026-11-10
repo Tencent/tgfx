@@ -116,10 +116,7 @@ inline std::map<std::string, UniformFormat> BuildParamFormatTable(
           const Element& element = module->elements[index];
           if (element.when >= 0) {
             const uint8_t value = variant.values[dimBase + static_cast<uint8_t>(element.when)];
-            const bool present = element.whenValue >= 0
-                                     ? value == static_cast<uint8_t>(element.whenValue)
-                                     : value != 0;
-            if (!present) {
+            if (!ElementPresentInVariant(element, value)) {
               continue;
             }
           }

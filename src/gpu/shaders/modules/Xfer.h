@@ -34,16 +34,16 @@ inline constexpr ModuleDim XferDims[] = {{"HAS_XP", 3}};
 /// the HAS_XP == 1 path, but they stay declared under HAS_XP == 2 too (the shader never reads
 /// them; the runtime binds the shared dummy texture) so one `when` rule covers them.
 inline constexpr Element XferElements[] = {
-    {Element::Kind::Param, ShaderType::Float2, "DstTextureUpperLeft", 1, 0},
-    {Element::Kind::Param, ShaderType::Float2, "DstTextureCoordScale", 1, 0},
-    {Element::Kind::Param, ShaderType::Int, "XPBlendMode", 1, 0},
+    {Element::Kind::Param, ShaderType::Float2, "DstTextureUpperLeft", 1, 0, 0x06},
+    {Element::Kind::Param, ShaderType::Float2, "DstTextureCoordScale", 1, 0, 0x06},
+    {Element::Kind::Param, ShaderType::Int, "XPBlendMode", 1, 0, 0x06},
     // The render-target write swizzle: 1 for ALPHA_8 targets (AAAA), 0 (a no-op) otherwise. It
     // stays unconditional because the HAS_XP == 0 path writes the composed color too.
     {Element::Kind::Param, ShaderType::Int, "OutputAlphaSwizzle"},
     // Only the dst-texture dialect declares the sampler: the framebuffer-fetch dialect reads the
     // destination through the subpass input, and a declared-but-unbound sampler would shift every
     // later texture binding at runtime.
-    {Element::Kind::Texture, ShaderType::Float4, "DstTextureSampler", 1, 0, 1},
+    {Element::Kind::Texture, ShaderType::Float4, "DstTextureSampler", 1, 0, 0x02},
 };
 
 inline constexpr Module Xfer = {"Xfer", XferDims, 1, XferElements, 5, false, true};

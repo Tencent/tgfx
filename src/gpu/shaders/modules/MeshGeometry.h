@@ -33,7 +33,7 @@ inline constexpr ModuleDim MeshGeometryDims[] = {{"TEX_COORDS", 2}};
 inline constexpr Element MeshGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "Position"},
     {Element::Kind::Attribute, ShaderType::Float, "Coverage"},
-    {Element::Kind::Attribute, ShaderType::Float2, "TexCoord", 1, 0},
+    {Element::Kind::Attribute, ShaderType::Float2, "TexCoord", 1, 0, 0x02},
     {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
     {Element::Kind::Varying, ShaderType::Float2, "Coord"},
     {Element::Kind::Varying, ShaderType::Float4, "Color"},

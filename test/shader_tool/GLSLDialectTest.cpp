@@ -151,6 +151,29 @@ void main() {
   EXPECT_EQ(FindDirectFormLeak(text, true).reason, nullptr) << text;
 }
 
+TEST(EmitDirectGLSTest, StripsTheSpecializationConstantsToMacroDefaults) {
+  // The canonical assembled text spells the spec constants with the constant_id qualifier; GL has
+  // no pipeline constants, so the qualifier must be stripped and the declaration must become the
+  // idempotent macro default the runtime specializes by inserting #define lines.
+  const char* const SpecTemplate = R"(#version 450
+layout(constant_id = 0) const int TGFX_SPEC_0 = 0;
+layout(constant_id = 7) const int TGFX_SPEC_7 = 0;
+layout(location = 0) out vec4 fragColor;
+void main() {
+  fragColor = vec4(float(TGFX_SPEC_7), 0.0, 0.0, 1.0);
+}
+)";
+  std::string error;
+  auto text = EmitDirectGLSL330(SpecTemplate, ShaderStageType::Fragment, nullptr, nullptr, &error);
+  EXPECT_TRUE(error.empty()) << error;
+  ASSERT_FALSE(text.empty());
+  EXPECT_EQ(text.find("constant_id"), std::string::npos) << text;
+  EXPECT_NE(text.find("#ifndef TGFX_SPEC_0\n#define TGFX_SPEC_0 0\n#endif"), std::string::npos)
+      << text;
+  EXPECT_NE(text.find("#ifndef TGFX_SPEC_7\n#define TGFX_SPEC_7 0\n#endif"), std::string::npos)
+      << text;
+}
+
 TEST(FindDirectFormLeakTest, AcceptsACleanTextOfEitherDialect) {
   const std::string gl = "#version 330\nlayout(location = 0) out vec4 fragColor;\n"
                          "void main() { fragColor = vec4(1.0); }\n";

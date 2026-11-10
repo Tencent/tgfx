@@ -57,24 +57,69 @@ struct Element {
   ShaderType type = ShaderType::Float4;
   /// Module-local name; the assembled GLSL and the derived layout spell it <Module>_<name>.
   const char* name = "";
-  /// Array length (std140 rounds each element up to 16 bytes).
+  /// Array length (std140 rounds each element up to 16 bytes). Fixed counts only; a length that
+  /// follows a capacity dim comes from countByValue instead.
   uint8_t count = 1;
-  /// Index of one of this module's dims; the element exists iff that dim's value is not 0.
-  /// -1 means unconditional. whenValue >= 0 narrows the rule to "the dim equals that value", for
-  /// the values a plain non-zero test cannot separate (the dst sampler exists only for HAS_XP==1,
-  /// while the framebuffer-fetch dialect must not declare it at all).
+  /// Index of one of this module's dims; -1 means unconditional. When >= 0 the element exists iff
+  /// (1u << dimValue) & whenMask — the old single-value and not-zero tests are the masks
+  /// (1u << whenValue) and WhenNotZero(dimCount) respectively. A mask of 0 with when >= 0 would be
+  /// an element that never exists: the derivation asserts against it.
   int8_t when = -1;
-  int8_t whenValue = -1;
-  /// Param only: delivered as a specialization constant when active (reserved; no module uses it
-  /// before the chain migration).
+  uint8_t whenMask = 0;
+  /// Param only: delivered as a specialization constant when active. A spec element must be
+  /// unconditional (its id set is part of the program interface, so a `when` gate could shift it)
+  /// and must be an Int or an Int4 array; the derivation asserts both.
   bool spec = false;
+  /// When >= 0: the element's array count is countByValue[value of this dim] instead of `count`.
+  /// The slot interpreter's two pool arrays are the one shape whose length is a capacity dim's
+  /// property (the former CHAIN_SLOT_CAPACITY macro, now a declaration fact). -1 = fixed count.
+  int8_t countWhen = -1;
+  const uint16_t* countByValue = nullptr;
 };
+
+/// The mask for the old "the dim is not zero" test over a dim of the given value count: every bit
+/// but bit 0 (a 2-value dim has 0x02, a 3-value dim 0x06, a 5-value dim 0x1E).
+constexpr uint8_t WhenNotZero(uint8_t dimCount) {
+  return static_cast<uint8_t>(((1u << dimCount) - 1u) & ~1u);
+}
+
+/// Whether the element exists in a variant whose `when` dim holds dimValue (dimValue is ignored
+/// for unconditional elements).
+constexpr bool ElementPresentInVariant(const Element& element, uint8_t dimValue) {
+  return element.when < 0 || (element.whenMask & (1u << dimValue)) != 0;
+}
+
+/// The element's array count in a variant whose `countWhen` dim holds dimValue (dimValue is
+/// ignored for fixed counts). 16 bits because the slot pool outgrows the byte (32 slots * 7 words
+/// + the 32-word block region is exactly 256).
+constexpr uint16_t ElementCountOf(const Element& element, uint8_t dimValue) {
+  if (element.countWhen < 0 || element.countByValue == nullptr) {
+    return element.count;
+  }
+  return element.countByValue[dimValue];
+}
 
 struct ModuleDim {
   /// Emitted as <Module>_<name>; a PRESENT dim with value 0 makes the assembler skip the whole
   /// module (elements and hooks).
   const char* name = "";
   uint8_t count = 0;
+};
+
+/// One module's unrolled executor site: the assembler generates the macro <Name>_RUN_UNROLLED_SLOTS
+/// (one guarded call per slot of the variant's declared capacity) and the fragment hook invokes it
+/// inside the function whose locals `arguments` names — a macro, not a function, so the site stays
+/// a statement sequence in the caller's scope, exactly like the former tool pragma's expansion.
+struct UnrollSite {
+  /// The module-local function that evaluates one slot, e.g. "chainRunSlotAt".
+  const char* function = "";
+  /// Forwarded verbatim after the slot index (the caller's locals, e.g.
+  /// "result, clipRegister, coverageRootRegister").
+  const char* arguments = "";
+  /// The spec Int4 array element whose variant count bounds the unroll (SlotPacked).
+  uint8_t capacityElement = 0;
+  /// The spec Int scalar element holding the live slot count (SlotCount).
+  uint8_t countElement = 0;
 };
 
 struct Module {
@@ -87,6 +132,9 @@ struct Module {
   bool hasVertex = false;
   /// <Name>.frag.glsl defines void <Name>_fragment(inout Fragment f).
   bool hasFragment = false;
+  /// Present on the modules that carry an unrolled executor (the chain family); the assembler
+  /// emits the site's macro from it.
+  const UnrollSite* unroll = nullptr;
 };
 
 /// The std140 byte size of one element of the type.

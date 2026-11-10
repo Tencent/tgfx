@@ -28,8 +28,8 @@ namespace tgfx {
 inline constexpr ModuleDim DeviceMaskDims[] = {{"PRESENT", 2}};
 
 inline constexpr Element DeviceMaskElements[] = {
-    {Element::Kind::Param, ShaderType::Mat3, "CoordMatrix", 1, 0},
-    {Element::Kind::Texture, ShaderType::Float4, "Sampler", 1, 0},
+    {Element::Kind::Param, ShaderType::Mat3, "CoordMatrix", 1, 0, 0x02},
+    {Element::Kind::Texture, ShaderType::Float4, "Sampler", 1, 0, 0x02},
 };
 
 inline constexpr Module DeviceMask = {"DeviceMask", DeviceMaskDims, 1, DeviceMaskElements, 2, false,

@@ -31,7 +31,7 @@ inline constexpr Element TextureElements[] = {
     {Element::Kind::VertexParam, ShaderType::Mat3, "CoordMatrix"},
     {Element::Kind::VertexParam, ShaderType::Mat3, "SubsetMatrix"},
     {Element::Kind::Varying, ShaderType::Float3, "Coord"},
-    {Element::Kind::Varying, ShaderType::Float4, "TexSubset", 1, 0},
+    {Element::Kind::Varying, ShaderType::Float4, "TexSubset", 1, 0, 0x02},
     {Element::Kind::Texture, ShaderType::Float4, "Sampler"},
     {Element::Kind::Param, ShaderType::Float4, "Subset"},
     {Element::Kind::Param, ShaderType::Int, "SubsetClampOn"},

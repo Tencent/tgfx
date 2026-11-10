@@ -33,12 +33,12 @@ inline constexpr ModuleDim QuadTextureGeometryDims[] = {{"HAS_UV_COORD", 2}, {"H
 inline constexpr Element QuadTextureGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "Position"},
     {Element::Kind::Attribute, ShaderType::Float, "InCoverage"},
-    {Element::Kind::Attribute, ShaderType::Float2, "UVCoord", 1, 0},
+    {Element::Kind::Attribute, ShaderType::Float2, "UVCoord", 1, 0, 0x02},
     {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
-    {Element::Kind::Attribute, ShaderType::Float4, "InTexSubset", 1, 1},
+    {Element::Kind::Attribute, ShaderType::Float4, "InTexSubset", 1, 1, 0x02},
     {Element::Kind::Varying, ShaderType::Float, "Coverage"},
     {Element::Kind::Varying, ShaderType::Float4, "Color"},
-    {Element::Kind::Varying, ShaderType::Float4, "TexSubset", 1, 1},
+    {Element::Kind::Varying, ShaderType::Float4, "TexSubset", 1, 1, 0x02},
     {Element::Kind::Param, ShaderType::Float4, "Color"},
     {Element::Kind::Param, ShaderType::Int, "HasCommonColor"},
 };
