@@ -36,6 +36,8 @@
 #include "gpu/aot/bundle/EmbeddedShaderBundles.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/select/PermutationMatch.h"
+#include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
@@ -348,6 +350,23 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
         continue;
       }
       seen += record.shaderName + "#" + std::to_string(record.fragPermutationIndex) + " ";
+      if (record.shaderName == "Chain") {
+        // The declared chain serves the same cell through its own variant space; decode it back
+        // into the legacy dims so this assertion keeps checking the cell, not the route.
+        const uint16_t chainIndex = FamilyIndexOf("Chain");
+        auto decoded = DecodeVariant(chainIndex, record.fragPermutationIndex);
+        ChainLegacyCell cell = {};
+        if (!decoded.has_value() || !DecodeChainCell(Families()[chainIndex], *decoded, &cell)) {
+          continue;
+        }
+        const bool resourceMatches = !gradientKind || cell.resource == 1;
+        if (cell.gpLayout == variant.gpLayout && cell.xp == expectedXP &&
+            cell.textureCount == variant.textureCount && cell.mask == variant.maskTexture &&
+            resourceMatches) {
+          served = true;
+        }
+        continue;
+      }
       if (record.shaderName != variant.shaderName) {
         continue;
       }

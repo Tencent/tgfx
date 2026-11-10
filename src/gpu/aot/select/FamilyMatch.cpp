@@ -17,10 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/select/FamilyMatch.h"
-
-#include "gpu/aot/chain/AOTChainBuilder.h"
-#include "gpu/shaders/kernels/PointwiseChainShader.h"
 #include <array>
+#include <cstdlib>
 #include "core/utils/Log.h"
 #include "gpu/YUVFormat.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
@@ -28,14 +26,19 @@
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/contract/DrawFacts.h"
+#include "gpu/shaders/kernels/PointwiseChainShader.h"
 
 namespace tgfx {
 
 namespace {
 
 bool& DeclaredChainEnabledStorage() {
-  static bool enabled = false;
+  // Off by default while the legacy interpreter still serves chain draws. The 2b gate flips it
+  // through the environment so the same binary can be compared both ways; 2c deletes the legacy
+  // path and hardwires the declared one.
+  static bool enabled = std::getenv("TGFX_DECLARED_CHAIN") != nullptr;
   return enabled;
 }
 
@@ -116,8 +119,7 @@ bool MatchSolidColor(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// fill whose sole fragment processor is the rasterized alpha-only shape mask. The mask's
 /// sampler facts come off the IR's sole coverage term, so the acceptance reads the carried IR.
 /// Slot layout: Frame(0), RectGeometry(1), MaskTexture(2), Xfer(3: HAS_XP).
-bool MatchMaskFill(const ProgramInfo* /*info*/, const DrawShape& shape,
-                   FamilyMatchResult* result) {
+bool MatchMaskFill(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::Default) {
     return false;
   }
@@ -212,8 +214,7 @@ bool MatchQuadColor(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// The RRect family's rule, carried over from the former NonAARRectFillShader: the non-AA
 /// rounded rect, at most one fragment (a sole analytic clip riding the runtime contract, or the
 /// single-tap tiled fill), never alpha-only, any xfer.
-bool MatchRRect(const ProgramInfo* /*info*/, const DrawShape& shape,
-                FamilyMatchResult* result) {
+bool MatchRRect(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::NonAARRect || shape.alphaOnlyTarget) {
     return false;
   }
@@ -278,8 +279,7 @@ const AOTGradientParameters* SoleGradientLeaf(const AOTEffectGraph& graph) {
 /// The Mesh family's rule, carried over from the former MeshFillShader: the mesh geometry with no
 /// fragment processor and any xfer. The flattened dims are the geometry's TEX_COORDS then the
 /// Xfer's HAS_XP, so the ordinal is TEX_COORDS + 2 * HAS_XP.
-bool MatchMesh(const ProgramInfo* /*info*/, const DrawShape& shape,
-               FamilyMatchResult* result) {
+bool MatchMesh(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::Mesh || shape.fragmentCount != 0 ||
       shape.xpType() < XP_NONE) {
     return false;
@@ -491,8 +491,8 @@ bool MatchGlassRefraction(const ProgramInfo* /*info*/, const DrawShape& shape, G
 /// families' geometries, so each family row gets its own one-line entry.
 bool MatchGlassRefractionEllipse(const ProgramInfo* /*info*/, const DrawShape& shape,
                                  FamilyMatchResult* result) {
-  return MatchGlassRefraction(/*info=*/nullptr, shape, GeometryKind::Ellipse,
-                              GlassRefractionIndex, result);
+  return MatchGlassRefraction(/*info=*/nullptr, shape, GeometryKind::Ellipse, GlassRefractionIndex,
+                              result);
 }
 
 bool MatchGlassRefractionQuad(const ProgramInfo* /*info*/, const DrawShape& shape,
@@ -539,21 +539,20 @@ bool MatchHairline(const ProgramInfo* /*info*/, const DrawShape& shape, Geometry
 /// The shared hairline rule's two table entries, one per family row.
 bool MatchHairlineLine(const ProgramInfo* /*info*/, const DrawShape& shape,
                        FamilyMatchResult* result) {
-  return MatchHairline(/*info=*/nullptr, shape, GeometryKind::HairlineLine,
-                       HairlineLineIndex, result);
+  return MatchHairline(/*info=*/nullptr, shape, GeometryKind::HairlineLine, HairlineLineIndex,
+                       result);
 }
 
 bool MatchHairlineQuad(const ProgramInfo* /*info*/, const DrawShape& shape,
                        FamilyMatchResult* result) {
-  return MatchHairline(/*info=*/nullptr, shape, GeometryKind::HairlineQuad,
-                       HairlineQuadIndex, result);
+  return MatchHairline(/*info=*/nullptr, shape, GeometryKind::HairlineQuad, HairlineQuadIndex,
+                       result);
 }
 
 /// The Ellipse family's rule, carried over from the former EllipseFillShader: the ellipse geometry
 /// with no color processor, a coverage that is anything but a local mask, and any xfer. DeviceMask
 /// carries PRESENT, so the ordinal is PRESENT + 2 * HAS_XP.
-bool MatchEllipse(const ProgramInfo* /*info*/, const DrawShape& shape,
-                  FamilyMatchResult* result) {
+bool MatchEllipse(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::Ellipse || shape.colorFPCount != 0 ||
       !shape.coverage.has_value() || *shape.coverage == Coverage::LocalMask ||
       shape.xpType() < XP_NONE) {
@@ -741,7 +740,8 @@ bool MatchChain(const ProgramInfo* info, const DrawShape& /*shape*/, FamilyMatch
   if (!composed.has_value()) {
     return false;
   }
-  // The composed values are the legacy dims in their own domain order; read them by name.
+  // The composed values are the legacy dims in their own domain order; the shared decoder folds
+  // them into the declared geometry/profile pair, so the matcher cannot drift from the tests.
   const auto vertDomain = PointwiseChainShader::VD::domain();
   const auto fragDomain = PointwiseChainShader::FD::domain();
   const auto vert = [&](const char* name) {
@@ -750,44 +750,22 @@ bool MatchChain(const ProgramInfo* info, const DrawShape& /*shape*/, FamilyMatch
   const auto frag = [&](const char* name) {
     return composed->fragValues[fragDomain.indexOf(name)];
   };
-  const int gpLayout = vert("GP_LAYOUT");
-  const int coverage = vert("HAS_COVERAGE");
-  const int uvCoord = vert("HAS_UV_COORD");
-  const int subset = vert("HAS_SUBSET");
-  const int xp = frag("HAS_XP");
-  const int textureCount = frag("TEXTURE_COUNT");
-  const int mask = frag("HAS_MASK_TEXTURE");
-  const int resource = frag("RESOURCE_KIND");
-  uint8_t geometry = 0;
-  if (gpLayout == 0) {
-    geometry = uvCoord != 0 ? (coverage != 0 ? 1 : 2) : 0;
-  } else if (gpLayout == 1) {
-    geometry = 3;
-  } else if (gpLayout == 2) {
-    geometry = 4;
-  } else {
-    geometry = 5;
-  }
-  const uint8_t stroke = gpLayout == 4 ? 1 : 0;
-  uint8_t profile = 0;
-  if (textureCount == 0 && mask == 0 && resource == 0) {
-    profile = 0;
-  } else if (textureCount == 0 && mask == 1 && resource == 0) {
-    profile = 1;
-  } else if (textureCount == 1 && mask == 0 && resource == 0) {
-    profile = 2;
-  } else if (textureCount == 0 && mask == 0 && resource == 1) {
-    profile = 3;
-  } else if (textureCount == 0 && mask == 1 && resource == 1) {
-    profile = 4;
-  } else if (textureCount == 1 && mask == 0 && resource == 1) {
-    profile = 5;
-  } else {
-    profile = 6;
-  }
-  return EncodeMatch(ChainIndex, geometry,
-                     {static_cast<uint8_t>(subset), stroke, profile, static_cast<uint8_t>(xp)},
-                     &result->variant);
+  ChainLegacyCell cell = {};
+  cell.gpLayout = vert("GP_LAYOUT");
+  cell.coverage = vert("HAS_COVERAGE");
+  cell.uvCoord = vert("HAS_UV_COORD");
+  cell.subset = vert("HAS_SUBSET");
+  cell.xp = frag("HAS_XP");
+  cell.textureCount = frag("TEXTURE_COUNT");
+  cell.mask = frag("HAS_MASK_TEXTURE");
+  cell.resource = frag("RESOURCE_KIND");
+  const uint8_t geometry = ChainGeometryOfCell(cell);
+  const uint8_t stroke = cell.gpLayout == 4 ? 1 : 0;
+  const uint8_t profile = ChainProfileOfCell(cell);
+  return EncodeMatch(
+      ChainIndex, geometry,
+      {static_cast<uint8_t>(cell.subset), stroke, profile, static_cast<uint8_t>(cell.xp)},
+      &result->variant);
 }
 
 }  // namespace
@@ -872,21 +850,25 @@ const FamilyMatchFunction* FamilyMatchers() {
 }
 
 std::optional<FamilyMatchResult> MatchAssembledFamily(const ProgramInfo* info,
-                                                     const DrawShape& shape) {
+                                                      const DrawShape& shape) {
   if (FamilyCount() == 0) {
     return std::nullopt;
   }
   const FamilyMatchFunction* matchers = FamilyMatchers();
   std::optional<FamilyMatchResult> accepted;
   uint16_t acceptedFamily = 0;
+  // Phase one: the curated shape rules, pairwise disjoint by contract (the tripwire below).
   for (uint16_t index = 0; index < FamilyCount(); ++index) {
+    if (Families()[index].fallback) {
+      continue;
+    }
     FamilyMatchResult result = {};
     if (!matchers[index](info, shape, &result)) {
       continue;
     }
     if (accepted.has_value()) {
 #if DEBUG
-      // The mutual-exclusion tripwire: the declared rules are pairwise disjoint by contract, so a
+      // The mutual-exclusion tripwire: the curated rules are pairwise disjoint by contract, so a
       // second acceptor means two predicates overlap and the walk order would silently pick the
       // winner. Reported and asserted in debug builds; release keeps the first acceptor.
       LOGE("[family-conflict] the %s and %s rules both accept one draw; narrow one of them",
@@ -902,7 +884,24 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const ProgramInfo* info,
     break;
 #endif
   }
-  return accepted;
+#if DEBUG
+  if (accepted.has_value()) {
+    return accepted;
+  }
+#endif
+  // Phase two: the fallback rows (the interpreter), consulted only when no curated rule accepted.
+  // Their acceptance is the carried IR's compilability, a superset of the shape rules, so they
+  // are excluded from the disjointness contract by design.
+  for (uint16_t index = 0; index < FamilyCount(); ++index) {
+    if (!Families()[index].fallback) {
+      continue;
+    }
+    FamilyMatchResult result = {};
+    if (matchers[index](info, shape, &result)) {
+      return result;
+    }
+  }
+  return std::nullopt;
 }
 
 }  // namespace tgfx

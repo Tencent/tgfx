@@ -39,8 +39,7 @@ struct AOTKernelMatch {
  * disjoint, so the iteration order (file-name order, the interpreter last) is not semantics:
  * the first acceptor is the only acceptor.
  */
-std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts,
-                                                const ProgramInfo* info,
+std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts, const ProgramInfo* info,
                                                 PermutationMatchFailure* failure);
 
 }  // namespace tgfx

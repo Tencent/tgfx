@@ -169,7 +169,11 @@ void ProgramWriter::writeUniformValues(const ProgramInfo& info, UniformData* ver
                                        UniformData* fragmentUniformData) const {
   auto array = GetRTAdjustArray(info.renderTarget);
   if (vertexUniformData != nullptr) {
-    vertexUniformData->setData(EngineParams::RTAdjust.name, array);
+    // The legacy kernels spell the vector through EngineParams ("tgfx_RTAdjust"); the declared
+    // families' Frame module spell it "RTAdjust". Write whichever spelling the program carries —
+    // both are optional so the other one is a silent no-op instead of a log line per draw.
+    vertexUniformData->setDataOptional(EngineParams::RTAdjust.name, array);
+    vertexUniformData->setDataOptional("RTAdjust", array);
   }
   writeEngineDefaults(info, fragmentUniformData);
 
@@ -894,7 +898,11 @@ void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program
 #endif
     renderPass->setTexture(textureBinding++, dstTextureView->getTexture(), sampler);
   }
-  DEBUG_ASSERT(textureBinding == program->expectedTextureCount());
+  if (textureBinding != program->expectedTextureCount()) {
+    LOGE("ChainProgramWriter::writeSamplers(): bound %u textures but the program declares %zu",
+         textureBinding, program->expectedTextureCount());
+    DEBUG_ASSERT(false);
+  }
 }
 
 }  // namespace tgfx

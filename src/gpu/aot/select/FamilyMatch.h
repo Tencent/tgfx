@@ -62,7 +62,7 @@ const FamilyMatchFunction* FamilyMatchers();
 /// the shape; the caller then falls back to the legacy kernel table (the transitional route
 /// until P3 removes it).
 std::optional<FamilyMatchResult> MatchAssembledFamily(const ProgramInfo* info,
-                                                     const DrawShape& shape);
+                                                      const DrawShape& shape);
 
 /// The declared Chain family's traffic switch (default off): while the legacy interpreter still
 /// serves chain draws, the declared rule must not claim them. Flipping it on lets the declared

@@ -107,7 +107,107 @@ PrecompiledShaderInfo AssembledFamilyInfo(const Family& family) {
   }
   AppendDomainEntries(&XferModule(), nullptr, owned, &nameIndex, &dims);
   PermutationDomain domain(dims);
-  return PrecompiledShaderInfo{family.name, "", "", domain, domain, 0};
+  return PrecompiledShaderInfo{family.name, "", "", domain, domain, family.textureReads};
+}
+
+uint8_t ChainGeometryOfCell(const ChainLegacyCell& cell) {
+  if (cell.gpLayout == 0) {
+    if (cell.coverage != 0) {
+      return cell.uvCoord != 0 ? 1 : 0;
+    }
+    return 2;
+  }
+  if (cell.gpLayout == 1) {
+    return 3;
+  }
+  if (cell.gpLayout == 2) {
+    return 4;
+  }
+  return 5;
+}
+
+uint8_t ChainProfileOfCell(const ChainLegacyCell& cell) {
+  if (cell.textureCount == 0 && cell.mask == 0 && cell.resource == 0) {
+    return 0;
+  }
+  if (cell.textureCount == 0 && cell.mask == 1 && cell.resource == 0) {
+    return 1;
+  }
+  if (cell.textureCount == 1 && cell.mask == 0 && cell.resource == 0) {
+    return 2;
+  }
+  if (cell.textureCount == 0 && cell.mask == 0 && cell.resource == 1) {
+    return 3;
+  }
+  if (cell.textureCount == 0 && cell.mask == 1 && cell.resource == 1) {
+    return 4;
+  }
+  if (cell.textureCount == 1 && cell.mask == 0 && cell.resource == 1) {
+    return 5;
+  }
+  return 6;
+}
+
+bool DecodeChainCell(const Family& family, const Variant& variant, ChainLegacyCell* cell) {
+  const uint8_t subset = DimValueOf(family, variant, 1, 0);
+  const uint8_t stroke = DimValueOf(family, variant, 1, 1);
+  const uint8_t profile = DimValueOf(family, variant, 2, 0);
+  cell->subset = subset;
+  cell->xp = DimValueOf(family, variant, 3, 0);
+  cell->coverage = 1;
+  cell->uvCoord = 0;
+  switch (variant.geometry) {
+    case 0:
+      break;
+    case 1:
+      cell->uvCoord = 1;
+      break;
+    case 2:
+      cell->coverage = 0;
+      cell->uvCoord = 1;
+      break;
+    case 3:
+      cell->gpLayout = 1;
+      cell->coverage = 0;
+      break;
+    case 4:
+      cell->gpLayout = 2;
+      cell->coverage = 0;
+      break;
+    default:
+      cell->gpLayout = 3 + stroke;
+      cell->coverage = 0;
+      break;
+  }
+  // PROFILE -> (texture count, mask, resource kind), the legacy cell terms.
+  switch (profile) {
+    case 0:
+      break;
+    case 1:
+      cell->mask = 1;
+      break;
+    case 2:
+      cell->textureCount = 1;
+      break;
+    case 3:
+      cell->resource = 1;
+      break;
+    case 4:
+      cell->mask = 1;
+      cell->resource = 1;
+      break;
+    case 5:
+      cell->textureCount = 1;
+      cell->resource = 1;
+      break;
+    case 6:
+      cell->textureCount = 1;
+      cell->resource = 2;
+      break;
+    default:
+      return false;
+  }
+  return true;
 }
 
 }  // namespace tgfx

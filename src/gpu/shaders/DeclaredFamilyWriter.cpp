@@ -196,14 +196,14 @@ void WriteCoverageTexture(const AOTTextureParameters& leaf, SlotWriter* writer) 
 // BindGradientNode uploads for the legacy instanced-shape kernel; the coordinate transform rides
 // the vertex block.
 void WriteGradient(const AOTGradientParameters& params, SlotWriter* writer) {
-  constexpr uint8_t CoordMatrix = UniformElementIndexOf(Gradient, "CoordMatrix");
-  constexpr uint8_t LeftBorderColor = UniformElementIndexOf(Gradient, "LeftBorderColor");
-  constexpr uint8_t RightBorderColor = UniformElementIndexOf(Gradient, "RightBorderColor");
-  constexpr uint8_t LayoutType = UniformElementIndexOf(Gradient, "LayoutType");
-  constexpr uint8_t Bias = UniformElementIndexOf(Gradient, "Bias");
-  constexpr uint8_t Scale = UniformElementIndexOf(Gradient, "Scale");
-  constexpr uint8_t Start = UniformElementIndexOf(Gradient, "Start");
-  constexpr uint8_t End = UniformElementIndexOf(Gradient, "End");
+  constexpr uint8_t CoordMatrix = UniformElementIndexOf(GradientModule, "CoordMatrix");
+  constexpr uint8_t LeftBorderColor = UniformElementIndexOf(GradientModule, "LeftBorderColor");
+  constexpr uint8_t RightBorderColor = UniformElementIndexOf(GradientModule, "RightBorderColor");
+  constexpr uint8_t LayoutType = UniformElementIndexOf(GradientModule, "LayoutType");
+  constexpr uint8_t Bias = UniformElementIndexOf(GradientModule, "Bias");
+  constexpr uint8_t Scale = UniformElementIndexOf(GradientModule, "Scale");
+  constexpr uint8_t Start = UniformElementIndexOf(GradientModule, "Start");
+  constexpr uint8_t End = UniformElementIndexOf(GradientModule, "End");
   writer->set(CoordMatrix, params.coordMatrix);
   writer->set(LeftBorderColor, params.leftBorder);
   writer->set(RightBorderColor, params.rightBorder);
@@ -521,8 +521,8 @@ void WriteQuadTextureGeometry(const ProgramInfo& info, SlotWriter* writer) {
 // subset bounds go through the same transform whether the geometry supplies uv coordinates or
 // the position (the old kernel's two uniforms held the same value).
 void WriteTexture(const ProgramInfo& info, const AOTTextureParameters& leaf, SlotWriter* writer) {
-  constexpr uint8_t CoordMatrix = UniformElementIndexOf(Texture, "CoordMatrix");
-  constexpr uint8_t SubsetMatrix = UniformElementIndexOf(Texture, "SubsetMatrix");
+  constexpr uint8_t CoordMatrix = UniformElementIndexOf(TextureModule, "CoordMatrix");
+  constexpr uint8_t SubsetMatrix = UniformElementIndexOf(TextureModule, "SubsetMatrix");
   // The subset bounds go through the leaf's bare coord transform (the old kernel's
   // texSubsetMatrix), while the source coordinate takes the transform with the geometry's uv
   // matrix pre-concatenated — the two differ exactly when the geometry carries a uv matrix.
@@ -532,7 +532,7 @@ void WriteTexture(const ProgramInfo& info, const AOTTextureParameters& leaf, Slo
       coordTransform != nullptr ? coordTransform->getTotalMatrix() : Matrix::I();
   writer->set(CoordMatrix, SourceCoordMatrix(info));
   writer->set(SubsetMatrix, subsetMatrix);
-  WriteTextureLeafParams<Texture>(leaf, writer);
+  WriteTextureLeafParams<TextureModule>(leaf, writer);
 }
 
 // LocalMask: the coverage mask's own coordinate transform, from the coverage TextureEffect.
@@ -1076,7 +1076,7 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       WriteAtlasTextGeometry(info, &writer);
     } else if (module == &QuadTextureGeometry) {
       WriteQuadTextureGeometry(info, &writer);
-    } else if (module == &Texture) {
+    } else if (module == &TextureModule) {
       if (match.tiledLeaf != nullptr) {
         WriteTexture(info, *match.tiledLeaf, &writer);
       }
@@ -1098,7 +1098,7 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       }
     } else if (module == &GlassLocalMask) {
       WriteGlassLocalMask(info, &writer, match.maskLeaf != nullptr);
-    } else if (module == &Gradient) {
+    } else if (module == &GradientModule) {
       if (match.gradient != nullptr) {
         WriteGradient(*match.gradient, &writer);
       }

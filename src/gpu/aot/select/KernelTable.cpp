@@ -94,8 +94,7 @@ void ReportDeclaredOverlap(const char* legacyName, const DrawShape& facts,
 
 }  // namespace
 
-std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts,
-                                                const ProgramInfo* info,
+std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts, const ProgramInfo* info,
                                                 PermutationMatchFailure* failure) {
 #if DEBUG
   AssertAtMostOneFamilyAccepts(facts);

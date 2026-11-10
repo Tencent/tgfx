@@ -40,7 +40,9 @@ inline constexpr Element TextureElements[] = {
     {Element::Kind::Param, ShaderType::Int, "HasRgbaaa"},
 };
 
-inline constexpr Module Texture = {
+// The variable carries a Module suffix because tgfx::Texture is the texture class this header
+// is often included beside; the declared name stays "Texture" (the assembled prefix).
+inline constexpr Module TextureModule = {
     "Texture", TextureDims, 1, TextureElements, std::size(TextureElements), true, true};
 
 }  // namespace tgfx

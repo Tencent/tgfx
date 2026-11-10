@@ -43,7 +43,8 @@ inline constexpr Element GradientElements[] = {
     {Element::Kind::Param, ShaderType::Float4, "End", 1, 0, 0x02},
 };
 
-inline constexpr Module Gradient = {
+// Module suffix: tgfx::Gradient is a shader class; the declared name stays "Gradient".
+inline constexpr Module GradientModule = {
     "Gradient", GradientDims, 1, GradientElements, std::size(GradientElements), true, true};
 
 }  // namespace tgfx

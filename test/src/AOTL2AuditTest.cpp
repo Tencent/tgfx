@@ -185,7 +185,8 @@ TGFX_TEST(AOTL2AuditTest, CleanBlendPrefersPointwiseChain) {
   EXPECT_EQ(noMatch, 0u);
   bool chainHit = false;
   for (const auto& record : cache->hitRecords()) {
-    chainHit = chainHit || record.shaderName == "PointwiseChainShader";
+    chainHit =
+        chainHit || record.shaderName == "PointwiseChainShader" || record.shaderName == "Chain";
   }
   EXPECT_TRUE(chainHit);
 }

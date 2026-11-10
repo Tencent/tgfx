@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/shaders/Family.h"
+#include "gpu/shaders/PrecompiledShader.h"  // ShaderTextureRead bits
 #include "gpu/shaders/modules/AnalyticClip.h"
 #include "gpu/shaders/modules/AtlasTextGeometry.h"
 #include "gpu/shaders/modules/BlurSourceGeometry.h"
@@ -169,7 +170,7 @@ inline constexpr FamilyModule RoundStrokeRectBody[] = {&AnalyticClip};
 /// DeviceMaskRuntime(4), AnalyticClip(5), Xfer(6).
 inline constexpr const Module* QuadTextureGeometries[] = {&QuadTextureGeometry};
 
-inline constexpr FamilyModule QuadTextureBody[] = {&Texture, &DeviceMaskRuntime, &LocalMask,
+inline constexpr FamilyModule QuadTextureBody[] = {&TextureModule, &DeviceMaskRuntime, &LocalMask,
                                                    &AnalyticClip};
 
 /// Slot layout: Frame(0), QuadTextureGeometry(1), Texture(2), LocalMask(3), DeviceMaskRuntime(4),
@@ -210,8 +211,8 @@ inline constexpr FamilyModule AtlasTextBody[] = {&DeviceMaskRuntime, &AnalyticCl
 inline constexpr const Module* ShapeInstancedTextureCoverageGeometries[] = {
     &ShapeInstancedGeometry};
 
-inline constexpr FamilyModule ShapeInstancedTextureCoverageBody[] = {&Gradient, &CoverageTexture,
-                                                                     &AnalyticClip};
+inline constexpr FamilyModule ShapeInstancedTextureCoverageBody[] = {
+    &GradientModule, &CoverageTexture, &AnalyticClip};
 
 /// Slot layout: Frame(0), ShapeInstancedGeometry(1), Gradient(2), CoverageTexture(3),
 /// AnalyticClip(4), Xfer(5).
@@ -332,7 +333,8 @@ inline constexpr Family FamilyTableStorage[] = {
     {"GlassUDFTentBlur", GlassUDFTentBlurGeometries, 1, GlassUDFTentBlurBody, 3},
     {"GlassRefraction", GlassRefractionGeometries, 1, GlassRefractionBody, 2},
     {"GlassRefractionQuad", GlassRefractionQuadGeometries, 1, GlassRefractionQuadBody, 3},
-    {"Chain", ChainGeometries, 6, ChainBody, 1, ChainVariantAllowed, /*bodyOwnsOutput=*/true},
+    {"Chain", ChainGeometries, 6, ChainBody, 1, ChainVariantAllowed, /*bodyOwnsOutput=*/true,
+     /*fallback=*/true, /*textureReads=*/ShaderTextureReadSwizzle},
 };
 
 inline const Family* FamilyTable() {

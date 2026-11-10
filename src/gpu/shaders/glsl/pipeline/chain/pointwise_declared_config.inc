@@ -19,7 +19,9 @@
 #define HAS_MASK_TEXTURE 0
 #endif
 
-#if PROFILE == 2 || PROFILE == 5
+// The gradient kind is profiles 3..5 (leaf-free, mask, four-leaf); profile 2 is the plain
+// four-leaf cell and must stay resource-kind 0.
+#if PROFILE == 3 || PROFILE == 4 || PROFILE == 5
 #define RESOURCE_KIND 1
 #elif PROFILE == 6
 #define RESOURCE_KIND 2

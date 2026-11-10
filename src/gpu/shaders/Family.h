@@ -73,6 +73,14 @@ struct Family {
   /// XferProcessor's blend pass inside its own evaluation): the assembler then declares the Xfer
   /// module's interface but skips its fragment hook, so the composition runs exactly once.
   bool bodyOwnsOutput = false;
+  /// The family is the walk's last resort, not a peer: its acceptance is "the draw compiles",
+  /// which is a superset of every curated shape predicate, so it is consulted only after every
+  /// non-fallback row rejected the draw and it takes no part in the disjointness tripwire. The
+  /// legacy kernel table gave its interpreter family exactly this role.
+  bool fallback = false;
+  /// The ShaderTextureRead bits the family's GLSL implements (see PrecompiledShader.h); the
+  /// admission gate refuses a draw that needs a semantic its matched family does not declare.
+  uint32_t textureReads = 0;
 };
 
 /// The module sequence of one variant: [Frame, geometry, body modules..., Xfer]. A module whose
