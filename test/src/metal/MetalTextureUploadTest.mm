@@ -197,7 +197,7 @@ static bool TexturePixelMatches(MetalGPU* gpu, std::shared_ptr<Texture> texture,
   return BufferPixelMatches(buffer, expected);
 }
 
-TGFX_TEST_PRIVATE(MetalTextureUploadTest, NestedBatchCopiesPixels) {
+TGFX_TEST_PRIVATE(MetalTextureUploadTest, UploadsFlushAtEncoderBoundary) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -220,21 +220,18 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, NestedBatchCopiesPixels) {
     memcpy(pixels.data() + index * 4, red.data(), 4);
     memcpy(pixels.data() + 16 + index * 4, green.data(), 4);
   }
-  queue->beginTextureUploadBatch();
-  queue->beginTextureUploadBatch();
   queue->writeTexture(texture, Rect::MakeXYWH(2, 3, 3, 2), pixels.data(), 16);
   EXPECT_TRUE(gate.isClosed());
   EXPECT_TRUE(queue->pendingUploadCommandBuffer != nil);
   EXPECT_EQ(queue->pendingUploadBytes, 24u);
   EXPECT_EQ(queue->pendingUploadCopies, 1u);
   std::fill(pixels.begin(), pixels.end(), 0);
-  queue->endTextureUploadBatch();
-  EXPECT_EQ(queue->textureUploadBatchDepth, 1u);
-  EXPECT_TRUE(queue->pendingUploadCommandBuffer != nil);
-  queue->endTextureUploadBatch();
+  auto encoder = gpu->createCommandEncoder();
+  ASSERT_TRUE(encoder != nullptr);
   EXPECT_TRUE(queue->pendingUploadCommandBuffer == nil);
-  EXPECT_EQ(queue->textureUploadBatchDepth, 0u);
+  EXPECT_EQ(queue->inFlightUploadBytes, 24u);
   gate.release();
+  queue->waitUntilCompleted();
   EXPECT_TRUE(TexturePixelMatches(gpu, texture, 2, 3, red));
   EXPECT_TRUE(TexturePixelMatches(gpu, texture, 4, 4, green));
   EXPECT_TRUE(TexturePixelMatches(gpu, texture, 1, 3, {0, 0, 0, 0}));
@@ -250,7 +247,6 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, CopyLimitSplitsBatch) {
   auto texture =
       MakeUploadTexture(gpu, 129, 1, MTLStorageModePrivate, MTLHazardTrackingModeTracked, false);
   ASSERT_TRUE(texture != nullptr);
-  queue->beginTextureUploadBatch();
   for (int index = 0; index < 128; ++index) {
     std::array<uint8_t, 4> pixel = {static_cast<uint8_t>(index), 32, 64, 255};
     queue->writeTexture(texture, Rect::MakeXYWH(index, 0, 1, 1), pixel.data(), 4);
@@ -262,7 +258,6 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, CopyLimitSplitsBatch) {
   std::array<uint8_t, 4> lastPixel = {255, 128, 64, 255};
   queue->writeTexture(texture, Rect::MakeXYWH(128, 0, 1, 1), lastPixel.data(), 4);
   EXPECT_EQ(queue->pendingUploadCopies, 1u);
-  queue->endTextureUploadBatch();
   EXPECT_TRUE(TexturePixelMatches(gpu, texture, 0, 0, {0, 32, 64, 255}));
   EXPECT_TRUE(TexturePixelMatches(gpu, texture, 127, 0, {127, 32, 64, 255}));
   EXPECT_TRUE(TexturePixelMatches(gpu, texture, 128, 0, lastPixel));
@@ -295,7 +290,6 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, LargePaddedUploadSplitsRows) {
       pixel[3] = 255;
     }
   }
-  queue->beginTextureUploadBatch();
   queue->writeTexture(texture, Rect::MakeXYWH(1, 1, 2048, 2049), pixels.data(), rowBytes);
   EXPECT_TRUE(gate.isClosed());
   ASSERT_EQ(queue->uploadSubmissions.size(), 1u);
@@ -303,7 +297,7 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, LargePaddedUploadSplitsRows) {
   EXPECT_EQ(queue->pendingUploadBytes, 2048u * 4);
   EXPECT_EQ(queue->pendingUploadCopies, 1u);
   std::fill(pixels.begin(), pixels.end(), 0);
-  queue->endTextureUploadBatch();
+  queue->flushTextureUploads();
   gate.release();
   EXPECT_TRUE(TexturePixelMatches(gpu, texture, 1, 1, {0, 32, 64, 255}));
   EXPECT_TRUE(TexturePixelMatches(gpu, texture, 2048, 2048, {2047 % 251, 32, 64, 255}));
@@ -377,7 +371,6 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, UntrackedUploadDrainsPriorAccesses) {
   encoder->copyTextureToBuffer(untracked, Rect::MakeWH(1, 1), buffer, 0, 256);
   queue->submit(encoder->finish());
   auto previous = [queue->lastSubmittedCommandBuffer retain];
-  queue->beginTextureUploadBatch();
   queue->writeTexture(tracked, Rect::MakeWH(1, 1), red.data(), 4);
   EXPECT_TRUE(gate.isClosed());
   gate.releaseAfter(std::chrono::milliseconds(100));
@@ -388,9 +381,7 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, UntrackedUploadDrainsPriorAccesses) {
   EXPECT_TRUE(queue->pendingUploadCommandBuffer == nil);
   EXPECT_TRUE(queue->uploadSubmissions.empty());
   EXPECT_EQ(queue->inFlightUploadBytes, 0u);
-  EXPECT_EQ(queue->textureUploadBatchDepth, 1u);
   [previous release];
-  queue->endTextureUploadBatch();
   EXPECT_TRUE(BufferPixelMatches(buffer, red));
   EXPECT_TRUE(TexturePixelMatches(gpu, untracked, 0, 0, green));
 
@@ -421,7 +412,6 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, EncoderAndSemaphoreFlushUploads) {
   auto waitSemaphore = MetalSemaphore::MakeFrom(gpu, gate.metalEvent(), 1);
   ASSERT_TRUE(waitSemaphore != nullptr);
   queue->waitSemaphore(waitSemaphore);
-  queue->beginTextureUploadBatch();
   std::array<uint8_t, 4> pixel = {32, 64, 128, 255};
   queue->writeTexture(texture, Rect::MakeWH(1, 1), pixel.data(), 4);
   EXPECT_TRUE(queue->pendingWaitSemaphore == nullptr);
@@ -445,7 +435,6 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, EncoderAndSemaphoreFlushUploads) {
   queue->submit(encoder->finish());
   EXPECT_TRUE(queue->pendingUploadCommandBuffer == nil);
   EXPECT_TRUE(queue->pendingSignalSemaphore == nullptr);
-  queue->endTextureUploadBatch();
 
   auto submitted = queue->lastSubmittedCommandBuffer;
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -506,7 +495,6 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, SharedUploadsRemainImmediate) {
   ASSERT_TRUE(texture != nullptr);
   std::array<uint8_t, 4> expected = {32, 64, 128, 255};
   auto pixels = expected;
-  queue->beginTextureUploadBatch();
   queue->writeTexture(texture, Rect::MakeWH(1, 1), pixels.data(), 4);
   pixels.fill(0);
   EXPECT_TRUE(queue->pendingUploadCommandBuffer == nil);
@@ -516,7 +504,6 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, SharedUploadsRemainImmediate) {
                         bytesPerRow:4
                          fromRegion:MTLRegionMake2D(0, 0, 1, 1)
                         mipmapLevel:0];
-  queue->endTextureUploadBatch();
   EXPECT_EQ(actual, expected);
 }
 
@@ -535,13 +522,11 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, MipmapsConsumeAsyncUploads) {
   for (size_t offset = 0; offset < pixels.size(); offset += 4) {
     memcpy(pixels.data() + offset, expected.data(), 4);
   }
-  queue->beginTextureUploadBatch();
   queue->writeTexture(texture, Rect::MakeWH(8, 8), pixels.data(), 32);
   auto encoder = gpu->createCommandEncoder();
   ASSERT_TRUE(encoder != nullptr);
   EXPECT_TRUE(queue->pendingUploadCommandBuffer == nil);
   encoder->generateMipmapsForTexture(texture);
-  queue->endTextureUploadBatch();
   queue->submit(encoder->finish());
   queue->waitUntilCompleted();
   auto nativeMip = [texture->metalTexture() newTextureViewWithPixelFormat:MTLPixelFormatRGBA8Unorm
@@ -563,22 +548,17 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, UploadOnlyWaitAndDestruction) {
       MakeUploadTexture(gpu, 1, 1, MTLStorageModePrivate, MTLHazardTrackingModeTracked, false);
   ASSERT_TRUE(texture != nullptr);
   std::array<uint8_t, 4> expected = {32, 64, 128, 255};
-  id<MTLCommandBuffer> lastUpload = nil;
   {
     MetalCommandQueue queue(gpu);
-    queue.beginTextureUploadBatch();
     queue.writeTexture(texture, Rect::MakeWH(1, 1), expected.data(), 4);
-    queue.endTextureUploadBatch();
     queue.waitUntilCompleted();
     EXPECT_TRUE(queue.uploadSubmissions.empty());
     EXPECT_EQ(queue.pendingUploadBytes, 0u);
     EXPECT_EQ(queue.inFlightUploadBytes, 0u);
     queue.writeTexture(texture, Rect::MakeWH(1, 1), expected.data(), 4);
-    ASSERT_EQ(queue.uploadSubmissions.size(), 1u);
-    lastUpload = [queue.uploadSubmissions.front().commandBuffer retain];
+    EXPECT_TRUE(queue.pendingUploadCommandBuffer != nil);
+    EXPECT_EQ(queue.pendingUploadBytes, 4u);
   }
-  EXPECT_EQ(lastUpload.status, MTLCommandBufferStatusCompleted);
-  [lastUpload release];
   EXPECT_TRUE(TexturePixelMatches(gpu, texture, 0, 0, expected));
 }
 
@@ -596,14 +576,13 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, OversizedUploadKeepsBudgetBounded) {
   TextureUploadGate gate(queue);
   ASSERT_TRUE(gate.isValid());
   gate.releaseAfter(std::chrono::milliseconds(300));
-  queue->beginTextureUploadBatch();
   queue->writeTexture(texture, Rect::MakeWH(4096, 4097), pixels.data(), 4096 * 4);
   EXPECT_LE(queue->pendingUploadBytes + queue->inFlightUploadBytes,
             queue->MAX_IN_FLIGHT_UPLOAD_BYTES);
   EXPECT_EQ(queue->pendingUploadBytes, 4096u * 4);
   EXPECT_EQ(queue->pendingUploadCopies, 1u);
   std::fill(pixels.begin(), pixels.end(), 0);
-  queue->endTextureUploadBatch();
+  queue->flushTextureUploads();
   gate.release();
   EXPECT_TRUE(TexturePixelMatches(gpu, texture, 0, 0, {64, 64, 64, 64}));
   EXPECT_TRUE(TexturePixelMatches(gpu, texture, 4095, 4096, {64, 64, 64, 64}));
@@ -625,10 +604,9 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, AlphaUploadPacksPartialRows) {
   auto texture = AdoptUploadTexture(gpu, [gpu->device() newTextureWithDescriptor:descriptor]);
   ASSERT_TRUE(texture != nullptr);
   std::array<uint8_t, 7> pixels = {16, 32, 64, 0, 128, 192, 255};
-  queue->beginTextureUploadBatch();
   queue->writeTexture(texture, Rect::MakeWH(3, 2), pixels.data(), 4);
   EXPECT_EQ(queue->pendingUploadBytes, 6u);
-  queue->endTextureUploadBatch();
+  queue->flushTextureUploads();
   auto buffer = gpu->createBuffer(512, GPUBufferUsage::READBACK);
   auto encoder = gpu->createCommandEncoder();
   ASSERT_TRUE(buffer != nullptr);
@@ -690,7 +668,6 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, DrawingBufferBatchesImageUploads) {
   ASSERT_TRUE(gate.isValid());
   context->submit(std::move(recording));
   EXPECT_TRUE(gate.isClosed());
-  EXPECT_EQ(queue->textureUploadBatchDepth, 0u);
   EXPECT_TRUE(queue->pendingUploadCommandBuffer == nil);
   ASSERT_EQ(queue->uploadSubmissions.size(), 1u);
   EXPECT_EQ(queue->inFlightUploadBytes, 2u * 4 * 4 * 4);

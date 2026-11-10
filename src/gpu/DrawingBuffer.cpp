@@ -34,8 +34,6 @@ DrawingBuffer::DrawingBuffer(Context* context)
 
 std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   DEBUG_ASSERT(!empty());
-  auto queue = context->gpu()->queue();
-  queue->beginTextureUploadBatch();
   {
     for (auto& task : resourceTasks) {
       task->execute(context);
@@ -46,7 +44,6 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
     task->upload(context);
     task = nullptr;
   }
-  queue->endTextureUploadBatch();
   auto commandEncoder = context->gpu()->createCommandEncoder();
   {
     for (auto& task : renderTasks) {

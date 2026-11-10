@@ -58,9 +58,6 @@ class MetalCommandQueue : public CommandQueue {
   void writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, const void* pixels,
                     size_t rowBytes) override;
 
-  void beginTextureUploadBatch() override;
-  void endTextureUploadBatch() override;
-
   /**
    * Commits pending texture uploads before encoding commands that consume them, without waiting
    * for GPU completion.
@@ -103,7 +100,6 @@ class MetalCommandQueue : public CommandQueue {
   id<MTLCommandBuffer> lastSubmittedCommandBuffer = nil;
   id<MTLCommandBuffer> pendingUploadCommandBuffer = nil;
   id<MTLBlitCommandEncoder> pendingUploadEncoder = nil;
-  size_t textureUploadBatchDepth = 0;
   size_t pendingUploadBytes = 0;
   size_t pendingUploadCopies = 0;
   size_t inFlightUploadBytes = 0;

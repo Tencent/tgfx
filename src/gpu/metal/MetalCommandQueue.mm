@@ -35,21 +35,6 @@ MetalCommandQueue::MetalCommandQueue(MetalGPU* metalGPU) : gpu(metalGPU) {
   commandQueue = [metalGPU->device() newCommandQueue];
 }
 
-void MetalCommandQueue::beginTextureUploadBatch() {
-  ++textureUploadBatchDepth;
-}
-
-void MetalCommandQueue::endTextureUploadBatch() {
-  DEBUG_ASSERT(textureUploadBatchDepth > 0);
-  if (textureUploadBatchDepth == 0) {
-    return;
-  }
-  --textureUploadBatchDepth;
-  if (textureUploadBatchDepth == 0) {
-    flushTextureUploads();
-  }
-}
-
 bool MetalCommandQueue::ensureTextureUploadEncoder() {
   if (pendingUploadEncoder != nil) {
     return true;
@@ -285,7 +270,7 @@ void MetalCommandQueue::writeTexture(std::shared_ptr<Texture> texture, const Rec
           ++pendingUploadCopies;
           [stagingBuffer release];
           row += rows;
-          if (textureUploadBatchDepth == 0 || pendingUploadCopies >= MAX_UPLOAD_BATCH_COPIES ||
+          if (pendingUploadCopies >= MAX_UPLOAD_BATCH_COPIES ||
               pendingUploadBytes >= MAX_UPLOAD_BATCH_BYTES) {
             flushTextureUploads();
           }

@@ -53,7 +53,9 @@ class CommandQueue {
    * fully contained within the texture's dimensions. If the texture has mipmaps, you should call
    * CommandEncoder's generateMipmapsForTexture() method after writing the pixels, as mipmaps will
    * not be generated automatically. This call does not generally wait for GPU completion; backends
-   * may synchronize uploads when the texture requires explicit hazard management.
+   * may defer the upload and submit it together with later uploads at a command encoder, submission,
+   * or synchronization boundary. Deferred uploads are still copied before this call returns, and
+   * backends may synchronize uploads when the texture requires explicit hazard management.
    * @param texture The texture to write to.
    * @param rect The destination rectangle in texture pixels.
    * @param pixels The pixel data to copy before this call returns.
@@ -61,24 +63,6 @@ class CommandQueue {
    */
   virtual void writeTexture(std::shared_ptr<Texture> texture, const Rect& rect, const void* pixels,
                             size_t rowBytes) = 0;
-
-  /**
-   * Begins a scope that allows consecutive texture uploads to share a submission. Scopes may be
-   * nested and every beginTextureUploadBatch() call must have a matching endTextureUploadBatch()
-   * call. Backends may submit uploads early to enforce resource limits or synchronization
-   * requirements. Pixel data is still copied before each writeTexture() call returns. The default
-   * implementation leaves the backend's upload behavior unchanged.
-   */
-  virtual void beginTextureUploadBatch() {
-  }
-
-  /**
-   * Ends the most recent texture upload batch scope. Ending the outermost scope submits any
-   * accumulated uploads without waiting for GPU completion. This does not submit separately
-   * encoded command buffers. The default implementation does nothing.
-   */
-  virtual void endTextureUploadBatch() {
-  }
 
   /**
    * Schedules the execution of the specified command buffer on the GPU.
