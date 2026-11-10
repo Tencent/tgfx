@@ -525,7 +525,7 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
   // semantics — alpha-only rejection is a row predicate (the ExtractFacts bodies), and
   // dedicatedKernelsEnabled gates the whole table.
   if (allowDedicated) {
-    if (auto table = KernelTableLookup(shape, failure)) {
+    if (auto table = KernelTableLookup(shape, programInfo, failure)) {
       return PermutationMatchResult{table->family, table->variant};
     }
   }

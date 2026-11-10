@@ -22,6 +22,13 @@
 #include "gpu/shaders/modules/AnalyticClip.h"
 #include "gpu/shaders/modules/AtlasTextGeometry.h"
 #include "gpu/shaders/modules/BlurSourceGeometry.h"
+#include "gpu/shaders/modules/Chain.h"
+#include "gpu/shaders/modules/ChainAtlasGeometry.h"
+#include "gpu/shaders/modules/ChainComplexGeometry.h"
+#include "gpu/shaders/modules/ChainEllipseGeometry.h"
+#include "gpu/shaders/modules/ChainHairlineGeometry.h"
+#include "gpu/shaders/modules/ChainRectGeometry.h"
+#include "gpu/shaders/modules/ChainRectUVGeometry.h"
 #include "gpu/shaders/modules/ComplexEllipseGeometry.h"
 #include "gpu/shaders/modules/ComplexRRectGeometry.h"
 #include "gpu/shaders/modules/CoverageTexture.h"
@@ -246,6 +253,59 @@ inline constexpr const Module* GlassRefractionQuadGeometries[] = {&QuadGeometry}
 inline constexpr FamilyModule GlassRefractionQuadBody[] = {&GlassRefraction, &GlassLocalMask,
                                                            &AnalyticClip};
 
+/// The Chain family: the pointwise interpreter as a declared assembly. The legacy kernel's five
+/// GP_LAYOUT values split into the six geometry modules whose attribute orders each pair by order
+/// with the GPs they share (see the module headers); the profile dimension folds the legacy
+/// (TEXTURE_COUNT, HAS_MASK_TEXTURE, RESOURCE_KIND) product into its seven reachable cells; the
+/// body is the shared interpreter text itself, spelled with the legacy interface names verbatim.
+/// The body owns the fragment output (it runs the XferProcessor's blend pass inside its own
+/// evaluation), so the Xfer module contributes its interface but not its hook.
+inline constexpr const Module* ChainGeometries[] = {&ChainRectGeometry,     &ChainRectUVGeometry,
+                                                    &ChainAtlasGeometry,    &ChainEllipseGeometry,
+                                                    &ChainHairlineGeometry, &ChainComplexGeometry};
+
+inline constexpr FamilyModule ChainBody[] = {&Chain};
+
+/// The reachable-set filter, restated over the new dimensions: the legacy Compose rules in terms
+/// of (geometry class, SUBSET/STROKE, PROFILE). The equivalence test pairs every enumerated variant
+/// with the legacy permutation set, so this function cannot drift from the old matcher's reachable
+/// set without failing the build.
+inline bool ChainVariantAllowed(const Variant& variant, const Family& family) {
+  // Every geometry declares the same (SUBSET, STROKE) pair so the family's ordinals decode against
+  // one flat domain; each geometry pins the dim it does not use to 0 here.
+  const uint8_t subset = DimValueOf(family, variant, 1, 0);
+  const uint8_t stroke = DimValueOf(family, variant, 1, 1);
+  const uint8_t profile = DimValueOf(family, variant, 2, 0);
+  switch (variant.geometry) {
+    case 0:
+      // ChainRectGeometry: every profile is reachable; the per-quad subset exists only on the
+      // plain four-leaf profile (the extended resource kinds carry no subset).
+      return stroke == 0 && (subset == 0 || profile == 2);
+    case 1:
+      // ChainRectUVGeometry: the uvCoord layouts — a mask-only profile requires the attribute-less
+      // layouts, and noise requires the uvless quad profile.
+      if (stroke != 0 || profile == 1 || profile == 4 || profile == 6) {
+        return false;
+      }
+      return subset == 0 || profile == 2;
+    case 2:
+      // ChainAtlasGeometry: the atlas route always carries the four leaf slots.
+      return subset == 0 && stroke == 0 && (profile == 2 || profile == 5);
+    case 3:
+      // ChainEllipseGeometry: the ellipse layout has no coverage or uvCoord attribute, so the
+      // mask-only profiles and noise are unreachable.
+      return subset == 0 && stroke == 0 &&
+             (profile == 0 || profile == 2 || profile == 3 || profile == 5);
+    case 4:
+      // ChainHairlineGeometry: the mask is reachable, noise is not.
+      return subset == 0 && stroke == 0 && profile != 6;
+    default:
+      // ChainComplexGeometry: the STROKE dim selects fill (3) or stroke (4); the mask is
+      // reachable, noise is not.
+      return subset == 0 && profile != 6;
+  }
+}
+
 /// The family table is the single definition site: a family exists by appearing here and nowhere
 /// else, so "defined but not registered" cannot happen — adding a row is the only way to add a
 /// family, and the match rules address the rows by position.
@@ -272,6 +332,7 @@ inline constexpr Family FamilyTableStorage[] = {
     {"GlassUDFTentBlur", GlassUDFTentBlurGeometries, 1, GlassUDFTentBlurBody, 3},
     {"GlassRefraction", GlassRefractionGeometries, 1, GlassRefractionBody, 2},
     {"GlassRefractionQuad", GlassRefractionQuadGeometries, 1, GlassRefractionQuadBody, 3},
+    {"Chain", ChainGeometries, 6, ChainBody, 1, ChainVariantAllowed, /*bodyOwnsOutput=*/true},
 };
 
 inline const Family* FamilyTable() {

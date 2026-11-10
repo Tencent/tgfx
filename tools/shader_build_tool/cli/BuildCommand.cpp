@@ -623,6 +623,17 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
     shaderReport.errorCount = 0;
     const auto variants = EnumerateVariants(family, static_cast<uint16_t>(familyIndex));
     shaderReport.rawCount = static_cast<uint32_t>(variants.size());
+    // A module carrying an unroll site is the interpreter assembly: its shared text reads the
+    // operator table (OP_* values) and the slot-pool capacities, which exist only as C++ constants.
+    // Those defines are injected for that family alone, so every other family's emitted text keeps
+    // its exact bytes.
+    bool familyNeedsChainContract = false;
+    for (uint8_t moduleIndex = 0; moduleIndex < family.moduleCount; ++moduleIndex) {
+      const FamilyModule& module = family.modules[moduleIndex];
+      if (module.module != nullptr && module.module->unroll != nullptr) {
+        familyNeedsChainContract = true;
+      }
+    }
     for (const auto& variant : variants) {
       const auto assembled = AssembleVariant(family, variant);
       // The assembled text carries module #includes; the compiler never sees one, so the same
@@ -630,7 +641,12 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       std::string expandError;
       const auto vertText = ExpandStageIncludes(assembled.vertText, options.shaderDir, &expandError);
       const auto fragText = ExpandStageIncludes(assembled.fragText, options.shaderDir, &expandError);
-      if (vertText.empty() || fragText.empty()) {
+      // The interpreter assembly carries the chain-ops pragma the legacy kernels also use; the
+      // declared path runs the same expansion after includes so both assemblies compile the same
+      // operator table.
+      auto vertExpanded = vertText.empty() ? std::string() : ExpandChainOpsPragma(vertText);
+      auto fragExpanded = fragText.empty() ? std::string() : ExpandChainOpsPragma(fragText);
+      if (vertExpanded.empty() || fragExpanded.empty()) {
         RecordBuildError(&report->diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
                          info.name, "", static_cast<int>(variant.ordinal), -1,
                          expandError.empty() ? "include expansion failed" : expandError);
@@ -642,8 +658,18 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         vertDefines.push_back(contractDefine);
         fragDefines.push_back(contractDefine);
       }
+      if (familyNeedsChainContract) {
+        for (const auto& opDefine : Op::Defines()) {
+          vertDefines.push_back(opDefine);
+          fragDefines.push_back(opDefine);
+        }
+        for (const auto& capacityDefine : SlotCapacityDefines()) {
+          vertDefines.push_back(capacityDefine);
+          fragDefines.push_back(capacityDefine);
+        }
+      }
       const auto& vertResult =
-          compiler->compileSpirv(PrependDefines(vertText, vertDefines), ShaderStageType::Vertex,
+          compiler->compileSpirv(PrependDefines(vertExpanded, vertDefines), ShaderStageType::Vertex,
                                  info.name, variant.ordinal, false);
       if (!vertResult.success) {
         RecordBuildError(&report->diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl,
@@ -651,8 +677,8 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         continue;
       }
       const auto& fragResult =
-          compiler->compileSpirv(PrependDefines(fragText, fragDefines), ShaderStageType::Fragment,
-                                 info.name, variant.ordinal, false);
+          compiler->compileSpirv(PrependDefines(fragExpanded, fragDefines),
+                                 ShaderStageType::Fragment, info.name, variant.ordinal, false);
       if (!fragResult.success) {
         RecordBuildError(&report->diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl,
                          info.name, "", -1, static_cast<int>(variant.ordinal), fragResult.error);
@@ -669,6 +695,27 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         continue;
       }
       shaderReport.compiledCount++;
+      // The specialization table, derived from the declaration like the generated text was: the
+      // same DeriveSpecFields call feeds the accessor ids the text carries, so the table the
+      // runtime injects through cannot disagree with the constants the shader reads.
+      std::vector<SpecEntry> specEntries;
+      const auto specFields = DeriveSpecFields(family, variant);
+      if (!specFields.empty()) {
+        const auto modules = ModulesOf(family, variant);
+        for (const auto& field : specFields) {
+          const Module* module = modules.list[field.slot];
+          const Element& element = module->elements[field.element];
+          SpecEntry entry = {};
+          entry.name = ElementNameOf(module, element);
+          entry.format = static_cast<uint8_t>(ShaderTypeFormat(element.type));
+          entry.arraySize =
+              element.type == ShaderType::Int4
+                  ? ElementCountOf(element, DimOffsetOf(family, variant, field.slot), variant)
+                  : 1;
+          entry.firstId = field.firstId;
+          specEntries.push_back(std::move(entry));
+        }
+      }
       for (auto& emitterEntry : emitters) {
         if (!PermutationCompilesForBackend(info, variant.ordinal, variant.ordinal,
                                            emitterEntry.first)) {
@@ -678,8 +725,8 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         input.info = &info;
         input.vertIndex = variant.ordinal;
         input.fragIndex = variant.ordinal;
-        input.vertSource = &vertText;
-        input.fragSource = &fragText;
+        input.vertSource = &vertExpanded;
+        input.fragSource = &fragExpanded;
         input.vertDefines = &vertDefines;
         input.fragDefines = &fragDefines;
         input.vertSpirv = &vertResult.spirv;
@@ -699,6 +746,7 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         variantData.fragmentBlob = std::move(stages->fragmentBlob);
         variantData.vertexReflection = reflection.vertexReflection;
         variantData.fragmentReflection = reflection.fragmentReflection;
+        variantData.fragmentReflection.specEntries = specEntries;
         report->variants.push_back(std::move(variantData));
       }
     }

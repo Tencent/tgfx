@@ -69,6 +69,10 @@ struct Family {
   uint8_t moduleCount = 0;
   /// Optional product filter over enumerated variants (e.g. the textured-stroke exclusion).
   bool (*allowed)(const Variant& variant, const Family& family) = nullptr;
+  /// The last body module owns the fragment output (the legacy chain's interpreter mixes the
+  /// XferProcessor's blend pass inside its own evaluation): the assembler then declares the Xfer
+  /// module's interface but skips its fragment hook, so the composition runs exactly once.
+  bool bodyOwnsOutput = false;
 };
 
 /// The module sequence of one variant: [Frame, geometry, body modules..., Xfer]. A module whose

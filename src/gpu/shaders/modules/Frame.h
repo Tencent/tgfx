@@ -28,7 +28,8 @@ inline constexpr Element FrameElements[] = {
     {Element::Kind::VertexParam, ShaderType::Float4, "RTAdjust"},
 };
 
-inline constexpr Module Frame = {"Frame", nullptr, 0, FrameElements, 1, false, false};
+inline constexpr Module Frame = {"Frame",           nullptr, 0, FrameElements, 1, false, false,
+                                 /*bareNames=*/true};
 
 inline const Module& FrameModule() {
   return Frame;

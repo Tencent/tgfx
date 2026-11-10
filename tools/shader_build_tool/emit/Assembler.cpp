@@ -29,7 +29,7 @@ namespace tgfx {
 namespace {
 
 std::string DimMacro(const Module* module, const ModuleDim& dim) {
-  if (ModuleIsImplicit(module)) {
+  if (module->bareNames) {
     return dim.name;
   }
   return std::string(module->name) + "_" + dim.name;
@@ -63,6 +63,9 @@ void AppendSpecBlock(const Family& family, const Variant& variant, const Variant
   *text += "// the field values per draw shape, and the generic compile keeps the defaults.\n";
   *text += std::string("layout(constant_id = 0) const int ") + SpecContract::MasterSwitch +
            " = 0;\n";
+  // The master-switch accessor the shared text branches on (one per specialized shader).
+  *text += std::string("bool ") + SpecContract::ActiveAccessor + "() { int s = " +
+           SpecContract::MasterSwitch + "; return s == 1; }\n";
   uint16_t nextId = 1;
   for (const auto& field : specFields) {
     const Module* module = modules.list[field.slot];
@@ -80,7 +83,8 @@ void AppendSpecBlock(const Family& family, const Variant& variant, const Variant
     const Module* module = modules.list[field.slot];
     const Element& element = module->elements[field.element];
     const std::string accessor =
-        std::string(module->name) + "_" + SpecContract::FieldAccessorPrefix + element.name;
+        (module->bareNames ? std::string() : std::string(module->name) + "_") +
+        SpecContract::FieldAccessorPrefix + element.name;
     const std::string fieldName = ElementNameOf(module, element);
     if (element.type == ShaderType::Int) {
       *text += "int " + accessor + "() { int s = " + SpecContract::MasterSwitch +
@@ -118,7 +122,8 @@ void AppendUnrollMacro(const Family& family, const Variant& variant, const Modul
   const uint16_t capacity = ElementCountOf(module->elements[site.capacityElement],
                                            DimOffsetOf(family, variant, slot), variant);
   const std::string countAccessor =
-      std::string(module->name) + "_" + SpecContract::FieldAccessorPrefix + countElement.name;
+      (module->bareNames ? std::string() : std::string(module->name) + "_") +
+      SpecContract::FieldAccessorPrefix + countElement.name;
   *text += "#define " + std::string(module->name) + "_RUN_UNROLLED_SLOTS() \\\n";
   for (uint16_t slotIndex = 0; slotIndex < capacity; ++slotIndex) {
     *text += "  if (" + countAccessor + "() > " + std::to_string(slotIndex) + ") { " +
@@ -252,7 +257,12 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
         textureBinding++;
       }
     }
-    if (module->hasFragment) {
+    // A body that owns the output (the legacy chain's interpreter) keeps the Xfer module's
+    // interface but not its hook: the composition already ran inside the body, and the hook's
+    // framebuffer-fetch input declaration would collide with the body's own include.
+    // The Xfer module always closes the sequence (ModulesOf appends it last).
+    const bool bodyOwnsXfer = family.bodyOwnsOutput && slot + 1 == modules.count;
+    if (module->hasFragment && !bodyOwnsXfer) {
       includes += "#include \"modules/" + std::string(module->name) + ".frag.glsl\"\n";
       calls += std::string("  ") + module->name + "_fragment(f);\n";
     }

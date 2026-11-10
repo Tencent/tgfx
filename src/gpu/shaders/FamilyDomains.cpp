@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/FamilyDomains.h"
+#include <cassert>
 #include <cstring>
 #include <map>
 #include <string>
@@ -35,9 +36,10 @@ void AppendDomainDims(const Module* module, const int8_t* pinned, std::vector<st
     if (pinned != nullptr && pinned[dim] >= 0) {
       continue;
     }
-    // Frame and Xfer are implicit singletons: their dim macros carry no module prefix, so the
-    // shared HAS_XP lookup the profile filters use keeps working.
-    owned->emplace_back(ModuleIsImplicit(module)
+    // A bare-names module (Frame, Xfer, the declared Chain) carries no dim prefix, so the shared
+    // HAS_XP lookup the profile filters use keeps working and the chain's hooks read the legacy
+    // dim macros verbatim.
+    owned->emplace_back(module->bareNames
                             ? module->dims[dim].name
                             : std::string(module->name) + "_" + module->dims[dim].name);
   }
@@ -71,9 +73,7 @@ PrecompiledShaderInfo AssembledFamilyInfo(const Family& family) {
   static std::map<const Family*, std::vector<std::string>> ownedNames;
   std::vector<std::string>& owned = ownedNames[&family];
   if (owned.empty()) {
-    for (uint8_t geometry = 0; geometry < family.geometryCount; ++geometry) {
-      AppendDomainDims(family.geometries[geometry], nullptr, &owned);
-    }
+    AppendDomainDims(family.geometries[0], nullptr, &owned);
     for (uint8_t index = 0; index < family.moduleCount; ++index) {
       AppendDomainDims(family.modules[index].module, family.modules[index].pinned, &owned);
     }
@@ -88,8 +88,18 @@ PrecompiledShaderInfo AssembledFamilyInfo(const Family& family) {
   if (family.geometryCount > 1) {
     dims.emplace_back(PermutationInt("GEOMETRY", family.geometryCount));
   }
-  for (uint8_t geometry = 0; geometry < family.geometryCount; ++geometry) {
-    AppendDomainEntries(family.geometries[geometry], nullptr, owned, &nameIndex, &dims);
+  // The ordinal composes the CHOSEN geometry's dims on the stride after the geometry, so every
+  // geometry must declare the dims positionally identical and the domain carries one copy. A
+  // family whose geometries disagree cannot be flat-decoded; the assert keeps that from slipping
+  // through as a silently wrong valueOf.
+  AppendDomainEntries(family.geometries[0], nullptr, owned, &nameIndex, &dims);
+  for (uint8_t geometry = 1; geometry < family.geometryCount; ++geometry) {
+    const Module& other = *family.geometries[geometry];
+    const Module& first = *family.geometries[0];
+    assert(other.dimCount == first.dimCount);
+    for (uint8_t dim = 0; dim < other.dimCount; ++dim) {
+      assert(other.dims[dim].count == first.dims[dim].count);
+    }
   }
   for (uint8_t index = 0; index < family.moduleCount; ++index) {
     AppendDomainEntries(family.modules[index].module, family.modules[index].pinned, owned,

@@ -130,7 +130,7 @@ TGFX_TEST(FamilyExclusivityTest, DedicatedFamiliesArePairwiseExclusiveOverTheFie
                 if (count == 1) {
                   everAccepted.insert(first);
                 }
-                if (MatchAssembledFamily(shape).has_value()) {
+                if (MatchAssembledFamily(nullptr, shape).has_value()) {
                   ++declaredAccepted;
                 }
                 if (count > 1) {

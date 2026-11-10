@@ -9,5 +9,9 @@
 #ifndef CHAIN_SOURCE_COORDS_LOC
 #define CHAIN_SOURCE_COORDS_LOC 7
 #endif
+// The declared Chain assembly declares the varying itself (the Chain module's SourceCoords
+// element, numbered by the assembler), so only the legacy kernels declare it here.
+#ifndef TGFX_DECLARED_CHAIN
 layout(location = CHAIN_SOURCE_COORDS_LOC) in vec3 SourceCoords;
+#endif
 #endif

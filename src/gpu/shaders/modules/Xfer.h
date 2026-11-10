@@ -46,7 +46,14 @@ inline constexpr Element XferElements[] = {
     {Element::Kind::Texture, ShaderType::Float4, "DstTextureSampler", 1, 0, 0x02},
 };
 
-inline constexpr Module Xfer = {"Xfer", XferDims, 1, XferElements, 5, false, true};
+inline constexpr Module Xfer = {"Xfer",
+                                XferDims,
+                                1,
+                                XferElements,
+                                5,
+                                false,
+                                true,
+                                /*bareNames=*/true};
 
 inline const Module& XferModule() {
   return Xfer;

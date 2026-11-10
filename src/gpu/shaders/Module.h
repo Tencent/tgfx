@@ -132,6 +132,12 @@ struct Module {
   bool hasVertex = false;
   /// <Name>.frag.glsl defines void <Name>_fragment(inout Fragment f).
   bool hasFragment = false;
+  /// The module spells its interface names verbatim (no <Module>_ prefix): uniform, attribute
+  /// and varying names, and its dim macros, appear exactly as declared. Frame and Xfer are the
+  /// singletons whose names the shared contracts spell bare; the declared Chain modules set it
+  /// too, because they reuse the legacy kernel's interface spellings verbatim (so the runtime
+  /// writers that address fields by name keep working unchanged).
+  bool bareNames = false;
   /// Present on the modules that carry an unrolled executor (the chain family); the assembler
   /// emits the site's macro from it.
   const UnrollSite* unroll = nullptr;
@@ -234,13 +240,6 @@ inline const char* ShaderTypeGlslName(ShaderType type) {
   return "float";
 }
 
-/// Frame and Xfer are implicit singletons: their dim macros and field names carry no module
-/// prefix, so the assembled text spells HAS_XP and DstTextureUpperLeft exactly like the shared
-/// xp contract the rest of the pipeline reads.
-inline bool ModuleIsImplicit(const Module* module) {
-  return std::strcmp(module->name, "Frame") == 0 || std::strcmp(module->name, "Xfer") == 0;
-}
-
 /// A module name the element array does not carry. Only declared, never defined: an odr-use is a
 /// link error, so even a runtime lookup with a mistyped name fails to build.
 uint8_t ElementNameNotFound();
@@ -296,18 +295,19 @@ constexpr bool HasElement(const Module& module, const char* name) {
   return false;
 }
 
-/// The assembled name of an element: bare for the implicit modules, <Module>_<name> otherwise.
+/// The assembled name of an element: verbatim for a bare-names module, <Module>_<name> otherwise.
 inline std::string ElementNameOf(const Module* module, const Element& element) {
-  if (ModuleIsImplicit(module)) {
+  if (module->bareNames) {
     return element.name;
   }
   return std::string(module->name) + "_" + element.name;
 }
 
-/// The assembled name of a varying: the v prefix keeps it apart from a same-named attribute.
+/// The assembled name of a varying: verbatim for a bare-names module (those declare the whole
+/// name, e.g. "vColor" and "TransformedCoords_0"), <Module>_v<name> otherwise.
 inline std::string VaryingNameOf(const Module* module, const Element& element) {
-  if (ModuleIsImplicit(module)) {
-    return std::string("v") + element.name;
+  if (module->bareNames) {
+    return element.name;
   }
   return std::string(module->name) + "_v" + element.name;
 }

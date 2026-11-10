@@ -24,6 +24,7 @@
 namespace tgfx {
 
 struct DrawShape;
+class ProgramInfo;
 struct AOTTextureParameters;
 struct AOTGradientParameters;
 struct AOTOpaqueKernelParameters;
@@ -42,8 +43,11 @@ struct FamilyMatchResult {
 };
 
 /// One declared family's match rule: the shape predicate plus the variant encoding, writing the
-/// matched variant and its data-source leaves into the result.
-using FamilyMatchFunction = bool (*)(const DrawShape& shape, FamilyMatchResult* result);
+/// matched variant and its data-source leaves into the result. The info is the draw's program
+/// being matched — the interpreter family compiles its carried IR through it (exactly what the
+/// legacy chain's Accept did), every other rule ignores it.
+using FamilyMatchFunction = bool (*)(const ProgramInfo* info, const DrawShape& shape,
+                                     FamilyMatchResult* result);
 
 /// The match rules, one per family table row, addressed by the family index (FamilyCount()
 /// entries; a row without a rule is a build failure). MatchAssembledFamily walks them for a
@@ -57,6 +61,13 @@ const FamilyMatchFunction* FamilyMatchers();
 /// one and the walk order carries no priority. Returns nullopt when no assembled family serves
 /// the shape; the caller then falls back to the legacy kernel table (the transitional route
 /// until P3 removes it).
-std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape);
+std::optional<FamilyMatchResult> MatchAssembledFamily(const ProgramInfo* info,
+                                                     const DrawShape& shape);
+
+/// The declared Chain family's traffic switch (default off): while the legacy interpreter still
+/// serves chain draws, the declared rule must not claim them. Flipping it on lets the declared
+/// family win the walk; the legacy chain then becomes unreachable and 2c deletes it.
+void SetDeclaredChainEnabled(bool enabled);
+bool DeclaredChainEnabled();
 
 }  // namespace tgfx

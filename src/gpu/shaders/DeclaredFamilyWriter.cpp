@@ -1018,7 +1018,7 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
   // The program's own rule alone: its family and variant were fixed at construction, and the rule
   // is the only place the per-draw data sources (the texture leaves, the kernels) come from.
   FamilyMatchResult match = {};
-  if (!FamilyMatchers()[variant.family](shape, &match)) {
+  if (!FamilyMatchers()[variant.family](&info, shape, &match)) {
     LOGE(
         "DeclaredFamilyProgramWriter: the draw no longer matches the %s family; uniforms stay "
         "unwritten",

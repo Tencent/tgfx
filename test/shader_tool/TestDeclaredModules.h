@@ -46,7 +46,7 @@ inline constexpr UnrollSite TestUnroll = {"runSlotAt", "result", /*capacityEleme
                                           /*countElement=*/0};
 
 inline constexpr Module TestSpecModule = {"TestSpec", TestSpecDims, 2, TestSpecElements, 4,
-                                          false, true, &TestUnroll};
+                                          false, true, /*bareNames=*/false, &TestUnroll};
 
 inline constexpr ModuleDim TestGeomDims[] = {{"STROKE", 2}};
 

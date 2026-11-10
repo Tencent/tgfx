@@ -40,6 +40,7 @@ struct AOTKernelMatch {
  * the first acceptor is the only acceptor.
  */
 std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts,
+                                                const ProgramInfo* info,
                                                 PermutationMatchFailure* failure);
 
 }  // namespace tgfx

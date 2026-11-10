@@ -77,7 +77,66 @@ std::string ExpandStageIncludes(const std::string& source, const std::string& sh
 /// and the loader above never sees them; their text must still reach the source digest, or a
 /// layout change would look like a fresh bundle.
 inline constexpr const char* GeneratorContractFiles[] = {"contract/ChainISA.h",
-                                                         "contract/ChainOps.h"};
+                                                         "contract/ChainOps.h",
+                                                         // The declaration layer generates the
+                                                         // assembled text the same way the chain
+                                                         // contract generates the interpreter's
+                                                         // operator table: a header change changes
+                                                         // what was compiled without touching any
+                                                         // shader source.
+                                                         "Module.h",
+                                                         "modules/AnalyticClip.h",
+                                                         "modules/AnalyticClipModule.h",
+                                                         "modules/AtlasTextGeometry.h",
+                                                         "modules/BlendParams.h",
+                                                         "modules/BlurSourceGeometry.h",
+                                                         "modules/Chain.h",
+                                                         "modules/ChainAtlasGeometry.h",
+                                                         "modules/ChainComplexGeometry.h",
+                                                         "modules/ChainEllipseGeometry.h",
+                                                         "modules/ChainHairlineGeometry.h",
+                                                         "modules/ChainParams.h",
+                                                         "modules/ChainRectGeometry.h",
+                                                         "modules/ChainRectUVGeometry.h",
+                                                         "modules/ColorSpaceParams.h",
+                                                         "modules/ComplexEllipseGeometry.h",
+                                                         "modules/ComplexRRectGeometry.h",
+                                                         "modules/CoverageTexture.h",
+                                                         "modules/DeviceMask.h",
+                                                         "modules/DeviceMaskModule.h",
+                                                         "modules/DeviceMaskRuntime.h",
+                                                         "modules/EllipseGeometry.h",
+                                                         "modules/EngineParams.h",
+                                                         "modules/Frame.h",
+                                                         "modules/GaussianBlur.h",
+                                                         "modules/GlassLocalMask.h",
+                                                         "modules/GlassRefraction.h",
+                                                         "modules/GlassUDFTentBlur.h",
+                                                         "modules/Gradient.h",
+                                                         "modules/HairlineLineGeometry.h",
+                                                         "modules/HairlineQuadGeometry.h",
+                                                         "modules/LocalMask.h",
+                                                         "modules/MaskTexture.h",
+                                                         "modules/MeshGeometry.h",
+                                                         "modules/ParamHandle.h",
+                                                         "modules/ParamWriter.h",
+                                                         "modules/PointwiseOpModule.h",
+                                                         "modules/PorterDuffXPModule.h",
+                                                         "modules/QuadColorGeometry.h",
+                                                         "modules/QuadGeometry.h",
+                                                         "modules/QuadTextureGeometry.h",
+                                                         "modules/RRectGeometry.h",
+                                                         "modules/RectGeometry.h",
+                                                         "modules/RoundStrokeRectGeometry.h",
+                                                         "modules/ShapeInstancedGeometry.h",
+                                                         "modules/Texture.h",
+                                                         "modules/TextureSourceModule.h",
+                                                         "modules/TiledSourceModule.h",
+                                                         "modules/TiledTexture.h",
+                                                         "modules/Xfer.h",
+                                                         "modules/YUVTexture.h",
+                                                         "Family.h",
+                                                         "Families.h"};
 
 /// Reads GeneratorContractFiles from the contract directory beside shaderDir (shaderDir points at
 /// .../shaders/glsl; the contract headers live in .../shaders/contract) and concatenates them in

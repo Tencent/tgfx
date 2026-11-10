@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "verify/ContractChecks.h"
+#include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -184,6 +186,19 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
       if (present) {
         checkedDimensions.insert(name);
       }
+    }
+  }
+  // The declared families generate their variants' defines from their module dims, so a source
+  // may condition on those names exactly like the legacy domains' names. The dead-dimension scan
+  // below stays on the legacy set: a declared dim's uses live in the modules' hook files, which
+  // the assembler, not this scan, ties to the enumeration.
+  for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
+    const auto familyInfo = AssembledFamilyInfo(Families()[familyIndex]);
+    for (const auto& dimension : familyInfo.vertDomain.getDimensions()) {
+      declaredDimensions.insert(std::visit(DimensionNameVisitor(), dimension));
+    }
+    for (const auto& dimension : familyInfo.fragDomain.getDimensions()) {
+      declaredDimensions.insert(std::visit(DimensionNameVisitor(), dimension));
     }
   }
   std::set<std::string> allowed = declaredDimensions;

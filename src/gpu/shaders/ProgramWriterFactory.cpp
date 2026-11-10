@@ -36,7 +36,9 @@ std::unique_ptr<ProgramWriter> MakeDeclaredFamilyProgramWriter(const ProgramInfo
 std::unique_ptr<ProgramWriter> MakeProgramWriter(const ProgramInfo& info,
                                                  const std::string& shaderName,
                                                  uint32_t permutationOrdinal) {
-  if (shaderName == PointwiseChainShader::Name) {
+  if (shaderName == PointwiseChainShader::Name || shaderName == "Chain") {
+    // The declared Chain family reuses the legacy interpreter's writer verbatim: the assembled
+    // block carries the same names, so every by-name write lands unchanged.
     return std::make_unique<ChainProgramWriter>();
   }
   if (shaderName == YUVTextureFillShader::Name) {

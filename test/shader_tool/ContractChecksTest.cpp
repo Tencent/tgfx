@@ -302,8 +302,10 @@ TEST(ReflectionContractTest, MoreThanTwoHundredFiftyFiveEntriesAreReported) {
 }
 
 TEST(ReflectionContractTest, AGenericSamplerWithAGapIsReported) {
+  // The gap index must not be a declared module's texture name: those are legal by construction
+  // (the Chain module declares TextureSampler_0..3), so the synthetic gap uses a free index.
   auto report = CheckReflection({VariantWithFragment(
-      {}, {TextureSampler("TextureSampler_0"), TextureSampler("TextureSampler_2")})});
+      {}, {TextureSampler("TextureSampler_0"), TextureSampler("TextureSampler_9")})});
   EXPECT_EQ(report.errors, 1u) << report.log;
   EXPECT_TRUE(report.mentions("indices must be dense from zero")) << report.log;
 }

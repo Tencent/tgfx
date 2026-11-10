@@ -74,8 +74,9 @@ void AssertAtMostOneFamilyAccepts(const DrawShape& facts) {
 /// failure: each (legacy, declared) pair prints once. A declared family that never shows up here
 /// either has no legacy counterpart left or never overlapped — the pair list is the migration's
 /// to-do list of rules that still need their legacy traffic drained before the table can go.
-void ReportDeclaredOverlap(const char* legacyName, const DrawShape& facts) {
-  auto assembled = MatchAssembledFamily(facts);
+void ReportDeclaredOverlap(const char* legacyName, const DrawShape& facts,
+                           const ProgramInfo* info) {
+  auto assembled = MatchAssembledFamily(info, facts);
   if (!assembled.has_value()) {
     return;
   }
@@ -94,6 +95,7 @@ void ReportDeclaredOverlap(const char* legacyName, const DrawShape& facts) {
 }  // namespace
 
 std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts,
+                                                const ProgramInfo* info,
                                                 PermutationMatchFailure* failure) {
 #if DEBUG
   AssertAtMostOneFamilyAccepts(facts);
@@ -110,7 +112,7 @@ std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts,
   // Every family must either join the table (FillKernel) or be the named interpreter: a family
   // that forgets both would otherwise vanish from matching silently.
 #if DEBUG
-#define DEBUG_OVERLAP_REPORT(legacyName, facts) ReportDeclaredOverlap(legacyName, facts)
+#define DEBUG_OVERLAP_REPORT(legacyName, facts) ReportDeclaredOverlap(legacyName, facts, info)
 #else
 #define DEBUG_OVERLAP_REPORT(legacyName, facts) ((void)0)
 #endif
@@ -135,7 +137,7 @@ std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts,
 #undef DEBUG_OVERLAP_REPORT
   // The declaration-driven families' variants ride the same bundle under the ordinal the family
   // table's domains encode.
-  if (auto assembled = MatchAssembledFamily(facts)) {
+  if (auto assembled = MatchAssembledFamily(info, facts)) {
     PermutationVariant variant = {};
     variant.vertPermutationIndex = assembled->variant.ordinal;
     variant.fragPermutationIndex = assembled->variant.ordinal;
