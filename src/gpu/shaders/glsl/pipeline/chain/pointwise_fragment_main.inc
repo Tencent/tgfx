@@ -94,7 +94,11 @@ bool chainLeafIsTiled(int leafIndex) {
 }
 #endif
 
+// The declared Chain assembly declares fragColor in its own template (the assembler emits one
+// located output per family), so the local declaration exists only on the legacy path.
+#ifndef TGFX_DECLARED_CHAIN
 layout(location = 0) out vec4 fragColor;
+#endif
 
 vec4 chainResults[16];
 
@@ -172,7 +176,9 @@ void chainRunSlotAt(int n, inout vec4 result, inout vec4 clipRegister,
   CHAIN_SLOT_WRITE(n, value)
 }
 
-void main() {
+// The whole evaluation, shared verbatim by the two assemblies: the legacy kernel's main() calls
+// it directly, and the declared Chain module's fragment hook calls it from the assembler's main.
+void chainMain() {
 #if GP_LAYOUT == 1
   // The ellipse edge coverage depends only on varyings, so it is evaluated ahead of the chain:
   // a coverage subtree's unit input consumes it (the -3 designator), and the tail below folds it
@@ -259,10 +265,15 @@ void main() {
     // The specialized executor: one call site per slot with literal indices. Once the runtime
     // injects the values, every guard and every selector word becomes a compile-time constant, so
     // the driver deletes the out-of-range call sites entirely.
-    // Generated: one guarded call site per slot of the declared capacity. The pragma keeps
-    // the tool the only place that knows the site count; the capacity macro picks the subset
-    // each profile compiles.
+    // One guarded call site per slot of the declared capacity. The two assemblies spell them
+    // differently: the declared Chain's macro comes from the module's UnrollSite declaration
+    // (assembler-generated, one line per slot of the variant's own capacity), while the legacy
+    // kernel keeps the tool pragma below — the tool expands it from the profile's capacity macro.
+#ifdef TGFX_DECLARED_CHAIN
+    Chain_RUN_UNROLLED_SLOTS()
+#else
     #pragma tgfx_spec_unroll chainRunSlotAt CHAIN_SLOT_CAPACITY SPEC_SlotCount (result, clipRegister, coverageRootRegister)
+#endif
 #if HAS_XP >= 1
     if (xpNeedsBlendPass()) {
       chainXPSrc = CHAIN_XP_SRC_UNPREMUL;
@@ -353,3 +364,11 @@ void main() {
 #undef CHAIN_XP_SRC_UNPREMUL
 #include "xp/output_swizzle.inc"
 }
+
+// The legacy kernel's entry; the declared assembly provides its own main() (the assembler's
+// template), which reaches chainMain through the Chain module's fragment hook.
+#ifndef TGFX_DECLARED_CHAIN
+void main() {
+  chainMain();
+}
+#endif
