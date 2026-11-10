@@ -59,7 +59,7 @@ static std::string separateSamplerDeclarations(const std::string& source) {
   return detail::ReplaceAllMatches(source, samplerRegex, replaceSeparatedSampler, binding);
 }
 
-// 分离资源后，采样、尺寸查询和整数像素读取仍须使用组合采样器类型。
+// Rebuilds combined samplers for texture sampling, size queries, and texel fetches.
 static std::string separateTextureLookups(const std::string& source,
                                           const std::vector<std::string>& samplerNames) {
   auto result = source;
