@@ -411,8 +411,15 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, EncoderAndSemaphoreFlushUploads) {
   ASSERT_TRUE(gate.isValid());
   auto waitSemaphore = MetalSemaphore::MakeFrom(gpu, gate.metalEvent(), 1);
   ASSERT_TRUE(waitSemaphore != nullptr);
-  queue->waitSemaphore(waitSemaphore);
   std::array<uint8_t, 4> pixel = {32, 64, 128, 255};
+  queue->writeTexture(texture, Rect::MakeWH(1, 1), pixel.data(), 4);
+  EXPECT_TRUE(queue->pendingUploadCommandBuffer != nil);
+  EXPECT_EQ(queue->pendingUploadBytes, 4u);
+  queue->waitSemaphore(waitSemaphore);
+  EXPECT_TRUE(queue->pendingUploadCommandBuffer == nil);
+  EXPECT_EQ(queue->pendingUploadBytes, 0u);
+  ASSERT_EQ(queue->uploadSubmissions.size(), 1u);
+  EXPECT_EQ(queue->uploadSubmissions.front().bytes, 4u);
   queue->writeTexture(texture, Rect::MakeWH(1, 1), pixel.data(), 4);
   EXPECT_TRUE(queue->pendingWaitSemaphore == nullptr);
   auto signalSemaphore = queue->insertSemaphore();
@@ -548,6 +555,7 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, UploadOnlyWaitAndDestruction) {
       MakeUploadTexture(gpu, 1, 1, MTLStorageModePrivate, MTLHazardTrackingModeTracked, false);
   ASSERT_TRUE(texture != nullptr);
   std::array<uint8_t, 4> expected = {32, 64, 128, 255};
+  std::array<uint8_t, 4> replacement = {128, 64, 32, 255};
   {
     MetalCommandQueue queue(gpu);
     queue.writeTexture(texture, Rect::MakeWH(1, 1), expected.data(), 4);
@@ -555,11 +563,12 @@ TGFX_TEST_PRIVATE(MetalTextureUploadTest, UploadOnlyWaitAndDestruction) {
     EXPECT_TRUE(queue.uploadSubmissions.empty());
     EXPECT_EQ(queue.pendingUploadBytes, 0u);
     EXPECT_EQ(queue.inFlightUploadBytes, 0u);
-    queue.writeTexture(texture, Rect::MakeWH(1, 1), expected.data(), 4);
+    EXPECT_TRUE(TexturePixelMatches(gpu, texture, 0, 0, expected));
+    queue.writeTexture(texture, Rect::MakeWH(1, 1), replacement.data(), 4);
     EXPECT_TRUE(queue.pendingUploadCommandBuffer != nil);
     EXPECT_EQ(queue.pendingUploadBytes, 4u);
   }
-  EXPECT_TRUE(TexturePixelMatches(gpu, texture, 0, 0, expected));
+  EXPECT_TRUE(TexturePixelMatches(gpu, texture, 0, 0, replacement));
 }
 
 TGFX_TEST_PRIVATE(MetalTextureUploadTest, OversizedUploadKeepsBudgetBounded) {
