@@ -80,15 +80,16 @@ struct GlassUDFGeometryParams : public GlassGeometryParams {
  * The output is vec4(refractDirection.xy, displacementDistance, lightResponse): the
  * corner-amplified refraction field, its per-pixel offset and the packed light response.
  * refractDirection is unit-length whenever it is nonzero, and displacementDistance is nonnegative.
- * The refraction processor clamps displacementDistance to the shared physical maximum before
- * applying it, so this contract bounds the final vector displacement. The
+ * The refraction processor bounds the final vector to the shared physical maximum: the UDF path
+ * clamps displacementDistance, while the SDF path retains its component-wise vector clamp. The
  * analytical SDF path carries the two edge terms (light-facing edge and light-away back-side rim,
  * coefficients 1 and 0.6), shading the adjacent edge faces separately and blending their responses
  * around a corner, plus a signed wide-band dark term (coefficient 0.05) on the light-facing side,
  * whose ramp is clamp(1 - edgeDistance / glassThickness, 0, 1)^2 read straight from the physical
  * glass thickness.
- * The mask/UDF path keeps the two edge terms only: the arbitrary-shape Figma pipeline exposes
- * exactly those two edge terms and no wide-band dark term, so none is added here.
+ * The mask/UDF path keeps the two edge terms only. Its tent-generated transition band is
+ * approximately 0.6 * glassThickness wide and it has no wide-band dark term, so its profile is not
+ * an SDF or Figma equivalent; profile alignment is outside this depth-unit change.
  */
 class GlassShapeGeometryFragmentProcessor : public FragmentProcessor {
  protected:

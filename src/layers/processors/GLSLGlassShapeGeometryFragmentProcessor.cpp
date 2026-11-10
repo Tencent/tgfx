@@ -237,7 +237,8 @@ void GLSLGlassSDFGeometryFragmentProcessor::onSetData(UniformData*,
                                                       UniformData* fragmentUniformData) const {
   float shapeData[4] = {params.halfW, params.halfH, params.cornerRadius, params.glassThickness};
   fragmentUniformData->setData("GlassShapeP0", shapeData);
-  float effectData[4] = {params.refractionFactor, params.splay, 0.0f, params.edgeBandLayerPixels};
+  float effectData[4] = {params.refractionFactor, params.splay, params.glassThickness,
+                         params.edgeBandLayerPixels};
   fragmentUniformData->setData("GlassShapeP1", effectData);
   float angle = params.lightAngle * static_cast<float>(M_PI) / 180.0f;
   float lightDirData[2] = {std::sin(angle), std::cos(angle)};
@@ -364,9 +365,10 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf(
       "  float normalizedThickness = clamp(%s.z / max(min(halfW, halfH), 0.0001), 0.0, 1.0);",
       effect.c_str());
-  // This shallow-depth curve is intentional and scale-invariant: K changes both glassThickness and
-  // minHalf, so normalizedThickness is unchanged. It makes displacement nonlinear in absolute depth
-  // at a fixed shape size, but not in the external K scaling contract.
+  // This UDF-only shallow-depth curve is intentional and scale-invariant. An external K scales both
+  // glassThickness and minHalf, leaving normalizedThickness and therefore depthScale unchanged. At a
+  // fixed shape size the curve is nonlinear in absolute depth, but it does not add a second K factor.
+  // The SDF path does not use this profile, and this change does not claim profile equivalence.
   fragBuilder->codeAppend("  float depthScale = smoothstep(0.0, 0.1, normalizedThickness);");
   fragBuilder->codeAppendf("  float distance = %s.z * %s.x * depthScale * gradientWeight;",
                            effect.c_str(), effect.c_str());

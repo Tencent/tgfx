@@ -60,12 +60,21 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   emitChild(geometryIndex, "vec4(glassUV, 0.0, 0.0)", &geometryOutput, args);
   // glassGeometry is vec4(refractDir.xy, offsetDist, lightResponse); see the geometry class doc.
   fragBuilder->codeAppendf("vec2 refractDir = %s.xy;", geometryOutput.c_str());
-  // The geometry child contracts that refractDir is unit-length when nonzero. Clamping the scalar
-  // distance here therefore bounds the final vector length for both SDF and UDF paths.
-  fragBuilder->codeAppendf("float offsetDist = clamp(%s.z, 0.0, %s.w);", geometryOutput.c_str(),
-                           common.c_str());
   fragBuilder->codeAppendf("float lightResponse = %s.w;", geometryOutput.c_str());
-  fragBuilder->codeAppend("vec2 displacement = refractDir * offsetDist;");
+  if (params.shapeType == GlassShapeType::AlphaMask) {
+    // The UDF distance can exceed the physical bound because of its proximity term. Constrain the
+    // scalar distance so a diagonal displacement cannot exceed the vector-length bound.
+    fragBuilder->codeAppendf("float offsetDist = clamp(%s.z, 0.0, %s.w);", geometryOutput.c_str(),
+                             common.c_str());
+    fragBuilder->codeAppend("vec2 displacement = refractDir * offsetDist;");
+  } else {
+    // Keep the original component-wise clamp for the SDF path. Its offset is already below the
+    // physical bound, but this exact expression preserves existing SDF pixel output.
+    fragBuilder->codeAppendf("float offsetDist = %s.z;", geometryOutput.c_str());
+    fragBuilder->codeAppend("vec2 displacement = refractDir * offsetDist;");
+    fragBuilder->codeAppendf("displacement = clamp(displacement, vec2(-%s.w), vec2(%s.w));",
+                             common.c_str(), common.c_str());
+  }
   fragBuilder->codeAppendf("vec2 uvOffset = vec2(displacement.x * %s.x, -displacement.y * %s.y);",
                            layerToSource.c_str(), layerToSource.c_str());
 

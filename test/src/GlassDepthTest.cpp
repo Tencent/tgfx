@@ -263,8 +263,12 @@ static void ExpectLinearScaleSeries(const std::array<float, 3>& displacements) {
 
 static void ExpectAbsoluteScaleSeries(const std::array<float, 3>& displacements,
                                       const std::array<float, 3>& expected) {
+  // The probe is read back as RGBA_F16 at x = 285 * K, so its quantization step grows with K.
+  // Scale the tolerance with that measurement resolution; the ratio assertions above still verify
+  // proportional displacement independently of this absolute-value tolerance.
+  constexpr std::array<float, 3> tolerances = {0.4f, 0.8f, 1.6f};
   for (size_t i = 0; i < displacements.size(); ++i) {
-    EXPECT_NEAR(displacements[i], expected[i], 0.75f)
+    EXPECT_NEAR(displacements[i], expected[i], tolerances[i])
         << "the render mapping must match the layer-pixel contract at index " << i;
   }
 }

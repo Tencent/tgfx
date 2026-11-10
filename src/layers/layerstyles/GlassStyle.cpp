@@ -50,6 +50,7 @@ struct GlassStyle::BackgroundMapping {
 // Sampling parameters of the refraction and edge-light UDF textures.
 struct GlassStyle::UDFSampling {
   Point pixelToLayerPixel;
+  float gradientSampleRadius = 0.0f;
   Point edgeSpan;
   Point textureOrigin;
   Point edgePixelToLayerPixel;
@@ -636,6 +637,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       }
       UDFSampling udf = {};
       udf.pixelToLayerPixel = {udfPixelToLayerPixelX, udfPixelToLayerPixelY};
+      udf.gradientSampleRadius = gradientSampleRadius;
       udf.edgeSpan = {edgeSpanX, edgeSpanY};
       udf.textureOrigin = udfTextureOrigin;
       udf.edgePixelToLayerPixel = {edgePixelToLayerPixelX, edgePixelToLayerPixelY};
@@ -813,8 +815,7 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
   udfParams.glassThickness = glassThickness;
   udfParams.refractionFactor = getRefractionFactor();
   udfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
-  udfParams.gradientSampleRadiusLayerPixels =
-      GetGradientSampleRadius(glassThickness, minHalf, udf.pixelToLayerPixel);
+  udfParams.gradientSampleRadiusLayerPixels = udf.gradientSampleRadius;
   udfParams.lightAngle = _lightAngle;
   udfParams.edgeBandLayerPixels = GetEdgeBandLayerPixels(contentScale);
   udfParams.udfPixelToLayerPixelX = udf.pixelToLayerPixel.x;

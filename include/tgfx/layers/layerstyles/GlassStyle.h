@@ -42,10 +42,11 @@ class GlassStyle : public LayerStyle {
   /**
    * Creates a new GlassStyle with the specified parameters.
    * @param refraction The amount of optical distortion along curved edges, range [0, 100].
-   * @param depth The inward refraction thickness from edges, in layer-space pixels. Rendering
-   *              clamps it to [0, min(halfWidth, halfHeight)]. NaN renders as zero, while infinite
-   *              values clamp to the corresponding finite endpoint. Callers that scale the layer
-   *              geometry must scale this value by the same factor.
+   * @param depth The inward refraction thickness from edges, in layer-space pixels. The supplied
+   *              value is stored unchanged; rendering computes the thickness as
+   *              clamp(depth, 0, min(halfWidth, halfHeight)). NaN renders as zero, while infinite
+   *              values clamp to the corresponding finite endpoint. A caller that scales geometry
+   *              must scale depth by the same factor; TGFX does not infer or apply that scale.
    * @param frost The amount of background blur (frosted glass), range [0, 100].
    * @param dispersion The intensity of chromatic aberration (rainbow prism effect), range [0, 100].
    * @param splay The blend factor for the refraction direction, range [0, 100]. At 0, refraction
@@ -71,8 +72,9 @@ class GlassStyle : public LayerStyle {
   void setRefraction(float value);
 
   /**
-   * Inward refraction thickness from edges, in layer-space pixels. The value is stored as supplied;
-   * rendering clamps it to [0, min(halfWidth, halfHeight)]. NaN renders as zero.
+   * Inward refraction thickness from edges, in layer-space pixels. The value is stored as supplied.
+   * Rendering computes clamp(depth, 0, min(halfWidth, halfHeight)); NaN renders as zero and infinite
+   * values clamp to the corresponding finite endpoint. TGFX never applies an external scale factor.
    */
   float depth() const {
     return _depth;
@@ -80,7 +82,8 @@ class GlassStyle : public LayerStyle {
 
   /**
    * Sets the inward refraction thickness in layer-space pixels. The raw value is preserved; TGFX
-   * applies the geometric clamp at render time and never applies an external scale factor.
+   * floors it at zero and caps it at min(halfWidth, halfHeight) at render time. A caller scaling the
+   * layer must scale this value by the same factor.
    */
   void setDepth(float value);
 
@@ -211,9 +214,9 @@ class GlassStyle : public LayerStyle {
     return std::clamp(_depth, 0.0f, std::max(minHalf, 0.0f));
   }
 
-  // Single physical displacement bound shared by the SDF shader, the UDF shader clamp, and the
-  // background-filter outset. The UDF profile shapes the value up to this bound, and the refraction
-  // shader clamps the final displacement to it.
+  // Single physical displacement bound shared by the SDF and UDF shaders and the background-filter
+  // outset. The SDF displacement is already within this vector-length bound and retains its original
+  // component-wise clamp; the UDF profile can exceed it, so the UDF path clamps its scalar distance.
   float getRefractionMaxDisplacement(float minHalf) const {
     return getGlassThickness(minHalf) * getRefractionFactor();
   }
