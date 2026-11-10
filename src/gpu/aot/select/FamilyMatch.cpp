@@ -319,6 +319,38 @@ bool MatchShapeInstancedTextureCoverage(const DrawShape& shape, Variant* variant
   return true;
 }
 
+/// The GaussianBlur family's rule, carried over from the former GaussianBlur1DShader.
+bool MatchGaussianBlur(const DrawShape& shape, Variant* variant, FamilyMatchResult* result) {
+  if (shape.geometry.kind != GeometryKind::Default &&
+      shape.geometry.kind != GeometryKind::QuadPerEdgeAA) {
+    return false;
+  }
+  if (shape.colorFPCount != 1) {
+    return false;
+  }
+  if (!shape.coverage.has_value() || shape.coverage == Coverage::LocalMask) {
+    return false;
+  }
+  if (shape.xpType() < XP_NONE) {
+    return false;
+  }
+  auto irShape = ReadOpaqueKernelIRShape(shape.ir, AOTOpaqueKernel::GaussianBlur1D, true);
+  if (!irShape) {
+    return false;
+  }
+  if (irShape->kernel->sigma < 1 || irShape->kernel->sigma > 10) {
+    return false;
+  }
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  variant->family = 17;
+  variant->geometry = 0;
+  variant->values[0] = hasXp;
+  variant->ordinal = static_cast<uint32_t>(hasXp);
+  result->blurKernel = irShape->kernel;
+  result->blurChild = irShape->childTexture;
+  return true;
+}
+
 /// The ComplexRRect family's rule, carried over from the former ComplexNonAARRectFillShader: the
 /// per-corner-radius rounded rect with no fragment processor and any xfer. STROKE is the geometry's
 /// own flag, so the ordinal is STROKE + 2 * HAS_XP.
@@ -578,6 +610,9 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
   }
   if (MatchShapeInstancedTextureCoverage(shape, &result.variant, &result.maskLeaf,
                                          &result.gradient)) {
+    return result;
+  }
+  if (MatchGaussianBlur(shape, &result.variant, &result)) {
     return result;
   }
   if (MatchAtlasText(shape, &result.variant)) {

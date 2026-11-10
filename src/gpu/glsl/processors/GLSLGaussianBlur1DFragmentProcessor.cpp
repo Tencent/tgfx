@@ -68,7 +68,6 @@ void GLSLGaussianBlur1DFragmentProcessor::onSetData(UniformData* /*vertexUniform
   matrix.mapPoints(stepVectors, 2);
   Point step = stepVectors[1] - stepVectors[0];
 
-  Blur1DFragmentProcessor::setKernelData(fragmentUniformData);
   fragmentUniformData->setData("Step", step);
   // Runtime flags of the shared blur kernel; a present mask FP overwrites HasDeviceMask with 1
   // later in traversal.

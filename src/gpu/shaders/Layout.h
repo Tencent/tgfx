@@ -35,7 +35,9 @@ struct Layout {
     uint16_t offset = 0;
     /// 0 = VertexUniformBlock, 1 = FragmentUniformBlock.
     uint8_t block = 0;
-    uint8_t size = 0;
+    /// The element's whole std140 footprint: an array of 17 vec4 is 272 bytes, so this is 16 bits
+    /// (the first array element to exceed 255 bytes was the blur kernel table).
+    uint16_t size = 0;
     uint8_t arraySize = 1;
     UniformFormat format = UniformFormat::Float;
   };

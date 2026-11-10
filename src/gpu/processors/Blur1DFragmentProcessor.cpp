@@ -26,11 +26,4 @@ namespace tgfx {
 Blur1DFragmentProcessor::Blur1DFragmentProcessor(uint32_t classID) : FragmentProcessor(classID) {
 }
 
-void Blur1DFragmentProcessor::setKernelData(UniformData* fragmentUniformData) const {
-  // Pack the half-kernel into a vec4 array. Unused trailing slots stay zero and are never indexed
-  // because the shader only accesses offsets within the stored radius. The writes are optional so
-  // the shared upload path also serves programs whose uniform block declares no kernel table.
-  fragmentUniformData->setDataOptional(BlurKernelModule::Kernel.name, packedKernel());
-  fragmentUniformData->setDataOptional(BlurKernelModule::Radius.name, kernelRadius);
-}
 }  // namespace tgfx

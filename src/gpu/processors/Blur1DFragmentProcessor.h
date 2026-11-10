@@ -76,7 +76,6 @@ class Blur1DFragmentProcessor : public FragmentProcessor {
    * Uploads the packed kernel and radius uniforms. The half-kernel uploads kernelRadius + 1
    * weights.
    */
-  void setKernelData(UniformData* fragmentUniformData) const;
 
   // The single-sided radius of the kernel.
   int kernelRadius = 0;

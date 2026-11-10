@@ -1031,9 +1031,8 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       // The draw anchor, not the lookup anchor: every prepare that finally refused a draw
       // incremented droppedDraws once (the pass probes that fall back to the original draw do
       // not), while the fallback counter also counts negative-cache replays of the same key.
-      auto testGate = EvaluateAOTCoverageGate(
-          result.drawStats.droppedDraws, deliberateNoMatching, environmentCompileFailures,
-          knownGapDrops);
+      auto testGate = EvaluateAOTCoverageGate(result.drawStats.droppedDraws, deliberateNoMatching,
+                                              environmentCompileFailures, knownGapDrops);
       coverageGate.noMatchingRule += testGate.noMatchingRule;
       coverageGate.excludedEnvironment += testGate.excludedEnvironment;
       coverageGate.excludedKnownGaps += testGate.excludedKnownGaps;

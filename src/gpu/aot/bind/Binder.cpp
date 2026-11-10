@@ -747,37 +747,9 @@ void BindRRectClipNode(const AOTRRectCoverageParameters& params, ParamWriter* wr
 
 void BindBlurKernelNode(const AOTOpaqueKernelParameters& params, const AOTTextureParameters* child,
                         ParamWriter* writer) {
-  writer->set(BlurKernelModule::Kernel, params.packedKernel);
-  writer->set(BlurKernelModule::Radius, params.kernelRadius);
-  Point stepVectors[] = {{0, 0}, {params.stepLength, 0}};
-  if (params.vertical) {
-    stepVectors[1] = {0, params.stepLength};
-  }
-  if (child != nullptr) {
-    // The child's coordinate transform as it resolves now: the raw matrix the leaf recorded,
-    // normalized by the view its proxy carries (CoordTransform::getTotalMatrix's math,
-    // replicated — a record-time total would miss the normalization of a texture that had not
-    // instantiated yet).
-    auto view = child->textureProxy != nullptr ? child->textureProxy->getTextureView() : nullptr;
-    auto matrix = child->uvMatrix;
-    if (view != nullptr) {
-      auto scale = view->getTextureCoord(1, 1);
-      matrix.postScale(scale.x, scale.y);
-      if (view->origin() == ImageOrigin::BottomLeft) {
-        matrix.postScale(1, -1);
-        auto translate = view->getTextureCoord(0, static_cast<float>(view->height()));
-        matrix.postTranslate(translate.x, translate.y);
-      }
-    }
-    matrix.mapPoints(stepVectors, 2);
-  }
-  Point step = stepVectors[1] - stepVectors[0];
-  const float stepValues[2] = {step.x, step.y};
-  writer->set(BlurKernelModule::Step, stepValues);
-  writer->set(DeviceMaskModule::HasDeviceMask, 0);
+  (void)params;
   writer->set(BlurKernelModule::TiledChild,
               child != nullptr && child->tiledRecipe.has_value() ? 1 : 0);
-  writer->set(BlurKernelModule::AlphaChild, child != nullptr && child->isAlphaOnly ? 1 : 0);
 }
 
 void BindPorterDuffXfer(int blendMode, const XferProcessor* processor, ParamWriter* writer) {

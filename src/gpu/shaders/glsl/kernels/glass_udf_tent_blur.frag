@@ -80,7 +80,7 @@ void main() {
       vec2 tapCoord = tiledMapCoord(sampleCoord, false, tapInCoord, tapSubsetCoord, tapClampedCoord);
       texColor = texture(TextureSampler_0, tapCoord);
       // RepeatLinearNone(3) seam blend, ported from the runtime GLSLTiledTextureEffect emission and
-      // shared with gaussian_blur_1d.frag.
+      // once shared with the Gaussian blur kernel.
       bool repeatX = ShaderModeX == 3 && tapSubsetCoord.x != tapClampedCoord.x;
       bool repeatY = ShaderModeY == 3 && tapSubsetCoord.y != tapClampedCoord.y;
       if (repeatX || repeatY) {

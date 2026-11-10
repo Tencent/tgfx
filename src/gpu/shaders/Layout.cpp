@@ -107,7 +107,7 @@ Layout DeriveLayout(const Variant& variant) {
             field.block = element.kind == Element::Kind::VertexParam ? 0 : 1;
             field.format = ShaderTypeFormat(element.type);
             field.arraySize = element.count;
-            field.size = static_cast<uint8_t>(ElementTotalSize(element));
+            field.size = static_cast<uint16_t>(ElementTotalSize(element));
             size_t alignment = ShaderTypeAlign(element.type);
             if (element.count > 1 && alignment < 16) {
               alignment = 16;

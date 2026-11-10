@@ -1,6 +1,6 @@
 // Shared blur-source vertex template: position transform plus one affine texture
 // coordinate, with the coord output preceding the position write. Used by
-// GaussianBlur1DShader and GlassUDFTentBlurShader.
+// the glass UDF tent blur.
 #version 450
 layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
