@@ -153,17 +153,17 @@ inline constexpr Element ChainElements[] = {
     // The coordinate transforms: with a resource source the source owns matrix 0 and the leaves
     // shift to 1..4 (the fifth leaf matrix is declared alongside the four-leaf forms); without
     // one the leaves own 0..3 and 4 is the declared-but-unread spare the legacy block kept.
-    {Element::Kind::VertexParam, ShaderType::Mat3, "CoordTransformMatrix_0", 1, -1,
+    {Element::Kind::VertexParam, ShaderType::Mat3, "CoordTransformMatrix_0", 1, 0,
      ChainCtmZeroMask},
-    {Element::Kind::VertexParam, ShaderType::Mat3, "CoordTransformMatrix_1", 1, -1,
+    {Element::Kind::VertexParam, ShaderType::Mat3, "CoordTransformMatrix_1", 1, 0,
      ChainCtmOneToFourMask},
-    {Element::Kind::VertexParam, ShaderType::Mat3, "CoordTransformMatrix_2", 1, -1,
+    {Element::Kind::VertexParam, ShaderType::Mat3, "CoordTransformMatrix_2", 1, 0,
      ChainCtmOneToFourMask},
-    {Element::Kind::VertexParam, ShaderType::Mat3, "CoordTransformMatrix_3", 1, -1,
+    {Element::Kind::VertexParam, ShaderType::Mat3, "CoordTransformMatrix_3", 1, 0,
      ChainCtmOneToFourMask},
-    {Element::Kind::VertexParam, ShaderType::Mat3, "CoordTransformMatrix_4", 1, -1,
+    {Element::Kind::VertexParam, ShaderType::Mat3, "CoordTransformMatrix_4", 1, 0,
      ChainCtmOneToFourMask},
-    {Element::Kind::VertexParam, ShaderType::Mat3, "CoordTransformMatrix_5", 1, -1,
+    {Element::Kind::VertexParam, ShaderType::Mat3, "CoordTransformMatrix_5", 1, 0,
      ChainCtmFiveMask},
 };
 

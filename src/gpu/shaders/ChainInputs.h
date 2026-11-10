@@ -19,10 +19,12 @@
 #pragma once
 
 #include <optional>
+#include <set>
+#include <utility>
 #include <vector>
 #include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
-#include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/Family.h"
 
 namespace tgfx {
 
@@ -81,15 +83,12 @@ struct PermutationVariant;
 ///     chains on the DefaultGP, hairline-line and complex rounded-rect layouts only.
 ///   HAS_SUBSET: mirrored with the vertex stage; leaf 0 clamps to vTexSubset ahead of its Subset
 ///     uniform, as the runtime TextureEffect applies the GP subset of a strict draw.
-class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
- public:
-  static constexpr const char* Name = "PointwiseChainShader";
-  static constexpr const char* VertFile = "kernels/pointwise_chain.vert";
-  static constexpr const char* FragFile = "kernels/pointwise_chain.frag";
-
-  // The kernel implements the GRAY_8 / RG_88 runtime read swizzle through its TextureEffect
-  // leaves, so the matcher may route such texture reads here.
-  static constexpr uint32_t TextureReads = ShaderTextureReadSwizzle;
+/// The interpreter's acceptance rules, kept after the shader family itself retired: the declared
+/// Chain family's matcher derives a draw's cell through them (DeriveInputs reads the compiled
+/// program — never the draw's shape — and Compose applies the legacy acceptance rules), and the
+/// equivalence test enumerates Reachable() as the frozen legacy reference set. A plain struct, not
+/// a family: nothing here registers a shader or joins the legacy table any more.
+struct ChainInputs {
 
   struct VertDims {
     // The dimension declarations: each handle is one dimension (typed by this stage), domain()
@@ -255,9 +254,6 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
 
   /// Whole-draw guards (alpha-only target, the GP profile classification, the chain leaf and
   /// budget shapes), defined in the family's own .cpp, next to the GLSL it owns.
-  static std::optional<Inputs> Extract(const ProgramInfo* programInfo,
-                                       PermutationMatchFailure* failure);
-
   /// The variant inputs of one compiled chain program for the draw programInfo describes (its
   /// geometry and xfer processors and its target). Pure derivation over data the caller already
   /// compiled; Extract is this plus the expression sourcing.
@@ -268,8 +264,19 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
   /// The variant one compiled chain program resolves to — the same DeriveInputs and Compose the
   /// matcher applies, so the AOT route (which holds the program before any cache lookup) and the
   /// matcher walk cannot disagree. Returns nullopt when the program's shape has no variant.
+  /// The declared variant the compiled program maps to (nullopt when the cell has no declared
+  /// counterpart — the allowed rule makes that unreachable for enumerable draws).
+  static std::optional<Variant> MatchVariant(const AOTProgram& program,
+                                             const ProgramInfo* programInfo);
+
+  /// The legacy (vert, frag) permutation the compiled program maps to — the reference encoding
+  /// the equivalence test and the retained composition tests compare against.
   static std::optional<PermutationVariant> MatchProgram(const AOTProgram& program,
                                                         const ProgramInfo* programInfo);
+
+  /// The frozen legacy reference set: every (vert, frag) permutation AllInputs maps through
+  /// Compose. The declared family's equivalence test pairs it against the declared enumeration.
+  static std::set<std::pair<uint32_t, uint32_t>> Reachable();
 
  private:
   static bool ComposeGP(const Inputs& inputs, ComposedDims<VertDims>* vert,

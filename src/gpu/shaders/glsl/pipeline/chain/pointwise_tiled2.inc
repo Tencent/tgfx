@@ -1,6 +1,6 @@
 // Shader-side leaf tiling with two scalar recipes (Tiled* and Tiled*2), used by the plain-chain
-// and noise resource kinds of PointwiseChainShader. Pairs with
-// pointwise_tiled2_uniforms.inc.
+// and noise resource kinds of the chain interpreter. Pairs with
+// the shared UBO declaration.
 
 // The number of recipe sets, and the leaf that reads recipe set `recipe` (-1 = unused). Pure
 // selector reads: main() uses them to find the tiled leaves without touching the chainTiled* state.

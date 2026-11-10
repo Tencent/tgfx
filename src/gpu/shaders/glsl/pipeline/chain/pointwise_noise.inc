@@ -1,5 +1,5 @@
 // Perlin noise source module (OP_PERLIN_NOISE), used by the noise resource kind (RESOURCE_KIND 2)
-// of PointwiseChainShader. Pairs with pointwise_noise_uniforms.inc. NoiseModeOctaves.w selects
+// of the chain interpreter. Pairs with the shared UBO declaration. NoiseModeOctaves.w selects
 // which leaf samplers hold the permutation and gradient lookup textures.
 #include "pipeline/chain/pointwise_source_coords.inc"
 

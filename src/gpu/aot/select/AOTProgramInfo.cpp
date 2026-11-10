@@ -26,9 +26,9 @@
 #include "gpu/aot/select/PrecompiledProgramCreator.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/aot/spec/SpecResolver.h"
+#include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/contract/DrawFacts.h"
-#include "gpu/shaders/kernels/PointwiseChainShader.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
@@ -59,13 +59,13 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& progra
     // Without a bundle there is no route; the plain fallback records the miss itself.
     return;
   }
-  auto variant = PointwiseChainShader::MatchProgram(program, &info);
+  auto variant = ChainInputs::MatchVariant(program, &info);
   if (!variant) {
     return;
   }
-  auto shaderInfo = ShaderRegistry::Find(PointwiseChainShader::Name);
-  if (shaderInfo == nullptr || !IsBuildablePermutation(*shaderInfo, variant->vertPermutationIndex,
-                                                       variant->fragPermutationIndex)) {
+  auto shaderInfo = ShaderRegistry::Find("Chain");
+  if (shaderInfo == nullptr ||
+      !IsBuildablePermutation(*shaderInfo, variant->ordinal, variant->ordinal)) {
     return;
   }
   // The same acceptance the plain lookup applies: a draw these gates refuse must not slip through
@@ -83,9 +83,9 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& progra
 
   BytesKey key = {};
   key.write(AOTRouteKeyTag);
-  key.write(ShaderNameHash(PointwiseChainShader::Name));
-  key.write(variant->vertPermutationIndex);
-  key.write(variant->fragPermutationIndex);
+  key.write(ShaderNameHash("Chain"));
+  key.write(variant->ordinal);
+  key.write(variant->ordinal);
   auto gp = info.getGeometryProcessor();
   if (gp != nullptr) {
     gp->computeProcessorKey(context, &key);
@@ -98,9 +98,9 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& progra
   // shape's specialized program. The capture runs the draw's own uniform writers over a CPU
   // scratch buffer (SpecCapture), so the key and the fold share one source of values. The entry
   // is the same one the plain route uses (SpecResolver), so both routes agree.
-  const SpecValues spec = SpecResolver::Resolve(
-      ContextCacheAccess::Cache(context), context->backend(), info, PointwiseChainShader::Name,
-      variant->vertPermutationIndex, variant->fragPermutationIndex);
+  const SpecValues spec =
+      SpecResolver::Resolve(ContextCacheAccess::Cache(context), context->backend(), info, "Chain",
+                            variant->ordinal, variant->ordinal);
   if (!spec.empty()) {
     spec.writeKey(&key);
   }
@@ -108,7 +108,7 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& progra
   auto globalCache = context->globalCache();
   auto resolved = globalCache->findProgram(key);
   if (resolved == nullptr) {
-    PermutationMatchResult match = {PointwiseChainShader::Name, *variant};
+    PermutationMatchResult match = {"Chain", {variant->ordinal, variant->ordinal}};
     resolved = PrecompiledProgramCreator::CreateProgramFromMatch(context, &info, match,
                                                                  spec.empty() ? nullptr : &spec);
     if (resolved == nullptr) {

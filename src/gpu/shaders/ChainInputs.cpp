@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/shaders/kernels/PointwiseChainShader.h"
+#include "gpu/shaders/ChainInputs.h"
 #include <optional>
 #include <vector>
 #include "gpu/DrawingManager.h"
@@ -32,30 +32,15 @@
 #include "gpu/processors/HairlineLineGeometryProcessor.h"
 #include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/contract/DrawFacts.h"
 
 namespace tgfx {
 
-std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
-    return std::nullopt;
-  }
-  if (programInfo->getGeometryProcessor() == nullptr) {
-    return std::nullopt;
-  }
-  // The interpreter's own subject: the whole effect expression resolves through the one compile
-  // entry — a plan pass arrives with its program, a plain draw compiles it on this first match,
-  // and every later prepare of the same op reads it back.
-  const auto* program = AOTChainBuilder::ResolveChainProgram(programInfo);
-  if (program == nullptr) {
-    return std::nullopt;
-  }
-  return DeriveInputs(*program, programInfo, failure);
-}
-
-std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::DeriveInputs(
-    const AOTProgram& program, const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+std::optional<ChainInputs::Inputs> ChainInputs::DeriveInputs(const AOTProgram& program,
+                                                             const ProgramInfo* programInfo,
+                                                             PermutationMatchFailure* failure) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -163,8 +148,41 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::DeriveInputs(
   return inputs;
 }
 
-std::optional<PermutationVariant> PointwiseChainShader::MatchProgram(
-    const AOTProgram& program, const ProgramInfo* programInfo) {
+std::optional<Variant> ChainInputs::MatchVariant(const AOTProgram& program,
+                                                 const ProgramInfo* programInfo) {
+  auto inputs = DeriveInputs(program, programInfo, nullptr);
+  if (!inputs) {
+    return std::nullopt;
+  }
+  auto composed = Compose(*inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  const auto vertDomain = VertDims::domain();
+  const auto fragDomain = FragDims::domain();
+  const auto vert = [&](const char* name) {
+    return composed->vertValues[vertDomain.indexOf(name)];
+  };
+  const auto frag = [&](const char* name) {
+    return composed->fragValues[fragDomain.indexOf(name)];
+  };
+  ChainLegacyCell cell = {};
+  cell.gpLayout = vert("GP_LAYOUT");
+  cell.coverage = vert("HAS_COVERAGE");
+  cell.uvCoord = vert("HAS_UV_COORD");
+  cell.subset = vert("HAS_SUBSET");
+  cell.xp = frag("HAS_XP");
+  cell.textureCount = frag("TEXTURE_COUNT");
+  cell.mask = frag("HAS_MASK_TEXTURE");
+  cell.resource = frag("RESOURCE_KIND");
+  const uint8_t stroke = cell.gpLayout == 4 ? 1 : 0;
+  return EncodeVariant(FamilyIndexOf("Chain"), ChainGeometryOfCell(cell),
+                       {static_cast<uint8_t>(cell.subset), stroke, ChainProfileOfCell(cell),
+                        static_cast<uint8_t>(cell.xp)});
+}
+
+std::optional<PermutationVariant> ChainInputs::MatchProgram(const AOTProgram& program,
+                                                            const ProgramInfo* programInfo) {
   auto inputs = DeriveInputs(program, programInfo, nullptr);
   if (!inputs) {
     return std::nullopt;
@@ -175,6 +193,21 @@ std::optional<PermutationVariant> PointwiseChainShader::MatchProgram(
   }
   return PermutationVariant{VertDims::domain().encode(composed->vertValues),
                             FragDims::domain().encode(composed->fragValues)};
+}
+
+std::set<std::pair<uint32_t, uint32_t>> ChainInputs::Reachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  const auto vertDomain = VertDims::domain();
+  const auto fragDomain = FragDims::domain();
+  for (const auto& inputs : AllInputs()) {
+    auto composed = Compose(inputs);
+    if (!composed) {
+      continue;
+    }
+    result.emplace(vertDomain.encode(composed->vertValues),
+                   fragDomain.encode(composed->fragValues));
+  }
+  return result;
 }
 
 }  // namespace tgfx

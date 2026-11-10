@@ -792,11 +792,6 @@ foreach (FAMILY_HEADER ${TGFX_SHADER_FAMILY_HEADERS})
     list(APPEND TGFX_SHADER_FAMILY_NAMES ${FAMILY_NAME})
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${FAMILY_HEADER}")
 endforeach ()
-# The generic interpreter is the walk's fallback: every dedicated family is tried before it, so
-# its entry is appended last regardless of the alphabetical file order (the matcher's walk and the
-# diagnostic switches in MatchPermutationImpl rely on this ordering).
-list(REMOVE_ITEM TGFX_SHADER_FAMILY_NAMES PointwiseChainShader)
-list(APPEND TGFX_SHADER_FAMILY_NAMES PointwiseChainShader)
 set(TGFX_SHADER_FAMILY_INCLUDES "")
 set(TGFX_SHADER_FAMILY_ENTRIES "")
 foreach (FAMILY_NAME ${TGFX_SHADER_FAMILY_NAMES})

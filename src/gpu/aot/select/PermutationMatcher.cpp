@@ -25,6 +25,7 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/Program.h"
+#include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/aot/select/KernelTable.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
@@ -43,6 +44,8 @@
 #include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/shaders/AllShaderFamilies.h"
+#include "gpu/shaders/ChainInputs.h"
+#include "gpu/shaders/Families.h"
 #include "gpu/shaders/contract/DrawFacts.h"
 #include "tgfx/core/BytesKey.h"
 
@@ -529,10 +532,13 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
       return PermutationMatchResult{table->family, table->variant};
     }
   }
-  // The interpreter stays the walk's documented fallback, tried last.
-  if (allowInterpreter && (!alphaOnly || PointwiseChainShader::ServesAlphaOnly)) {
-    if (auto result = PointwiseChainShader::Match(programInfo, failure)) {
-      return PermutationMatchResult{PointwiseChainShader::Name, *result};
+  // The interpreter is the decomposition route: its acceptance is the carried IR, not the shape,
+  // so it is gated by the decomposition policy alone (never by dedicatedKernels) and stays the
+  // walk's documented last resort.
+  if (allowInterpreter && (!alphaOnly || ChainInputs::ServesAlphaOnly)) {
+    if (auto result = MatchChainProgram(programInfo)) {
+      return PermutationMatchResult{Families()[result->variant.family].name,
+                                    {result->variant.ordinal, result->variant.ordinal}};
     }
   }
   return alphaOnly ? Fail(failure, PermutationMatchFailure::NoMatchingFamily) : std::nullopt;

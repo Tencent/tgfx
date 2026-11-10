@@ -30,7 +30,7 @@
 #include "gpu/processors/Processor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
-#include "gpu/shaders/kernels/PointwiseChainShader.h"
+#include "gpu/shaders/ChainInputs.h"
 
 namespace tgfx {
 
@@ -48,7 +48,7 @@ void StandardDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget)
 // direct serving. The perlin kernel serving a plain noise tree is the dedicated route, not the
 // AOT entry's own.
 static bool IsDirectAOTShader(const std::string& shaderName) {
-  return shaderName == PointwiseChainShader::Name;
+  return shaderName == "Chain";
 }
 
 #if DEBUG

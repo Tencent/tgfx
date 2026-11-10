@@ -27,6 +27,7 @@
 #include <string>
 #include <vector>
 
+#include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/Layout.h"
 #include "gpu/shaders/PrecompiledShader.h"
@@ -87,21 +88,22 @@ void ProfileCell(int profile, int* textureCount, int* mask, int* resource) {
 TEST(ChainEquivalenceTest, DeclaredVariantsBijectTheLegacyReachableSet) {
   const auto chainIndex = ChainFamilyIndex();
   ASSERT_NE(chainIndex, 0xFFFF);
-  const auto* info = ShaderRegistry::Find("PointwiseChainShader");
-  ASSERT_NE(info, nullptr);
-  const auto reachable = EnumerateReachablePermutations("PointwiseChainShader");
-  ASSERT_TRUE(reachable.has_value());
+  // The legacy family retired; its composition rules remain in ChainInputs, which enumerates the
+  // frozen reference set in the legacy (vert, frag) encoding.
+  const auto reachable = ChainInputs::Reachable();
+  const auto vertDomain = ChainInputs::VertDims::domain();
+  const auto fragDomain = ChainInputs::FragDims::domain();
 
   std::set<std::string> legacy;
-  for (const auto& pair : *reachable) {
-    legacy.insert(CellKey(info->fragDomain.valueOf(pair.second, "GP_LAYOUT"),
-                          info->fragDomain.valueOf(pair.second, "HAS_XP"),
-                          info->fragDomain.valueOf(pair.second, "HAS_COVERAGE"),
-                          info->vertDomain.valueOf(pair.first, "HAS_UV_COORD"),
-                          info->fragDomain.valueOf(pair.second, "TEXTURE_COUNT"),
-                          info->fragDomain.valueOf(pair.second, "HAS_MASK_TEXTURE"),
-                          info->fragDomain.valueOf(pair.second, "HAS_SUBSET"),
-                          info->fragDomain.valueOf(pair.second, "RESOURCE_KIND")));
+  for (const auto& pair : reachable) {
+    legacy.insert(CellKey(fragDomain.valueOf(pair.second, "GP_LAYOUT"),
+                          fragDomain.valueOf(pair.second, "HAS_XP"),
+                          fragDomain.valueOf(pair.second, "HAS_COVERAGE"),
+                          vertDomain.valueOf(pair.first, "HAS_UV_COORD"),
+                          fragDomain.valueOf(pair.second, "TEXTURE_COUNT"),
+                          fragDomain.valueOf(pair.second, "HAS_MASK_TEXTURE"),
+                          fragDomain.valueOf(pair.second, "HAS_SUBSET"),
+                          fragDomain.valueOf(pair.second, "RESOURCE_KIND")));
   }
   ASSERT_EQ(legacy.size(), 111u);
 

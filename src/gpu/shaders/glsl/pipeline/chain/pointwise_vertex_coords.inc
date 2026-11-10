@@ -1,5 +1,5 @@
 // The chain's leaf and procedural-source coordinate transforms, shared verbatim by the two
-// assemblies: the legacy kernel's vertex stage (through pointwise_vertex.inc) and the declared
+// assemblies: the legacy kernel's vertex stage (through the legacy vertex entry) and the declared
 // Chain module's vertex hook. The CHAIN_LEAF_SOURCE(k) / CHAIN_SOURCE_COORDS macros select the
 // coordinate source per path (the legacy stage defines them from the layout's attributes; the
 // declared geometry hooks set v.localCoord instead), so this text is the one definition of the

@@ -64,10 +64,10 @@ const FamilyMatchFunction* FamilyMatchers();
 std::optional<FamilyMatchResult> MatchAssembledFamily(const ProgramInfo* info,
                                                       const DrawShape& shape);
 
-/// The declared Chain family's traffic switch (default off): while the legacy interpreter still
-/// serves chain draws, the declared rule must not claim them. Flipping it on lets the declared
-/// family win the walk; the legacy chain then becomes unreachable and 2c deletes it.
-void SetDeclaredChainEnabled(bool enabled);
-bool DeclaredChainEnabled();
+/// The declared Chain's own match, for the decomposition route: the interpreter is not a shape
+/// rule but the carried IR's compilability, so it is consulted behind the decomposition policy
+/// rather than inside the dedicated-kernel walk (a policy can disable that walk while still
+/// asking the interpreter to serve the draw).
+std::optional<FamilyMatchResult> MatchChainProgram(const ProgramInfo* info);
 
 }  // namespace tgfx

@@ -6,15 +6,15 @@
 #include <map>
 #include <string>
 #include "base/TGFXTest.h"
-#include "gpu/shaders/kernels/PointwiseChainShader.h"
+#include "gpu/shaders/ChainInputs.h"
 
 namespace tgfx {
 
 TGFX_TEST(DiagnosticChainBreakdown, Print) {
-  auto pairs = PointwiseChainShader::Reachable();
+  auto pairs = ChainInputs::Reachable();
   std::printf("[CB] total=%zu\n", pairs.size());
-  using VD = PointwiseChainShader::VD;
-  using FD = PointwiseChainShader::FD;
+  using VD = ChainInputs::VD;
+  using FD = ChainInputs::FD;
   const auto vertDomain = VD::domain();
   const auto fragDomain = FD::domain();
   const size_t vGPLayout = vertDomain.indexOf(VD::GP_LAYOUT.defineName);

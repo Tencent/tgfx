@@ -59,12 +59,13 @@
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/shaders/AllShaderFamilies.h"
+#include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/contract/ShaderProfileResolver.h"
-#include "gpu/shaders/kernels/PointwiseChainShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ColorFilter.h"
@@ -82,6 +83,15 @@
 #include "zstd.h"
 
 namespace tgfx {
+
+// The legacy family retired when the declared Chain took over; these tests still read its
+// dimension view to check the retained composition rules, so the view is assembled here.
+struct PointwiseChainShader {
+  PrecompiledShaderInfo info() const {
+    return {"PointwiseChainShader",          "", "", ChainInputs::VertDims::domain(),
+            ChainInputs::FragDims::domain(), 0};
+  }
+};
 
 #ifndef TGFX_BACKEND_NAME
 #define TGFX_BACKEND_NAME "opengl"
@@ -358,8 +368,10 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   // ExpectBundleEntryCounts already ties every family's reachable set to the bundle's actual
   // entry counts, so a hand-maintained total would only add a number to update on every change.
 
-  EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
-            PointwiseChainShader::Reachable());
+  // The legacy reference set is frozen in ChainInputs (ChainEquivalenceTest pairs it with the
+  // declared variants); the registry now enumerates the declared family alone.
+  EXPECT_EQ(ChainInputs::Reachable().size(), 111u);
+  EXPECT_FALSE(EnumerateReachablePermutations("PointwiseChainShader").has_value());
   // The declaration-driven families enumerate their own ordinals: the geometry IS the family, so
   // SolidColor/MaskFill list HAS_XP alone and TiledTextureFill leads with the geometry radix.
   const std::set<std::pair<uint32_t, uint32_t>> solidColorPairs = {{0, 0}, {1, 1}, {2, 2}};
@@ -498,14 +510,15 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
   EXPECT_STREQ(std::get<PermutationBool>(info.vertDomain.getDimensions().back()).defineName,
                "HAS_SOURCE_COORDS");
 
-  auto reachable = EnumerateReachablePermutations(info.name);
-  ASSERT_TRUE(reachable.has_value());
+  // The retired family's reference set lives in ChainInputs; the registry only enumerates the
+  // declared families now.
+  const auto referenceSet = ChainInputs::Reachable();
   std::set<uint32_t> vertexIndices;
   std::set<uint32_t> fragmentIndices;
   for (int gpType = 0; gpType < 2; ++gpType) {
     for (int hasCoverage = 0; hasCoverage < 2; ++hasCoverage) {
       for (int xpType = 0; xpType < 3; ++xpType) {
-        PointwiseChainShader::Inputs inputs;
+        ChainInputs::Inputs inputs;
         inputs.gpKind = gpType;
         // The DefaultGP's coverage attribute is unconditional (the non-AA path triangles carry
         // a constant 1.0 slot), so coverage is always present for every GP kind.
@@ -513,14 +526,13 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
         inputs.hasGradient = true;
         inputs.resourceProfile = AOTResourceProfile::TiledGraph;
         inputs.xpType = xpType;
-        auto composed = PointwiseChainShader::Compose(inputs);
+        auto composed = ChainInputs::Compose(inputs);
         ASSERT_TRUE(composed.has_value());
         auto vertexIndex = info.vertDomain.encode(composed->vertValues);
         auto fragmentIndex = info.fragDomain.encode(composed->fragValues);
         EXPECT_TRUE(IsBuildablePermutation(info, vertexIndex, fragmentIndex));
-        EXPECT_EQ(reachable->count({vertexIndex, fragmentIndex}), 1u);
-        EXPECT_EQ(info.fragDomain.valueOf(fragmentIndex,
-                                          PointwiseChainShader::FD::RESOURCE_KIND.defineName),
+        EXPECT_EQ(referenceSet.count({vertexIndex, fragmentIndex}), 1u);
+        EXPECT_EQ(info.fragDomain.valueOf(fragmentIndex, ChainInputs::FD::RESOURCE_KIND.defineName),
                   1);
         vertexIndices.insert(vertexIndex);
         fragmentIndices.insert(fragmentIndex);
@@ -535,7 +547,7 @@ TGFX_TEST(ShaderPermutationTest, ComposedDimsFinishIgnoresAssignmentOrder) {
   // Assignment through typed handles resolves positions by name, so the write order cannot
   // transpose against the domain order: assigning in reverse produces the same vector and the
   // same encoded index as the declaration order.
-  using FD = PointwiseChainShader::FD;
+  using FD = ChainInputs::FD;
   ComposedDims<FD> reversed(FD::domain());
   reversed.set(FD::RESOURCE_KIND, 2)
       .set(FD::HAS_SUBSET, 1)
@@ -564,7 +576,7 @@ TGFX_TEST(ShaderPermutationTest, ComposedDimsRejectsMissingAssignment) {
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   // The pre-handle write path zero-filled a forgotten dimension (resize then index writes);
   // finish() must fail instead of letting it read as a valid 0.
-  using FD = PointwiseChainShader::FD;
+  using FD = ChainInputs::FD;
   ComposedDims<FD> partial(FD::domain());
   partial.set(FD::GP_LAYOUT, 0)
       .set(FD::HAS_XP, 0)
@@ -579,7 +591,7 @@ TGFX_TEST(ShaderPermutationTest, ComposedDimsRejectsUnknownDimensionHandle) {
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   // A handle whose name is not in the domain the builder was built from fails loudly, where a
   // typo'd name in the old string queries (valueOf) silently read as 0.
-  using FD = PointwiseChainShader::FD;
+  using FD = ChainInputs::FD;
   ComposedDims<FD> frag(FD::domain());
   const PermutationBoolDim<FD> notDeclared{"NOT_A_DIMENSION"};
   EXPECT_DEATH(frag.set(notDeclared, 1), "unknown dimension handle");
@@ -588,7 +600,7 @@ TGFX_TEST(ShaderPermutationTest, ComposedDimsRejectsUnknownDimensionHandle) {
 TGFX_TEST(ShaderPermutationTest, ComposedDimsRejectsOutOfRangeValue) {
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   // HAS_XP declares three values; 3 is outside the range.
-  using FD = PointwiseChainShader::FD;
+  using FD = ChainInputs::FD;
   ComposedDims<FD> frag(FD::domain());
   EXPECT_DEATH(frag.set(FD::HAS_XP, 3), "dimension value outside the declared range");
 }
@@ -609,7 +621,10 @@ TGFX_TEST(ShaderPermutationTest, GradientUniformsExistOnlyInExtendedChainArtifac
     return false;
   };
   const auto checkFamily = [&](const char* family) {
-    auto info = PointwiseChainShader().info();
+    const uint16_t chainIndex = FamilyIndexOf(family);
+    ASSERT_NE(chainIndex, 0xFFFF);
+    const auto& chainFamily = Families()[chainIndex];
+    auto info = AssembledFamilyInfo(chainFamily);
     auto profile = ParseProfileTag(cache->profileTag());
     ASSERT_TRUE(profile.has_value());
     auto reachable = EnumerateReachablePermutations(family);
@@ -624,21 +639,22 @@ TGFX_TEST(ShaderPermutationTest, GradientUniformsExistOnlyInExtendedChainArtifac
       auto fragment = cache->findFragment(fragmentKey.hi, fragmentKey.lo);
       ASSERT_NE(vertex, nullptr);
       ASSERT_NE(fragment, nullptr);
-      // Only the gradient resource kind carries the gradient uniforms; the noise kind and the
-      // plain chains do not. Every extended kind reserves CoordTransformMatrix_0 for its source,
-      // while a leaf-free plain chain declares no leaf matrix at all.
-      int resourceKind = info.fragDomain.valueOf(indices.second, "RESOURCE_KIND");
-      bool hasGradient = resourceKind == 1;
+      // PROFILE folds the legacy (texture count, mask, resource kind) triple: 3..5 are the
+      // gradient cells and 6 the noise cell. Only the gradient kind carries the gradient
+      // uniforms; every resource kind and every four-leaf cell declares CoordTransformMatrix_0
+      // (the source matrix, the leaf-0 matrix, or both).
+      const int profileValue = info.fragDomain.valueOf(indices.second, "PROFILE");
+      ASSERT_GE(profileValue, 0);
+      const bool hasGradient = profileValue >= 3 && profileValue <= 5;
+      const bool hasResource = profileValue >= 3 && profileValue <= 6;
+      const bool hasLeaves = profileValue == 2 || profileValue == 5 || profileValue == 6;
       EXPECT_EQ(hasUniform(fragment, "GradientLayoutType"), hasGradient);
       EXPECT_EQ(hasUniform(fragment, "GradientLUTLeaf"), hasGradient);
-      if (resourceKind != 0) {
-        EXPECT_TRUE(hasUniform(vertex, "CoordTransformMatrix_0"));
-      } else if (info.vertDomain.valueOf(indices.first, "TEXTURE_COUNT") == 0) {
-        EXPECT_FALSE(hasUniform(vertex, "CoordTransformMatrix_0"));
-      }
+      EXPECT_EQ(hasUniform(vertex, "CoordTransformMatrix_0"), hasResource || hasLeaves);
     }
   };
-  checkFamily("PointwiseChainShader");
+
+  checkFamily("Chain");
 }
 
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
@@ -696,7 +712,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
                                   !coverageProcessors.empty());
           // The interpreter's own match: a program-holding draw resolves through MatchProgram,
           // not the family walk (whose dedicated families would claim the empty processor list).
-          auto match = PointwiseChainShader::MatchProgram(chain, &programInfo);
+          auto match = ChainInputs::MatchProgram(chain, &programInfo);
           ASSERT_TRUE(match.has_value());
           ASSERT_LT(match->vertPermutationIndex, info.vertDomain.totalCount());
           ASSERT_LT(match->fragPermutationIndex, info.fragDomain.totalCount());
@@ -749,7 +765,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
     ProgramInfo programInfo(renderTarget.get(), gp.get(), nullptr, BlendMode::SrcOver, true);
     // The interpreter's own match: a program-holding draw resolves through MatchProgram, not the
     // family walk (whose dedicated families would claim the empty processor list).
-    auto match = PointwiseChainShader::MatchProgram(chain, &programInfo);
+    auto match = ChainInputs::MatchProgram(chain, &programInfo);
     ASSERT_TRUE(match.has_value());
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "RESOURCE_KIND"), 1);
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "TEXTURE_COUNT"), 1);
@@ -777,7 +793,7 @@ TGFX_TEST(ShaderPermutationTest, ProgramMatchRejectsOverBudgetWithoutFailureSink
   ProgramInfo programInfo(renderTarget.get(), gp.get(), nullptr, BlendMode::SrcOver, false);
   // Two gradient slots exceed the one-gradient budget: this is the rejection path that used to
   // write through a null failure pointer.
-  EXPECT_FALSE(PointwiseChainShader::MatchProgram(program, &programInfo).has_value());
+  EXPECT_FALSE(ChainInputs::MatchProgram(program, &programInfo).has_value());
 }
 
 TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
@@ -854,7 +870,7 @@ TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
     ProgramInfo programInfo(renderTarget.get(), gp.get(), nullptr, BlendMode::SrcOver, false);
     // The interpreter's own match: a program-holding draw resolves through MatchProgram, not the
     // family walk (whose dedicated families would claim the empty processor list).
-    auto match = PointwiseChainShader::MatchProgram(program, &programInfo);
+    auto match = ChainInputs::MatchProgram(program, &programInfo);
     ASSERT_TRUE(match.has_value());
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "RESOURCE_KIND"), 1);
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "TEXTURE_COUNT"), 1);
@@ -902,7 +918,7 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskServesBothCoveragePolaritie
     // the shader cannot evaluate it; what matters is that neither polarity is dropped.
     ASSERT_TRUE(match.has_value()) << (inverted ? "inverted" : "straight");
     if (inverted) {
-      EXPECT_EQ(match->shaderName, "PointwiseChainShader");
+      EXPECT_EQ(match->shaderName, "Chain");
     } else {
       EXPECT_EQ(match->shaderName, "QuadTexture");
     }

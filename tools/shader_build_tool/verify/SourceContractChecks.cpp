@@ -192,13 +192,25 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
   // may condition on those names exactly like the legacy domains' names. The dead-dimension scan
   // below stays on the legacy set: a declared dim's uses live in the modules' hook files, which
   // the assembler, not this scan, ties to the enumeration.
-  for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
-    const auto familyInfo = AssembledFamilyInfo(Families()[familyIndex]);
-    for (const auto& dimension : familyInfo.vertDomain.getDimensions()) {
-      declaredDimensions.insert(std::visit(DimensionNameVisitor(), dimension));
+  // Every dim name a declared family can spell, pinned ones included: a pinned dim has no domain
+  // entry (the variant never varies it) but its macro still gates code in the module hooks.
+  const auto addModuleDims = [&declaredDimensions](const Module* module) {
+    if (module == nullptr) {
+      return;
     }
-    for (const auto& dimension : familyInfo.fragDomain.getDimensions()) {
-      declaredDimensions.insert(std::visit(DimensionNameVisitor(), dimension));
+    for (uint8_t dim = 0; dim < module->dimCount; ++dim) {
+      declaredDimensions.insert(module->bareNames
+                                    ? module->dims[dim].name
+                                    : std::string(module->name) + "_" + module->dims[dim].name);
+    }
+  };
+  for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
+    const Family& family = Families()[familyIndex];
+    for (uint8_t geometry = 0; geometry < family.geometryCount; ++geometry) {
+      addModuleDims(family.geometries[geometry]);
+    }
+    for (uint8_t index = 0; index < family.moduleCount; ++index) {
+      addModuleDims(family.modules[index].module);
     }
   }
   std::set<std::string> allowed = declaredDimensions;
@@ -211,7 +223,10 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
       continue;
     }
     const auto extension = it->path().extension().string();
-    if (extension != ".inc" && extension != ".frag" && extension != ".vert") {
+    // The declared families' hook files (.glsl under modules/) are sources too: their defines are
+    // visible to every includer, so they must join the known set like any shared .inc.
+    if (extension != ".inc" && extension != ".frag" && extension != ".vert" &&
+        extension != ".glsl") {
       continue;
     }
     files.push_back(it->path().string());
@@ -447,7 +462,10 @@ size_t ValidateSpecReaders(const std::string& shaderDir, Diagnostics* diagnostic
       continue;
     }
     const auto extension = it->path().extension().string();
-    if (extension != ".inc" && extension != ".frag" && extension != ".vert") {
+    // The declared families' hook files (.glsl under modules/) are sources too: their defines are
+    // visible to every includer, so they must join the known set like any shared .inc.
+    if (extension != ".inc" && extension != ".frag" && extension != ".vert" &&
+        extension != ".glsl") {
       continue;
     }
     std::ifstream stream(it->path());

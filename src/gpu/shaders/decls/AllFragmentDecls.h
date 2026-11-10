@@ -19,16 +19,14 @@
 #pragma once
 
 #include <vector>
-#include "gpu/shaders/decls/PointwiseChainDecl.h"
 
 namespace tgfx {
 
-/// The declared fragment families, in the fixed order the emitter walks them. The list is short
-/// on purpose: only the pilot families are migrated, and it grows as the migration proceeds. A
-/// declaration joins by being added here; the family's shell (kernels/*.h) stays the registry
-/// entry, and the two agree on the family name (pinned by a static_assert in every shell).
+/// The hand-written fragment declarations the emitter still walks. The chain interpreter's was
+/// the last one (the declaration layer supersedes them); the list stays as the emitter's seam, and
+/// a family that still needs a hand-written entry joins here.
 inline const std::vector<const FragmentFamilyDecl*>& AllFragmentDecls() {
-  static const std::vector<const FragmentFamilyDecl*> decls = {&PointwiseChainDecl::Decl};
+  static const std::vector<const FragmentFamilyDecl*> decls = {};
   return decls;
 }
 

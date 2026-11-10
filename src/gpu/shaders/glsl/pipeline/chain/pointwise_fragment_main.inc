@@ -94,12 +94,6 @@ bool chainLeafIsTiled(int leafIndex) {
 }
 #endif
 
-// The declared Chain assembly declares fragColor in its own template (the assembler emits one
-// located output per family), so the local declaration exists only on the legacy path.
-#ifndef TGFX_DECLARED_CHAIN
-layout(location = 0) out vec4 fragColor;
-#endif
-
 vec4 chainResults[16];
 
 // Prefetched leaf samples. Fetched in main (the samplers stay statically bound, see aotChainRead);
@@ -265,15 +259,9 @@ void chainMain() {
     // The specialized executor: one call site per slot with literal indices. Once the runtime
     // injects the values, every guard and every selector word becomes a compile-time constant, so
     // the driver deletes the out-of-range call sites entirely.
-    // One guarded call site per slot of the declared capacity. The two assemblies spell them
-    // differently: the declared Chain's macro comes from the module's UnrollSite declaration
-    // (assembler-generated, one line per slot of the variant's own capacity), while the legacy
-    // kernel keeps the tool pragma below — the tool expands it from the profile's capacity macro.
-#ifdef TGFX_DECLARED_CHAIN
+    // One guarded call site per slot of the declared capacity, generated from the module's
+    // UnrollSite declaration (one line per slot of the variant's own capacity).
     Chain_RUN_UNROLLED_SLOTS()
-#else
-    #pragma tgfx_spec_unroll chainRunSlotAt CHAIN_SLOT_CAPACITY SPEC_SlotCount (result, clipRegister, coverageRootRegister)
-#endif
 #if HAS_XP >= 1
     if (xpNeedsBlendPass()) {
       chainXPSrc = CHAIN_XP_SRC_UNPREMUL;
@@ -365,10 +353,3 @@ void chainMain() {
 #include "xp/output_swizzle.inc"
 }
 
-// The legacy kernel's entry; the declared assembly provides its own main() (the assembler's
-// template), which reaches chainMain through the Chain module's fragment hook.
-#ifndef TGFX_DECLARED_CHAIN
-void main() {
-  chainMain();
-}
-#endif

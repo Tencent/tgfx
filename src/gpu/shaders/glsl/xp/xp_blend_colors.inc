@@ -1,7 +1,7 @@
 // PorterDuff blend math shared by the xfer processors and the fused pointwise-chain kernel.
 // xpBlendColors(S, D, mode) blends two premultiplied colors with a runtime-selected mode. This
 // file has its own include guard so kernels that need the blend math without the dst-texture XP
-// machinery (PointwiseChainShader) can include it directly.
+// machinery (the chain interpreter) can include it directly.
 //
 // The heavy modes (Overlay, ColorDodge, ColorBurn, HardLight, SoftLight, and the HSL family) are
 // written as branch-free vector selections of the runtime's per-component formulas

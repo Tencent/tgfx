@@ -36,9 +36,9 @@
 #include "gpu/aot/bundle/EmbeddedShaderBundles.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/select/PermutationMatch.h"
+#include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/FamilyDomains.h"
-#include "gpu/shaders/kernels/PointwiseChainShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
@@ -336,7 +336,7 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
     // An empty shader name leaves the serving kernel unpinned: the draw must still be served by a
     // precompiled program (no drop, no runtime program) and render like the runtime.
     const bool pinned = variant.shaderName[0] != '\0';
-    using FD = PointwiseChainShader::FD;
+    using FD = ChainInputs::FD;
     const auto fragDomain = FD::domain();
     const size_t gpLayoutPos = fragDomain.indexOf(FD::GP_LAYOUT.defineName);
     const size_t hasXPPos = fragDomain.indexOf(FD::HAS_XP.defineName);

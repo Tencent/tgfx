@@ -26,6 +26,8 @@
 #include <vector>
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/AllShaderFamilies.h"
+#include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
 #include "gtest/gtest.h"
@@ -53,7 +55,8 @@ struct DefineNameOf {
 
 TEST(FamilyRegistryTest, EveryFamilyIsRegisteredOnceWithItsOwnFiles) {
   auto families = AllFamilies();
-  // The kernel-shell families: 2 after the declaration-driven migration removed
+  // The kernel-shell families: 1 after the chain's migration (the interpreter's shell retired;
+  // its composition rules survive as ChainInputs) and after the declaration-driven migration removed
   // NonAARRectFillShader, SolidColorFillShader, MaskFillShader, TiledTextureFillShader,
   // QuadColorFillShader, MeshFillShader, ShapeInstancedFillShader, ComplexNonAARRectFillShader,
   // QuadTextureFillShader, YUVTextureFillShader, AtlasTextFillShader,
@@ -61,7 +64,7 @@ TEST(FamilyRegistryTest, EveryFamilyIsRegisteredOnceWithItsOwnFiles) {
   // serves, and GaussianBlur1DShader, GlassUDFTentBlurShader and GlassRefractionShader (the
   // declaration-driven families join Find/Enumerate without
   // a shell, see ShaderPermutationTest).
-  EXPECT_EQ(families.size(), 2u);
+  EXPECT_EQ(families.size(), 1u);
   std::set<std::string> names;
   for (const auto& info : families) {
     EXPECT_TRUE(names.insert(info.name).second) << "duplicate family " << info.name;
@@ -112,7 +115,11 @@ TEST(ReachabilityTest, TheReachableSetIsSmallerThanTheFullProductWherePossible) 
   // product is what the old domain walk compiled. At least the large families must be sparse, or
   // the bundle would carry variants nothing can request.
   size_t sparse = 0;
-  for (const auto& info : AllFamilies()) {
+  std::vector<PrecompiledShaderInfo> infos = AllFamilies();
+  for (size_t index = 0; index < FamilyCount(); ++index) {
+    infos.push_back(AssembledFamilyInfo(Families()[index]));
+  }
+  for (const auto& info : infos) {
     auto reachable = EnumerateReachablePermutations(info.name);
     ASSERT_TRUE(reachable.has_value());
     uint64_t product = static_cast<uint64_t>(info.vertDomain.totalCount()) *
@@ -206,21 +213,18 @@ TEST(MirroredDimensionsTest, DomainsWithoutACommonDimensionAlwaysAgree) {
   EXPECT_TRUE(MirroredDimsAgree(vertex, fragment, {0}, {1}));
 }
 
-TEST(MirroredDimensionsTest, TheRealFamiliesDisagreeSomewhereInTheFullProduct) {
-  // The full product of the two domains contains pairs whose mirrored dimensions differ, which is
-  // why a variant has to be checked before it is built. A family with no such pair would make the
-  // check vacuous for it, so at least one family must exercise the rejection.
-  size_t rejected = 0;
+TEST(MirroredDimensionsTest, TheRetainedFamiliesAgreeOnEveryVariant) {
+  // The last family with disagreeing stage domains was the chain interpreter, whose stages
+  // mirrored five dims; it retired into one declared domain set. The retained shell (YUV) exposes
+  // the same dims on both stages, so the mirrored check must accept every variant — the rejection
+  // path itself stays covered by the synthetic cases above.
   for (const auto& info : AllFamilies()) {
     for (uint32_t vert = 0; vert < info.vertDomain.totalCount(); ++vert) {
       for (uint32_t frag = 0; frag < info.fragDomain.totalCount(); ++frag) {
-        if (!IsBuildablePermutation(info, vert, frag)) {
-          ++rejected;
-        }
+        EXPECT_TRUE(IsBuildablePermutation(info, vert, frag)) << info.name;
       }
     }
   }
-  EXPECT_GT(rejected, 0u);
 }
 
 // ---- PermutationDomain ----------------------------------------------------------------------

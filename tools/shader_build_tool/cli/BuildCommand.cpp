@@ -18,6 +18,8 @@
 
 #include "BuildCommand.h"
 
+#include "gpu/aot/AOTResourceProfile.h"
+
 #include <cstdint>
 #include <cstring>
 #include <cstdio>

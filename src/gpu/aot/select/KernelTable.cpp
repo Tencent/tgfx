@@ -31,11 +31,12 @@
 namespace tgfx {
 namespace {
 
-/// The one family that is not a table row: its acceptance is the carried IR, not the facts, and
-/// the matcher calls its Extract as the walk's last step. Naming it here turns the exemption from
-/// a silent SFINAE default into an explicit, checked exception.
+/// The families that are not table rows: their acceptance is the carried IR, not the facts. After
+/// the chain's migration only the YUV shell remains on this path (it retires with its declared
+/// successor). Naming it here turns the exemption from a silent SFINAE default into an explicit,
+/// checked exception.
 template <typename F>
-constexpr bool IsInterpreterFamily = std::is_same_v<F, PointwiseChainShader>;
+constexpr bool IsInterpreterFamily = std::is_same_v<F, YUVTextureFillShader>;
 
 #if DEBUG
 /// The offline exclusivity test enumerates the DrawShape field space with a null IR, so the

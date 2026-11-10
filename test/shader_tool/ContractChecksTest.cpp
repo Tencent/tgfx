@@ -390,7 +390,7 @@ TEST(MacroNamesTest, AnUnknownMacroIsReported) {
 TEST(MacroNamesTest, AFamilyDimensionAndASourceDefinePass) {
   const ScratchDir dir("macro_names_known");
   dir.write("kernels/good.frag",
-            "#define LOCAL_FLAG 1\n#ifdef LOCAL_FLAG\n#endif\n#if defined(HAS_SUBSET)\n#endif\n");
+            "#define LOCAL_FLAG 1\n#ifdef LOCAL_FLAG\n#endif\n#if defined(PROFILE)\n#endif\n");
   auto report = CheckMacroNames(dir.dir());
   EXPECT_EQ(report.errors, 0u) << report.log;
 }

@@ -25,32 +25,12 @@
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/resources/YUVTextureView.h"
+#include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/contract/DrawFacts.h"
-#include "gpu/shaders/kernels/PointwiseChainShader.h"
 
 namespace tgfx {
-
-namespace {
-
-bool& DeclaredChainEnabledStorage() {
-  // Off by default while the legacy interpreter still serves chain draws. The 2b gate flips it
-  // through the environment so the same binary can be compared both ways; 2c deletes the legacy
-  // path and hardwires the declared one.
-  static bool enabled = std::getenv("TGFX_DECLARED_CHAIN") != nullptr;
-  return enabled;
-}
-
-}  // namespace
-
-void SetDeclaredChainEnabled(bool enabled) {
-  DeclaredChainEnabledStorage() = enabled;
-}
-
-bool DeclaredChainEnabled() {
-  return DeclaredChainEnabledStorage();
-}
 
 /// The table indices the match rules address their families by. Each is a constant expression, so
 /// a name that drifts from the family table fails the build here instead of silently matching
@@ -723,49 +703,21 @@ bool MatchAtlasText(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// did — and derives every dimension from the compiled program rather than guessing from the
 /// shape, which is what kept the old matcher from accepting shapes its writer could not serve.
 bool MatchChain(const ProgramInfo* info, const DrawShape& /*shape*/, FamilyMatchResult* result) {
-  if (info == nullptr || !DeclaredChainEnabled()) {
-    // A caller without a program (the exclusivity test) cannot compile the interpreter; with the
-    // switch off the legacy chain still serves every chain draw.
+  if (info == nullptr) {
+    // The exclusivity test matches shapes without a program; the interpreter's acceptance needs
+    // the compiled IR.
     return false;
   }
   const auto* program = AOTChainBuilder::ResolveChainProgram(info);
   if (program == nullptr) {
     return false;
   }
-  const auto inputs = PointwiseChainShader::DeriveInputs(*program, info, nullptr);
-  if (!inputs.has_value()) {
+  auto variant = ChainInputs::MatchVariant(*program, info);
+  if (!variant.has_value()) {
     return false;
   }
-  const auto composed = PointwiseChainShader::Compose(*inputs);
-  if (!composed.has_value()) {
-    return false;
-  }
-  // The composed values are the legacy dims in their own domain order; the shared decoder folds
-  // them into the declared geometry/profile pair, so the matcher cannot drift from the tests.
-  const auto vertDomain = PointwiseChainShader::VD::domain();
-  const auto fragDomain = PointwiseChainShader::FD::domain();
-  const auto vert = [&](const char* name) {
-    return composed->vertValues[vertDomain.indexOf(name)];
-  };
-  const auto frag = [&](const char* name) {
-    return composed->fragValues[fragDomain.indexOf(name)];
-  };
-  ChainLegacyCell cell = {};
-  cell.gpLayout = vert("GP_LAYOUT");
-  cell.coverage = vert("HAS_COVERAGE");
-  cell.uvCoord = vert("HAS_UV_COORD");
-  cell.subset = vert("HAS_SUBSET");
-  cell.xp = frag("HAS_XP");
-  cell.textureCount = frag("TEXTURE_COUNT");
-  cell.mask = frag("HAS_MASK_TEXTURE");
-  cell.resource = frag("RESOURCE_KIND");
-  const uint8_t geometry = ChainGeometryOfCell(cell);
-  const uint8_t stroke = cell.gpLayout == 4 ? 1 : 0;
-  const uint8_t profile = ChainProfileOfCell(cell);
-  return EncodeMatch(
-      ChainIndex, geometry,
-      {static_cast<uint8_t>(cell.subset), stroke, profile, static_cast<uint8_t>(cell.xp)},
-      &result->variant);
+  result->variant = *variant;
+  return true;
 }
 
 }  // namespace
@@ -847,6 +799,18 @@ std::array<FamilyMatchFunction, FamilyTableCount()> BuildMatcherTable() {
 const FamilyMatchFunction* FamilyMatchers() {
   static const std::array<FamilyMatchFunction, FamilyTableCount()> matchers = BuildMatcherTable();
   return matchers.data();
+}
+
+std::optional<FamilyMatchResult> MatchChainProgram(const ProgramInfo* info) {
+  if (info == nullptr) {
+    return std::nullopt;
+  }
+  const auto shape = ExtractDrawShape(info);
+  FamilyMatchResult result = {};
+  if (!MatchChain(info, shape, &result)) {
+    return std::nullopt;
+  }
+  return result;
 }
 
 std::optional<FamilyMatchResult> MatchAssembledFamily(const ProgramInfo* info,
