@@ -41,9 +41,22 @@ struct FamilyMatchResult {
   const AOTOpaqueKernelParameters* glassKernel = nullptr;
 };
 
-/// Matches a draw against the declaration-driven family table (Families(), in table order).
-/// Returns nullopt when no assembled family serves the shape; the caller then falls back to the
-/// legacy kernel table (the transitional route until P3 removes it).
+/// One declared family's match rule: the shape predicate plus the variant encoding, writing the
+/// matched variant and its data-source leaves into the result.
+using FamilyMatchFunction = bool (*)(const DrawShape& shape, FamilyMatchResult* result);
+
+/// The match rules, one per family table row, addressed by the family index (FamilyCount()
+/// entries; a row without a rule is a build failure). MatchAssembledFamily walks them for a
+/// draw's family; the declared writer calls its program's own rule alone to collect the
+/// per-draw data sources.
+const FamilyMatchFunction* FamilyMatchers();
+
+/// Matches a draw against the declaration-driven family table. The rules are pairwise disjoint
+/// (a debug-build tripwire walks them all and reports any second acceptor as a
+/// [family-conflict] failure), so in release the first acceptor — whichever it is — is the only
+/// one and the walk order carries no priority. Returns nullopt when no assembled family serves
+/// the shape; the caller then falls back to the legacy kernel table (the transitional route
+/// until P3 removes it).
 std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape);
 
 }  // namespace tgfx

@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/select/FamilyMatch.h"
+#include <array>
+#include "core/utils/Log.h"
 #include "gpu/YUVFormat.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/ir/DrawIR.h"
@@ -74,7 +76,7 @@ namespace {
 /// rounded rect) riding the runtime clip contract. Any xfer, alpha-only targets included.
 /// Slot layout: Frame(0), RectGeometry(1), AnalyticClip(2), Xfer(3: HAS_XP). No free dims in the
 /// geometry or the body, so the ordinal is HAS_XP alone.
-bool MatchSolidColor(const DrawShape& shape, Variant* variant) {
+bool MatchSolidColor(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::Default) {
     return false;
   }
@@ -85,14 +87,14 @@ bool MatchSolidColor(const DrawShape& shape, Variant* variant) {
     return false;
   }
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(SolidColorIndex, 0, {hasXp}, variant);
+  return EncodeMatch(SolidColorIndex, 0, {hasXp}, &result->variant);
 }
 
 /// The MaskFill family's rule, carried over from the former MaskFillShader: the DefaultGP's rect
 /// fill whose sole fragment processor is the rasterized alpha-only shape mask. The mask's
 /// sampler facts come off the IR's sole coverage term, so the acceptance reads the carried IR.
 /// Slot layout: Frame(0), RectGeometry(1), MaskTexture(2), Xfer(3: HAS_XP).
-bool MatchMaskFill(const DrawShape& shape, Variant* variant, const AOTTextureParameters** maskOut) {
+bool MatchMaskFill(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::Default) {
     return false;
   }
@@ -111,10 +113,10 @@ bool MatchMaskFill(const DrawShape& shape, Variant* variant, const AOTTexturePar
     return false;
   }
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  if (!EncodeMatch(MaskFillIndex, 0, {hasXp}, variant)) {
+  if (!EncodeMatch(MaskFillIndex, 0, {hasXp}, &result->variant)) {
     return false;
   }
-  *maskOut = mask;
+  result->maskLeaf = mask;
   return true;
 }
 
@@ -124,8 +126,7 @@ bool MatchMaskFill(const DrawShape& shape, Variant* variant, const AOTTexturePar
 /// accepts (the legacy dedicated table runs first); this family serves the DefaultGP form and the
 /// Quad draws with a Tiled leaf. FULL and PRESENT are pinned to 1, so the flattened dim order
 /// stays [FULL=1, PRESENT=1, HAS_XP] and the ordinal is geometry + 2 * HAS_XP.
-bool MatchTiledTextureFill(const DrawShape& shape, Variant* variant,
-                           const AOTTextureParameters** leafOut) {
+bool MatchTiledTextureFill(const DrawShape& shape, FamilyMatchResult* result) {
   if (!shape.positionOnlyRect()) {
     return false;
   }
@@ -150,10 +151,10 @@ bool MatchTiledTextureFill(const DrawShape& shape, Variant* variant,
   // The pinned dims (FULL and PRESENT at 1) are filled by EncodeVariant from the declaration;
   // hand-rolling them at zero made PRESENT read as "module absent" and skip every tiled uniform
   // (the c8c9c9e6d bug this helper exists to prevent).
-  if (!EncodeMatch(TiledTextureFillIndex, geometry, {hasXp}, variant)) {
+  if (!EncodeMatch(TiledTextureFillIndex, geometry, {hasXp}, &result->variant)) {
     return false;
   }
-  *leafOut = leaf;
+  result->tiledLeaf = leaf;
   return true;
 }
 
@@ -161,7 +162,7 @@ bool MatchTiledTextureFill(const DrawShape& shape, Variant* variant,
 /// QuadPerEdgeAA rect with no fragment processor, or one coverage processor (an analytic rect or
 /// rounded-rect clip, or a device-space mask). Slot layout: Frame(0), QuadColorGeometry(1),
 /// DeviceMask(2: PRESENT), AnalyticClip(3), Xfer(4: HAS_XP). The ordinal is PRESENT + 2 * HAS_XP.
-bool MatchQuadColor(const DrawShape& shape, Variant* variant) {
+bool MatchQuadColor(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::QuadPerEdgeAA) {
     return false;
   }
@@ -180,13 +181,13 @@ bool MatchQuadColor(const DrawShape& shape, Variant* variant) {
     return false;
   }
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(QuadColorIndex, 0, {present, hasXp}, variant);
+  return EncodeMatch(QuadColorIndex, 0, {present, hasXp}, &result->variant);
 }
 
 /// The RRect family's rule, carried over from the former NonAARRectFillShader: the non-AA
 /// rounded rect, at most one fragment (a sole analytic clip riding the runtime contract, or the
 /// single-tap tiled fill), never alpha-only, any xfer.
-bool MatchRRect(const DrawShape& shape, Variant* variant, const AOTTextureParameters** leaf) {
+bool MatchRRect(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::NonAARRect || shape.alphaOnlyTarget) {
     return false;
   }
@@ -227,10 +228,10 @@ bool MatchRRect(const DrawShape& shape, Variant* variant, const AOTTextureParame
   const uint8_t present = tiledLeaf != nullptr ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
   // The free values in flattened order: [STROKE, PRESENT, HAS_XP] (FULL is pinned to 0).
-  if (!EncodeMatch(RRectIndex, 0, {stroke, present, hasXp}, variant)) {
+  if (!EncodeMatch(RRectIndex, 0, {stroke, present, hasXp}, &result->variant)) {
     return false;
   }
-  *leaf = tiledLeaf;
+  result->tiledLeaf = tiledLeaf;
   return true;
 }
 
@@ -248,18 +249,17 @@ const AOTGradientParameters* SoleGradientLeaf(const AOTEffectGraph& graph) {
   return std::get_if<AOTGradientParameters>(&node->parameters);
 }
 
-}  // namespace
 /// The Mesh family's rule, carried over from the former MeshFillShader: the mesh geometry with no
 /// fragment processor and any xfer. The flattened dims are the geometry's TEX_COORDS then the
 /// Xfer's HAS_XP, so the ordinal is TEX_COORDS + 2 * HAS_XP.
-bool MatchMesh(const DrawShape& shape, Variant* variant) {
+bool MatchMesh(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::Mesh || shape.fragmentCount != 0 ||
       shape.xpType() < XP_NONE) {
     return false;
   }
   const uint8_t texCoords = shape.geometry.hasTexCoords ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(MeshIndex, 0, {texCoords, hasXp}, variant);
+  return EncodeMatch(MeshIndex, 0, {texCoords, hasXp}, &result->variant);
 }
 
 /// The ShapeInstanced family's rule, carried over from the former ShapeInstancedFillShader: the
@@ -268,13 +268,13 @@ bool MatchMesh(const DrawShape& shape, Variant* variant) {
 /// free values are [0, HAS_XP] and the ordinal is 2 * HAS_XP. The hand-rolled ordinal this rule
 /// carried before EncodeVariant was HAS_XP alone — an encoding outside the family's reachable
 /// set for every blended xfer.
-bool MatchShapeInstanced(const DrawShape& shape, Variant* variant) {
+bool MatchShapeInstanced(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::ShapeInstanced || shape.fragmentCount != 0 ||
       shape.xpType() < XP_NONE) {
     return false;
   }
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(ShapeInstancedIndex, 0, {0, hasXp}, variant);
+  return EncodeMatch(ShapeInstancedIndex, 0, {0, hasXp}, &result->variant);
 }
 
 /// The ShapeInstancedTextureCoverage family's rule, carried over from the former
@@ -284,9 +284,7 @@ bool MatchShapeInstanced(const DrawShape& shape, Variant* variant) {
 /// analytic clip (the clip rides the runtime contract uniforms, so both forms select the same
 /// variant). The legacy kernel served XP_NONE only. The flattened dims are [VERTEX_COLOR,
 /// GRADIENT, HAS_XP] with the first and last pinned to 0, so the ordinal is 2 * GRADIENT.
-bool MatchShapeInstancedTextureCoverage(const DrawShape& shape, Variant* variant,
-                                        const AOTTextureParameters** coverageOut,
-                                        const AOTGradientParameters** gradientOut) {
+bool MatchShapeInstancedTextureCoverage(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::ShapeInstanced || shape.geometry.hasCoverage ||
       shape.xpType() != XP_NONE || shape.ir == nullptr) {
     return false;
@@ -330,16 +328,17 @@ bool MatchShapeInstancedTextureCoverage(const DrawShape& shape, Variant* variant
   const uint8_t gradientValue = gradient != nullptr ? 1 : 0;
   // The free values in flattened order: [VERTEX_COLOR = 0, GRADIENT, HAS_XP = 0] (the allowed
   // filter drops both non-zero ends).
-  if (!EncodeMatch(ShapeInstancedTextureCoverageIndex, 0, {0, gradientValue, 0}, variant)) {
+  if (!EncodeMatch(ShapeInstancedTextureCoverageIndex, 0, {0, gradientValue, 0},
+                   &result->variant)) {
     return false;
   }
-  *coverageOut = coverage;
-  *gradientOut = gradient;
+  result->maskLeaf = coverage;
+  result->gradient = gradient;
   return true;
 }
 
 /// The GaussianBlur family's rule, carried over from the former GaussianBlur1DShader.
-bool MatchGaussianBlur(const DrawShape& shape, Variant* variant, FamilyMatchResult* result) {
+bool MatchGaussianBlur(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::Default &&
       shape.geometry.kind != GeometryKind::QuadPerEdgeAA) {
     return false;
@@ -361,7 +360,7 @@ bool MatchGaussianBlur(const DrawShape& shape, Variant* variant, FamilyMatchResu
     return false;
   }
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  if (!EncodeMatch(GaussianBlurIndex, 0, {hasXp}, variant)) {
+  if (!EncodeMatch(GaussianBlurIndex, 0, {hasXp}, &result->variant)) {
     return false;
   }
   result->blurKernel = irShape->kernel;
@@ -372,7 +371,7 @@ bool MatchGaussianBlur(const DrawShape& shape, Variant* variant, FamilyMatchResu
 /// The GlassUDFTentBlur family's rule, carried over from the former GlassUDFTentBlurShader: the
 /// position-only rect providers with one color processor, a classifiable coverage, and the carried
 /// IR's tent-blur node over one servable texture child; the fixed loop bound caps the radius.
-bool MatchGlassUDFTentBlur(const DrawShape& shape, Variant* variant, FamilyMatchResult* result) {
+bool MatchGlassUDFTentBlur(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::Default &&
       shape.geometry.kind != GeometryKind::QuadPerEdgeAA) {
     return false;
@@ -391,7 +390,7 @@ bool MatchGlassUDFTentBlur(const DrawShape& shape, Variant* variant, FamilyMatch
     return false;
   }
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  if (!EncodeMatch(GlassUDFTentBlurIndex, 0, {hasXp}, variant)) {
+  if (!EncodeMatch(GlassUDFTentBlurIndex, 0, {hasXp}, &result->variant)) {
     return false;
   }
   result->blurKernel = irShape->kernel;
@@ -413,7 +412,7 @@ bool MatchGlassUDFTentBlur(const DrawShape& shape, Variant* variant, FamilyMatch
 /// [DISPERSION, SHAPE, HAS_XP], so the ordinal is DISPERSION + 2 * SHAPE + 6 * HAS_XP — 18
 /// variants per family, the legacy kernel's 36 across the two.
 bool MatchGlassRefraction(const DrawShape& shape, GeometryKind kind, uint16_t family,
-                          Variant* variant, FamilyMatchResult* result) {
+                          FamilyMatchResult* result) {
   if (shape.geometry.kind != kind || shape.alphaOnlyTarget) {
     return false;
   }
@@ -449,7 +448,7 @@ bool MatchGlassRefraction(const DrawShape& shape, GeometryKind kind, uint16_t fa
   const uint8_t dispersion = irShape->kernel->dispersionOn ? 1 : 0;
   const uint8_t shapeKind = static_cast<uint8_t>(*irShape->kernel->geometryKind);
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  if (!EncodeMatch(family, 0, {dispersion, shapeKind, hasXp}, variant)) {
+  if (!EncodeMatch(family, 0, {dispersion, shapeKind, hasXp}, &result->variant)) {
     return false;
   }
   result->glassKernel = irShape->kernel;
@@ -457,24 +456,35 @@ bool MatchGlassRefraction(const DrawShape& shape, GeometryKind kind, uint16_t fa
   return true;
 }
 
+/// The shared glass rule's two table entries: the legacy kernel's GP_KIND dimension is the two
+/// families' geometries, so each family row gets its own one-line entry.
+bool MatchGlassRefractionEllipse(const DrawShape& shape, FamilyMatchResult* result) {
+  return MatchGlassRefraction(shape, GeometryKind::Ellipse, GlassRefractionIndex, result);
+}
+
+bool MatchGlassRefractionQuad(const DrawShape& shape, FamilyMatchResult* result) {
+  return MatchGlassRefraction(shape, GeometryKind::QuadPerEdgeAA, GlassRefractionQuadIndex, result);
+}
+
 /// The ComplexRRect family's rule, carried over from the former ComplexNonAARRectFillShader: the
 /// per-corner-radius rounded rect with no fragment processor and any xfer. STROKE is the geometry's
 /// own flag, so the ordinal is STROKE + 2 * HAS_XP.
-bool MatchComplexRRect(const DrawShape& shape, Variant* variant) {
+bool MatchComplexRRect(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::ComplexNonAARRect || shape.fragmentCount != 0 ||
       shape.xpType() < XP_NONE) {
     return false;
   }
   const uint8_t stroke = shape.geometry.isStroke ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(ComplexRRectIndex, 0, {stroke, hasXp}, variant);
+  return EncodeMatch(ComplexRRectIndex, 0, {stroke, hasXp}, &result->variant);
 }
 
 /// The hairline families' shared rule, carried over from the former HairlineLineShader and
 /// HairlineQuadShader: the hairline geometry with no fragment processor, or one that is a bare
 /// analytic rect/rounded-rect clip (no color processors). Only HAS_XP varies, so the ordinal is
 /// HAS_XP alone.
-bool MatchHairline(const DrawShape& shape, GeometryKind kind, uint16_t family, Variant* variant) {
+bool MatchHairline(const DrawShape& shape, GeometryKind kind, uint16_t family,
+                   FamilyMatchResult* result) {
   if (shape.geometry.kind != kind) {
     return false;
   }
@@ -487,13 +497,22 @@ bool MatchHairline(const DrawShape& shape, GeometryKind kind, uint16_t family, V
     return false;
   }
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(family, 0, {hasXp}, variant);
+  return EncodeMatch(family, 0, {hasXp}, &result->variant);
+}
+
+/// The shared hairline rule's two table entries, one per family row.
+bool MatchHairlineLine(const DrawShape& shape, FamilyMatchResult* result) {
+  return MatchHairline(shape, GeometryKind::HairlineLine, HairlineLineIndex, result);
+}
+
+bool MatchHairlineQuad(const DrawShape& shape, FamilyMatchResult* result) {
+  return MatchHairline(shape, GeometryKind::HairlineQuad, HairlineQuadIndex, result);
 }
 
 /// The Ellipse family's rule, carried over from the former EllipseFillShader: the ellipse geometry
 /// with no color processor, a coverage that is anything but a local mask, and any xfer. DeviceMask
 /// carries PRESENT, so the ordinal is PRESENT + 2 * HAS_XP.
-bool MatchEllipse(const DrawShape& shape, Variant* variant) {
+bool MatchEllipse(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::Ellipse || shape.colorFPCount != 0 ||
       !shape.coverage.has_value() || *shape.coverage == Coverage::LocalMask ||
       shape.xpType() < XP_NONE) {
@@ -501,14 +520,14 @@ bool MatchEllipse(const DrawShape& shape, Variant* variant) {
   }
   const uint8_t present = *shape.coverage == Coverage::DeviceMask ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(EllipseIndex, 0, {present, hasXp}, variant);
+  return EncodeMatch(EllipseIndex, 0, {present, hasXp}, &result->variant);
 }
 
 /// The ComplexEllipse family's rule, carried over from the former ComplexEllipseFillShader: the
 /// complex-ellipse geometry with no color processor, a coverage that is anything but a local mask,
 /// and any xfer. The flattened dims are STROKE, PRESENT, HAS_XP, so the ordinal is
 /// STROKE + 2 * PRESENT + 4 * HAS_XP.
-bool MatchComplexEllipse(const DrawShape& shape, Variant* variant) {
+bool MatchComplexEllipse(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::ComplexEllipse || shape.colorFPCount != 0 ||
       !shape.coverage.has_value() || *shape.coverage == Coverage::LocalMask ||
       shape.xpType() < XP_NONE) {
@@ -517,14 +536,14 @@ bool MatchComplexEllipse(const DrawShape& shape, Variant* variant) {
   const uint8_t stroke = shape.geometry.isStroke ? 1 : 0;
   const uint8_t present = *shape.coverage == Coverage::DeviceMask ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(ComplexEllipseIndex, 0, {stroke, present, hasXp}, variant);
+  return EncodeMatch(ComplexEllipseIndex, 0, {stroke, present, hasXp}, &result->variant);
 }
 
 /// The RoundStrokeRect family's rule, carried over from the former RoundStrokeRectFillShader: the
 /// stroked rounded-rect geometry with no fragment processor, or one bare analytic rect/rrect clip,
 /// rejecting perspective uv matrices. UV_MATRIX and HAS_XP flatten in that order, so the ordinal
 /// is UV_MATRIX + 2 * HAS_XP.
-bool MatchRoundStrokeRect(const DrawShape& shape, Variant* variant) {
+bool MatchRoundStrokeRect(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::RoundStrokeRect) {
     return false;
   }
@@ -538,7 +557,7 @@ bool MatchRoundStrokeRect(const DrawShape& shape, Variant* variant) {
   }
   const uint8_t uvMatrix = shape.geometry.hasUVMatrix ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(RoundStrokeRectIndex, 0, {uvMatrix, hasXp}, variant);
+  return EncodeMatch(RoundStrokeRectIndex, 0, {uvMatrix, hasXp}, &result->variant);
 }
 
 /// The QuadTexture family's rule, carried over from the former QuadTextureFillShader: the
@@ -546,8 +565,7 @@ bool MatchRoundStrokeRect(const DrawShape& shape, Variant* variant) {
 /// an optional bare analytic clip, device mask or local-space mask, and any xfer. The flattened
 /// dims are [UV_COORD, SUBSET, SUBSET, PRESENT, HAS_XP], so the ordinal is
 /// UV_COORD + 2*SUBSET + 4*SUBSET + 8*PRESENT + 16*HAS_XP.
-bool MatchQuadTexture(const DrawShape& shape, Variant* variant,
-                      const AOTTextureParameters** leafOut) {
+bool MatchQuadTexture(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::QuadPerEdgeAA || shape.colorFPCount != 1 ||
       shape.xpType() < XP_NONE || shape.ir == nullptr) {
     return false;
@@ -579,10 +597,11 @@ bool MatchQuadTexture(const DrawShape& shape, Variant* variant,
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
   // The free values in flattened order: [UV_COORD, SUBSET (geometry), SUBSET (texture), PRESENT,
   // HAS_XP] — the geometry's and the texture's SUBSET move together (the allowed rule).
-  if (!EncodeMatch(QuadTextureIndex, 0, {uvCoord, subset, subset, present, hasXp}, variant)) {
+  if (!EncodeMatch(QuadTextureIndex, 0, {uvCoord, subset, subset, present, hasXp},
+                   &result->variant)) {
     return false;
   }
-  *leafOut = tail.leaf;
+  result->tiledLeaf = tail.leaf;
   return true;
 }
 
@@ -591,8 +610,7 @@ bool MatchQuadTexture(const DrawShape& shape, Variant* variant,
 /// xfer. Color-graded YUV draws stay on the legacy kernel until the flatten fallback lands. The
 /// flattened dims are [UV_COORD, SUBSET=0, FORMAT, HAS_XP], so the ordinal is
 /// UV_COORD + 4*FORMAT + 8*HAS_XP.
-bool MatchYUVTexture(const DrawShape& shape, Variant* variant,
-                     const AOTTextureParameters** leafOut) {
+bool MatchYUVTexture(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::QuadPerEdgeAA || shape.geometry.hasSubset ||
       shape.colorFPCount != 1 || shape.colorFPCount != shape.fragmentCount ||
       shape.xpType() < XP_NONE || shape.ir == nullptr) {
@@ -623,10 +641,10 @@ bool MatchYUVTexture(const DrawShape& shape, Variant* variant,
   // The free values in flattened order: [UV_COORD, SUBSET = 0, FORMAT, HAS_XP] — SUBSET is free in
   // the geometry but the allowed filter keeps its 0 half only (the YUV path never carries one).
   if (!EncodeMatch(YUVTextureIndex, 0, {uvCoord, 0, static_cast<uint8_t>(format), hasXp},
-                   variant)) {
+                   &result->variant)) {
     return false;
   }
-  *leafOut = tail.leaf;
+  result->tiledLeaf = tail.leaf;
   return true;
 }
 
@@ -634,7 +652,7 @@ bool MatchYUVTexture(const DrawShape& shape, Variant* variant,
 /// geometry kind is the contract — no color processors, at most one coverage processor (a bare
 /// analytic clip or an alpha-only affine device mask), and any xfer. HAS_COVERAGE and HAS_XP
 /// flatten in that order, so the ordinal is HAS_COVERAGE + 2 * HAS_XP.
-bool MatchAtlasText(const DrawShape& shape, Variant* variant) {
+bool MatchAtlasText(const DrawShape& shape, FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::AtlasText || shape.colorFPCount != 0 ||
       shape.fragmentCount > 1 || shape.xpType() < XP_NONE) {
     return false;
@@ -651,82 +669,119 @@ bool MatchAtlasText(const DrawShape& shape, Variant* variant) {
   }
   const uint8_t hasCoverage = shape.geometry.hasCoverage ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(AtlasTextIndex, 0, {hasCoverage, hasXp}, variant);
+  return EncodeMatch(AtlasTextIndex, 0, {hasCoverage, hasXp}, &result->variant);
+}
+
+}  // namespace
+
+/// The one match rule per family, addressed by the family index. The switch keys off the
+/// FamilyIndexOf constants, so the table cannot drift from the family table's order: a reorder
+/// re-keys the switch automatically, and a duplicate name would collide two case labels.
+constexpr FamilyMatchFunction MatcherFor(uint16_t index) {
+  switch (index) {
+    case SolidColorIndex:
+      return MatchSolidColor;
+    case MaskFillIndex:
+      return MatchMaskFill;
+    case TiledTextureFillIndex:
+      return MatchTiledTextureFill;
+    case QuadColorIndex:
+      return MatchQuadColor;
+    case RRectIndex:
+      return MatchRRect;
+    case MeshIndex:
+      return MatchMesh;
+    case ShapeInstancedIndex:
+      return MatchShapeInstanced;
+    case ComplexRRectIndex:
+      return MatchComplexRRect;
+    case HairlineLineIndex:
+      return MatchHairlineLine;
+    case HairlineQuadIndex:
+      return MatchHairlineQuad;
+    case EllipseIndex:
+      return MatchEllipse;
+    case ComplexEllipseIndex:
+      return MatchComplexEllipse;
+    case RoundStrokeRectIndex:
+      return MatchRoundStrokeRect;
+    case QuadTextureIndex:
+      return MatchQuadTexture;
+    case YUVTextureIndex:
+      return MatchYUVTexture;
+    case AtlasTextIndex:
+      return MatchAtlasText;
+    case ShapeInstancedTextureCoverageIndex:
+      return MatchShapeInstancedTextureCoverage;
+    case GaussianBlurIndex:
+      return MatchGaussianBlur;
+    case GlassUDFTentBlurIndex:
+      return MatchGlassUDFTentBlur;
+    case GlassRefractionIndex:
+      return MatchGlassRefractionEllipse;
+    case GlassRefractionQuadIndex:
+      return MatchGlassRefractionQuad;
+  }
+  return nullptr;
+}
+
+/// A family table row without a match rule is a build failure: the family would silently never
+/// match, dropping every one of its draws onto the fallback route.
+constexpr bool EveryFamilyHasARule() {
+  for (uint16_t index = 0; index < FamilyTableCount(); ++index) {
+    if (MatcherFor(index) == nullptr) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static_assert(EveryFamilyHasARule(), "every family table row needs a match rule in MatcherFor");
+
+std::array<FamilyMatchFunction, FamilyTableCount()> BuildMatcherTable() {
+  std::array<FamilyMatchFunction, FamilyTableCount()> table = {};
+  for (size_t index = 0; index < table.size(); ++index) {
+    table[index] = MatcherFor(static_cast<uint16_t>(index));
+  }
+  return table;
+}
+
+const FamilyMatchFunction* FamilyMatchers() {
+  static const std::array<FamilyMatchFunction, FamilyTableCount()> matchers = BuildMatcherTable();
+  return matchers.data();
 }
 
 std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
   if (FamilyCount() == 0) {
     return std::nullopt;
   }
-  // The table order is the match priority; the dedicated rules are disjoint.
-  FamilyMatchResult result = {};
-  if (MatchSolidColor(shape, &result.variant)) {
-    return result;
+  const FamilyMatchFunction* matchers = FamilyMatchers();
+  std::optional<FamilyMatchResult> accepted;
+  uint16_t acceptedFamily = 0;
+  for (uint16_t index = 0; index < FamilyCount(); ++index) {
+    FamilyMatchResult result = {};
+    if (!matchers[index](shape, &result)) {
+      continue;
+    }
+    if (accepted.has_value()) {
+#if DEBUG
+      // The mutual-exclusion tripwire: the declared rules are pairwise disjoint by contract, so a
+      // second acceptor means two predicates overlap and the walk order would silently pick the
+      // winner. Reported and asserted in debug builds; release keeps the first acceptor.
+      LOGE("[family-conflict] the %s and %s rules both accept one draw; narrow one of them",
+           Families()[acceptedFamily].name, Families()[index].name);
+      DEBUG_ASSERT(false);
+#endif
+      continue;
+    }
+    accepted = result;
+    acceptedFamily = index;
+#if !DEBUG
+    // Release: the first acceptor is the only one (the rules are disjoint), so stop walking.
+    break;
+#endif
   }
-  if (MatchMaskFill(shape, &result.variant, &result.maskLeaf)) {
-    return result;
-  }
-  if (MatchTiledTextureFill(shape, &result.variant, &result.tiledLeaf)) {
-    return result;
-  }
-  if (MatchQuadColor(shape, &result.variant)) {
-    return result;
-  }
-  if (MatchMesh(shape, &result.variant)) {
-    return result;
-  }
-  if (MatchShapeInstanced(shape, &result.variant)) {
-    return result;
-  }
-  if (MatchShapeInstancedTextureCoverage(shape, &result.variant, &result.maskLeaf,
-                                         &result.gradient)) {
-    return result;
-  }
-  if (MatchGaussianBlur(shape, &result.variant, &result)) {
-    return result;
-  }
-  if (MatchGlassUDFTentBlur(shape, &result.variant, &result)) {
-    return result;
-  }
-  if (MatchGlassRefraction(shape, GeometryKind::Ellipse, GlassRefractionIndex, &result.variant,
-                           &result)) {
-    return result;
-  }
-  if (MatchGlassRefraction(shape, GeometryKind::QuadPerEdgeAA, GlassRefractionQuadIndex,
-                           &result.variant, &result)) {
-    return result;
-  }
-  if (MatchAtlasText(shape, &result.variant)) {
-    return result;
-  }
-  if (MatchQuadTexture(shape, &result.variant, &result.tiledLeaf)) {
-    return result;
-  }
-  if (MatchYUVTexture(shape, &result.variant, &result.tiledLeaf)) {
-    return result;
-  }
-  if (MatchRoundStrokeRect(shape, &result.variant)) {
-    return result;
-  }
-  if (MatchComplexEllipse(shape, &result.variant)) {
-    return result;
-  }
-  if (MatchEllipse(shape, &result.variant)) {
-    return result;
-  }
-  if (MatchHairline(shape, GeometryKind::HairlineLine, HairlineLineIndex, &result.variant)) {
-    return result;
-  }
-  if (MatchHairline(shape, GeometryKind::HairlineQuad, HairlineQuadIndex, &result.variant)) {
-    return result;
-  }
-  if (MatchComplexRRect(shape, &result.variant)) {
-    return result;
-  }
-  if (MatchRRect(shape, &result.variant, &result.tiledLeaf)) {
-    return result;
-  }
-  return std::nullopt;
+  return accepted;
 }
 
 }  // namespace tgfx
