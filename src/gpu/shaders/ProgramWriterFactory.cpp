@@ -25,13 +25,17 @@
 namespace tgfx {
 
 /// The declaration-driven families' layout-addressed writer (DeclaredFamilyWriter.cpp).
-std::unique_ptr<ProgramWriter> MakeDeclaredFamilyProgramWriter();
+std::unique_ptr<ProgramWriter> MakeDeclaredFamilyProgramWriter(const ProgramInfo& info,
+                                                               uint16_t familyIndex,
+                                                               uint32_t permutationOrdinal);
 
 // The re-expressing chain family carries its own writer (it compiles the draw's whole expression
 // into the chain program); the YUV family appends its compiled tail records to the standard walk;
-// the declaration-driven families write through their derived layouts; every other family uses
-// the generic precompiled writer.
-std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shaderName) {
+// the declaration-driven families write through their derived layouts, derived once per program
+// from the matched variant; every other family uses the generic precompiled writer.
+std::unique_ptr<ProgramWriter> MakeProgramWriter(const ProgramInfo& info,
+                                                 const std::string& shaderName,
+                                                 uint32_t permutationOrdinal) {
   if (shaderName == PointwiseChainShader::Name) {
     return std::make_unique<ChainProgramWriter>();
   }
@@ -40,7 +44,8 @@ std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shaderName) 
   }
   for (size_t index = 0; index < FamilyCount(); ++index) {
     if (shaderName == Families()[index].name) {
-      return MakeDeclaredFamilyProgramWriter();
+      return MakeDeclaredFamilyProgramWriter(info, static_cast<uint16_t>(index),
+                                             permutationOrdinal);
     }
   }
   return std::make_unique<PrecompiledProgramWriter>();

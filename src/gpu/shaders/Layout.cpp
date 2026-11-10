@@ -55,6 +55,7 @@ Layout DeriveLayout(const Variant& variant) {
   Layout layout;
   layout.moduleBase.resize(modules.count, 0);
   layout.moduleFieldCount.resize(modules.count, 0);
+  layout.elementField.resize(modules.count);
   size_t vertexCursor = 0;
   size_t fragmentCursor = 0;
   // The same hole rule the assembler spells: attributes, instance attributes and varyings carry
@@ -65,10 +66,12 @@ Layout DeriveLayout(const Variant& variant) {
   for (uint8_t slot = 0; slot < modules.count; ++slot) {
     const Module* module = modules.list[slot];
     layout.moduleBase[slot] = static_cast<uint16_t>(layout.fields.size());
+    layout.elementField[slot].assign(module != nullptr ? module->elementCount : 0, Layout::NoField);
     if (module == nullptr || !ModulePresent(family, variant, slot)) {
       continue;
     }
     const uint16_t firstField = static_cast<uint16_t>(layout.fields.size());
+    uint16_t presentFieldCount = 0;
     const uint8_t dimBase = DimOffsetOf(family, variant, slot);
     for (uint8_t index = 0; index < module->elementCount; ++index) {
       const Element& element = module->elements[index];
@@ -118,6 +121,10 @@ Layout DeriveLayout(const Variant& variant) {
             cursor += field.size;
             layout.fields.push_back(field);
             layout.fieldNames.push_back(name);
+            // The element's field, for the element-indexed writes (SlotWriter).
+            layout.elementField[slot][index] =
+                static_cast<uint16_t>(firstField + presentFieldCount);
+            ++presentFieldCount;
             break;
           }
           case Element::Kind::Attribute:

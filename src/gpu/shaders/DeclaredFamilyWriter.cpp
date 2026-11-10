@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
 #include <cmath>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProgramWriter.h"
@@ -82,6 +83,17 @@ namespace tgfx {
 
 namespace {
 
+/// Whether the geometry's slot list declares the location (the pairing check's per-attribute
+/// probe; a plain loop in place of the std::any_of lambda the coding rules exclude).
+bool SlotIsDeclared(const std::vector<uint32_t>& slots, uint32_t location) {
+  for (uint32_t slot : slots) {
+    if (slot == location) {
+      return true;
+    }
+  }
+  return false;
+}
+
 std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
   std::array<float, 4> result = {};
   result[0] = 2.f / static_cast<float>(renderTarget->width());
@@ -101,71 +113,61 @@ std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
 }
 
 // Frame (slot 0): the render-target adjust vector.
-void WriteFrame(const ProgramInfo& info, const Layout& layout, uint8_t slot, ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
-  const auto adjust = GetRTAdjustArray(info.getRenderTarget());
-  buffer->set(slice.fields[0], adjust);
+void WriteFrame(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t RTAdjust = UniformElementIndexOf(Frame, "RTAdjust");
+  writer->set(RTAdjust, GetRTAdjustArray(info.getRenderTarget()));
 }
 
 // RectGeometry (the DefaultGP geometry): the view transform and the paint color uniform. The
 // per-vertex coverage rides the varying and needs no write.
-void WriteRectGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                       ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteRectGeometry(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t Matrix = UniformElementIndexOf(RectGeometry, "Matrix");
+  constexpr uint8_t Color = UniformElementIndexOf(RectGeometry, "Color");
   const auto* geometry = static_cast<const DefaultGeometryProcessor*>(info.getGeometryProcessor());
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "RectGeometry", "Matrix")],
-              geometry->getViewMatrix());
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "RectGeometry", "Color")],
-              geometry->getCommonColor());
+  writer->set(Matrix, geometry->getViewMatrix());
+  writer->set(Color, geometry->getCommonColor());
 }
 
 // QuadGeometry (the QuadPerEdgeAA geometry): the paint color uniform; the position is already in
 // device space, so there is no view transform.
-void WriteQuadGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                       ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteQuadGeometry(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t Color = UniformElementIndexOf(QuadGeometry, "Color");
   const auto* geometry =
       static_cast<const QuadPerEdgeAAGeometryProcessor*>(info.getGeometryProcessor());
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "QuadGeometry", "Color")],
-              geometry->getCommonColor());
+  writer->set(Color, geometry->getCommonColor());
 }
 
-void WriteCoordMatrix(const ProgramInfo& info, const Layout& layout, const char* moduleName,
-                      uint8_t slot, ParamBuffer* buffer);
+template <const Module& module>
+void WriteCoordMatrix(const ProgramInfo& info, SlotWriter* writer);
 
 /// The transform at the given position in the FP tree's coordinate-transform sequence; a negative
 /// index selects the last one.
-void WriteCoordMatrixAt(const ProgramInfo& info, const Layout& layout, const char* moduleName,
-                        uint8_t slot, ParamBuffer* buffer, int index);
+template <const Module& module>
+void WriteCoordMatrixAt(const ProgramInfo& info, SlotWriter* writer, int index);
 
-void WriteTextureLeafParams(const AOTTextureParameters& leaf, const Layout& layout,
-                            const char* moduleName, uint8_t slot, ParamBuffer* buffer);
+template <const Module& module>
+void WriteTextureLeafParams(const AOTTextureParameters& leaf, SlotWriter* writer);
 
 // ComplexRRectGeometry: the color pair. The corner data and the SDF run entirely on the varyings.
-void WriteComplexRRectGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                               ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteComplexRRectGeometry(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t Color = UniformElementIndexOf(ComplexRRectGeometry, "Color");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(ComplexRRectGeometry, "HasCommonColor");
   const auto* geometry =
       static_cast<const ComplexNonAARRectGeometryProcessor*>(info.getGeometryProcessor());
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "ComplexRRectGeometry", "Color")],
-              geometry->getCommonColor());
-  buffer->set(
-      slice.fields[layout.FieldIndexInSlice(slice, "ComplexRRectGeometry", "HasCommonColor")],
-      static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+  writer->set(Color, geometry->getCommonColor());
+  writer->set(HasCommonColor, static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
 }
 
 // MeshGeometry: the view transform, the color pair and the texture coordinate chain.
-void WriteMeshGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                       ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteMeshGeometry(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t Matrix = UniformElementIndexOf(MeshGeometry, "Matrix");
+  constexpr uint8_t Color = UniformElementIndexOf(MeshGeometry, "Color");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(MeshGeometry, "HasCommonColor");
   const auto* geometry = static_cast<const MeshGeometryProcessor*>(info.getGeometryProcessor());
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "MeshGeometry", "Matrix")],
-              geometry->getViewMatrix());
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "MeshGeometry", "Color")],
-              geometry->getCommonColor());
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "MeshGeometry", "HasCommonColor")],
-              static_cast<int32_t>(geometry->getHasColors() ? 0 : 1));
-  WriteCoordMatrix(info, layout, "MeshGeometry", slot, buffer);
+  writer->set(Matrix, geometry->getViewMatrix());
+  writer->set(Color, geometry->getCommonColor());
+  writer->set(HasCommonColor, static_cast<int32_t>(geometry->getHasColors() ? 0 : 1));
+  WriteCoordMatrix<MeshGeometry>(info, writer);
 }
 
 // ShapeInstancedGeometry: the local-coordinate recovery, the view transform and the sampling
@@ -173,114 +175,102 @@ void WriteMeshGeometry(const ProgramInfo& info, const Layout& layout, uint8_t sl
 // transform is the LAST one in the tree: the color graph's transforms come first, so a draw whose
 // only fragment processors are the color ones leaves this unwritten (the instanced fill family
 // carries no processor at all), and a coverage texture lands on it.
-void WriteShapeInstancedGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                                 ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteShapeInstancedGeometry(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t UVMatrix = UniformElementIndexOf(ShapeInstancedGeometry, "UVMatrix");
+  constexpr uint8_t ViewMatrix = UniformElementIndexOf(ShapeInstancedGeometry, "ViewMatrix");
   const auto* geometry =
       static_cast<const ShapeInstancedGeometryProcessor*>(info.getGeometryProcessor());
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "ShapeInstancedGeometry", "UVMatrix")],
-              geometry->getUVMatrix());
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "ShapeInstancedGeometry", "ViewMatrix")],
-              geometry->getViewMatrix());
-  WriteCoordMatrixAt(info, layout, "ShapeInstancedGeometry", slot, buffer, -1);
+  writer->set(UVMatrix, geometry->getUVMatrix());
+  writer->set(ViewMatrix, geometry->getViewMatrix());
+  WriteCoordMatrixAt<ShapeInstancedGeometry>(info, writer, -1);
 }
 
 // CoverageTexture: the leaf's subset rect and read gates, the same values BindTextureSourceLeaf
 // uploads. The sample coordinate rides the geometry's own transform.
-void WriteCoverageTexture(const AOTTextureParameters& leaf, const Layout& layout, uint8_t slot,
-                          ParamBuffer* buffer) {
-  WriteTextureLeafParams(leaf, layout, "CoverageTexture", slot, buffer);
+void WriteCoverageTexture(const AOTTextureParameters& leaf, SlotWriter* writer) {
+  WriteTextureLeafParams<CoverageTexture>(leaf, writer);
 }
 
 // Gradient: the clamped single-interval gradient's whole record — the endpoints, the boundary
 // colors, the layout branch and the conic layout's bias/scale pair. The values are the ones
 // BindGradientNode uploads for the legacy instanced-shape kernel; the coordinate transform rides
 // the vertex block.
-void WriteGradient(const AOTGradientParameters& params, const Layout& layout, uint8_t slot,
-                   ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, "Gradient", name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    }
-  };
-  put("CoordMatrix", params.coordMatrix);
-  put("LeftBorderColor", params.leftBorder);
-  put("RightBorderColor", params.rightBorder);
-  put("LayoutType", static_cast<int32_t>(params.layoutType));
+void WriteGradient(const AOTGradientParameters& params, SlotWriter* writer) {
+  constexpr uint8_t CoordMatrix = UniformElementIndexOf(Gradient, "CoordMatrix");
+  constexpr uint8_t LeftBorderColor = UniformElementIndexOf(Gradient, "LeftBorderColor");
+  constexpr uint8_t RightBorderColor = UniformElementIndexOf(Gradient, "RightBorderColor");
+  constexpr uint8_t LayoutType = UniformElementIndexOf(Gradient, "LayoutType");
+  constexpr uint8_t Bias = UniformElementIndexOf(Gradient, "Bias");
+  constexpr uint8_t Scale = UniformElementIndexOf(Gradient, "Scale");
+  constexpr uint8_t Start = UniformElementIndexOf(Gradient, "Start");
+  constexpr uint8_t End = UniformElementIndexOf(Gradient, "End");
+  writer->set(CoordMatrix, params.coordMatrix);
+  writer->set(LeftBorderColor, params.leftBorder);
+  writer->set(RightBorderColor, params.rightBorder);
+  writer->set(LayoutType, static_cast<int32_t>(params.layoutType));
   // The conic layout is the only one the shared gradient layout maths reads these two for; the
   // other layouts record their defaults, which the shader never touches.
-  put("Bias", params.bias);
-  put("Scale", params.scale);
-  put("Start", params.start);
-  put("End", params.end);
+  writer->set(Bias, params.bias);
+  writer->set(Scale, params.scale);
+  writer->set(Start, params.start);
+  writer->set(End, params.end);
 }
 
-void WriteBlurSourceGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                             ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteBlurSourceGeometry(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t ViewMatrix = UniformElementIndexOf(BlurSourceGeometry, "Matrix");
   const auto* geometry = info.getGeometryProcessor();
   Matrix view = Matrix::I();
   if (IsProcessor<DefaultGeometryProcessor>(geometry)) {
     view = static_cast<const DefaultGeometryProcessor*>(geometry)->getViewMatrix();
   }
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "BlurSourceGeometry", "Matrix")], view);
-  WriteCoordMatrix(info, layout, "BlurSourceGeometry", slot, buffer);
+  writer->set(ViewMatrix, view);
+  WriteCoordMatrix<BlurSourceGeometry>(info, writer);
 }
 
 /// The child's sampling fields the blur-style bodies share: the tiled recipe or the plain subset
-/// rect, plus the tiled-child selector.
+/// rect, plus the tiled-child selector. Both blur modules declare the same five fields, so the
+/// shared body templates on the module and resolves every element index at compile time.
+template <const Module& module>
 void WriteChildSamplingFields(const AOTTextureParameters* child, const TextureView* view,
-                              const char* moduleName, const Layout& layout, uint8_t slot,
-                              ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, moduleName, name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    } else {
-      LOGE("WriteChildSamplingFields: field %s is absent from the derived layout", name);
-      DEBUG_ASSERT(false);
-    }
-  };
+                              SlotWriter* writer) {
+  constexpr uint8_t TiledChild = UniformElementIndexOf(module, "TiledChild");
+  constexpr uint8_t ShaderModeX = UniformElementIndexOf(module, "ShaderModeX");
+  constexpr uint8_t ShaderModeY = UniformElementIndexOf(module, "ShaderModeY");
+  constexpr uint8_t Subset = UniformElementIndexOf(module, "Subset");
+  constexpr uint8_t Clamp = UniformElementIndexOf(module, "Clamp");
+  constexpr uint8_t Dimension = UniformElementIndexOf(module, "Dimension");
   const bool tiled = child != nullptr && child->tiledRecipe.has_value();
-  put("TiledChild", static_cast<int32_t>(tiled ? 1 : 0));
+  writer->set(TiledChild, static_cast<int32_t>(tiled ? 1 : 0));
   if (tiled) {
     const auto& sampling = *child->tiledRecipe;
-    put("ShaderModeX", static_cast<int32_t>(sampling.shaderModeX));
-    put("ShaderModeY", static_cast<int32_t>(sampling.shaderModeY));
-    put("Subset", std::array<float, 4>{sampling.shaderSubset.left, sampling.shaderSubset.top,
-                                       sampling.shaderSubset.right, sampling.shaderSubset.bottom});
-    put("Clamp", std::array<float, 4>{sampling.shaderClamp.left, sampling.shaderClamp.top,
-                                      sampling.shaderClamp.right, sampling.shaderClamp.bottom});
+    writer->set(ShaderModeX, static_cast<int32_t>(sampling.shaderModeX));
+    writer->set(ShaderModeY, static_cast<int32_t>(sampling.shaderModeY));
+    writer->set(Subset,
+                std::array<float, 4>{sampling.shaderSubset.left, sampling.shaderSubset.top,
+                                     sampling.shaderSubset.right, sampling.shaderSubset.bottom});
+    writer->set(Clamp,
+                std::array<float, 4>{sampling.shaderClamp.left, sampling.shaderClamp.top,
+                                     sampling.shaderClamp.right, sampling.shaderClamp.bottom});
     if (sampling.usesShaderDimensions) {
-      put("Dimension",
-          std::array<float, 2>{sampling.shaderDimensions.x, sampling.shaderDimensions.y});
+      writer->set(Dimension,
+                  std::array<float, 2>{sampling.shaderDimensions.x, sampling.shaderDimensions.y});
     }
   } else if (child != nullptr && view != nullptr && view->getTexture() != nullptr) {
     float rect[4] = {};
     LeafSubsetRectForSampler(child->textureProxy, view, child->subset, child->samplerState, rect);
-    put("Subset", std::array<float, 4>{rect[0], rect[1], rect[2], rect[3]});
+    writer->set(Subset, std::array<float, 4>{rect[0], rect[1], rect[2], rect[3]});
   }
 }
 
 void WriteGlassUDFTentBlur(const AOTOpaqueKernelParameters& params,
-                           const AOTTextureParameters* child, const Layout& layout, uint8_t slot,
-                           ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, "GlassUDFTentBlur", name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    } else {
-      LOGE("WriteGlassUDFTentBlur: field %s is absent from the derived layout", name);
-      DEBUG_ASSERT(false);
-    }
-  };
-  put("Radius", std::array<float, 2>{params.tentFineRadius, params.tentCoarseRadius});
-  put("Field", params.tentField);
-  put("InputIsPacked", params.tentInputIsPacked);
+                           const AOTTextureParameters* child, SlotWriter* writer) {
+  constexpr uint8_t Radius = UniformElementIndexOf(GlassUDFTentBlur, "Radius");
+  constexpr uint8_t Field = UniformElementIndexOf(GlassUDFTentBlur, "Field");
+  constexpr uint8_t InputIsPacked = UniformElementIndexOf(GlassUDFTentBlur, "InputIsPacked");
+  constexpr uint8_t Step = UniformElementIndexOf(GlassUDFTentBlur, "Step");
+  writer->set(Radius, std::array<float, 2>{params.tentFineRadius, params.tentCoarseRadius});
+  writer->set(Field, params.tentField);
+  writer->set(InputIsPacked, params.tentInputIsPacked);
   Point stepVectors[] = {{0, 0}, {1.0f, 0}};
   if (params.tentVertical) {
     stepVectors[1] = {0, 1.0f};
@@ -302,24 +292,18 @@ void WriteGlassUDFTentBlur(const AOTOpaqueKernelParameters& params,
     matrix.mapPoints(stepVectors, 2);
   }
   const Point step = stepVectors[1] - stepVectors[0];
-  put("Step", std::array<float, 2>{step.x, step.y});
-  WriteChildSamplingFields(child, view.get(), "GlassUDFTentBlur", layout, slot, buffer);
+  writer->set(Step, std::array<float, 2>{step.x, step.y});
+  WriteChildSamplingFields<GlassUDFTentBlur>(child, view.get(), writer);
 }
 
 void WriteGaussianBlur(const AOTOpaqueKernelParameters& params, const AOTTextureParameters* child,
-                       const Layout& layout, uint8_t slot, ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, "GaussianBlur", name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    } else {
-      LOGE("WriteGaussianBlur: field %s is absent from the derived layout", name);
-      DEBUG_ASSERT(false);
-    }
-  };
-  put("Kernel", params.packedKernel);
-  put("Radius", params.kernelRadius);
+                       SlotWriter* writer) {
+  constexpr uint8_t Kernel = UniformElementIndexOf(GaussianBlur, "Kernel");
+  constexpr uint8_t Radius = UniformElementIndexOf(GaussianBlur, "Radius");
+  constexpr uint8_t Step = UniformElementIndexOf(GaussianBlur, "Step");
+  constexpr uint8_t AlphaChild = UniformElementIndexOf(GaussianBlur, "AlphaChild");
+  writer->set(Kernel, params.packedKernel);
+  writer->set(Radius, params.kernelRadius);
   Point stepVectors[] = {{0, 0}, {params.stepLength, 0}};
   if (params.vertical) {
     stepVectors[1] = {0, params.stepLength};
@@ -341,9 +325,9 @@ void WriteGaussianBlur(const AOTOpaqueKernelParameters& params, const AOTTexture
     matrix.mapPoints(stepVectors, 2);
   }
   const Point step = stepVectors[1] - stepVectors[0];
-  put("Step", std::array<float, 2>{step.x, step.y});
-  put("AlphaChild", static_cast<int32_t>(child != nullptr && child->isAlphaOnly ? 1 : 0));
-  WriteChildSamplingFields(child, view.get(), "GaussianBlur", layout, slot, buffer);
+  writer->set(Step, std::array<float, 2>{step.x, step.y});
+  writer->set(AlphaChild, static_cast<int32_t>(child != nullptr && child->isAlphaOnly ? 1 : 0));
+  WriteChildSamplingFields<GaussianBlur>(child, view.get(), writer);
 }
 
 // GlassRefraction: the optics and shape records, field for field the same values the runtime
@@ -351,26 +335,29 @@ void WriteGaussianBlur(const AOTOpaqueKernelParameters& params, const AOTTexture
 // children), sourced from the IR node instead of the processor tree. The background-coordinate
 // transform is the tree's first coord transform (the standard helper upload).
 void WriteGlassRefraction(const AOTOpaqueKernelParameters& params, const ProgramInfo& info,
-                          const Layout& layout, uint8_t slot, ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, "GlassRefraction", name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    } else {
-      LOGE("WriteGlassRefraction: field %s is absent from the derived layout", name);
-      DEBUG_ASSERT(false);
-    }
-  };
-  WriteCoordMatrixAt(info, layout, "GlassRefraction", slot, buffer, 0);
+                          SlotWriter* writer) {
+  constexpr uint8_t OpticsP0 = UniformElementIndexOf(GlassRefraction, "OpticsP0");
+  constexpr uint8_t OpticsP1 = UniformElementIndexOf(GlassRefraction, "OpticsP1");
+  constexpr uint8_t OpticsP2 = UniformElementIndexOf(GlassRefraction, "OpticsP2");
+  constexpr uint8_t OpticsP3 = UniformElementIndexOf(GlassRefraction, "OpticsP3");
+  constexpr uint8_t ShapeP0 = UniformElementIndexOf(GlassRefraction, "ShapeP0");
+  constexpr uint8_t ShapeP1 = UniformElementIndexOf(GlassRefraction, "ShapeP1");
+  constexpr uint8_t LightDir = UniformElementIndexOf(GlassRefraction, "LightDir");
+  constexpr uint8_t LightingOn = UniformElementIndexOf(GlassRefraction, "LightingOn");
+  // The UDF-only fields exist iff SHAPE == 2, so their writes take the ifPresent form.
+  constexpr uint8_t FineMaskUV = UniformElementIndexOf(GlassRefraction, "FineMaskUV");
+  constexpr uint8_t EdgeSpan = UniformElementIndexOf(GlassRefraction, "EdgeSpan");
+  constexpr uint8_t EdgeMaskUV = UniformElementIndexOf(GlassRefraction, "EdgeMaskUV");
+  constexpr uint8_t EdgeMaskOn = UniformElementIndexOf(GlassRefraction, "EdgeMaskOn");
+  WriteCoordMatrixAt<GlassRefraction>(info, writer, 0);
   if (params.glassSourceProxy == nullptr) {
     LOGE("WriteGlassRefraction: the IR node carries no background source proxy");
     return;
   }
   const float sourceWidth = static_cast<float>(params.glassSourceProxy->width());
   const float sourceHeight = static_cast<float>(params.glassSourceProxy->height());
-  put("OpticsP0", std::array<float, 4>{1.0f / sourceWidth, 1.0f / sourceHeight,
-                                       params.glassDispersion, params.glassMaxDisplacement});
+  writer->set(OpticsP0, std::array<float, 4>{1.0f / sourceWidth, 1.0f / sourceHeight,
+                                             params.glassDispersion, params.glassMaxDisplacement});
   float layerToSourceX = params.glassLayerToSourceX;
   float layerToSourceY = params.glassLayerToSourceY;
   if (layerToSourceX <= 0.0f) {
@@ -379,25 +366,27 @@ void WriteGlassRefraction(const AOTOpaqueKernelParameters& params, const Program
   if (layerToSourceY <= 0.0f) {
     layerToSourceY = params.glassOrigHeight > 0.0f ? sourceHeight / params.glassOrigHeight : 1.0f;
   }
-  put("OpticsP1",
-      std::array<float, 2>{layerToSourceX / sourceWidth, layerToSourceY / sourceHeight});
+  writer->set(OpticsP1,
+              std::array<float, 2>{layerToSourceX / sourceWidth, layerToSourceY / sourceHeight});
   const float glassUVScaleX =
       params.glassUVScaleX > 0.0f ? params.glassUVScaleX : 1.0f / sourceWidth;
   const float glassUVScaleY =
       params.glassUVScaleY > 0.0f ? params.glassUVScaleY : 1.0f / sourceHeight;
-  put("OpticsP2", std::array<float, 4>{glassUVScaleX, glassUVScaleY, params.glassLightIntensity,
-                                       params.glassFrost / 100.0f});
-  put("OpticsP3", std::array<float, 4>{params.glassUVOffsetX, params.glassUVOffsetY, 0.0f, 0.0f});
-  put("LightingOn", static_cast<int32_t>(params.glassLightIntensity > 0.0f ? 1 : 0));
+  writer->set(OpticsP2,
+              std::array<float, 4>{glassUVScaleX, glassUVScaleY, params.glassLightIntensity,
+                                   params.glassFrost / 100.0f});
+  writer->set(OpticsP3,
+              std::array<float, 4>{params.glassUVOffsetX, params.glassUVOffsetY, 0.0f, 0.0f});
+  writer->set(LightingOn, static_cast<int32_t>(params.glassLightIntensity > 0.0f ? 1 : 0));
   const auto& shape = params.glassShape;
   const float angle = shape.lightAngle * static_cast<float>(M_PI) / 180.0f;
-  put("LightDir", std::array<float, 2>{std::sin(angle), std::cos(angle)});
-  put("ShapeP1", std::array<float, 4>{shape.refractionFactor, shape.splay, shape.depthRatio,
-                                      shape.edgeBandLayerPixels});
+  writer->set(LightDir, std::array<float, 2>{std::sin(angle), std::cos(angle)});
+  writer->set(ShapeP1, std::array<float, 4>{shape.refractionFactor, shape.splay, shape.depthRatio,
+                                            shape.edgeBandLayerPixels});
   if (params.geometryKind == AOTGlassGeometryKind::Udf) {
-    put("ShapeP0", std::array<float, 4>{shape.halfW, shape.halfH, shape.udfPixelToLayerPixelX,
-                                        shape.udfPixelToLayerPixelY});
-    put("EdgeSpan", std::array<float, 2>{shape.edgeSpanX, shape.edgeSpanY});
+    writer->set(ShapeP0, std::array<float, 4>{shape.halfW, shape.halfH, shape.udfPixelToLayerPixelX,
+                                              shape.udfPixelToLayerPixelY});
+    writer->setIfPresent(EdgeSpan, std::array<float, 2>{shape.edgeSpanX, shape.edgeSpanY});
     if (shape.maskProxy == nullptr) {
       // The UDF child's constructor guarantees the mask; reaching here means a malformed IR.
       LOGE("WriteGlassRefraction: the UDF node carries no mask proxy");
@@ -407,9 +396,10 @@ void WriteGlassRefraction(const AOTOpaqueKernelParameters& params, const Program
     const float textureHeight = static_cast<float>(shape.maskProxy->height());
     const float coreWidth = std::round(shape.halfW * 2.0f / shape.udfPixelToLayerPixelX);
     const float coreHeight = std::round(shape.halfH * 2.0f / shape.udfPixelToLayerPixelY);
-    put("FineMaskUV", std::array<float, 4>{coreWidth / textureWidth, coreHeight / textureHeight,
-                                           -shape.textureOriginX / textureWidth,
-                                           -shape.textureOriginY / textureHeight});
+    writer->setIfPresent(FineMaskUV,
+                         std::array<float, 4>{coreWidth / textureWidth, coreHeight / textureHeight,
+                                              -shape.textureOriginX / textureWidth,
+                                              -shape.textureOriginY / textureHeight});
     float edgeScaleX = 1.0f;
     float edgeScaleY = 1.0f;
     float edgeOriginX = shape.edgeTextureOriginX;
@@ -424,23 +414,23 @@ void WriteGlassRefraction(const AOTOpaqueKernelParameters& params, const Program
       edgeOriginX = -shape.edgeTextureOriginX / edgeTextureWidth;
       edgeOriginY = -shape.edgeTextureOriginY / edgeTextureHeight;
     }
-    put("EdgeMaskUV", std::array<float, 4>{edgeScaleX, edgeScaleY, edgeOriginX, edgeOriginY});
-    put("EdgeMaskOn",
+    writer->setIfPresent(EdgeMaskUV,
+                         std::array<float, 4>{edgeScaleX, edgeScaleY, edgeOriginX, edgeOriginY});
+    writer->setIfPresent(
+        EdgeMaskOn,
         static_cast<int32_t>(shape.enableEdgeLighting && shape.edgeMaskProxy != nullptr ? 1 : 0));
   } else {
-    put("ShapeP0",
-        std::array<float, 4>{shape.halfW, shape.halfH, shape.cornerRadius, shape.glassThickness});
+    writer->set(ShapeP0, std::array<float, 4>{shape.halfW, shape.halfH, shape.cornerRadius,
+                                              shape.glassThickness});
   }
 }
 
 // GlassLocalMask: the runtime gate (the legacy kernel's HasLocalMask branch) plus the mask's own
 // coordinate transform — the second one in the tree, the same matrix the standard helper uploads.
-void WriteGlassLocalMask(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                         ParamBuffer* buffer, bool hasMask) {
-  const auto slice = layout.SliceOf(slot);
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "GlassLocalMask", "HasMask")],
-              static_cast<int32_t>(hasMask ? 1 : 0));
-  WriteCoordMatrixAt(info, layout, "GlassLocalMask", slot, buffer, 1);
+void WriteGlassLocalMask(const ProgramInfo& info, SlotWriter* writer, bool hasMask) {
+  constexpr uint8_t HasMask = UniformElementIndexOf(GlassLocalMask, "HasMask");
+  writer->set(HasMask, static_cast<int32_t>(hasMask ? 1 : 0));
+  WriteCoordMatrixAt<GlassLocalMask>(info, writer, 1);
 }
 
 // The source coordinate matrix every texture leaf shares: the FP tree's first coord transform
@@ -461,79 +451,78 @@ Matrix SourceCoordMatrix(const ProgramInfo& info) {
   return combined;
 }
 
-// The leaf's subset rect and read gates, the same values BindTextureSourceLeaf uploads.
-void WriteTextureLeafParams(const AOTTextureParameters& leaf, const Layout& layout,
-                            const char* moduleName, uint8_t slot, ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, moduleName, name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    }
-  };
+// The leaf's subset rect and read gates, the same values BindTextureSourceLeaf uploads. The
+// texture-carrying modules declare different subsets of these fields, so the shared body
+// templates on the module and writes exactly the fields it declares (a compile-time fact).
+template <const Module& module>
+void WriteTextureLeafParams(const AOTTextureParameters& leaf, SlotWriter* writer) {
+  constexpr uint8_t Subset = UniformElementIndexOf(module, "Subset");
   auto view = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
   if (view == nullptr || view->getTexture() == nullptr) {
     return;
   }
   float rect[4] = {};
   LeafSubsetRectForSampler(leaf.textureProxy, view.get(), leaf.subset, leaf.samplerState, rect);
-  put("Subset", std::array<float, 4>{rect[0], rect[1], rect[2], rect[3]});
-  put("SubsetClampOn",
-      static_cast<int32_t>(LeafSubsetClampOn(leaf.textureProxy, view.get(), leaf.subset) ? 1 : 0));
-  if (leaf.hasRGBAAA) {
-    auto coord = view->getTextureCoord(leaf.alphaStart.x, leaf.alphaStart.y);
-    put("AlphaStart", std::array<float, 2>{coord.x, coord.y});
+  writer->set(Subset, std::array<float, 4>{rect[0], rect[1], rect[2], rect[3]});
+  if constexpr (HasElement(module, "SubsetClampOn")) {
+    constexpr uint8_t SubsetClampOn = UniformElementIndexOf(module, "SubsetClampOn");
+    writer->set(SubsetClampOn,
+                static_cast<int32_t>(
+                    LeafSubsetClampOn(leaf.textureProxy, view.get(), leaf.subset) ? 1 : 0));
   }
-  put("AlphaOnly", static_cast<int32_t>(leaf.isAlphaOnly ? 1 : 0));
-  put("HasRgbaaa", static_cast<int32_t>(leaf.hasRGBAAA ? 1 : 0));
+  if constexpr (HasElement(module, "AlphaStart")) {
+    constexpr uint8_t AlphaStart = UniformElementIndexOf(module, "AlphaStart");
+    if (leaf.hasRGBAAA) {
+      auto coord = view->getTextureCoord(leaf.alphaStart.x, leaf.alphaStart.y);
+      writer->set(AlphaStart, std::array<float, 2>{coord.x, coord.y});
+    }
+  }
+  if constexpr (HasElement(module, "AlphaOnly")) {
+    constexpr uint8_t AlphaOnly = UniformElementIndexOf(module, "AlphaOnly");
+    writer->set(AlphaOnly, static_cast<int32_t>(leaf.isAlphaOnly ? 1 : 0));
+  }
+  if constexpr (HasElement(module, "HasRgbaaa")) {
+    constexpr uint8_t HasRgbaaa = UniformElementIndexOf(module, "HasRgbaaa");
+    writer->set(HasRgbaaa, static_cast<int32_t>(leaf.hasRGBAAA ? 1 : 0));
+  }
 }
 
 // AtlasTextGeometry: the atlas size scale, the color pair and the AlphaOnly switch. The atlas
 // sample supplies the coverage itself, so the geometry needs no transform.
-void WriteAtlasTextGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                            ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteAtlasTextGeometry(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t AtlasSizeInv = UniformElementIndexOf(AtlasTextGeometry, "AtlasSizeInv");
+  constexpr uint8_t Color = UniformElementIndexOf(AtlasTextGeometry, "Color");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(AtlasTextGeometry, "HasCommonColor");
+  constexpr uint8_t AlphaOnly = UniformElementIndexOf(AtlasTextGeometry, "AlphaOnly");
   const auto* geometry =
       static_cast<const AtlasTextGeometryProcessor*>(info.getGeometryProcessor());
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, "AtlasTextGeometry", name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    }
-  };
   const auto& proxy = geometry->getTextureProxy();
   auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
   if (view != nullptr && view->getTexture() != nullptr) {
     const auto scale = view->getTextureCoord(1.f, 1.f);
-    put("AtlasSizeInv", std::array<float, 2>{scale.x, scale.y});
+    writer->set(AtlasSizeInv, std::array<float, 2>{scale.x, scale.y});
   }
-  put("Color", geometry->getCommonColor());
-  put("HasCommonColor", static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
-  put("AlphaOnly", static_cast<int32_t>(geometry->isAlphaOnly() ? 1 : 0));
+  writer->set(Color, geometry->getCommonColor());
+  writer->set(HasCommonColor, static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+  writer->set(AlphaOnly, static_cast<int32_t>(geometry->isAlphaOnly() ? 1 : 0));
 }
 
 // QuadTextureGeometry: the paint color the texture source multiplies by.
-void WriteQuadTextureGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                              ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteQuadTextureGeometry(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t Color = UniformElementIndexOf(QuadTextureGeometry, "Color");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(QuadTextureGeometry, "HasCommonColor");
   const auto* geometry =
       static_cast<const QuadPerEdgeAAGeometryProcessor*>(info.getGeometryProcessor());
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, "QuadTextureGeometry", name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    }
-  };
-  put("Color", geometry->getCommonColor());
-  put("HasCommonColor", static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+  writer->set(Color, geometry->getCommonColor());
+  writer->set(HasCommonColor, static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
 }
 
 // Texture: the plain leaf source. Both matrices carry the source coordinate transform — the
 // subset bounds go through the same transform whether the geometry supplies uv coordinates or
 // the position (the old kernel's two uniforms held the same value).
-void WriteTexture(const ProgramInfo& info, const AOTTextureParameters& leaf, const Layout& layout,
-                  uint8_t slot, ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteTexture(const ProgramInfo& info, const AOTTextureParameters& leaf, SlotWriter* writer) {
+  constexpr uint8_t CoordMatrix = UniformElementIndexOf(Texture, "CoordMatrix");
+  constexpr uint8_t SubsetMatrix = UniformElementIndexOf(Texture, "SubsetMatrix");
   // The subset bounds go through the leaf's bare coord transform (the old kernel's
   // texSubsetMatrix), while the source coordinate takes the transform with the geometry's uv
   // matrix pre-concatenated — the two differ exactly when the geometry carries a uv matrix.
@@ -541,17 +530,14 @@ void WriteTexture(const ProgramInfo& info, const AOTTextureParameters& leaf, con
   const CoordTransform* coordTransform = iter.next();
   const Matrix subsetMatrix =
       coordTransform != nullptr ? coordTransform->getTotalMatrix() : Matrix::I();
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "Texture", "CoordMatrix")],
-              SourceCoordMatrix(info));
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "Texture", "SubsetMatrix")],
-              subsetMatrix);
-  WriteTextureLeafParams(leaf, layout, "Texture", slot, buffer);
+  writer->set(CoordMatrix, SourceCoordMatrix(info));
+  writer->set(SubsetMatrix, subsetMatrix);
+  WriteTextureLeafParams<Texture>(leaf, writer);
 }
 
 // LocalMask: the coverage mask's own coordinate transform, from the coverage TextureEffect.
-void WriteLocalMask(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                    ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteLocalMask(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t CoordMatrix = UniformElementIndexOf(LocalMask, "CoordMatrix");
   for (size_t index = info.numColorFragmentProcessors(); index < info.numFragmentProcessors();
        ++index) {
     const auto* fp = info.getFragmentProcessor(index);
@@ -564,8 +550,7 @@ void WriteLocalMask(const ProgramInfo& info, const Layout& layout, uint8_t slot,
       Matrix combined = {};
       combined.setConcat(
           static_cast<const TextureEffect*>(fp)->getCoordTransform().getTotalMatrix(), uvMatrix);
-      buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "LocalMask", "CoordMatrix")],
-                  combined);
+      writer->set(CoordMatrix, combined);
       return;
     }
   }
@@ -573,15 +558,9 @@ void WriteLocalMask(const ProgramInfo& info, const Layout& layout, uint8_t slot,
 
 // DeviceMaskRuntime: the runtime gate plus the same device-space transform WriteDeviceMask
 // computes; a draw without a device mask keeps the branch off.
-void WriteDeviceMaskRuntime(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                            ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, "DeviceMaskRuntime", name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    }
-  };
+void WriteDeviceMaskRuntime(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t HasDeviceMask = UniformElementIndexOf(DeviceMaskRuntime, "HasDeviceMask");
+  constexpr uint8_t CoordMatrix = UniformElementIndexOf(DeviceMaskRuntime, "CoordMatrix");
   const DeviceSpaceTextureEffect* mask = nullptr;
   for (size_t index = info.numColorFragmentProcessors(); index < info.numFragmentProcessors();
        ++index) {
@@ -590,7 +569,7 @@ void WriteDeviceMaskRuntime(const ProgramInfo& info, const Layout& layout, uint8
       mask = static_cast<const DeviceSpaceTextureEffect*>(fp);
     }
   }
-  put("HasDeviceMask", static_cast<int32_t>(mask != nullptr ? 1 : 0));
+  writer->set(HasDeviceMask, static_cast<int32_t>(mask != nullptr ? 1 : 0));
   if (mask == nullptr) {
     return;
   }
@@ -602,51 +581,44 @@ void WriteDeviceMaskRuntime(const ProgramInfo& info, const Layout& layout, uint8
   }
   const auto scale = view->getTextureCoord(1, 1);
   deviceCoordMatrix.postScale(scale.x, scale.y);
-  put("CoordMatrix", deviceCoordMatrix);
+  writer->set(CoordMatrix, deviceCoordMatrix);
 }
 
 // YUVTexture: the source transform, the full-bounds subset and the conversion pair off the view.
 void WriteYUVTexture(const ProgramInfo& info, const AOTTextureParameters& leaf,
-                     const Layout& layout, uint8_t slot, ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, "YUVTexture", name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    }
-  };
-  put("CoordMatrix", SourceCoordMatrix(info));
-  WriteTextureLeafParams(leaf, layout, "YUVTexture", slot, buffer);
+                     SlotWriter* writer) {
+  constexpr uint8_t CoordMatrix = UniformElementIndexOf(YUVTexture, "CoordMatrix");
+  constexpr uint8_t LimitedRange = UniformElementIndexOf(YUVTexture, "LimitedRange");
+  constexpr uint8_t ColorConversion = UniformElementIndexOf(YUVTexture, "ColorConversion");
+  writer->set(CoordMatrix, SourceCoordMatrix(info));
+  WriteTextureLeafParams<YUVTexture>(leaf, writer);
   auto view = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
   if (view == nullptr || !view->isYUV()) {
     return;
   }
   auto* yuvView = static_cast<const YUVTextureView*>(view.get());
-  put("LimitedRange",
-      static_cast<int32_t>(IsLimitedYUVColorRange(yuvView->yuvColorSpace()) ? 1 : 0));
+  writer->set(LimitedRange,
+              static_cast<int32_t>(IsLimitedYUVColorRange(yuvView->yuvColorSpace()) ? 1 : 0));
   if (auto conversion = YUVColorConversionMatrix(yuvView->yuvColorSpace())) {
-    put("ColorConversion", *conversion);
+    writer->set(ColorConversion, *conversion);
   }
 }
 
 // QuadColorGeometry (the QuadPerEdgeAA geometry with the per-vertex color): the exact paint color
 // and its flag. The per-vertex color rides the varying.
-void WriteQuadColorGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                            ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteQuadColorGeometry(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t Color = UniformElementIndexOf(QuadColorGeometry, "Color");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(QuadColorGeometry, "HasCommonColor");
   const auto* geometry =
       static_cast<const QuadPerEdgeAAGeometryProcessor*>(info.getGeometryProcessor());
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "QuadColorGeometry", "Color")],
-              geometry->getCommonColor());
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "QuadColorGeometry", "HasCommonColor")],
-              static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+  writer->set(Color, geometry->getCommonColor());
+  writer->set(HasCommonColor, static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
 }
 
 // DeviceMask: the mask's destination-to-sample transform, the same value BindDeviceMaskLeaf
 // uploads (the effect's uv matrix scaled by the texture view's normalized coord).
-void WriteDeviceMask(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                     ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteDeviceMask(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t CoordMatrix = UniformElementIndexOf(DeviceMask, "CoordMatrix");
   const DeviceSpaceTextureEffect* mask = nullptr;
   for (size_t index = info.numColorFragmentProcessors();
        index < info.numFragmentProcessors() && mask == nullptr; ++index) {
@@ -666,99 +638,77 @@ void WriteDeviceMask(const ProgramInfo& info, const Layout& layout, uint8_t slot
   }
   const auto scale = view->getTextureCoord(1, 1);
   deviceCoordMatrix.postScale(scale.x, scale.y);
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "DeviceMask", "CoordMatrix")],
-              deviceCoordMatrix);
+  writer->set(CoordMatrix, deviceCoordMatrix);
 }
 
-void WriteClipParams(const ProgramInfo& info, const Layout& layout, const char* moduleName,
-                     uint8_t slot, ParamBuffer* buffer);
+template <const Module& module>
+void WriteClipParams(const ProgramInfo& info, SlotWriter* writer);
 
-void WriteAnalyticClip(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                       ParamBuffer* buffer) {
-  WriteClipParams(info, layout, "AnalyticClip", slot, buffer);
+void WriteAnalyticClip(const ProgramInfo& info, SlotWriter* writer) {
+  WriteClipParams<AnalyticClip>(info, writer);
 }
 
 // EllipseGeometry: the color pair and the stroke selector; the ellipse data rides the varyings.
-void WriteEllipseGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                          ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteEllipseGeometry(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t Color = UniformElementIndexOf(EllipseGeometry, "Color");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(EllipseGeometry, "HasCommonColor");
+  constexpr uint8_t StrokeEnabled = UniformElementIndexOf(EllipseGeometry, "StrokeEnabled");
   const auto* geometry = static_cast<const EllipseGeometryProcessor*>(info.getGeometryProcessor());
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, "EllipseGeometry", name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    }
-  };
-  put("Color", geometry->getCommonColor());
-  put("HasCommonColor", static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
-  put("StrokeEnabled", static_cast<int32_t>(geometry->isStroke() ? 1 : 0));
+  writer->set(Color, geometry->getCommonColor());
+  writer->set(HasCommonColor, static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+  writer->set(StrokeEnabled, static_cast<int32_t>(geometry->isStroke() ? 1 : 0));
 }
 
 // ComplexEllipseGeometry: the color pair; the ellipse data rides the varyings.
-void WriteComplexEllipseGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                                 ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteComplexEllipseGeometry(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t Color = UniformElementIndexOf(ComplexEllipseGeometry, "Color");
+  constexpr uint8_t HasCommonColor =
+      UniformElementIndexOf(ComplexEllipseGeometry, "HasCommonColor");
   const auto* geometry =
       static_cast<const ComplexEllipseGeometryProcessor*>(info.getGeometryProcessor());
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, "ComplexEllipseGeometry", name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    }
-  };
-  put("Color", geometry->getCommonColor());
-  put("HasCommonColor", static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+  writer->set(Color, geometry->getCommonColor());
+  writer->set(HasCommonColor, static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
 }
 
 // RoundStrokeRectGeometry: the color pair, the AA flag and the analytic clip.
-void WriteRoundStrokeRectGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                                  ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteRoundStrokeRectGeometry(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t Color = UniformElementIndexOf(RoundStrokeRectGeometry, "Color");
+  constexpr uint8_t HasCommonColor =
+      UniformElementIndexOf(RoundStrokeRectGeometry, "HasCommonColor");
+  constexpr uint8_t AAEnabled = UniformElementIndexOf(RoundStrokeRectGeometry, "AAEnabled");
   const auto* geometry =
       static_cast<const RoundStrokeRectGeometryProcessor*>(info.getGeometryProcessor());
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, "RoundStrokeRectGeometry", name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    }
-  };
-  put("Color", geometry->getCommonColor());
-  put("HasCommonColor", static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
-  put("AAEnabled", static_cast<int32_t>(geometry->getAAType() == AAType::None ? 0 : 1));
+  writer->set(Color, geometry->getCommonColor());
+  writer->set(HasCommonColor, static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+  writer->set(AAEnabled, static_cast<int32_t>(geometry->getAAType() == AAType::None ? 0 : 1));
 }
 
 // HairlineLineGeometry / HairlineQuadGeometry: the view matrix, the color/coverage/AA triple and
 // the analytic clip the old declaration carried in the same block.
-template <typename Geometry>
-void WriteHairlineGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                           const char* moduleName, ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+template <typename Geometry, const Module& module>
+void WriteHairlineGeometry(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t ViewMatrix = UniformElementIndexOf(module, "Matrix");
+  constexpr uint8_t Color = UniformElementIndexOf(module, "Color");
+  constexpr uint8_t Coverage = UniformElementIndexOf(module, "Coverage");
+  constexpr uint8_t AAEnabled = UniformElementIndexOf(module, "AAEnabled");
   const auto* geometry = static_cast<const Geometry*>(info.getGeometryProcessor());
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, moduleName, name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    }
-  };
-  put("Matrix", geometry->getViewMatrix());
-  put("Color", geometry->getCommonColor());
-  put("Coverage", geometry->getCoverage());
-  put("AAEnabled", static_cast<int32_t>(geometry->getAAType() == AAType::None ? 0 : 1));
-  WriteClipParams(info, layout, moduleName, slot, buffer);
+  writer->set(ViewMatrix, geometry->getViewMatrix());
+  writer->set(Color, geometry->getCommonColor());
+  writer->set(Coverage, geometry->getCoverage());
+  writer->set(AAEnabled, static_cast<int32_t>(geometry->getAAType() == AAType::None ? 0 : 1));
+  WriteClipParams<module>(info, writer);
 }
 
 // RRectGeometry (the non-AA rounded rect): the exact common color and its flag. The 8-bit
 // quantized varying needs no write; the values come from the geometry processor.
-void WriteRRectGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                        ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
+void WriteRRectGeometry(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t CommonColor = UniformElementIndexOf(RRectGeometry, "CommonColor");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(RRectGeometry, "HasCommonColor");
   const auto* geometry =
       static_cast<const NonAARRectGeometryProcessor*>(info.getGeometryProcessor());
   const auto commonColor = geometry->getCommonColor();
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "RRectGeometry", "CommonColor")],
-              commonColor.value_or(PMColor()));
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "RRectGeometry", "HasCommonColor")],
-              static_cast<int32_t>(commonColor.has_value() ? 1 : 0));
+  writer->set(CommonColor, commonColor.value_or(PMColor()));
+  writer->set(HasCommonColor, static_cast<int32_t>(commonColor.has_value() ? 1 : 0));
 }
 
 /// The texture-space coordinate transform: the FP tree's coord transform at the given position
@@ -766,9 +716,9 @@ void WriteRRectGeometry(const ProgramInfo& info, const Layout& layout, uint8_t s
 /// legacy families. A negative index selects the last transform, which is where the coverage
 /// terms sit — the color graph's transforms come first. The IR's uvMatrix keeps the raw user
 /// matrix, which does not carry the texture's normalization.
-void WriteCoordMatrixAt(const ProgramInfo& info, const Layout& layout, const char* moduleName,
-                        uint8_t slot, ParamBuffer* buffer, int index) {
-  const auto slice = layout.SliceOf(slot);
+template <const Module& module>
+void WriteCoordMatrixAt(const ProgramInfo& info, SlotWriter* writer, int index) {
+  constexpr uint8_t CoordMatrix = UniformElementIndexOf(module, "CoordMatrix");
   FragmentProcessor::CoordTransformIter iter(&info);
   const CoordTransform* coordTransform = nullptr;
   int position = 0;
@@ -798,52 +748,54 @@ void WriteCoordMatrixAt(const ProgramInfo& info, const Layout& layout, const cha
   }
   Matrix combined = {};
   combined.setConcat(coordTransform->getTotalMatrix(), uvMatrix);
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, moduleName, "CoordMatrix")], combined);
+  writer->set(CoordMatrix, combined);
 }
 
 // The first transform's matrix: every family whose color source is the sole sampler reads it
 // through this form.
-void WriteCoordMatrix(const ProgramInfo& info, const Layout& layout, const char* moduleName,
-                      uint8_t slot, ParamBuffer* buffer) {
-  WriteCoordMatrixAt(info, layout, moduleName, slot, buffer, 0);
+template <const Module& module>
+void WriteCoordMatrix(const ProgramInfo& info, SlotWriter* writer) {
+  WriteCoordMatrixAt<module>(info, writer, 0);
 }
 
 // TiledTexture: the single-tap or full nine-mode recipe, field for field the same values
 // BindTiledSourceLeaf uploads for the legacy families.
 void WriteTiledTexture(const ProgramInfo& info, const AOTTextureParameters& leaf,
-                       const Layout& layout, uint8_t slot, ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
-  WriteCoordMatrix(info, layout, "TiledTexture", slot, buffer);
+                       SlotWriter* writer) {
+  constexpr uint8_t ShaderModeX = UniformElementIndexOf(TiledTexture, "ShaderModeX");
+  constexpr uint8_t ShaderModeY = UniformElementIndexOf(TiledTexture, "ShaderModeY");
+  constexpr uint8_t Subset = UniformElementIndexOf(TiledTexture, "Subset");
+  constexpr uint8_t Clamp = UniformElementIndexOf(TiledTexture, "Clamp");
+  constexpr uint8_t Dimension = UniformElementIndexOf(TiledTexture, "Dimension");
+  constexpr uint8_t AlphaOnly = UniformElementIndexOf(TiledTexture, "AlphaOnly");
+  constexpr uint8_t Strict = UniformElementIndexOf(TiledTexture, "Strict");
+  // The runtime texture read swizzle (GRAY_8/RG_88) is only read by the full nine-mode path; its
+  // field exists iff FULL != 0, absent from the single-tap variants. Same value
+  // GLSLTiledTextureEffect uploads.
+  constexpr uint8_t ReadSwizzle = UniformElementIndexOf(TiledTexture, "ReadSwizzle");
+  WriteCoordMatrix<TiledTexture>(info, writer);
   if (!leaf.tiledRecipe.has_value()) {
     return;
   }
   const auto& sampling = *leaf.tiledRecipe;
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "TiledTexture", "ShaderModeX")],
-              static_cast<int32_t>(sampling.shaderModeX));
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "TiledTexture", "ShaderModeY")],
-              static_cast<int32_t>(sampling.shaderModeY));
+  writer->set(ShaderModeX, static_cast<int32_t>(sampling.shaderModeX));
+  writer->set(ShaderModeY, static_cast<int32_t>(sampling.shaderModeY));
   const float subset[4] = {sampling.shaderSubset.left, sampling.shaderSubset.top,
                            sampling.shaderSubset.right, sampling.shaderSubset.bottom};
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "TiledTexture", "Subset")], subset);
+  writer->set(Subset, subset);
   const float clampRect[4] = {sampling.shaderClamp.left, sampling.shaderClamp.top,
                               sampling.shaderClamp.right, sampling.shaderClamp.bottom};
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "TiledTexture", "Clamp")], clampRect);
+  writer->set(Clamp, clampRect);
   if (sampling.usesShaderDimensions) {
     const float dimensions[2] = {sampling.shaderDimensions.x, sampling.shaderDimensions.y};
-    buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "TiledTexture", "Dimension")],
-                dimensions);
+    writer->set(Dimension, dimensions);
   }
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "TiledTexture", "AlphaOnly")],
-              static_cast<int32_t>(sampling.alphaOnly ? 1 : 0));
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "TiledTexture", "Strict")],
-              static_cast<int32_t>(sampling.strict ? 1 : 0));
-  // The runtime texture read swizzle (GRAY_8/RG_88) is only read by the full nine-mode path; its
-  // field is absent from the single-tap variants. Same value GLSLTiledTextureEffect uploads.
-  const auto swizzleIndex = layout.FieldIndexInSlice(slice, "TiledTexture", "ReadSwizzle");
-  if (swizzleIndex < slice.count) {
+  writer->set(AlphaOnly, static_cast<int32_t>(sampling.alphaOnly ? 1 : 0));
+  writer->set(Strict, static_cast<int32_t>(sampling.strict ? 1 : 0));
+  if (writer->present(ReadSwizzle)) {
     auto view = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
     if (view != nullptr && view->getTexture() != nullptr) {
-      buffer->set(slice.fields[swizzleIndex],
+      writer->set(ReadSwizzle,
                   static_cast<int32_t>(AOTReadSwizzleMode(view->getTexture()->format())));
     }
   }
@@ -851,25 +803,24 @@ void WriteTiledTexture(const ProgramInfo& info, const AOTTextureParameters& leaf
 
 // MaskTexture: the rasterized shape mask's coordinate transform. The texture itself is bound by
 // the sampler path; the shader samples it and folds the red channel into the coverage.
-void WriteMaskTexture(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                      ParamBuffer* buffer) {
-  WriteCoordMatrix(info, layout, "MaskTexture", slot, buffer);
+void WriteMaskTexture(const ProgramInfo& info, SlotWriter* writer) {
+  WriteCoordMatrix<MaskTexture>(info, writer);
 }
 
 // AnalyticClip: the runtime clip contract. The values mirror GLSLRectEffect's and
 // GLSLRRectEffect's onSetData uploads field for field.
 /// Writes the analytic clip parameters (slot's module fields) from the draw's IR analytic term.
-/// The hairline families carry the same fields inside their geometry module, so the reader takes
-/// the module name instead of hard-coding "AnalyticClip".
-void WriteClipParams(const ProgramInfo& info, const Layout& layout, const char* moduleName,
-                     uint8_t slot, ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
-  auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, moduleName, name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    }
-  };
+/// The hairline families carry the same fields inside their geometry module, so the shared body
+/// templates on the module that owns the fields.
+template <const Module& module>
+void WriteClipParams(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t Rect = UniformElementIndexOf(module, "Rect");
+  constexpr uint8_t HasClip = UniformElementIndexOf(module, "HasClip");
+  constexpr uint8_t LocalRect = UniformElementIndexOf(module, "LocalRect");
+  constexpr uint8_t RadiiX = UniformElementIndexOf(module, "RadiiX");
+  constexpr uint8_t RadiiY = UniformElementIndexOf(module, "RadiiY");
+  constexpr uint8_t AntiAlias = UniformElementIndexOf(module, "AntiAlias");
+  constexpr uint8_t DeviceToLocal = UniformElementIndexOf(module, "DeviceToLocal");
   // The lowering already classified the clip into the IR's analytic term and copied every
   // parameter into its node chain (RectCoverage / RRectCoverage), so the writer reads the draw's
   // IR instead of searching the processor tree — the same values, sourced from the one place that
@@ -896,61 +847,53 @@ void WriteClipParams(const ProgramInfo& info, const Layout& layout, const char* 
             Matrix::MakeAll(rect->deviceToLocal[0], rect->deviceToLocal[1], rect->deviceToLocal[2],
                             rect->deviceToLocal[3], rect->deviceToLocal[4], rect->deviceToLocal[5],
                             rect->deviceToLocal[6], rect->deviceToLocal[7], rect->deviceToLocal[8]);
-        put("LocalRect",
-            std::array<float, 4>{rect->rect[0], rect->rect[1], rect->rect[2], rect->rect[3]});
+        writer->set(LocalRect, std::array<float, 4>{rect->rect[0], rect->rect[1], rect->rect[2],
+                                                    rect->rect[3]});
         // The RectCoverage node is the AA form: the lowering routes hard-edged rects through the
         // rrect node with a zero antiAlias.
-        put("AntiAlias", 1.0f);
-        put("DeviceToLocal", deviceToLocal);
+        writer->set(AntiAlias, 1.0f);
+        writer->set(DeviceToLocal, deviceToLocal);
         if (deviceToLocal == Matrix::I()) {
           // The device-space form uploads half a pixel outward so the coverage ramp centers on the
           // geometric boundary (GLSLRectEffect::onSetData).
-          put("Rect", std::array<float, 4>{rect->rect[0] - 0.5f, rect->rect[1] - 0.5f,
-                                           rect->rect[2] + 0.5f, rect->rect[3] + 0.5f});
-          put("HasClip", static_cast<int32_t>(1));
+          writer->set(Rect, std::array<float, 4>{rect->rect[0] - 0.5f, rect->rect[1] - 0.5f,
+                                                 rect->rect[2] + 0.5f, rect->rect[3] + 0.5f});
+          writer->set(HasClip, static_cast<int32_t>(1));
         } else {
-          put("HasClip", static_cast<int32_t>(3));
+          writer->set(HasClip, static_cast<int32_t>(3));
         }
         return;
       }
       if (const auto* rrect = std::get_if<AOTRRectCoverageParameters>(&node->parameters)) {
-        put("LocalRect",
-            std::array<float, 4>{rrect->rect[0], rrect->rect[1], rrect->rect[2], rrect->rect[3]});
-        put("RadiiX", rrect->radiiX);
-        put("RadiiY", rrect->radiiY);
-        put("AntiAlias", rrect->antiAlias);
-        put("DeviceToLocal", Matrix::MakeAll(rrect->deviceToLocal[0], rrect->deviceToLocal[1],
-                                             rrect->deviceToLocal[2], rrect->deviceToLocal[3],
-                                             rrect->deviceToLocal[4], rrect->deviceToLocal[5],
-                                             rrect->deviceToLocal[6], rrect->deviceToLocal[7],
-                                             rrect->deviceToLocal[8]));
-        put("HasClip", static_cast<int32_t>(2));
+        writer->set(LocalRect, std::array<float, 4>{rrect->rect[0], rrect->rect[1], rrect->rect[2],
+                                                    rrect->rect[3]});
+        writer->set(RadiiX, rrect->radiiX);
+        writer->set(RadiiY, rrect->radiiY);
+        writer->set(AntiAlias, rrect->antiAlias);
+        writer->set(DeviceToLocal, Matrix::MakeAll(rrect->deviceToLocal[0], rrect->deviceToLocal[1],
+                                                   rrect->deviceToLocal[2], rrect->deviceToLocal[3],
+                                                   rrect->deviceToLocal[4], rrect->deviceToLocal[5],
+                                                   rrect->deviceToLocal[6], rrect->deviceToLocal[7],
+                                                   rrect->deviceToLocal[8]));
+        writer->set(HasClip, static_cast<int32_t>(2));
         return;
       }
     }
   }
   // No clip: the contract branch reads nothing but the flag.
-  put("HasClip", static_cast<int32_t>(0));
+  writer->set(HasClip, static_cast<int32_t>(0));
 }
 
 // Xfer: the blend mode, the dst-texture coord mapping for the dst dialect, and the render-target
 // write swizzle — the same values BindPorterDuffXfer uploads for the legacy families.
-void WriteXfer(const ProgramInfo& info, const Layout& layout, uint8_t slot, ParamBuffer* buffer) {
-  const auto slice = layout.SliceOf(slot);
-  if (slice.count == 0) {
-    return;
-  }
-  // Every write goes through an index check: the dst-dialect fields are absent when the draw's
-  // HAS_XP dim is 0, and a wrong name must degrade to a skipped field, never an out-of-range one.
-  auto put = [&](const char* name, auto value) {
-    const auto index = layout.FieldIndexInSlice(slice, "Xfer", name);
-    if (index < slice.count) {
-      buffer->set(slice.fields[index], value);
-    }
-  };
+void WriteXfer(const ProgramInfo& info, SlotWriter* writer) {
+  constexpr uint8_t XPBlendMode = UniformElementIndexOf(Xfer, "XPBlendMode");
+  constexpr uint8_t DstTextureUpperLeft = UniformElementIndexOf(Xfer, "DstTextureUpperLeft");
+  constexpr uint8_t DstTextureCoordScale = UniformElementIndexOf(Xfer, "DstTextureCoordScale");
+  constexpr uint8_t OutputAlphaSwizzle = UniformElementIndexOf(Xfer, "OutputAlphaSwizzle");
   // The write swizzle is unconditional (the HAS_XP == 0 path composes too).
-  put("OutputAlphaSwizzle",
-      static_cast<int32_t>(info.getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0));
+  writer->set(OutputAlphaSwizzle,
+              static_cast<int32_t>(info.getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0));
   const auto* processor = info.getXferProcessor();
   // Only the PorterDuff processor carries a blend mode and a dst texture; the passthrough XP
   // (the HAS_XP == 0 variants) declares neither field.
@@ -958,7 +901,9 @@ void WriteXfer(const ProgramInfo& info, const Layout& layout, uint8_t slot, Para
     return;
   }
   const auto* porterDuff = static_cast<const PorterDuffXferProcessor*>(processor);
-  put("XPBlendMode", static_cast<int32_t>(porterDuff->getBlendMode()));
+  // The dst-dialect fields are `when HAS_XP != 0`: absent when the draw's xfer is the
+  // passthrough, which the processor check above already excludes.
+  writer->setIfPresent(XPBlendMode, static_cast<int32_t>(porterDuff->getBlendMode()));
   const auto& dstInfo = porterDuff->getDstTextureInfo();
   if (dstInfo.textureProxy == nullptr) {
     return;
@@ -968,7 +913,7 @@ void WriteXfer(const ProgramInfo& info, const Layout& layout, uint8_t slot, Para
     return;
   }
   const std::array<float, 2> upperLeft = {dstInfo.offset.x, dstInfo.offset.y};
-  put("DstTextureUpperLeft", upperLeft);
+  writer->setIfPresent(DstTextureUpperLeft, upperLeft);
   int width = dstView->width();
   int height = dstView->height();
   if (dstView->getTexture()->type() == TextureType::Rectangle) {
@@ -977,16 +922,20 @@ void WriteXfer(const ProgramInfo& info, const Layout& layout, uint8_t slot, Para
   }
   const std::array<float, 2> scales = {1.f / static_cast<float>(width),
                                        1.f / static_cast<float>(height)};
-  put("DstTextureCoordScale", scales);
+  writer->setIfPresent(DstTextureCoordScale, scales);
 }
 
 }  // namespace
 
-/// The declaration-driven families' writer: every field write goes through the derived layout
-/// (ParamBuffer addressing), dispatched by the module in each slot, with no name lookup and no
-/// processor-tree walk for the values.
+/// The declaration-driven families' writer. The variant is fixed at construction: the layout is
+/// derived once per program (not once per draw), and every field write addresses the element's
+/// index in its module's declaration (a compile-time constant) through the layout's elementField
+/// table — no name is composed at draw time. The per-draw work is one match rule (the program's
+/// own family, for the data-source leaves) plus the module walk.
 class DeclaredFamilyProgramWriter final : public PrecompiledProgramWriter {
  public:
+  DeclaredFamilyProgramWriter(const ProgramInfo& info, Variant variant);
+
   bool canWrite(const ProgramInfo& info) const override;
 
  protected:
@@ -996,34 +945,21 @@ class DeclaredFamilyProgramWriter final : public PrecompiledProgramWriter {
                               UniformData* fragmentUniformData) const override;
   void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
                        UniformData* fragmentUniformData) const override;
+
+ private:
+  Variant variant;
+  Layout layout;
 };
 
-bool DeclaredFamilyProgramWriter::canWrite(const ProgramInfo&) const {
-  return true;
-}
-
-void DeclaredFamilyProgramWriter::writeEngineDefaults(const ProgramInfo&, UniformData*) const {
-}
-
-void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
-                                                         UniformData* vertexUniformData,
-                                                         UniformData* fragmentUniformData) const {
-  const auto shape = ExtractDrawShape(&info);
-  const auto match = MatchAssembledFamily(shape);
-  if (!match) {
-    LOGE(
-        "DeclaredFamilyProgramWriter: the draw no longer matches a declared family; uniforms "
-        "stay unwritten");
-    return;
-  }
-  const Family& family = Families()[match->variant.family];
-  const auto layout = DeriveLayout(match->variant);
+DeclaredFamilyProgramWriter::DeclaredFamilyProgramWriter(const ProgramInfo& info, Variant variant)
+    : variant(std::move(variant)), layout(DeriveLayout(variant)) {
 #if DEBUG
   // The pairing contract, spelled the way the program creator applies it: a shader that declares
   // one input per geometry attribute pairs in order (the count must match), and one that reads a
   // strict subset pairs by physical slot (every declared location must be a slot the geometry
   // actually provides). A violation here means the module's element order disagrees with the
   // geometry's declared attribute order, which would otherwise surface only as pixel damage.
+  // Checked once per program, not once per draw.
   {
     const auto& geometryAttributes = info.getVertexAttributes();
     const auto& geometrySlots = info.getGeometryProcessor()->vertexAttributeLocations();
@@ -1043,7 +979,7 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       LOGE(
           "DeclaredFamilyProgramWriter: %s declares %zu vertex inputs but the geometry provides "
           "%zu attributes — the module's element list is out of sync with the geometry",
-          family.name, vertexInputCount, geometryAttributes.size());
+          Families()[variant.family].name, vertexInputCount, geometryAttributes.size());
       DEBUG_ASSERT(false);
     }
     // Only a strict subset pairs by physical slot (the creator parks the unread attributes); a
@@ -1053,9 +989,7 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
         if (attribute.location >= instanceBase) {
           continue;
         }
-        const bool onSlot = std::any_of(
-            geometrySlots.begin(), geometrySlots.end(),
-            [location = attribute.location](uint32_t slot) { return slot == location; });
+        const bool onSlot = SlotIsDeclared(geometrySlots, attribute.location);
         if (!onSlot) {
           LOGE(
               "DeclaredFamilyProgramWriter: attribute %s wants location %u, which the geometry "
@@ -1068,93 +1002,126 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
     }
   }
 #endif
-  const auto modules = ModulesOf(family, match->variant);
+}
+
+bool DeclaredFamilyProgramWriter::canWrite(const ProgramInfo&) const {
+  return true;
+}
+
+void DeclaredFamilyProgramWriter::writeEngineDefaults(const ProgramInfo&, UniformData*) const {
+}
+
+void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
+                                                         UniformData* vertexUniformData,
+                                                         UniformData* fragmentUniformData) const {
+  const auto shape = ExtractDrawShape(&info);
+  // The program's own rule alone: its family and variant were fixed at construction, and the rule
+  // is the only place the per-draw data sources (the texture leaves, the kernels) come from.
+  FamilyMatchResult match = {};
+  if (!FamilyMatchers()[variant.family](shape, &match)) {
+    LOGE(
+        "DeclaredFamilyProgramWriter: the draw no longer matches the %s family; uniforms stay "
+        "unwritten",
+        Families()[variant.family].name);
+    return;
+  }
+  // The program key carries the variant, so a draw landing on this program re-matches the same
+  // variant; a mismatch means one key covers two variants and the leaves would write into the
+  // wrong layout.
+  if (match.variant.id() != variant.id()) {
+    LOGE(
+        "DeclaredFamilyProgramWriter: the draw matched %s variant %u but the program was built "
+        "for %u — one program key covers two variants",
+        Families()[variant.family].name, match.variant.id(), variant.id());
+    return;
+  }
+  const Family& family = Families()[variant.family];
+  const auto modules = ModulesOf(family, variant);
   ParamBuffer buffer(vertexUniformData, fragmentUniformData);
   for (uint8_t slot = 0; slot < modules.count; ++slot) {
     const Module* module = modules.list[slot];
-    if (module == nullptr || !ModulePresent(family, match->variant, slot)) {
+    if (module == nullptr || !ModulePresent(family, variant, slot)) {
       continue;
     }
+    SlotWriter writer(layout, *module, slot, &buffer);
     if (module == &FrameModule()) {
-      WriteFrame(info, layout, slot, &buffer);
+      WriteFrame(info, &writer);
     } else if (module == &RectGeometry) {
-      WriteRectGeometry(info, layout, slot, &buffer);
+      WriteRectGeometry(info, &writer);
     } else if (module == &BlurSourceGeometry) {
-      WriteBlurSourceGeometry(info, layout, slot, &buffer);
+      WriteBlurSourceGeometry(info, &writer);
     } else if (module == &RoundStrokeRectGeometry) {
-      WriteRoundStrokeRectGeometry(info, layout, slot, &buffer);
+      WriteRoundStrokeRectGeometry(info, &writer);
     } else if (module == &ComplexEllipseGeometry) {
-      WriteComplexEllipseGeometry(info, layout, slot, &buffer);
+      WriteComplexEllipseGeometry(info, &writer);
     } else if (module == &EllipseGeometry) {
-      WriteEllipseGeometry(info, layout, slot, &buffer);
+      WriteEllipseGeometry(info, &writer);
     } else if (module == &HairlineLineGeometry) {
-      WriteHairlineGeometry<HairlineLineGeometryProcessor>(info, layout, slot,
-                                                           "HairlineLineGeometry", &buffer);
+      WriteHairlineGeometry<HairlineLineGeometryProcessor, HairlineLineGeometry>(info, &writer);
     } else if (module == &HairlineQuadGeometry) {
-      WriteHairlineGeometry<HairlineQuadGeometryProcessor>(info, layout, slot,
-                                                           "HairlineQuadGeometry", &buffer);
+      WriteHairlineGeometry<HairlineQuadGeometryProcessor, HairlineQuadGeometry>(info, &writer);
     } else if (module == &ComplexRRectGeometry) {
-      WriteComplexRRectGeometry(info, layout, slot, &buffer);
+      WriteComplexRRectGeometry(info, &writer);
     } else if (module == &MeshGeometry) {
-      WriteMeshGeometry(info, layout, slot, &buffer);
+      WriteMeshGeometry(info, &writer);
     } else if (module == &ShapeInstancedGeometry) {
-      WriteShapeInstancedGeometry(info, layout, slot, &buffer);
+      WriteShapeInstancedGeometry(info, &writer);
     } else if (module == &QuadColorGeometry) {
-      WriteQuadColorGeometry(info, layout, slot, &buffer);
+      WriteQuadColorGeometry(info, &writer);
     } else if (module == &QuadGeometry) {
-      WriteQuadGeometry(info, layout, slot, &buffer);
+      WriteQuadGeometry(info, &writer);
     } else if (module == &RRectGeometry) {
-      WriteRRectGeometry(info, layout, slot, &buffer);
+      WriteRRectGeometry(info, &writer);
     } else if (module == &AtlasTextGeometry) {
-      WriteAtlasTextGeometry(info, layout, slot, &buffer);
+      WriteAtlasTextGeometry(info, &writer);
     } else if (module == &QuadTextureGeometry) {
-      WriteQuadTextureGeometry(info, layout, slot, &buffer);
+      WriteQuadTextureGeometry(info, &writer);
     } else if (module == &Texture) {
-      if (match->tiledLeaf != nullptr) {
-        WriteTexture(info, *match->tiledLeaf, layout, slot, &buffer);
+      if (match.tiledLeaf != nullptr) {
+        WriteTexture(info, *match.tiledLeaf, &writer);
       }
     } else if (module == &CoverageTexture) {
-      if (match->maskLeaf != nullptr) {
-        WriteCoverageTexture(*match->maskLeaf, layout, slot, &buffer);
+      if (match.maskLeaf != nullptr) {
+        WriteCoverageTexture(*match.maskLeaf, &writer);
       }
     } else if (module == &GaussianBlur) {
-      if (match->blurKernel != nullptr) {
-        WriteGaussianBlur(*match->blurKernel, match->blurChild, layout, slot, &buffer);
+      if (match.blurKernel != nullptr) {
+        WriteGaussianBlur(*match.blurKernel, match.blurChild, &writer);
       }
     } else if (module == &GlassUDFTentBlur) {
-      if (match->blurKernel != nullptr) {
-        WriteGlassUDFTentBlur(*match->blurKernel, match->blurChild, layout, slot, &buffer);
+      if (match.blurKernel != nullptr) {
+        WriteGlassUDFTentBlur(*match.blurKernel, match.blurChild, &writer);
       }
     } else if (module == &GlassRefraction) {
-      if (match->glassKernel != nullptr) {
-        WriteGlassRefraction(*match->glassKernel, info, layout, slot, &buffer);
+      if (match.glassKernel != nullptr) {
+        WriteGlassRefraction(*match.glassKernel, info, &writer);
       }
     } else if (module == &GlassLocalMask) {
-      WriteGlassLocalMask(info, layout, slot, &buffer, match->maskLeaf != nullptr);
+      WriteGlassLocalMask(info, &writer, match.maskLeaf != nullptr);
     } else if (module == &Gradient) {
-      if (match->gradient != nullptr) {
-        WriteGradient(*match->gradient, layout, slot, &buffer);
+      if (match.gradient != nullptr) {
+        WriteGradient(*match.gradient, &writer);
       }
     } else if (module == &LocalMask) {
-      WriteLocalMask(info, layout, slot, &buffer);
+      WriteLocalMask(info, &writer);
     } else if (module == &DeviceMaskRuntime) {
-      WriteDeviceMaskRuntime(info, layout, slot, &buffer);
+      WriteDeviceMaskRuntime(info, &writer);
     } else if (module == &YUVTexture) {
-      if (match->tiledLeaf != nullptr) {
-        WriteYUVTexture(info, *match->tiledLeaf, layout, slot, &buffer);
+      if (match.tiledLeaf != nullptr) {
+        WriteYUVTexture(info, *match.tiledLeaf, &writer);
       }
     } else if (module == &TiledTexture) {
-      if (match->tiledLeaf != nullptr) {
-        WriteTiledTexture(info, *match->tiledLeaf, layout, slot, &buffer);
+      if (match.tiledLeaf != nullptr) {
+        WriteTiledTexture(info, *match.tiledLeaf, &writer);
       }
     } else if (module == &DeviceMask) {
-      WriteDeviceMask(info, layout, slot, &buffer);
+      WriteDeviceMask(info, &writer);
     } else if (module == &MaskTexture) {
-      WriteMaskTexture(info, layout, slot, &buffer);
+      WriteMaskTexture(info, &writer);
     } else if (module == &AnalyticClip) {
-      WriteAnalyticClip(info, layout, slot, &buffer);
+      WriteAnalyticClip(info, &writer);
     } else if (module == &XferModule()) {
-      WriteXfer(info, layout, slot, &buffer);
+      WriteXfer(info, &writer);
     }
   }
 }
@@ -1164,8 +1131,16 @@ void DeclaredFamilyProgramWriter::writeProcessors(const ProgramInfo&, UniformDat
   // Every value write happens in writeGeometryProcessor's module walk.
 }
 
-std::unique_ptr<ProgramWriter> MakeDeclaredFamilyProgramWriter() {
-  return std::make_unique<DeclaredFamilyProgramWriter>();
+std::unique_ptr<ProgramWriter> MakeDeclaredFamilyProgramWriter(const ProgramInfo& info,
+                                                               uint16_t familyIndex,
+                                                               uint32_t permutationOrdinal) {
+  auto variant = DecodeVariant(familyIndex, permutationOrdinal);
+  if (!variant.has_value()) {
+    LOGE("MakeDeclaredFamilyProgramWriter: %s has no variant %u in the family table",
+         Families()[familyIndex].name, permutationOrdinal);
+    return nullptr;
+  }
+  return std::make_unique<DeclaredFamilyProgramWriter>(info, *variant);
 }
 
 }  // namespace tgfx

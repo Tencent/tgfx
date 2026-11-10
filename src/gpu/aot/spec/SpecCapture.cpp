@@ -41,7 +41,7 @@ SpecValues SpecCapture::Capture(SpecSource* source, const ProgramInfo& info,
   if (specFields == nullptr) {
     return result;
   }
-  auto writer = MakeProgramWriter(shaderName);
+  auto writer = MakeProgramWriter(info, shaderName, vertIndex);
   if (writer == nullptr || !writer->canWrite(info)) {
     return result;
   }

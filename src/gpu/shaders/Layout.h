@@ -58,6 +58,13 @@ struct Layout {
   /// One entry per (module, element) present in the variant, in module order.
   std::vector<Field> fields;
   std::vector<std::string> fieldNames;
+  /// Per module slot, per element of the slot's module: the index of the element's uniform field
+  /// in `fields`, or NoField when the element is absent in this variant (its `when` dim excludes
+  /// it) or contributes no field (attributes, varyings, textures). One derivation per program
+  /// replaces every per-draw name lookup.
+  std::vector<std::vector<uint16_t>> elementField;
+  /// The elementField entry for an element with no uniform field in this variant.
+  static constexpr uint16_t NoField = 0xFFFF;
   /// The first field index of each module slot (slot 0 is Frame; the value is fields.size() when
   /// the slot contributes no fields).
   std::vector<uint16_t> moduleBase;

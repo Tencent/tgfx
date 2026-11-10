@@ -18,19 +18,25 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
 namespace tgfx {
 
+class ProgramInfo;
 class ProgramWriter;
 
 /**
  * The writer one family's programs own: the chain family's fused writer, the YUV family's tail
  * writer, or the generic precompiled walk. It lives with the families it names — the program creator
  * and the specialization capture both ask here, so the one place a family's writer is chosen is the
- * declaration layer rather than the artifact store.
+ * declaration layer rather than the artifact store. The info feeds the once-per-program checks
+ * (the declared families' vertex pairing contract); the permutation ordinal lets a declared
+ * family's writer derive its layout at construction instead of once per draw.
  */
-std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shaderName);
+std::unique_ptr<ProgramWriter> MakeProgramWriter(const ProgramInfo& info,
+                                                 const std::string& shaderName,
+                                                 uint32_t permutationOrdinal);
 
 }  // namespace tgfx

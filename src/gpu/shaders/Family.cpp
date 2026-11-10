@@ -19,12 +19,22 @@
 #include "gpu/shaders/Family.h"
 #include <cassert>
 #include <cstring>
+#include <limits>
 #include <optional>
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/modules/Frame.h"
 #include "gpu/shaders/modules/Xfer.h"
 
 namespace tgfx {
+
+/// The not-found arm of FamilyIndexOf's runtime uses (the writer factory looks its program's
+/// family up by the name the match produced): constant-expression lookups of an absent name fail
+/// the build instead. The invalid index makes every consumer reject the variant, so a drifted
+/// name surfaces as the next match's absence rather than a wrong family's row.
+uint16_t FamilyNameNotFound() {
+  assert(false);
+  return std::numeric_limits<uint16_t>::max();
+}
 
 namespace {
 

@@ -193,6 +193,61 @@ inline bool ModuleIsImplicit(const Module* module) {
   return std::strcmp(module->name, "Frame") == 0 || std::strcmp(module->name, "Xfer") == 0;
 }
 
+/// A module name the element array does not carry. Only declared, never defined: an odr-use is a
+/// link error, so even a runtime lookup with a mistyped name fails to build.
+uint8_t ElementNameNotFound();
+
+constexpr bool ElementNameEquals(const char* left, const char* right) {
+  while (*left != '\0' && *right != '\0') {
+    if (*left != *right) {
+      return false;
+    }
+    ++left;
+    ++right;
+  }
+  return *left == '\0' && *right == '\0';
+}
+
+/// The element's index in the module's declaration. Evaluate it in a constant expression (the
+/// writers' element constants): a name absent from the array then fails the build instead of
+/// silently addressing another element.
+constexpr uint8_t ElementIndexOf(const Module& module, const char* name) {
+  for (uint8_t index = 0; index < module.elementCount; ++index) {
+    if (ElementNameEquals(module.elements[index].name, name)) {
+      return index;
+    }
+  }
+  return ElementNameNotFound();
+}
+
+/// The index of the element that carries the named uniform field: attributes and varyings never
+/// produce one, so the search skips them — a module may spell one name on a varying and a param
+/// both (the varying comes first), and the writers address the field. Evaluate it in a constant
+/// expression like ElementIndexOf.
+constexpr uint8_t UniformElementIndexOf(const Module& module, const char* name) {
+  for (uint8_t index = 0; index < module.elementCount; ++index) {
+    const Element& element = module.elements[index];
+    if (element.kind != Element::Kind::Param && element.kind != Element::Kind::VertexParam) {
+      continue;
+    }
+    if (ElementNameEquals(element.name, name)) {
+      return index;
+    }
+  }
+  return ElementNameNotFound();
+}
+
+/// Whether the module declares an element of that name: the writers shared by several modules
+/// branch on it in constant expressions, so each module writes exactly the fields it declares.
+constexpr bool HasElement(const Module& module, const char* name) {
+  for (uint8_t index = 0; index < module.elementCount; ++index) {
+    if (ElementNameEquals(module.elements[index].name, name)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /// The assembled name of an element: bare for the implicit modules, <Module>_<name> otherwise.
 inline std::string ElementNameOf(const Module* module, const Element& element) {
   if (ModuleIsImplicit(module)) {

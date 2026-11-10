@@ -709,9 +709,10 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   cache->recordAOTStage(PrecompiledAOTStage::PipelineCreated,
                         MakeHitRecord(cache, programInfo, *matchResult));
 
-  auto program = std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
-                                           std::move(fragmentUniformData),
-                                           MakeProgramWriter(matchResult->shaderName));
+  auto program = std::make_shared<Program>(
+      std::move(pipeline), std::move(vertexUniformData), std::move(fragmentUniformData),
+      MakeProgramWriter(*programInfo, matchResult->shaderName,
+                        matchResult->variant.vertPermutationIndex));
   program->setShaderName(matchResult->shaderName);
   program->setExpectedTextureCount(static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));
   return program;

@@ -19,8 +19,11 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <type_traits>
+#include "core/utils/Log.h"
 #include "gpu/shaders/Layout.h"
+#include "gpu/shaders/Module.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
@@ -52,6 +55,90 @@ class ParamBuffer {
 
   UniformData* vertexData = nullptr;
   UniformData* fragmentData = nullptr;
+};
+
+/**
+ * The writes of one module slot, addressed by the element's index in its module's declaration
+ * (an ElementIndexOf constant) instead of a name: the layout's elementField table resolves the
+ * index to the uniform field once per program, so no string is composed at draw time. The two
+ * write forms carry the missing-field contract: `set` is for elements the module declares
+ * unconditionally (an absent field is a bug — logged and asserted), `setIfPresent` for elements
+ * whose `when` dim legitimately excludes them from this variant.
+ */
+class SlotWriter {
+ public:
+  SlotWriter(const Layout& layout, const Module& module, uint8_t slot, ParamBuffer* buffer)
+      : layout(layout), module(module), slot(slot), buffer(buffer) {
+  }
+
+  template <typename T>
+  void set(uint8_t elementIndex, const T& value) const {
+    const auto* field = fieldOf(elementIndex);
+    if (field == nullptr) {
+      return;
+    }
+    buffer->set(*field, value);
+  }
+
+  void set(uint8_t elementIndex, const Matrix& value) const {
+    const auto* field = fieldOf(elementIndex);
+    if (field == nullptr) {
+      return;
+    }
+    buffer->set(*field, value);
+  }
+
+  template <typename T>
+  void setIfPresent(uint8_t elementIndex, const T& value) const {
+    const uint16_t fieldIndex = fieldIndexOf(elementIndex);
+    if (fieldIndex == Layout::NoField) {
+      return;
+    }
+    buffer->set(layout.fields[fieldIndex], value);
+  }
+
+  void setIfPresent(uint8_t elementIndex, const Matrix& value) const {
+    const uint16_t fieldIndex = fieldIndexOf(elementIndex);
+    if (fieldIndex == Layout::NoField) {
+      return;
+    }
+    buffer->set(layout.fields[fieldIndex], value);
+  }
+
+  /// Whether the element contributes a uniform field in this variant (a `when` gate the caller
+  /// branches on for the value, like the tiled recipe's swizzle).
+  bool present(uint8_t elementIndex) const {
+    return fieldIndexOf(elementIndex) != Layout::NoField;
+  }
+
+ private:
+  uint16_t fieldIndexOf(uint8_t elementIndex) const {
+    if (slot >= layout.elementField.size() || elementIndex >= layout.elementField[slot].size()) {
+      LOGE("SlotWriter: %s has no element %u; the module and the writer disagree",
+           module.name != nullptr ? module.name : "", elementIndex);
+      DEBUG_ASSERT(false);
+      return Layout::NoField;
+    }
+    return layout.elementField[slot][elementIndex];
+  }
+
+  const Layout::Field* fieldOf(uint8_t elementIndex) const {
+    const uint16_t fieldIndex = fieldIndexOf(elementIndex);
+    if (fieldIndex == Layout::NoField) {
+      LOGE(
+          "SlotWriter: %s element %u is absent from the program's layout though the module "
+          "declares it unconditionally; the writer and the variant disagree",
+          module.name != nullptr ? module.name : "", static_cast<unsigned>(elementIndex));
+      DEBUG_ASSERT(false);
+      return nullptr;
+    }
+    return &layout.fields[fieldIndex];
+  }
+
+  const Layout& layout;
+  const Module& module;
+  uint8_t slot;
+  ParamBuffer* buffer;
 };
 
 }  // namespace tgfx
