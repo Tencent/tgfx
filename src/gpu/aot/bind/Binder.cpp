@@ -31,7 +31,6 @@
 #include "gpu/shaders/contract/ChainOps.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/BlendParams.h"
-#include "gpu/shaders/modules/BlurKernelModule.h"
 #include "gpu/shaders/modules/ChainParams.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
 #include "gpu/shaders/modules/ParamWriter.h"
@@ -743,13 +742,6 @@ void BindRRectClipNode(const AOTRRectCoverageParameters& params, ParamWriter* wr
   writer->set(AnalyticClipModule::AntiAlias, params.antiAlias);
   writer->set(AnalyticClipModule::DeviceToLocal, Mat3ToStd140ColumnMajor(params.deviceToLocal));
   writer->set(AnalyticClipModule::HasClip, 2);
-}
-
-void BindBlurKernelNode(const AOTOpaqueKernelParameters& params, const AOTTextureParameters* child,
-                        ParamWriter* writer) {
-  (void)params;
-  writer->set(BlurKernelModule::TiledChild,
-              child != nullptr && child->tiledRecipe.has_value() ? 1 : 0);
 }
 
 void BindPorterDuffXfer(int blendMode, const XferProcessor* processor, ParamWriter* writer) {

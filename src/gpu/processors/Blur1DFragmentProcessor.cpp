@@ -19,7 +19,6 @@
 #include "Blur1DFragmentProcessor.h"
 #include <cstring>
 #include "gpu/UniformData.h"
-#include "gpu/shaders/modules/BlurKernelModule.h"
 
 namespace tgfx {
 

@@ -19,7 +19,6 @@
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/BlendParams.h"
-#include "gpu/shaders/modules/BlurKernelModule.h"
 #include "gpu/shaders/modules/ChainParams.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
 #include "gpu/shaders/modules/EngineParams.h"
@@ -71,7 +70,6 @@ inline const std::vector<std::pair<const ParamInfo*, size_t>>& ParamFieldTables(
       {BlendParams::Fields, std::size(BlendParams::Fields)},
       {ParamCatalog::Fields, std::size(ParamCatalog::Fields)},
       {AnalyticClipModule::Fields, std::size(AnalyticClipModule::Fields)},
-      {BlurKernelModule::Fields, std::size(BlurKernelModule::Fields)},
       {DeviceMaskModule::Fields, std::size(DeviceMaskModule::Fields)},
       {PorterDuffXPModule::Fields, std::size(PorterDuffXPModule::Fields)},
       {TextureSourceModule::Fields, std::size(TextureSourceModule::Fields)},

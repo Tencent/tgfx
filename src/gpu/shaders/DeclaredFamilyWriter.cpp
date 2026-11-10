@@ -56,6 +56,7 @@
 #include "gpu/shaders/modules/EllipseGeometry.h"
 #include "gpu/shaders/modules/Frame.h"
 #include "gpu/shaders/modules/GaussianBlur.h"
+#include "gpu/shaders/modules/GlassUDFTentBlur.h"
 #include "gpu/shaders/modules/Gradient.h"
 #include "gpu/shaders/modules/HairlineLineGeometry.h"
 #include "gpu/shaders/modules/HairlineQuadGeometry.h"
@@ -225,6 +226,83 @@ void WriteBlurSourceGeometry(const ProgramInfo& info, const Layout& layout, uint
   WriteCoordMatrix(info, layout, "BlurSourceGeometry", slot, buffer);
 }
 
+/// The child's sampling fields the blur-style bodies share: the tiled recipe or the plain subset
+/// rect, plus the tiled-child selector.
+void WriteChildSamplingFields(const AOTTextureParameters* child, const TextureView* view,
+                              const char* moduleName, const Layout& layout, uint8_t slot,
+                              ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  auto put = [&](const char* name, auto&& value) {
+    const auto index = layout.FieldIndexInSlice(slice, moduleName, name);
+    if (index < slice.count) {
+      buffer->set(slice.fields[index], value);
+    } else {
+      LOGE("WriteChildSamplingFields: field %s is absent from the derived layout", name);
+      DEBUG_ASSERT(false);
+    }
+  };
+  const bool tiled = child != nullptr && child->tiledRecipe.has_value();
+  put("TiledChild", static_cast<int32_t>(tiled ? 1 : 0));
+  if (tiled) {
+    const auto& sampling = *child->tiledRecipe;
+    put("ShaderModeX", static_cast<int32_t>(sampling.shaderModeX));
+    put("ShaderModeY", static_cast<int32_t>(sampling.shaderModeY));
+    put("Subset", std::array<float, 4>{sampling.shaderSubset.left, sampling.shaderSubset.top,
+                                       sampling.shaderSubset.right, sampling.shaderSubset.bottom});
+    put("Clamp", std::array<float, 4>{sampling.shaderClamp.left, sampling.shaderClamp.top,
+                                      sampling.shaderClamp.right, sampling.shaderClamp.bottom});
+    if (sampling.usesShaderDimensions) {
+      put("Dimension",
+          std::array<float, 2>{sampling.shaderDimensions.x, sampling.shaderDimensions.y});
+    }
+  } else if (child != nullptr && view != nullptr && view->getTexture() != nullptr) {
+    float rect[4] = {};
+    LeafSubsetRectForSampler(child->textureProxy, view, child->subset, child->samplerState, rect);
+    put("Subset", std::array<float, 4>{rect[0], rect[1], rect[2], rect[3]});
+  }
+}
+
+void WriteGlassUDFTentBlur(const AOTOpaqueKernelParameters& params,
+                           const AOTTextureParameters* child, const Layout& layout, uint8_t slot,
+                           ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  auto put = [&](const char* name, auto&& value) {
+    const auto index = layout.FieldIndexInSlice(slice, "GlassUDFTentBlur", name);
+    if (index < slice.count) {
+      buffer->set(slice.fields[index], value);
+    } else {
+      LOGE("WriteGlassUDFTentBlur: field %s is absent from the derived layout", name);
+      DEBUG_ASSERT(false);
+    }
+  };
+  put("Radius", std::array<float, 2>{params.tentFineRadius, params.tentCoarseRadius});
+  put("Field", params.tentField);
+  put("InputIsPacked", params.tentInputIsPacked);
+  Point stepVectors[] = {{0, 0}, {1.0f, 0}};
+  if (params.tentVertical) {
+    stepVectors[1] = {0, 1.0f};
+  }
+  auto view = child != nullptr && child->textureProxy != nullptr
+                  ? child->textureProxy->getTextureView()
+                  : nullptr;
+  if (child != nullptr) {
+    auto matrix = child->uvMatrix;
+    if (view != nullptr) {
+      auto scale = view->getTextureCoord(1, 1);
+      matrix.postScale(scale.x, scale.y);
+      if (view->origin() == ImageOrigin::BottomLeft) {
+        matrix.postScale(1, -1);
+        auto translate = view->getTextureCoord(0, static_cast<float>(view->height()));
+        matrix.postTranslate(translate.x, translate.y);
+      }
+    }
+    matrix.mapPoints(stepVectors, 2);
+  }
+  const Point step = stepVectors[1] - stepVectors[0];
+  put("Step", std::array<float, 2>{step.x, step.y});
+  WriteChildSamplingFields(child, view.get(), "GlassUDFTentBlur", layout, slot, buffer);
+}
+
 void WriteGaussianBlur(const AOTOpaqueKernelParameters& params, const AOTTextureParameters* child,
                        const Layout& layout, uint8_t slot, ParamBuffer* buffer) {
   const auto slice = layout.SliceOf(slot);
@@ -261,27 +339,8 @@ void WriteGaussianBlur(const AOTOpaqueKernelParameters& params, const AOTTexture
   }
   const Point step = stepVectors[1] - stepVectors[0];
   put("Step", std::array<float, 2>{step.x, step.y});
-  const bool tiled = child != nullptr && child->tiledRecipe.has_value();
-  put("TiledChild", static_cast<int32_t>(tiled ? 1 : 0));
   put("AlphaChild", static_cast<int32_t>(child != nullptr && child->isAlphaOnly ? 1 : 0));
-  if (tiled) {
-    const auto& sampling = *child->tiledRecipe;
-    put("ShaderModeX", static_cast<int32_t>(sampling.shaderModeX));
-    put("ShaderModeY", static_cast<int32_t>(sampling.shaderModeY));
-    put("Subset", std::array<float, 4>{sampling.shaderSubset.left, sampling.shaderSubset.top,
-                                       sampling.shaderSubset.right, sampling.shaderSubset.bottom});
-    put("Clamp", std::array<float, 4>{sampling.shaderClamp.left, sampling.shaderClamp.top,
-                                      sampling.shaderClamp.right, sampling.shaderClamp.bottom});
-    if (sampling.usesShaderDimensions) {
-      put("Dimension",
-          std::array<float, 2>{sampling.shaderDimensions.x, sampling.shaderDimensions.y});
-    }
-  } else if (child != nullptr && view != nullptr && view->getTexture() != nullptr) {
-    float rect[4] = {};
-    LeafSubsetRectForSampler(child->textureProxy, view.get(), child->subset, child->samplerState,
-                             rect);
-    put("Subset", std::array<float, 4>{rect[0], rect[1], rect[2], rect[3]});
-  }
+  WriteChildSamplingFields(child, view.get(), "GaussianBlur", layout, slot, buffer);
 }
 
 // The source coordinate matrix every texture leaf shares: the FP tree's first coord transform
@@ -961,6 +1020,10 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
     } else if (module == &GaussianBlur) {
       if (match->blurKernel != nullptr) {
         WriteGaussianBlur(*match->blurKernel, match->blurChild, layout, slot, &buffer);
+      }
+    } else if (module == &GlassUDFTentBlur) {
+      if (match->blurKernel != nullptr) {
+        WriteGlassUDFTentBlur(*match->blurKernel, match->blurChild, layout, slot, &buffer);
       }
     } else if (module == &Gradient) {
       if (match->gradient != nullptr) {

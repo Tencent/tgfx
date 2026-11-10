@@ -51,21 +51,16 @@ struct ParamCatalog {
   static constexpr Param<ParamType::Float4> GlassFineMaskUV{"GlassFineMaskUV"};
   static constexpr Param<ParamType::Float4> GlassEdgeMaskUV{"GlassEdgeMaskUV"};
   static constexpr Param<ParamType::Int> EdgeMaskOn{"EdgeMaskOn"};
-  static constexpr Param<ParamType::Float2> GlassUDFRadius{"GlassUDFRadius"};
-  static constexpr Param<ParamType::Float2> GlassUDFStep{"GlassUDFStep"};
-  static constexpr Param<ParamType::Int> Field{"Field"};
-  static constexpr Param<ParamType::Int> InputIsPacked{"InputIsPacked"};
 
   static constexpr ParamInfo Fields[] = {
-      Color,           HasCommonColor,  Matrix,         TexSubsetMatrix,
-      Coverage,        AAEnabled,       StrokeEnabled,  CoordTransformMatrix,
-      ChainCSFlags,    ChainSrcTF0,     ChainSrcTF1,    ChainSrcTFType,
-      ChainSrcOOTF,    ChainColorXform, ChainDstOOTF,   ChainDstTF0,
-      ChainDstTF1,     ChainDstTFType,  GlassOpticsP0,  GlassOpticsP1,
-      GlassLightDir,   GlassOpticsP2,   GlassOpticsP3,  LightingOn,
-      GlassShapeP0,    GlassShapeP1,    GlassEdgeSpan,  GlassFineMaskUV,
-      GlassEdgeMaskUV, EdgeMaskOn,      GlassUDFRadius, GlassUDFStep,
-      Field,           InputIsPacked};
+      Color,           HasCommonColor,  Matrix,        TexSubsetMatrix,
+      Coverage,        AAEnabled,       StrokeEnabled, CoordTransformMatrix,
+      ChainCSFlags,    ChainSrcTF0,     ChainSrcTF1,   ChainSrcTFType,
+      ChainSrcOOTF,    ChainColorXform, ChainDstOOTF,  ChainDstTF0,
+      ChainDstTF1,     ChainDstTFType,  GlassOpticsP0, GlassOpticsP1,
+      GlassLightDir,   GlassOpticsP2,   GlassOpticsP3, LightingOn,
+      GlassShapeP0,    GlassShapeP1,    GlassEdgeSpan, GlassFineMaskUV,
+      GlassEdgeMaskUV, EdgeMaskOn};
 };
 
 }  // namespace tgfx

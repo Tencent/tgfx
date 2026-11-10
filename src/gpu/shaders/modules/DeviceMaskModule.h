@@ -16,8 +16,7 @@ struct DeviceMaskModule {
   static constexpr Param<ParamType::Float4> Subset{"Subset"};
   static constexpr Param<ParamType::Float4> Rect{"Rect"};
 
-  static constexpr ParamInfo Fields[] = {DeviceCoordMatrix, DeviceMaskSubset, Subset, Rect,
-                                         HasDeviceMask};
+  static constexpr ParamInfo Fields[] = {DeviceCoordMatrix, DeviceMaskSubset, Subset, Rect};
 };
 
 }  // namespace tgfx

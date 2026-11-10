@@ -21,7 +21,6 @@
 #include <cmath>
 #include <limits>
 #include "gpu/aot/ir/EffectGraph.h"
-#include "gpu/shaders/modules/BlurKernelModule.h"
 
 namespace tgfx {
 
@@ -82,7 +81,7 @@ bool GaussianBlur1DFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNod
   parameters.kernel = AOTOpaqueKernel::GaussianBlur1D;
   // The fixed kernel caps sigma at 10; the matcher reads the acceptance range off the node.
   parameters.sigma = maxSigma;
-  // The upload values the blur bind reads off the node (see BlurKernelModule's fields). The
+  // The upload values the blur bind reads off the node (see AOTOpaqueKernelParameters). The
   // step's matrix is NOT stashed here: its normalization needs the child's instantiated view,
   // so the bind maps it through the child leaf's recorded matrix at bind time.
   parameters.kernelRadius = getKernelRadius();

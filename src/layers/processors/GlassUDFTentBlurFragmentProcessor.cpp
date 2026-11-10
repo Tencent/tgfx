@@ -121,6 +121,11 @@ bool GlassUDFTentBlurFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTN
   AOTOpaqueKernelParameters parameters = {};
   parameters.kernel = AOTOpaqueKernel::GlassUDFTentBlur;
   parameters.maxRadius = maxRadius;
+  parameters.tentFineRadius = fineRadius;
+  parameters.tentCoarseRadius = coarseRadius;
+  parameters.tentField = static_cast<int>(field);
+  parameters.tentInputIsPacked = inputIsPacked ? 1 : 0;
+  parameters.tentVertical = direction == GlassUDFBlurDirection::Vertical;
   return builder->addOpaqueKernel(childNode, parameters, output);
 }
 

@@ -285,6 +285,15 @@ struct AOTOpaqueKernelParameters {
   // 4 * KERNEL_VEC4_COUNT, with the constant as spelled in Blur1DFragmentProcessor.h
   // (MAX_KERNEL_RADIUS 64 → MAX_KERNEL_SIZE 65 → 17 vec4s).
   std::array<float, 68> packedKernel = {};
+  // GlassUDFTentBlur's record-time upload values: the per-field radii, the field selector, the
+  // packed-input flag and the step's direction. The step vector itself is bind-time (it maps
+  // through the child's coordinate transform, whose normalization needs the instantiated view),
+  // so the writer derives it from the child leaf as the Gaussian blur's step is derived.
+  float tentFineRadius = 0.0f;
+  float tentCoarseRadius = 0.0f;
+  int tentField = 0;
+  int tentInputIsPacked = 0;
+  bool tentVertical = false;
 };
 
 // Analytic anti-aliased rect coverage (RectEffect, produced by AA rect clips). Multiplies the

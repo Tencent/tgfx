@@ -436,9 +436,10 @@ void PrecompiledProgramWriter::writeProcessorsByTree(const ProgramInfo& info,
           bound = true;
         }
       } else if (IsProcessor<GaussianBlur1DFragmentProcessor>(fp)) {
+        // The blurred child's kernel parameters travel through the declared family's own block
+        // now, so marking the FP handled is the whole bind.
         if (blurCursor < blurs.size()) {
-          const auto& blur = blurs[blurCursor++];
-          BindBlurKernelNode(*blur.first, blur.second, &paramWriter);
+          ++blurCursor;
           bound = true;
         }
       }
@@ -689,9 +690,7 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
         // gradient fields any more, so the action writes nothing.
         break;
       case Action::Kind::Blur:
-        if (action.blur != nullptr) {
-          BindBlurKernelNode(*action.blur, action.blurChild, &paramWriter);
-        }
+        // No kernel declares the legacy blur fields any more; the declared families carry them.
         break;
     }
   }

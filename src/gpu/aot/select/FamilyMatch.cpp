@@ -351,6 +351,37 @@ bool MatchGaussianBlur(const DrawShape& shape, Variant* variant, FamilyMatchResu
   return true;
 }
 
+/// The GlassUDFTentBlur family's rule, carried over from the former GlassUDFTentBlurShader: the
+/// position-only rect providers with one color processor, a classifiable coverage, and the carried
+/// IR's tent-blur node over one servable texture child; the fixed loop bound caps the radius.
+bool MatchGlassUDFTentBlur(const DrawShape& shape, Variant* variant, FamilyMatchResult* result) {
+  if (shape.geometry.kind != GeometryKind::Default &&
+      shape.geometry.kind != GeometryKind::QuadPerEdgeAA) {
+    return false;
+  }
+  if (shape.colorFPCount != 1) {
+    return false;
+  }
+  if (!shape.coverage.has_value() || shape.coverage == Coverage::LocalMask) {
+    return false;
+  }
+  if (shape.xpType() < XP_NONE) {
+    return false;
+  }
+  auto irShape = ReadOpaqueKernelIRShape(shape.ir, AOTOpaqueKernel::GlassUDFTentBlur, true);
+  if (!irShape || irShape->kernel->maxRadius > 64) {
+    return false;
+  }
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  variant->family = 18;
+  variant->geometry = 0;
+  variant->values[0] = hasXp;
+  variant->ordinal = static_cast<uint32_t>(hasXp);
+  result->blurKernel = irShape->kernel;
+  result->blurChild = irShape->childTexture;
+  return true;
+}
+
 /// The ComplexRRect family's rule, carried over from the former ComplexNonAARRectFillShader: the
 /// per-corner-radius rounded rect with no fragment processor and any xfer. STROKE is the geometry's
 /// own flag, so the ordinal is STROKE + 2 * HAS_XP.
@@ -613,6 +644,9 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
     return result;
   }
   if (MatchGaussianBlur(shape, &result.variant, &result)) {
+    return result;
+  }
+  if (MatchGlassUDFTentBlur(shape, &result.variant, &result)) {
     return result;
   }
   if (MatchAtlasText(shape, &result.variant)) {

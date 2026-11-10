@@ -15,7 +15,7 @@ struct TiledSourceModule {
   static constexpr Param<ParamType::Int> ShaderModeX{"ShaderModeX"};
   static constexpr Param<ParamType::Int> ShaderModeY{"ShaderModeY"};
 
-  static constexpr ParamInfo Fields[] = {Dimension, Subset, Clamp, ShaderModeX, ShaderModeY};
+  static constexpr ParamInfo Fields[] = {Subset};
 };
 
 }  // namespace tgfx

@@ -101,10 +101,6 @@ void BindRRectClipNode(const AOTRRectCoverageParameters& params, ParamWriter* wr
 /// dedicated single-operator kernel and the chain share one parameter ABI. The shader side reads
 /// it through applyPointwiseOp (pipeline/slot/pointwise_op.inc).
 void UploadPointwiseSlot(UniformData* uniformData, const AOTChainSlot& slot);
-/// The blur node's upload values plus its child leaf (TiledChild/AlphaChild and the step's
-/// matrix come off the child).
-void BindBlurKernelNode(const AOTOpaqueKernelParameters& params, const AOTTextureParameters* child,
-                        ParamWriter* writer);
 /// The xfer bind: the blend mode off the IR, the dst texture's instance-time facts off the made
 /// processor (the same layer the geometry facts read).
 void BindPorterDuffXfer(int blendMode, const XferProcessor* processor, ParamWriter* writer);

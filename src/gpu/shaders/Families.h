@@ -29,6 +29,7 @@
 #include "gpu/shaders/modules/DeviceMaskRuntime.h"
 #include "gpu/shaders/modules/EllipseGeometry.h"
 #include "gpu/shaders/modules/GaussianBlur.h"
+#include "gpu/shaders/modules/GlassUDFTentBlur.h"
 #include "gpu/shaders/modules/Gradient.h"
 #include "gpu/shaders/modules/HairlineLineGeometry.h"
 #include "gpu/shaders/modules/HairlineQuadGeometry.h"
@@ -213,6 +214,15 @@ inline constexpr const Module* GaussianBlurGeometries[] = {&BlurSourceGeometry};
 inline constexpr FamilyModule GaussianBlurBody[] = {&GaussianBlur, &DeviceMaskRuntime,
                                                     &AnalyticClip};
 
+/// The GlassUDFTentBlur family (the former GlassUDFTentBlurShader): the analytic tent blur over one
+/// child texture, writing one field of the UDF. The radii, the field selector and the packed-input
+/// flag are runtime uniforms, so HAS_XP is the only dimension. Slot layout: Frame(0),
+/// BlurSourceGeometry(1), GlassUDFTentBlur(2), DeviceMaskRuntime(3), AnalyticClip(4), Xfer(5).
+inline constexpr const Module* GlassUDFTentBlurGeometries[] = {&BlurSourceGeometry};
+
+inline constexpr FamilyModule GlassUDFTentBlurBody[] = {&GlassUDFTentBlur, &DeviceMaskRuntime,
+                                                        &AnalyticClip};
+
 /// The family table is the single definition site: a family exists by appearing here and nowhere
 /// else, so "defined but not registered" cannot happen — adding a row is the only way to add a
 /// family, and the match rules address the rows by position.
@@ -236,6 +246,7 @@ inline constexpr Family FamilyTableStorage[] = {
     {"ShapeInstancedTextureCoverage", ShapeInstancedTextureCoverageGeometries, 1,
      ShapeInstancedTextureCoverageBody, 3, ShapeInstancedTextureCoverageVariantAllowed},
     {"GaussianBlur", GaussianBlurGeometries, 1, GaussianBlurBody, 3},
+    {"GlassUDFTentBlur", GlassUDFTentBlurGeometries, 1, GlassUDFTentBlurBody, 3},
 };
 
 inline const Family* FamilyTable() {
