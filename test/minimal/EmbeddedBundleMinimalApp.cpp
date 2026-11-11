@@ -25,8 +25,8 @@
 
 #include <array>
 #include <cstdio>
-#include "gpu/GlobalCache.h"
 #include "gpu/ContextInternal.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
@@ -47,7 +47,7 @@ int main() {
     printf("FAIL: no context\n");
     return 1;
   }
-  auto* cache = ContextCacheAccess::Cache(context);
+  auto* cache = tgfx::ContextCacheAccess::Cache(context);
   if (!cache->isLoaded()) {
     printf("FAIL: the embedded bundle is not loaded at startup\n");
     device->unlock();
@@ -82,8 +82,7 @@ int main() {
     device->unlock();
     return 1;
   }
-  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0,
-                                       0, 0, 0, 1, 0};
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
   tgfx::Paint paint = {};
   paint.setColorFilter(tgfx::ColorFilter::Matrix(swapRedBlue));
   surface->getCanvas()->drawImage(image, 0, 0, &paint);
@@ -95,9 +94,10 @@ int main() {
     device->unlock();
     return 1;
   }
-  if (ContextCacheAccess::Cache(context)->drawStats().droppedDraws != 0) {
-    printf("FAIL: a draw was dropped (droppedDraws=%u)\n",
-           static_cast<unsigned>(ContextCacheAccess::Cache(context)->drawStats().droppedDraws));
+  if (tgfx::ContextCacheAccess::Cache(context)->drawStats().droppedDraws != 0) {
+    printf(
+        "FAIL: a draw was dropped (droppedDraws=%u)\n",
+        static_cast<unsigned>(tgfx::ContextCacheAccess::Cache(context)->drawStats().droppedDraws));
     device->unlock();
     return 1;
   }
