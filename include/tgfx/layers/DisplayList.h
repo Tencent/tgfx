@@ -401,8 +401,16 @@ class DisplayList {
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear, BackgroundSnapshotMap* snapshots) const;
 
+  /**
+   * Collects the world-space rect each visible background style actually samples, so a capture can
+   * cull layers that only touch the tile but lie under no background style. `worldBounds` limits
+   * the walk to the area being captured.
+   */
+  std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
+
   std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(
-      Surface* surface, const std::vector<Rect>& renderRects) const;
+      Surface* surface, const std::vector<Rect>& renderRects,
+      const std::vector<Rect>& cullRects = {}) const;
 
   void updateMousePosition();
 };

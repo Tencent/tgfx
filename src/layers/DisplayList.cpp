@@ -37,6 +37,12 @@ static constexpr int MIN_TILE_SIZE = 16;
 static constexpr int MAX_TILE_SIZE = 2048;
 static constexpr int FALLBACK_GRID_SIZE = 64;
 static constexpr int MAX_ATLAS_SIZE = 8192;
+// Culls the capture against the blur footprints instead of the whole tile, so layers that overlap
+// the tile but sit under no background style are not drawn. The capture keeps the tile rects when
+// there are more footprints than the per-layer cull loop can afford.
+static constexpr bool TIGHTEN_CAPTURE_TO_FOOTPRINTS = true;
+// Number of rects the per-layer cull loop can afford.
+static constexpr size_t MAX_CULL_RECTS = 32;
 
 class DrawTask {
  public:
@@ -464,7 +470,31 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       captureRect.offset(_contentOffset.x, _contentOffset.y);
       captureRects.push_back(captureRect);
     }
-    snapshotMap = captureBackgrounds(surface, captureRects);
+    std::vector<Rect> cullRects = {};
+    if (TIGHTEN_CAPTURE_TO_FOOTPRINTS) {
+      // The capture covers the tiles, but a background style only samples the area under its own
+      // bounds plus the blur reach. Narrow the rects the capture uses to decide which layers to
+      // draw; the captured area stays the tile union, so the surfaces and the way sibling styles
+      // share their output do not change.
+      auto viewMatrix = getViewMatrix();
+      Matrix inverse = Matrix::I();
+      if (viewMatrix.invert(&inverse)) {
+        auto capturedRect = Rect::MakeEmpty();
+        for (const auto& rect : captureRects) {
+          capturedRect.join(rect);
+        }
+        auto footprints = collectBackgroundFootprints(inverse.mapRect(capturedRect));
+        if (!footprints.empty() && footprints.size() <= MAX_CULL_RECTS) {
+          cullRects.reserve(footprints.size());
+          for (const auto& footprint : footprints) {
+            auto rect = viewMatrix.mapRect(footprint);
+            rect.roundOut();
+            cullRects.push_back(rect);
+          }
+        }
+      }
+    }
+    snapshotMap = captureBackgrounds(surface, captureRects, cullRects);
   }
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
@@ -1201,8 +1231,48 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
 }
 
+std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds) const {
+  std::vector<Rect> footprints = {};
+  bool safe = true;
+  auto collect = [](const Layer* layer, const Rect& bounds, bool& safe, std::vector<Rect>& out,
+                    const auto& self) -> void {
+    if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
+        !Rect::Intersects(bounds, layer->renderBounds)) {
+      return;
+    }
+    // matrix() reports the identity whenever the layer carries a 3D or projection transform, in
+    // which case the 2D renderBounds no longer delimits what the style samples. Bail out and let
+    // the caller keep the whole tile.
+    if (!layer->matrix3D().isIdentity() && layer->matrix().isIdentity()) {
+      safe = false;
+      return;
+    }
+    for (const auto& style : layer->_layerStyles) {
+      if (style == nullptr ||
+          (style->extraSourceType() &
+           static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
+        continue;
+      }
+      // The style samples the backdrop under its own bounds plus the blur reach.
+      auto footprint = layer->renderBounds;
+      footprint.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
+      out.push_back(footprint);
+      break;
+    }
+    for (const auto& child : layer->_children) {
+      self(child.get(), bounds, safe, out, self);
+    }
+  };
+  collect(_root.get(), worldBounds, safe, footprints, collect);
+  if (!safe) {
+    return {};
+  }
+  return footprints;
+}
+
 std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
-    Surface* surface, const std::vector<Rect>& renderRects) const {
+    Surface* surface, const std::vector<Rect>& renderRects,
+    const std::vector<Rect>& cullRects) const {
   DEBUG_ASSERT(surface != nullptr);
   if (!_root->hasBackgroundStyle()) {
     return nullptr;
@@ -1241,6 +1311,21 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   for (auto& rect : worldRects) {
     rect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
   }
+  // The layers to draw can be narrowed to the area the background styles actually sample, while
+  // the surface still covers every render rect: a style never reads outside its footprint, and
+  // keeping the captured area unchanged keeps the multi-pass structure (and the style output
+  // sharing that depends on it) intact.
+  std::vector<Rect> cullWorldRects = worldRects;
+  if (!cullRects.empty()) {
+    cullWorldRects.clear();
+    cullWorldRects.reserve(cullRects.size());
+    for (const auto& cullRect : cullRects) {
+      auto worldRect = inverse.mapRect(cullRect);
+      worldRect.roundOut();
+      worldRect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
+      cullWorldRects.push_back(worldRect);
+    }
+  }
   DrawArgs args(context);
   args.dstColorSpace = surface->colorSpace();
   args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
@@ -1274,7 +1359,8 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   if (_backgroundColor != Color::Transparent()) {
     bgSource->getCanvas()->drawColor(_backgroundColor, BlendMode::SrcOver);
   }
-  BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get(), worldRects);
+  BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get(),
+                          cullWorldRects);
   return snapshotMap;
 }
 
