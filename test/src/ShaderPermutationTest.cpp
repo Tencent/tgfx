@@ -467,7 +467,9 @@ TGFX_TEST(ShaderPermutationTest, ComposedDimsFinishIgnoresAssignmentOrder) {
 
 // Death tests need fork/exec, which Emscripten does not provide; GTEST_HAS_DEATH_TEST is 0 for
 // wasm builds, where these compile out.
-#if GTEST_HAS_DEATH_TEST
+// The three rejections below die on assert(), which NDEBUG removes: a release build has nothing
+// to terminate on, so the tests only describe a debug-build contract.
+#if GTEST_HAS_DEATH_TEST && DEBUG
 TGFX_TEST(ShaderPermutationTest, ComposedDimsRejectsMissingAssignment) {
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   // The pre-handle write path zero-filled a forgotten dimension (resize then index writes);
