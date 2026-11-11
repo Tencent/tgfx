@@ -31,10 +31,6 @@ struct BuildOptions {
   std::string outDir;
   std::vector<ShaderProfile> backends;
   bool compress = false;
-  std::string stageReportPath;
-  // Set by --dump-stages: the per-variant stage dump two builds are compared with.
-  std::string stageDumpDir;
-  std::string inlineReportPath;
   // Persistent stage cache. Defaults to <out-dir>/stage_cache; --no-cache keeps it memory-only.
   std::string cacheDir;
   bool noCache = false;

@@ -34,13 +34,11 @@ struct ShaderReport {
   uint32_t errorCount = 0;
 };
 
-/// The whole build's outcome: the per-family reports, the produced variants, the inline
-/// expansion analysis of every compiled fragment permutation, and the per-profile error ledger.
+/// The whole build's outcome: the per-family reports, the produced variants, and the per-profile
+/// error ledger.
 struct BuildReport {
   std::vector<ShaderReport> shaders;
   std::vector<VariantData> variants;
-  // One per compiled fragment permutation, from its unoptimized SPIR-V.
-  std::vector<InlineExpansionRecord> inlineExpansions;
   // The per-profile error ledger; the compile loop records through it and the report reads it.
   Diagnostics diagnostics;
 };

@@ -41,12 +41,12 @@ SourceRuleContext RealSourceContext() {
 
 }  // namespace
 
-TEST(ContractRulesTest, TheSourceRegistryHoldsTheFourSourceRules) {
-  EXPECT_EQ(MakeSourceRules().size(), 4u);
+TEST(ContractRulesTest, TheSourceRegistryHoldsTheThreeSourceRules) {
+  EXPECT_EQ(MakeSourceRules().size(), 3u);
 }
 
-TEST(ContractRulesTest, TheArtifactRegistryHoldsTheFiveArtifactRules) {
-  EXPECT_EQ(MakeArtifactRules().size(), 5u);
+TEST(ContractRulesTest, TheArtifactRegistryHoldsTheTwoArtifactRules) {
+  EXPECT_EQ(MakeArtifactRules().size(), 2u);
 }
 
 TEST(ContractRulesTest, EverySourceRuleIsCleanOnTheRealSources) {
@@ -62,9 +62,7 @@ TEST(ContractRulesTest, EverySourceRuleIsCleanOnTheRealSources) {
 TEST(ContractRulesTest, EveryArtifactRuleIsCleanOnAnEmptyBuild) {
   ArtifactRuleContext context;
   std::vector<VariantData> variants;
-  std::vector<InlineExpansionRecord> expansions;
   context.variants = &variants;
-  context.inlineExpansions = &expansions;
   for (const auto& rule : MakeArtifactRules()) {
     Diagnostics diagnostics;
     EXPECT_EQ(rule->check(context, &diagnostics), 0u);

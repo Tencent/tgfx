@@ -24,25 +24,8 @@ namespace tgfx {
 
 namespace {
 
-// The source rules: each wraps one check of ContractChecks.cpp, whose implementation stays
-// where it is — a rule owns when the check runs and what it is named by, not the check itself.
-
-// The artifact rules: two wrap the variant checks of ContractChecks.cpp, one the inline
-// expansion policy of InlineExpansion.cpp.
-
-class ClipContractRule : public ArtifactRule {
- public:
-  size_t check(const ArtifactRuleContext& context, Diagnostics* diagnostics) const override {
-    return ValidateClipContractFields(*context.variants, diagnostics);
-  }
-};
-
-class FamilyParamsRule : public ArtifactRule {
- public:
-  size_t check(const ArtifactRuleContext& context, Diagnostics* diagnostics) const override {
-    return ValidateFamilyParams(*context.variants, diagnostics);
-  }
-};
+// The source rules: each wraps one check of ContractChecks.h, whose implementation stays where it
+// is — a rule owns when the check runs and what it is named by, not the check itself.
 
 class MacroNamesRule : public SourceRule {
  public:
@@ -55,13 +38,6 @@ class PointwiseDispatchRule : public SourceRule {
  public:
   size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
     return ValidatePointwiseDispatch(context.shaderDir, diagnostics);
-  }
-};
-
-class MirroredDimensionsRule : public SourceRule {
- public:
-  size_t check(const SourceRuleContext&, Diagnostics* diagnostics) const override {
-    return ValidateMirroredDimensions(diagnostics);
   }
 };
 
@@ -79,31 +55,20 @@ class ReflectionContractRule : public ArtifactRule {
   }
 };
 
-class InlineExpansionRule : public ArtifactRule {
- public:
-  size_t check(const ArtifactRuleContext& context, Diagnostics* diagnostics) const override {
-    return ValidateInlineExpansion(*context.inlineExpansions, diagnostics);
-  }
-};
-
 }  // namespace
 
 std::vector<std::unique_ptr<SourceRule>> MakeSourceRules() {
   std::vector<std::unique_ptr<SourceRule>> rules;
   rules.push_back(std::make_unique<MacroNamesRule>());
   rules.push_back(std::make_unique<PointwiseDispatchRule>());
-  rules.push_back(std::make_unique<MirroredDimensionsRule>());
   rules.push_back(std::make_unique<SpecReaderRule>());
   return rules;
 }
 
 std::vector<std::unique_ptr<ArtifactRule>> MakeArtifactRules() {
   std::vector<std::unique_ptr<ArtifactRule>> rules;
-  rules.push_back(std::make_unique<ClipContractRule>());
   rules.push_back(std::make_unique<ReflectionContractRule>());
   rules.push_back(std::make_unique<BindingLayoutRule>());
-  rules.push_back(std::make_unique<InlineExpansionRule>());
-  rules.push_back(std::make_unique<FamilyParamsRule>());
   return rules;
 }
 

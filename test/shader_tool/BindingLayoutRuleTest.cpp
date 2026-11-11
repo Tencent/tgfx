@@ -92,23 +92,19 @@ std::string WebgpuFragmentText(int pairCount) {
   return text;
 }
 
-ArtifactRuleContext ContextOf(const std::vector<VariantData>& variants,
-                              const std::vector<InlineExpansionRecord>& expansions) {
+ArtifactRuleContext ContextOf(const std::vector<VariantData>& variants) {
   ArtifactRuleContext context;
   context.variants = &variants;
-  context.inlineExpansions = &expansions;
   return context;
 }
 
 BindingLayoutRule rule;
 
-std::vector<InlineExpansionRecord> noExpansions;
-
 // Runs the rule over the variants and returns the violation count; the per-test diagnostics
 // stay local, so a test that cares what was reported builds its own Diagnostics.
 size_t CheckVariants(const std::vector<VariantData>& variants) {
   Diagnostics diagnostics;
-  auto errors = rule.check(ContextOf(variants, noExpansions), &diagnostics);
+  auto errors = rule.check(ContextOf(variants), &diagnostics);
   EXPECT_EQ(errors, FailuresIn(diagnostics));
   return errors;
 }
@@ -298,7 +294,7 @@ TEST(BindingLayoutRuleTest, AD3D12StageWithoutAnEntryPointIsUnverifiable) {
                               "float4 main() : SV_Target { return 0; }\n");
   std::vector<VariantData> variants = {variant};
   Diagnostics diagnostics;
-  auto errors = rule.check(ContextOf(variants, noExpansions), &diagnostics);
+  auto errors = rule.check(ContextOf(variants), &diagnostics);
   EXPECT_EQ(errors, FailuresIn(diagnostics));
   EXPECT_GE(errors, 1u);
   ASSERT_FALSE(diagnostics.records().empty());
@@ -338,7 +334,7 @@ TEST(BindingLayoutRuleTest, GlStorageReportsASurvivingLayoutQualifier) {
       "vec4 c; };\nvoid main() {}\n");
   variants.push_back(glVariant);
   Diagnostics diagnostics;
-  auto errors = rule.check(ContextOf(variants, noExpansions), &diagnostics);
+  auto errors = rule.check(ContextOf(variants), &diagnostics);
   EXPECT_EQ(errors, 1u);
   ASSERT_FALSE(diagnostics.records().empty());
   EXPECT_STREQ(diagnostics.records()[0].code, DiagnosticCode::EmitFormLeak);
@@ -353,7 +349,7 @@ TEST(BindingLayoutRuleTest, AVertexStageWithoutAnEntryPointIsUnverifiable) {
   variant.vertexBlob = BytesOf("@binding(0) @group(0) var<uniform> x : S;\n");
   std::vector<VariantData> variants = {variant};
   Diagnostics diagnostics;
-  auto errors = rule.check(ContextOf(variants, noExpansions), &diagnostics);
+  auto errors = rule.check(ContextOf(variants), &diagnostics);
   EXPECT_EQ(errors, FailuresIn(diagnostics));
   EXPECT_GE(errors, 1u);
   ASSERT_FALSE(diagnostics.records().empty());
@@ -372,7 +368,7 @@ TEST(BindingLayoutRuleTest, AVertexStageWithoutQualifiersIsUnverifiable) {
       "}\n");
   std::vector<VariantData> variants = {variant};
   Diagnostics diagnostics;
-  auto errors = rule.check(ContextOf(variants, noExpansions), &diagnostics);
+  auto errors = rule.check(ContextOf(variants), &diagnostics);
   EXPECT_EQ(errors, FailuresIn(diagnostics));
   EXPECT_GE(errors, 1u);
   ASSERT_FALSE(diagnostics.records().empty());
@@ -391,7 +387,7 @@ TEST(BindingLayoutRuleTest, AnUnparseableVulkanModuleIsUnverifiable) {
       SpirvWithDecorations({{FRAGMENT_UBO_DESCRIPTOR_SET, FRAGMENT_UBO_BINDING_POINT}});
   std::vector<VariantData> variants = {variant};
   Diagnostics diagnostics;
-  auto errors = rule.check(ContextOf(variants, noExpansions), &diagnostics);
+  auto errors = rule.check(ContextOf(variants), &diagnostics);
   EXPECT_EQ(errors, FailuresIn(diagnostics));
   EXPECT_GE(errors, 1u);
   ASSERT_FALSE(diagnostics.records().empty());

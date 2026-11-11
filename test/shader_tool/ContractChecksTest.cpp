@@ -66,21 +66,9 @@ Report Finish(size_t errors, const Diagnostics& diagnostics) {
   return report;
 }
 
-Report CheckClip(const std::vector<VariantData>& variants) {
-  Diagnostics diagnostics;
-  auto errors = ValidateClipContractFields(variants, &diagnostics);
-  return Finish(errors, diagnostics);
-}
-
 Report CheckReflection(const std::vector<VariantData>& variants) {
   Diagnostics diagnostics;
   auto errors = ValidateReflectionContracts(variants, &diagnostics);
-  return Finish(errors, diagnostics);
-}
-
-Report CheckFamilyParams(const std::vector<VariantData>& variants) {
-  Diagnostics diagnostics;
-  auto errors = ValidateFamilyParams(variants, &diagnostics);
   return Finish(errors, diagnostics);
 }
 
@@ -97,16 +85,6 @@ UniformEntry Field(const std::string& name, UniformFormat format = UniformFormat
 
 UniformEntry TextureSampler(const std::string& name) {
   return UniformEntry{name, static_cast<uint8_t>(UniformFormat::Texture2DSampler), 1};
-}
-
-std::vector<UniformEntry> ClipFields() {
-  return {Field(ClipContract::Rect),
-          Field(ClipContract::HasClip),
-          Field(ClipContract::LocalRect),
-          Field(ClipContract::RadiiX),
-          Field(ClipContract::RadiiY),
-          Field(ClipContract::AntiAlias),
-          Field(ClipContract::DeviceToLocal, UniformFormat::Float3x3)};
 }
 
 VariantData VariantWithFragment(const std::vector<UniformEntry>& uniforms,
@@ -152,40 +130,6 @@ class DamagedShaderDir : public ::testing::Test {
 };
 
 }  // namespace
-
-// ---- ValidateClipContractFields -------------------------------------------------------------
-
-TEST(ClipContractTest, ACompleteContractPasses) {
-  auto report = CheckClip({VariantWithFragment(ClipFields())});
-  EXPECT_EQ(report.errors, 0u) << report.log;
-}
-
-TEST(ClipContractTest, AVariantWithoutTheMarkerIsNotChecked) {
-  // Only a fragment block that carries HasClip is held to the contract.
-  auto report = CheckClip({VariantWithFragment({Field("Color")})});
-  EXPECT_EQ(report.errors, 0u) << report.log;
-}
-
-TEST(ClipContractTest, EachMissingFieldIsReported) {
-  const auto all = ClipFields();
-  for (size_t dropped = 0; dropped < all.size(); ++dropped) {
-    if (all[dropped].name == ClipContract::HasClip) {
-      continue;  // Without the marker the variant is not checked at all.
-    }
-    auto fields = all;
-    fields.erase(fields.begin() + static_cast<std::ptrdiff_t>(dropped));
-    auto report = CheckClip({VariantWithFragment(fields)});
-    EXPECT_EQ(report.errors, 1u) << all[dropped].name;
-    EXPECT_TRUE(report.mentions("'" + all[dropped].name + "'")) << report.log;
-  }
-}
-
-TEST(ClipContractTest, EveryOffendingVariantIsCounted) {
-  auto fields = ClipFields();
-  fields.pop_back();
-  std::vector<VariantData> variants(3, VariantWithFragment(fields));
-  EXPECT_EQ(CheckClip(variants).errors, 3u);
-}
 
 // ---- ValidateReflectionContracts ------------------------------------------------------------
 
@@ -288,40 +232,6 @@ TEST(ReflectionContractTest, TheVertexStageIsCheckedToo) {
   auto report = CheckReflection({variant});
   EXPECT_EQ(report.errors, 1u) << report.log;
   EXPECT_TRUE(report.mentions("duplicate name 'Matrix'")) << report.log;
-}
-
-// ---- the declared-name reconciliation -------------------------------------------------------
-
-TEST(FamilyParamsTest, AReflectedNameWithoutADeclarationIsReported) {
-  auto report = CheckFamilyParams({VariantWithFragment({Field("NotARealField")})});
-  EXPECT_TRUE(report.mentions("'NotARealField', which no module or catalog constant declares"))
-      << report.log;
-}
-
-TEST(FamilyParamsTest, ADeclaredTypeMismatchIsReported) {
-  // Subset is declared Float4; a Float2 reflection is a declaration that drifted.
-  auto report = CheckFamilyParams({VariantWithFragment({Field("Subset", UniformFormat::Float2)})});
-  EXPECT_TRUE(report.mentions("reflects format")) << report.log;
-}
-
-TEST(FamilyParamsTest, TheStructuralSuffixResolvesToTheDeclaredBase) {
-  auto report = CheckFamilyParams({VariantWithFragment({Field("Subset_1")})});
-  EXPECT_FALSE(report.mentions("'Subset_1'")) << report.log;
-  EXPECT_FALSE(report.mentions("declared parameter 'Subset' is carried")) << report.log;
-}
-
-TEST(FamilyParamsTest, ADeclaredConstantNoVariantCarriesIsReported) {
-  // Only Subset is reflected, so every other declared constant is unused; AlphaStart is one.
-  auto report = CheckFamilyParams({VariantWithFragment({Field("Subset")})});
-  EXPECT_TRUE(report.mentions("declared parameter 'AlphaStart' is carried by no variant"))
-      << report.log;
-}
-
-TEST(FamilyParamsTest, ANameEndingInDigitsStaysItself) {
-  // TiledSubset2 is itself declared; stripping its trailing digits would resolve it to
-  // TiledSubset, which is declared too, so the wrong field would answer for it.
-  auto report = CheckFamilyParams({VariantWithFragment({Field("TiledSubset2")})});
-  EXPECT_FALSE(report.mentions("'TiledSubset2'")) << report.log;
 }
 
 // ---- the macro-name rule --------------------------------------------------------------------

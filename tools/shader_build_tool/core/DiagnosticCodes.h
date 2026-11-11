@@ -80,29 +80,15 @@ inline constexpr const char* EmitFormLeak = "emit.form-leak";
 
 // ---- verify: the build-time contract checks ------------------------------------------------
 
-/// A variant carries the clip contract but is missing one of its uniform fields.
-inline constexpr const char* VerifyClipField = "verify.clip.missing-field";
-
 /// A reflected sampler/uniform violates the reflection contract the loader enforces on read.
 inline constexpr const char* VerifyReflection = "verify.reflection.invalid";
 
 /// A shader resource sits on a set/binding/group the runtime pipeline does not bind there.
 inline constexpr const char* VerifyBindingLayout = "verify.binding.misplaced";
 
-/// A function's duplicated instructions exceed the inline expansion policy.
-inline constexpr const char* VerifyInlinePolicy = "verify.inline-policy";
-
 /// A check could not run at all (a pattern it scans for is absent, a file it reads is not the
 /// format it expects). Reported as Unverifiable, never as a silent skip.
 inline constexpr const char* VerifyNotApplicable = "verify.unverifiable";
-
-/// A reflected uniform name has no declared writer constant, or the declared type does not match
-/// the reflected format.
-inline constexpr const char* VerifyParamUndeclared = "verify.param.undeclared";
-
-/// A declared parameter constant no variant's reflection carries: the declaration is dead or the
-/// shader dropped the field.
-inline constexpr const char* VerifyParamUnused = "verify.param.unused";
 
 /// A preprocessor condition references an identifier that is neither a family permutation
 /// dimension, a define in the shader sources, nor a whitelisted builtin: a typo would evaluate
@@ -136,13 +122,9 @@ inline constexpr const char* AllCodes[] = {
     EmitFormLeak,
     SpecReader,
     SpecLayoutDrift,
-    VerifyClipField,
     VerifyReflection,
     VerifyBindingLayout,
-    VerifyInlinePolicy,
     VerifyNotApplicable,
-    VerifyParamUndeclared,
-    VerifyParamUnused,
     VerifyMacroUnknown,
     VerifyPointwiseDispatch,
     OutputWrite,

@@ -27,7 +27,6 @@
 #include <utility>
 #include <vector>
 #include "cli/ReportWriter.h"
-#include "compile/InlineExpansion.h"
 #include "compile/ReflectionExtractor.h"
 #include "compile/ShaderCompiler.h"
 #include "compile/SpecCodegen.h"
@@ -47,9 +46,6 @@
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/contract/SpecContract.h"
 #include "output/BundleWriter.h"
-#include "output/InlineExpansionReport.h"
-#include "output/StageDump.h"
-#include "output/StageReport.h"
 #include "verify/ContractRules.h"
 
 namespace tgfx {
@@ -137,12 +133,6 @@ std::string UsageText() {
          "  --backends <list>     Comma-separated backend list "
          "(opengl,opengles,vulkan,metal,webgpu,d3d12)\n"
          "\n"
-         "  --stage-report <path> Write the per-stage audit report (requires a full compile)\n"
-         "  --dump-stages <dir>  Write the per-variant stage dump (code hashes, reflection, and\n"
-         "                        the expanded include text) two builds are compared with\n"
-         "  --inline-report <path>\n"
-         "                        Write each fragment variant's inline expansion (functions the\n"
-         "                        driver compiles more than once) as JSON\n"
          "  --compress            Compress data pool with zstd in output bundles\n"
          "  --cache-dir <path>    Persistent stage cache (default: <out-dir>/stage_cache)\n"
          "  --no-cache            Compile every stage, reading and writing no persistent cache\n"
@@ -170,12 +160,6 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options) {
         PrintUsage();
         return false;
       }
-    } else if (std::strcmp(argv[i], "--stage-report") == 0 && i + 1 < argc) {
-      options->stageReportPath = argv[++i];
-    } else if (std::strcmp(argv[i], "--dump-stages") == 0 && i + 1 < argc) {
-      options->stageDumpDir = argv[++i];
-    } else if (std::strcmp(argv[i], "--inline-report") == 0 && i + 1 < argc) {
-      options->inlineReportPath = argv[++i];
     } else if (std::strcmp(argv[i], "--compress") == 0) {
       options->compress = true;
     } else if (std::strcmp(argv[i], "--cache-dir") == 0 && i + 1 < argc) {
@@ -484,39 +468,13 @@ int RunBuildCommand(const BuildOptions& options) {
     return 1;
   }
 
-  // Must run before the variants are moved into the per-backend bundles below.
-  if (!options.stageReportPath.empty() && !report.variants.empty()) {
-    if (!WriteStageReport(options.stageReportPath, report.variants, &report.diagnostics)) {
-      PrintDiagnostics(report.diagnostics);
-      return 1;
-    }
-    std::cout << "Stage report written to: " << options.stageReportPath << "\n";
-  }
-
-  // Must run before the variants are moved into the per-backend bundles below, like the stage
-  // report: the dump reads the same records.
-  if (!options.stageDumpDir.empty() && !report.variants.empty()) {
-    if (!WriteStageDump(options.stageDumpDir, report.variants, &report.diagnostics)) {
-      PrintDiagnostics(report.diagnostics);
-      return 1;
-    }
-    std::cout << "Stage dump written to: " << options.stageDumpDir << "\n";
-  }
-
   // Cross-language contract checks, as two rule registries: the artifact rules read what the
-  // build produced (the clip contract fields, the reflection contracts, the inline expansion
-  // policy), the source rules read the shader text (the op codes, the slot capacities, the
-  // source references). A rule prints each violation itself; the counts gate the build, so a
-  // mismatch fails here instead of surfacing as a runtime upload missing its target.
-  if (!options.inlineReportPath.empty() &&
-      !WriteInlineExpansionReport(options.inlineReportPath, report.inlineExpansions,
-                                  &report.diagnostics)) {
-    PrintDiagnostics(report.diagnostics);
-    return 1;
-  }
+  // build produced (the reflection contracts, the binding layout), the source rules read the
+  // shader text (the macro names, the pointwise dispatch, the spec readers). A rule prints each
+  // violation itself; the counts gate the build, so a mismatch fails here instead of surfacing as
+  // a runtime upload missing its target.
   ArtifactRuleContext artifactContext;
   artifactContext.variants = &report.variants;
-  artifactContext.inlineExpansions = &report.inlineExpansions;
   for (const auto& rule : MakeArtifactRules()) {
     // Every rule reports each violation as a diagnostic; the returned count is for the tests
     // (RuleCountingTest pins it to the records the rule added) and is not gated on here.

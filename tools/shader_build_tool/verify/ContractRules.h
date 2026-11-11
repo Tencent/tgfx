@@ -29,8 +29,8 @@ namespace tgfx {
 
 // The verify sublayer holds the build-time contract checks, split by what a rule reads:
 //
-//   source rules   read the shader text            (op codes, slot capacities, references)
-//   artifact rules read what the build produced    (clip fields, reflection, inline expansion)
+//   source rules   read the shader text            (macro names, the pointwise dispatch, spec readers)
+//   artifact rules read what the build produced    (the reflection contracts, the binding layout)
 //
 // A rule reports each violation as a Diagnostic (with its code and subject) and returns the
 // count; the build gates on the sum, so a contract mismatch fails the build instead of
@@ -43,11 +43,9 @@ struct SourceRuleContext {
   std::string shaderDir;
 };
 
-/// The inputs of an artifact-level rule: the variants the build produced and, per compiled
-/// fragment permutation, the inline expansion analysis of its unoptimized SPIR-V.
+/// The inputs of an artifact-level rule: the variants the build produced.
 struct ArtifactRuleContext {
   const std::vector<VariantData>* variants = nullptr;
-  const std::vector<InlineExpansionRecord>* inlineExpansions = nullptr;
 };
 
 /// One contract check over the shader sources.
@@ -70,13 +68,12 @@ class ArtifactRule {
   virtual size_t check(const ArtifactRuleContext& context, Diagnostics* diagnostics) const = 0;
 };
 
-/// The source rules of one build, in the order their violations print: the chain op codes,
-/// the pointwise op codes, the slot capacities, and the references to things that must still
-/// exist.
+/// The source rules of one build, in the order their violations print: the macro names, the
+/// pointwise dispatch, and the spec-reader declarations.
 std::vector<std::unique_ptr<SourceRule>> MakeSourceRules();
 
-/// The artifact rules of one build, in the order their violations print: the clip contract
-/// fields, the reflection contracts, the binding layout, and the inline expansion policy.
+/// The artifact rules of one build, in the order their violations print: the reflection contracts
+/// and the binding layout.
 std::vector<std::unique_ptr<ArtifactRule>> MakeArtifactRules();
 
 }  // namespace tgfx

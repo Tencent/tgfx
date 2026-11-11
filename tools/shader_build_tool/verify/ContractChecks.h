@@ -30,13 +30,6 @@ namespace tgfx {
 // cli renders the records — so a test asserts the code and the subject fields instead of
 // capturing stderr.
 
-/// Validates that every compiled variant carrying the clip contract (HasClip) declares all
-/// ClipContract uniform fields. Returns the error count.
-size_t ValidateClipContractFields(const std::vector<VariantData>& variants,
-                                  Diagnostics* diagnostics);
-
-size_t ValidateFamilyParams(const std::vector<VariantData>& variants, Diagnostics* diagnostics);
-
 size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics);
 
 /// Checks the shared pointwise dispatch (operator/pointwise_color_dispatch.inc) against the op
@@ -44,11 +37,6 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
 /// <reason>` entry, every branch must name a listed operator, and an exemption must state its
 /// reason. Reports verify.pointwise-dispatch and returns the violation count.
 size_t ValidatePointwiseDispatch(const std::string& shaderDir, Diagnostics* diagnostics);
-
-/// Checks the dimensions both stages declare: the two declarations must agree on kind and value
-/// count (they build one value per variant). Reports verify.macro.unknown and returns the
-/// violation count.
-size_t ValidateMirroredDimensions(Diagnostics* diagnostics);
 
 /// Checks that every source reading the SPEC_ accessors declares `#pragma tgfx_spec_reader`.
 /// Reports spec.reader-undeclared and returns the violation count.
@@ -60,16 +48,5 @@ size_t ValidateSpecReaders(const std::string& shaderDir, Diagnostics* diagnostic
 /// runtime loader rejects, caught at build time instead. Returns the error count.
 size_t ValidateReflectionContracts(const std::vector<VariantData>& variants,
                                    Diagnostics* diagnostics);
-
-/// Validates the expansion policy over the fragment stages: the instructions a function adds by
-/// being inlined more than once (its own instructions times its copies beyond the first,
-/// DuplicatedInstructions in core/Types.h) must stay below MaxDuplicatedInstructions, with no
-/// exceptions. A function with several call sites is the pattern that multiplied the pointwise
-/// kernels' compile time (per-leaf tiled fetches, per-mode HSL blend helpers, per-channel transfer
-/// functions, the XferProcessor blend next to the loop's blend); funnelling the call sites into
-/// one is what removes the copies. Reports each violation and each unanalyzable module as a
-/// diagnostic and returns the count.
-size_t ValidateInlineExpansion(const std::vector<InlineExpansionRecord>& records,
-                               Diagnostics* diagnostics);
 
 }  // namespace tgfx

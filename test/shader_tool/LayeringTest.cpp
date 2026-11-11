@@ -351,14 +351,13 @@ TEST(LayeringTest, TheToolModulesFormNoIncludeCycle) {
 }
 
 TEST(LayeringTest, TheAnalysesDoNotDependOnTheProductsTheyFeed) {
-  // Reflection, inline analysis and the cache read compiler output or a payload; they must not
-  // know about the bundle files built from it, or the dependency turns around. The data structures
-  // that travel between the stages are declared in BundleWriter.h, which is why that one is
-  // allowed to be included.
+  // Reflection and the cache read compiler output or a payload; they must not know about the
+  // bundle files built from it, or the dependency turns around. The data structures that travel
+  // between the stages are declared in BundleWriter.h, which is why that one is allowed to be
+  // included.
   auto graph = ToolModuleGraph();
-  const std::vector<std::string> analyses = {"ReflectionExtractor", "InlineExpansion",
-                                             "StageCache"};
-  const std::vector<std::string> products = {"StageReport", "ContractChecks"};
+  const std::vector<std::string> analyses = {"ReflectionExtractor", "StageCache"};
+  const std::vector<std::string> products = {"ContractChecks"};
   for (const auto& analysis : analyses) {
     ASSERT_EQ(graph.count(analysis), 1u) << analysis;
     for (const auto& product : products) {
