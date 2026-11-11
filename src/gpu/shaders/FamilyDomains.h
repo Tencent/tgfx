@@ -54,4 +54,10 @@ bool DecodeChainCell(const Family& family, const Variant& variant, ChainLegacyCe
 uint8_t ChainGeometryOfCell(const ChainLegacyCell& cell);
 uint8_t ChainProfileOfCell(const ChainLegacyCell& cell);
 
+/// The variant's identity in a bundle: Variant::id (the family index in the high bits, the
+/// family-local ordinal in the low 20). The tool writes the bundle and the runtime reads it, and
+/// both derive the id from the declaration table, so an id names the same variant on both sides
+/// without a name hash. Returns UINT32_MAX beyond the id's field widths.
+uint32_t VariantIdOf(uint16_t familyIndex, uint32_t ordinal);
+
 }  // namespace tgfx

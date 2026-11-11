@@ -183,10 +183,10 @@ class PrecompiledShaderCache : public SpecSource {
   bool loadBundle(const uint8_t* data, size_t size);
 
   /// Looks up a vertex shader by its 128-bit hash. Returns nullptr if not found.
-  const ShaderStageBlob* findVertex(uint64_t hashHi, uint64_t hashLo) const;
+  const ShaderStageBlob* findVertex(uint32_t variantId) const;
 
   /// Looks up a fragment shader by its 128-bit hash. Returns nullptr if not found.
-  const ShaderStageBlob* findFragment(uint64_t hashHi, uint64_t hashLo) const;
+  const ShaderStageBlob* findFragment(uint32_t variantId) const;
 
   /// What became of the embedded bundle when the owning Context loaded it. Set once by the Context;
   /// later loadBundle()/unload() calls (tests swap bundles in and out) do not change it. It only
@@ -453,12 +453,9 @@ class PrecompiledShaderCache : public SpecSource {
 
   /// SpecSource: the two stages' reflected layouts and the fragment stage's spec table, as the
   /// capture needs them. A missing stage yields null rather than an empty view.
-  const std::vector<SpecFieldInfo>* findFragmentSpecFields(uint64_t hashHi,
-                                                           uint64_t hashLo) const override;
+  const std::vector<SpecFieldInfo>* findFragmentSpecFields(uint32_t variantId) const override;
 
-  using HashKey = BundleStageKey;
-
-  using HashKeyHasher = BundleStageKeyHasher;
+  using HashKey = uint32_t;
 
  private:
   struct SharedBundleKeyHasher {

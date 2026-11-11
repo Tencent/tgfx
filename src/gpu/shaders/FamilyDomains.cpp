@@ -210,4 +210,14 @@ bool DecodeChainCell(const Family& family, const Variant& variant, ChainLegacyCe
   return true;
 }
 
+uint32_t VariantIdOf(uint16_t familyIndex, uint32_t ordinal) {
+  // The runtime's variant identity (see Variant::id): the family index in the high bits and the
+  // family-local ordinal in the low 20. The ordinal is the mixed-radix encoding, not the
+  // enumeration index, so it is unique within its family but sparse.
+  if (familyIndex >= FamilyCount() || ordinal >= (1u << 20)) {
+    return UINT32_MAX;
+  }
+  return (static_cast<uint32_t>(familyIndex) << 20) | ordinal;
+}
+
 }  // namespace tgfx

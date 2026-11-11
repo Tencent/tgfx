@@ -340,18 +340,18 @@ namespace BundleFormat {
 /// The first four bytes of every bundle: "TGSF" read as a little endian integer.
 inline constexpr uint32_t Magic = 0x54475346u;
 
-/// The only version the writer produces, the runtime loader reads, and --verify-bundle accepts.
-/// Older versions carried no array sizes (v3), no vertex input reflection (v4), no payload
-/// format field (v5), no spec table (v6) or both reserved reflection bytes (pre-v5) and were read
-/// through compatibility branches the loader no longer has; they are refused instead.
-inline constexpr uint16_t CurrentVersion = 7;
+/// The only version the writer produces and the runtime loader reads. Older versions carried no
+/// array sizes (v3), no vertex input reflection (v4), no payload format field (v5), no spec table
+/// (v6) or hash-keyed pool entries (v7); they are refused instead of read through compatibility
+/// branches the loader no longer has. v8 keys the entries by the declaration table's variant id
+/// instead of a name hash, so the bundle no longer carries shader names at all.
+inline constexpr uint16_t CurrentVersion = 8;
 
 /// The size of the fixed header.
 inline constexpr uint32_t HeaderSize = 84;
 
-/// The size of one pool entry: hashHi(8) + hashLo(8) + dataOffset(4) + dataSize(4) +
-/// reflectionOffset(4).
-inline constexpr uint32_t PoolEntrySize = 28;
+/// The size of one pool entry: variantId(4) + dataOffset(4) + dataSize(4) + reflectionOffset(4).
+inline constexpr uint32_t PoolEntrySize = 16;
 
 /// How the data pool is stored. Stored in the header as a 16 bit value.
 namespace Compression {
@@ -405,11 +405,10 @@ inline constexpr uint32_t MaxNameLength = 255;   // bytes of one uniform/sampler
 
 /// The byte offsets of the fields inside one pool entry.
 namespace EntryOffset {
-inline constexpr uint32_t HashHi = 0;             // u64
-inline constexpr uint32_t HashLo = 8;             // u64
-inline constexpr uint32_t DataOffset = 16;        // u32, relative to the data pool
-inline constexpr uint32_t DataSize = 20;          // u32
-inline constexpr uint32_t ReflectionOffset = 24;  // u32, relative to the reflection pool
+inline constexpr uint32_t VariantId = 0;          // u32, see VariantIdOf
+inline constexpr uint32_t DataOffset = 4;         // u32, relative to the data pool
+inline constexpr uint32_t DataSize = 8;           // u32
+inline constexpr uint32_t ReflectionOffset = 12;  // u32, relative to the reflection pool
 }  // namespace EntryOffset
 
 static_assert(Offset::PayloadFormat == Offset::ProfileTag + ProfileTagSize,
@@ -474,7 +473,7 @@ inline bool ProfileAllowsPayload(ShaderProfile profile, uint16_t payloadFormat) 
  * still refuses bundles whose recorded ABI is not this value, which guards hand-carried or
  * cached bundle files.
  */
-inline constexpr uint32_t ExpectedToolchainABI = 0x0001001fu;
+inline constexpr uint32_t ExpectedToolchainABI = 0x00010020u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"
@@ -508,25 +507,16 @@ inline uint64_t BundleIdentityHashHeader(uint64_t state, uint16_t formatVersion,
   return BundleIdentityHashBytes(state, profileTag32, 32);
 }
 
-// Pool entries are fed in the on-disk field order: hashHi(8) + hashLo(8) + dataOffset(4) +
-// dataSize(4) + reflOffset(4), all little-endian.
-inline uint64_t BundleIdentityHashEntry(uint64_t state, uint64_t hashHi, uint64_t hashLo,
-                                        uint32_t dataOffset, uint32_t dataSize,
-                                        uint32_t reflOffset) {
-  auto feedU64 = [&state](uint64_t value) {
-    uint8_t le[8] = {};
-    for (int i = 0; i < 8; ++i) {
-      le[i] = static_cast<uint8_t>(value >> (i * 8));
-    }
-    state = BundleIdentityHashBytes(state, le, 8);
-  };
+// Pool entries are fed in the on-disk field order: variantId(4) + dataOffset(4) + dataSize(4) +
+// reflOffset(4), all little-endian.
+inline uint64_t BundleIdentityHashEntry(uint64_t state, uint32_t variantId, uint32_t dataOffset,
+                                        uint32_t dataSize, uint32_t reflOffset) {
   auto feedU32 = [&state](uint32_t value) {
     uint8_t le[4] = {static_cast<uint8_t>(value), static_cast<uint8_t>(value >> 8),
                      static_cast<uint8_t>(value >> 16), static_cast<uint8_t>(value >> 24)};
     state = BundleIdentityHashBytes(state, le, 4);
   };
-  feedU64(hashHi);
-  feedU64(hashLo);
+  feedU32(variantId);
   feedU32(dataOffset);
   feedU32(dataSize);
   feedU32(reflOffset);

@@ -87,6 +87,9 @@ struct StageReflectionData {
 
 struct VariantData {
   std::string shaderName;
+  /// The variant's bundle id (VariantIdOf): what the runtime looks the entry up by. The compile
+  /// step stamps it from the declaration table, so the writer never needs a family name.
+  uint32_t variantId = 0;
   uint32_t vertPermutationIndex = 0;
   uint32_t fragPermutationIndex = 0;
   std::string profileTag;

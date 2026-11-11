@@ -161,7 +161,7 @@ bool CheckPoolPayloadBudget(const uint8_t* fileData, size_t poolOffset, uint32_t
     auto blobOffset = ReadBundleU32LE(entry + BundleFormat::EntryOffset::DataOffset, 0);
     auto blobSize = ReadBundleU32LE(entry + BundleFormat::EntryOffset::DataSize, 0);
     if (blobOffset > dataPoolSize || blobSize > dataPoolSize - blobOffset ||
-        !ConsumePayloadBudget(sizeof(ShaderStageBlob) + sizeof(BundleStageKey), remainingBytes) ||
+        !ConsumePayloadBudget(sizeof(ShaderStageBlob) + sizeof(uint32_t), remainingBytes) ||
         !ConsumePayloadBudget(blobSize, remainingBytes)) {
       return false;
     }
@@ -171,8 +171,7 @@ bool CheckPoolPayloadBudget(const uint8_t* fileData, size_t poolOffset, uint32_t
 
 bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset, uint32_t poolCount,
               size_t dataPoolStart, size_t dataPoolEnd, size_t reflectionPoolStart,
-              std::unordered_map<BundleStageKey, ShaderStageBlob, BundleStageKeyHasher>& entries,
-              size_t* remainingBytes) {
+              std::unordered_map<uint32_t, ShaderStageBlob>& entries, size_t* remainingBytes) {
   for (uint32_t i = 0; i < poolCount; i++) {
     size_t entryOff = poolOffset + static_cast<size_t>(i) * BundleFormat::PoolEntrySize;
     if (entryOff > fileSize || BundleFormat::PoolEntrySize > fileSize - entryOff) {
@@ -180,8 +179,7 @@ bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset, uint3
       return false;
     }
     const uint8_t* entry = fileData + entryOff;
-    uint64_t hashHi = ReadBundleU64LE(entry + BundleFormat::EntryOffset::HashHi, 0);
-    uint64_t hashLo = ReadBundleU64LE(entry + BundleFormat::EntryOffset::HashLo, 0);
+    uint32_t variantId = ReadBundleU32LE(entry + BundleFormat::EntryOffset::VariantId, 0);
     uint32_t blobOff = ReadBundleU32LE(entry + BundleFormat::EntryOffset::DataOffset, 0);
     uint32_t blobSize = ReadBundleU32LE(entry + BundleFormat::EntryOffset::DataSize, 0);
     uint32_t reflOff = ReadBundleU32LE(entry + BundleFormat::EntryOffset::ReflectionOffset, 0);
@@ -209,7 +207,7 @@ bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset, uint3
       }
     }
 
-    BundleStageKey key{hashHi, hashLo};
+    uint32_t key = variantId;
     auto existing = entries.find(key);
     if (existing != entries.end()) {
       // A repeated stage key is only legal as byte-identical duplication; the writer rejects
@@ -244,10 +242,8 @@ bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset, uint3
           !uniformListsEqual(existing->second.uniforms, blob.uniforms) ||
           !uniformListsEqual(existing->second.samplers, blob.samplers) ||
           !vertexInputsEqual(existing->second.vertexInputs, blob.vertexInputs)) {
-        LOGE(
-            "PrecompiledShaderCache: Conflicting content for duplicate pool entry (key "
-            "%016llx%016llx)",
-            static_cast<unsigned long long>(hashHi), static_cast<unsigned long long>(hashLo));
+        LOGE("PrecompiledShaderCache: Conflicting content for duplicate pool entry (variant %u)",
+             variantId);
         return false;
       }
     } else {
@@ -263,8 +259,7 @@ uint64_t HashPoolEntries(uint64_t state, const uint8_t* pool, uint32_t count) {
   for (uint32_t i = 0; i < count; i++) {
     const uint8_t* entry = pool + static_cast<size_t>(i) * BundleFormat::PoolEntrySize;
     state = BundleIdentityHashEntry(
-        state, ReadBundleU64LE(entry + BundleFormat::EntryOffset::HashHi, 0),
-        ReadBundleU64LE(entry + BundleFormat::EntryOffset::HashLo, 0),
+        state, ReadBundleU32LE(entry + BundleFormat::EntryOffset::VariantId, 0),
         ReadBundleU32LE(entry + BundleFormat::EntryOffset::DataOffset, 0),
         ReadBundleU32LE(entry + BundleFormat::EntryOffset::DataSize, 0),
         ReadBundleU32LE(entry + BundleFormat::EntryOffset::ReflectionOffset, 0));

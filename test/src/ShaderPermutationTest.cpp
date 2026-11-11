@@ -528,10 +528,10 @@ TGFX_TEST(ShaderPermutationTest, GradientUniformsExistOnlyInExtendedChainArtifac
       if (!PermutationCompilesForBackend(info, indices.first, indices.second, *profile)) {
         continue;
       }
-      auto vertexKey = ComputeVertexKeyHash(family, indices.first, cache->profileTag());
-      auto fragmentKey = ComputeFragmentKeyHash(family, indices.second, cache->profileTag());
-      auto vertex = cache->findVertex(vertexKey.hi, vertexKey.lo);
-      auto fragment = cache->findFragment(fragmentKey.hi, fragmentKey.lo);
+      const uint16_t familyIndex = FamilyIndexOf(family);
+      ASSERT_NE(familyIndex, 0xFFFF);
+      auto vertex = cache->findVertex(VariantIdOf(familyIndex, indices.first));
+      auto fragment = cache->findFragment(VariantIdOf(familyIndex, indices.second));
       ASSERT_NE(vertex, nullptr);
       ASSERT_NE(fragment, nullptr);
       // PROFILE folds the legacy (texture count, mask, resource kind) triple: 3..5 are the
@@ -1196,15 +1196,15 @@ static std::vector<uint8_t> MakeTestBundle(const std::string& profileTag, uint32
   for (uint32_t index = 0; index < vertCount; ++index) {
     auto entryOffset = HeaderSize + index * PoolEntrySize;
     TestWriteU32LE(bundle.data() + entryOffset, hashSeed + index);
-    TestWriteU32LE(bundle.data() + entryOffset + 16, index);
-    TestWriteU32LE(bundle.data() + entryOffset + 20, 1);
+    TestWriteU32LE(bundle.data() + entryOffset + 4, index);
+    TestWriteU32LE(bundle.data() + entryOffset + 8, 1);
     bundle[dataOffset + index] = static_cast<uint8_t>(index + 1);
   }
   for (uint32_t index = 0; index < fragCount; ++index) {
     auto entryOffset = fragPoolOffset + index * PoolEntrySize;
     TestWriteU32LE(bundle.data() + entryOffset, hashSeed + 0x100 + index);
-    TestWriteU32LE(bundle.data() + entryOffset + 16, vertCount + index);
-    TestWriteU32LE(bundle.data() + entryOffset + 20, 1);
+    TestWriteU32LE(bundle.data() + entryOffset + 4, vertCount + index);
+    TestWriteU32LE(bundle.data() + entryOffset + 8, 1);
     bundle[dataOffset + vertCount + index] = static_cast<uint8_t>(index + 1);
   }
   SetTestBundleIdentity(&bundle);
@@ -1242,9 +1242,9 @@ static void SetTestBundleIdentity(std::vector<uint8_t>* bundle) {
   auto hash = BundleIdentityHashHeader(BundleIdentityHashInit(), TestReadU16LE(data + 4), vertCount,
                                        fragCount, data + 48);
   hash = BundleIdentityHashBytes(hash, data + TestReadU32LE(data + 28),
-                                 static_cast<size_t>(vertCount) * 28);
+                                 static_cast<size_t>(vertCount) * BundleFormat::PoolEntrySize);
   hash = BundleIdentityHashBytes(hash, data + TestReadU32LE(data + 32),
-                                 static_cast<size_t>(fragCount) * 28);
+                                 static_cast<size_t>(fragCount) * BundleFormat::PoolEntrySize);
   hash = BundleIdentityHashBytes(hash, data + TestReadU32LE(data + 36), TestReadU32LE(data + 40));
   auto reflectionOffset = TestReadU32LE(data + 44);
   if (reflectionOffset != 0) {
@@ -1292,14 +1292,14 @@ static void ExpectBundleRejectedPreservingCache(const std::vector<uint8_t>& inva
   EXPECT_EQ(cache.profileTag(), "original");
   EXPECT_EQ(cache.vertexEntryCount(), 1u);
   EXPECT_EQ(cache.fragmentEntryCount(), 1u);
-  auto vertex = cache.findVertex(10, 0);
-  auto fragment = cache.findFragment(10 + 0x100, 0);
+  auto vertex = cache.findVertex(10);
+  auto fragment = cache.findFragment(10 + 0x100);
   ASSERT_NE(vertex, nullptr);
   ASSERT_NE(fragment, nullptr);
   EXPECT_EQ(vertex->data, (std::vector<uint8_t>{1}));
   EXPECT_EQ(fragment->data, (std::vector<uint8_t>{1}));
-  EXPECT_EQ(cache.findVertex(50, 0), nullptr);
-  EXPECT_EQ(cache.findFragment(50 + 0x100, 0), nullptr);
+  EXPECT_EQ(cache.findVertex(50), nullptr);
+  EXPECT_EQ(cache.findFragment(50 + 0x100), nullptr);
 }
 
 TGFX_TEST(ShaderPermutationTest, BundleRejectsDisorderedVertexInputLocations) {
@@ -1335,8 +1335,8 @@ TGFX_TEST(ShaderPermutationTest, BundleCompressionAndReflectionRoundTrip) {
         EXPECT_EQ(cache.profileTag(), "bounds");
         EXPECT_EQ(cache.vertexEntryCount(), 1u);
         EXPECT_EQ(cache.fragmentEntryCount(), 1u);
-        auto vertex = cache.findVertex(50, 0);
-        auto fragment = cache.findFragment(50 + 0x100, 0);
+        auto vertex = cache.findVertex(50);
+        auto fragment = cache.findFragment(50 + 0x100);
         ASSERT_NE(vertex, nullptr);
         ASSERT_NE(fragment, nullptr);
         for (auto blob : {vertex, fragment}) {
@@ -1456,7 +1456,7 @@ TGFX_TEST(ShaderPermutationTest, BundleReflectionContractsWithVerifiedIdentity) 
         auto bundle = CompressTestBundle(original, compression);
         PrecompiledShaderCache cache(nullptr, Backend::Unknown);
         ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
-        auto vertex = cache.findVertex(50, 0);
+        auto vertex = cache.findVertex(50);
         ASSERT_NE(vertex, nullptr);
         const auto& entries = sampler ? vertex->samplers : vertex->uniforms;
         ASSERT_EQ(entries.size(), 1u);
@@ -1529,7 +1529,7 @@ TGFX_TEST(ShaderPermutationTest, BundleRejectsIncompatibleToolchainABI) {
   TestWriteU32LE(valid.data() + 16, ExpectedToolchainABI);
   PrecompiledShaderCache cache(nullptr, Backend::Unknown);
   EXPECT_TRUE(cache.loadBundle(valid.data(), valid.size()));
-  EXPECT_NE(cache.findVertex(50, 0), nullptr);
+  EXPECT_NE(cache.findVertex(50), nullptr);
 }
 
 TGFX_TEST(ShaderPermutationTest, BundleRejectsUnknownPayloadFormat) {
@@ -1549,7 +1549,7 @@ TGFX_TEST(ShaderPermutationTest, BundleRejectsUnknownPayloadFormat) {
     PrecompiledShaderCache cache(nullptr, Backend::Unknown);
     ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
     EXPECT_EQ(cache.payloadFormat(), stamped);
-    EXPECT_NE(cache.findVertex(50, 0), nullptr);
+    EXPECT_NE(cache.findVertex(50), nullptr);
   }
 }
 
@@ -1564,8 +1564,9 @@ TGFX_TEST(ShaderPermutationTest, BundleRejectsAllocationAmplification) {
   PrecompiledShaderCache cache(nullptr, Backend::Unknown);
   ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
   for (uint32_t index = 0; index < EntryCount; ++index) {
-    TestWriteU32LE(bundle.data() + BundleFormat::HeaderSize + index * 28 + 16, 0);
-    TestWriteU32LE(bundle.data() + BundleFormat::HeaderSize + index * 28 + 20, BlobSize);
+    auto entryOffset = BundleFormat::HeaderSize + index * BundleFormat::PoolEntrySize;
+    TestWriteU32LE(bundle.data() + entryOffset + BundleFormat::EntryOffset::DataOffset, 0);
+    TestWriteU32LE(bundle.data() + entryOffset + BundleFormat::EntryOffset::DataSize, BlobSize);
   }
   auto generation = cache.bundleGeneration();
   EXPECT_FALSE(cache.loadBundle(bundle.data(), bundle.size()));
@@ -1644,8 +1645,8 @@ TGFX_TEST(ShaderPermutationTest, FailedBundleReloadPreservesCache) {
   auto original = MakeTestBundle("original", 1, 1, 10);
   PrecompiledShaderCache cache(nullptr, Backend::Unknown);
   ASSERT_TRUE(cache.loadBundle(original.data(), original.size()));
-  ASSERT_TRUE(cache.findVertex(10, 0) != nullptr);
-  ASSERT_TRUE(cache.findFragment(10 + 0x100, 0) != nullptr);
+  ASSERT_TRUE(cache.findVertex(10) != nullptr);
+  ASSERT_TRUE(cache.findFragment(10 + 0x100) != nullptr);
 
   auto invalid = MakeTestBundle("failed", 2, 1, 30);
   TestWriteU32LE(invalid.data() + 32, static_cast<uint32_t>(invalid.size() - 1));
@@ -1653,9 +1654,9 @@ TGFX_TEST(ShaderPermutationTest, FailedBundleReloadPreservesCache) {
   EXPECT_EQ(cache.vertexEntryCount(), 1u);
   EXPECT_EQ(cache.fragmentEntryCount(), 1u);
   EXPECT_EQ(cache.profileTag(), "original");
-  EXPECT_TRUE(cache.findVertex(10, 0) != nullptr);
-  EXPECT_TRUE(cache.findFragment(10 + 0x100, 0) != nullptr);
-  EXPECT_TRUE(cache.findVertex(30, 0) == nullptr);
+  EXPECT_TRUE(cache.findVertex(10) != nullptr);
+  EXPECT_TRUE(cache.findFragment(10 + 0x100) != nullptr);
+  EXPECT_TRUE(cache.findVertex(30) == nullptr);
 }
 
 TGFX_TEST(ShaderPermutationTest, SuccessfulBundleReloadReplacesCache) {
@@ -1671,10 +1672,10 @@ TGFX_TEST(ShaderPermutationTest, SuccessfulBundleReloadReplacesCache) {
   EXPECT_EQ(cache.vertexEntryCount(), 1u);
   EXPECT_EQ(cache.fragmentEntryCount(), 1u);
   EXPECT_EQ(cache.profileTag(), "replacement");
-  EXPECT_TRUE(cache.findVertex(30, 0) != nullptr);
-  EXPECT_TRUE(cache.findFragment(30 + 0x100, 0) != nullptr);
-  EXPECT_TRUE(cache.findVertex(10, 0) == nullptr);
-  EXPECT_TRUE(cache.findFragment(10 + 0x100, 0) == nullptr);
+  EXPECT_TRUE(cache.findVertex(30) != nullptr);
+  EXPECT_TRUE(cache.findFragment(30 + 0x100) != nullptr);
+  EXPECT_TRUE(cache.findVertex(10) == nullptr);
+  EXPECT_TRUE(cache.findFragment(10 + 0x100) == nullptr);
 }
 
 TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {

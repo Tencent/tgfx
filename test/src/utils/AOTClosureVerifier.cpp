@@ -19,6 +19,7 @@
 #include "utils/AOTClosureVerifier.h"
 #include <set>
 #include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 
@@ -80,18 +81,20 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
       vertIndices.insert(permutation.first);
       fragIndices.insert(permutation.second);
     }
+    const uint16_t familyIndex = FamilyIndexOf(info->name.c_str());
+    if (familyIndex == 0xFFFF) {
+      continue;
+    }
     for (auto vi : vertIndices) {
       result.expectedCount++;
-      auto hash = ComputeVertexKeyHash(info->name, vi, profileTag);
-      if (cache->findVertex(hash.hi, hash.lo) == nullptr) {
+      if (cache->findVertex(VariantIdOf(familyIndex, vi)) == nullptr) {
         result.missingCount++;
         result.missing.push_back({info->name, true, vi});
       }
     }
     for (auto fi : fragIndices) {
       result.expectedCount++;
-      auto hash = ComputeFragmentKeyHash(info->name, fi, profileTag);
-      if (cache->findFragment(hash.hi, hash.lo) == nullptr) {
+      if (cache->findFragment(VariantIdOf(familyIndex, fi)) == nullptr) {
         result.missingCount++;
         result.missing.push_back({info->name, false, fi});
       }

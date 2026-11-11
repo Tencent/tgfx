@@ -435,6 +435,7 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         }
         VariantData variantData;
         variantData.shaderName = info.name;
+        variantData.variantId = VariantIdOf(static_cast<uint16_t>(familyIndex), variant.ordinal);
         variantData.vertPermutationIndex = variant.ordinal;
         variantData.fragPermutationIndex = variant.ordinal;
         variantData.profileTag = ProfileTag(emitterEntry.first);

@@ -41,8 +41,7 @@ bool CheckPoolPayloadBudget(const uint8_t* fileData, size_t poolOffset, uint32_t
 /// Loads one pool's stages into `entries`.
 bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset, uint32_t poolCount,
               size_t dataPoolStart, size_t dataPoolEnd, size_t reflectionPoolStart,
-              std::unordered_map<BundleStageKey, ShaderStageBlob, BundleStageKeyHasher>& entries,
-              size_t* remainingBytes);
+              std::unordered_map<uint32_t, ShaderStageBlob>& entries, size_t* remainingBytes);
 
 /// Feeds a pool's entry hashes into the bundle identity hash, in the on-disk field order the
 /// writer feeds (see BundleIdentityHashEntry).

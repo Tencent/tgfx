@@ -106,7 +106,7 @@ std::vector<uint8_t> SerializeStageReflection(const StageReflectionData& reflect
 }
 
 struct PoolEntry {
-  ShaderKeyHash hash;
+  uint32_t variantId = 0;
   uint32_t dataOffset = 0;
   uint32_t dataSize = 0;
   uint32_t reflOffset = 0;
@@ -135,84 +135,46 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     }
   }
 
-  // Build separate vert and frag entries with deduplication by hash.
+  // One entry per variant and pool, keyed by the id the compile step stamped. The bundle carries
+  // no shader name, and this writer needs no knowledge of the declaration table.
   std::vector<uint8_t> dataPool;
   std::vector<uint8_t> reflPool;
   std::vector<PoolEntry> vertPool;
   std::vector<PoolEntry> fragPool;
+  std::set<uint32_t> seenIds;
 
-  struct HashKeyLess {
-    bool operator()(const ShaderKeyHash& a, const ShaderKeyHash& b) const {
-      if (a.hi != b.hi) {
-        return a.hi < b.hi;
-      }
-      return a.lo < b.lo;
-    }
+  auto addBlob = [&](const std::vector<uint8_t>& blob, const std::vector<uint8_t>& reflection,
+                     PoolEntry* entry) {
+    entry->dataOffset = static_cast<uint32_t>(dataPool.size());
+    entry->dataSize = static_cast<uint32_t>(blob.size());
+    dataPool.insert(dataPool.end(), blob.begin(), blob.end());
+    entry->reflOffset = static_cast<uint32_t>(reflPool.size());
+    reflPool.insert(reflPool.end(), reflection.begin(), reflection.end());
   };
-  // A repeated stage key is only legal when the content is byte-identical (true deduplication);
-  // two different code or reflection blobs under one key would silently drop one of them — the
-  // first here, the last in the runtime loader — so the collision itself must fail the build.
-  struct SeenEntry {
-    std::vector<uint8_t> code;
-    std::vector<uint8_t> reflection;
-  };
-  std::map<ShaderKeyHash, SeenEntry, HashKeyLess> vertSeen;
-  std::map<ShaderKeyHash, SeenEntry, HashKeyLess> fragSeen;
 
   for (const auto& v : variants) {
-    // Vertex entry: key = ComputeVertexKeyHash(shaderName, vertPermutationIndex, profileTag)
-    auto vertHash =
-        ComputeVertexKeyHash(v.shaderName, v.vertPermutationIndex, v.profileTag);
-    auto vertReflBlob = SerializeStageReflection(v.vertexReflection);
-    auto vertIt = vertSeen.find(vertHash);
-    if (vertIt == vertSeen.end()) {
-      vertSeen.emplace(vertHash, SeenEntry{v.vertexBlob, vertReflBlob});
-      PoolEntry entry;
-      entry.hash = vertHash;
-      entry.dataOffset = static_cast<uint32_t>(dataPool.size());
-      entry.dataSize = static_cast<uint32_t>(v.vertexBlob.size());
-      dataPool.insert(dataPool.end(), v.vertexBlob.begin(), v.vertexBlob.end());
-      entry.reflOffset = static_cast<uint32_t>(reflPool.size());
-      reflPool.insert(reflPool.end(), vertReflBlob.begin(), vertReflBlob.end());
-      vertPool.push_back(entry);
-    } else if (vertIt->second.code != v.vertexBlob || vertIt->second.reflection != vertReflBlob) {
+    // A repeated id would make the runtime's lookup ambiguous; the compile step derives the id
+    // from (family, ordinal), so a collision here means a caller bug, not a legal duplicate.
+    if (!seenIds.insert(v.variantId).second) {
       ReportWriteFailure(diagnostics, DiagnosticCode::OutputDuplicateKey, v.shaderName,
-                         v.profileTag, static_cast<int>(v.vertPermutationIndex), -1,
-                         "conflicting content for a duplicate vertex key; refusing to silently "
-                         "drop either variant");
+                         v.profileTag, static_cast<int>(v.vertPermutationIndex),
+                         static_cast<int>(v.fragPermutationIndex),
+                         "two variants carry the same bundle id; the bundle cannot hold both");
       return false;
     }
-
-    // Fragment entry: key = ComputeFragmentKeyHash(shaderName, fragPermutationIndex, profileTag)
-    auto fragHash =
-        ComputeFragmentKeyHash(v.shaderName, v.fragPermutationIndex, v.profileTag);
-    auto fragReflBlob = SerializeStageReflection(v.fragmentReflection);
-    auto fragIt = fragSeen.find(fragHash);
-    if (fragIt == fragSeen.end()) {
-      fragSeen.emplace(fragHash, SeenEntry{v.fragmentBlob, fragReflBlob});
-      PoolEntry entry;
-      entry.hash = fragHash;
-      entry.dataOffset = static_cast<uint32_t>(dataPool.size());
-      entry.dataSize = static_cast<uint32_t>(v.fragmentBlob.size());
-      dataPool.insert(dataPool.end(), v.fragmentBlob.begin(), v.fragmentBlob.end());
-      entry.reflOffset = static_cast<uint32_t>(reflPool.size());
-      reflPool.insert(reflPool.end(), fragReflBlob.begin(), fragReflBlob.end());
-      fragPool.push_back(entry);
-    } else if (fragIt->second.code != v.fragmentBlob || fragIt->second.reflection != fragReflBlob) {
-      ReportWriteFailure(diagnostics, DiagnosticCode::OutputDuplicateKey, v.shaderName,
-                         v.profileTag, -1, static_cast<int>(v.fragPermutationIndex),
-                         "conflicting content for a duplicate fragment key; refusing to silently "
-                         "drop either variant");
-      return false;
-    }
+    PoolEntry vert;
+    vert.variantId = v.variantId;
+    addBlob(v.vertexBlob, SerializeStageReflection(v.vertexReflection), &vert);
+    vertPool.push_back(vert);
+    PoolEntry frag;
+    frag.variantId = v.variantId;
+    addBlob(v.fragmentBlob, SerializeStageReflection(v.fragmentReflection), &frag);
+    fragPool.push_back(frag);
   }
 
-  // Sort pools by hash for deterministic output
+  // Sort pools by variant id for deterministic output.
   auto hashCompare = [](const PoolEntry& a, const PoolEntry& b) {
-    if (a.hash.hi != b.hash.hi) {
-      return a.hash.hi < b.hash.hi;
-    }
-    return a.hash.lo < b.hash.lo;
+    return a.variantId < b.variantId;
   };
   std::sort(vertPool.begin(), vertPool.end(), hashCompare);
   std::sort(fragPool.begin(), fragPool.end(), hashCompare);
@@ -261,12 +223,12 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   identityHash = BundleIdentityHashHeader(identityHash, BundleFormat::CurrentVersion, vertPoolCount,
                                           fragPoolCount, reinterpret_cast<const uint8_t*>(tagBuf));
   for (const auto& entry : vertPool) {
-    identityHash = BundleIdentityHashEntry(identityHash, entry.hash.hi, entry.hash.lo,
-                                           entry.dataOffset, entry.dataSize, entry.reflOffset);
+    identityHash = BundleIdentityHashEntry(identityHash, entry.variantId, entry.dataOffset,
+                                           entry.dataSize, entry.reflOffset);
   }
   for (const auto& entry : fragPool) {
-    identityHash = BundleIdentityHashEntry(identityHash, entry.hash.hi, entry.hash.lo,
-                                           entry.dataOffset, entry.dataSize, entry.reflOffset);
+    identityHash = BundleIdentityHashEntry(identityHash, entry.variantId, entry.dataOffset,
+                                           entry.dataSize, entry.reflOffset);
   }
   identityHash = BundleIdentityHashBytes(identityHash, dataPool.data(), dataPool.size());
   identityHash = BundleIdentityHashBytes(identityHash, reflPool.data(), reflPool.size());
@@ -297,8 +259,7 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
 
   // Vert pool entries
   for (const auto& entry : vertPool) {
-    WriteU64LE(file, entry.hash.hi);
-    WriteU64LE(file, entry.hash.lo);
+    WriteU32LE(file, entry.variantId);
     WriteU32LE(file, entry.dataOffset);
     WriteU32LE(file, entry.dataSize);
     WriteU32LE(file, entry.reflOffset);
@@ -306,8 +267,7 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
 
   // Frag pool entries
   for (const auto& entry : fragPool) {
-    WriteU64LE(file, entry.hash.hi);
-    WriteU64LE(file, entry.hash.lo);
+    WriteU32LE(file, entry.variantId);
     WriteU32LE(file, entry.dataOffset);
     WriteU32LE(file, entry.dataSize);
     WriteU32LE(file, entry.reflOffset);

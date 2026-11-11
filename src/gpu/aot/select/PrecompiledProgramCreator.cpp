@@ -39,6 +39,8 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/ProgramWriterFactory.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/GPU.h"
@@ -374,12 +376,15 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   // derives its variant from the compiled program), so this entry starts past the match.
   const PermutationMatchResult* matchResult = &match;
 
-  auto vertHash = ComputeVertexKeyHash(
-      matchResult->shaderName, matchResult->variant.vertPermutationIndex, cache->profileTag());
-  auto fragHash = ComputeFragmentKeyHash(
-      matchResult->shaderName, matchResult->variant.fragPermutationIndex, cache->profileTag());
+  const uint16_t familyIndex = FamilyIndexOf(matchResult->shaderName.c_str());
+  if (familyIndex == 0xFFFF) {
+    LOGE("PrecompiledShaderMiss: unknown family %s", matchResult->shaderName.c_str());
+    return nullptr;
+  }
+  const uint32_t vertId = VariantIdOf(familyIndex, matchResult->variant.vertPermutationIndex);
+  const uint32_t fragId = VariantIdOf(familyIndex, matchResult->variant.fragPermutationIndex);
 
-  auto vertBlob = cache->findVertex(vertHash.hi, vertHash.lo);
+  auto vertBlob = cache->findVertex(vertId);
   if (vertBlob == nullptr) {
     cache->recordArtifactMiss(PrecompiledFallbackReason::VertexArtifactMissing,
                               MakeFallbackRecord(cache, programInfo, &*matchResult));
@@ -387,7 +392,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
          matchResult->shaderName.c_str(), matchResult->variant.vertPermutationIndex);
     return nullptr;
   }
-  auto fragBlob = cache->findFragment(fragHash.hi, fragHash.lo);
+  auto fragBlob = cache->findFragment(fragId);
   if (fragBlob == nullptr) {
     cache->recordArtifactMiss(PrecompiledFallbackReason::FragmentArtifactMissing,
                               MakeFallbackRecord(cache, programInfo, &*matchResult));

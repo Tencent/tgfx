@@ -48,8 +48,7 @@ class SpecSource {
   virtual uint16_t payloadFormat() const = 0;
 
   /// The fragment stage's spec table, or null when the stage carries no freezable fields.
-  virtual const std::vector<SpecFieldInfo>* findFragmentSpecFields(uint64_t hashHi,
-                                                                   uint64_t hashLo) const = 0;
+  virtual const std::vector<SpecFieldInfo>* findFragmentSpecFields(uint32_t variantId) const = 0;
 
   /// Records one derivation for the cost statistics (empty values count as a generic-form serve).
   virtual void recordSpecCapture(const SpecValues& values) = 0;

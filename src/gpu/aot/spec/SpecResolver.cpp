@@ -21,6 +21,8 @@
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/chain/AOTChainSpec.h"
 #include "gpu/aot/spec/SpecInjector.h"
+#include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
@@ -55,8 +57,11 @@ SpecValues SpecResolver::Resolve(SpecSource* source, Backend backend, const Prog
   // The values come straight off the compiled program (the same fields the runtime binder
   // uploads); the bundle's spec table supplies the order and the array lengths.
   (void)vertIndex;
-  auto fragHash = ComputeFragmentKeyHash(shaderName, fragIndex, source->profileTag());
-  const auto* fields = source->findFragmentSpecFields(fragHash.hi, fragHash.lo);
+  const uint16_t familyIndex = FamilyIndexOf(shaderName.c_str());
+  if (familyIndex == 0xFFFF) {
+    return {};
+  }
+  const auto* fields = source->findFragmentSpecFields(VariantIdOf(familyIndex, fragIndex));
   if (fields == nullptr) {
     return {};
   }

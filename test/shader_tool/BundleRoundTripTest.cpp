@@ -61,6 +61,8 @@ VariantData FullVariant(const std::string& shader, uint32_t vertIndex, uint32_t 
                         const std::string& profileTag, const std::string& vertexCode,
                         const std::string& fragmentCode) {
   VariantData variant;
+  static uint32_t nextId = 1;
+  variant.variantId = nextId++;
   variant.shaderName = shader;
   variant.vertPermutationIndex = vertIndex;
   variant.fragPermutationIndex = fragIndex;
@@ -164,21 +166,19 @@ TEST_P(BundleRoundTripTest, EveryFieldSurvivesTheLoader) {
   EXPECT_EQ(bundle.cache.bundleToolchainABI(), ExpectedToolchainABI);
 
   for (const auto& variant : variants) {
-    auto vertexKey = ComputeVertexKeyHash(variant.shaderName, variant.vertPermutationIndex, tag);
-    auto fragmentKey =
-        ComputeFragmentKeyHash(variant.shaderName, variant.fragPermutationIndex, tag);
     ExpectStageRoundTrips(variant.vertexBlob, variant.vertexReflection,
-                          bundle.cache.findVertex(vertexKey.hi, vertexKey.lo), true);
+                          bundle.cache.findVertex(variant.variantId), true);
     ExpectStageRoundTrips(variant.fragmentBlob, variant.fragmentReflection,
-                          bundle.cache.findFragment(fragmentKey.hi, fragmentKey.lo), false);
+                          bundle.cache.findFragment(variant.variantId), false);
   }
   std::remove(path.c_str());
 }
 
-TEST_P(BundleRoundTripTest, SharedStagesAreStoredOnce) {
+TEST_P(BundleRoundTripTest, EveryVariantCarriesBothStages) {
   const bool compress = GetParam();
   const std::string tag = ProfileTag(ShaderProfile::OpenGL);
-  // Two variants use the same fragment index of the same family: one pool entry, two lookups.
+  // Every variant carries its own entry in both pools: the lookup key is the variant id, so two
+  // variants never share an entry even when their bytes coincide.
   std::vector<VariantData> variants = {
       FullVariant("Shared", 1, 5, tag, "vertex one", "the one fragment"),
       FullVariant("Shared", 2, 5, tag, "vertex two", "the one fragment"),
@@ -190,7 +190,7 @@ TEST_P(BundleRoundTripTest, SharedStagesAreStoredOnce) {
   LoadedBundle bundle;
   ASSERT_TRUE(bundle.cache.loadBundle(bytes.data(), bytes.size()));
   EXPECT_EQ(bundle.cache.vertexEntryCount(), 2u);
-  EXPECT_EQ(bundle.cache.fragmentEntryCount(), 1u);
+  EXPECT_EQ(bundle.cache.fragmentEntryCount(), 2u);
   std::remove(path.c_str());
 }
 

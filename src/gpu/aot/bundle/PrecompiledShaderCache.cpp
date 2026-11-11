@@ -535,8 +535,8 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     return true;
   }
 
-  std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newVertEntries;
-  std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newFragEntries;
+  std::unordered_map<HashKey, ShaderStageBlob> newVertEntries;
+  std::unordered_map<HashKey, ShaderStageBlob> newFragEntries;
   if (!LoadPool(loadPtr, loadSize, vertPoolOffset, vertPoolCount, dataPoolStart, dataPoolEnd,
                 reflectionPoolStart, newVertEntries, &remainingPayloadBytes)) {
     return false;
@@ -620,25 +620,22 @@ void PrecompiledShaderCache::recordCachedMiss(PrecompiledFallbackReason reason) 
   }
 }
 
-const ShaderStageBlob* PrecompiledShaderCache::findVertex(uint64_t hashHi, uint64_t hashLo) const {
+const ShaderStageBlob* PrecompiledShaderCache::findVertex(uint32_t variantId) const {
   if (_bundle == nullptr) {
     return nullptr;
   }
-  HashKey key{hashHi, hashLo};
-  auto it = _bundle->vertEntries.find(key);
+  auto it = _bundle->vertEntries.find(variantId);
   if (it == _bundle->vertEntries.end()) {
     return nullptr;
   }
   return &it->second;
 }
 
-const ShaderStageBlob* PrecompiledShaderCache::findFragment(uint64_t hashHi,
-                                                            uint64_t hashLo) const {
+const ShaderStageBlob* PrecompiledShaderCache::findFragment(uint32_t variantId) const {
   if (_bundle == nullptr) {
     return nullptr;
   }
-  HashKey key{hashHi, hashLo};
-  auto it = _bundle->fragEntries.find(key);
+  auto it = _bundle->fragEntries.find(variantId);
   if (it == _bundle->fragEntries.end()) {
     return nullptr;
   }
@@ -646,8 +643,8 @@ const ShaderStageBlob* PrecompiledShaderCache::findFragment(uint64_t hashHi,
 }
 
 const std::vector<SpecFieldInfo>* PrecompiledShaderCache::findFragmentSpecFields(
-    uint64_t hashHi, uint64_t hashLo) const {
-  auto* blob = findFragment(hashHi, hashLo);
+    uint32_t variantId) const {
+  auto* blob = findFragment(variantId);
   return blob == nullptr || blob->specFields.empty() ? nullptr : &blob->specFields;
 }
 

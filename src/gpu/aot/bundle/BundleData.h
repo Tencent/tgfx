@@ -52,24 +52,6 @@ struct ShaderStageBlob {
   std::vector<SpecFieldInfo> specFields;
 };
 
-/// One stage's address in the bundle: the (hi, lo) hash pair the entries are keyed by.
-struct BundleStageKey {
-  uint64_t hi;
-  uint64_t lo;
-  bool operator==(const BundleStageKey& other) const {
-    return hi == other.hi && lo == other.lo;
-  }
-  bool operator<(const BundleStageKey& other) const {
-    return hi != other.hi ? hi < other.hi : lo < other.lo;
-  }
-};
-
-struct BundleStageKeyHasher {
-  size_t operator()(const BundleStageKey& key) const {
-    return static_cast<size_t>(key.hi ^ (key.lo * 0x9E3779B97F4A7C15ULL));
-  }
-};
-
 /// The immutable parse of one bundle. loadBundle() shares one instance per (identity hash, byte
 /// size) across every cache in the process, so an embedded bundle is parsed once rather than once
 /// per Context; the parse is contention-free read-only afterwards.
@@ -78,8 +60,8 @@ struct ParsedBundle {
   uint64_t identityHash = 0;
   uint32_t toolchainABI = 0;
   uint16_t payloadFormat = BundleFormat::Payload::Text;
-  std::unordered_map<BundleStageKey, ShaderStageBlob, BundleStageKeyHasher> vertEntries;
-  std::unordered_map<BundleStageKey, ShaderStageBlob, BundleStageKeyHasher> fragEntries;
+  std::unordered_map<uint32_t, ShaderStageBlob> vertEntries;
+  std::unordered_map<uint32_t, ShaderStageBlob> fragEntries;
 };
 
 }  // namespace tgfx
