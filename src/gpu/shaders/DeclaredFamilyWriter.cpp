@@ -27,6 +27,7 @@
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
+#include "gpu/aot/ir/GeometryParameters.h"
 #include "gpu/aot/select/FamilyMatchResult.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
@@ -115,6 +116,90 @@ std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
   return result;
 }
 
+/// One snapshot of the geometry facts the module walk uploads: read off the draw's geometry
+/// processor once per program, then addressed by every writer below. The concrete geometry type
+/// stays here alone, so the writers no longer cast and P6's geometry removal touches this function
+/// only.
+AOTGeometryParameters GeometryParametersOf(const ProgramInfo& info) {
+  AOTGeometryParameters params = {};
+  const auto* geometry = info.getGeometryProcessor();
+  if (geometry == nullptr) {
+    return params;
+  }
+  if (IsProcessor<DefaultGeometryProcessor>(geometry)) {
+    const auto* gp = static_cast<const DefaultGeometryProcessor*>(geometry);
+    params.commonColor = gp->getCommonColor();
+    params.hasCommonColor = true;
+    params.viewMatrix = gp->getViewMatrix();
+    params.uvMatrix = gp->getUVMatrix();
+    params.aaType = gp->getAAType();
+  } else if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(geometry)) {
+    const auto* gp = static_cast<const QuadPerEdgeAAGeometryProcessor*>(geometry);
+    params.commonColor = gp->getCommonColor();
+    params.hasCommonColor = gp->hasCommonColor();
+    params.uvMatrix = gp->getUVMatrix();
+    params.aaType = gp->getAAType();
+  } else if (IsProcessor<NonAARRectGeometryProcessor>(geometry)) {
+    const auto* gp = static_cast<const NonAARRectGeometryProcessor*>(geometry);
+    const auto color = gp->getCommonColor();
+    params.commonColor = color.value_or(PMColor());
+    params.hasCommonColor = color.has_value();
+    params.isStroke = gp->isStroke();
+  } else if (IsProcessor<ComplexNonAARRectGeometryProcessor>(geometry)) {
+    const auto* gp = static_cast<const ComplexNonAARRectGeometryProcessor*>(geometry);
+    params.commonColor = gp->getCommonColor();
+    params.hasCommonColor = gp->hasCommonColor();
+    params.isStroke = gp->isStroke();
+  } else if (IsProcessor<EllipseGeometryProcessor>(geometry)) {
+    const auto* gp = static_cast<const EllipseGeometryProcessor*>(geometry);
+    params.commonColor = gp->getCommonColor();
+    params.hasCommonColor = gp->hasCommonColor();
+    params.isStroke = gp->isStroke();
+  } else if (IsProcessor<ComplexEllipseGeometryProcessor>(geometry)) {
+    const auto* gp = static_cast<const ComplexEllipseGeometryProcessor*>(geometry);
+    params.commonColor = gp->getCommonColor();
+    params.hasCommonColor = gp->hasCommonColor();
+    params.isStroke = gp->isStroke();
+  } else if (IsProcessor<HairlineLineGeometryProcessor>(geometry)) {
+    const auto* gp = static_cast<const HairlineLineGeometryProcessor*>(geometry);
+    params.commonColor = gp->getCommonColor();
+    params.hasCommonColor = true;
+    params.viewMatrix = gp->getViewMatrix();
+    params.coverage = gp->getCoverage();
+    params.aaType = gp->getAAType();
+  } else if (IsProcessor<HairlineQuadGeometryProcessor>(geometry)) {
+    const auto* gp = static_cast<const HairlineQuadGeometryProcessor*>(geometry);
+    params.commonColor = gp->getCommonColor();
+    params.hasCommonColor = true;
+    params.viewMatrix = gp->getViewMatrix();
+    params.coverage = gp->getCoverage();
+    params.aaType = gp->getAAType();
+  } else if (IsProcessor<MeshGeometryProcessor>(geometry)) {
+    const auto* gp = static_cast<const MeshGeometryProcessor*>(geometry);
+    params.commonColor = gp->getCommonColor();
+    params.hasCommonColor = !gp->getHasColors();
+    params.viewMatrix = gp->getViewMatrix();
+    params.hasColors = gp->getHasColors();
+  } else if (IsProcessor<RoundStrokeRectGeometryProcessor>(geometry)) {
+    const auto* gp = static_cast<const RoundStrokeRectGeometryProcessor*>(geometry);
+    params.commonColor = gp->getCommonColor();
+    params.hasCommonColor = gp->hasCommonColor();
+    params.aaType = gp->getAAType();
+  } else if (IsProcessor<ShapeInstancedGeometryProcessor>(geometry)) {
+    const auto* gp = static_cast<const ShapeInstancedGeometryProcessor*>(geometry);
+    params.viewMatrix = gp->getViewMatrix();
+    params.uvMatrix = gp->getUVMatrix();
+  } else if (IsProcessor<AtlasTextGeometryProcessor>(geometry)) {
+    const auto* gp = static_cast<const AtlasTextGeometryProcessor*>(geometry);
+    params.commonColor = gp->getCommonColor();
+    params.hasCommonColor = gp->hasCommonColor();
+    params.isAlphaOnly = gp->isAlphaOnly();
+    params.atlasProxy = gp->getTextureProxy();
+    params.aaType = gp->getAAType();
+  }
+  return params;
+}
+
 // Frame (slot 0): the render-target adjust vector.
 void WriteFrame(const ProgramInfo& info, SlotWriter* writer) {
   constexpr uint8_t RTAdjust = UniformElementIndexOf(Frame, "RTAdjust");
@@ -123,21 +208,18 @@ void WriteFrame(const ProgramInfo& info, SlotWriter* writer) {
 
 // RectGeometry (the DefaultGP geometry): the view transform and the paint color uniform. The
 // per-vertex coverage rides the varying and needs no write.
-void WriteRectGeometry(const ProgramInfo& info, SlotWriter* writer) {
+void WriteRectGeometry(const AOTGeometryParameters& params, SlotWriter* writer) {
   constexpr uint8_t Matrix = UniformElementIndexOf(RectGeometry, "Matrix");
   constexpr uint8_t Color = UniformElementIndexOf(RectGeometry, "Color");
-  const auto* geometry = static_cast<const DefaultGeometryProcessor*>(info.getGeometryProcessor());
-  writer->set(Matrix, geometry->getViewMatrix());
-  writer->set(Color, geometry->getCommonColor());
+  writer->set(Matrix, params.viewMatrix);
+  writer->set(Color, params.commonColor);
 }
 
 // QuadGeometry (the QuadPerEdgeAA geometry): the paint color uniform; the position is already in
 // device space, so there is no view transform.
-void WriteQuadGeometry(const ProgramInfo& info, SlotWriter* writer) {
+void WriteQuadGeometry(const AOTGeometryParameters& params, SlotWriter* writer) {
   constexpr uint8_t Color = UniformElementIndexOf(QuadGeometry, "Color");
-  const auto* geometry =
-      static_cast<const QuadPerEdgeAAGeometryProcessor*>(info.getGeometryProcessor());
-  writer->set(Color, geometry->getCommonColor());
+  writer->set(Color, params.commonColor);
 }
 
 template <const Module& module>
@@ -152,24 +234,22 @@ template <const Module& module>
 void WriteTextureLeafParams(const AOTTextureParameters& leaf, SlotWriter* writer);
 
 // ComplexRRectGeometry: the color pair. The corner data and the SDF run entirely on the varyings.
-void WriteComplexRRectGeometry(const ProgramInfo& info, SlotWriter* writer) {
+void WriteComplexRRectGeometry(const AOTGeometryParameters& params, SlotWriter* writer) {
   constexpr uint8_t Color = UniformElementIndexOf(ComplexRRectGeometry, "Color");
   constexpr uint8_t HasCommonColor = UniformElementIndexOf(ComplexRRectGeometry, "HasCommonColor");
-  const auto* geometry =
-      static_cast<const ComplexNonAARRectGeometryProcessor*>(info.getGeometryProcessor());
-  writer->set(Color, geometry->getCommonColor());
-  writer->set(HasCommonColor, static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+  writer->set(Color, params.commonColor);
+  writer->set(HasCommonColor, static_cast<int32_t>(params.hasCommonColor ? 1 : 0));
 }
 
 // MeshGeometry: the view transform, the color pair and the texture coordinate chain.
-void WriteMeshGeometry(const ProgramInfo& info, SlotWriter* writer) {
+void WriteMeshGeometry(const ProgramInfo& info, const AOTGeometryParameters& params,
+                       SlotWriter* writer) {
   constexpr uint8_t Matrix = UniformElementIndexOf(MeshGeometry, "Matrix");
   constexpr uint8_t Color = UniformElementIndexOf(MeshGeometry, "Color");
   constexpr uint8_t HasCommonColor = UniformElementIndexOf(MeshGeometry, "HasCommonColor");
-  const auto* geometry = static_cast<const MeshGeometryProcessor*>(info.getGeometryProcessor());
-  writer->set(Matrix, geometry->getViewMatrix());
-  writer->set(Color, geometry->getCommonColor());
-  writer->set(HasCommonColor, static_cast<int32_t>(geometry->getHasColors() ? 0 : 1));
+  writer->set(Matrix, params.viewMatrix);
+  writer->set(Color, params.commonColor);
+  writer->set(HasCommonColor, static_cast<int32_t>(params.hasCommonColor ? 1 : 0));
   WriteCoordMatrix<MeshGeometry>(info, writer);
 }
 
@@ -178,13 +258,12 @@ void WriteMeshGeometry(const ProgramInfo& info, SlotWriter* writer) {
 // transform is the LAST one in the tree: the color graph's transforms come first, so a draw whose
 // only fragment processors are the color ones leaves this unwritten (the instanced fill family
 // carries no processor at all), and a coverage texture lands on it.
-void WriteShapeInstancedGeometry(const ProgramInfo& info, SlotWriter* writer) {
+void WriteShapeInstancedGeometry(const ProgramInfo& info, const AOTGeometryParameters& params,
+                                 SlotWriter* writer) {
   constexpr uint8_t UVMatrix = UniformElementIndexOf(ShapeInstancedGeometry, "UVMatrix");
   constexpr uint8_t ViewMatrix = UniformElementIndexOf(ShapeInstancedGeometry, "ViewMatrix");
-  const auto* geometry =
-      static_cast<const ShapeInstancedGeometryProcessor*>(info.getGeometryProcessor());
-  writer->set(UVMatrix, geometry->getUVMatrix());
-  writer->set(ViewMatrix, geometry->getViewMatrix());
+  writer->set(UVMatrix, params.uvMatrix);
+  writer->set(ViewMatrix, params.viewMatrix);
   WriteCoordMatrixAt<ShapeInstancedGeometry>(info, writer, -1);
 }
 
@@ -219,14 +298,10 @@ void WriteGradient(const AOTGradientParameters& params, SlotWriter* writer) {
   writer->set(End, params.end);
 }
 
-void WriteBlurSourceGeometry(const ProgramInfo& info, SlotWriter* writer) {
+void WriteBlurSourceGeometry(const ProgramInfo& info, const AOTGeometryParameters& params,
+                             SlotWriter* writer) {
   constexpr uint8_t ViewMatrix = UniformElementIndexOf(BlurSourceGeometry, "Matrix");
-  const auto* geometry = info.getGeometryProcessor();
-  Matrix view = Matrix::I();
-  if (IsProcessor<DefaultGeometryProcessor>(geometry)) {
-    view = static_cast<const DefaultGeometryProcessor*>(geometry)->getViewMatrix();
-  }
-  writer->set(ViewMatrix, view);
+  writer->set(ViewMatrix, params.viewMatrix);
   WriteCoordMatrix<BlurSourceGeometry>(info, writer);
 }
 
@@ -491,32 +566,28 @@ void WriteTextureLeafParams(const AOTTextureParameters& leaf, SlotWriter* writer
 
 // AtlasTextGeometry: the atlas size scale, the color pair and the AlphaOnly switch. The atlas
 // sample supplies the coverage itself, so the geometry needs no transform.
-void WriteAtlasTextGeometry(const ProgramInfo& info, SlotWriter* writer) {
+void WriteAtlasTextGeometry(const AOTGeometryParameters& params, SlotWriter* writer) {
   constexpr uint8_t AtlasSizeInv = UniformElementIndexOf(AtlasTextGeometry, "AtlasSizeInv");
   constexpr uint8_t Color = UniformElementIndexOf(AtlasTextGeometry, "Color");
   constexpr uint8_t HasCommonColor = UniformElementIndexOf(AtlasTextGeometry, "HasCommonColor");
   constexpr uint8_t AlphaOnly = UniformElementIndexOf(AtlasTextGeometry, "AlphaOnly");
-  const auto* geometry =
-      static_cast<const AtlasTextGeometryProcessor*>(info.getGeometryProcessor());
-  const auto& proxy = geometry->getTextureProxy();
+  const auto& proxy = params.atlasProxy;
   auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
   if (view != nullptr && view->getTexture() != nullptr) {
     const auto scale = view->getTextureCoord(1.f, 1.f);
     writer->set(AtlasSizeInv, std::array<float, 2>{scale.x, scale.y});
   }
-  writer->set(Color, geometry->getCommonColor());
-  writer->set(HasCommonColor, static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
-  writer->set(AlphaOnly, static_cast<int32_t>(geometry->isAlphaOnly() ? 1 : 0));
+  writer->set(Color, params.commonColor);
+  writer->set(HasCommonColor, static_cast<int32_t>(params.hasCommonColor ? 1 : 0));
+  writer->set(AlphaOnly, static_cast<int32_t>(params.isAlphaOnly ? 1 : 0));
 }
 
 // QuadTextureGeometry: the paint color the texture source multiplies by.
-void WriteQuadTextureGeometry(const ProgramInfo& info, SlotWriter* writer) {
+void WriteQuadTextureGeometry(const AOTGeometryParameters& params, SlotWriter* writer) {
   constexpr uint8_t Color = UniformElementIndexOf(QuadTextureGeometry, "Color");
   constexpr uint8_t HasCommonColor = UniformElementIndexOf(QuadTextureGeometry, "HasCommonColor");
-  const auto* geometry =
-      static_cast<const QuadPerEdgeAAGeometryProcessor*>(info.getGeometryProcessor());
-  writer->set(Color, geometry->getCommonColor());
-  writer->set(HasCommonColor, static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+  writer->set(Color, params.commonColor);
+  writer->set(HasCommonColor, static_cast<int32_t>(params.hasCommonColor ? 1 : 0));
 }
 
 // Texture: the plain leaf source. Both matrices carry the source coordinate transform — the
@@ -608,13 +679,11 @@ void WriteYUVTexture(const ProgramInfo& info, const AOTTextureParameters& leaf,
 
 // QuadColorGeometry (the QuadPerEdgeAA geometry with the per-vertex color): the exact paint color
 // and its flag. The per-vertex color rides the varying.
-void WriteQuadColorGeometry(const ProgramInfo& info, SlotWriter* writer) {
+void WriteQuadColorGeometry(const AOTGeometryParameters& params, SlotWriter* writer) {
   constexpr uint8_t Color = UniformElementIndexOf(QuadColorGeometry, "Color");
   constexpr uint8_t HasCommonColor = UniformElementIndexOf(QuadColorGeometry, "HasCommonColor");
-  const auto* geometry =
-      static_cast<const QuadPerEdgeAAGeometryProcessor*>(info.getGeometryProcessor());
-  writer->set(Color, geometry->getCommonColor());
-  writer->set(HasCommonColor, static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+  writer->set(Color, params.commonColor);
+  writer->set(HasCommonColor, static_cast<int32_t>(params.hasCommonColor ? 1 : 0));
 }
 
 // DeviceMask: the mask's destination-to-sample transform, the same value BindDeviceMaskLeaf
@@ -651,66 +720,58 @@ void WriteAnalyticClip(const ProgramInfo& info, SlotWriter* writer) {
 }
 
 // EllipseGeometry: the color pair and the stroke selector; the ellipse data rides the varyings.
-void WriteEllipseGeometry(const ProgramInfo& info, SlotWriter* writer) {
+void WriteEllipseGeometry(const AOTGeometryParameters& params, SlotWriter* writer) {
   constexpr uint8_t Color = UniformElementIndexOf(EllipseGeometry, "Color");
   constexpr uint8_t HasCommonColor = UniformElementIndexOf(EllipseGeometry, "HasCommonColor");
   constexpr uint8_t StrokeEnabled = UniformElementIndexOf(EllipseGeometry, "StrokeEnabled");
-  const auto* geometry = static_cast<const EllipseGeometryProcessor*>(info.getGeometryProcessor());
-  writer->set(Color, geometry->getCommonColor());
-  writer->set(HasCommonColor, static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
-  writer->set(StrokeEnabled, static_cast<int32_t>(geometry->isStroke() ? 1 : 0));
+  writer->set(Color, params.commonColor);
+  writer->set(HasCommonColor, static_cast<int32_t>(params.hasCommonColor ? 1 : 0));
+  writer->set(StrokeEnabled, static_cast<int32_t>(params.isStroke ? 1 : 0));
 }
 
 // ComplexEllipseGeometry: the color pair; the ellipse data rides the varyings.
-void WriteComplexEllipseGeometry(const ProgramInfo& info, SlotWriter* writer) {
+void WriteComplexEllipseGeometry(const AOTGeometryParameters& params, SlotWriter* writer) {
   constexpr uint8_t Color = UniformElementIndexOf(ComplexEllipseGeometry, "Color");
   constexpr uint8_t HasCommonColor =
       UniformElementIndexOf(ComplexEllipseGeometry, "HasCommonColor");
-  const auto* geometry =
-      static_cast<const ComplexEllipseGeometryProcessor*>(info.getGeometryProcessor());
-  writer->set(Color, geometry->getCommonColor());
-  writer->set(HasCommonColor, static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+  writer->set(Color, params.commonColor);
+  writer->set(HasCommonColor, static_cast<int32_t>(params.hasCommonColor ? 1 : 0));
 }
 
 // RoundStrokeRectGeometry: the color pair, the AA flag and the analytic clip.
-void WriteRoundStrokeRectGeometry(const ProgramInfo& info, SlotWriter* writer) {
+void WriteRoundStrokeRectGeometry(const AOTGeometryParameters& params, SlotWriter* writer) {
   constexpr uint8_t Color = UniformElementIndexOf(RoundStrokeRectGeometry, "Color");
   constexpr uint8_t HasCommonColor =
       UniformElementIndexOf(RoundStrokeRectGeometry, "HasCommonColor");
   constexpr uint8_t AAEnabled = UniformElementIndexOf(RoundStrokeRectGeometry, "AAEnabled");
-  const auto* geometry =
-      static_cast<const RoundStrokeRectGeometryProcessor*>(info.getGeometryProcessor());
-  writer->set(Color, geometry->getCommonColor());
-  writer->set(HasCommonColor, static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
-  writer->set(AAEnabled, static_cast<int32_t>(geometry->getAAType() == AAType::None ? 0 : 1));
+  writer->set(Color, params.commonColor);
+  writer->set(HasCommonColor, static_cast<int32_t>(params.hasCommonColor ? 1 : 0));
+  writer->set(AAEnabled, static_cast<int32_t>(params.aaType == AAType::None ? 0 : 1));
 }
 
 // HairlineLineGeometry / HairlineQuadGeometry: the view matrix, the color/coverage/AA triple and
 // the analytic clip the old declaration carried in the same block.
-template <typename Geometry, const Module& module>
-void WriteHairlineGeometry(const ProgramInfo& info, SlotWriter* writer) {
+template <const Module& module>
+void WriteHairlineGeometry(const ProgramInfo& info, const AOTGeometryParameters& params,
+                           SlotWriter* writer) {
   constexpr uint8_t ViewMatrix = UniformElementIndexOf(module, "Matrix");
   constexpr uint8_t Color = UniformElementIndexOf(module, "Color");
   constexpr uint8_t Coverage = UniformElementIndexOf(module, "Coverage");
   constexpr uint8_t AAEnabled = UniformElementIndexOf(module, "AAEnabled");
-  const auto* geometry = static_cast<const Geometry*>(info.getGeometryProcessor());
-  writer->set(ViewMatrix, geometry->getViewMatrix());
-  writer->set(Color, geometry->getCommonColor());
-  writer->set(Coverage, geometry->getCoverage());
-  writer->set(AAEnabled, static_cast<int32_t>(geometry->getAAType() == AAType::None ? 0 : 1));
+  writer->set(ViewMatrix, params.viewMatrix);
+  writer->set(Color, params.commonColor);
+  writer->set(Coverage, params.coverage);
+  writer->set(AAEnabled, static_cast<int32_t>(params.aaType == AAType::None ? 0 : 1));
   WriteClipParams<module>(info, writer);
 }
 
 // RRectGeometry (the non-AA rounded rect): the exact common color and its flag. The 8-bit
 // quantized varying needs no write; the values come from the geometry processor.
-void WriteRRectGeometry(const ProgramInfo& info, SlotWriter* writer) {
+void WriteRRectGeometry(const AOTGeometryParameters& params, SlotWriter* writer) {
   constexpr uint8_t CommonColor = UniformElementIndexOf(RRectGeometry, "CommonColor");
   constexpr uint8_t HasCommonColor = UniformElementIndexOf(RRectGeometry, "HasCommonColor");
-  const auto* geometry =
-      static_cast<const NonAARRectGeometryProcessor*>(info.getGeometryProcessor());
-  const auto commonColor = geometry->getCommonColor();
-  writer->set(CommonColor, commonColor.value_or(PMColor()));
-  writer->set(HasCommonColor, static_cast<int32_t>(commonColor.has_value() ? 1 : 0));
+  writer->set(CommonColor, params.commonColor);
+  writer->set(HasCommonColor, static_cast<int32_t>(params.hasCommonColor ? 1 : 0));
 }
 
 /// The texture-space coordinate transform: the FP tree's coord transform at the given position
@@ -1038,6 +1099,7 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
   }
   const Family& family = Families()[variant.family];
   const auto modules = ModulesOf(family, variant);
+  const auto geometryParams = GeometryParametersOf(info);
   ParamBuffer buffer(vertexUniformData, fragmentUniformData);
   for (uint8_t slot = 0; slot < modules.count; ++slot) {
     const Module* module = modules.list[slot];
@@ -1048,35 +1110,35 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
     if (module == &FrameModule()) {
       WriteFrame(info, &writer);
     } else if (module == &RectGeometry) {
-      WriteRectGeometry(info, &writer);
+      WriteRectGeometry(geometryParams, &writer);
     } else if (module == &BlurSourceGeometry) {
-      WriteBlurSourceGeometry(info, &writer);
+      WriteBlurSourceGeometry(info, geometryParams, &writer);
     } else if (module == &RoundStrokeRectGeometry) {
-      WriteRoundStrokeRectGeometry(info, &writer);
+      WriteRoundStrokeRectGeometry(geometryParams, &writer);
     } else if (module == &ComplexEllipseGeometry) {
-      WriteComplexEllipseGeometry(info, &writer);
+      WriteComplexEllipseGeometry(geometryParams, &writer);
     } else if (module == &EllipseGeometry) {
-      WriteEllipseGeometry(info, &writer);
+      WriteEllipseGeometry(geometryParams, &writer);
     } else if (module == &HairlineLineGeometry) {
-      WriteHairlineGeometry<HairlineLineGeometryProcessor, HairlineLineGeometry>(info, &writer);
+      WriteHairlineGeometry<HairlineLineGeometry>(info, geometryParams, &writer);
     } else if (module == &HairlineQuadGeometry) {
-      WriteHairlineGeometry<HairlineQuadGeometryProcessor, HairlineQuadGeometry>(info, &writer);
+      WriteHairlineGeometry<HairlineQuadGeometry>(info, geometryParams, &writer);
     } else if (module == &ComplexRRectGeometry) {
-      WriteComplexRRectGeometry(info, &writer);
+      WriteComplexRRectGeometry(geometryParams, &writer);
     } else if (module == &MeshGeometry) {
-      WriteMeshGeometry(info, &writer);
+      WriteMeshGeometry(info, geometryParams, &writer);
     } else if (module == &ShapeInstancedGeometry) {
-      WriteShapeInstancedGeometry(info, &writer);
+      WriteShapeInstancedGeometry(info, geometryParams, &writer);
     } else if (module == &QuadColorGeometry) {
-      WriteQuadColorGeometry(info, &writer);
+      WriteQuadColorGeometry(geometryParams, &writer);
     } else if (module == &QuadGeometry) {
-      WriteQuadGeometry(info, &writer);
+      WriteQuadGeometry(geometryParams, &writer);
     } else if (module == &RRectGeometry) {
-      WriteRRectGeometry(info, &writer);
+      WriteRRectGeometry(geometryParams, &writer);
     } else if (module == &AtlasTextGeometry) {
-      WriteAtlasTextGeometry(info, &writer);
+      WriteAtlasTextGeometry(geometryParams, &writer);
     } else if (module == &QuadTextureGeometry) {
-      WriteQuadTextureGeometry(info, &writer);
+      WriteQuadTextureGeometry(geometryParams, &writer);
     } else if (module == &TextureModule) {
       if (match->tiledLeaf != nullptr) {
         WriteTexture(info, *match->tiledLeaf, &writer);
