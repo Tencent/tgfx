@@ -37,6 +37,8 @@
 | 1 | 安全网：EncodeVariant（1a）、互斥绊线（1b）、写入路径（1c） | 3 | 1.5 天 |
 | 2 | Chain 模块化 + 声明式特化 + 收编 YUV + 删旧表（2a–2d） | 4 | 5 天 |
 | 3 | Chain 编译器收敛 4 阶段、容量常量收成一处 | 1–2 | 2 天 |
+| 3a 阶段合并 | 完成 | `0bb38f087` | MET：AOT 套件 125 项（含编译快照）全过；24 条一致；gate MET 2194；工具 211/211 | 8 阶段 → Schedule/Encode/Registers/Bindings 四个入口，子步骤转文件内 static（内部头 8 声明 → 4）；`AOTChainAllocate.cpp` 拆分：形状/覆盖根/分析路由搬入 Encode，收尾步骤搬到驱动旁，剩余改名 `AOTChainRegisters.cpp` |
+| 3b 容量单一来源 | 完成 | `251527dc6` | MET：`.bin` 逐字节不变（`03e90f1b…`）；摘要一次性变化（`0x94e2…`→`0x0559…`）；24 条一致；gate MET 2194；AOT 73 项全过；工具 211/211 | 容量宏改由**工具从声明读取**（`ChainSlotPackedCounts[0]/[6]`，新增 `core/CapacityDefines.h`）；合约头保留规划预算 + `ChainInputs.cpp` 的 `static_assert` 钉住“预算==声明长度”（分层规则禁止合约头包含声明层，故不能照计划直接读 count）；YUV 尾部容量归 `YUVChainTailSlotCapacity`，删 `MaxPointwiseSlots`/`TGFX_TAIL_SLOT_CAPACITY` 与死文件 `pointwise_chain_uniforms.inc`；`chainResults[16]` 改注入宏。**实测否决一条路**：GLSL `ChainData.length()` 会改变 SPIR-V → `.bin` 变化，按字节门禁回退 |
 | 4 | Chain 新增 ShapeInstanced / RoundStrokeRect 几何 | 1 | 1 天 |
 | 5 | prepare 只规划一次、writer 只读 IR、programKey 改 IR 键 | 3 | 4 天 |
 | 6 | 工具瘦身（6a–6d） | 4 | 3 天 |
