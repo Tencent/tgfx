@@ -37,10 +37,6 @@ static constexpr int MIN_TILE_SIZE = 16;
 static constexpr int MAX_TILE_SIZE = 2048;
 static constexpr int FALLBACK_GRID_SIZE = 64;
 static constexpr int MAX_ATLAS_SIZE = 8192;
-// Culls the capture against the blur footprints instead of the whole tile, so layers that overlap
-// the tile but sit under no background style are not drawn. The capture keeps the tile rects when
-// there are more footprints than the per-layer cull loop can afford.
-static constexpr bool TIGHTEN_CAPTURE_TO_FOOTPRINTS = true;
 // Number of rects the per-layer cull loop can afford.
 static constexpr size_t MAX_CULL_RECTS = 32;
 
@@ -470,27 +466,27 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       captureRect.offset(_contentOffset.x, _contentOffset.y);
       captureRects.push_back(captureRect);
     }
+    // A background style only samples the area under its own bounds plus the blur reach, so cull
+    // the capture against those footprints instead of the whole tile. Layers that overlap the tile
+    // but sit under no background style are then not drawn. The captured area stays the tile union,
+    // so the surfaces and the way sibling styles share their output do not change.
     std::vector<Rect> cullRects = {};
-    if (TIGHTEN_CAPTURE_TO_FOOTPRINTS) {
-      // The capture covers the tiles, but a background style only samples the area under its own
-      // bounds plus the blur reach. Narrow the rects the capture uses to decide which layers to
-      // draw; the captured area stays the tile union, so the surfaces and the way sibling styles
-      // share their output do not change.
-      auto viewMatrix = getViewMatrix();
-      Matrix inverse = Matrix::I();
-      if (viewMatrix.invert(&inverse)) {
-        auto capturedRect = Rect::MakeEmpty();
-        for (const auto& rect : captureRects) {
-          capturedRect.join(rect);
-        }
-        auto footprints = collectBackgroundFootprints(inverse.mapRect(capturedRect));
-        if (!footprints.empty() && footprints.size() <= MAX_CULL_RECTS) {
-          cullRects.reserve(footprints.size());
-          for (const auto& footprint : footprints) {
-            auto rect = viewMatrix.mapRect(footprint);
-            rect.roundOut();
-            cullRects.push_back(rect);
-          }
+    auto viewMatrix = getViewMatrix();
+    Matrix inverse = Matrix::I();
+    if (viewMatrix.invert(&inverse)) {
+      auto capturedRect = Rect::MakeEmpty();
+      for (const auto& rect : captureRects) {
+        capturedRect.join(rect);
+      }
+      auto footprints = collectBackgroundFootprints(inverse.mapRect(capturedRect));
+      // The capture keeps the tile rects when there are more footprints than the per-layer cull
+      // loop can afford.
+      if (!footprints.empty() && footprints.size() <= MAX_CULL_RECTS) {
+        cullRects.reserve(footprints.size());
+        for (const auto& footprint : footprints) {
+          auto rect = viewMatrix.mapRect(footprint);
+          rect.roundOut();
+          cullRects.push_back(rect);
         }
       }
     }
@@ -1248,9 +1244,8 @@ std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBoun
       return;
     }
     for (const auto& style : layer->_layerStyles) {
-      if (style == nullptr ||
-          (style->extraSourceType() &
-           static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
+      if (style == nullptr || (style->extraSourceType() &
+                               static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
         continue;
       }
       // The style samples the backdrop under its own bounds plus the blur reach.
