@@ -837,7 +837,7 @@ constexpr int BlurSurfaceSize = 200;
 // back. Drawing at 40 + offset keeps every case aligned on the same world position, so two runs
 // differ only in the path the filter takes.
 std::vector<uint8_t> RenderClippedBlur(Context* context, const std::shared_ptr<Image>& image,
-                                      float sigma, const Rect* clip) {
+                                       float sigma, const Rect* clip) {
   auto surface = Surface::Make(context, BlurSurfaceSize, BlurSurfaceSize);
   if (surface == nullptr) {
     return {};
@@ -873,8 +873,8 @@ int WindowSpread(const std::vector<uint8_t>& pixels, int left, int top, int righ
   return high - low;
 }
 
-int MaxDiffInWindow(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b, int left,
-                    int top, int right, int bottom) {
+int MaxDiffInWindow(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b, int left, int top,
+                    int right, int bottom) {
   int maxDiff = 0;
   for (int y = top; y < bottom; ++y) {
     for (int x = left; x < right; ++x) {
