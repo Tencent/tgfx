@@ -21,19 +21,18 @@
 #include <string>
 #include <vector>
 #include "core/Diagnostics.h"
-#include "core/ShaderSources.h"
 #include "core/Types.h"
 
 namespace tgfx {
 
 /// Writes the per-variant stage dump that two builds are compared with: one JSON file per
 /// (profile, family, variant) under <dir>/<profile>/ holding the code blob hash and the full
-/// reflection (uniform names/formats, sampler names, vertex input names/formats/locations), and
-/// the expanded include text of every family stage under <dir>/expanded/. A reorganization that
-/// moves files without changing the compiled output keeps every hash and every reflection entry
-/// identical, so a diff of two dumps attributes each change to the step that caused it.
+/// reflection (uniform names/formats, sampler names, vertex input names/formats/locations). A
+/// reorganization that moves files without changing the compiled output keeps every hash and
+/// every reflection entry identical, so a diff of two dumps attributes each change to the step
+/// that caused it.
 /// Returns false when a file cannot be written, reporting the failure to diagnostics.
 bool WriteStageDump(const std::string& dir, const std::vector<VariantData>& variants,
-                    const ShaderSourceSet& sources, Diagnostics* diagnostics);
+                    Diagnostics* diagnostics);
 
 }  // namespace tgfx

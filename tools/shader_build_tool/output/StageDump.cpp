@@ -44,17 +44,6 @@ std::string FormatHashHex(const ShaderKeyHash& hash) {
   return stream.str();
 }
 
-bool WriteTextFile(const std::filesystem::path& path, const std::string& text,
-                   Diagnostics* diagnostics) {
-  std::ofstream file(path, std::ios::binary);
-  if (!file.is_open()) {
-    ReportWriteFailure(diagnostics, path.string());
-    return false;
-  }
-  file.write(text.data(), static_cast<std::streamsize>(text.size()));
-  return true;
-}
-
 void WriteUniformEntries(std::ofstream& file, const std::vector<UniformEntry>& entries) {
   file << "[";
   for (size_t index = 0; index < entries.size(); ++index) {
@@ -103,20 +92,9 @@ void WriteStage(std::ofstream& file, const char* stageName, const std::vector<ui
 }  // namespace
 
 bool WriteStageDump(const std::string& dir, const std::vector<VariantData>& variants,
-                    const ShaderSourceSet& sources, Diagnostics* diagnostics) {
+                    Diagnostics* diagnostics) {
   std::error_code errorCode;
   const std::filesystem::path root(dir);
-  std::filesystem::create_directories(root / "expanded", errorCode);
-  for (const auto& shader : sources.shaders) {
-    if (!WriteTextFile(root / "expanded" / (shader.info.name + ".vert"), shader.vertex,
-                       diagnostics)) {
-      return false;
-    }
-    if (!WriteTextFile(root / "expanded" / (shader.info.name + ".frag"), shader.fragment,
-                       diagnostics)) {
-      return false;
-    }
-  }
   std::set<std::string> createdProfiles;
   for (const auto& variant : variants) {
     const std::filesystem::path profileDir = root / variant.profileTag;

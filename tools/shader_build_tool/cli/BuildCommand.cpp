@@ -50,7 +50,6 @@
 #include "gpu/shaders/Layout.h"
 #include "emit/ChainOpsGLSL.h"
 #include "emit/ProfileEmitter.h"
-#include "emit/StageEmitter.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
@@ -474,48 +473,11 @@ int RunBuildCommand(const BuildOptions& options) {
     return 1;
   }
 
-  // Every shader file is read exactly once, here. The compile loop and the manifests' source
-  // digests both use this set, so a manifest always describes the text that was compiled.
-  ShaderSourceSet sources;
   // The contract headers generate the stage text through the chain-ops pragma; they are C++
-  // headers, so the source set cannot carry them and the digests below must cover them here.
+  // headers, so no stage includes them and the digest below must cover them here.
   std::string generatorContract;
   const bool compiling = !options.shaderDir.empty();
   if (compiling) {
-    // The declared families' fragment entries are generated from their declarations: the
-    // handwritten files are gone, and the override is how their text reaches the compiler.
-    std::string emitError;
-    auto stageOverrides = EmitDeclaredFragmentEntries(&emitError);
-    if (stageOverrides.empty() && !emitError.empty()) {
-      RecordBuildError(&report.diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable, "",
-                       "", -1, -1, emitError);
-      PrintDiagnostics(report.diagnostics);
-      std::cerr << "Build failed: " << emitError << ".\n";
-      return 1;
-    }
-    sources = LoadShaderSources(options.shaderDir, &stageOverrides);
-    if (sources.overrideHits != stageOverrides.size()) {
-      const auto message =
-          "generated stage entries did not reach the loader: " +
-          std::to_string(stageOverrides.size()) + " declared, " +
-          std::to_string(sources.overrideHits) +
-          " matched; the equivalence check would compare the handwritten files";
-      RecordBuildError(&report.diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable, "",
-                       "", -1, -1, message);
-      PrintDiagnostics(report.diagnostics);
-      std::cerr << "Build failed: " << message << ".\n";
-      return 1;
-    }
-    if (!sources.ok) {
-      for (const auto& error : sources.errors) {
-        RecordBuildError(&report.diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
-                         "", "", -1, -1, error);
-      }
-      PrintDiagnostics(report.diagnostics);
-      std::cerr << "Build failed: " << sources.errors.size() << " shader source error(s) in "
-                << options.shaderDir << ".\n";
-      return 1;
-    }
     std::string contractError;
     if (!ReadGeneratorContract(options.shaderDir, &generatorContract, &contractError)) {
       RecordBuildError(&report.diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable, "",
@@ -560,7 +522,7 @@ int RunBuildCommand(const BuildOptions& options) {
   // Must run before the variants are moved into the per-backend bundles below, like the stage
   // report: the dump reads the same records.
   if (!options.stageDumpDir.empty() && !report.variants.empty()) {
-    if (!WriteStageDump(options.stageDumpDir, report.variants, sources, &report.diagnostics)) {
+    if (!WriteStageDump(options.stageDumpDir, report.variants, &report.diagnostics)) {
       PrintDiagnostics(report.diagnostics);
       return 1;
     }

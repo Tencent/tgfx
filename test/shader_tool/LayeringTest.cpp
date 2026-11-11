@@ -136,8 +136,6 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
       "gpu/shaders/FamilyDomains.h",
       "gpu/shaders/Layout.h",
       // the fragment-stage declaration language (the emitter walks these tables)
-      "gpu/shaders/decls/AllFragmentDecls.h",
-      "gpu/shaders/decls/ModuleDecl.h",
   };
   return allowed;
 }
