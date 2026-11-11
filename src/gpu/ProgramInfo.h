@@ -120,6 +120,14 @@ class ProgramInfo {
    */
   void writePipelineStateKey(BytesKey* key) const;
 
+  /**
+   * Whether coverage processors follow the color ones. The pipeline's blend formula reads it, so
+   * the program key carries it: two draws that differ only here need different pipelines.
+   */
+  bool blendFormulaHasCoverage() const {
+    return hasCoverageForBlend;
+  }
+
   std::shared_ptr<GPUBuffer> getUniformBuffer(const Program* program, size_t* vertexOffset,
                                               size_t* fragmentOffset) const;
 
@@ -191,9 +199,10 @@ class ProgramInfo {
   }
 
   /**
-   * The program-cache key, computed once per info and shared by getProgram and the prepare-time
-   * route checks. The setters above invalidate it, so it always reflects the current pipeline
-   * state.
+   * The attempt key: what the draw is before any match ran, computed once per info. The program
+   * cache is keyed by MakeProgramKey instead (a program's key carries its matched variant), so this
+   * key only addresses the negative cache and the diagnostic records. The setters above invalidate
+   * it, so it always reflects the current pipeline state.
    */
   const BytesKey& programKey() const;
 

@@ -177,18 +177,10 @@ void ProgramInfo::writePipelineStateKey(BytesKey* key) const {
 
 std::shared_ptr<Program> ProgramInfo::getProgram() const {
   auto context = renderTarget->getContext();
-  auto globalCache = context->globalCache();
-
-  // The plain key only ever holds generic programs (the creator caches a specialized program
-  // under its structure-bearing key), so this fast path is correct for every chain shape.
-  const auto& key = programKey();
-  auto program = globalCache->findProgram(key);
-  if (program != nullptr) {
-    return program;
-  }
   // Precompiled artifacts are the only program source: a miss drops the draw (see
-  // StandardDrawOp::prepare).
-  program = PrecompiledProgramCreator::CreateProgram(context, this);
+  // StandardDrawOp::prepare). The cache lookup lives in the creator because a program's key
+  // carries its matched variant and specialization values, which only the match can name.
+  auto program = PrecompiledProgramCreator::CreateProgram(context, this);
   if (program == nullptr) {
     LOGE("ProgramInfo::getProgram() Precompiled program unavailable!");
     return nullptr;

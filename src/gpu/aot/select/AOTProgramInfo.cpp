@@ -24,6 +24,7 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/Program.h"
 #include "gpu/aot/select/PrecompiledProgramCreator.h"
+#include "gpu/aot/select/ProgramKey.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/aot/spec/SpecResolver.h"
 #include "gpu/shaders/ChainInputs.h"
@@ -34,23 +35,6 @@
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
-namespace {
-
-// Distinguishes this route's keys from the plain route's processor-tree keys: the two routes key
-// equivalent draws differently (this one never hashes a fragment-processor list), so a marker
-// keeps them from ever colliding in the shared program cache.
-constexpr uint32_t AOTRouteKeyTag = 0xA07D4E01u;
-
-// A stable in-process hash of a shader name, so the key carries the family identity as one word.
-uint32_t ShaderNameHash(const std::string& name) {
-  uint32_t hash = 2166136261u;
-  for (char character : name) {
-    hash = (hash ^ static_cast<uint8_t>(character)) * 16777619u;
-  }
-  return hash;
-}
-
-}  // namespace
 
 AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& program) {
   auto context = info.getContext();
@@ -81,29 +65,14 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& progra
   cache->recordAOTStage(PrecompiledAOTStage::CacheAvailable);
   cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
 
-  BytesKey key = {};
-  key.write(AOTRouteKeyTag);
-  key.write(ShaderNameHash("Chain"));
-  key.write(variant->ordinal);
-  key.write(variant->ordinal);
-  auto gp = info.getGeometryProcessor();
-  if (gp != nullptr) {
-    gp->computeProcessorKey(context, &key);
-  }
-  info.getXferProcessor()->computeProcessorKey(context, &key);
-  info.writePipelineStateKey(&key);
   // The variant's identity does not name the chain's shape: two effect trees of one variant
-  // (same GP, same XP, same slot-count class) encode different chains, so the structural words
-  // this draw captured must join the key or the second shape would silently reuse the first
-  // shape's specialized program. The capture runs the draw's own uniform writers over a CPU
-  // scratch buffer (SpecCapture), so the key and the fold share one source of values. The entry
-  // is the same one the plain route uses (SpecResolver), so both routes agree.
+  // (same GP, same XP, same slot-count class) encode different chains, so the specialization
+  // values join the key or the second shape would silently reuse the first shape's program. The
+  // entry is the same one the plain route uses (SpecResolver), so both routes agree.
   const SpecValues spec =
       SpecResolver::Resolve(ContextCacheAccess::Cache(context), context->backend(), info, "Chain",
                             variant->ordinal, variant->ordinal);
-  if (!spec.empty()) {
-    spec.writeKey(&key);
-  }
+  const BytesKey key = MakeProgramKey(context, info, variant->id(), spec);
 
   auto globalCache = context->globalCache();
   auto resolved = globalCache->findProgram(key);

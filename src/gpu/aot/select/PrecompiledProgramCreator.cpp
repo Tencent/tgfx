@@ -34,6 +34,7 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/select/PermutationMatch.h"
+#include "gpu/aot/select/ProgramKey.h"
 #include "gpu/aot/spec/SpecInjector.h"
 #include "gpu/aot/spec/SpecResolver.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -323,30 +324,28 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
   // The specialization values are part of the program's identity: the processor tree cannot tell
   // two chain shapes apart (a rect clip's anti-alias flag, for one, is not in it), so a program
-  // built for one shape must never answer the other. A specialized program is therefore cached
-  // under the structure-bearing key only, which leaves the plain key holding generic programs —
-  // those render correctly for every shape, so a plain-key hit is always safe.
+  // built for one shape must never answer the other. The key below carries them, so the generic
+  // form and every specialized form of one variant are distinct programs under distinct keys.
   const SpecValues spec = SpecResolver::Resolve(
       cache, context->backend(), *programInfo, matchResult->shaderName,
       matchResult->variant.vertPermutationIndex, matchResult->variant.fragPermutationIndex);
-  if (spec.empty()) {
-    auto program = CreateProgramFromMatch(context, programInfo, *matchResult, nullptr);
-    if (program != nullptr) {
-      context->globalCache()->addProgram(programInfo->programKey(), program);
-    }
-    return program;
+  const uint16_t familyIndex = FamilyIndexOf(matchResult->shaderName.c_str());
+  if (familyIndex == 0xFFFF) {
+    LOGE("PrecompiledShaderMiss: unknown family %s", matchResult->shaderName.c_str());
+    return nullptr;
   }
-  const BytesKey plainKey = programInfo->programKey();
-  BytesKey specializedKey = plainKey;
-  spec.writeKey(&specializedKey);
-  if (auto cached = context->globalCache()->findProgram(specializedKey)) {
+  const uint32_t variantId = VariantIdOf(familyIndex, matchResult->variant.fragPermutationIndex);
+  const BytesKey key = MakeProgramKey(context, *programInfo, variantId, spec);
+  if (auto cached = context->globalCache()->findProgram(key)) {
     return cached;
   }
-  auto program = CreateProgramFromMatch(context, programInfo, *matchResult, &spec);
+  auto program =
+      CreateProgramFromMatch(context, programInfo, *matchResult, spec.empty() ? nullptr : &spec);
   if (program != nullptr) {
-    // A specialization that failed to build still returns the generic form (see the fallback
-    // below); caching it under this key keeps the failing compile from being retried.
-    context->globalCache()->addProgram(specializedKey, program);
+    // A specialization that failed to build still returns the generic form (see the fallback in
+    // CreateProgramFromMatch); caching it under this key keeps the failing compile from being
+    // retried.
+    context->globalCache()->addProgram(key, program);
   }
   return program;
 }
