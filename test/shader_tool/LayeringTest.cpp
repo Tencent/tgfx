@@ -140,13 +140,6 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
   return allowed;
 }
 
-// Headers of the allowed list that CMake generates into the build tree instead of keeping in src.
-// The declaration layer needs none: every family is a src header now.
-const std::set<std::string>& GeneratedHeaders() {
-  static const std::set<std::string> generated = {};
-  return generated;
-}
-
 // The contract headers: constants and pure functions shared by the tool and the runtime.
 const std::vector<std::string>& ContractHeaders() {
   static const std::vector<std::string> headers = {
@@ -220,23 +213,7 @@ TEST(LayeringTest, TheToolIncludesNoRuntimeClassThroughAPublicHeader) {
 
 TEST(LayeringTest, EveryAllowedHeaderExists) {
   for (const auto& header : AllowedRuntimeHeaders()) {
-    if (GeneratedHeaders().count(header) > 0) {
-      continue;
-    }
     EXPECT_TRUE(std::filesystem::exists(SourceDir + "/src/" + header)) << header;
-  }
-}
-
-TEST(LayeringTest, EveryGeneratedHeaderIsGeneratedByCMake) {
-  // The list of generated headers is only valid while CMake still generates them.
-  std::ifstream file(SourceDir + "/CMakeLists.txt");
-  std::stringstream buffer;
-  buffer << file.rdbuf();
-  auto text = buffer.str();
-  for (const auto& header : GeneratedHeaders()) {
-    auto name = std::filesystem::path(header).filename().string();
-    EXPECT_NE(text.find(name), std::string::npos)
-        << name << " is listed as generated but CMakeLists.txt no longer mentions it";
   }
 }
 

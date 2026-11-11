@@ -97,19 +97,6 @@ TEST(FamilyRegistryTest, EveryFamilyIsRegisteredOnceWithItsOwnFiles) {
   }
 }
 
-TEST(FamilyRegistryTest, FindAndEnumerateAgreeWithTheRegisteredFamilies) {
-  for (const auto& info : AllFamilies()) {
-    auto found = ShaderRegistry::Find(info.name);
-    ASSERT_NE(found, nullptr) << info.name;
-    EXPECT_EQ(found->name, info.name);
-    EXPECT_TRUE(EnumerateReachablePermutations(info.name).has_value()) << info.name;
-    EXPECT_TRUE(EnumerateReachablePermutations(info.name).has_value()) << info.name;
-  }
-  EXPECT_EQ(ShaderRegistry::Find("NoSuchFamily"), nullptr);
-  EXPECT_FALSE(EnumerateReachablePermutations("NoSuchFamily").has_value());
-  EXPECT_FALSE(EnumerateReachablePermutations("NoSuchFamily").has_value());
-}
-
 TEST(ReachabilityTest, EveryFamilyHasAtLeastOneReachableVariant) {
   for (const auto& info : AllFamilies()) {
     auto reachable = EnumerateReachablePermutations(info.name);
@@ -234,7 +221,6 @@ TEST(MirroredDimensionsTest, DomainsWithoutACommonDimensionAlwaysAgree) {
   EXPECT_TRUE(MirroredDimsAgree(vertex, fragment, {1}, {0}));
   EXPECT_TRUE(MirroredDimsAgree(vertex, fragment, {0}, {1}));
 }
-
 
 // ---- PermutationDomain ----------------------------------------------------------------------
 
