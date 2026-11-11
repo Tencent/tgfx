@@ -53,38 +53,30 @@ inline constexpr size_t MaxChainRegisters = 16;
 inline constexpr size_t MaxChainGradientSlots = TiledGraphResourceCapacity.gradients;
 inline constexpr size_t MaxChainColorSpaceXformSlots = 1;
 
-// The chain-layout pipeline, split by stage across AOTChainSchedule/Encode/Allocate/Bindings.cpp.
-// PlanChainLayout is the only caller that runs the stages in order; every other entry point
-// (AOTChainBuilder::Compile, FitsChainPlan) goes through it, so a stage never re-derives what an
-// earlier stage produced.
+// The chain-layout pipeline, four stages over one merged node space. PlanChainLayout is the only
+// caller that runs them in order; every other entry point (AOTChainBuilder::Compile, FitsChainPlan)
+// goes through it, so a stage never re-derives what an earlier stage produced. A stage's steps are
+// file-static in its translation unit: only these four names cross a file boundary.
 
 // Turns one scheduled node into its pointwise op slot. Shared by the encoder (EncodeUnaryPointwise)
 // and the texture/YUV tail collectors in AOTChainBuilder.cpp.
 bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node, AOTChainSlot* slot);
 
-// Stage one: merges the color and coverage node spaces and admits the pass.
-bool MergeNodeSpaces(AOTChainContext* ctx);
+// Stage one — Schedule: merges the color and coverage node spaces, admits the pass, then orders
+// the texture leaves ahead of the remaining nodes in topological order.
+bool ScheduleSlots(AOTChainContext* ctx);
 
-// Stage two: texture leaves first, then the remaining nodes in topological order.
-void ScheduleChainSlots(AOTChainContext* ctx);
+// Stage two — Encode: encodes every scheduled node into its chain slot, resolves the pass's
+// resource shape, roots the coverage subtree, and routes the analytic coverage links.
+bool EncodeSlots(AOTChainContext* ctx);
 
-// Stage three: encodes every scheduled node into its chain slot.
-bool EncodeChainSlots(AOTChainContext* ctx);
+// Stage three — Registers: rewrites instruction ordinals into the kernel's recycled result
+// registers, so the instruction budget and the live-result budget stay independent.
+bool AllocateRegisters(AOTChainContext* ctx);
 
-// Stage four: the pass's resource demand picks the final profile.
-bool ResolveFinalChainProfile(AOTChainContext* ctx);
-
-// Stage five: resolves the coverage subtree's root register and validates its shape.
-bool ResolveCoverageRoot(AOTChainContext* ctx);
-
-// Stage six: routes the analytic coverage links onto the clip-coverage channel.
-void RouteAnalyticChains(AOTChainContext* ctx);
-
-// Stage seven: register allocation.
-bool AssignChainRegisters(AOTChainContext* ctx);
-
-// Stage eight: slot rules and the final profile's capacities.
-bool FinalizeChainLayout(AOTChainContext* ctx);
+// Stage four — Bindings: the slot rules and the final shape's capacities, checked on the exact
+// instruction array the compile hands to ValidateSlots, then published onto the program.
+bool BindLayout(AOTChainContext* ctx);
 
 /// Describes a graph that is its own pass: every non-designator node in index order, rooted at the
 /// graph's root, with the resource profile the chain plan resolves. A cut segment graph and a

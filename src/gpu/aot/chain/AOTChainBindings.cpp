@@ -121,18 +121,31 @@ bool PlanChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
   ctx.coverageLeafFromUVCoord = coverageLeafFromUVCoord;
   ctx.clipLinks = &clipLinks;
   ctx.layout = layout;
-  if (!MergeNodeSpaces(&ctx)) {
+  return ScheduleSlots(&ctx) && EncodeSlots(&ctx) && AllocateRegisters(&ctx) && BindLayout(&ctx);
+}
+
+// The Bindings stage: the slot rules and the final profile's capacities decide last, on the exact
+// instruction array the compile hands to AOTChainBuilder::ValidateSlots.
+bool BindLayout(AOTChainContext* ctx) {
+  auto* layout = ctx->layout;
+  std::vector<int> tiledLeafIndices = {};
+  for (const auto& tiled : layout->program.tiledLeaves) {
+    tiledLeafIndices.push_back(tiled.leafIndex);
+  }
+  if (ctx->assignment.rootRegister < 0 ||
+      !AOTChainBuilder::ValidateSlots(ctx->slots, static_cast<size_t>(ctx->assignment.rootRegister),
+                                      ctx->assignment.coverageRootRegister,
+                                      ctx->assignment.clipCoverageRegister,
+                                      layout->leafNodes.size(), layout->lutGradient != nullptr,
+                                      tiledLeafIndices, &ctx->finalProfile)) {
     return false;
   }
-  ScheduleChainSlots(&ctx);
-  if (!EncodeChainSlots(&ctx) || !ResolveFinalChainProfile(&ctx)) {
-    return false;
-  }
-  if (!ResolveCoverageRoot(&ctx)) {
-    return false;
-  }
-  RouteAnalyticChains(&ctx);
-  return AssignChainRegisters(&ctx) && FinalizeChainLayout(&ctx);
+  layout->program.slots = std::move(ctx->slots);
+  layout->program.rootRegister = static_cast<size_t>(ctx->assignment.rootRegister);
+  layout->program.coverageRootRegister = ctx->assignment.coverageRootRegister;
+  layout->program.clipCoverageRegister = ctx->assignment.clipCoverageRegister;
+  layout->program.profile = ctx->finalProfile;
+  return true;
 }
 
 // The padding state that mirrors the first real leaf's sampler on the phantom children: on

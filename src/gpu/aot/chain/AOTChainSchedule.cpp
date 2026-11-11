@@ -42,7 +42,9 @@ namespace tgfx {
 // Stage one: merges the color and coverage node spaces, and admits the pass itself — non-empty
 // with a valid output, every node listed exactly once, and a chain kernel when the caller asked
 // for that check.
-bool MergeNodeSpaces(AOTChainContext* ctx) {
+// The Schedule stage, step one: merges the color and coverage node spaces and admits the
+// pass.
+static bool MergeNodeSpaces(AOTChainContext* ctx) {
   const auto& pass = *ctx->pass;
   if (ctx->layout == nullptr || pass.nodes.empty() || !pass.output.isValid()) {
     return false;
@@ -125,7 +127,9 @@ static void CollectChainNode(AOTChainContext* ctx, size_t combined, bool texture
 // Index 0 of the coverage graph is the GeometryCoverage unit, which never becomes a slot.
 // Designator-only input nodes (white / opaque geometry inputs lowered by xfer children) stay out
 // too: their value rides on the input-edge designators, not on a chain slot.
-void ScheduleChainSlots(AOTChainContext* ctx) {
+// The Schedule stage, step two: texture leaves first, then the remaining nodes in
+// topological order.
+static void ScheduleChainSlots(AOTChainContext* ctx) {
   ctx->slotOf.assign(ctx->nodes.size(), SIZE_MAX);
   // For a computed-input texture node, the leading raw-sampling slot's position (sampler
   // binding); the node's value for consumers is the topologically-ordered TEX_MODULATE slot
@@ -145,6 +149,14 @@ void ScheduleChainSlots(AOTChainContext* ctx) {
       }
     }
   }
+}
+
+bool ScheduleSlots(AOTChainContext* ctx) {
+  if (!MergeNodeSpaces(ctx)) {
+    return false;
+  }
+  ScheduleChainSlots(ctx);
+  return true;
 }
 
 }  // namespace tgfx
