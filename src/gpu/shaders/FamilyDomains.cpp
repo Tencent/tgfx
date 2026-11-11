@@ -93,6 +93,7 @@ PrecompiledShaderInfo AssembledFamilyInfo(const Family& family) {
   // family whose geometries disagree cannot be flat-decoded; the assert keeps that from slipping
   // through as a silently wrong valueOf.
   AppendDomainEntries(family.geometries[0], nullptr, owned, &nameIndex, &dims);
+#if DEBUG
   for (uint8_t geometry = 1; geometry < family.geometryCount; ++geometry) {
     const Module& other = *family.geometries[geometry];
     const Module& first = *family.geometries[0];
@@ -101,6 +102,7 @@ PrecompiledShaderInfo AssembledFamilyInfo(const Family& family) {
       assert(other.dims[dim].count == first.dims[dim].count);
     }
   }
+#endif
   for (uint8_t index = 0; index < family.moduleCount; ++index) {
     AppendDomainEntries(family.modules[index].module, family.modules[index].pinned, owned,
                         &nameIndex, &dims);

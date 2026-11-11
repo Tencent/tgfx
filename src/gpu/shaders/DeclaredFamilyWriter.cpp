@@ -84,6 +84,7 @@ namespace tgfx {
 
 namespace {
 
+#if DEBUG
 /// Whether the geometry's slot list declares the location (the pairing check's per-attribute
 /// probe; a plain loop in place of the std::any_of lambda the coding rules exclude).
 bool SlotIsDeclared(const std::vector<uint32_t>& slots, uint32_t location) {
@@ -94,6 +95,7 @@ bool SlotIsDeclared(const std::vector<uint32_t>& slots, uint32_t location) {
   }
   return false;
 }
+#endif
 
 std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
   std::array<float, 4> result = {};
@@ -952,7 +954,8 @@ class DeclaredFamilyProgramWriter final : public PrecompiledProgramWriter {
   Layout layout;
 };
 
-DeclaredFamilyProgramWriter::DeclaredFamilyProgramWriter(const ProgramInfo& info, Variant variant)
+DeclaredFamilyProgramWriter::DeclaredFamilyProgramWriter([[maybe_unused]] const ProgramInfo& info,
+                                                         Variant variant)
     : variant(std::move(variant)), layout(DeriveLayout(variant)) {
 #if DEBUG
   // The pairing contract, spelled the way the program creator applies it: a shader that declares

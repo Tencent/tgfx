@@ -840,16 +840,17 @@ std::optional<FamilyMatchResult> MatchChainProgram(const ProgramInfo* info) {
   return result;
 }
 
-std::optional<FamilyMatchResult> MatchAssembledFamily(const ProgramInfo* info,
-                                                      const DrawShape& shape) {
-  if (FamilyCount() == 0) {
-    return std::nullopt;
-  }
+namespace {
+
+#if DEBUG
+// The mutual-exclusion tripwire: the curated rules are pairwise disjoint by contract, so a second
+// acceptor means two predicates overlap and the walk order would silently pick the winner. Debug
+// builds walk the rows after the first acceptor and report any second one; release never pays for
+// the walk.
+void ReportFamilyConflicts(const ProgramInfo* info, const DrawShape& shape,
+                           uint16_t acceptedIndex) {
   const FamilyMatchFunction* matchers = FamilyMatchers();
-  std::optional<FamilyMatchResult> accepted;
-  uint16_t acceptedFamily = 0;
-  // Phase one: the curated shape rules, pairwise disjoint by contract (the tripwire below).
-  for (uint16_t index = 0; index < FamilyCount(); ++index) {
+  for (uint16_t index = acceptedIndex + 1; index < FamilyCount(); ++index) {
     if (Families()[index].fallback) {
       continue;
     }
@@ -857,29 +858,36 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const ProgramInfo* info,
     if (!matchers[index](info, shape, &result)) {
       continue;
     }
-    if (accepted.has_value()) {
-#if DEBUG
-      // The mutual-exclusion tripwire: the curated rules are pairwise disjoint by contract, so a
-      // second acceptor means two predicates overlap and the walk order would silently pick the
-      // winner. Reported and asserted in debug builds; release keeps the first acceptor.
-      LOGE("[family-conflict] the %s and %s rules both accept one draw; narrow one of them",
-           Families()[acceptedFamily].name, Families()[index].name);
-      DEBUG_ASSERT(false);
+    LOGE("[family-conflict] the %s and %s rules both accept one draw; narrow one of them",
+         Families()[acceptedIndex].name, Families()[index].name);
+    DEBUG_ASSERT(false);
+  }
+}
 #endif
+
+}  // namespace
+
+std::optional<FamilyMatchResult> MatchAssembledFamily(const ProgramInfo* info,
+                                                      const DrawShape& shape) {
+  if (FamilyCount() == 0) {
+    return std::nullopt;
+  }
+  const FamilyMatchFunction* matchers = FamilyMatchers();
+  // Phase one: the curated shape rules, pairwise disjoint by contract, so the first acceptor is
+  // the only one. The walk stops there in every build; only the conflict tripwire reads the rest,
+  // and it exists in debug builds alone.
+  for (uint16_t index = 0; index < FamilyCount(); ++index) {
+    if (Families()[index].fallback) {
       continue;
     }
-    accepted = result;
-    acceptedFamily = index;
-#if !DEBUG
-    // Release: the first acceptor is the only one (the rules are disjoint), so stop walking.
-    break;
-#endif
-  }
+    FamilyMatchResult result = {};
+    if (matchers[index](info, shape, &result)) {
 #if DEBUG
-  if (accepted.has_value()) {
-    return accepted;
-  }
+      ReportFamilyConflicts(info, shape, index);
 #endif
+      return result;
+    }
+  }
   // Phase two: the fallback rows (the interpreter), consulted only when no curated rule accepted.
   // Their acceptance is the carried IR's compilability, a superset of the shape rules, so they
   // are excluded from the disjointness contract by design.
