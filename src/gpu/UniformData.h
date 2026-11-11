@@ -177,12 +177,6 @@ class UniformData {
     return _buffer;
   }
 
-#if DEBUG
-  /// Records a layout-addressed write so dumpValues() shows its bytes as covered (the same
-  /// tracking writeBytes keeps for the name-addressed path).
-  void recordDebugWriteRange(size_t offset, size_t size) const;
-#endif
-
   /**
    * Returns the size of the uniform data in bytes.
    */
@@ -236,13 +230,6 @@ class UniformData {
   /// The one memcpy every write funnels into, so the debug write-range tracking sees them all.
   void writeBytes(size_t offset, const void* data, size_t size) const;
   std::unique_ptr<AOTParamLayout> _paramLayout = {};
-#if DEBUG
-  // The byte ranges this draw's writes covered (reset by setBuffer, which begins a draw's slice):
-  // UBO slices are carved from a shared, recycled buffer, so a field no writer touches holds
-  // stale bytes from earlier draws. dumpValues() prints those words as '-', so a dumped trace
-  // stays deterministic run to run.
-  mutable std::vector<std::pair<size_t, size_t>> _debugWriteRanges = {};
-#endif
 
   explicit UniformData(std::vector<Uniform> uniforms);
 
@@ -265,11 +252,6 @@ class UniformData {
   static const char* ToUniformFormatName(UniformFormat format);
 
   void dump() const;
-
-  // Prints every field's current value (floats/ints read from the backing buffer), for A/B
-  // diffing the uniforms two routes upload for the same draw. Words no writer touched this draw
-  // print as '-' (recycled-buffer stale bytes). Diagnostic only.
-  void dumpValues(const char* label) const;
 #endif
 
   friend class ProgramInfo;

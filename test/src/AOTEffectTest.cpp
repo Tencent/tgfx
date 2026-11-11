@@ -122,11 +122,6 @@ class ShapeRejectingFragmentProcessor : public FragmentProcessor {
   }
 };
 
-static AOTAxisAnalysis AnalyzeColorProcessor(FragmentProcessor* processor) {
-  ProgramInfo programInfo(nullptr, nullptr, {processor}, 1, nullptr, BlendMode::SrcOver);
-  return AOTEffectDecomposer::Analyze(&programInfo).color;
-}
-
 static PlacementPtr<FragmentProcessor> MakeTextureProcessor(Context* context,
                                                             BlockAllocator* allocator,
                                                             PixelFormat format) {
@@ -1206,16 +1201,16 @@ TGFX_TEST(AOTEffectTest, AnalysisAcceptsTiledTextureLowering) {
       FragmentProcessor::Compose(&allocator, std::move(constColor), std::move(xfermode));
   ASSERT_NE(composed, nullptr);
 
-  auto analysis = AnalyzeColorProcessor(composed.get());
-  EXPECT_EQ(analysis.outcome, AOTDecomposeOutcome::FusablePointwise);
-  EXPECT_TRUE(analysis.blockingProcessor.empty());
+  AOTEffectGraph graph;
+  ASSERT_TRUE(LowerToGraph({composed.get()}, &graph));
+  Plan plan;
+  EXPECT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
 }
 
 TGFX_TEST(AOTEffectTest, LoweringShapeRejectionIsUnsupportedShape) {
   ShapeRejectingFragmentProcessor processor;
-  auto analysis = AnalyzeColorProcessor(&processor);
-  EXPECT_EQ(analysis.outcome, AOTDecomposeOutcome::UnsupportedShape);
-  EXPECT_TRUE(analysis.blockingProcessor.empty());
+  AOTEffectGraph graph;
+  EXPECT_FALSE(LowerToGraph({&processor}, &graph));
 }
 
 TGFX_TEST(AOTEffectTest, ColorMatrixChainFusesToSinglePass) {

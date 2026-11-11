@@ -278,21 +278,6 @@ std::string CompileGLSLToWGSL(const std::string& source, ShaderStageType stage,
     return {};
   }
   auto vulkanGLSL = RewriteSamplerLayoutForWGSL(expandedSource);
-  if (const char* dumpDir = std::getenv("TGFX_SHADER_DUMP_DIR")) {
-    static std::atomic<int> dumpCounter{0};
-    std::string base = std::string(dumpDir) + "/wgsl_" + shaderName + "_v" +
-                       std::to_string(variantIndex) + "_" + std::to_string(dumpCounter++);
-    FILE* f = fopen((base + ".pre.glsl").c_str(), "w");
-    if (f) {
-      fwrite(expandedSource.data(), 1, expandedSource.size(), f);
-      fclose(f);
-    }
-    f = fopen((base + ".final.glsl").c_str(), "w");
-    if (f) {
-      fwrite(vulkanGLSL.data(), 1, vulkanGLSL.size(), f);
-      fclose(f);
-    }
-  }
   auto spirv = compileSPIRVForWGSL(vulkanGLSL, stage, &compileError);
   if (spirv.empty()) {
     *error = errorPrefix + "GLSL to SPIR-V: " + compileError;

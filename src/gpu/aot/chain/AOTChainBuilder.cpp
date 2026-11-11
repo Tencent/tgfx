@@ -228,7 +228,7 @@ bool AOTChainBuilder::CollectTextureTail(const AOTEffectGraph& graph, AOTTexture
   return true;
 }
 
-bool AOTChainBuilder::CollectYUVTail(const AOTEffectGraph& graph, AOTYUVTailShape* shape) {
+bool AOTChainBuilder::CollectYUVTail(const AOTEffectGraph& graph, AOTTextureTailShape* shape) {
   if (shape == nullptr) {
     return false;
   }
@@ -272,7 +272,7 @@ static bool CompileYUVProgramForInfo(const ProgramInfo* info, AOTProgram* out) {
   if (ir == nullptr) {
     return false;
   }
-  AOTChainBuilder::AOTYUVTailShape shape = {};
+  AOTChainBuilder::AOTTextureTailShape shape = {};
   if (!AOTChainBuilder::CollectYUVTail(ir->color, &shape)) {
     return false;
   }

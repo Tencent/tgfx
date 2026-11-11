@@ -61,17 +61,8 @@ UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(un
   bufferSize = alignCursor(16);
 }
 
-#if DEBUG
-void UniformData::recordDebugWriteRange(size_t offset, size_t size) const {
-  _debugWriteRanges.emplace_back(offset, offset + size);
-}
-#endif
-
 void UniformData::writeBytes(size_t offset, const void* data, size_t size) const {
   memcpy(_buffer + offset, data, size);
-#if DEBUG
-  _debugWriteRanges.emplace_back(offset, size);
-#endif
 }
 
 void UniformData::buildParamLayout() {
@@ -109,9 +100,6 @@ bool UniformData::writeParamKey(const void* key, size_t instance, const Matrix& 
 
 void UniformData::setBuffer(void* buffer) {
   _buffer = static_cast<uint8_t*>(buffer);
-#if DEBUG
-  _debugWriteRanges.clear();
-#endif
 }
 
 void UniformData::onSetArrayElement(const std::string& name, size_t index, const void* data,
@@ -282,47 +270,5 @@ void UniformData::dump() const {
   LOGI("-------------- UniformData Layout dump end --------------\n");
 }
 
-void UniformData::dumpValues(const char* label) const {
-  if (_buffer == nullptr) {
-    return;
-  }
-  std::vector<Field> sortedFields;
-  sortedFields.reserve(fieldMap.size());
-  for (const auto& [name, field] : fieldMap) {
-    sortedFields.push_back(field);
-  }
-  std::sort(sortedFields.begin(), sortedFields.end(),
-            [](const Field& a, const Field& b) { return a.offset < b.offset; });
-  std::printf("[UNIF %s] fields=%zu\n", label, sortedFields.size());
-  for (const auto& field : sortedFields) {
-    std::printf("  %-24s = [", field.name.c_str());
-    bool isInt = field.format == UniformFormat::Int || field.format == UniformFormat::Int2 ||
-                 field.format == UniformFormat::Int3 || field.format == UniformFormat::Int4;
-    auto wordCount = field.size / 4;
-    for (size_t w = 0; w < wordCount; ++w) {
-      auto wordOffset = field.offset + w * 4;
-      bool covered = false;
-      for (const auto& range : _debugWriteRanges) {
-        if (wordOffset >= range.first && wordOffset + 4 <= range.first + range.second) {
-          covered = true;
-          break;
-        }
-      }
-      if (!covered) {
-        // The slice is carved from a shared, recycled buffer: an unwritten word holds stale
-        // bytes from an earlier draw, not a value this route uploaded.
-        std::printf("- ");
-        continue;
-      }
-      auto* p = _buffer + wordOffset;
-      if (isInt) {
-        std::printf("%d ", *reinterpret_cast<const int32_t*>(p));
-      } else {
-        std::printf("%.6g ", *reinterpret_cast<const float*>(p));
-      }
-    }
-    std::printf("]\n");
-  }
-}
 #endif
 }  // namespace tgfx

@@ -527,16 +527,6 @@ static nlohmann::json BuildRootCauseProgramKeyAttribution(
   return output;
 }
 
-static nlohmann::json AxisAnalysisToJSON(const AOTAxisAnalysis& axis) {
-  nlohmann::json json = {{"outcome", AOTDecomposeOutcomeName(axis.outcome)},
-                         {"processorCount", axis.processorCount},
-                         {"textureLeafCount", axis.textureLeafCount}};
-  if (!axis.blockingProcessor.empty()) {
-    json["blockingProcessor"] = axis.blockingProcessor;
-  }
-  return json;
-}
-
 static nlohmann::json FallbackRecordToJSON(const PrecompiledFallbackRecord& record) {
   nlohmann::json result = {{"programKey", record.programKey},
                            {"reason", PrecompiledFallbackReasonName(record.reason)},
@@ -548,77 +538,6 @@ static nlohmann::json FallbackRecordToJSON(const PrecompiledFallbackRecord& reco
   result["variantId"] =
       record.variantId == invalidIndex ? nlohmann::json(nullptr) : nlohmann::json(record.variantId);
   return result;
-}
-
-// Aggregates the per-draw decomposition feasibility analysis (attached to NoMatchingRule fallback
-// records during diagnostic runs) into a machine-readable audit: per-axis outcome histograms, the
-// blocking-fragment-processor histogram ranked by how many misses each unimplemented lowering
-// blocks, and per-mechanism recoverable totals. Weighted by each unique structure's occurrence
-// count so the numbers reflect real draw frequency, not just distinct shapes.
-static nlohmann::json BuildDecompositionAudit(const std::vector<AggregatedFallback>& fallbacks,
-                                              uint64_t* outFusableNow, uint64_t* outNeedsLowering) {
-  std::map<std::string, uint64_t> colorOutcomes;
-  std::map<std::string, uint64_t> coverageOutcomes;
-  std::map<std::string, uint64_t> blockingByFP;
-  uint64_t analyzed = 0;
-  uint64_t fusableNow = 0;
-  uint64_t needsLowering = 0;
-  uint64_t samplerBudgetExceeded = 0;
-  for (const auto& fallback : fallbacks) {
-    const auto& record = fallback.record;
-    if (record.reason != PrecompiledFallbackReason::NoMatchingRule) {
-      continue;
-    }
-    auto count = fallback.count;
-    analyzed += count;
-    const auto& color = record.decomposeAnalysis.color;
-    const auto& coverage = record.decomposeAnalysis.coverage;
-    colorOutcomes[AOTDecomposeOutcomeName(color.outcome)] += count;
-    coverageOutcomes[AOTDecomposeOutcomeName(coverage.outcome)] += count;
-    if (color.outcome == AOTDecomposeOutcome::BlockedByLowering &&
-        !color.blockingProcessor.empty()) {
-      blockingByFP[color.blockingProcessor] += count;
-    }
-    if (coverage.outcome == AOTDecomposeOutcome::BlockedByLowering &&
-        !coverage.blockingProcessor.empty()) {
-      blockingByFP[coverage.blockingProcessor] += count;
-    }
-    bool colorFusable = color.outcome == AOTDecomposeOutcome::FusablePointwise;
-    bool coverageServable = coverage.outcome == AOTDecomposeOutcome::Trivial ||
-                            coverage.outcome == AOTDecomposeOutcome::FusablePointwise;
-    if (colorFusable && coverageServable) {
-      if (color.textureLeafCount + coverage.textureLeafCount > MaxFusedAOTSamplers) {
-        samplerBudgetExceeded += count;
-      } else {
-        fusableNow += count;
-      }
-    } else if (color.outcome == AOTDecomposeOutcome::BlockedByLowering ||
-               coverage.outcome == AOTDecomposeOutcome::BlockedByLowering) {
-      needsLowering += count;
-    }
-  }
-  nlohmann::json blockingJSON = nlohmann::json::array();
-  for (const auto& item : blockingByFP) {
-    blockingJSON.push_back({{"processor", item.first}, {"blockedMisses", item.second}});
-  }
-  std::sort(blockingJSON.begin(), blockingJSON.end(),
-            [](const nlohmann::json& a, const nlohmann::json& b) {
-              return a["blockedMisses"].get<uint64_t>() > b["blockedMisses"].get<uint64_t>();
-            });
-  if (outFusableNow != nullptr) {
-    *outFusableNow = fusableNow;
-  }
-  if (outNeedsLowering != nullptr) {
-    *outNeedsLowering = needsLowering;
-  }
-  return {{"analyzedMisses", analyzed},
-          {"fusableNow", fusableNow},
-          {"fusableButSamplerBudgetExceeded", samplerBudgetExceeded},
-          {"needsNewLowering", needsLowering},
-          {"colorOutcomes", colorOutcomes},
-          {"coverageOutcomes", coverageOutcomes},
-          {"blockingProcessorsRanked", std::move(blockingJSON)},
-          {"fusedSamplerBudget", MaxFusedAOTSamplers}};
 }
 
 class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
@@ -933,11 +852,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       auto json = FallbackRecordToJSON(fallback.record);
       json["count"] = fallback.count;
       json["tests"] = fallback.tests;
-      if (fallback.record.reason == PrecompiledFallbackReason::NoMatchingRule) {
-        json["decompose"] = {
-            {"color", AxisAnalysisToJSON(fallback.record.decomposeAnalysis.color)},
-            {"coverage", AxisAnalysisToJSON(fallback.record.decomposeAnalysis.coverage)}};
-      }
       fallbackStructuresJSON.push_back(std::move(json));
     }
 
@@ -1037,10 +951,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         BuildConsistencyChecks(summary.programStats, summary.artifactHits, summary.aotStageCounts,
                                summary.fallbackCounts, hitRecordCount, fallbackRecordCount);
 
-    uint64_t auditFusableNow = 0;
-    uint64_t auditNeedsLowering = 0;
-    auto decompositionAudit =
-        BuildDecompositionAudit(sortedFallbacks, &auditFusableNow, &auditNeedsLowering);
     auto rootCauseProgramKeyAttribution = BuildRootCauseProgramKeyAttribution(testResults);
 
     nlohmann::json identity = {{"backend", TGFX_BACKEND_NAME},
@@ -1141,7 +1051,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         {"successfulStructures", std::move(successfulStructuresJSON)},
         {"fallbackEffectsByReason", std::move(fallbackEffectsByReasonJSON)},
         {"fallbackStructures", std::move(fallbackStructuresJSON)},
-        {"decompositionAudit", std::move(decompositionAudit)},
         {"rootCauseProgramKeyAttribution", std::move(rootCauseProgramKeyAttribution)},
         {"tests", std::move(testsJSON)}};
 
@@ -1177,12 +1086,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
                   fallback.record.shaderName.c_str(), fallback.record.pipelineSignature.c_str());
     }
     std::printf("  report=%s\n", outputPath.c_str());
-    std::printf(
-        "[Decompose Audit][%s] analyzed=%llu fusableNow=%llu needsNewLowering=%llu "
-        "(see decompositionAudit.blockingProcessorsRanked)\n",
-        TGFX_BACKEND_NAME, static_cast<unsigned long long>(auditFusableNow + auditNeedsLowering),
-        static_cast<unsigned long long>(auditFusableNow),
-        static_cast<unsigned long long>(auditNeedsLowering));
     // WP5 strict coverage targets. The terminal state requires zero NoMatchingRule fallbacks and
     // zero dropped draws across the full suite; every remaining miss prints as a
     // tracked entry with its effect shape, so a regression adds a name here instead of hiding

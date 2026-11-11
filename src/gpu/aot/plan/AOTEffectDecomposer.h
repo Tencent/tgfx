@@ -49,23 +49,6 @@ enum class AOTDecomposeOutcome {
   UnsupportedShape,
 };
 
-/** Per-axis feasibility analysis produced by AOTEffectDecomposer::Analyze. */
-struct AOTAxisAnalysis {
-  AOTDecomposeOutcome outcome = AOTDecomposeOutcome::Trivial;
-  /// Class name of the first fragment processor lacking AOT lowering (BlockedByLowering only).
-  std::string blockingProcessor = {};
-  /// Number of top-level fragment processors on this axis.
-  int processorCount = 0;
-  /// Number of texture-sampling leaves in the tree — the sampler-budget input for a fused kernel.
-  int textureLeafCount = 0;
-};
-
-/** Feasibility analysis of both effect axes of a single draw. */
-struct AOTDecomposeAnalysis {
-  AOTAxisAnalysis color = {};
-  AOTAxisAnalysis coverage = {};
-};
-
 class AOTEffectDecomposer {
  public:
   /**
@@ -80,18 +63,6 @@ class AOTEffectDecomposer {
    * whenever the graph's shape allows it, otherwise the multi-pass planners answer.
    */
   static bool Decompose(const AOTEffectGraph& graph, Plan* plan);
-
-  /**
-   * Statically classifies whether the color and coverage effect axes of the given draw can be
-   * reduced onto the existing AOT kernel basis. Pure analysis: it runs Lower / Decompose
-   * but never renders, allocates GPU resources, or mutates the ProgramInfo. Used by the
-   * offline decomposition-coverage audit to quantify recovery potential per mechanism and to name
-   * the specific fragment processors whose AOT lowering is still missing.
-   *
-   * @param programInfo the draw to analyze; may be null (returns an all-Trivial analysis).
-   * @return the per-axis feasibility classification.
-   */
-  static AOTDecomposeAnalysis Analyze(const ProgramInfo* programInfo);
 };
 
 }  // namespace tgfx

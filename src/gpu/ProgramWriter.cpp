@@ -59,26 +59,6 @@ namespace tgfx {
 // The compiled YUV tail program, mirroring ChainProgram: kept on the draw's IR, compiled here
 // once when the match never needed to (the family's matching reads IR facts only).
 
-#if DEBUG
-// Prints one bound sampler slot of the TGFX_UNIF_DUMP trace: which texture the slot received, so
-// an A/B run can diff the binding order of two routes for the same draw shape.
-static void DebugDumpSamplerSlot(const char* label, unsigned slot, const Texture* texture,
-                                 bool dummy) {
-  if (label == nullptr || texture == nullptr) {
-    return;
-  }
-  std::printf("[UNIF %s] sampler slot=%u texture=%dx%d format=%d%s\n", label, slot,
-              texture->width(), texture->height(), static_cast<int>(texture->format()),
-              dummy ? " (dummy)" : "");
-}
-
-static const char* UnifDumpLabel() {
-  // Read per call, not cached: the A/B harness toggles the variable around each route within one
-  // process, and a cached first read would freeze whichever route ran first.
-  return std::getenv("TGFX_UNIF_DUMP");
-}
-#endif
-
 static std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
   std::array<float, 4> result = {};
   result[0] = 2.f / static_cast<float>(renderTarget->width());
@@ -136,24 +116,6 @@ bool ProgramWriter::write(const ProgramInfo& info, RenderPass* renderPass, Progr
   }
 
   writeUniformValues(info, vertexUniformData, fragmentUniformData);
-
-  // TGFX_UNIF_DUMP prints the fully-assembled uniform values (after every writer ran) so an A/B
-  // run can diff what the two routes actually upload for the same draw shape. Every draw dumps,
-  // labeled by the program key, so two builds can be diffed per draw shape without filtering.
-  // Diagnostic only.
-#if DEBUG
-  const char* unifDump = UnifDumpLabel();
-  if (unifDump != nullptr) {
-    auto dumpLabel =
-        std::string(unifDump) + " key=" + ProgramInfo::FormatDiagnosticKey(info.programKey());
-    if (vertexUniformData != nullptr) {
-      vertexUniformData->dumpValues(dumpLabel.c_str());
-    }
-    if (fragmentUniformData != nullptr) {
-      fragmentUniformData->dumpValues(dumpLabel.c_str());
-    }
-  }
-#endif
 
   info.bindUniformBufferAndUnloadToGPU(program, std::move(uniformBuffer), renderPass, vertexOffset,
                                        fragmentOffset);
@@ -248,14 +210,8 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
   // device mask, or the edge-lit-off UDF's always-declared edge-mask slot in the declared
   // GlassRefraction families — so an expected/supplied gap means the dummy must be inserted there.
   bool padHole = expected > samplers.size();
-#if DEBUG
-  const char* unifDump = UnifDumpLabel();
-#endif
   for (size_t i = 0; i < sequentialCount; ++i) {
     if (padHole && textureBinding == colorSamplerCount) {
-#if DEBUG
-      DebugDumpSamplerSlot(unifDump, textureBinding, cache->getOrCreateDummyTexture().get(), true);
-#endif
       renderPass->setTexture(textureBinding++, cache->getOrCreateDummyTexture(),
                              cache->getOrCreateDummySampler());
     }
@@ -263,9 +219,6 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                  state.minFilterMode, state.magFilterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
-#if DEBUG
-    DebugDumpSamplerSlot(unifDump, textureBinding, texture.get(), false);
-#endif
     renderPass->setTexture(textureBinding++, texture, sampler);
   }
   if (textureBinding < expected - (holdDst ? 1u : 0u)) {
@@ -273,9 +226,6 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
     auto dummySampler = cache->getOrCreateDummySampler();
     unsigned stop = expected - (holdDst ? 1u : 0u);
     while (textureBinding < stop) {
-#if DEBUG
-      DebugDumpSamplerSlot(unifDump, textureBinding, dummyTexture.get(), true);
-#endif
       renderPass->setTexture(textureBinding++, dummyTexture, dummySampler);
     }
   }
@@ -284,9 +234,6 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                  state.minFilterMode, state.magFilterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
-#if DEBUG
-    DebugDumpSamplerSlot(unifDump, textureBinding, texture.get(), false);
-#endif
     renderPass->setTexture(textureBinding, texture, sampler);
   }
 }
@@ -357,9 +304,6 @@ void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program
     return;
   }
   auto gpu = info.renderTarget->getContext()->gpu();
-#if DEBUG
-  const char* unifDump = UnifDumpLabel();
-#endif
   unsigned textureBinding = 0;
   // The artifact's sampler order is the program's binding order: the DAG leaves (padded to the
   // four-leaf slots), the LUT gradient, the noise lookups, then the mask slot child. Each binding
@@ -375,9 +319,6 @@ void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                  state.minFilterMode, state.magFilterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
-#if DEBUG
-    DebugDumpSamplerSlot(unifDump, textureBinding, textureView->getTexture().get(), false);
-#endif
     renderPass->setTexture(textureBinding++, textureView->getTexture(), sampler);
   }
   // The dst texture always binds last.
@@ -388,9 +329,6 @@ void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                  state.minFilterMode, state.magFilterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
-#if DEBUG
-    DebugDumpSamplerSlot(unifDump, textureBinding, dstTextureView->getTexture().get(), false);
-#endif
     renderPass->setTexture(textureBinding++, dstTextureView->getTexture(), sampler);
   }
   if (textureBinding != program->expectedTextureCount()) {

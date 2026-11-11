@@ -647,7 +647,7 @@ bool MatchYUVTexture(const ProgramInfo* info, const DrawShape& shape, FamilyMatc
   if (RejectsAlphaOnlyTarget(/*servesAlphaOnly=*/false, info)) {
     return false;
   }
-  AOTChainBuilder::AOTYUVTailShape tail = {};
+  AOTChainBuilder::AOTTextureTailShape tail = {};
   if (!AOTChainBuilder::CollectYUVTail(shape.ir->color, &tail) ||
       shape.colorFPCount > 1 + tail.ops.size()) {
     return false;

@@ -38,9 +38,6 @@ void ParamBuffer::write(const Layout::Field& field, const void* data, size_t siz
     return;
   }
   std::memcpy(target->writableBytes() + field.offset, data, size);
-#if DEBUG
-  target->recordDebugWriteRange(field.offset, size);
-#endif
 }
 
 void ParamBuffer::set(const Layout::Field& field, const Matrix& matrix) const {

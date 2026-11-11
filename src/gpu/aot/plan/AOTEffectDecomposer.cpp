@@ -31,49 +31,6 @@
 
 namespace tgfx {
 
-// Counts texture-sampling leaves across the tree. A fused kernel needs one sampler per leaf, so
-// this is the sampler-budget input the audit reports.
-static int CountTextureLeaves(const FragmentProcessor* processor) {
-  if (processor == nullptr) {
-    return 0;
-  }
-  // The class test, not the printed name: a name comparison would keep compiling after a rename
-  // and silently report zero samplers.
-  int count = IsProcessor<TextureEffect>(processor) || IsProcessor<TiledTextureEffect>(processor) ||
-                      IsProcessor<DeviceSpaceTextureEffect>(processor)
-                  ? 1
-                  : 0;
-  for (size_t i = 0; i < processor->numChildProcessors(); ++i) {
-    count += CountTextureLeaves(processor->childProcessor(i));
-  }
-  return count;
-}
-
-static AOTAxisAnalysis ClassifyAxis(const std::vector<const FragmentProcessor*>& processors) {
-  AOTAxisAnalysis analysis = {};
-  analysis.processorCount = static_cast<int>(processors.size());
-  if (processors.empty()) {
-    analysis.outcome = AOTDecomposeOutcome::Trivial;
-    return analysis;
-  }
-  for (auto processor : processors) {
-    analysis.textureLeafCount += CountTextureLeaves(processor);
-  }
-  AOTEffectGraph graph = {};
-  if (!LowerToGraph(processors, &graph, &analysis.blockingProcessor)) {
-    analysis.outcome = analysis.blockingProcessor.empty() ? AOTDecomposeOutcome::UnsupportedShape
-                                                          : AOTDecomposeOutcome::BlockedByLowering;
-    return analysis;
-  }
-  Plan plan = {};
-  if (!AOTEffectDecomposer::Decompose(graph, &plan)) {
-    analysis.outcome = AOTDecomposeOutcome::UnsupportedShape;
-    return analysis;
-  }
-  analysis.outcome = AOTDecomposeOutcome::FusablePointwise;
-  return analysis;
-}
-
 // The multi-pass source, the unary pointwise set and the const-operand blend are shared shape
 // rules (gpu/AOTShapeRules.h) — the same authority the executor's admission checks and the chain
 // builder consume.
@@ -388,8 +345,7 @@ bool AOTEffectDecomposer::DecomposeMultiPass(const AOTEffectGraph& graph, Plan* 
     // Each planner's own admission subsumes what AOTPlanner::Validate would re-derive: the linear
     // planner's fit calls BuildCutSegment with the same placeholder admission the planner's
     // validation relies on, and the cut planner runs the same segment build construction uses over
-    // placeholder intermediates. The re-check therefore runs only as a debug assertion.
-    DEBUG_ASSERT(AOTPlanner::Validate(graph, candidate));
+    // placeholder intermediates.
     *plan = std::move(candidate);
     return true;
   }
@@ -404,27 +360,6 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, Plan* plan) {
     return true;
   }
   return DecomposeMultiPass(graph, plan);
-}
-
-AOTDecomposeAnalysis AOTEffectDecomposer::Analyze(const ProgramInfo* programInfo) {
-  AOTDecomposeAnalysis result = {};
-  if (programInfo == nullptr) {
-    return result;
-  }
-  auto total = programInfo->numFragmentProcessors();
-  auto colorCount = programInfo->numColorFragmentProcessors();
-  std::vector<const FragmentProcessor*> colorProcessors;
-  std::vector<const FragmentProcessor*> coverageProcessors;
-  colorProcessors.reserve(colorCount);
-  for (size_t i = 0; i < colorCount; ++i) {
-    colorProcessors.push_back(programInfo->getFragmentProcessor(i));
-  }
-  for (size_t i = colorCount; i < total; ++i) {
-    coverageProcessors.push_back(programInfo->getFragmentProcessor(i));
-  }
-  result.color = ClassifyAxis(colorProcessors);
-  result.coverage = ClassifyAxis(coverageProcessors);
-  return result;
 }
 
 }  // namespace tgfx

@@ -94,9 +94,6 @@ struct PrecompiledFallbackRecord : PrecompiledProgramRecord {
   // Set when the miss was provoked on purpose (a test fixture verifying miss accounting); such
   // records are listed but excluded from the production coverage metrics.
   bool deliberate = false;
-  // Populated only for NoMatchingRule misses while diagnostic recording is enabled; drives the
-  // offline decomposition-coverage audit. Left at its all-Trivial default otherwise.
-  AOTDecomposeAnalysis decomposeAnalysis = {};
 };
 
 const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason);

@@ -302,14 +302,6 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     }
     auto record = MakeFallbackRecord(cache, programInfo);
     record.matchFailure = static_cast<uint8_t>(matchFailure);
-    // Offline decomposition-coverage audit: for structural misses, classify (during diagnostic
-    // runs only) whether each effect axis could be reduced onto the existing AOT kernel basis. This
-    // is pure static analysis — no rendering, no state change — gated so the production hot path
-    // pays nothing.
-    if (reason == PrecompiledFallbackReason::NoMatchingRule &&
-        cache->diagnosticRecordingEnabled()) {
-      record.decomposeAnalysis = AOTEffectDecomposer::Analyze(programInfo);
-    }
     cache->recordArtifactMiss(reason, record);
     if (reason != PrecompiledFallbackReason::DeferredTexture) {
       // A deferred texture may be instantiated later, which can make the same key serviceable:
@@ -438,35 +430,6 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
   if (!fragBlob->uniforms.empty()) {
     fragmentDesc.uniformSlots = {
         {std::string(FragmentUniformBlockName), static_cast<unsigned>(FRAGMENT_UBO_BINDING_POINT)}};
-  }
-
-#if DEBUG
-  static const char* dumpDir = std::getenv("TGFX_AOT_DUMP_DIR");
-#else
-  const char* dumpDir = nullptr;
-#endif
-  if (dumpDir != nullptr) {
-    std::string base = std::string(dumpDir) + "/" + shaderName + "_v" + std::to_string(variantId);
-    if (!vertexDesc.code.empty()) {
-      std::string path = base + ".vert";
-      FILE* file = fopen(path.c_str(), "w");
-      if (file == nullptr) {
-        LOGE("PrecompiledProgramCreator::CreateProgram() Cannot open dump file %s", path.c_str());
-      } else {
-        fwrite(vertexDesc.code.data(), 1, vertexDesc.code.size(), file);
-        fclose(file);
-      }
-    }
-    if (!fragmentDesc.code.empty()) {
-      std::string path = base + ".frag";
-      FILE* file = fopen(path.c_str(), "w");
-      if (file == nullptr) {
-        LOGE("PrecompiledProgramCreator::CreateProgram() Cannot open dump file %s", path.c_str());
-      } else {
-        fwrite(fragmentDesc.code.data(), 1, fragmentDesc.code.size(), file);
-        fclose(file);
-      }
-    }
   }
 
   auto* shaderCache = cache->shaderCache();
