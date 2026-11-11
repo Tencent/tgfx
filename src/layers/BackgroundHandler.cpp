@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BackgroundHandler.h"
+#include <algorithm>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/BackgroundSnapshotMap.h"
@@ -27,6 +28,7 @@
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
@@ -196,6 +198,25 @@ BackgroundHandler* BackgroundHandler::NoOp() {
   return &instance;
 }
 
+bool& BackgroundHandler::SkipNegligibleBlurEnabled() {
+  static bool enabled = true;
+  return enabled;
+}
+
+bool BackgroundHandler::IsNegligibleBackgroundStyle(const LayerStyle* style, float densityScale) {
+  if (!SkipNegligibleBlurEnabled() || style == nullptr ||
+      style->Type() != LayerStyleType::BackgroundBlur) {
+    return false;
+  }
+  auto* blur = static_cast<const BackgroundBlurStyle*>(style);
+  // A style without any blur is already ignored when drawn, leave it on that path.
+  if (blur->blurrinessX() <= 0 && blur->blurrinessY() <= 0) {
+    return false;
+  }
+  auto radius = std::max(blur->blurrinessX(), blur->blurrinessY()) * densityScale;
+  return radius <= NegligibleBlurRadius;
+}
+
 void BackgroundHandler::DispatchOrSkip(const DrawArgs& args, Canvas* canvas, Layer* layer,
                                        float alpha, LayerStyle* style,
                                        const LayerStyleSource* source) {
@@ -253,6 +274,14 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
   return buildSubCapturer(parentArgs, std::move(subSource));
 }
 
+float BackgroundCapturer::consumerContentScale(float contentScale) const {
+  auto surfaceScale = bgSource != nullptr ? bgSource->surfaceScale() : 1.0f;
+  if (!FloatNearlyZero(surfaceScale) && surfaceScale != 1.0f) {
+    return contentScale / surfaceScale;
+  }
+  return contentScale;
+}
+
 void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
                                              float /*alpha*/, LayerStyle* style,
                                              const LayerStyleSource* source) {
@@ -292,6 +321,10 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     contentScale /= surfaceScale;
   }
   if (FloatNearlyZero(contentScale)) {
+    return;
+  }
+  // Mirrors the consumer's gate below; both sides must skip exactly the same styles.
+  if (IsNegligibleBackgroundStyle(style, contentScale)) {
     return;
   }
   // The background must cover exactly the rect of the recording this style resolves (the style's
@@ -444,6 +477,10 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
                                              float alpha, LayerStyle* style,
                                              const LayerStyleSource* source) {
   if (source == nullptr || FloatNearlyZero(source->contentScale)) {
+    return;
+  }
+  // Mirrors the capturer's gate; a style skipped there never pushed a snapshot to read back here.
+  if (IsNegligibleBackgroundStyle(style, source->contentScale)) {
     return;
   }
   auto groupIndex = static_cast<int>(style->excludeChildEffects());

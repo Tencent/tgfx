@@ -33,14 +33,12 @@ TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
   appHost = std::make_shared<hello2d::AppHost>();
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
-  displayList.setMaxTileCount(512);
 }
 
 TGFXBaseView::TGFXBaseView(emscripten::val canvas) : canvasVal(std::move(canvas)) {
   appHost = std::make_shared<hello2d::AppHost>();
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
-  displayList.setMaxTileCount(512);
 }
 
 std::shared_ptr<tgfx::Window> TGFXBaseView::createWindow() {

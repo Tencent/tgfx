@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/SubtreeCache.h"
-#include "layers/TileCache.h"
+#include "layers/TilePool.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -709,7 +709,6 @@ TGFX_TEST_PRIVATE(LayerCacheTest, DirtyRegionTest) {
 
   displayList->setRenderMode(RenderMode::Tiled);
   displayList->setTileUpdateMode(TileUpdateMode::Fast);
-  displayList->setMaxTileCount(512);
   displayList->render(surface.get());
   // Clear the previous dirty regions.
   displayList->showDirtyRegions(false);
@@ -790,15 +789,12 @@ TGFX_TEST_PRIVATE(LayerCacheTest, TileClearWhenAllLayersRemoved) {
   rootLayer->addChild(blueRect);
   displayList->render(surface.get());
 
-  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tileCaches.size(), 1u);
-                      auto result = displayList->tileCaches.find(1000);
-                      EXPECT_TRUE(result != displayList->tileCaches.end());
-                      EXPECT_EQ(result->second->tileMap.size(), 4u));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 4u));
 
   blueRect->removeFromParent();
   displayList->render(surface.get());
 
-  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->tileCaches.empty()));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 0u));
 
   // Test 1: Add a layer that only covers part of tile(0,0)
   // Red rectangle at (20,20) with size 60x60, only covers (20,20)-(80,80) in tile(0,0)
@@ -905,17 +901,21 @@ TGFX_TEST_PRIVATE(LayerCacheTest, OverlappingDirtyRegions) {
   rootLayer->addChild(blueRect);
 
   displayList->render(surface.get());
-  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tileCaches.size(), 1u));
+  TGFX_PRIVATE_ACCESS(EXPECT_GT(displayList->tilePool->size(TileType::Grid), 0u));
 
   redRect->removeFromParent();
   blueRect->removeFromParent();
 
   displayList->render(surface.get());
 
-  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tileCaches.size(), 0lu));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 0u));
 
-  TGFX_PRIVATE_ACCESS(auto emptyTilesAfter = displayList->emptyTiles.size();
-                      EXPECT_EQ(9lu, emptyTilesAfter));
+  // Every atlas slot is back in the free list exactly once, so no tile was recycled twice.
+  TGFX_PRIVATE_ACCESS(size_t slotCount = 0; for (auto& atlas
+                                                 : displayList->surfaceCaches) {
+    slotCount +=
+        static_cast<size_t>(atlas->width() / 128) * static_cast<size_t>(atlas->height() / 128);
+  } EXPECT_EQ(slotCount, displayList->emptyTiles.size()));
 }
 
 }  // namespace tgfx

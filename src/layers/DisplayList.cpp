@@ -18,30 +18,45 @@
 
 #include "tgfx/layers/DisplayList.h"
 #include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <functional>
+#include <map>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
+#include "gpu/DrawingManager.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
-#include "layers/TileCache.h"
+#include "layers/TileCluster.h"
+#include "layers/TilePool.h"
 #include "tgfx/gpu/GPU.h"
+#include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 
 namespace tgfx {
 static constexpr size_t MAX_DIRTY_REGION_FRAMES = 5;
 static constexpr float DIRTY_REGION_ANTIALIAS_MARGIN = 0.5f;
 static constexpr int MIN_TILE_SIZE = 16;
 static constexpr int MAX_TILE_SIZE = 2048;
-static constexpr int FALLBACK_GRID_SIZE = 64;
-static constexpr int MAX_ATLAS_SIZE = 8192;
-// Culls the capture against the blur footprints instead of the whole tile, so layers that overlap
-// the tile but sit under no background style are not drawn. The capture keeps the tile rects when
-// there are more footprints than the per-layer cull loop can afford.
-static constexpr bool TIGHTEN_CAPTURE_TO_FOOTPRINTS = true;
-// Number of rects the per-layer cull loop can afford.
+static constexpr int MAX_ATLAS_SIZE = 4096;
+// Bounds the tile memory at roughly 2 GB (32 atlases of 64 MB). Every display resolution fits,
+// including 8K, so the bound only stops a surface far larger than any display from exhausting it.
+static constexpr int MAX_ATLAS_COUNT = 32;
+// Covering a viewport with the tree levels L to L+3 takes 1 + 1/4 + 1/16 + 1/64 times the tiles of
+// level L.
+static constexpr float TREE_LEVELS_COVERAGE_FACTOR = 1.33f;
+static constexpr int TREE_LEVEL_COUNT = 4;
+static constexpr size_t BLANK_MARKS_PER_TILE = 4;
+// ClusterTileRects growth allowed when merging footprints, and the number of rects the per-layer
+// cull loop can afford.
+static constexpr double FOOTPRINT_CLUSTER_GROWTH = 4.0;
 static constexpr size_t MAX_CULL_RECTS = 32;
 
 class DrawTask {
@@ -90,13 +105,39 @@ class DrawTask {
     return _identityScale;
   }
 
+  /**
+   * Returns the level of the tree tiles this task rasterizes, or kExactLevel if it rasterizes grid
+   * tiles at the current zoom scale.
+   */
+  int treeLevel() const {
+    return _treeLevel;
+  }
+
+  void setTreeLevel(int level) {
+    _treeLevel = level;
+  }
+
+  /**
+   * Returns true if the task rasterizes the whole area of its tiles, which is required to judge
+   * them blank.
+   */
+  bool coversTiles() const {
+    return _coversTiles;
+  }
+
+  void setCoversTiles(bool coversTiles) {
+    _coversTiles = coversTiles;
+  }
+
  private:
-  // Hold strong references to tiles to ensure they aren't reused by TileCache.
+  // Hold strong references to tiles to ensure the pool doesn't evict them.
   std::vector<std::shared_ptr<Tile>> tiles = {};
   Rect _sourceRect = {};
   Rect _tileRect = {};
   Rect _strictRect = {};
   bool _identityScale = true;
+  bool _coversTiles = false;
+  int _treeLevel = kExactLevel;
 
   void calculateRects(int tileSize, const Rect& drawRect, float scale) {
     DEBUG_ASSERT(!tiles.empty());
@@ -181,7 +222,210 @@ static std::vector<std::pair<int, int>> GetSortedTiles(int startX, int endX, int
   return tiles;
 }
 
-DisplayList::DisplayList() : _root(RootLayer::Make()) {
+/**
+ * The tree tiles of one level inside the viewport. The references also keep the pool from evicting
+ * these tiles while the current frame is being assembled.
+ */
+struct TreeLevelCoverage {
+  int level = 0;
+  float zoomToRaster = 1.0f;
+  int startX = 0;
+  int startY = 0;
+  int countX = 0;
+  int countY = 0;
+  std::vector<std::shared_ptr<Tile>> tiles = {};
+  std::vector<bool> blanks = {};
+
+  size_t indexOf(int tileX, int tileY) const {
+    return static_cast<size_t>((tileY - startY) * countX + tileX - startX);
+  }
+
+  std::shared_ptr<Tile>& tileAt(int tileX, int tileY) {
+    return tiles[indexOf(tileX, tileY)];
+  }
+
+  bool isBlank(int tileX, int tileY) const {
+    return blanks[indexOf(tileX, tileY)];
+  }
+
+  bool isCovered(int tileX, int tileY) const {
+    auto index = indexOf(tileX, tileY);
+    return tiles[index] != nullptr || blanks[index];
+  }
+
+  // Returns the rectangle in this level's rasterization grid.
+  Rect toRaster(const Rect& zoomRect) const {
+    auto rect = zoomRect;
+    rect.scale(zoomToRaster, zoomToRaster);
+    return rect;
+  }
+};
+
+static void ForEachTileUnderRect(const Rect& rect, int tileSize,
+                                 const std::function<bool(int, int)>& visitor) {
+  auto tileSizeFloat = static_cast<float>(tileSize);
+  auto startX = FloatFloorToInt(rect.left / tileSizeFloat);
+  auto startY = FloatFloorToInt(rect.top / tileSizeFloat);
+  auto endX = FloatCeilToInt(rect.right / tileSizeFloat);
+  auto endY = FloatCeilToInt(rect.bottom / tileSizeFloat);
+  for (auto tileY = startY; tileY < endY; ++tileY) {
+    for (auto tileX = startX; tileX < endX; ++tileX) {
+      if (!visitor(tileX, tileY)) {
+        return;
+      }
+    }
+  }
+}
+
+// Looks up every tile of the levels L to L+3 inside the viewport. Hits are touched regardless of
+// whether the frame displays them, which is what keeps the coarse levels from being evicted.
+static std::vector<TreeLevelCoverage> CollectTreeCoverages(TilePool* tilePool,
+                                                           const BlankTileSet* blankTiles,
+                                                           float zoomScale, const Rect& renderRect,
+                                                           int tileSize) {
+  std::vector<TreeLevelCoverage> coverages = {};
+  coverages.reserve(TREE_LEVEL_COUNT);
+  auto baseLevel = GetTileLevel(zoomScale);
+  auto tileSizeFloat = static_cast<float>(tileSize);
+  for (int i = 0; i < TREE_LEVEL_COUNT; ++i) {
+    TreeLevelCoverage coverage = {};
+    coverage.level = baseLevel + i;
+    coverage.zoomToRaster = GetTileRasterScale(coverage.level) / zoomScale;
+    auto rasterRect = coverage.toRaster(renderRect);
+    coverage.startX = FloatFloorToInt(rasterRect.left / tileSizeFloat);
+    coverage.startY = FloatFloorToInt(rasterRect.top / tileSizeFloat);
+    coverage.countX = FloatCeilToInt(rasterRect.right / tileSizeFloat) - coverage.startX;
+    coverage.countY = FloatCeilToInt(rasterRect.bottom / tileSizeFloat) - coverage.startY;
+    auto cellCount = static_cast<size_t>(coverage.countX * coverage.countY);
+    coverage.tiles.resize(cellCount);
+    coverage.blanks.resize(cellCount, false);
+    for (auto tileY = coverage.startY; tileY < coverage.startY + coverage.countY; ++tileY) {
+      for (auto tileX = coverage.startX; tileX < coverage.startX + coverage.countX; ++tileX) {
+        auto key = TileKey::MakeTree(tileX, tileY, coverage.level);
+        auto tile = tilePool->find(key);
+        if (tile != nullptr) {
+          tilePool->touch(key);
+          coverage.tileAt(tileX, tileY) = std::move(tile);
+        } else if (blankTiles->contains(key)) {
+          coverage.blanks[coverage.indexOf(tileX, tileY)] = true;
+        }
+      }
+    }
+    coverages.push_back(std::move(coverage));
+  }
+  return coverages;
+}
+
+static TreeLevelCoverage* FindFinestCoverage(std::vector<TreeLevelCoverage>* coverages,
+                                             const Rect& zoomRect, int tileSize) {
+  for (auto& coverage : *coverages) {
+    bool covered = true;
+    ForEachTileUnderRect(coverage.toRaster(zoomRect), tileSize, [&](int tileX, int tileY) {
+      covered = coverage.isCovered(tileX, tileY);
+      return covered;
+    });
+    if (covered) {
+      return &coverage;
+    }
+  }
+  return nullptr;
+}
+
+// Returns the tiles of a level that are neither cached nor blank under any of the given rects, each
+// listed once, in the zoomed display list grid.
+static std::vector<std::pair<int, int>> CollectMissingTreeTiles(const TreeLevelCoverage& coverage,
+                                                                const std::vector<Rect>& zoomRects,
+                                                                int tileSize) {
+  std::vector<std::pair<int, int>> cells = {};
+  std::unordered_set<size_t> requested = {};
+  for (auto& rect : zoomRects) {
+    ForEachTileUnderRect(coverage.toRaster(rect), tileSize, [&](int tileX, int tileY) {
+      if (!coverage.isCovered(tileX, tileY) &&
+          requested.insert(coverage.indexOf(tileX, tileY)).second) {
+        cells.emplace_back(tileX, tileY);
+      }
+      return true;
+    });
+  }
+  return cells;
+}
+
+// Blank cells go to backgroundRects, in the zoomed display list grid.
+static void AppendFallbackScreenTasks(TreeLevelCoverage* coverage, const Rect& zoomRect,
+                                      int tileSize, std::vector<DrawTask>* tasks,
+                                      std::vector<Rect>* backgroundRects) {
+  auto rasterRect = coverage->toRaster(zoomRect);
+  auto displayScale = 1.0f / coverage->zoomToRaster;
+  ForEachTileUnderRect(rasterRect, tileSize, [&](int tileX, int tileY) {
+    auto drawRect = Rect::MakeXYWH(tileX * tileSize, tileY * tileSize, tileSize, tileSize);
+    if (!drawRect.intersect(rasterRect)) {
+      return true;
+    }
+    if (coverage->isBlank(tileX, tileY)) {
+      drawRect.scale(displayScale, displayScale);
+      backgroundRects->push_back(drawRect);
+    } else {
+      tasks->emplace_back(coverage->tileAt(tileX, tileY), tileSize, drawRect, displayScale);
+    }
+    return true;
+  });
+}
+
+static std::vector<std::shared_ptr<Tile>> GetGridTilesUnderRect(const TilePool* tilePool,
+                                                                int64_t scaleInt, int tileSize,
+                                                                const Rect& rect,
+                                                                bool* continuous) {
+  *continuous = false;
+  if (rect.isEmpty()) {
+    return {};
+  }
+  auto tileSizeFloat = static_cast<float>(tileSize);
+  auto startX = FloatFloorToInt(rect.left / tileSizeFloat);
+  auto startY = FloatFloorToInt(rect.top / tileSizeFloat);
+  auto endX = FloatCeilToInt(rect.right / tileSizeFloat);
+  auto endY = FloatCeilToInt(rect.bottom / tileSizeFloat);
+  auto requestCount = static_cast<size_t>(endX - startX) * static_cast<size_t>(endY - startY);
+  std::vector<std::shared_ptr<Tile>> tiles = {};
+  if (requestCount < tilePool->size(TileType::Grid)) {
+    tiles.reserve(requestCount);
+    for (auto tileY = startY; tileY < endY; ++tileY) {
+      for (auto tileX = startX; tileX < endX; ++tileX) {
+        auto tile = tilePool->find(TileKey::MakeGrid(tileX, tileY, scaleInt));
+        if (tile != nullptr) {
+          tiles.push_back(std::move(tile));
+        }
+      }
+    }
+  } else {
+    for (auto& key : tilePool->keysOf(TileType::Grid)) {
+      if (key.scaleInt == scaleInt && key.tileX >= startX && key.tileX < endX &&
+          key.tileY >= startY && key.tileY < endY) {
+        tiles.push_back(tilePool->find(key));
+      }
+    }
+  }
+  if (tiles.size() == requestCount && !tiles.empty()) {
+    auto& first = tiles.front();
+    *continuous = std::all_of(tiles.begin(), tiles.end(), [&](const std::shared_ptr<Tile>& tile) {
+      return tile->sourceIndex == first->sourceIndex &&
+             tile->tileX - first->tileX == tile->sourceX - first->sourceX &&
+             tile->tileY - first->tileY == tile->sourceY - first->sourceY;
+    });
+  }
+  return tiles;
+}
+
+static void GetAtlasTileGrid(int tileCount, int* countX, int* countY) {
+  *countX = FloatCeilToInt(sqrtf(static_cast<float>(tileCount)));
+  *countY = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(*countX));
+}
+
+// Frames with a still viewport that rasterize nothing and show no missing content are skipped to
+// keep the log readable.
+
+DisplayList::DisplayList()
+    : _root(RootLayer::Make()), tilePool(std::make_unique<TilePool>()),
+      blankTiles(std::make_unique<BlankTileSet>()) {
   _root->_root = _root.get();
 }
 
@@ -217,14 +461,7 @@ void DisplayList::setZoomScalePrecision(int precision) {
   _zoomScalePrecision = precision;
   _zoomScaleInt = ChangeZoomScalePrecision(_zoomScaleInt, oldPrecision, precision);
   lastZoomScaleInt = ChangeZoomScalePrecision(lastZoomScaleInt, oldPrecision, precision);
-  if (!tileCaches.empty()) {
-    std::unordered_map<int64_t, TileCache*> newCaches = {};
-    for (auto& item : tileCaches) {
-      auto zoomScaleInt = ChangeZoomScalePrecision(item.first, oldPrecision, _zoomScalePrecision);
-      newCaches[zoomScaleInt] = item.second;
-    }
-    tileCaches = std::move(newCaches);
-  }
+  recycleGridTiles();
 }
 
 void DisplayList::setContentOffset(float offsetX, float offsetY) {
@@ -267,17 +504,6 @@ void DisplayList::setTileSize(int tileSize) {
   if (_renderMode == RenderMode::Tiled) {
     resetCaches();
   }
-}
-
-void DisplayList::setMaxTileCount(int count) {
-  if (count < 0) {
-    count = 0;
-  }
-  if (_maxTileCount == count) {
-    return;
-  }
-  _maxTileCount = count;
-  resetCaches();
 }
 
 void DisplayList::setBackgroundColor(const Color& color) {
@@ -355,7 +581,7 @@ std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) co
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
   if (_root->hasBackgroundStyle()) {
-    snapshotMap = captureBackgrounds(surface, {surfaceRect});
+    snapshotMap = captureBackgrounds(surface, {surfaceRect}, getViewMatrix());
   }
   drawRootLayer(surface, surfaceRect, getViewMatrix(), autoClear, snapshotMap.get());
   return {Rect::MakeEmpty()};
@@ -424,7 +650,7 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   // gaps between scattered dirty regions get skipped.
   std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
   if (_root->hasBackgroundStyle()) {
-    snapshotMap = captureBackgrounds(surface, renderRects);
+    snapshotMap = captureBackgrounds(surface, renderRects, viewMatrix);
   }
   auto canvas = surface->getCanvas();
   for (auto& drawRect : renderRects) {
@@ -450,91 +676,178 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     resetCaches();
   }
   checkTileCount(surface);
+  const auto zoomChanged = lastZoomScaleInt != _zoomScaleInt;
+  // No draw task outlives a frame, so nothing references the grid tiles of the previous zoom scale.
+  if (zoomChanged) {
+    recycleGridTiles();
+  }
   auto tileTasks = invalidateTileCaches(dirtyRegions, GetViewportRect(surface, _contentOffset));
   std::vector<Rect> skippedRects = {};
-  std::vector<DrawTask> throttleScreenTasks = {};
-  auto screenTasks = collectScreenTasks(surface, !dirtyRegions.empty(), autoClear, &tileTasks,
-                                        &skippedRects, &throttleScreenTasks);
-  // Throttle tasks and skipped rects must keep the tiled path; only fall back when all are empty.
-  if (screenTasks.empty() && throttleScreenTasks.empty() && skippedRects.empty()) {
+  auto screenTasks = collectScreenTasks(surface, &tileTasks, &skippedRects);
+  // Skipped rects must keep the tiled path; only fall back when both are empty.
+  if (screenTasks.empty() && skippedRects.empty()) {
     recycleCurrentTileTasks(tileTasks);
     return renderDirect(surface, autoClear);
   }
-  // tileRect is in zoom space; offset by contentOffset to line it up with surface pixel coords.
-  std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
+  auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  std::vector<std::unique_ptr<BackgroundSnapshotMap>> captureMaps = {};
+  std::vector<int> taskCapture = {};
+  captureTileBackgrounds(surface, tileTasks, zoomScale, &captureMaps, &taskCapture);
+  auto dirtyRects = drawTileTasks(tileTasks, captureMaps, taskCapture, surface, zoomScale);
+  drawScreenTasks(std::move(screenTasks), std::move(skippedRects), surface, autoClear);
+  return dirtyRects;
+}
+
+void DisplayList::captureTileBackgrounds(
+    Surface* surface, const std::vector<DrawTask>& tileTasks, float zoomScale,
+    std::vector<std::unique_ptr<BackgroundSnapshotMap>>* captureMaps,
+    std::vector<int>* taskCapture) const {
+  // Each capture covers one cluster of tiles at a single raster scale, so a tile is captured with
+  // the density it is drawn with. That is what lets tree tiles take part: their scale is 2^-level,
+  // not the current zoom.
+  captureMaps->clear();
+  taskCapture->assign(tileTasks.size(), -1);
   if (_root->hasBackgroundStyle()) {
-    std::vector<Rect> captureRects = {};
-    captureRects.reserve(tileTasks.size());
-    for (auto& task : tileTasks) {
-      auto captureRect = task.tileRect();
-      captureRect.offset(_contentOffset.x, _contentOffset.y);
-      captureRects.push_back(captureRect);
+    // Group by level first: one capture transform cannot serve two raster scales.
+    std::vector<std::pair<int, std::vector<size_t>>> levels = {};
+    for (size_t i = 0; i < tileTasks.size(); ++i) {
+      auto level = tileTasks[i].treeLevel();
+      auto it = std::find_if(levels.begin(), levels.end(),
+                             [level](const std::pair<int, std::vector<size_t>>& entry) {
+                               return entry.first == level;
+                             });
+      if (it == levels.end()) {
+        levels.push_back({level, {i}});
+      } else {
+        it->second.push_back(i);
+      }
     }
-    std::vector<Rect> cullRects = {};
-    if (TIGHTEN_CAPTURE_TO_FOOTPRINTS) {
-      // The capture covers the tiles, but a background style only samples the area under its own
-      // bounds plus the blur reach. Narrow the rects the capture uses to decide which layers to
-      // draw; the captured area stays the tile union, so the surfaces and the way sibling styles
-      // share their output do not change.
-      auto viewMatrix = getViewMatrix();
-      Matrix inverse = Matrix::I();
-      if (viewMatrix.invert(&inverse)) {
-        auto capturedRect = Rect::MakeEmpty();
-        for (const auto& rect : captureRects) {
-          capturedRect.join(rect);
+    for (const auto& levelEntry : levels) {
+      auto level = levelEntry.first;
+      auto rasterScale = level == kExactLevel ? zoomScale : GetTileRasterScale(level);
+      if (FloatNearlyZero(rasterScale)) {
+        continue;
+      }
+      std::vector<Rect> levelRects = {};
+      levelRects.reserve(levelEntry.second.size());
+      for (auto index : levelEntry.second) {
+        levelRects.push_back(tileTasks[index].tileRect());
+      }
+      auto clusters = ClusterTileRects(levelRects);
+      auto viewMatrix = Matrix::MakeScale(rasterScale);
+      for (const auto& cluster : clusters) {
+        std::vector<Rect> clusterRects = {};
+        clusterRects.reserve(cluster.indices.size());
+        for (auto index : cluster.indices) {
+          clusterRects.push_back(levelRects[index]);
         }
-        auto footprints = collectBackgroundFootprints(inverse.mapRect(capturedRect));
-        if (!footprints.empty() && footprints.size() <= MAX_CULL_RECTS) {
-          cullRects.reserve(footprints.size());
-          for (const auto& footprint : footprints) {
-            auto rect = viewMatrix.mapRect(footprint);
-            rect.roundOut();
-            cullRects.push_back(rect);
+        // A background style only samples the area under its own bounds plus the blur
+        // reach, so cull the capture against those footprints instead of the whole tile.
+        // Layers that overlap the tile but sit under no background style are then not
+        // drawn. The captured area stays the cluster union, so the surfaces and the way
+        // sibling styles share their output do not change.
+        std::vector<Rect> cullRects = clusterRects;
+        Matrix inverse = Matrix::I();
+        if (viewMatrix.invert(&inverse)) {
+          auto worldRect = Rect::MakeEmpty();
+          for (const auto& rect : clusterRects) {
+            worldRect.join(inverse.mapRect(rect));
           }
+          auto footprints = collectBackgroundFootprints(worldRect, viewMatrix);
+          if (!footprints.empty()) {
+            // Keep the raw rects while the per-layer cull loop can afford them: separate rects
+            // keep the capture multi-pass, which is what enables style output sharing.
+            std::vector<Rect> rects = {};
+            for (const auto& footprint : footprints) {
+              rects.push_back(viewMatrix.mapRect(footprint));
+            }
+            if (rects.size() > MAX_CULL_RECTS) {
+              auto merged = ClusterTileRects(footprints, FOOTPRINT_CLUSTER_GROWTH);
+              rects.clear();
+              for (const auto& entry : merged) {
+                // Back to the capture surface space that captureBackgrounds expects.
+                rects.push_back(viewMatrix.mapRect(entry.bounds));
+              }
+            }
+            if (rects.size() <= MAX_CULL_RECTS) {
+              cullRects = std::move(rects);
+            }
+          }
+        }
+        auto map = captureBackgrounds(surface, clusterRects, viewMatrix, cullRects);
+        auto captureIndex = static_cast<int>(captureMaps->size());
+        captureMaps->push_back(std::move(map));
+        for (auto offset : cluster.indices) {
+          (*taskCapture)[levelEntry.second[offset]] = captureIndex;
         }
       }
     }
-    snapshotMap = captureBackgrounds(surface, captureRects, cullRects);
   }
+}
+
+std::vector<Rect> DisplayList::drawTileTasks(
+    std::vector<DrawTask>& tileTasks,
+    const std::vector<std::unique_ptr<BackgroundSnapshotMap>>& captureMaps,
+    const std::vector<int>& taskCapture, Surface* surface, float zoomScale) {
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
-  for (auto& task : tileTasks) {
-    drawTileTask(task, snapshotMap.get());
+  for (size_t taskIndex = 0; taskIndex < tileTasks.size(); ++taskIndex) {
+    auto& task = tileTasks[taskIndex];
+    auto isTreeTask = task.treeLevel() != kExactLevel;
+    auto captureIndex = taskCapture[taskIndex];
+    auto* snapshots =
+        captureIndex >= 0 ? captureMaps[static_cast<size_t>(captureIndex)].get() : nullptr;
+    auto hasContent = drawTileTask(task, snapshots);
+    if (!hasContent && task.coversTiles()) {
+      recycleBlankTiles(task);
+    }
     auto dirtyRect = task.tileRect();
+    if (isTreeTask) {
+      auto displayScale = zoomScale / GetTileRasterScale(task.treeLevel());
+      dirtyRect.scale(displayScale, displayScale);
+    }
     dirtyRect.offset(_contentOffset.x, _contentOffset.y);
     if (dirtyRect.intersect(surfaceRect)) {
       dirtyRects.emplace_back(dirtyRect);
     }
   }
-  drawScreenTasks(std::move(screenTasks), std::move(skippedRects), surface, autoClear);
-  drawThrottleScreenTasks(std::move(throttleScreenTasks), surface, autoClear);
   return dirtyRects;
 }
 
 void DisplayList::checkTileCount(Surface* renderSurface) {
   DEBUG_ASSERT(renderSurface != nullptr);
-  const auto tileSizeFloat = static_cast<float>(_tileSize);
-  const auto tileCountX =
-      FloatCeilToInt(static_cast<float>(renderSurface->width()) / tileSizeFloat);
-  const auto tileCountY =
-      FloatCeilToInt(static_cast<float>(renderSurface->height()) / tileSizeFloat);
-  auto minTileCount = (tileCountX + 1) * (tileCountY + 1);
-  if (totalTileCount > 0) {
-    if (totalTileCount >= minTileCount) {
-      return;
-    }
-    resetCaches();
-  }
-  totalTileCount = std::max(minTileCount, _maxTileCount);
-  auto maxTileCountPerAtlas = getMaxTileCountPerAtlas(renderSurface->getContext());
-  if (maxTileCountPerAtlas <= 0) {
+  const auto surfaceWidth = renderSurface->width();
+  const auto surfaceHeight = renderSurface->height();
+  if (totalTileCount > 0 && surfaceWidth == lastSurfaceWidth &&
+      surfaceHeight == lastSurfaceHeight) {
     return;
   }
-  auto remainingTileCount = totalTileCount % maxTileCountPerAtlas;
-  totalTileCount -= remainingTileCount;
-  auto width = FloatSaturateToInt(sqrtf(static_cast<float>(remainingTileCount)));
-  int height = FloatCeilToInt(static_cast<float>(remainingTileCount) / static_cast<float>(width));
-  totalTileCount += width * height;
+  lastSurfaceWidth = surfaceWidth;
+  lastSurfaceHeight = surfaceHeight;
+  auto countTiles = [surfaceWidth, surfaceHeight](float tileSize) {
+    return (FloatCeilToInt(static_cast<float>(surfaceWidth) / tileSize) + 2) *
+           (FloatCeilToInt(static_cast<float>(surfaceHeight) / tileSize) + 2);
+  };
+  const auto tileSizeFloat = static_cast<float>(_tileSize);
+  // A tree tile of the viewport's level covers more than half a tile size on screen.
+  const auto treeTileCount = countTiles(tileSizeFloat * 0.5f);
+  const auto gridTileCount = countTiles(tileSizeFloat);
+  totalTileCount = 2 * treeTileCount + gridTileCount;
+  auto maxTileCountPerAtlas = getMaxTileCountPerAtlas(renderSurface->getContext());
+  if (maxTileCountPerAtlas > 0) {
+    auto atlasCount = (totalTileCount + maxTileCountPerAtlas - 1) / maxTileCountPerAtlas;
+    totalTileCount = std::min(atlasCount, MAX_ATLAS_COUNT) * maxTileCountPerAtlas;
+  }
+  minTreeTileCount = static_cast<size_t>(
+      FloatCeilToInt(TREE_LEVELS_COVERAGE_FACTOR * static_cast<float>(treeTileCount)));
+  // Splitting by demand gives both types the same safety factor at any aspect ratio.
+  auto treeRatio =
+      static_cast<double>(treeTileCount) / static_cast<double>(treeTileCount + gridTileCount);
+  auto treeQuota =
+      static_cast<size_t>(std::lround(static_cast<double>(totalTileCount) * treeRatio));
+  tilePool->setQuota(TileType::Tree, treeQuota);
+  tilePool->setQuota(TileType::Grid, static_cast<size_t>(totalTileCount) - treeQuota);
+  blankTiles->setMaxCount(BLANK_MARKS_PER_TILE * static_cast<size_t>(totalTileCount));
 }
 
 std::vector<DrawTask> DisplayList::invalidateTileCaches(const std::vector<Rect>& dirtyRegions,
@@ -543,67 +856,130 @@ std::vector<DrawTask> DisplayList::invalidateTileCaches(const std::vector<Rect>&
     return {};
   }
   std::vector<DrawTask> tileTasks = {};
-  std::vector<int64_t> emptyScales = {};
-  for (auto& [scaleInt, tileCache] : tileCaches) {
-    if (scaleInt == _zoomScaleInt) {
-      invalidateCurrentTileCache(tileCache, dirtyRegions, viewportRect, &tileTasks);
-      continue;
-    }
-    auto zoomMatrix = Matrix::MakeScale(ToZoomScaleFloat(scaleInt, _zoomScalePrecision));
-    auto dirtyRects = MapDirtyRegions(dirtyRegions, zoomMatrix);
-    for (auto& dirtyRect : dirtyRects) {
-      auto tiles = tileCache->getTilesUnderRect(dirtyRect);
-      for (auto& tile : tiles) {
-        tileCache->removeTile(tile->tileX, tile->tileY);
-      }
-      emptyTiles.insert(emptyTiles.end(), tiles.begin(), tiles.end());
-    }
-    if (tileCache->empty()) {
-      emptyScales.push_back(scaleInt);
-    }
-  }
-  for (auto& scale : emptyScales) {
-    auto result = tileCaches.find(scale);
-    if (result != tileCaches.end()) {
-      delete result->second;
-      tileCaches.erase(result);
-    }
-  }
+  invalidateCurrentGridTiles(dirtyRegions, viewportRect, &tileTasks);
+  invalidateTreeTiles(dirtyRegions, viewportRect, &tileTasks);
+  invalidateBlankTiles(dirtyRegions);
   return tileTasks;
 }
 
-void DisplayList::recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks) {
-  if (tileTasks.empty()) {
+void DisplayList::invalidateBlankTiles(const std::vector<Rect>& dirtyRegions) {
+  if (blankTiles->size() == 0) {
     return;
   }
-  auto result = tileCaches.find(_zoomScaleInt);
-  DEBUG_ASSERT(result != tileCaches.end());
-  if (result == tileCaches.end()) {
-    return;
-  }
-  auto tileCache = result->second;
-  for (auto& task : tileTasks) {
-    for (auto& tile : task.getTiles()) {
-      if (tileCache->removeTile(tile->tileX, tile->tileY)) {
-        emptyTiles.push_back(tile);
-      }
+  auto gridScale = blankTiles->gridScale();
+  if (gridScale != 0) {
+    auto group = TileKey::MakeGrid(0, 0, gridScale);
+    auto zoomMatrix = Matrix::MakeScale(ToZoomScaleFloat(gridScale, _zoomScalePrecision));
+    for (auto& dirtyRect : MapDirtyRegions(dirtyRegions, zoomMatrix)) {
+      blankTiles->eraseUnderRect(group, dirtyRect, _tileSize);
     }
   }
-  if (tileCache->empty()) {
-    delete tileCache;
-    tileCaches.erase(result);
+  for (auto level : blankTiles->treeLevels()) {
+    auto group = TileKey::MakeTree(0, 0, level);
+    auto rasterMatrix = Matrix::MakeScale(GetTileRasterScale(level));
+    for (auto& dirtyRect : MapDirtyRegions(dirtyRegions, rasterMatrix)) {
+      blankTiles->eraseUnderRect(group, dirtyRect, _tileSize);
+    }
   }
 }
 
-void DisplayList::invalidateCurrentTileCache(TileCache* tileCache,
-                                             const std::vector<Rect>& dirtyRegions,
+void DisplayList::invalidateTreeTiles(const std::vector<Rect>& dirtyRegions,
+                                      const Rect& viewportRect, std::vector<DrawTask>* tileTasks) {
+  if (tilePool->size(TileType::Tree) == 0) {
+    return;
+  }
+  auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  auto baseLevel = GetTileLevel(zoomScale);
+  struct LevelDirtyRects {
+    std::vector<Rect> dirtyRects = {};
+    Rect viewportRect = {};
+  };
+  std::unordered_map<int, LevelDirtyRects> rectsByLevel = {};
+  std::vector<TileKey> dirtyKeys = {};
+  for (auto& key : tilePool->keysOf(TileType::Tree)) {
+    auto result = rectsByLevel.find(key.level);
+    if (result == rectsByLevel.end()) {
+      auto rasterScale = GetTileRasterScale(key.level);
+      LevelDirtyRects rects = {};
+      rects.dirtyRects = MapDirtyRegions(dirtyRegions, Matrix::MakeScale(rasterScale));
+      rects.viewportRect = viewportRect;
+      rects.viewportRect.scale(rasterScale / zoomScale, rasterScale / zoomScale);
+      result = rectsByLevel.emplace(key.level, std::move(rects)).first;
+    }
+    auto tileRect =
+        Rect::MakeXYWH(key.tileX * _tileSize, key.tileY * _tileSize, _tileSize, _tileSize);
+    auto& rects = result->second;
+    if (std::none_of(
+            rects.dirtyRects.begin(), rects.dirtyRects.end(),
+            [&tileRect](const Rect& dirtyRect) { return Rect::Intersects(tileRect, dirtyRect); })) {
+      continue;
+    }
+    // Only the coarsest level is patched, because the finer fallbacks are not drawn while the
+    // grid covers every cell: patching them would replay the whole scene for pixels nobody sees.
+    // They are dropped here instead and rebuilt by the chain top-up once the grid is settled.
+    const auto coarsestLevel = baseLevel + TREE_LEVEL_COUNT - 1;
+    if (key.level != coarsestLevel || !Rect::Intersects(tileRect, rects.viewportRect)) {
+      dirtyKeys.push_back(key);
+      continue;
+    }
+    auto tile = tilePool->find(key);
+    for (auto& dirtyRect : rects.dirtyRects) {
+      auto drawRect = tileRect;
+      if (drawRect.intersect(dirtyRect)) {
+        DrawTask task(tile, _tileSize, drawRect);
+        task.setTreeLevel(key.level);
+        tileTasks->push_back(std::move(task));
+      }
+    }
+  }
+  for (auto& key : dirtyKeys) {
+    emptyTiles.push_back(tilePool->erase(key));
+  }
+}
+
+void DisplayList::recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks) {
+  for (auto& task : tileTasks) {
+    for (auto& tile : task.getTiles()) {
+      auto key = task.treeLevel() == kExactLevel
+                     ? TileKey::MakeGrid(tile->tileX, tile->tileY, _zoomScaleInt)
+                     : TileKey::MakeTree(tile->tileX, tile->tileY, task.treeLevel());
+      if (auto recycled = tilePool->erase(key)) {
+        emptyTiles.push_back(std::move(recycled));
+      }
+    }
+  }
+}
+
+void DisplayList::recycleGridTiles() {
+  auto tiles = tilePool->clear(TileType::Grid);
+  emptyTiles.insert(emptyTiles.end(), tiles.begin(), tiles.end());
+  blankTiles->clearGrid();
+}
+
+void DisplayList::recycleBlankTiles(const DrawTask& task) {
+  for (auto& tile : task.getTiles()) {
+    auto key = task.treeLevel() == kExactLevel
+                   ? TileKey::MakeGrid(tile->tileX, tile->tileY, _zoomScaleInt)
+                   : TileKey::MakeTree(tile->tileX, tile->tileY, task.treeLevel());
+    if (tilePool->erase(key) == nullptr) {
+      continue;
+    }
+    // The slot stays valid for the rest of this frame: it is only rewritten when a later frame
+    // takes it from the free list.
+    emptyTiles.push_back(tile);
+    blankTiles->insert(key);
+  }
+}
+
+void DisplayList::invalidateCurrentGridTiles(const std::vector<Rect>& dirtyRegions,
                                              const Rect& viewportRect,
                                              std::vector<DrawTask>* tileTasks) {
   auto zoomMatrix = Matrix::MakeScale(ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision));
   auto dirtyRects = MapDirtyRegions(dirtyRegions, zoomMatrix, true);
   for (auto& dirtyRect : dirtyRects) {
     bool continuous = false;
-    auto tiles = tileCache->getTilesUnderRect(dirtyRect, false, &continuous);
+    auto tiles =
+        GetGridTilesUnderRect(tilePool.get(), _zoomScaleInt, _tileSize, dirtyRect, &continuous);
     if (continuous && viewportRect.contains(dirtyRect)) {
       tileTasks->emplace_back(std::move(tiles), _tileSize, dirtyRect);
       continue;
@@ -614,8 +990,9 @@ void DisplayList::invalidateCurrentTileCache(TileCache* tileCache,
         // Dirty content outside the viewport only invalidates the tile: rasterizing it now would
         // touch pixels nobody sees, while keeping it would leave stale content behind for the next
         // time it scrolls back into view.
-        if (tileCache->removeTile(tile->tileX, tile->tileY)) {
-          emptyTiles.push_back(tile);
+        auto key = TileKey::MakeGrid(tile->tileX, tile->tileY, _zoomScaleInt);
+        if (auto recycled = tilePool->erase(key)) {
+          emptyTiles.push_back(std::move(recycled));
         }
         continue;
       }
@@ -629,28 +1006,21 @@ void DisplayList::invalidateCurrentTileCache(TileCache* tileCache,
   }
 }
 
-std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface, bool hasDirtyRegions,
-                                                      bool autoClear,
+std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks,
-                                                      std::vector<Rect>* skippedRects,
-                                                      std::vector<DrawTask>* throttleScreenTasks) {
-  auto maxBudget = _maxTilesRefinedPerFrame;
+                                                      std::vector<Rect>* skippedRects) {
+  auto refineBudget = std::max(_maxTilesRefinedPerFrame, 0);
   const auto useFallback = _tileUpdateMode != TileUpdateMode::Immediate;
-  if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
+  // Grid tiles drawn while the viewport moves are often stale by the next frame, so a moving
+  // viewport spends the budget on tree tiles, which stay valid across zoom scales.
+  const auto viewportChanged =
+      lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt;
+  if (viewportChanged) {
     updateMousePosition();
     lastContentOffset = _contentOffset;
     lastZoomScaleInt = _zoomScaleInt;
-    maxBudget = 0;
   }
   hasZoomBlurTiles = false;
-  TileCache* currentTileCache = nullptr;
-  auto result = tileCaches.find(_zoomScaleInt);
-  if (result != tileCaches.end()) {
-    currentTileCache = result->second;
-  } else {
-    currentTileCache = new TileCache(_tileSize);
-    tileCaches[_zoomScaleInt] = currentTileCache;
-  }
   auto renderRect = GetViewportRect(surface, _contentOffset);
 
   auto renderBounds = _root->renderBounds;
@@ -671,73 +1041,222 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface, bo
   }
 
   std::vector<DrawTask> screenTasks = {};
-  std::vector<std::pair<int, int>> dirtyGrids = {};
   auto tileCount = static_cast<size_t>(endX - startX) * static_cast<size_t>(endY - startY);
   screenTasks.reserve(tileCount);
-  dirtyGrids.reserve(tileCount);
-  auto sortedCaches = getSortedTileCaches();
-  auto fallbackTileCaches = getFallbackTileCaches(sortedCaches);
+  std::vector<TreeLevelCoverage> coverages = {};
+  if (useFallback) {
+    coverages =
+        CollectTreeCoverages(tilePool.get(), blankTiles.get(), zoomScale, renderRect, _tileSize);
+  }
+  auto getGridRect = [&](const std::pair<int, int>& grid) {
+    auto rect =
+        Rect::MakeXYWH(grid.first * _tileSize, grid.second * _tileSize, _tileSize, _tileSize);
+    rect.intersect(renderRect);
+    return rect;
+  };
+  std::vector<std::pair<int, int>> missingGrids = {};
+  missingGrids.reserve(tileCount);
   auto sortedTiles = GetSortedTiles(startX, endX, startY, endY, _tileSize, mousePosition);
-  for (const auto& [tileX, tileY] : sortedTiles) {
-    auto tile = currentTileCache->getTile(tileX, tileY);
+  for (const auto& grid : sortedTiles) {
+    auto key = TileKey::MakeGrid(grid.first, grid.second, _zoomScaleInt);
+    auto tile = tilePool->find(key);
     if (tile != nullptr) {
+      tilePool->touch(key);
       auto tileRect = tile->getTileRect(_tileSize, &renderRect);
       screenTasks.emplace_back(tile, _tileSize, tileRect);
-      continue;
-    }
-    if (!useFallback || maxBudget > 0) {
-      if (useFallback) {
-        maxBudget--;
-      }
-      dirtyGrids.emplace_back(tileX, tileY);
+    } else if (blankTiles->contains(key)) {
+      skippedRects->push_back(getGridRect(grid));
     } else {
-      auto fallbackTasks = getFallbackDrawTasks(tileX, tileY, fallbackTileCaches);
-      if (!fallbackTasks.empty()) {
-        hasZoomBlurTiles = true;
-        screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
-        continue;
-      }
-      // Rasterize in Smooth mode, or when this frame has dirty regions: dirty regions also
-      // clear fallback tiles at other scales, so a skipRect would render as background color.
-      if (_tileUpdateMode == TileUpdateMode::Smooth || hasDirtyRegions) {
-        dirtyGrids.emplace_back(tileX, tileY);
-        continue;
-      }
-      hasZoomBlurTiles = true;
-      skippedRects->emplace_back(
-          Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize));
-      if (!autoClear) {
-        // Under autoClear=false, throttle fallback tiles are not drawn because SrcOver blending
-        // would let farther tiles bleed through near-tile alpha edges, producing cross-scale
-        // artifacts. Skip collection entirely to avoid wasted work.
-        continue;
-      }
-      auto throttleFallback = getThrottleFallbackTasks(tileX, tileY, fallbackTileCaches);
-      if (!throttleFallback.empty()) {
-        throttleScreenTasks->insert(throttleScreenTasks->end(), throttleFallback.begin(),
-                                    throttleFallback.end());
-      }
+      missingGrids.push_back(grid);
     }
   }
+
   std::vector<std::shared_ptr<Tile>> freeTiles = {};
+  std::vector<std::pair<int, int>> dirtyGrids = {};
   bool continuous = false;
-  if (screenTasks.empty() && throttleScreenTasks->empty()) {
+  // A frame without any atlas has nothing to fall back on, so it goes straight to full resolution.
+  if (missingGrids.size() == tileCount && (!useFallback || surfaceCaches.empty())) {
     freeTiles = createContinuousTiles(surface, endX - startX, endY - startY);
     continuous = !freeTiles.empty();
+  }
+  if (continuous) {
     dirtyGrids = GenerateGridTiles(startX, endX, startY, endY);
-    skippedRects->clear();
-    hasZoomBlurTiles = false;
-  }
-  if (freeTiles.empty()) {
-    freeTiles = getFreeTiles(surface, dirtyGrids.size(), sortedCaches);
-  }
-  if (dirtyGrids.size() != freeTiles.size()) {
-    DEBUG_ASSERT(freeTiles.size() < dirtyGrids.size());
-    LOGE("DisplayList::collectRenderTiles() Not enough free tiles available.");
-    return {};
+  } else {
+    dirtyGrids.reserve(missingGrids.size());
+    std::vector<std::pair<int, int>> fallbackGrids = {};
+    for (auto& grid : missingGrids) {
+      if (!useFallback || (!viewportChanged && refineBudget > 0)) {
+        if (useFallback) {
+          refineBudget--;
+        }
+        dirtyGrids.push_back(grid);
+      } else {
+        fallbackGrids.push_back(grid);
+      }
+    }
+    // This frame draws the last missing grid tiles, so nothing else is left to drive the loop; keep
+    // it alive for the frame that tops up the fallback levels.
+    if (!missingGrids.empty() && dirtyGrids.size() == missingGrids.size()) {
+      hasZoomBlurTiles = true;
+    }
+    // Takes free tiles for the given cells of a tree level and queues them for rasterization.
+    // Returns how many cells got a tile.
+    auto rasterizeTreeTiles = [&](TreeLevelCoverage* coverage,
+                                  const std::vector<std::pair<int, int>>& cells) -> size_t {
+      if (cells.empty()) {
+        return 0;
+      }
+      auto treeTiles = getFreeTiles(surface, TileType::Tree, cells.size());
+      for (size_t i = 0; i < treeTiles.size(); ++i) {
+        auto& tile = treeTiles[i];
+        tile->tileX = cells[i].first;
+        tile->tileY = cells[i].second;
+        tilePool->insert(TileKey::MakeTree(tile->tileX, tile->tileY, coverage->level), tile);
+        coverage->tileAt(tile->tileX, tile->tileY) = tile;
+        DrawTask task(tile, _tileSize);
+        task.setTreeLevel(coverage->level);
+        task.setCoversTiles(true);
+        tileTasks->push_back(std::move(task));
+      }
+      return treeTiles.size();
+    };
+    if (!fallbackGrids.empty()) {
+      hasZoomBlurTiles = true;
+      std::vector<Rect> uncoveredRects = {};
+      for (auto& grid : fallbackGrids) {
+        auto gridRect = getGridRect(grid);
+        if (FindFinestCoverage(&coverages, gridRect, _tileSize) == nullptr) {
+          uncoveredRects.push_back(gridRect);
+        }
+      }
+      // Pass 1: cells without any fallback are rasterized regardless of the budget, or they would
+      // show the background. The coarsest level is used because it needs the fewest tiles: the
+      // cost of a tile is dominated by the layers it intersects rather than by its area, and a
+      // large layer is drawn again for every tile it reaches. Fast mode accepts the background
+      // instead, so the frame that changes the zoom does not pay for tiles the budget skipped.
+      if (!uncoveredRects.empty() && _tileUpdateMode != TileUpdateMode::Fast) {
+        auto& coarsest = coverages.back();
+        rasterizeTreeTiles(&coarsest, CollectMissingTreeTiles(coarsest, uncoveredRects, _tileSize));
+      }
+      // Pass 2: the budget refines the displayed fallbacks one level at a time, coarse levels
+      // first, so the screen sharpens evenly instead of one cell at a time.
+      if (viewportChanged && refineBudget > 0) {
+        struct RefineCandidate {
+          size_t coverageIndex = 0;
+          int tileX = 0;
+          int tileY = 0;
+        };
+        std::vector<RefineCandidate> candidates = {};
+        std::unordered_set<int64_t> requested = {};
+        for (auto& grid : fallbackGrids) {
+          auto gridRect = getGridRect(grid);
+          auto coverage = FindFinestCoverage(&coverages, gridRect, _tileSize);
+          if (coverage == nullptr || coverage == &coverages.front()) {
+            continue;
+          }
+          auto finerIndex = static_cast<size_t>(coverage - coverages.data()) - 1;
+          auto& finer = coverages[finerIndex];
+          ForEachTileUnderRect(finer.toRaster(gridRect), _tileSize, [&](int tileX, int tileY) {
+            auto packed = static_cast<int64_t>(finerIndex) << 48 |
+                          static_cast<int64_t>(finer.indexOf(tileX, tileY));
+            if (!finer.isCovered(tileX, tileY) && requested.insert(packed).second) {
+              candidates.push_back({finerIndex, tileX, tileY});
+            }
+            return true;
+          });
+        }
+        // Candidates are already sorted by distance to the mouse within each level.
+        std::stable_sort(candidates.begin(), candidates.end(),
+                         [](const RefineCandidate& a, const RefineCandidate& b) {
+                           return a.coverageIndex > b.coverageIndex;
+                         });
+        if (candidates.size() > static_cast<size_t>(refineBudget)) {
+          candidates.resize(static_cast<size_t>(refineBudget));
+        }
+        std::vector<std::vector<std::pair<int, int>>> cellsByLevel(coverages.size());
+        for (auto& candidate : candidates) {
+          cellsByLevel[candidate.coverageIndex].emplace_back(candidate.tileX, candidate.tileY);
+        }
+        for (size_t i = 0; i < coverages.size(); ++i) {
+          auto refined = rasterizeTreeTiles(&coverages[i], cellsByLevel[i]);
+          refineBudget -= static_cast<int>(refined);
+        }
+      }
+      // The passes above may have added tiles, so the coverage is queried again: the finest
+      // complete level is displayed, and cells nothing covers fall back to the background.
+      for (auto& grid : fallbackGrids) {
+        auto gridRect = getGridRect(grid);
+        auto coverage = FindFinestCoverage(&coverages, gridRect, _tileSize);
+        if (coverage != nullptr) {
+          AppendFallbackScreenTasks(coverage, gridRect, _tileSize, &screenTasks, skippedRects);
+        } else {
+          skippedRects->push_back(gridRect);
+        }
+      }
+    }
+    // Every viewport cell has its exact tile, so the screen is sharp and the budget can top up the
+    // coarser fallback levels. A zoom-in remaps them onto the next frame's L+3..L+1; without them
+    // that zoom has to rasterize a fallback level on the spot. A frame that already has other tile
+    // work only reports what is left, so the loop keeps running until the levels are full.
+    if (useFallback && !coverages.empty()) {
+      const bool mayRefine = tileTasks->empty();
+      const bool gridComplete = missingGrids.empty();
+      // Top up the levels above L from L+2 towards L, only once the grid is complete.
+      auto chainBudget = gridComplete ? std::max(_maxTilesRefinedPerFrame, 0) : 0;
+      const auto lowestLevel = gridComplete ? size_t{1} : size_t{2};
+      if (mayRefine) {
+        // coverages[0] is L and coverages[3] is L+3.
+        for (auto level = coverages.size() - 1; level >= lowestLevel && chainBudget > 0; --level) {
+          auto& coverage = coverages[level - 1];
+          auto cells = CollectMissingTreeTiles(coverage, {renderRect}, _tileSize);
+          if (cells.empty()) {
+            continue;
+          }
+          if (cells.size() > static_cast<size_t>(chainBudget)) {
+            cells.resize(static_cast<size_t>(chainBudget));
+          }
+          auto refined = rasterizeTreeTiles(&coverage, cells);
+          chainBudget -= static_cast<int>(refined);
+        }
+      }
+      // Report the state left after this frame: a skipped frame still has to keep the loop alive,
+      // and a frame that filled everything has to stop it.
+      bool chainPending = false;
+      for (auto level = coverages.size() - 1; level >= lowestLevel; --level) {
+        if (!CollectMissingTreeTiles(coverages[level - 1], {renderRect}, _tileSize).empty()) {
+          chainPending = true;
+          break;
+        }
+      }
+      // Without a budget the chain can never progress, so it must not keep the loop running.
+      if (chainPending && _maxTilesRefinedPerFrame > 0) {
+        hasZoomBlurTiles = true;
+      }
+    }
+    freeTiles = getFreeTiles(surface, TileType::Grid, dirtyGrids.size());
+    if (freeTiles.size() < dirtyGrids.size()) {
+      if (!useFallback) {
+        emptyTiles.insert(emptyTiles.end(), freeTiles.begin(), freeTiles.end());
+        LOGE("DisplayList::collectScreenTasks() Not enough free tiles available.");
+        return {};
+      }
+      // The next frame selects the remaining grids again, so they only need something to show now.
+      hasZoomBlurTiles = true;
+      for (auto i = freeTiles.size(); i < dirtyGrids.size(); ++i) {
+        auto gridRect = getGridRect(dirtyGrids[i]);
+        auto coverage = FindFinestCoverage(&coverages, gridRect, _tileSize);
+        if (coverage != nullptr) {
+          AppendFallbackScreenTasks(coverage, gridRect, _tileSize, &screenTasks, skippedRects);
+        } else {
+          skippedRects->push_back(gridRect);
+        }
+      }
+      dirtyGrids.resize(freeTiles.size());
+    }
   }
   size_t tileIndex = 0;
   std::vector<std::shared_ptr<Tile>> taskTiles = {};
+  taskTiles.reserve(dirtyGrids.size());
   for (auto& grid : dirtyGrids) {
     auto& tile = freeTiles[tileIndex++];
     tile->tileX = grid.first;
@@ -745,218 +1264,60 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface, bo
     taskTiles.push_back(tile);
     auto tileRect = tile->getTileRect(_tileSize, &renderRect);
     screenTasks.emplace_back(tile, _tileSize, tileRect);
-    currentTileCache->addTile(tile);
+    tilePool->insert(TileKey::MakeGrid(tile->tileX, tile->tileY, _zoomScaleInt), tile);
   }
   if (continuous) {
     // If we have continuous tiles, we can draw a single rectangle for the entire area.
     auto drawRect = Rect::MakeXYWH(startX * _tileSize, startY * _tileSize,
                                    (endX - startX) * _tileSize, (endY - startY) * _tileSize);
-    tileTasks->emplace_back(std::move(freeTiles), _tileSize, drawRect);
+    DrawTask task(std::move(freeTiles), _tileSize, drawRect);
+    task.setCoversTiles(true);
+    tileTasks->push_back(std::move(task));
   } else {
     for (auto& tile : taskTiles) {
-      tileTasks->emplace_back(tile, _tileSize);
+      DrawTask task(tile, _tileSize);
+      task.setCoversTiles(true);
+      tileTasks->push_back(std::move(task));
     }
   }
   return screenTasks;
 }
 
-static float ScaleRatio(float scaleA, float zoomScale) {
-  auto ratio = fabsf(scaleA / zoomScale);
-  if (ratio < 1.0f) {
-    ratio = 1.0f / ratio;
-  }
-  return ratio;
-}
-
-std::vector<std::pair<float, TileCache*>> DisplayList::getSortedTileCaches() const {
-  std::vector<std::pair<float, TileCache*>> sortedTileCaches;
-  sortedTileCaches.reserve(tileCaches.size());
-  for (auto& [scaleInt, tileCache] : tileCaches) {
-    auto zoomScale = ToZoomScaleFloat(scaleInt, _zoomScalePrecision);
-    sortedTileCaches.emplace_back(zoomScale, tileCache);
-  }
-  std::sort(sortedTileCaches.begin(), sortedTileCaches.end(),
-            [](const std::pair<float, TileCache*>& a, const std::pair<float, TileCache*>& b) {
-              return a.first < b.first;
-            });
-  return sortedTileCaches;
-}
-
-std::vector<std::pair<float, TileCache*>> DisplayList::getFallbackTileCaches(
-    const std::vector<std::pair<float, TileCache*>>& sortedCaches) const {
-  if (_tileUpdateMode == TileUpdateMode::Immediate) {
-    return {};
-  }
-  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  DEBUG_ASSERT(currentZoomScale != 0.0f);
-  auto cacheCount = sortedCaches.size();
-  std::vector<std::pair<float, TileCache*>> fallbackCaches = {};
-  fallbackCaches.reserve(cacheCount);
-  size_t firstGreaterIndex = 0;
-  for (auto& item : sortedCaches) {
-    if (item.first < currentZoomScale) {
-      firstGreaterIndex++;
-    } else {
-      fallbackCaches.push_back(item);
-    }
-  }
-  for (size_t index = firstGreaterIndex; index > 0; index--) {
-    auto& item = sortedCaches[index - 1];
-    fallbackCaches.push_back(item);
-  }
-  return fallbackCaches;
-}
-
-std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
-    int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const {
-  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  DEBUG_ASSERT(currentZoomScale != 0.0f);
-  auto gridCount = std::max(_tileSize / FALLBACK_GRID_SIZE, 1);
-  auto gridSize = _tileSize / gridCount;
-  auto tileStartX = tileX * _tileSize;
-  auto tileStartY = tileY * _tileSize;
-  std::vector<DrawTask> tasks = {};
-  auto renderBounds = _root->renderBounds;
-  renderBounds.scale(currentZoomScale, currentZoomScale);
-  renderBounds.roundOut();
-  for (int gridX = 0; gridX < gridCount; gridX++) {
-    for (int gridY = 0; gridY < gridCount; gridY++) {
-      auto gridStartX = tileStartX + gridX * gridSize;
-      auto gridStartY = tileStartY + gridY * gridSize;
-      bool found = false;
-      auto gridRect = Rect::MakeXYWH(gridStartX, gridStartY, gridSize, gridSize);
-      if (!gridRect.intersect(renderBounds)) {
-        continue;
-      }
-      for (auto& [scale, tileCache] : fallbackCaches) {
-        if (scale == currentZoomScale || tileCache->empty()) {
-          continue;
-        }
-        auto scaleRatio = scale / currentZoomScale;
-        DEBUG_ASSERT(scaleRatio != 0.0f);
-        auto zoomedRect = gridRect;
-        zoomedRect.scale(scaleRatio, scaleRatio);
-        auto tiles = tileCache->getTilesUnderRect(zoomedRect, true);
-        if (tiles.empty()) {
-          continue;
-        }
-        for (auto& tile : tiles) {
-          auto drawRect = tile->getTileRect(_tileSize);
-          if (drawRect.intersect(zoomedRect)) {
-            tasks.emplace_back(tile, _tileSize, drawRect, 1.0f / scaleRatio);
-          }
-        }
-        found = true;
-        break;
-      }
-      if (!found) {
-        return {};
-      }
-    }
-  }
-  return tasks;
-}
-
-std::vector<DrawTask> DisplayList::getThrottleFallbackTasks(
-    int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const {
-  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  DEBUG_ASSERT(currentZoomScale != 0.0f);
-  auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
-  auto renderBounds = _root->renderBounds;
-  renderBounds.scale(currentZoomScale, currentZoomScale);
-  renderBounds.roundOut();
-  if (!tileRect.intersect(renderBounds)) {
-    return {};
-  }
-  // Sort fallback caches farthest-first so that nearer (higher-quality) tiles are drawn on top
-  // of farther (lower-quality) ones during rendering. When two caches have the same ScaleRatio
-  // (e.g. 0.5x and 2.0x relative to 1.0x), the upsample cache is placed before the downsample
-  // cache so the downsample output (sharper) overlays the upsample output (blurrier).
-  auto orderedCaches = fallbackCaches;
-  std::sort(orderedCaches.begin(), orderedCaches.end(),
-            [currentZoomScale](const std::pair<float, TileCache*>& a,
-                               const std::pair<float, TileCache*>& b) {
-              auto ratioA = ScaleRatio(a.first, currentZoomScale);
-              auto ratioB = ScaleRatio(b.first, currentZoomScale);
-              if (ratioA != ratioB) {
-                return ratioA > ratioB;
-              }
-              return a.first < b.first;
-            });
-  std::vector<DrawTask> tasks = {};
-  for (auto& [scale, tileCache] : orderedCaches) {
-    if (scale == currentZoomScale || tileCache->empty()) {
-      continue;
-    }
-    auto scaleRatio = scale / currentZoomScale;
-    DEBUG_ASSERT(scaleRatio != 0.0f);
-    auto zoomedRect = tileRect;
-    zoomedRect.scale(scaleRatio, scaleRatio);
-    auto covering = tileCache->getTilesUnderRect(zoomedRect, false);
-    if (covering.empty()) {
-      continue;
-    }
-    for (auto& t : covering) {
-      auto drawRect = t->getTileRect(_tileSize);
-      if (drawRect.intersect(zoomedRect)) {
-        tasks.emplace_back(t, _tileSize, drawRect, 1.0f / scaleRatio);
-      }
-    }
-  }
-  return tasks;
-}
-
-std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
-    const Surface* renderSurface, size_t tileCount,
-    const std::vector<std::pair<float, TileCache*>>& sortedCaches) {
+std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(const Surface* renderSurface,
+                                                             TileType type, size_t tileCount) {
   std::vector<std::shared_ptr<Tile>> tiles = {};
   tiles.reserve(tileCount);
-  while (emptyTiles.size() < tileCount) {
-    if (!createEmptyTiles(renderSurface)) {
-      break;
-    }
+  while (emptyTiles.size() < tileCount && createEmptyTiles(renderSurface)) {
   }
-  if (emptyTiles.size() >= tileCount) {
-    tiles.insert(tiles.end(), emptyTiles.end() - static_cast<int>(tileCount), emptyTiles.end());
-    emptyTiles.resize(emptyTiles.size() - tileCount);
+  auto emptyCount = std::min(tileCount, emptyTiles.size());
+  tiles.insert(tiles.end(), emptyTiles.end() - static_cast<std::ptrdiff_t>(emptyCount),
+               emptyTiles.end());
+  emptyTiles.resize(emptyTiles.size() - emptyCount);
+  auto evictInto = [&](TileType evictType, size_t count) {
+    auto evicted = tilePool->evict(evictType, std::min(count, tileCount - tiles.size()));
+    tiles.insert(tiles.end(), evicted.begin(), evicted.end());
+  };
+  const auto otherType = type == TileType::Grid ? TileType::Tree : TileType::Grid;
+  if (tilePool->size(otherType) > tilePool->quota(otherType)) {
+    evictInto(otherType, tilePool->size(otherType) - tilePool->quota(otherType));
+  }
+  evictInto(type, tileCount);
+  if (tiles.size() == tileCount) {
     return tiles;
   }
-  tiles.insert(tiles.end(), emptyTiles.begin(), emptyTiles.end());
-  emptyTiles.clear();
-  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  DEBUG_ASSERT(currentZoomScale != 0.0f);
-  // Reverse iterate through sorted caches to get the farest tiles first.
-  for (size_t i = 0, j = sortedCaches.size(); i < j;) {
-    auto& [scaleS, tileCacheS] = sortedCaches.at(i);
-    auto& [scaleL, tileCacheL] = sortedCaches.at(j - 1);
-    auto scale = scaleS;
-    auto tileCache = tileCacheS;
-    if (ScaleRatio(scaleS, currentZoomScale) < ScaleRatio(scaleL, currentZoomScale)) {
-      scale = scaleL;
-      tileCache = tileCacheL;
-      j--;
-    } else {
-      i++;
-    }
-    auto centerX = static_cast<float>(renderSurface->width()) * 0.5f - _contentOffset.x;
-    auto centerY = static_cast<float>(renderSurface->height()) * 0.5f - _contentOffset.y;
-    centerX *= scale / currentZoomScale;
-    centerY *= scale / currentZoomScale;
-    auto reusableTiles = tileCache->getReusableTiles(centerX, centerY);
-    for (auto& tile : reusableTiles) {
-      tileCache->removeTile(tile->tileX, tile->tileY);
-      tiles.push_back(std::move(tile));
-      if (tiles.size() >= tileCount) {
-        break;
-      }
-    }
-    if (tiles.size() >= tileCount) {
-      break;
-    }
+  if (type == TileType::Tree) {
+    // Tree tiles are only requested when nothing else can fill the screen, which outranks
+    // sharpness.
+    evictInto(TileType::Grid, tileCount);
+    return tiles;
   }
-  if (tiles.size() < tileCount) {
-    emptyTiles = std::move(tiles);
-    return {};
+  // Grid tiles may borrow from the tree tiles as long as the grid stays within its quota and the
+  // tree levels can still cover the viewport.
+  auto gridCount = tilePool->size(TileType::Grid) + tiles.size();
+  auto gridQuota = tilePool->quota(TileType::Grid);
+  auto treeCount = tilePool->size(TileType::Tree);
+  if (gridCount < gridQuota && treeCount > minTreeTileCount) {
+    evictInto(TileType::Tree, std::min(gridQuota - gridCount, treeCount - minTreeTileCount));
   }
   return tiles;
 }
@@ -974,14 +1335,19 @@ std::vector<std::shared_ptr<Tile>> DisplayList::createContinuousTiles(const Surf
   if (tileCount < requestCount) {
     return {};
   }
-  int countX = FloatSaturateToInt(sqrtf(static_cast<float>(tileCount)));
-  int countY = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countX));
+  int countX = 0;
+  int countY = 0;
+  GetAtlasTileGrid(tileCount, &countX, &countY);
   if (countX < requestCountX) {
     countX = requestCountX;
     countY = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countX));
   } else if (countY < requestCountY) {
     countY = requestCountY;
     countX = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countY));
+  }
+  auto maxAtlasSize = std::min(context->gpu()->limits()->maxTextureDimension2D, MAX_ATLAS_SIZE);
+  if (countX * _tileSize > maxAtlasSize || countY * _tileSize > maxAtlasSize) {
+    return {};
   }
   auto surface =
       Surface::Make(context, countX * _tileSize, countY * _tileSize, ColorType::RGBA_8888, 1, false,
@@ -1018,8 +1384,9 @@ bool DisplayList::createEmptyTiles(const Surface* renderSurface) {
   if (tileCount <= 0) {
     return false;
   }
-  int countX = FloatSaturateToInt(sqrtf(static_cast<float>(tileCount)));
-  int countY = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(countX));
+  int countX = 0;
+  int countY = 0;
+  GetAtlasTileGrid(tileCount, &countX, &countY);
   auto surface =
       Surface::Make(context, countX * _tileSize, countY * _tileSize, ColorType::RGBA_8888, 1, false,
                     renderSurface->renderFlags(), renderSurface->colorSpace());
@@ -1061,14 +1428,16 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
-void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots) const {
+bool DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots) const {
   auto surface = surfaceCaches[task.sourceIndex()].get();
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   AutoCanvasRestore autoRestore(canvas);
-  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  DEBUG_ASSERT(currentZoomScale != 0.0f);
-  auto viewMatrix = Matrix::MakeScale(currentZoomScale);
+  auto rasterScale = task.treeLevel() == kExactLevel
+                         ? ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision)
+                         : GetTileRasterScale(task.treeLevel());
+  DEBUG_ASSERT(rasterScale != 0.0f);
+  auto viewMatrix = Matrix::MakeScale(rasterScale);
   auto& tileRect = task.tileRect();
   auto& sourceRect = task.sourceRect();
   auto offsetX = sourceRect.left - tileRect.left;
@@ -1076,7 +1445,7 @@ void DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
   viewMatrix.postTranslate(offsetX, offsetY);
   auto clipRect = tileRect;
   clipRect.offset(offsetX, offsetY);
-  drawRootLayer(surface, clipRect, viewMatrix, true, snapshots);
+  return drawRootLayer(surface, clipRect, viewMatrix, true, snapshots);
 }
 
 void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
@@ -1132,27 +1501,6 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector
   }
 }
 
-void DisplayList::drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTasks,
-                                          Surface* surface, bool autoClear) const {
-  if (throttleScreenTasks.empty()) {
-    return;
-  }
-  auto canvas = surface->getCanvas();
-  AutoCanvasRestore autoRestore(canvas);
-  canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
-  Paint paint = {};
-  paint.setAntiAlias(false);
-  paint.setBlendMode(autoClear ? BlendMode::Src : BlendMode::SrcOver);
-  static SamplingOptions linearSampling(FilterMode::Linear, MipmapMode::None);
-  for (auto& task : throttleScreenTasks) {
-    auto surfaceCache = surfaceCaches[task.sourceIndex()];
-    DEBUG_ASSERT(surfaceCache != nullptr);
-    auto image = surfaceCache->makeImageSnapshot();
-    canvas->drawImageRect(std::move(image), task.sourceRect(), task.tileRect(), linearSampling,
-                          &paint, SrcRectConstraint::Strict, &task.strictRect());
-  }
-}
-
 void DisplayList::renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions) {
   if (lastDirtyRegions.empty()) {
     for (size_t i = 0; i < MAX_DIRTY_REGION_FRAMES; ++i) {
@@ -1181,16 +1529,15 @@ Matrix DisplayList::getViewMatrix() const {
 }
 
 void DisplayList::resetCaches() {
-  for (auto& item : tileCaches) {
-    delete item.second;
-  }
-  tileCaches = {};
+  tilePool->clear(TileType::Grid);
+  tilePool->clear(TileType::Tree);
+  blankTiles->clear();
   surfaceCaches = {};
   totalTileCount = 0;
   emptyTiles.clear();
 }
 
-void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
+bool DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                                 bool autoClear, BackgroundSnapshotMap* snapshots) const {
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
@@ -1228,14 +1575,20 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   BackgroundConsumer consumer(snapshots, snapshots != nullptr && _backgroundColor.isOpaque() &&
                                              snapshots->multiPass && snapshots->styleShareCompact);
   args.backgroundHandler = snapshots ? &consumer : BackgroundHandler::NoOp();
+  // The clear and the background color above must not count as content.
+  auto drawingManager = context->drawingManager();
+  auto drawMark = drawingManager->drawMark();
   _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
+  return drawingManager->hasDrawnSince(drawMark);
 }
 
-std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds) const {
+std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds,
+                                                           const Matrix& viewMatrix) const {
   std::vector<Rect> footprints = {};
+  auto deviceScale = viewMatrix.getMaxScale();
   bool safe = true;
-  auto collect = [](const Layer* layer, const Rect& bounds, bool& safe, std::vector<Rect>& out,
-                    const auto& self) -> void {
+  auto collect = [](const Layer* layer, const Rect& bounds, float deviceScale, bool& safe,
+                    std::vector<Rect>& out, const auto& self) -> void {
     if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
         !Rect::Intersects(bounds, layer->renderBounds)) {
       return;
@@ -1247,10 +1600,12 @@ std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBoun
       safe = false;
       return;
     }
+    auto layerScale = deviceScale * layer->getMatrixWithScrollRect().asMatrix().getMaxScale();
     for (const auto& style : layer->_layerStyles) {
       if (style == nullptr ||
           (style->extraSourceType() &
-           static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
+           static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0 ||
+          BackgroundHandler::IsNegligibleBackgroundStyle(style.get(), layerScale)) {
         continue;
       }
       // The style samples the backdrop under its own bounds plus the blur reach.
@@ -1260,10 +1615,10 @@ std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBoun
       break;
     }
     for (const auto& child : layer->_children) {
-      self(child.get(), bounds, safe, out, self);
+      self(child.get(), bounds, deviceScale, safe, out, self);
     }
   };
-  collect(_root.get(), worldBounds, safe, footprints, collect);
+  collect(_root.get(), worldBounds, deviceScale, safe, footprints, collect);
   if (!safe) {
     return {};
   }
@@ -1271,7 +1626,7 @@ std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBoun
 }
 
 std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
-    Surface* surface, const std::vector<Rect>& renderRects,
+    Surface* surface, const std::vector<Rect>& renderRects, const Matrix& viewMatrix,
     const std::vector<Rect>& cullRects) const {
   DEBUG_ASSERT(surface != nullptr);
   if (!_root->hasBackgroundStyle()) {
@@ -1284,7 +1639,6 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   if (context == nullptr) {
     return nullptr;
   }
-  auto viewMatrix = getViewMatrix();
   DEBUG_ASSERT(viewMatrix.invertible());
   // createBackgroundSource takes a surface-pixel-space rect for sizing; BackgroundCapturer::Run
   // takes world-space renderRects (pre-outset by blur sampling range) for per-rect culling.
@@ -1306,6 +1660,54 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     return nullptr;
   }
   auto visibleRects = worldRects;
+  // A background style whose blur radius is under a pixel on the device cannot change the picture:
+  // it is the same rule the draw path uses to skip such a style. When every style in range is like
+  // that, the capture would draw the tree and produce nothing, so skip it, because a capture that
+  // produces no snapshot is pure cost.
+  auto deviceScale = viewMatrix.getMaxScale();
+  // Quick reject: renderBounds covers the subtree, so one test against the union of the rects
+  // settles whether any layer inside can contribute at all.
+  Rect unionRect = Rect::MakeEmpty();
+  for (const auto& rect : worldRects) {
+    unionRect.join(rect);
+  }
+  auto hasVisibleBackgroundStyle = [](const Layer* layer, const Rect& unionRect,
+                                      const std::vector<Rect>& rects, float scale,
+                                      const auto& self) -> bool {
+    if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
+        !Rect::Intersects(unionRect, layer->renderBounds)) {
+      return false;
+    }
+    auto layerScale = scale * layer->getMatrixWithScrollRect().asMatrix().getMaxScale();
+    for (const auto& style : layer->_layerStyles) {
+      if (style == nullptr || (style->extraSourceType() &
+                               static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
+        continue;
+      }
+      // The draw path leaves such a style out entirely, so nothing would read its snapshot.
+      if (BackgroundHandler::IsNegligibleBackgroundStyle(style.get(), layerScale)) {
+        continue;
+      }
+      // The union covers the gaps between scattered rects; the capture culls against each rect, so
+      // a layer that only touches a gap would produce nothing.
+      for (const auto& rect : rects) {
+        if (Rect::Intersects(rect, layer->renderBounds)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    for (const auto& child : layer->_children) {
+      if (self(child.get(), unionRect, rects, layerScale, self)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  if (!hasVisibleBackgroundStyle(_root.get(), unionRect, worldRects, deviceScale,
+                                 hasVisibleBackgroundStyle)) {
+    return nullptr;
+  }
   // Expand by the max blur outset so layers whose bounds sit just outside the dirty rects but
   // still contribute pixels to the blur sampling region are not culled by the capture pass.
   for (auto& rect : worldRects) {

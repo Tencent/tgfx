@@ -1818,7 +1818,16 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   bool needContour[2] = {false, false};
   bool bucketNeedsGeometry[2] = {false, false};
   bool needsContentShape = false;
+  // A background blur too small to change a pixel is left out entirely, so a layer that has no other
+  // style does not record and rasterize its content for nothing. The density is the one the
+  // consumer draws with, so the capture and consume passes decide the same.
+  auto* handler = args.backgroundHandler;
+  auto styleDensity =
+      handler != nullptr ? handler->consumerContentScale(contentScale) : contentScale;
   for (const auto& layerStyle : _layerStyles) {
+    if (BackgroundHandler::IsNegligibleBackgroundStyle(layerStyle.get(), styleDensity)) {
+      continue;
+    }
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
     if (DeclaresGeometry(layerStyle.get())) {
       bucketNeedsGeometry[index] = true;

@@ -63,6 +63,36 @@ class BackgroundHandler {
     return nullptr;
   }
 
+  /**
+   * A background blur whose radius, measured in the pixels of the tile it is drawn into, is at or
+   * below this value changes no pixel by more than 1/255 (the neighbour weight of a gaussian with
+   * sigma 0.3 is 0.0038), so drawing it only costs passes and textures.
+   */
+  static constexpr float NegligibleBlurRadius = 0.3f;
+
+  /**
+   * Debugging switch for comparing the picture and the cost with and without skipping negligible
+   * background blurs. Enabled by default.
+   */
+  static bool& SkipNegligibleBlurEnabled();
+
+  /**
+   * Returns true if drawing the style at the given density would not change the picture, so the
+   * capture pass, the consume pass and the style source creation can all leave it out. The density
+   * must be the one the consumer draws with, which the capturer derives with
+   * consumerContentScale(). Every caller has to use this one function, because a style that is
+   * captured but not consumed (or the other way round) unbalances the snapshot queue.
+   */
+  static bool IsNegligibleBackgroundStyle(const LayerStyle* style, float densityScale);
+
+  /**
+   * Converts the content scale seen by this handler into the one the consumer draws with. They
+   * differ only when the capture surface was down-sampled.
+   */
+  virtual float consumerContentScale(float contentScale) const {
+    return contentScale;
+  }
+
   // Returns true when descendants of `layer` should render onto a real Surface so a sub
   // background source can sample them back. Capturer returns true only when `layer` actually has
   // descendant background-sourced styles AND a GPU context is available; Consumer / NoOp always
@@ -132,6 +162,8 @@ class BackgroundCapturer : public BackgroundHandler {
 
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                            LayerStyle* style, const LayerStyleSource* source) override;
+
+  float consumerContentScale(float contentScale) const override;
 
   BackgroundCapturer* asCapturer() override {
     return this;

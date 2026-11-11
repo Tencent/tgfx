@@ -81,7 +81,6 @@
     presentImmediately = true;
     displayList.setRenderMode(tgfx::RenderMode::Tiled);
     displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
-    displayList.setMaxTileCount(512);
   }
   lastSurfaceWidth = static_cast<int>(self.bounds.size.width * self.contentScaleFactor);
   lastSurfaceHeight = static_cast<int>(self.bounds.size.height * self.contentScaleFactor);

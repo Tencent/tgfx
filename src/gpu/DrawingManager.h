@@ -36,6 +36,29 @@ class DrawingManager {
  public:
   explicit DrawingManager(Context* context);
 
+  /**
+   * Returns a mark of the draw calls recorded so far. DisplayList takes one before drawing a tile
+   * and passes it to hasDrawnSince() to tell whether the tile produced any content.
+   */
+  uint64_t drawMark() const {
+    return _drawCount;
+  }
+
+  /**
+   * Returns true if an OpsCompositor of this context recorded a draw call after the given mark.
+   */
+  bool hasDrawnSince(uint64_t mark) const {
+    return _drawCount != mark;
+  }
+
+  /**
+   * Records that this context is about to draw something. RenderContext calls it when a canvas
+   * obtains its OpsCompositor, which every draw path goes through.
+   */
+  void markDrawn() {
+    ++_drawCount;
+  }
+
   BlockAllocator* drawingAllocator() {
     return &getDrawingBuffer()->drawingAllocator;
   }
@@ -151,6 +174,7 @@ class DrawingManager {
   std::deque<std::shared_ptr<DrawingBuffer>> bufferPool = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   std::unordered_map<TextureProxy*, AtlasUploadTask*> atlasTaskMap = {};
+  uint64_t _drawCount = 0;
 
   DrawingBuffer* getDrawingBuffer() {
     return currentBuffer ? currentBuffer.get() : createDrawingBuffer();

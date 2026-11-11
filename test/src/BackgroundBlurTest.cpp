@@ -1373,19 +1373,22 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleShareCompactGate){TGFX_PRIVATE_ACCESS
   // Two 100x100 rects across the diagonal of a 200x200 box: the union is exactly twice their sum,
   // which is the gate's boundary, and the boundary itself still shares.
   auto atBoundary = displayList.captureBackgrounds(
-      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(100, 100, 100, 100)});
+      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(100, 100, 100, 100)},
+      displayList.getViewMatrix());
   EXPECT_TRUE(atBoundary != nullptr);
   EXPECT_TRUE(atBoundary->styleShareCompact);
 
   // One pixel further apart and the union grows past the boundary.
   auto pastBoundary = displayList.captureBackgrounds(
-      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(101, 100, 100, 100)});
+      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(101, 100, 100, 100)},
+      displayList.getViewMatrix());
   EXPECT_TRUE(pastBoundary != nullptr);
   EXPECT_FALSE(pastBoundary->styleShareCompact);
 
   // Opposite corners of the surface: the union is the whole surface.
   auto scattered = displayList.captureBackgrounds(
-      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(300, 300, 100, 100)});
+      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(300, 300, 100, 100)},
+      displayList.getViewMatrix());
   EXPECT_TRUE(scattered != nullptr);
   EXPECT_FALSE(scattered->styleShareCompact);
 
@@ -1438,7 +1441,8 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleOutputOversizeFallsBack) {
     const auto height = static_cast<float>(TargetHeight);
     auto snapshots = displayList.captureBackgrounds(
         surface.get(),
-        {Rect::MakeWH(halfWidth, height), Rect::MakeXYWH(halfWidth, 0.f, halfWidth, height)});
+        {Rect::MakeWH(halfWidth, height), Rect::MakeXYWH(halfWidth, 0.f, halfWidth, height)},
+        displayList.getViewMatrix());
     ASSERT_TRUE(snapshots != nullptr);
     displayList.drawRootLayer(surface.get(), Rect::MakeWH(static_cast<float>(TargetWidth), height),
                               displayList.getViewMatrix(), true, snapshots.get());

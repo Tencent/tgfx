@@ -26,8 +26,10 @@
 namespace tgfx {
 class RootLayer;
 class Tile;
-class TileCache;
+class TilePool;
+class BlankTileSet;
 class DrawTask;
+enum class TileType;
 struct BackgroundSnapshotMap;
 
 /**
@@ -70,18 +72,17 @@ enum class RenderMode {
  */
 enum class TileUpdateMode {
   /**
-   * Missing tiles are rasterized at the current zoomScale within the same frame. Cached tiles
-   * from other zoom scales are never reused. This produces the highest visual fidelity but may
-   * cause frame drops during heavy zoom or pan. This is the default mode.
+   * Missing tiles are rasterized at the current zoomScale within the same frame. No fallback tiles
+   * are used. This produces the highest visual fidelity but may cause frame drops during heavy zoom
+   * or pan. This is the default mode.
    */
   Immediate,
 
   /**
-   * For each missing tile, the display list first tries to reuse a cached tile from another
-   * zoom scale as a temporary fallback (producing brief zoom blur). When no such cache is
-   * available, the tile is rasterized at the current zoomScale within the same frame to keep
-   * the result correct. Use this mode when you want a smoother visual transition during zoom
-   * while still guaranteeing visible content on every frame.
+   * Missing tiles are filled with fallback tiles reused across zoom scales as a temporary stand-in
+   * (producing brief zoom blur). The tiles at the current zoomScale then fill in over the following
+   * frames to keep the frame rate stable. When no fallback covers a tile, it is rasterized at the
+   * current zoomScale within the same frame to keep the result correct.
    */
   Smooth,
 
@@ -196,28 +197,6 @@ class DisplayList {
   void setTileSize(int tileSize);
 
   /**
-   * Returns the maximum number of tiles that can be created in tiled rendering mode. This setting
-   * is ignored in other render modes. Allowing more tiles can improve performance, especially when
-   * zooming. If the specified count is less than the minimum required for tiled rendering, it will
-   * be automatically increased to meet the minimum. The minimum value is calculated based on the
-   * tile size and viewport size, ensuring the visible area is always fully covered, even if the
-   * viewport is offset by half a tile. For example, with a tile size of 256 pixels and a viewport
-   * of 512x512 pixels, the minimum tile count is 9 (2 tiles in each direction plus 1 for offset).
-   * The minimum tile count is sufficient for scrolling without zooming. If you plan to zoom
-   * frequently, you should set a higher maximum tile count to avoid performance issues. The default
-   * value is 0, which means the minimum tile count will be used based on the viewport size and tile
-   * size.
-   */
-  int maxTileCount() const {
-    return _maxTileCount;
-  }
-
-  /**
-   * Sets the maximum number of tiles that can be created in tiled rendering mode.
-   */
-  void setMaxTileCount(int count);
-
-  /**
    * Returns the current tile update mode. This setting only applies in tiled rendering mode and
    * controls how missing tiles are produced when the zoomScale changes. The default is
    * TileUpdateMode::Immediate.
@@ -235,15 +214,12 @@ class DisplayList {
 
   /**
    * Returns the per-frame budget for rasterizing missing tiles. This setting only applies in
-   * tiled rendering mode and is ignored when tileUpdateMode() is TileUpdateMode::Immediate. In
-   * TileUpdateMode::Smooth, once the budget is exhausted, tiles that have a cached fallback at
-   * another zoom scale will display the fallback instead of being rasterized; tiles without any
-   * fallback are still rasterized in the same frame to keep the result correct, so the actual
-   * tiles drawn per frame may exceed this limit. In TileUpdateMode::Fast, the budget is a hard
-   * cap: tiles beyond it fall back to cached content from other zoom scales, or are filled with
-   * the background color when no fallback is available. Higher values fill the screen faster
-   * during zoom and pan at the cost of per-frame GPU load; lower values prioritize stable frame
-   * rate.
+   * tiled rendering mode and is ignored when tileUpdateMode() is TileUpdateMode::Immediate. While
+   * the viewport stays still, the budget rasterizes tiles at the current zoomScale. While it zooms
+   * or pans, the budget instead refines the displayed fallback tiles one power-of-two level at a
+   * time, coarse levels first. Fallback tiles rasterized because nothing covers a missing tile do
+   * not count against the budget. Higher values fill the screen faster during zoom and pan at the
+   * cost of per-frame GPU load; lower values prioritize stable frame rate.
    */
   int maxTilesRefinedPerFrame() const {
     return _maxTilesRefinedPerFrame;
@@ -321,7 +297,6 @@ class DisplayList {
   Point _contentOffset = {};
   RenderMode _renderMode = RenderMode::Partial;
   int _tileSize = 256;
-  int _maxTileCount = 0;
   TileUpdateMode _tileUpdateMode = TileUpdateMode::Immediate;
   int _maxTilesRefinedPerFrame = 5;
   int _subtreeCacheMaxSize = 0;
@@ -332,8 +307,12 @@ class DisplayList {
   Point lastContentOffset = {};
   Point mousePosition = {};
   int totalTileCount = 0;
+  int lastSurfaceWidth = 0;
+  int lastSurfaceHeight = 0;
+  size_t minTreeTileCount = 0;
   std::vector<std::shared_ptr<Surface>> surfaceCaches = {};
-  std::unordered_map<int64_t, TileCache*> tileCaches = {};
+  std::unique_ptr<TilePool> tilePool = nullptr;
+  std::unique_ptr<BlankTileSet> blankTiles = nullptr;
   std::vector<std::shared_ptr<Tile>> emptyTiles = {};
   std::deque<std::vector<Rect>> lastDirtyRegions = {};
 
@@ -350,30 +329,25 @@ class DisplayList {
   std::vector<DrawTask> invalidateTileCaches(const std::vector<Rect>& dirtyRegions,
                                              const Rect& viewportRect);
 
-  void invalidateCurrentTileCache(TileCache* tileCache, const std::vector<Rect>& dirtyRegions,
-                                  const Rect& viewportRect, std::vector<DrawTask>* tileTasks);
+  void invalidateCurrentGridTiles(const std::vector<Rect>& dirtyRegions, const Rect& viewportRect,
+                                  std::vector<DrawTask>* tileTasks);
+
+  void invalidateTreeTiles(const std::vector<Rect>& dirtyRegions, const Rect& viewportRect,
+                           std::vector<DrawTask>* tileTasks);
+
+  void invalidateBlankTiles(const std::vector<Rect>& dirtyRegions);
 
   void recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks);
 
-  std::vector<DrawTask> collectScreenTasks(const Surface* surface, bool hasDirtyRegions,
-                                           bool autoClear, std::vector<DrawTask>* tileTasks,
-                                           std::vector<Rect>* skippedRects,
-                                           std::vector<DrawTask>* throttleScreenTasks);
+  void recycleGridTiles();
 
-  std::vector<std::pair<float, TileCache*>> getSortedTileCaches() const;
+  void recycleBlankTiles(const DrawTask& task);
 
-  std::vector<std::pair<float, TileCache*>> getFallbackTileCaches(
-      const std::vector<std::pair<float, TileCache*>>& sortedCaches) const;
+  std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
+                                           std::vector<Rect>* skippedRects);
 
-  std::vector<DrawTask> getFallbackDrawTasks(
-      int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const;
-
-  std::vector<DrawTask> getThrottleFallbackTasks(
-      int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& fallbackCaches) const;
-
-  std::vector<std::shared_ptr<Tile>> getFreeTiles(
-      const Surface* renderSurface, size_t tileCount,
-      const std::vector<std::pair<float, TileCache*>>& sortedCaches);
+  std::vector<std::shared_ptr<Tile>> getFreeTiles(const Surface* renderSurface, TileType type,
+                                                  size_t tileCount);
 
   std::vector<std::shared_ptr<Tile>> createContinuousTiles(const Surface* renderSurface,
                                                            int requestCountX, int requestCountY);
@@ -384,13 +358,20 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  void drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots) const;
+  bool drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots) const;
+
+  void captureTileBackgrounds(Surface* surface, const std::vector<DrawTask>& tileTasks,
+                              float zoomScale,
+                              std::vector<std::unique_ptr<BackgroundSnapshotMap>>* captureMaps,
+                              std::vector<int>* taskCapture) const;
+
+  std::vector<Rect> drawTileTasks(
+      std::vector<DrawTask>& tileTasks,
+      const std::vector<std::unique_ptr<BackgroundSnapshotMap>>& captureMaps,
+      const std::vector<int>& taskCapture, Surface* surface, float zoomScale);
 
   void drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
                        Surface* surface, bool autoClear) const;
-
-  void drawThrottleScreenTasks(std::vector<DrawTask> throttleScreenTasks, Surface* surface,
-                               bool autoClear) const;
 
   void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
 
@@ -398,7 +379,7 @@ class DisplayList {
 
   void resetCaches();
 
-  void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
+  bool drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear, BackgroundSnapshotMap* snapshots) const;
 
   /**
@@ -406,10 +387,16 @@ class DisplayList {
    * cull layers that only touch the tile but lie under no background style. `worldBounds` limits
    * the walk to the area being captured.
    */
-  std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
+  std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds,
+                                                const Matrix& viewMatrix) const;
 
+  /**
+   * Captures the backdrop for background-sourced styles. `renderRects` are in the surface pixels of
+   * `viewMatrix`, which maps the layer space to those pixels; a tile passes its own raster scale so
+   * the snapshot density matches the tile it is drawn into.
+   */
   std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(
-      Surface* surface, const std::vector<Rect>& renderRects,
+      Surface* surface, const std::vector<Rect>& renderRects, const Matrix& viewMatrix,
       const std::vector<Rect>& cullRects = {}) const;
 
   void updateMousePosition();

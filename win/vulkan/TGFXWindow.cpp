@@ -286,7 +286,6 @@ void TGFXWindow::createAppHost() {
 
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
-  displayList.setMaxTileCount(512);
 
   std::filesystem::path filePath = __FILE__;
   auto rootPath = filePath.parent_path().parent_path().parent_path().string();

@@ -29,7 +29,7 @@
 #include "layers/OpaqueContext.h"
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
-#include "layers/TileCache.h"
+#include "layers/TilePool.h"
 #include "layers/compositing3d/Render3DContext.h"
 #include "layers/contents/ComposeContent.h"
 #include "layers/contents/MatrixContent.h"
@@ -8808,9 +8808,8 @@ TGFX_TEST(LayerTest, TiledDirtyRegionOutsideViewport) {
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Tiled);
   displayList->setTileSize(64);
-  // A large tile pool keeps the tiles covering the first viewport cached while the viewport moves,
-  // so a missing invalidation shows up as stale pixels instead of a reclaimed tile.
-  displayList->setMaxTileCount(400);
+  // The tile pool is large enough to keep the tiles covering the first viewport cached while the
+  // viewport moves, so a missing invalidation shows up as stale pixels instead of a reclaimed tile.
   auto solidLayer = SolidLayer::Make();
   solidLayer->setColor(Color::Red());
   solidLayer->setWidth(400);
