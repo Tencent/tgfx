@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/ProgramWriterFactory.h"
+#include "core/utils/Log.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
@@ -46,7 +47,11 @@ std::unique_ptr<ProgramWriter> MakeProgramWriter(const ProgramInfo& info,
                                              permutationOrdinal);
     }
   }
-  return std::make_unique<PrecompiledProgramWriter>();
+  // Every name reaching here comes from a matched variant, and a matched variant's family is a
+  // table row, so a miss is a bug rather than a draw the runtime can serve: nothing would upload
+  // that program's uniforms.
+  LOGE("MakeProgramWriter: %s is not a declared family", shaderName.c_str());
+  return nullptr;
 }
 
 }  // namespace tgfx

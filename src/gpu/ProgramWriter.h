@@ -89,23 +89,21 @@ class ProgramWriter {
                              RenderPass* renderPass) const = 0;
 };
 
-/** The precompiled route: the IR-driven walk and the artifact's sampler slots. */
+/**
+ * The precompiled route's base: the artifact's engine defaults and sampler slots. It is not a
+ * writer on its own — every family either declares its own processor write (the declared families,
+ * deriving the layout from the variant) or compiles the draw's whole expression (Chain), so no
+ * concrete writer leaves writeProcessors unimplemented.
+ */
 class PrecompiledProgramWriter : public ProgramWriter {
  public:
-  PrecompiledProgramWriter() = default;
-
   bool canWrite(const ProgramInfo& info) const override;
 
  protected:
   void writeEngineDefaults(const ProgramInfo& info,
                            UniformData* fragmentUniformData) const override;
-  void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                       UniformData* fragmentUniformData) const override;
   void writeSamplers(const ProgramInfo& info, Program* program,
                      RenderPass* renderPass) const override;
-  /// The processor-tree fallback for IRs the action list cannot bind (see writeProcessors).
-  void writeProcessorsByTree(const ProgramInfo& info, UniformData* vertexUniformData,
-                             UniformData* fragmentUniformData) const;
 };
 
 /**

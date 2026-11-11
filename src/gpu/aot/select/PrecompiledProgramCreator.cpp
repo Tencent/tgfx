@@ -711,10 +711,17 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   cache->recordAOTStage(PrecompiledAOTStage::PipelineCreated,
                         MakeHitRecord(cache, programInfo, *matchResult));
 
-  auto program = std::make_shared<Program>(
-      std::move(pipeline), std::move(vertexUniformData), std::move(fragmentUniformData),
-      MakeProgramWriter(*programInfo, matchResult->shaderName,
-                        matchResult->variant.vertPermutationIndex));
+  auto writer = MakeProgramWriter(*programInfo, matchResult->shaderName,
+                                  matchResult->variant.vertPermutationIndex);
+  if (writer == nullptr) {
+    // A family without a writer has no way to upload its uniforms. The matcher only ever returns
+    // table rows, so this is a defect rather than a draw the runtime can serve.
+    cache->recordFailure(PrecompiledFallbackReason::Unspecified,
+                         MakeFallbackRecord(cache, programInfo, &*matchResult));
+    return nullptr;
+  }
+  auto program = std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
+                                           std::move(fragmentUniformData), std::move(writer));
   program->setShaderName(matchResult->shaderName);
   program->setExpectedTextureCount(static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));
   return program;
