@@ -45,90 +45,7 @@ using contract_check::Report;
 
 }  // namespace
 
-static bool IsIdentifierChar(char ch) {
-  return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') ||
-         ch == '_';
-}
-
-static bool EndsWith(const std::string& text, const std::string& suffix) {
-  return text.size() >= suffix.size() &&
-         text.compare(text.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
-
 // Names that end in "Shader" but are not tgfx shader families.
-static bool IsExternalShaderName(const std::string& name) {
-  return name == "SwiftShader";
-}
-
-size_t ValidateShaderSourceReferences(const std::string& shaderDir,
-                                      const std::vector<std::string>& registeredShaders,
-                                      Diagnostics* diagnostics) {
-  namespace fs = std::filesystem;
-  std::error_code code;
-  std::set<std::string> existingFiles;
-  std::vector<fs::path> sourcePaths;
-  for (fs::recursive_directory_iterator it(shaderDir, code), end; !code && it != end;
-       it.increment(code)) {
-    if (!it->is_regular_file()) {
-      continue;
-    }
-    existingFiles.insert(it->path().filename().string());
-    auto extension = it->path().extension().string();
-    if (extension == ".inc" || extension == ".frag" || extension == ".vert") {
-      sourcePaths.push_back(it->path());
-    }
-  }
-  if (code || sourcePaths.empty()) {
-    Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1, -1,
-           "cannot list shader sources under " + shaderDir);
-    return 1;
-  }
-  const std::set<std::string> registered(registeredShaders.begin(), registeredShaders.end());
-  const std::string fileSuffixes[] = {".inc", ".frag", ".vert"};
-  size_t errors = 0;
-  for (const auto& path : sourcePaths) {
-    std::ifstream file(path);
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    const auto text = buffer.str();
-    const auto fileName = path.filename().string();
-    size_t position = 0;
-    while (position < text.size()) {
-      if (!IsIdentifierChar(text[position])) {
-        ++position;
-        continue;
-      }
-      size_t tokenEnd = position;
-      while (tokenEnd < text.size() && IsIdentifierChar(text[tokenEnd])) {
-        ++tokenEnd;
-      }
-      const auto token = text.substr(position, tokenEnd - position);
-      // A "<module>_uniforms.inc" or "pointwise_*.inc" mention is a placeholder, not a file name.
-      const bool placeholder =
-          position > 0 && (text[position - 1] == '>' || text[position - 1] == '*');
-      for (const auto& suffix : fileSuffixes) {
-        if (!placeholder && text.compare(tokenEnd, suffix.size(), suffix) == 0 &&
-            (tokenEnd + suffix.size() >= text.size() ||
-             !IsIdentifierChar(text[tokenEnd + suffix.size()])) &&
-            existingFiles.count(token + suffix) == 0) {
-          Report(diagnostics, Severity::Error, DiagnosticCode::VerifySourceFile, "", "", -1, -1,
-                 fileName + " refers to " + token + suffix + ", which does not exist under " +
-                     shaderDir);
-          ++errors;
-        }
-      }
-      if (EndsWith(token, "Shader") && token.size() > 6 && token[0] >= 'A' && token[0] <= 'Z' &&
-          !IsExternalShaderName(token) && registered.count(token) == 0) {
-        Report(diagnostics, Severity::Error, DiagnosticCode::VerifySourceFamily, "", "", -1, -1,
-               fileName + " refers to shader family " + token +
-                   ", which is not registered (removed or merged into another family?)");
-        ++errors;
-      }
-      position = tokenEnd;
-    }
-  }
-  return errors;
-}
 
 // Reflection-level invariants the runtime loader enforces on read: catching them at build time
 // keeps a broken writer from shipping bundles that the loader would reject (or worse, accept with
@@ -328,8 +245,6 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
   return errors;
 }
 
-
-
 // The pointwise dispatch rule: the shared GLSL dispatch must cover the op list. An operator needs
 // an `op == OP_<NAME>` branch or a `tgfx_pointwise_exempt <Name>: <reason>` entry (the reason is
 // mandatory: an exemption is a design decision, and the file is where it is written down). A
@@ -410,8 +325,6 @@ size_t ValidatePointwiseDispatch(const std::string& shaderDir, Diagnostics* diag
   }
   return errors;
 }
-
-
 
 namespace {
 

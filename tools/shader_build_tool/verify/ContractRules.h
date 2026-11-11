@@ -38,11 +38,9 @@ namespace tgfx {
 // below are the only way the build reaches a check — adding one means adding it to a registry,
 // not threading a new call through main.
 
-/// The inputs of a source-level rule: the directory the shaders live in and the names of
-/// every registered family.
+/// The inputs of a source-level rule: the directory the shaders live in.
 struct SourceRuleContext {
   std::string shaderDir;
-  std::vector<std::string> registeredShaders;
 };
 
 /// The inputs of an artifact-level rule: the variants the build produced and, per compiled

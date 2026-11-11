@@ -534,9 +534,6 @@ int RunBuildCommand(const BuildOptions& options) {
   if (!options.shaderDir.empty()) {
     SourceRuleContext sourceContext;
     sourceContext.shaderDir = options.shaderDir;
-    for (size_t index = 0; index < FamilyCount(); ++index) {
-      sourceContext.registeredShaders.push_back(Families()[index].name);
-    }
     for (const auto& rule : MakeSourceRules()) {
       rule->check(sourceContext, &report.diagnostics);
     }

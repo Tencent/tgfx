@@ -87,10 +87,8 @@ inline constexpr const char* VerifyClipField = "verify.clip.missing-field";
 /// an op the C++ side cannot emit into a slot.
 
 /// A shader source refers to a file that does not exist.
-inline constexpr const char* VerifySourceFile = "verify.reference.missing-file";
 
 /// A shader source refers to a shader family that is not registered.
-inline constexpr const char* VerifySourceFamily = "verify.reference.unknown-family";
 
 /// A reflected sampler/uniform violates the reflection contract the loader enforces on read.
 inline constexpr const char* VerifyReflection = "verify.reflection.invalid";
@@ -166,7 +164,7 @@ inline constexpr const char* AllCodes[] = {
     SpecReader,
     SpecLayoutDrift,
     VerifyClipField,
-    VerifySourceFile,      VerifySourceFamily, VerifyReflection,
+    VerifyReflection,
     VerifyBindingLayout,   VerifyInlinePolicy, VerifyNotApplicable,
     VerifyParamUndeclared, VerifyParamUnused,
     VerifyMacroUnknown,     VerifyPointwiseDispatch,

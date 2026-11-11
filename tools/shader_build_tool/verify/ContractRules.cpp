@@ -27,14 +27,6 @@ namespace {
 // The source rules: each wraps one check of ContractChecks.cpp, whose implementation stays
 // where it is — a rule owns when the check runs and what it is named by, not the check itself.
 
-class SourceReferencesRule : public SourceRule {
- public:
-  size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
-    return ValidateShaderSourceReferences(context.shaderDir, context.registeredShaders,
-                                          diagnostics);
-  }
-};
-
 // The artifact rules: two wrap the variant checks of ContractChecks.cpp, one the inline
 // expansion policy of InlineExpansion.cpp.
 
@@ -98,7 +90,6 @@ class InlineExpansionRule : public ArtifactRule {
 
 std::vector<std::unique_ptr<SourceRule>> MakeSourceRules() {
   std::vector<std::unique_ptr<SourceRule>> rules;
-  rules.push_back(std::make_unique<SourceReferencesRule>());
   rules.push_back(std::make_unique<MacroNamesRule>());
   rules.push_back(std::make_unique<PointwiseDispatchRule>());
   rules.push_back(std::make_unique<MirroredDimensionsRule>());

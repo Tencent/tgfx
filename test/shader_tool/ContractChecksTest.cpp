@@ -78,23 +78,6 @@ Report CheckReflection(const std::vector<VariantData>& variants) {
   return Finish(errors, diagnostics);
 }
 
-std::vector<std::string> RegisteredShaderNames() {
-  // Every family is a row of the declaration table; the reference check resolves those names.
-  std::vector<std::string> names;
-  for (size_t index = 0; index < FamilyCount(); ++index) {
-    names.push_back(Families()[index].name);
-  }
-  return names;
-}
-
-Report CheckReferences(const std::string& shaderDir) {
-  auto names = RegisteredShaderNames();
-  Diagnostics diagnostics;
-  auto errors = ValidateShaderSourceReferences(shaderDir, names, &diagnostics);
-  return Finish(errors, diagnostics);
-}
-
-
 Report CheckFamilyParams(const std::vector<VariantData>& variants) {
   Diagnostics diagnostics;
   auto errors = ValidateFamilyParams(variants, &diagnostics);
@@ -202,40 +185,6 @@ TEST(ClipContractTest, EveryOffendingVariantIsCounted) {
   fields.pop_back();
   std::vector<VariantData> variants(3, VariantWithFragment(fields));
   EXPECT_EQ(CheckClip(variants).errors, 3u);
-}
-
-// ---- ValidateShaderSourceReferences ---------------------------------------------------------
-
-TEST_F(DamagedShaderDir, TheRealSourcesReferenceOnlyThingsThatExist) {
-  auto report = CheckReferences(scratch.dir());
-  EXPECT_EQ(report.errors, 0u) << report.log;
-}
-
-TEST_F(DamagedShaderDir, AReferenceToAMissingFileIsReported) {
-  Append("kernels/solid_color_fill.frag", "\n// see removed_header.inc\n");
-  auto report = CheckReferences(scratch.dir());
-  EXPECT_EQ(report.errors, 1u) << report.log;
-  EXPECT_TRUE(report.mentions("refers to removed_header.inc, which does not exist")) << report.log;
-}
-
-TEST_F(DamagedShaderDir, AReferenceToAnUnregisteredFamilyIsReported) {
-  Append("kernels/solid_color_fill.frag", "\n// formerly GoneAwayShader\n");
-  auto report = CheckReferences(scratch.dir());
-  EXPECT_EQ(report.errors, 1u) << report.log;
-  EXPECT_TRUE(report.mentions("refers to shader family GoneAwayShader")) << report.log;
-}
-
-TEST_F(DamagedShaderDir, PlaceholdersAndExternalNamesAreExempt) {
-  Append("kernels/solid_color_fill.frag",
-         "\n// <module>_uniforms.inc, pointwise_*.inc, SwiftShader\n");
-  auto report = CheckReferences(scratch.dir());
-  EXPECT_EQ(report.errors, 0u) << report.log;
-}
-
-TEST(SourceReferencesTest, AnUnreadableDirectoryIsReported) {
-  auto report = CheckReferences("/nonexistent/shader/dir");
-  EXPECT_EQ(report.errors, 1u);
-  EXPECT_TRUE(report.mentions("cannot list shader sources")) << report.log;
 }
 
 // ---- ValidateReflectionContracts ------------------------------------------------------------

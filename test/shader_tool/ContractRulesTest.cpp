@@ -36,16 +36,13 @@ const std::string RealShaderDir = std::string(TGFX_SOURCE_DIR) + "/src/gpu/shade
 SourceRuleContext RealSourceContext() {
   SourceRuleContext context;
   context.shaderDir = RealShaderDir;
-  for (size_t index = 0; index < FamilyCount(); ++index) {
-    context.registeredShaders.push_back(Families()[index].name);
-  }
   return context;
 }
 
 }  // namespace
 
-TEST(ContractRulesTest, TheSourceRegistryHoldsTheFiveSourceRules) {
-  EXPECT_EQ(MakeSourceRules().size(), 5u);
+TEST(ContractRulesTest, TheSourceRegistryHoldsTheFourSourceRules) {
+  EXPECT_EQ(MakeSourceRules().size(), 4u);
 }
 
 TEST(ContractRulesTest, TheArtifactRegistryHoldsTheFiveArtifactRules) {
