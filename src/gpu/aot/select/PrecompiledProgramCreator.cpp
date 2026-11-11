@@ -248,7 +248,7 @@ static bool VertexInputFormatMatches(const std::vector<VertexInput>& inputs, uin
 }
 
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
-                                                                  const ProgramInfo* programInfo) {
+                                                                  ProgramInfo* programInfo) {
   auto cache = ContextCacheAccess::Cache(context);
   cache->recordAOTStage(PrecompiledAOTStage::Attempt);
   if (!cache->isLoaded()) {
@@ -318,6 +318,10 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
+  // The selection's data sources stay on the info before the cache lookup: the upload reads them
+  // instead of re-running the family rule, whether the program comes from the cache or is created
+  // below.
+  programInfo->setFamilyMatch(selection->sources);
   // The selection names the program: its variant selects the blob pair and its specialization
   // values tell two chain shapes of one variant apart (a rect clip's anti-alias flag, for one, is
   // not in the processor tree), so the generic form and every specialized form of one variant

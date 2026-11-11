@@ -19,6 +19,7 @@
 #pragma once
 
 #include <optional>
+#include "gpu/aot/select/FamilyMatchResult.h"
 #include "gpu/aot/spec/SpecValues.h"
 #include "gpu/shaders/Family.h"
 #include "gpu/shaders/contract/AOTFailure.h"
@@ -29,13 +30,15 @@ class Context;
 class ProgramInfo;
 
 /**
- * One draw's resolved program: the variant that serves it and the specialization values folded
- * into the shader. The per-draw data sources the writer reads are deliberately absent — the
- * writer still re-matches for them; carrying them here is the next step's change.
+ * One draw's resolved program: the variant that serves it, the specialization values folded into
+ * the shader, and the data sources the writers read. The sources travel with the selection so a
+ * draw is matched once: the writers consume them instead of re-running the family rule (the rule
+ * is the only place the per-draw texture/gradient/kernel leaves come from).
  */
 struct ProgramSelection {
   Variant variant = {};
   SpecValues spec = {};
+  FamilyMatchResult sources = {};
 };
 
 /**

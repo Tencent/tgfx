@@ -95,12 +95,6 @@ struct Layout {
     uint16_t count = 0;
   };
   Slice SliceOf(uint8_t slotIndex) const;
-
-  /// The index of the module's named element inside the slice, spelled <Module>_<name> (bare for
-  /// the implicit Frame/Xfer). A wrong name returns the slice's count, which every writer treats
-  /// as "field absent" and skips loudly in debug.
-  uint16_t FieldIndexInSlice(const Slice& slice, const char* moduleName,
-                             const char* elementName) const;
 };
 
 /// Derives the layout of one variant of `family` (the explicit form the module tests use; the

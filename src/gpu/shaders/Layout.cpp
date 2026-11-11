@@ -203,15 +203,4 @@ Layout::Slice Layout::SliceOf(uint8_t slotIndex) const {
   return slice;
 }
 
-uint16_t Layout::FieldIndexInSlice(const Slice& slice, const char* moduleName,
-                                   const char* elementName) const {
-  const std::string fullName = std::string(moduleName) + "_" + elementName;
-  for (uint16_t index = 0; index < slice.count; ++index) {
-    if (slice.names[index] == fullName || slice.names[index] == elementName) {
-      return index;
-    }
-  }
-  return slice.count;
-}
-
 }  // namespace tgfx

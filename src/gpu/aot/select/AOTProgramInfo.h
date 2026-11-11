@@ -36,7 +36,9 @@ struct AOTProgram;
  */
 class AOTProgramInfo {
  public:
-  explicit AOTProgramInfo(const ProgramInfo& info);
+  /// info must outlive this object: a successful resolution records the selection's data sources
+  /// on it, so the upload reads them instead of re-matching.
+  explicit AOTProgramInfo(ProgramInfo* info);
 
   /**
    * Whether the route resolved. False means the draw's expression is not servable this way (no

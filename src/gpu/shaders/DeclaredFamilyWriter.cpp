@@ -27,7 +27,7 @@
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
-#include "gpu/aot/select/FamilyMatch.h"
+#include "gpu/aot/select/FamilyMatchResult.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
 #include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
@@ -1016,25 +1016,24 @@ void DeclaredFamilyProgramWriter::writeEngineDefaults(const ProgramInfo&, Unifor
 void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
                                                          UniformData* vertexUniformData,
                                                          UniformData* fragmentUniformData) const {
-  const auto shape = ExtractDrawShape(&info);
-  // The program's own rule alone: its family and variant were fixed at construction, and the rule
-  // is the only place the per-draw data sources (the texture leaves, the kernels) come from.
-  FamilyMatchResult match = {};
-  if (!FamilyMatchers()[variant.family](&info, shape, &match)) {
+  // The draw's selection ran once, before the program was created from this variant, and its data
+  // sources (the texture leaves, the kernels) rode the info to here: the upload never re-matches.
+  const auto* match = info.getFamilyMatch();
+  if (match == nullptr) {
     LOGE(
-        "DeclaredFamilyProgramWriter: the draw no longer matches the %s family; uniforms stay "
-        "unwritten",
+        "DeclaredFamilyProgramWriter: the draw carries no selection for the %s family; uniforms "
+        "stay unwritten",
         Families()[variant.family].name);
     return;
   }
-  // The program key carries the variant, so a draw landing on this program re-matches the same
-  // variant; a mismatch means one key covers two variants and the leaves would write into the
-  // wrong layout.
-  if (match.variant.id() != variant.id()) {
+  // The program key carries the variant, so a draw landing on this program was selected for the
+  // same variant; a mismatch means one key covers two variants and the leaves would write into
+  // the wrong layout.
+  if (match->variant.id() != variant.id()) {
     LOGE(
-        "DeclaredFamilyProgramWriter: the draw matched %s variant %u but the program was built "
+        "DeclaredFamilyProgramWriter: the draw selected %s variant %u but the program was built "
         "for %u — one program key covers two variants",
-        Families()[variant.family].name, match.variant.id(), variant.id());
+        Families()[variant.family].name, match->variant.id(), variant.id());
     return;
   }
   const Family& family = Families()[variant.family];
@@ -1079,38 +1078,38 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
     } else if (module == &QuadTextureGeometry) {
       WriteQuadTextureGeometry(info, &writer);
     } else if (module == &TextureModule) {
-      if (match.tiledLeaf != nullptr) {
-        WriteTexture(info, *match.tiledLeaf, &writer);
+      if (match->tiledLeaf != nullptr) {
+        WriteTexture(info, *match->tiledLeaf, &writer);
       }
     } else if (module == &CoverageTexture) {
-      if (match.maskLeaf != nullptr) {
-        WriteCoverageTexture(*match.maskLeaf, &writer);
+      if (match->maskLeaf != nullptr) {
+        WriteCoverageTexture(*match->maskLeaf, &writer);
       }
     } else if (module == &GaussianBlur) {
-      if (match.blurKernel != nullptr) {
-        WriteGaussianBlur(*match.blurKernel, match.blurChild, &writer);
+      if (match->blurKernel != nullptr) {
+        WriteGaussianBlur(*match->blurKernel, match->blurChild, &writer);
       }
     } else if (module == &GlassUDFTentBlur) {
-      if (match.blurKernel != nullptr) {
-        WriteGlassUDFTentBlur(*match.blurKernel, match.blurChild, &writer);
+      if (match->blurKernel != nullptr) {
+        WriteGlassUDFTentBlur(*match->blurKernel, match->blurChild, &writer);
       }
     } else if (module == &GlassRefraction) {
-      if (match.glassKernel != nullptr) {
-        WriteGlassRefraction(*match.glassKernel, info, &writer);
+      if (match->glassKernel != nullptr) {
+        WriteGlassRefraction(*match->glassKernel, info, &writer);
       }
     } else if (module == &GlassLocalMask) {
-      WriteGlassLocalMask(info, &writer, match.maskLeaf != nullptr);
+      WriteGlassLocalMask(info, &writer, match->maskLeaf != nullptr);
     } else if (module == &GradientModule) {
-      if (match.gradient != nullptr) {
-        WriteGradient(*match.gradient, &writer);
+      if (match->gradient != nullptr) {
+        WriteGradient(*match->gradient, &writer);
       }
     } else if (module == &LocalMask) {
       WriteLocalMask(info, &writer);
     } else if (module == &DeviceMaskRuntime) {
       WriteDeviceMaskRuntime(info, &writer);
     } else if (module == &YUVTexture) {
-      if (match.tiledLeaf != nullptr) {
-        WriteYUVTexture(info, *match.tiledLeaf, &writer);
+      if (match->tiledLeaf != nullptr) {
+        WriteYUVTexture(info, *match->tiledLeaf, &writer);
       }
     } else if (module == &YUVChainTail) {
       // The analytic clip fields live in this module (bare names, the legacy spelling); the tail's
@@ -1120,8 +1119,8 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
         BindYUVProgram(*program, fragmentUniformData);
       }
     } else if (module == &TiledTexture) {
-      if (match.tiledLeaf != nullptr) {
-        WriteTiledTexture(info, *match.tiledLeaf, &writer);
+      if (match->tiledLeaf != nullptr) {
+        WriteTiledTexture(info, *match->tiledLeaf, &writer);
       }
     } else if (module == &DeviceMask) {
       WriteDeviceMask(info, &writer);

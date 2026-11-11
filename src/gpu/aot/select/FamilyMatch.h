@@ -19,6 +19,7 @@
 #pragma once
 
 #include <optional>
+#include "gpu/aot/select/FamilyMatchResult.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/shaders/Family.h"
 
@@ -26,22 +27,6 @@ namespace tgfx {
 
 struct DrawShape;
 class ProgramInfo;
-struct AOTTextureParameters;
-struct AOTGradientParameters;
-struct AOTOpaqueKernelParameters;
-
-/// One declaration-driven family's match: the variant the draw maps to and the module data
-/// sources the writers read (the tiled leaf for the TiledTexture slot, the mask leaf for the
-/// MaskTexture slot and the color graph's gradient node for the Gradient slot, null when absent).
-struct FamilyMatchResult {
-  Variant variant;
-  const AOTTextureParameters* tiledLeaf = nullptr;
-  const AOTTextureParameters* maskLeaf = nullptr;
-  const AOTGradientParameters* gradient = nullptr;
-  const AOTOpaqueKernelParameters* blurKernel = nullptr;
-  const AOTTextureParameters* blurChild = nullptr;
-  const AOTOpaqueKernelParameters* glassKernel = nullptr;
-};
 
 /// One declared family's match rule: the shape predicate plus the variant encoding, writing the
 /// matched variant and its data-source leaves into the result. The info is the draw's program

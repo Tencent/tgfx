@@ -175,11 +175,13 @@ void ProgramInfo::writePipelineStateKey(BytesKey* key) const {
   EncodeStencilFace(*key, depthStencil.stencilBack);
 }
 
-std::shared_ptr<Program> ProgramInfo::getProgram() const {
+std::shared_ptr<Program> ProgramInfo::getProgram() {
   auto context = renderTarget->getContext();
   // Precompiled artifacts are the only program source: a miss drops the draw (see
   // StandardDrawOp::prepare). The cache lookup lives in the creator because a program's key
-  // carries its matched variant and specialization values, which only the match can name.
+  // carries its matched variant and specialization values, which only the match can name. The
+  // creator records the selection's data sources on this info, so the upload reads them instead
+  // of re-matching.
   auto program = PrecompiledProgramCreator::CreateProgram(context, this);
   if (program == nullptr) {
     LOGE("ProgramInfo::getProgram() Precompiled program unavailable!");

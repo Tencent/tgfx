@@ -38,13 +38,11 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
     return std::nullopt;
   }
   auto matchFailure = PermutationMatchFailure::None;
-  std::optional<Variant> variant = std::nullopt;
+  std::optional<FamilyMatchResult> match = std::nullopt;
   if (scope == SelectionScope::ChainOnly) {
     // A plan pass carries its expression pre-compiled, so the interpreter is the only family that
     // can serve it; MatchChainProgram resolves the compiled program off the carried IR.
-    if (auto chain = MatchChainProgram(&info)) {
-      variant = chain->variant;
-    }
+    match = MatchChainProgram(&info);
   } else {
     // Alpha-only (AAAA) targets: only the kernels that apply the write swizzle at output may
     // serve the draw; the row predicates carry that rejection.
@@ -59,19 +57,15 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
       // The declared walk already consults the interpreter's fallback row (MatchChain is its
       // matcher), so one walk answers both; a second explicit interpreter attempt would run the
       // same predicate on the same shape.
-      if (auto assembled = MatchAssembledFamily(&info, shape)) {
-        variant = assembled->variant;
-      }
+      match = MatchAssembledFamily(&info, shape);
     } else if (allowInterpreter && (!alphaOnly || ChainInputs::ServesAlphaOnly)) {
-      if (auto chain = MatchChainProgram(&info)) {
-        variant = chain->variant;
-      }
+      match = MatchChainProgram(&info);
     }
-    if (!variant && alphaOnly) {
+    if (!match && alphaOnly) {
       matchFailure = PermutationMatchFailure::NoMatchingFamily;
     }
   }
-  if (!variant) {
+  if (!match) {
     // No rejecting site named a reason: the generic no-matching-rule verdict.
     if (matchFailure == PermutationMatchFailure::None) {
       matchFailure = PermutationMatchFailure::NoMatchingRule;
@@ -85,7 +79,7 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
   // semantics in play. The variant came out of EncodeVariant, so it is inside the family's
   // reachable set by construction — the former buildable-permutation re-check here was a tautology
   // over the same declaration.
-  if (!AdmitMatchedProgram(&info, shape, &Families()[variant->family], failure)) {
+  if (!AdmitMatchedProgram(&info, shape, &Families()[match->variant.family], failure)) {
     return std::nullopt;
   }
   // The specialization values are part of the program's identity: the processor tree cannot tell
@@ -93,13 +87,14 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
   // built for one shape must never answer the other.
   const SpecValues spec =
       SpecResolver::Resolve(context != nullptr ? ContextCacheAccess::Cache(context) : nullptr,
-                            info.backend(), info, *variant);
+                            info.backend(), info, match->variant);
   if (failure != nullptr) {
     *failure = PermutationMatchFailure::None;
   }
   ProgramSelection selection = {};
-  selection.variant = *variant;
+  selection.variant = match->variant;
   selection.spec = spec;
+  selection.sources = *match;
   return selection;
 }
 

@@ -22,9 +22,9 @@
 
 namespace tgfx {
 
-/// A tiled texture as the color source. FULL selects the 4-tap mipmap-repeat path (the
-/// TiledTextureFill family; not yet assembled by any family). PRESENT carries the module:
-/// 0 = the module is absent (a solid fill), 1 = the texture rides the fill.
+/// A tiled texture as the color source. FULL selects the 4-tap mipmap-repeat path (pinned to 1 by
+/// TiledTextureFill, to 0 by RRect's single-tap form). PRESENT carries the module: 0 = the module
+/// is absent (a solid fill), 1 = the texture rides the fill.
 inline constexpr ModuleDim TiledTextureDims[] = {{"FULL", 2}, {"PRESENT", 2}};
 
 inline constexpr Element TiledTextureElements[] = {

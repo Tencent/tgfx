@@ -24,6 +24,7 @@
 #include "gpu/Program.h"
 #include "gpu/Swizzle.h"
 #include "gpu/aot/ir/Program.h"
+#include "gpu/aot/select/FamilyMatchResult.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
@@ -107,9 +108,28 @@ class ProgramInfo {
 
   /**
    * Resolves the program for this info from the caches. Precompiled artifacts are the only
-   * program source: a miss drops the draw, with no runtime fallback.
+   * program source: a miss drops the draw, with no runtime fallback. The first call also runs the
+   * draw's single selection and keeps its data sources on this info (see getFamilyMatch), so the
+   * upload never re-matches.
    */
-  std::shared_ptr<Program> getProgram() const;
+  std::shared_ptr<Program> getProgram();
+
+  /**
+   * Records the selection's data sources on this info. The selection layer is the only caller:
+   * it runs once per draw, right before the program is created from the selected variant.
+   */
+  void setFamilyMatch(const FamilyMatchResult& match) {
+    familyMatch = match;
+  }
+
+  /**
+   * The data sources the draw's selection named (the texture/gradient/kernel leaves the declared
+   * families' writers read), or null when no selection ran — a chain program, a draw that did not
+   * match, or an info whose program was never resolved.
+   */
+  const FamilyMatchResult* getFamilyMatch() const {
+    return familyMatch.has_value() ? &*familyMatch : nullptr;
+  }
 
   /**
    * Writes the pipeline-state fields the program keys carry — everything past the processor keys
@@ -288,6 +308,10 @@ class ProgramInfo {
   // so the attachment can happen right after construction (the pipeline-state setters already
   // run in that window); it is an input, never recomputed, and null unless explicitly attached.
   mutable const DrawIR* carriedIR = nullptr;
+
+  // The draw's single selection result, filled by getProgram()'s first call. An input to the
+  // upload, never recomputed; null when no selection ran.
+  std::optional<FamilyMatchResult> familyMatch = std::nullopt;
 
   friend class ProgramWriter;
   friend class PrecompiledProgramWriter;

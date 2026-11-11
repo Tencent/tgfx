@@ -32,8 +32,8 @@
 
 namespace tgfx {
 
-AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info) {
-  auto context = info.getContext();
+AOTProgramInfo::AOTProgramInfo(ProgramInfo* info) {
+  auto context = info->getContext();
   auto cache = context != nullptr ? ContextCacheAccess::Cache(context) : nullptr;
   if (cache == nullptr || !cache->isLoaded()) {
     // Without a bundle there is no route; the plain fallback records the miss itself.
@@ -43,7 +43,7 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info) {
   // SelectProgram runs the same admission, buildability, and specialization steps the plain
   // lookup applies, so a draw these gates refuse falls back to the original draw instead of
   // rendering wrong pixels.
-  auto selection = SelectProgram(context, info, SelectionScope::ChainOnly, nullptr);
+  auto selection = SelectProgram(context, *info, SelectionScope::ChainOnly, nullptr);
   if (!selection) {
     return;
   }
@@ -52,18 +52,21 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info) {
   cache->recordAOTStage(PrecompiledAOTStage::Attempt);
   cache->recordAOTStage(PrecompiledAOTStage::CacheAvailable);
   cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
+  // The selection's data sources stay on the info, exactly as the plain route records them: the
+  // upload never re-matches on either route.
+  info->setFamilyMatch(selection->sources);
 
   // The specialization values join the key: two effect trees of one variant (same GP, same XP,
   // same slot-count class) encode different chains, so the second shape must not silently reuse
   // the first shape's program. SelectProgram resolved them through the same SpecResolver entry
   // the plain route uses, so both routes agree.
-  const BytesKey key = MakeProgramKey(context, info, selection->variant.id(), selection->spec);
+  const BytesKey key = MakeProgramKey(context, *info, selection->variant.id(), selection->spec);
 
   auto globalCache = context->globalCache();
   auto resolved = globalCache->findProgram(key);
   if (resolved == nullptr) {
     resolved = PrecompiledProgramCreator::CreateProgramForVariant(
-        context, &info, selection->variant, selection->spec.empty() ? nullptr : &selection->spec);
+        context, info, selection->variant, selection->spec.empty() ? nullptr : &selection->spec);
     if (resolved == nullptr) {
       return;
     }
