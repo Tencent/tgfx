@@ -134,11 +134,18 @@ class StandardDrawOp : public DrawOp {
   virtual void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
 
  private:
+  /// The configuration every prepared info shares: cull mode, the pass's inherited depth-stencil
+  /// format, and the op's own processor-info hook.
+  void configureProgramInfo(ProgramInfo* info, PixelFormat depthStencilFormat);
+
+  /// The final-lookup failure account: a probe (isFinalLookup false) falls back to the original
+  /// draw, so only the draw's own last lookup logs and counts the drop.
+  static bool failLookup(RenderTarget* renderTarget, bool isFinalLookup, const char* reason);
+
   PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
   bool geometryProcessorInitialized = false;
   std::unique_ptr<ProgramInfo> preparedProgramInfo = nullptr;
   std::shared_ptr<Program> preparedProgram = nullptr;
   RenderTarget* preparedRenderTarget = nullptr;
-  bool preparedViaDecomposition = false;
 };
 }  // namespace tgfx

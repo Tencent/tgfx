@@ -29,6 +29,9 @@
 namespace tgfx {
 
 class RenderTask;
+class StandardDrawOp;
+struct AOTCoverageTerm;
+struct DrawIR;
 
 /**
  * What the router is asked to route: an on-screen draw (whose device bounds gate the plan route)
@@ -80,6 +83,19 @@ class AOTRouter {
  private:
   PlacementPtr<RenderTask> routeDraw(PlacementPtr<DrawOp>* op, const AOTRouteRequest& request);
   PlacementPtr<RenderTask> routeFill(PlacementPtr<DrawOp>* op, const AOTRouteRequest& request);
+
+  /// The decision tail both routes share: one fused pass wins no plan, otherwise the planners'
+  /// verdict decides whether a task is built. `blend` and `terminalCoverage` are the two inputs
+  /// the routes disagree on; `localRemapSource` is the draw whose device-to-local map a multi-pass
+  /// fill needs (null for an offscreen fill, whose local coordinates are device plus coordOffset).
+  /// `planMissed`, when given, reports that the planners produced nothing — the draw side records
+  /// it as an unsupported shape; a fused pass is not a miss.
+  PlacementPtr<RenderTask> routePlan(const DrawIR* ir, const AOTRouteRequest& request,
+                                     BlendMode blend,
+                                     const std::vector<AOTCoverageTerm>* terminalCoverage,
+                                     StandardDrawOp* localRemapSource, PlacementPtr<DrawOp>* op,
+                                     bool* planMissed = nullptr);
+
   PlacementPtr<RenderTask> buildPlanTask(const AOTEffectGraph& graph, const Plan& plan,
                                          const AOTRouteRequest& request,
                                          const std::optional<Matrix>& deviceToLocal,

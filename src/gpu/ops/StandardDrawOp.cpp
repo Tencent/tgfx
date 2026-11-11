@@ -113,6 +113,33 @@ void AssertSingleLeafFacts(const DrawIR& ir,
 }  // namespace
 #endif
 
+void StandardDrawOp::configureProgramInfo(ProgramInfo* info, PixelFormat depthStencilFormat) {
+  info->setCullMode(cullMode);
+  if (depthStencilFormat != PixelFormat::Unknown) {
+    // Some backends reject a pipeline that declares no depth-stencil format while the pass has a
+    // depth-stencil attachment. Inherit the pass format; the default no-op depth/stencil state
+    // keeps the draw behaviour unchanged.
+    DepthStencilDescriptor depthStencil = {};
+    depthStencil.format = depthStencilFormat;
+    info->setDepthStencil(depthStencil);
+  }
+  onConfigureProgramInfo(*info);
+}
+
+bool StandardDrawOp::failLookup(RenderTarget* renderTarget, bool isFinalLookup,
+                                const char* reason) {
+  if (isFinalLookup) {
+    // The final lookup for this draw (plan-task pass probes fall back to the original draw):
+    // nothing will be drawn, so the drop must be visible.
+    LOGE("StandardDrawOp::prepare() %s; the draw is dropped!", reason);
+    auto cache = ContextCacheAccess::Cache(renderTarget->getContext());
+    if (cache->diagnosticRecordingEnabled()) {
+      cache->recordDroppedDraw();
+    }
+  }
+  return false;
+}
+
 bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStencilFormat,
                              bool isFinalLookup, const DrawIR* passIR) {
   if (!geometryProcessorInitialized) {
@@ -134,7 +161,6 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
   preparedProgram = nullptr;
   preparedProgramInfo = nullptr;
   preparedRenderTarget = nullptr;
-  preparedViaDecomposition = false;
 
   std::vector<FragmentProcessor*> fragmentProcessors = {};
   size_t colorCount = colors.size();
@@ -161,28 +187,12 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
     // false (the kernel folds coverage itself).
     if (!resolvedPassIR->program.has_value()) {
       // A pass IR is compiled when the plan builds it; a missing program means the admission
-      // promise was broken, so the draw is dropped instead of compiled on the spot. A pass probe
-      // (isFinalLookup false) falls back to the original draw, so only the draw's own final
-      // lookup records the drop.
-      if (isFinalLookup) {
-        LOGE(
-            "StandardDrawOp::prepare() the pass carries no compiled program; the draw is dropped!");
-        auto cache = ContextCacheAccess::Cache(renderTarget->getContext());
-        if (cache->diagnosticRecordingEnabled()) {
-          cache->recordDroppedDraw();
-        }
-      }
-      return false;
+      // promise was broken, so the draw is dropped instead of compiled on the spot.
+      return failLookup(renderTarget, isFinalLookup, "the pass carries no compiled program");
     }
     auto passInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
                                                   xferProcessor.get(), blendMode, false);
-    passInfo->setCullMode(cullMode);
-    if (depthStencilFormat != PixelFormat::Unknown) {
-      DepthStencilDescriptor depthStencil = {};
-      depthStencil.format = depthStencilFormat;
-      passInfo->setDepthStencil(depthStencil);
-    }
-    onConfigureProgramInfo(*passInfo);
+    configureProgramInfo(passInfo.get(), depthStencilFormat);
     // The pass's expression is already compiled into its carried IR, so only the interpreter can
     // serve it; the scope is the one difference from a draw's own lookup, and the one entry
     // resolves both. The resolution (and the specialization capture it runs) consults the
@@ -192,45 +202,24 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
     auto program = passInfo->getProgram();
     if (program == nullptr) {
       // The pass's shape has no variant, or the bundle lacks it: nothing can serve this draw.
-      // As above, only the draw's own final lookup records the drop; a probe falls back.
-      if (isFinalLookup) {
-        LOGE(
-            "StandardDrawOp::prepare() the pass program has no serving variant; the draw is "
-            "dropped!");
-        auto cache = ContextCacheAccess::Cache(renderTarget->getContext());
-        if (cache->diagnosticRecordingEnabled()) {
-          cache->recordDroppedDraw();
-        }
-      }
-      return false;
+      return failLookup(renderTarget, isFinalLookup, "the pass program has no serving variant");
     }
     preparedProgramInfo = std::move(passInfo);
     preparedProgram = std::move(program);
-    preparedViaDecomposition = true;
     preparedRenderTarget = renderTarget;
     return true;
-  } else {
-    fragmentProcessors.reserve(colors.size() + coverages.size());
-    for (auto& color : colors) {
-      fragmentProcessors.emplace_back(color.get());
-    }
-    for (auto& coverage : coverages) {
-      fragmentProcessors.emplace_back(coverage.get());
-    }
+  }
+  fragmentProcessors.reserve(colors.size() + coverages.size());
+  for (auto& color : colors) {
+    fragmentProcessors.emplace_back(color.get());
+  }
+  for (auto& coverage : coverages) {
+    fragmentProcessors.emplace_back(coverage.get());
   }
   preparedProgramInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
                                                       std::move(fragmentProcessors), colorCount,
                                                       xferProcessor.get(), blendMode);
-  preparedProgramInfo->setCullMode(cullMode);
-  if (depthStencilFormat != PixelFormat::Unknown) {
-    // Some backends reject a pipeline that declares no depth-stencil format while the pass has a
-    // depth-stencil attachment. Inherit the pass format; the default no-op depth/stencil state
-    // keeps the draw behaviour unchanged.
-    DepthStencilDescriptor depthStencil = {};
-    depthStencil.format = depthStencilFormat;
-    preparedProgramInfo->setDepthStencil(depthStencil);
-  }
-  onConfigureProgramInfo(*preparedProgramInfo);
+  configureProgramInfo(preparedProgramInfo.get(), depthStencilFormat);
   // The draw's record-time IR is the expression every later stage reads. A coverage processor
   // attached only at prepare (a rasterized shape's mask, added by onMakeGeometryProcessor) is
   // appended to the IR's terms instead of dropping the IR — the color graph cannot change after
@@ -241,20 +230,8 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
   }
   preparedProgram = preparedProgramInfo->getProgram();
   if (preparedProgram == nullptr) {
-    if (isFinalLookup) {
-      // The final lookup for this draw (plan-task pass probes fall back to the original draw):
-      // nothing will be drawn, so the drop must be visible.
-      LOGE("StandardDrawOp::prepare() No program for the draw; the draw is dropped!");
-      auto cache = ContextCacheAccess::Cache(renderTarget->getContext());
-      if (cache->diagnosticRecordingEnabled()) {
-        cache->recordDroppedDraw();
-      }
-    }
-    return false;
+    return failLookup(renderTarget, isFinalLookup, "No program for the draw");
   }
-  // The direct-chain accounting derives from the resolved program: the plain lookup served this
-  // draw through the chain interpreter when the program it resolved to is the chain shader.
-  preparedViaDecomposition = IsDirectAOTShader(preparedProgram->shaderName());
   preparedRenderTarget = renderTarget;
   return true;
 }
@@ -288,7 +265,10 @@ bool StandardDrawOp::executePrepared(RenderPass* renderPass, RenderTarget* rende
   if (recordDrawStats && cache->diagnosticRecordingEnabled()) {
     AOTDrawStats drawDelta = {};
     drawDelta.kernelInvocations = 1;
-    if (preparedViaDecomposition) {
+    // The direct-chain accounting derives from the resolved program: a pass resolves through the
+    // chain scope and a plain lookup is direct when the program it resolved to is the chain
+    // shader, so one test covers both branches.
+    if (IsDirectAOTShader(preparedProgram->shaderName())) {
       drawDelta.directChainDraws = 1;
     }
     cache->recordDraw(drawDelta, true);

@@ -52,6 +52,46 @@ void AOTRouter::lowerOps(PlacementArray<DrawOp>& ops) {
   }
 }
 
+PlacementPtr<RenderTask> AOTRouter::routePlan(const DrawIR* ir, const AOTRouteRequest& request,
+                                              BlendMode blend,
+                                              const std::vector<AOTCoverageTerm>* terminalCoverage,
+                                              StandardDrawOp* localRemapSource,
+                                              PlacementPtr<DrawOp>* op, bool* planMissed) {
+  // A graph one fused pass can carry needs no plan at all: prepare compiles that pass from the
+  // graph itself, which is the same decision the DAG planner would make.
+  PassIR fused = {};
+  if (AOTChainBuilder::PlanFusedPass(ir->color, &fused)) {
+    return nullptr;
+  }
+  auto plan = AOTPlanner::MakePlan(*ir);
+  if (!plan.has_value()) {
+    if (planMissed != nullptr) {
+      *planMissed = true;
+    }
+    return nullptr;
+  }
+  // A fill pass carrying local-coordinate leaves (a plain texture, a gradient, a noise source)
+  // evaluates them at top-left device positions and needs one affine device-to-local map; the
+  // uniform-geometry-color requirement is enforced inside AOTPlanner::Build. An offscreen fill
+  // needs none: its local coordinates are exactly device plus coordOffset, which Build expresses
+  // as an absent map.
+  std::optional<Matrix> deviceToLocal = std::nullopt;
+  if (localRemapSource != nullptr && plan->passes.size() > 1 &&
+      AOTPlanner::NeedsLocalRemap(ir->color, *plan)) {
+    deviceToLocal = localRemapSource->deviceToLocalMatrix();
+    if (!deviceToLocal.has_value()) {
+      return nullptr;
+    }
+  }
+  const std::vector<AOTCoverageTerm> noCoverage = {};
+  const auto& coverage = terminalCoverage != nullptr ? *terminalCoverage : noCoverage;
+  if (AOTPlanner::RouteRecordPlan(*plan, coverage, blend) != AOTRecordRoute::Task) {
+    // Anything else keeps the plain route: the matcher serves it at prepare time.
+    return nullptr;
+  }
+  return buildPlanTask(ir->color, *plan, request, deviceToLocal, terminalCoverage, op);
+}
+
 PlacementPtr<RenderTask> AOTRouter::routeDraw(PlacementPtr<DrawOp>* op,
                                               const AOTRouteRequest& request) {
   auto* drawOp = op->get();
@@ -67,53 +107,34 @@ PlacementPtr<RenderTask> AOTRouter::routeDraw(PlacementPtr<DrawOp>* op,
   // pass, and a single-pass plan stays on the plain route for the prepare-time walk.
   drawOp->tryLowerIR();
   const bool coverageFree = !drawOp->hasCoverageProcessors();
-  if (cache->aotPolicy().decomposition && request.deviceBounds.has_value() &&
-      !request.deviceBounds->isEmpty()) {
-    if (auto* ir = drawOp->loweredIR()) {
-      // A graph one fused pass can carry needs no plan at all: prepare compiles that pass from the
-      // graph itself, which is the same decision the DAG planner would make.
-      PassIR fused = {};
-      if (AOTChainBuilder::PlanFusedPass(ir->color, &fused)) {
-        return nullptr;
-      }
-      auto plan = AOTPlanner::MakePlan(*ir);
-      if (plan.has_value()) {
-        switch (AOTPlanner::RouteRecordPlan(*plan, ir->coverage, request.blend)) {
-          case AOTRecordRoute::Task: {
-            // A fill pass carrying local-coordinate leaves (a plain texture, a gradient, a noise
-            // source) evaluates them at top-left device positions and needs one affine
-            // device-to-local map; the uniform-geometry-color requirement is enforced inside
-            // AOTPlanner::Build.
-            std::optional<Matrix> deviceToLocal = std::nullopt;
-            if (plan->passes.size() > 1 && AOTPlanner::NeedsLocalRemap(ir->color, *plan)) {
-              deviceToLocal = static_cast<StandardDrawOp*>(drawOp)->deviceToLocalMatrix();
-              if (!deviceToLocal.has_value()) {
-                break;
-              }
-            }
-            return buildPlanTask(ir->color, *plan, request, deviceToLocal, &ir->coverage, op);
-          }
-          case AOTRecordRoute::Plain:
-            // Anything else keeps the plain route: the matcher serves it at prepare time.
-            break;
-        }
-      } else if (coverageFree && cache->diagnosticRecordingEnabled()) {
-        // The color side lowered but no planner covers it — the same fact the color-only attempt
-        // recorded. A draw still carrying coverage processors records nothing: its route was
-        // never a color-only one, and classifying it would require the analysis the production
-        // path does not run.
-        cache->recordDecomposeRejection(AOTDecomposeOutcome::UnsupportedShape);
-      }
-    } else if (coverageFree && drawOp->type() != DrawOp::Type::AtlasTextOp &&
-               cache->diagnosticRecordingEnabled()) {
-      // The color side failed to lower: the same category the FP-walk route recorded, without a
-      // second analysis pass over the processor tree. Atlas-text ops never attempt the lowering
-      // (their glyph leaf needs the geometry processor), so they record nothing here — as they
-      // never did.
+  if (!cache->aotPolicy().decomposition || !request.deviceBounds.has_value() ||
+      request.deviceBounds->isEmpty()) {
+    return nullptr;
+  }
+  auto* ir = drawOp->loweredIR();
+  if (ir == nullptr) {
+    // The color side failed to lower: the same category the FP-walk route recorded, without a
+    // second analysis pass over the processor tree. Atlas-text ops never attempt the lowering
+    // (their glyph leaf needs the geometry processor), so they record nothing here — as they
+    // never did. A draw still carrying coverage processors records nothing either: its route was
+    // never a color-only one.
+    if (coverageFree && drawOp->type() != DrawOp::Type::AtlasTextOp &&
+        cache->diagnosticRecordingEnabled()) {
       cache->recordDecomposeRejection(AOTDecomposeOutcome::BlockedByLowering);
     }
+    return nullptr;
   }
-  return nullptr;
+  bool planMissed = false;
+  auto task = routePlan(ir, request, request.blend, &ir->coverage,
+                        static_cast<StandardDrawOp*>(drawOp), op, &planMissed);
+  if (planMissed && coverageFree && cache->diagnosticRecordingEnabled()) {
+    // The color side lowered but no planner covers it — the same fact the color-only attempt
+    // recorded. A draw still carrying coverage processors records nothing: its route was never a
+    // color-only one, and classifying it would require the analysis the production path does not
+    // run.
+    cache->recordDecomposeRejection(AOTDecomposeOutcome::UnsupportedShape);
+  }
+  return task;
 }
 
 PlacementPtr<RenderTask> AOTRouter::routeFill(PlacementPtr<DrawOp>* op,
@@ -142,24 +163,7 @@ PlacementPtr<RenderTask> AOTRouter::routeFill(PlacementPtr<DrawOp>* op,
   if (ir == nullptr) {
     return nullptr;
   }
-  // A graph one fused pass can carry needs no plan: prepare compiles that pass from the graph.
-  PassIR fused = {};
-  if (AOTChainBuilder::PlanFusedPass(ir->color, &fused)) {
-    return nullptr;
-  }
-  if (auto plan = AOTPlanner::MakePlan(*ir)) {
-    switch (AOTPlanner::RouteRecordPlan(*plan, {}, BlendMode::Src)) {
-      case AOTRecordRoute::Task:
-        // A fill's local coordinates are exactly device plus coordOffset, so the task's local
-        // remap stays nullopt — Build's built-in meaning for that case — instead of re-deriving
-        // the same mapping from the fill op.
-        return buildPlanTask(ir->color, *plan, request, std::nullopt, nullptr, op);
-      case AOTRecordRoute::Plain:
-        // Anything else keeps the plain lookup for the fill at prepare time.
-        break;
-    }
-  }
-  return nullptr;
+  return routePlan(ir, request, BlendMode::Src, nullptr, nullptr, op);
 }
 
 PlacementPtr<RenderTask> AOTRouter::buildPlanTask(
