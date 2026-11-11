@@ -23,6 +23,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
+#include "gpu/processors/GaussianBlur2DFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -45,6 +46,10 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
 float GaussianBlurImageFilter::MaxSigma() {
   return MAX_BLUR_SIGMA;
 }
+
+// The single pass evaluates (2 * ceil(2 * sigma) + 1)^2 samples per pixel. Up to this long edge
+// that stays far below the cost of the render pass it saves.
+static constexpr int SINGLE_PASS_MAX_EDGE = 64;
 
 GaussianBlurImageFilter::GaussianBlurImageFilter(float blurrinessX, float blurrinessY,
                                                  TileMode tileMode)
@@ -120,9 +125,44 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   const auto isAlphaOnly = source->isAlphaOnly();
   const bool isBlurDstScaled = (!FloatNearlyEqual(blurDstWidth, dstDrawWidth) ||
                                 !FloatNearlyEqual(blurDstHeight, dstDrawHeight));
-  const bool isBlurDstTrans =
-      clipBounds.left == srcSampleBounds.left && clipBounds.top == srcSampleBounds.top;
-  const bool needExtraTransform = isBlurDstScaled || isBlurDstTrans;
+  auto finalUVMatrix = Matrix::MakeScale(clipBounds.width() * blurDstScaleX / dstDrawWidth,
+                                         clipBounds.height() * blurDstScaleY / dstDrawHeight);
+  finalUVMatrix.postTranslate((clipBounds.left - srcSampleBounds.left) * blurDstScaleX,
+                              (clipBounds.top - srcSampleBounds.top) * blurDstScaleY);
+  const bool isIdentityEnd = !isBlurDstScaled && finalUVMatrix.isIdentity();
+  const bool needExtraTransform = !isIdentityEnd;
+  // Without any rescale the copy is a translation, which the vertical pass applies while it reads
+  // the horizontal result. Every output pixel then reads the same samples of that result as the
+  // copy would, so only the samples the copy drops are no longer computed. The target sizes
+  // differ in that case by the sampling margin, which is what the copy removes.
+  const bool foldCrop = blur2D && needExtraTransform && finalUVMatrix.isTranslate();
+  // A small kernel is cheaper to evaluate in full than to split into passes. The single pass reads
+  // the source directly, so it only matches the separable blur where both read the same pixels:
+  // the vertical pass reads the horizontal result through the tile mode, which for rows past
+  // srcSampleBounds agrees with reading the source only under Decal and Clamp.
+  const auto kernelRadiusY = std::ceil(2.0f * sigmaY);
+  const bool rowsInside = clipBounds.top - kernelRadiusY >= srcSampleBounds.top &&
+                          clipBounds.bottom + kernelRadiusY <= srcSampleBounds.bottom;
+  const bool singlePass =
+      finalUVMatrix.isTranslate() && FloatNearlyEqual(blurDstScaleX, 1.0f) &&
+      FloatNearlyEqual(blurDstScaleY, 1.0f) &&
+      std::max(sigmaX, sigmaY) <= GaussianBlur2DFragmentProcessor::MAX_SIGMA &&
+      std::max(dstDrawWidth, dstDrawHeight) <= static_cast<float>(SINGLE_PASS_MAX_EDGE) &&
+      (!blur2D || tileMode == TileMode::Decal || tileMode == TileMode::Clamp || rowsInside);
+  auto allocator = args.context->drawingAllocator();
+  if (singlePass) {
+    auto target = RenderTargetProxy::Make(args.context, static_cast<int>(dstDrawWidth),
+                                          static_cast<int>(dstDrawHeight), isAlphaOnly, 1,
+                                          args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+    auto processor = GaussianBlur2DFragmentProcessor::Make(
+        allocator, std::move(sourceFragment), sigmaX, sigmaY,
+        Point::Make(finalUVMatrix.getTranslateX(), finalUVMatrix.getTranslateY()));
+    if (target == nullptr || processor == nullptr) {
+      return nullptr;
+    }
+    args.context->drawingManager()->fillRTWithFP(target, std::move(processor), args.renderFlags);
+    return target->asTextureProxy();
+  }
   const bool defaultBlurTargetMipmapped = (args.mipmapped && !blur2D && !needExtraTransform);
   auto renderTarget = RenderTargetProxy::Make(
       args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly, 1,
@@ -132,24 +172,28 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     return nullptr;
   }
 
-  auto allocator = args.context->drawingAllocator();
   if (blur2D) {
     Blur1D(std::move(sourceFragment), renderTarget, sigmaX, GaussianBlurDirection::Horizontal, 1.0f,
            args.renderFlags);
 
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
-    sourceFragment =
-        TiledTextureEffect::Make(allocator, renderTarget->asTextureProxy(), samplingArgs);
-    const bool finalBlurTargetMipmapped = (args.mipmapped && !needExtraTransform);
-    renderTarget = RenderTargetProxy::Make(
-        args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly,
-        1, finalBlurTargetMipmapped, ImageOrigin::TopLeft,
-        needExtraTransform ? BackingFit::Approx : args.backingFit);
+    sourceFragment = TiledTextureEffect::Make(allocator, renderTarget->asTextureProxy(),
+                                              samplingArgs, foldCrop ? &finalUVMatrix : nullptr);
+    // A folded pass writes the requested bounds, so its target takes what the copy target took.
+    const bool isFinalTarget = foldCrop || !needExtraTransform;
+    const auto finalWidth = static_cast<int>(foldCrop ? dstDrawWidth : blurDstWidth);
+    const auto finalHeight = static_cast<int>(foldCrop ? dstDrawHeight : blurDstHeight);
+    renderTarget = RenderTargetProxy::Make(args.context, finalWidth, finalHeight, isAlphaOnly, 1,
+                                           args.mipmapped && isFinalTarget, ImageOrigin::TopLeft,
+                                           isFinalTarget ? args.backingFit : BackingFit::Approx);
     if (!renderTarget) {
       return nullptr;
     }
     Blur1D(std::move(sourceFragment), renderTarget, sigmaY, GaussianBlurDirection::Vertical, 1.0f,
            args.renderFlags);
+    if (foldCrop) {
+      return renderTarget->asTextureProxy();
+    }
   } else {
     const auto blurDirection =
         (sigmaX > sigmaY ? GaussianBlurDirection::Horizontal : GaussianBlurDirection::Vertical);
@@ -162,10 +206,6 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     return renderTarget->asTextureProxy();
   }
 
-  auto finalUVMatrix = Matrix::MakeScale(clipBounds.width() * blurDstScaleX / dstDrawWidth,
-                                         clipBounds.height() * blurDstScaleY / dstDrawHeight);
-  finalUVMatrix.postTranslate((clipBounds.left - srcSampleBounds.left) * blurDstScaleX,
-                              (clipBounds.top - srcSampleBounds.top) * blurDstScaleY);
   auto finalProcessor =
       TextureEffect::Make(allocator, renderTarget->asTextureProxy(), {}, &finalUVMatrix);
   renderTarget = RenderTargetProxy::Make(args.context, static_cast<int>(dstDrawWidth),

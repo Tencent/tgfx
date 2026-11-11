@@ -830,6 +830,133 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
   }
 }
 
+namespace {
+constexpr int BlurSurfaceSize = 200;
+
+// Renders `image` blurred by `sigma`, clipped to `clip` when it is not null, and reads the surface
+// back. Drawing at 40 + offset keeps every case aligned on the same world position, so two runs
+// differ only in the path the filter takes.
+std::vector<uint8_t> RenderClippedBlur(Context* context, const std::shared_ptr<Image>& image,
+                                      float sigma, const Rect* clip) {
+  auto surface = Surface::Make(context, BlurSurfaceSize, BlurSurfaceSize);
+  if (surface == nullptr) {
+    return {};
+  }
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  auto filter = std::make_shared<GaussianBlurImageFilter>(sigma, sigma, TileMode::Decal);
+  Point offset = {};
+  auto filtered = image->makeWithFilter(filter, &offset, clip);
+  if (filtered != nullptr) {
+    canvas->drawImage(filtered, 40.0f + offset.x, 40.0f + offset.y);
+  }
+  context->flushAndSubmit();
+  std::vector<uint8_t> pixels(static_cast<size_t>(BlurSurfaceSize * BlurSurfaceSize * 4));
+  auto info = ImageInfo::Make(BlurSurfaceSize, BlurSurfaceSize, ColorType::RGBA_8888,
+                              AlphaType::Premultiplied);
+  EXPECT_TRUE(surface->readPixels(info, pixels.data()));
+  return pixels;
+}
+
+// Spread of the red channel inside the window, used to prove the comparison is not looking at a
+// blank area.
+int WindowSpread(const std::vector<uint8_t>& pixels, int left, int top, int right, int bottom) {
+  int low = 255;
+  int high = 0;
+  for (int y = top; y < bottom; ++y) {
+    for (int x = left; x < right; ++x) {
+      auto value = static_cast<int>(pixels[static_cast<size_t>((y * BlurSurfaceSize + x) * 4)]);
+      low = std::min(low, value);
+      high = std::max(high, value);
+    }
+  }
+  return high - low;
+}
+
+int MaxDiffInWindow(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b, int left,
+                    int top, int right, int bottom) {
+  int maxDiff = 0;
+  for (int y = top; y < bottom; ++y) {
+    for (int x = left; x < right; ++x) {
+      auto index = static_cast<size_t>((y * BlurSurfaceSize + x) * 4);
+      for (size_t channel = 0; channel < 4; ++channel) {
+        auto diff = static_cast<int>(a[index + channel]) - static_cast<int>(b[index + channel]);
+        maxDiff = std::max(maxDiff, diff < 0 ? -diff : diff);
+      }
+    }
+  }
+  return maxDiff;
+}
+
+// Hard edges and thin lines, so a wrong sampling shows up instead of being averaged away.
+std::shared_ptr<Image> MakeBlurSource(Context* context) {
+  constexpr int SourceSize = 160;
+  auto surface = Surface::Make(context, SourceSize, SourceSize);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  Paint paint = {};
+  paint.setColor(Color::FromRGBA(20, 40, 200, 255));
+  canvas->drawRect(Rect::MakeXYWH(10, 12, 60, 44), paint);
+  paint.setColor(Color::FromRGBA(200, 30, 30, 255));
+  canvas->drawRect(Rect::MakeXYWH(70, 30, 48, 90), paint);
+  paint.setColor(Color::Black());
+  for (int i = 0; i < 8; ++i) {
+    canvas->drawRect(Rect::MakeXYWH(14, 70 + i * 6, 40, 2), paint);
+  }
+  return surface->makeImageSnapshot();
+}
+}  // namespace
+
+// A blur within the single-pass limits has to match the separable blur it replaces. The clip picks
+// the path: a target of at most 64 px on its long edge runs the single pass, a larger one keeps the
+// two passes. The single pass keeps the horizontal result in floating point, the separable one
+// rounds it to 8 bits between the passes, so the two differ by at most 1/255.
+TGFX_TEST(FilterTest, GaussianBlurSmallSigmaMatchesSeparable) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto source = MakeBlurSource(context);
+  ASSERT_TRUE(source != nullptr);
+  const auto smallClip = Rect::MakeXYWH(6, 5, 24, 19);  // long edge 24: single pass
+  const auto bigClip = Rect::MakeXYWH(0, 0, 120, 100);  // long edge 120: two passes
+  auto single = RenderClippedBlur(context, source, 1.5f, &smallClip);
+  auto separable = RenderClippedBlur(context, source, 1.5f, &bigClip);
+  ASSERT_FALSE(single.empty());
+  ASSERT_FALSE(separable.empty());
+  // Stay a kernel radius (2 * sigma) away from the clip edge, where the two paths can read
+  // different rows of the source.
+  constexpr int Inset = 3;
+  auto left = 40 + 6 + Inset;
+  auto top = 40 + 5 + Inset;
+  auto right = 40 + 6 + 24 - Inset;
+  auto bottom = 40 + 5 + 19 - Inset;
+  // The window must cover something with contrast, otherwise the comparison proves nothing.
+  EXPECT_GT(WindowSpread(single, left, top, right, bottom), 8);
+  EXPECT_LE(MaxDiffInWindow(single, separable, left, top, right, bottom), 1);
+}
+
+// Letting the vertical pass write the requested bounds directly must match the copy it replaces,
+// down to the last bit: it reads the same samples of the horizontal result.
+TGFX_TEST(FilterTest, GaussianBlurFoldedCropMatchesTheCopy) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto source = MakeBlurSource(context);
+  ASSERT_TRUE(source != nullptr);
+  // No clip: the blurred target already has the requested bounds, so nothing is copied at all.
+  const auto clip = Rect::MakeXYWH(10, 12, 60, 44);
+  auto noCopy = RenderClippedBlur(context, source, 3.0f, nullptr);
+  // A clip inside those bounds only translates, so the last pass writes it and no copy is needed.
+  auto folded = RenderClippedBlur(context, source, 3.0f, &clip);
+  ASSERT_FALSE(noCopy.empty());
+  ASSERT_FALSE(folded.empty());
+  EXPECT_GT(WindowSpread(noCopy, 40 + 10, 40 + 12, 40 + 10 + 60, 40 + 12 + 44), 8);
+  EXPECT_EQ(MaxDiffInWindow(noCopy, folded, 40 + 10, 40 + 12, 40 + 10 + 60, 40 + 12 + 44), 0);
+}
+
 TGFX_TEST(FilterTest, ReverseFilterBounds) {
   auto rect = Rect::MakeXYWH(0, 0, 100, 100);
   ContextScope scope;
