@@ -156,6 +156,33 @@ struct AOTChainDeviceLeaf {
  * entry (plan-time fit checks and construction run exactly this pipeline); the shell-free serving
  * path consumes it directly, and fixed-program matching keys on its canonical shape.
  */
+/// The selector word a chain slot's packed record carries: the op-specific small value in the low
+/// bits and the result register + 1 in bits 20-24 (zero marks a dead instruction). One definition
+/// shared by the runtime binder and the specialization values, so the two cannot drift.
+inline int ChainSlotSelector(const AOTChainSlot& slot) {
+  int selector = slot.op == AOTChainOp::Blend
+                     ? slot.blend.blendMode | (slot.blend.multiplyInputAlpha ? 0x100 : 0)
+                     : 0;
+  if (slot.op == AOTChainOp::ConstColor) {
+    selector = slot.constColor.inputMode;
+  }
+  if (slot.op == AOTChainOp::Texture) {
+    // Bit 0: modulate by the paint alpha. Bit 1: alpha-only leaf, splat .r into all channels.
+    // Bit 2: coverage-root leaf, modulate by the coverage unit alpha. Bit 3: alpha-only leaf
+    // modulated by the geometry color's RGB. Bit 4: alpha-only leaf modulated by the full
+    // geometry color.
+    selector = slot.textureModulate | (slot.textureAlphaOnly << 1) |
+               (slot.textureModulateUnit << 2) | (slot.textureModulateGeometryRGB << 3) |
+               (slot.textureModulateFullInput << 4);
+  }
+  if (slot.op == AOTChainOp::TexModulate) {
+    // Bit 0: the source leaf is alpha-only. Bits 16-19: the leading raw-sampling slot's index.
+    selector = slot.texModulateAlphaOnly | (slot.texModulateSourceSlot << 16);
+  }
+  selector |= (slot.outRegister + 1) << 20;
+  return selector;
+}
+
 struct AOTProgram {
   std::vector<AOTChainSlot> slots = {};
   std::vector<AOTChainTiledLeaf> tiledLeaves = {};

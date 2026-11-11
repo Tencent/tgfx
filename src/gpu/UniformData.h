@@ -278,7 +278,6 @@ class UniformData {
   friend class PrecompiledProgramWriter;
   friend class ChainProgramWriter;
   friend class PrecompiledProgramCreator;
-  friend class SpecCapture;
   // The shell-free chain binder drives the same structural-suffix addressing the processor-tree
   // walk maintained; only the per-binding walk needs the direct access.
   friend void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformData);

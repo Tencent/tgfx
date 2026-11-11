@@ -18,7 +18,8 @@
 
 #include "gpu/aot/spec/SpecResolver.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/aot/spec/SpecCapture.h"
+#include "gpu/aot/chain/AOTChainBuilder.h"
+#include "gpu/aot/chain/AOTChainSpec.h"
 #include "gpu/aot/spec/SpecInjector.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 
@@ -51,7 +52,19 @@ SpecValues SpecResolver::Resolve(SpecSource* source, Backend backend, const Prog
   if (FindSpecInjector(SpecFormatForBackend(backend, source->payloadFormat())) == nullptr) {
     return {};
   }
-  auto values = SpecCapture::Capture(source, info, shaderName, vertIndex, fragIndex);
+  // The values come straight off the compiled program (the same fields the runtime binder
+  // uploads); the bundle's spec table supplies the order and the array lengths.
+  (void)vertIndex;
+  auto fragHash = ComputeFragmentKeyHash(shaderName, fragIndex, source->profileTag());
+  const auto* fields = source->findFragmentSpecFields(fragHash.hi, fragHash.lo);
+  if (fields == nullptr) {
+    return {};
+  }
+  const auto* program = AOTChainBuilder::ResolveChainProgram(&info);
+  if (program == nullptr) {
+    return {};
+  }
+  auto values = ResolveChainSpec(*program, *fields);
   source->recordSpecCapture(values);
   return values;
 }

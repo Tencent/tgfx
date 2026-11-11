@@ -104,30 +104,9 @@ void UploadTiledRecipe(UniformData* uniformData, const AOTTiledTextureRecipe& re
 }
 
 void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot) {
-  int selector = slot.op == AOTChainOp::Blend
-                     ? slot.blend.blendMode | (slot.blend.multiplyInputAlpha ? 0x100 : 0)
-                     : 0;
-  if (slot.op == AOTChainOp::ConstColor) {
-    selector = slot.constColor.inputMode;
-  }
-  if (slot.op == AOTChainOp::Texture) {
-    // Bit 0: modulate by the paint alpha. Bit 1: alpha-only leaf, splat .r into all channels.
-    // Bit 2: coverage-root leaf, modulate by the coverage unit alpha. Bit 3: alpha-only leaf
-    // modulated by the geometry color's RGB (a two-child blend operand, whose input is
-    // (geom.rgb, 1.0)). Bit 4: alpha-only leaf modulated by the full geometry color (the color
-    // root, whose readback is sample.a * the complete premul input color).
-    selector = slot.textureModulate | (slot.textureAlphaOnly << 1) |
-               (slot.textureModulateUnit << 2) | (slot.textureModulateGeometryRGB << 3) |
-               (slot.textureModulateFullInput << 4);
-  }
-  if (slot.op == AOTChainOp::TexModulate) {
-    // Bit 0: the source leaf is alpha-only. Bits 16-19: the leading raw-sampling slot's index
-    // into chainLeafTex (not Packed.z, which the register allocator rewrites).
-    selector = slot.texModulateAlphaOnly | (slot.texModulateSourceSlot << 16);
-  }
-  // Bits 20-24: the result register + 1 (0 marks a dead instruction whose result nothing reads;
-  // the kernel then skips the chainResults write).
-  selector |= (slot.outRegister + 1) << 20;
+  // The packed record's selector is shared with the specialization values (Program.h).
+  const int selector = ChainSlotSelector(slot);
+
   int packed[] = {static_cast<int>(slot.op), slot.in0, slot.in1, selector};
   uniformData->setArrayElementOptional(ChainParams::SlotPacked.name, index, packed);
   // The parameter block is the instruction contract's bind column: one function per op that

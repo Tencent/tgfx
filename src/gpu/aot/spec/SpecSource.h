@@ -41,7 +41,7 @@ struct SpecScratch {
 };
 
 /**
- * What the specialization layer needs from the artifact store. SpecCapture and SpecResolver read
+ * What the specialization layer needs from the artifact store. SpecResolver reads
  * the bundle's reflected layouts and record their outcome through this interface, so the spec layer
  * never includes the bundle implementation that provides them — the cache implements this and is the
  * only thing that knows how a bundle is stored.
