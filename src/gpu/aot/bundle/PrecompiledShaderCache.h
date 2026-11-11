@@ -450,13 +450,9 @@ class PrecompiledShaderCache : public SpecSource {
   /// scratch per fragment stage key, rebuilt whenever the bundle changes.
   /// Returns the capture scratch of one (vertex, fragment) stage pair, creating it from the two
   /// stages' reflected uniforms on first use. Returns nullptr when either stage has no blob.
-  SpecScratch* findOrCreateSpecScratch(uint64_t vertHi, uint64_t vertLo, uint64_t fragHi,
-                                       uint64_t fragLo) override;
 
   /// SpecSource: the two stages' reflected layouts and the fragment stage's spec table, as the
   /// capture needs them. A missing stage yields null rather than an empty view.
-  const std::vector<Uniform>* findVertexUniforms(uint64_t hashHi, uint64_t hashLo) const override;
-  const std::vector<Uniform>* findFragmentUniforms(uint64_t hashHi, uint64_t hashLo) const override;
   const std::vector<SpecFieldInfo>* findFragmentSpecFields(uint64_t hashHi,
                                                            uint64_t hashLo) const override;
 
@@ -493,7 +489,6 @@ class PrecompiledShaderCache : public SpecSource {
   /// The specialization capture's per-(vertex, fragment)-stage scratch, keyed by the two stage
   /// hashes and dropped whenever a bundle load replaces the stage blobs (the reflected uniforms
   /// the scratch was built from may no longer be the same).
-  std::map<std::pair<HashKey, HashKey>, std::unique_ptr<SpecScratch>> _specScratch;
   bool _specializationEnabled = false;
   mutable std::mutex _specStatsMutex;
   SpecStats _specStats = {};

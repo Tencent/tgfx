@@ -29,18 +29,6 @@
 namespace tgfx {
 
 /**
- * The CPU scratch one (vertex, fragment) stage pair uses to capture a draw's structural values:
- * the same reflected layouts the created program's uniform data has, over CPU buffers the regular
- * writers fill without a GPU. Owned by the bundle cache, which recycles it per stage pair.
- */
-struct SpecScratch {
-  std::unique_ptr<UniformData> vertexUniformData;
-  std::unique_ptr<UniformData> fragmentUniformData;
-  std::vector<uint8_t> vertexBuffer;
-  std::vector<uint8_t> fragmentBuffer;
-};
-
-/**
  * What the specialization layer needs from the artifact store. SpecResolver reads
  * the bundle's reflected layouts and record their outcome through this interface, so the spec layer
  * never includes the bundle implementation that provides them — the cache implements this and is the
@@ -59,21 +47,11 @@ class SpecSource {
   /// The bundle's payload format, which decides whether the backend can consume the values.
   virtual uint16_t payloadFormat() const = 0;
 
-  /// The vertex stage's reflected uniforms, or null when the stage is absent.
-  virtual const std::vector<Uniform>* findVertexUniforms(uint64_t hashHi,
-                                                         uint64_t hashLo) const = 0;
-  /// The fragment stage's reflected uniforms, or null when the stage is absent.
-  virtual const std::vector<Uniform>* findFragmentUniforms(uint64_t hashHi,
-                                                           uint64_t hashLo) const = 0;
   /// The fragment stage's spec table, or null when the stage carries no freezable fields.
   virtual const std::vector<SpecFieldInfo>* findFragmentSpecFields(uint64_t hashHi,
                                                                    uint64_t hashLo) const = 0;
 
-  /// The capture scratch of one stage pair, created from the two stages' reflections on first use.
-  virtual SpecScratch* findOrCreateSpecScratch(uint64_t vertHi, uint64_t vertLo, uint64_t fragHi,
-                                               uint64_t fragLo) = 0;
-
-  /// Records one capture for the cost statistics (empty values count as a generic-form serve).
+  /// Records one derivation for the cost statistics (empty values count as a generic-form serve).
   virtual void recordSpecCapture(const SpecValues& values) = 0;
 };
 

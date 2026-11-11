@@ -707,18 +707,6 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
   } else {
     processor->setData(vertexUniformData, fragmentUniformData);
   }
-  if (bindYUVTail) {
-    // The YUV family's tail instruction records come from the compiled program — the
-    // shell-free value write the chain route applies to its own slots.
-    auto* program = AOTChainBuilder::ResolveYUVProgram(&info);
-    if (program == nullptr) {
-      LOGE(
-          "PrecompiledProgramWriter::writeProcessors() no compiled YUV tail program; the draw "
-          "renders with unwritten tail uniforms");
-      return;
-    }
-    BindYUVProgram(*program, fragmentUniformData);
-  }
 }
 
 void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
@@ -794,10 +782,8 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
   }
 }
 
-bool PrecompiledProgramWriter::canWrite(const ProgramInfo& info) const {
-  // Only the YUV family's tail needs a compiled program beyond the walk's own content; every
-  // other family uploads the walk alone.
-  return !bindYUVTail || AOTChainBuilder::ResolveYUVProgram(&info) != nullptr;
+bool PrecompiledProgramWriter::canWrite(const ProgramInfo&) const {
+  return true;
 }
 
 // The compiled chain program this draw resolves to comes from the one memoized entry

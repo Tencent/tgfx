@@ -92,13 +92,7 @@ class ProgramWriter {
 /** The precompiled route: the IR-driven walk and the artifact's sampler slots. */
 class PrecompiledProgramWriter : public ProgramWriter {
  public:
-  /**
-   * The YUV family appends its compiled tail records after the walk (the tail program the
-   * family's matching compiled, or that compiles here once on a cache hit); every other family
-   * uploads the walk's content alone.
-   */
-  explicit PrecompiledProgramWriter(bool bindYUVTail = false) : bindYUVTail(bindYUVTail) {
-  }
+  PrecompiledProgramWriter() = default;
 
   bool canWrite(const ProgramInfo& info) const override;
 
@@ -112,9 +106,6 @@ class PrecompiledProgramWriter : public ProgramWriter {
   /// The processor-tree fallback for IRs the action list cannot bind (see writeProcessors).
   void writeProcessorsByTree(const ProgramInfo& info, UniformData* vertexUniformData,
                              UniformData* fragmentUniformData) const;
-
- private:
-  bool bindYUVTail = false;
 };
 
 /**
@@ -134,19 +125,6 @@ class ChainProgramWriter final : public PrecompiledProgramWriter {
                        UniformData* fragmentUniformData) const override;
   void writeSamplers(const ProgramInfo& info, Program* program,
                      RenderPass* renderPass) const override;
-};
-
-/**
- * The YUV family's writer: the source leaf's family uniforms and samplers ride the standard
- * precompiled walk (the tree's TextureEffect writes them — on a planned draw the operators above
- * it declare no fields the kernel reads, so their writes are no-ops), and the color-grade tail
- * rides the compiled tail program's chain-encoded instruction records. No rebuilt processor:
- * the tail's upload no longer depends on one existing.
- */
-class YUVProgramWriter final : public PrecompiledProgramWriter {
- public:
-  YUVProgramWriter() : PrecompiledProgramWriter(true) {
-  }
 };
 
 }  // namespace tgfx
