@@ -7,6 +7,7 @@
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
+#include "utils/ReachableSet.h"
 
 namespace tgfx {
 

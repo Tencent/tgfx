@@ -22,6 +22,7 @@
 #include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
+#include "utils/ReachableSet.h"
 
 namespace tgfx {
 

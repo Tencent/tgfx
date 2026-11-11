@@ -17,13 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/PrecompiledShader.h"
-#include <array>
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <iterator>
 #include <map>
-#include <type_traits>
 #include <utility>
 #include "core/utils/USE.h"
 #include "gpu/shaders/Families.h"
@@ -33,51 +29,17 @@ namespace tgfx {
 
 namespace {
 
-struct RegisteredShader {
-  PrecompiledShaderInfo info;
-  ShaderRegistry::Enumerator enumerator;
-};
-
-/// The reachable set of the declaration-driven family at the table index: every enumerated
-/// variant's (ordinal, ordinal) pair. The template exists because the registry stores plain
-/// function pointers; a new family adds an instantiation.
-template <size_t Index>
-std::set<std::pair<uint32_t, uint32_t>> AssembledFamilyReachable() {
-  const auto variants = EnumerateVariants(Families()[Index], static_cast<uint16_t>(Index));
-  std::set<std::pair<uint32_t, uint32_t>> pairs = {};
-  for (const auto& variant : variants) {
-    pairs.insert({variant.ordinal, variant.ordinal});
-  }
-  return pairs;
-}
-
-/// The reachable-set enumerator per table index. The registry stores plain function pointers, so
-/// the per-family instantiations are materialized into one array here; the table may grow up to
-/// MaxDeclaredFamilies before the static_assert below fails.
-inline constexpr size_t MaxDeclaredFamilies = 22;
-
-template <size_t... Indices>
-constexpr std::array<ShaderRegistry::Enumerator, sizeof...(Indices)> MakeDeclaredEnumerators(
-    std::index_sequence<Indices...>) {
-  return {&AssembledFamilyReachable<Indices>...};
-}
-
-const std::map<std::string, RegisteredShader>& ShaderInfos() {
-  static const std::map<std::string, RegisteredShader> infos = [] {
-    std::map<std::string, RegisteredShader> result;
-    // The declaration-driven families join the lookup tables (Find and the reachable-set
-    // enumerator) but never the factory list: the build tool assembles their text from the
-    // declarations, so the legacy per-family compile loop must not see them.
-    static_assert(FamilyTableCount() <= MaxDeclaredFamilies,
-                  "raise MaxDeclaredFamilies above the family table size");
-    const auto declaredEnumerators =
-        MakeDeclaredEnumerators(std::make_index_sequence<MaxDeclaredFamilies>());
+/// The name-keyed view the matcher and the reports resolve through. The per-family enumerators
+// that used to live here had no runtime caller once the bundle became variant-id keyed: the tool
+// compiles EnumerateVariants directly, and the reachable-set reference the tests compare against
+// lives with those tests.
+const std::map<std::string, PrecompiledShaderInfo>& ShaderInfos() {
+  static const std::map<std::string, PrecompiledShaderInfo> infos = [] {
+    std::map<std::string, PrecompiledShaderInfo> result;
     for (size_t index = 0; index < FamilyCount(); ++index) {
-      const Family& family = Families()[index];
-      auto info = AssembledFamilyInfo(family);
+      auto info = AssembledFamilyInfo(Families()[index]);
       auto name = info.name;
-      result.emplace(std::move(name),
-                     RegisteredShader{std::move(info), declaredEnumerators[index]});
+      result.emplace(std::move(name), std::move(info));
     }
     return result;
   }();
@@ -85,21 +47,6 @@ const std::map<std::string, RegisteredShader>& ShaderInfos() {
 }
 
 }  // namespace
-
-std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateBackendStages(
-    const PrecompiledShaderInfo& info, ShaderProfile profile) {
-  auto reachable = EnumerateReachablePermutations(info.name);
-  if (!reachable) {
-    return std::nullopt;
-  }
-  std::set<std::pair<uint32_t, uint32_t>> stages = {};
-  for (const auto& pair : *reachable) {
-    if (PermutationCompilesForBackend(info, pair.first, pair.second, profile)) {
-      stages.insert(pair);
-    }
-  }
-  return stages;
-}
 
 bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertIndex,
                             uint32_t fragIndex) {
@@ -124,22 +71,7 @@ bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t v
 const PrecompiledShaderInfo* ShaderRegistry::Find(const std::string& name) {
   const auto& infos = ShaderInfos();
   auto result = infos.find(name);
-  return result == infos.end() ? nullptr : &result->second.info;
-}
-
-std::optional<std::set<std::pair<uint32_t, uint32_t>>> ShaderRegistry::Enumerate(
-    const std::string& name) {
-  const auto& infos = ShaderInfos();
-  auto result = infos.find(name);
-  if (result == infos.end()) {
-    return std::nullopt;
-  }
-  return result->second.enumerator();
-}
-
-std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
-    const std::string& shaderName) {
-  return ShaderRegistry::Enumerate(shaderName);
+  return result == infos.end() ? nullptr : &result->second;
 }
 
 }  // namespace tgfx

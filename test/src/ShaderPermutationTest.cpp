@@ -78,6 +78,7 @@
 #include "tgfx/core/Surface.h"
 #include "utils/AOTToleranceCompare.h"
 #include "utils/ProjectPath.h"
+#include "utils/ReachableSet.h"
 #include "utils/TestUtils.h"
 #include "zstd.h"
 
@@ -316,7 +317,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
        {"TextureFillShader", "TextureColorMatrixShader", "DeviceSpaceTextureShader",
         "PointwiseDirectShader", "PointwiseChainShader", "YUVTextureFillShader"}) {
     EXPECT_EQ(ShaderRegistry::Find(retired), nullptr) << retired;
-    EXPECT_FALSE(ShaderRegistry::Enumerate(retired).has_value()) << retired;
+    EXPECT_FALSE(EnumerateReachablePermutations(retired).has_value()) << retired;
   }
   const auto* maskFill = ShaderRegistry::Find("MaskFill");
   ASSERT_NE(maskFill, nullptr);
@@ -375,7 +376,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
                  rrectInfo->fragDomain.valueOf(indices.second, "RRectGeometry_STROKE") != 0);
   }
   EXPECT_EQ(ShaderRegistry::Find("UnknownShader"), nullptr);
-  EXPECT_FALSE(ShaderRegistry::Enumerate("UnknownShader").has_value());
+  EXPECT_FALSE(EnumerateReachablePermutations("UnknownShader").has_value());
   EXPECT_FALSE(EnumerateReachablePermutations("UnknownShader").has_value());
 }
 

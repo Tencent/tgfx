@@ -74,24 +74,6 @@ bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t v
                                    uint32_t fragIndex, ShaderProfile profile);
 
 /**
- * Returns the reachable variant set of the shader registered under the given name, or nullopt
- * when no such shader is registered. The family-level rules (Inputs, Compose, Extract, the
- * Reachable enumeration and the shared rejection predicates) live in each family's own header
- * through the ShaderFamily base; see ShaderFamily.h for the contract.
- */
-std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
-    const std::string& shaderName);
-
-/**
- * The (vert, frag) index pairs one profile's bundle must contain: the reachable set filtered by
- * PermutationCompilesForBackend (the framebuffer-fetch exclusion). Every consumer of "what this
- * backend's bundle holds" asks this one function, so the bundle verifier, the manifest digest
- * and the closure checks cannot disagree.
- */
-std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateBackendStages(
-    const PrecompiledShaderInfo& info, ShaderProfile profile);
-
-/**
  * Base class for all precompiled shader declarations. Each concrete shader must override info()
  * to provide its metadata.
  */
@@ -103,19 +85,13 @@ class PrecompiledShader {
 };
 
 /**
- * The declared families' metadata and enumerators. Every family lives in the declaration table
- * (Families.h), so there is no registration step and no dependence on static-initialization
- * order.
+ * The declared families' metadata. Every family lives in the declaration table (Families.h), so
+ * there is no registration step and no dependence on static-initialization order.
  */
 class ShaderRegistry {
  public:
-  using Enumerator = std::set<std::pair<uint32_t, uint32_t>> (*)();
-
   /** Returns the registered metadata for a shader name, or nullptr when no shader is registered. */
   static const PrecompiledShaderInfo* Find(const std::string& name);
-
-  /** Invokes the family's registered enumerator, or returns nullopt for an unknown name. */
-  static std::optional<std::set<std::pair<uint32_t, uint32_t>>> Enumerate(const std::string& name);
 };
 
 }  // namespace tgfx

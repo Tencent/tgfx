@@ -46,10 +46,6 @@ struct ChainLegacyCell {
   int xp = 0;
 };
 
-/// Fills `cell` for a variant of the Chain family; false when the geometry cannot place a cell
-/// (the family's allowed filter makes that unreachable, so it only guards misuse).
-bool DecodeChainCell(const Family& family, const Variant& variant, ChainLegacyCell* cell);
-
 /// The declared geometry index and PROFILE value a legacy cell encodes (the matcher's direction).
 uint8_t ChainGeometryOfCell(const ChainLegacyCell& cell);
 uint8_t ChainProfileOfCell(const ChainLegacyCell& cell);

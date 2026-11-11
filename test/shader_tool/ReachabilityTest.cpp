@@ -32,6 +32,28 @@
 #include "gtest/gtest.h"
 
 namespace tgfx {
+
+namespace {
+
+/// The reachable variant set of a declared family (the reference set the retired registry
+/// enumerator served): every enumerated variant's (ordinal, ordinal) pair, nullopt for a name the
+/// table does not hold.
+std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
+    const std::string& shaderName) {
+  for (size_t index = 0; index < FamilyCount(); ++index) {
+    if (shaderName != Families()[index].name) {
+      continue;
+    }
+    std::set<std::pair<uint32_t, uint32_t>> pairs = {};
+    for (const auto& variant : EnumerateVariants(Families()[index], static_cast<uint16_t>(index))) {
+      pairs.insert({variant.ordinal, variant.ordinal});
+    }
+    return pairs;
+  }
+  return std::nullopt;
+}
+
+}  // namespace
 namespace {
 
 std::vector<PrecompiledShaderInfo> AllFamilies() {
@@ -80,11 +102,11 @@ TEST(FamilyRegistryTest, FindAndEnumerateAgreeWithTheRegisteredFamilies) {
     auto found = ShaderRegistry::Find(info.name);
     ASSERT_NE(found, nullptr) << info.name;
     EXPECT_EQ(found->name, info.name);
-    EXPECT_TRUE(ShaderRegistry::Enumerate(info.name).has_value()) << info.name;
+    EXPECT_TRUE(EnumerateReachablePermutations(info.name).has_value()) << info.name;
     EXPECT_TRUE(EnumerateReachablePermutations(info.name).has_value()) << info.name;
   }
   EXPECT_EQ(ShaderRegistry::Find("NoSuchFamily"), nullptr);
-  EXPECT_FALSE(ShaderRegistry::Enumerate("NoSuchFamily").has_value());
+  EXPECT_FALSE(EnumerateReachablePermutations("NoSuchFamily").has_value());
   EXPECT_FALSE(EnumerateReachablePermutations("NoSuchFamily").has_value());
 }
 

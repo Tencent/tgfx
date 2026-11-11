@@ -55,6 +55,75 @@
 #include "utils/TestUtils.h"
 
 namespace tgfx {
+
+namespace {
+
+/// The declared-chain variant back in the legacy cell's dims, for the route assertions: the
+/// matcher no longer decodes cells on the runtime path, so the mapping lives with the test that
+/// still checks the cell.
+bool DecodeChainCell(const Family& family, const Variant& variant, ChainLegacyCell* cell) {
+  const uint8_t subset = DimValueOf(family, variant, 1, 0);
+  const uint8_t stroke = DimValueOf(family, variant, 1, 1);
+  const uint8_t profile = DimValueOf(family, variant, 2, 0);
+  cell->subset = subset;
+  cell->xp = DimValueOf(family, variant, 3, 0);
+  cell->coverage = 1;
+  cell->uvCoord = 0;
+  switch (variant.geometry) {
+    case 0:
+      break;
+    case 1:
+      cell->uvCoord = 1;
+      break;
+    case 2:
+      cell->coverage = 0;
+      cell->uvCoord = 1;
+      break;
+    case 3:
+      cell->gpLayout = 1;
+      cell->coverage = 0;
+      break;
+    case 4:
+      cell->gpLayout = 2;
+      cell->coverage = 0;
+      break;
+    default:
+      cell->gpLayout = 3 + stroke;
+      cell->coverage = 0;
+      break;
+  }
+  // PROFILE -> (texture count, mask, resource kind), the legacy cell terms.
+  switch (profile) {
+    case 0:
+      break;
+    case 1:
+      cell->mask = 1;
+      break;
+    case 2:
+      cell->textureCount = 1;
+      break;
+    case 3:
+      cell->resource = 1;
+      break;
+    case 4:
+      cell->mask = 1;
+      cell->resource = 1;
+      break;
+    case 5:
+      cell->textureCount = 1;
+      cell->resource = 1;
+      break;
+    case 6:
+      cell->textureCount = 1;
+      cell->resource = 2;
+      break;
+    default:
+      return false;
+  }
+  return true;
+}
+
+}  // namespace
 namespace {
 
 constexpr int SceneSize = 160;
