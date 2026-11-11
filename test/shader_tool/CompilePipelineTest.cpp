@@ -26,15 +26,15 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include "FailureAssertions.h"
 #include "compile/InlineExpansion.h"
 #include "compile/ReflectionExtractor.h"
 #include "compile/ShaderCompiler.h"
-#include "core/DiagnosticCodes.h"
 #include "compile/StageCompiler.h"
-#include "gpu/shaders/contract/ShaderBundleContract.h"
+#include "core/DiagnosticCodes.h"
 #include "gpu/Uniform.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gtest/gtest.h"
-#include "FailureAssertions.h"
 #include "output/InlineExpansionReport.h"
 #include "verify/ContractChecks.h"
 
@@ -82,8 +82,8 @@ std::vector<uint32_t> MustCompile(const std::string& source, ShaderStageType sta
   return spirv;
 }
 
-bool HasEntry(const std::vector<UniformEntry>& entries, const std::string& name, UniformFormat format,
-              uint16_t arraySize = 1) {
+bool HasEntry(const std::vector<UniformEntry>& entries, const std::string& name,
+              UniformFormat format, uint16_t arraySize = 1) {
   for (const auto& entry : entries) {
     if (entry.name == name) {
       return entry.format == static_cast<uint8_t>(format) && entry.arraySize == arraySize;
@@ -311,9 +311,10 @@ TEST(ReflectionExtractorTest, ManyVertexInputsDeclaredBackwardsStillComeInLocati
 
 TEST(ReflectionExtractorTest, OnlyTheNamedBlockIsReflected) {
   // A block with another name is not the stage's uniform block, so its members are not reported.
-  const std::string source = std::string("#version 450\n") +
-                             "layout(std140, set = 0, binding = 0) uniform OtherBlock { vec4 X; };\n"
-                             "void main() { gl_Position = X; }\n";
+  const std::string source =
+      std::string("#version 450\n") +
+      "layout(std140, set = 0, binding = 0) uniform OtherBlock { vec4 X; };\n"
+      "void main() { gl_Position = X; }\n";
   auto vertex = MustCompile(source, ShaderStageType::Vertex);
   auto reflection = ReflectOf(vertex, {});
   EXPECT_TRUE(reflection.vertexReflection.uniforms.empty());
@@ -344,9 +345,10 @@ std::string FragmentCalling(int calls, int bodyOperations) {
   for (int i = 0; i < bodyOperations; ++i) {
     body += "  x = x * 1.0001 + " + std::to_string(i + 1) + ".0;\n";
   }
-  std::string source = "#version 450\nlayout(location = 0) out vec4 c;\nlayout(location = 0) in float "
-                       "v;\nfloat heavy(float x) {\n" +
-                       body + "  return x;\n}\nvoid main() {\n  float r = v;\n";
+  std::string source =
+      "#version 450\nlayout(location = 0) out vec4 c;\nlayout(location = 0) in float "
+      "v;\nfloat heavy(float x) {\n" +
+      body + "  return x;\n}\nvoid main() {\n  float r = v;\n";
   for (int i = 0; i < calls; ++i) {
     source += "  r = heavy(r + " + std::to_string(i) + ".0);\n";
   }
@@ -406,8 +408,8 @@ TEST(InlineExpansionTest, CopiesMultiplyThroughNestedCalls) {
 
 TEST(InlineExpansionTest, MalformedModulesAreInvalid) {
   EXPECT_FALSE(AnalyzeInlineExpansion({}).valid);
-  EXPECT_FALSE(AnalyzeInlineExpansion({0x07230203u, 0, 0, 0}).valid);        // Header too short.
-  EXPECT_FALSE(AnalyzeInlineExpansion({0xdeadbeefu, 0, 0, 0, 0}).valid);     // Wrong magic.
+  EXPECT_FALSE(AnalyzeInlineExpansion({0x07230203u, 0, 0, 0}).valid);     // Header too short.
+  EXPECT_FALSE(AnalyzeInlineExpansion({0xdeadbeefu, 0, 0, 0, 0}).valid);  // Wrong magic.
   // A well formed header followed by an instruction that claims more words than exist.
   EXPECT_FALSE(AnalyzeInlineExpansion({0x07230203u, 0, 0, 0, 0, (9u << 16) | 54u}).valid);
 }
@@ -514,8 +516,7 @@ TEST(InlineExpansionReportTest, TheReportListsEveryVariantAndItsDuplicatedFuncti
 
 TEST(InlineExpansionReportTest, AnUnwritablePathFailsInsteadOfPretending) {
   Diagnostics diagnostics;
-  EXPECT_FALSE(
-      WriteInlineExpansionReport("/nonexistent/directory/report.json", {}, &diagnostics));
+  EXPECT_FALSE(WriteInlineExpansionReport("/nonexistent/directory/report.json", {}, &diagnostics));
   ASSERT_EQ(diagnostics.records().size(), 1u);
   EXPECT_STREQ(diagnostics.records()[0].code, DiagnosticCode::OutputWrite);
   EXPECT_EQ(diagnostics.records()[0].layer, Layer::Output);

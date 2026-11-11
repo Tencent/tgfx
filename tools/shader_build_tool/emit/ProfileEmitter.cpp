@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProfileEmitter.h"
-
 #include <utility>
-
 #include "GLSLDialect.h"
 #include "compile/StageCompiler.h"
 #include "core/DiagnosticCodes.h"
@@ -112,10 +110,9 @@ class MetalEmitter : public ProfileEmitter {
     // values through MTLFunctionConstantValues at pipeline creation and the Metal compiler
     // folds them into the specialized function. Other families keep the common SPIR-V.
     if (input.fragSpecSource != nullptr) {
-      const auto& specFrag =
-          compiler->compileSpirv(PrependDefines(*input.fragSpecSource, *input.fragDefines),
-                                 ShaderStageType::Fragment, input.info->name, input.fragIndex,
-                                 false);
+      const auto& specFrag = compiler->compileSpirv(
+          PrependDefines(*input.fragSpecSource, *input.fragDefines), ShaderStageType::Fragment,
+          input.info->name, input.fragIndex, false);
       if (!specFrag.success) {
         ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
                       "spec-dialect fragment recompile failed: " + specFrag.error);
@@ -129,8 +126,7 @@ class MetalEmitter : public ProfileEmitter {
       }
       return CompileMetallibPair(compiler, input, mslVert.text, mslFragSpec.text);
     }
-    const auto& mslFrag =
-        compiler->translateMSL(input.fragStage->spirv, ShaderStageType::Fragment);
+    const auto& mslFrag = compiler->translateMSL(input.fragStage->spirv, ShaderStageType::Fragment);
     if (!mslFrag.success) {
       ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
                     "MSL translation error: " + mslFrag.error);
@@ -146,8 +142,7 @@ class MetalEmitter : public ProfileEmitter {
     std::string metalError;
     EmittedStages stages;
     stages.payloadKind = BundleFormat::Payload::Binary;
-    stages.vertexBlob =
-        compiler->compileMetallib(mslVert, ShaderStageType::Vertex, &metalError);
+    stages.vertexBlob = compiler->compileMetallib(mslVert, ShaderStageType::Vertex, &metalError);
     if (!stages.vertexBlob.empty()) {
       stages.fragmentBlob =
           compiler->compileMetallib(mslFrag, ShaderStageType::Fragment, &metalError);
@@ -183,9 +178,9 @@ class WebGPUEmitter : public ProfileEmitter {
     const auto& wgslFrag = compiler->compileWgsl(expandedFragWgsl, ShaderStageType::Fragment,
                                                  input.info->name, input.fragIndex);
     if (!wgslVert.success || !wgslFrag.success) {
-      ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
-                    "WGSL translation error: " +
-                        (wgslVert.success ? wgslFrag.error : wgslVert.error));
+      ReportFailure(
+          input, profile(), DiagnosticCode::EmitFailed,
+          "WGSL translation error: " + (wgslVert.success ? wgslFrag.error : wgslVert.error));
       return std::nullopt;
     }
     EmittedStages stages;
@@ -226,10 +221,9 @@ class D3D12Emitter : public ProfileEmitter {
     // folds the value in. A silent fallback to the common SPIR-V would emit a macro-less HLSL
     // whose runtime injection never matches, so a recompile failure is loud.
     if (input.fragSpecSource != nullptr) {
-      const auto& specFrag =
-          compiler->compileSpirv(PrependDefines(*input.fragSpecSource, *input.fragDefines),
-                                 ShaderStageType::Fragment, input.info->name, input.fragIndex,
-                                 false);
+      const auto& specFrag = compiler->compileSpirv(
+          PrependDefines(*input.fragSpecSource, *input.fragDefines), ShaderStageType::Fragment,
+          input.info->name, input.fragIndex, false);
       if (!specFrag.success) {
         ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
                       "spec-dialect fragment recompile failed: " + specFrag.error);
@@ -262,7 +256,8 @@ class D3D12Emitter : public ProfileEmitter {
       std::string dxbcError;
       stages.vertexBlob = compiler->compileDxbc(vertText, ShaderStageType::Vertex, &dxbcError);
       if (!stages.vertexBlob.empty()) {
-        stages.fragmentBlob = compiler->compileDxbc(fragText, ShaderStageType::Fragment, &dxbcError);
+        stages.fragmentBlob =
+            compiler->compileDxbc(fragText, ShaderStageType::Fragment, &dxbcError);
       }
       if (stages.vertexBlob.empty() || stages.fragmentBlob.empty()) {
         ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
@@ -305,12 +300,12 @@ std::optional<EmittedStages> DirectGLSLEmitter::emit(const EmitInput& input, Sta
     // source (input.fragSource) already carries the generated const TGFX_SPEC declarations in
     // their plain text form — GL keeps them verbatim for the runtime injection to rewrite,
     // this backend's counterpart of the Vulkan family's pipeline-constant injection.
-    bool fbfVariant = input.info->fragDomain.valueOf(input.fragIndex, XP_DEFINE_NAME) ==
-                      XP_FRAMEBUFFER_FETCH;
+    bool fbfVariant =
+        input.info->fragDomain.valueOf(input.fragIndex, XP_DEFINE_NAME) == XP_FRAMEBUFFER_FETCH;
     std::string emissionError;
-    directVert = EmitDirectGLSLES300(PrependDefines(*input.vertSource, *input.vertDefines),
-                                     ShaderStageType::Vertex, false, nullptr, nullptr,
-                                     &emissionError);
+    directVert =
+        EmitDirectGLSLES300(PrependDefines(*input.vertSource, *input.vertDefines),
+                            ShaderStageType::Vertex, false, nullptr, nullptr, &emissionError);
     directFrag = EmitDirectGLSLES300(PrependDefines(*input.fragSource, *input.fragDefines),
                                      ShaderStageType::Fragment, fbfVariant, input.fragGates,
                                      input.fragSpecEntries, &emissionError);

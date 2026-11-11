@@ -128,16 +128,25 @@ inline constexpr const char* OutputDuplicateKey = "output.duplicate-key";
 /// must be referenced by at least one site (an unreferenced one is dead, or a site that still
 /// reports through something else).
 inline constexpr const char* AllCodes[] = {
-    SourcesUnreadable,     CompileGlsl,           CompileCacheDisabled, ReflectUnknownType,
-    EmitFailed,            EmitFormLeak,
+    SourcesUnreadable,
+    CompileGlsl,
+    CompileCacheDisabled,
+    ReflectUnknownType,
+    EmitFailed,
+    EmitFormLeak,
     SpecReader,
     SpecLayoutDrift,
     VerifyClipField,
     VerifyReflection,
-    VerifyBindingLayout,   VerifyInlinePolicy, VerifyNotApplicable,
-    VerifyParamUndeclared, VerifyParamUnused,
-    VerifyMacroUnknown,     VerifyPointwiseDispatch,
-    OutputWrite,           OutputDuplicateKey,
+    VerifyBindingLayout,
+    VerifyInlinePolicy,
+    VerifyNotApplicable,
+    VerifyParamUndeclared,
+    VerifyParamUnused,
+    VerifyMacroUnknown,
+    VerifyPointwiseDispatch,
+    OutputWrite,
+    OutputDuplicateKey,
 };
 
 }  // namespace DiagnosticCode

@@ -26,10 +26,10 @@
 #include <iterator>
 #include <string>
 #include <vector>
-#include "output/BundleWriter.h"
-#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gtest/gtest.h"
+#include "output/BundleWriter.h"
 
 namespace tgfx {
 namespace {
@@ -77,9 +77,9 @@ VariantData FullVariant(const std::string& shader, uint32_t vertIndex, uint32_t 
   variant.fragmentReflection.uniforms = {MakeUniform("uColor", UniformFormat::Float4),
                                          MakeUniform("uStops", UniformFormat::Float4, 8),
                                          MakeUniform("uMode", UniformFormat::Int)};
-  variant.fragmentReflection.samplers = {MakeUniform("TextureSampler_0", UniformFormat::Texture2DSampler),
-                                         MakeUniform("TextureSampler_1",
-                                                 UniformFormat::TextureExternalSampler)};
+  variant.fragmentReflection.samplers = {
+      MakeUniform("TextureSampler_0", UniformFormat::Texture2DSampler),
+      MakeUniform("TextureSampler_1", UniformFormat::TextureExternalSampler)};
   return variant;
 }
 
@@ -216,8 +216,9 @@ TEST(BundleHeaderTest, TheWriterFillsExactlyTheDocumentedLayout) {
   EXPECT_EQ(ReadU32(bytes, BundleFormat::Offset::DataOffset),
             BundleFormat::HeaderSize + 2 * BundleFormat::PoolEntrySize);
   // The profile tag is zero padded to its field.
-  std::string storedTag(reinterpret_cast<const char*>(bytes.data()) + BundleFormat::Offset::ProfileTag,
-                        BundleFormat::ProfileTagSize);
+  std::string storedTag(
+      reinterpret_cast<const char*>(bytes.data()) + BundleFormat::Offset::ProfileTag,
+      BundleFormat::ProfileTagSize);
   EXPECT_EQ(storedTag.substr(0, tag.size()), tag);
   EXPECT_EQ(storedTag.find_first_not_of('\0', tag.size()), std::string::npos);
   std::remove(path.c_str());
@@ -230,8 +231,8 @@ TEST(BundleHeaderTest, ThePayloadFormatFollowsTheProfileTag) {
     auto variant = FullVariant("Payload", 0, 0, tag, "vert", "frag");
     variant.payloadKind = kind;
     std::vector<VariantData> variants = {variant};
-    auto path = TempPath(kind == BundleFormat::Payload::Binary ? "payload_binary.bin"
-                                                              : "payload_text.bin");
+    auto path =
+        TempPath(kind == BundleFormat::Payload::Binary ? "payload_binary.bin" : "payload_text.bin");
     Diagnostics diagnostics;
     ASSERT_TRUE(WriteBundle(path, tag, variants, false, &diagnostics));
     auto bytes = ReadFile(path);

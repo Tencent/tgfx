@@ -20,8 +20,8 @@
 #include <set>
 #include <string>
 #include "TestDeclaredModules.h"
-#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/Layout.h"
 
 namespace tgfx {
@@ -175,7 +175,8 @@ const Layout::Field* FindField(const Layout& layout, const char* name) {
 }  // namespace
 
 TEST(LayoutTest, SpecIdsFollowModuleThenElementOrder) {
-  const auto layout = DeriveLayout(test_modules::TestFamily, test_modules::TestVariant(1));  // CAP = 32
+  const auto layout =
+      DeriveLayout(test_modules::TestFamily, test_modules::TestVariant(1));  // CAP = 32
   ASSERT_EQ(layout.specFields.size(), 2u);
   // SlotCount: the scalar spec field, one id, in the body slot (Frame 0, geometry 1, body 2).
   EXPECT_EQ(layout.specFields[0].firstId, 1u);

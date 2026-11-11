@@ -113,12 +113,9 @@ TEST_F(StageCacheTest, EveryKeyInputChangesTheKey) {
   };
   EXPECT_EQ(keys.size(), 4u);
   // Adding a field changes the key too, even one that is empty or zero.
-  EXPECT_NE(StageCacheKey("spirv", cache.toolIdentity()).add("source").add(uint64_t{1}).finish(),
-            StageCacheKey("spirv", cache.toolIdentity())
-                .add("source")
-                .add(uint64_t{1})
-                .add("")
-                .finish());
+  EXPECT_NE(
+      StageCacheKey("spirv", cache.toolIdentity()).add("source").add(uint64_t{1}).finish(),
+      StageCacheKey("spirv", cache.toolIdentity()).add("source").add(uint64_t{1}).add("").finish());
 }
 
 TEST_F(StageCacheTest, FieldBoundariesAreNotAmbiguous) {
@@ -266,8 +263,7 @@ TEST_F(StageCacheTest, ADamagedEntryIsReplacedByTheNextStore) {
 TEST_F(StageCacheTest, NoTemporaryFilesAreLeftBehind) {
   StageCacheStats stats;
   for (uint64_t i = 0; i < 5; ++i) {
-    cache.store(KeyOf("spirv", "source", i), Payload("bytes " + std::to_string(i)),
-                            &stats);
+    cache.store(KeyOf("spirv", "source", i), Payload("bytes " + std::to_string(i)), &stats);
   }
   size_t entries = 0;
   for (const auto& item : std::filesystem::recursive_directory_iterator(scratch.dir())) {

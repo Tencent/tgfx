@@ -17,19 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "compile/SpecCodegen.h"
-#include <sstream>
-#include "gpu/aot/AOTResourceProfile.h"
-#include "gpu/shaders/contract/SpecContract.h"
 #include <cctype>
 #include <map>
+#include <sstream>
 #include "core/DiagnosticCodes.h"
-#include "gpu/shaders/KernelContract.h"
 #include "gpu/Uniform.h"
+#include "gpu/aot/AOTResourceProfile.h"
+#include "gpu/shaders/KernelContract.h"
+#include "gpu/shaders/contract/SpecContract.h"
 
 namespace tgfx {
 
 namespace {
-
 
 bool IsIdentifierChar(char c) {
   return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_';
@@ -38,18 +37,11 @@ bool IsIdentifierChar(char c) {
 /// Removes // line comments and /* */ block comments, keeping the newlines so the reported line
 /// numbers stay true. The shader sources carry no string literals, so a text-level strip is safe.
 
-
 /// Whether one line of the comment-stripped source declares the uniform `name`: its trimmed form
 /// starts with the type keyword and names the member, which is how every UBO declaration in the
 /// kernels is spelled (`int SlotCount;`, `ivec4 SlotPacked[CHAIN_SLOT_CAPACITY];`).
 
-
-
 }  // namespace
-
-
-
-
 
 namespace {
 
@@ -93,9 +85,8 @@ std::string StubReturnValue(const std::string& rawType) {
 // the matching ')' and the brace-matched body. The return type is the prefix itself.
 bool FindGatedFunction(const std::string& text, const std::string& functionName,
                        GatedFunctionSpan* span, std::string* error) {
-  static const char* kReturnTypes[] = {"bool",  "int",    "float", "vec2", "vec3",
-                                       "vec4",  "mat3",   "mat4",  "void", "highp vec2",
-                                       "highp vec4"};
+  static const char* kReturnTypes[] = {"bool", "int",  "float", "vec2",       "vec3",      "vec4",
+                                       "mat3", "mat4", "void",  "highp vec2", "highp vec4"};
   const std::string needle = " " + functionName + "(";
   auto at = text.find(needle);
   bool found = false;
@@ -280,8 +271,7 @@ TextGateResult ApplyTextSpecGates(const std::string& preprocessedText,
     // The wrapper opens with a newline: the body's opening brace may share the signature's line
     // (K&R style), and a preprocessor directive must start its own line.
     const auto replacement = std::string("\n#if ") + SpecContract::GateMacroPrefix + gate.name +
-                             "\n" + body + "\n#else\n{ return " +
-                             stub + "; }\n#endif\n";
+                             "\n" + body + "\n#else\n{ return " + stub + "; }\n#endif\n";
     text.replace(span.bodyStart, span.bodyEnd - span.bodyStart + 1, replacement);
     ++result.wrapped;
   }
@@ -298,7 +288,8 @@ TextGateResult ApplyTextSpecGates(const std::string& preprocessedText,
   return result;
 }
 
-std::string StubOutGatedFunctions(const std::string& source, const std::vector<SpecGateInfo>& gates) {
+std::string StubOutGatedFunctions(const std::string& source,
+                                  const std::vector<SpecGateInfo>& gates) {
   std::string text = source;
   for (const auto& gate : gates) {
     GatedFunctionSpan span;
@@ -314,7 +305,5 @@ std::string StubOutGatedFunctions(const std::string& source, const std::vector<S
   }
   return text;
 }
-
-
 
 }  // namespace tgfx

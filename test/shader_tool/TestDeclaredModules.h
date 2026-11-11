@@ -24,7 +24,6 @@
 #pragma once
 
 #include <cstdint>
-
 #include "gpu/shaders/Family.h"
 
 namespace tgfx {
@@ -45,8 +44,9 @@ inline constexpr Element TestSpecElements[] = {
 inline constexpr UnrollSite TestUnroll = {"runSlotAt", "result", /*capacityElement=*/1,
                                           /*countElement=*/0};
 
-inline constexpr Module TestSpecModule = {"TestSpec", TestSpecDims, 2, TestSpecElements, 4,
-                                          false, true, /*bareNames=*/false, &TestUnroll};
+inline constexpr Module TestSpecModule = {"TestSpec", TestSpecDims, 2,    TestSpecElements,
+                                          4,          false,        true, /*bareNames=*/false,
+                                          &TestUnroll};
 
 inline constexpr ModuleDim TestGeomDims[] = {{"STROKE", 2}};
 
@@ -55,8 +55,8 @@ inline constexpr Element TestGeomElements[] = {
     {Element::Kind::Param, ShaderType::Float4, "Color", 1, 0, 0x02},
 };
 
-inline constexpr Module TestGeomModule = {"TestGeom", TestGeomDims, 1, TestGeomElements, 2, true,
-                                          false};
+inline constexpr Module TestGeomModule = {"TestGeom", TestGeomDims, 1,    TestGeomElements,
+                                          2,          true,         false};
 
 inline constexpr const Module* TestGeometries[] = {&TestGeomModule};
 

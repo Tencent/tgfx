@@ -21,7 +21,6 @@
 // macro follow the declaration, and a family without spec elements keeps a byte-clean text.
 
 #include <string>
-
 #include "TestDeclaredModules.h"
 #include "emit/Assembler.h"
 #include "gpu/shaders/Families.h"
@@ -46,8 +45,9 @@ TEST(AssemblerTest, GeneratesTheSpecPrologueFromTheDeclaration) {
   // 32 elements * 4 ids = ids 2..129.
   EXPECT_TRUE(Contains(frag, "layout(constant_id = 129) const int TGFX_SPEC_129 = 0;")) << frag;
   // The scalar accessor: the constant under the master switch, the uniform otherwise.
-  EXPECT_TRUE(Contains(frag, "int TestSpec_SPEC_SlotCount() { int s = TGFX_SPEC_0; if (s == 1) { "
-                             "return TGFX_SPEC_1; } return TestSpec_SlotCount; }"))
+  EXPECT_TRUE(Contains(frag,
+                       "int TestSpec_SPEC_SlotCount() { int s = TGFX_SPEC_0; if (s == 1) { "
+                       "return TGFX_SPEC_1; } return TestSpec_SlotCount; }"))
       << frag;
   // The Int4 accessor indexes the constants by literal element and falls back to the array.
   EXPECT_TRUE(Contains(frag, "ivec4 TestSpec_SPEC_SlotPacked(int i) {")) << frag;
@@ -61,7 +61,8 @@ TEST(AssemblerTest, GeneratesTheSpecPrologueFromTheDeclaration) {
 TEST(AssemblerTest, UnrollSitesFollowTheVariantCapacity) {
   const auto wide = AssembleVariant(test_modules::TestFamily, test_modules::TestVariant(1));
   EXPECT_TRUE(Contains(wide.fragText, "#define TestSpec_RUN_UNROLLED_SLOTS()")) << wide.fragText;
-  EXPECT_TRUE(Contains(wide.fragText, "if (TestSpec_SPEC_SlotCount() > 0) { runSlotAt(0, result); }"))
+  EXPECT_TRUE(
+      Contains(wide.fragText, "if (TestSpec_SPEC_SlotCount() > 0) { runSlotAt(0, result); }"))
       << wide.fragText;
   EXPECT_TRUE(
       Contains(wide.fragText, "if (TestSpec_SPEC_SlotCount() > 31) { runSlotAt(31, result); }"))

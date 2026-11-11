@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLDialect.h"
-
 #include <cctype>
 #include <charconv>
 #include <cstring>
@@ -37,7 +36,8 @@ class IntegerExpressionParser {
   static bool Evaluate(const std::string& expression, int64_t* value);
 
  private:
-  explicit IntegerExpressionParser(const std::string& expression) : expression(expression) {}
+  explicit IntegerExpressionParser(const std::string& expression) : expression(expression) {
+  }
 
   bool ParseSum(int64_t* value);
   bool ParseProduct(int64_t* value);
@@ -163,8 +163,7 @@ void IntegerExpressionParser::SkipSpaces() {
 // unchanged. Returns an empty string when the source does not carry the expected version, so
 // the caller fails the variant closed.
 std::string EmitDirectGLSL330Impl(const std::string& source, ShaderStageType stage,
-                                  const std::string& versionLine, bool esDialect,
-                                  bool fbfVariant) {
+                                  const std::string& versionLine, bool esDialect, bool fbfVariant) {
   const std::string versionToken = "#version 450";
   auto versionPos = source.find(versionToken);
   if (versionPos == std::string::npos) {
@@ -449,8 +448,7 @@ std::string EmitDirectGLSL330(const std::string& source, ShaderStageType stage,
   }
   if (gates != nullptr && !gates->empty()) {
     const auto gated = ApplyTextSpecGates(preprocessed, *gates,
-                                           entries == nullptr ? std::vector<SpecEntry>{}
-                                                              : *entries);
+                                          entries == nullptr ? std::vector<SpecEntry>{} : *entries);
     if (!gated.error.empty()) {
       if (error != nullptr) {
         *error = gated.error;
@@ -475,8 +473,7 @@ std::string EmitDirectGLSLES300(const std::string& source, ShaderStageType stage
   }
   if (gates != nullptr && !gates->empty()) {
     const auto gated = ApplyTextSpecGates(preprocessed, *gates,
-                                           entries == nullptr ? std::vector<SpecEntry>{}
-                                                              : *entries);
+                                          entries == nullptr ? std::vector<SpecEntry>{} : *entries);
     if (!gated.error.empty()) {
       if (error != nullptr) {
         *error = gated.error;

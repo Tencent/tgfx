@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "verify/ContractChecks.h"
 #include <algorithm>
 #include <map>
 #include <set>
@@ -31,6 +30,7 @@
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "verify/ContractCheckSupport.h"
+#include "verify/ContractChecks.h"
 
 namespace tgfx {
 
@@ -99,7 +99,6 @@ size_t ValidateClipContractFields(const std::vector<VariantData>& variants,
   }
   return errors;
 }
-
 
 size_t ValidateReflectionContracts(const std::vector<VariantData>& variants,
                                    Diagnostics* diagnostics) {
@@ -263,7 +262,6 @@ size_t ValidateInlineExpansion(const std::vector<InlineExpansionRecord>& records
   return invalid + violations.size();
 }
 
-
 // The base name of a reflected field: the runtime's structural suffix (Subset, Subset_1) appends
 // an underscore and digits to the declared name, so the reconciliation resolves both forms.
 
@@ -300,8 +298,7 @@ static const std::pair<const std::string, UniformFormat>* DeclaredEntry(
 // declared writer constant with a matching format (a GLSL typo would otherwise read as zero or
 // stale data at runtime), and every declared constant must appear in some variant (a dead
 // declaration is a drift nobody reconciles any more).
-size_t ValidateFamilyParams(const std::vector<VariantData>& variants,
-                            Diagnostics* diagnostics) {
+size_t ValidateFamilyParams(const std::vector<VariantData>& variants, Diagnostics* diagnostics) {
   size_t errors = 0;
   const auto& formats = AllParamFormats();
   std::set<std::string> usedNames;
@@ -334,9 +331,9 @@ size_t ValidateFamilyParams(const std::vector<VariantData>& variants,
         } else if (declared->second != static_cast<UniformFormat>(entry.format)) {
           Report(diagnostics, Severity::Error, DiagnosticCode::VerifyParamUndeclared,
                  variant.shaderName, variant.profileTag, -1, -1,
-                 "uniform '" + entry.name + "' reflects format " +
-                     std::to_string(entry.format) + " but the constant '" + declared->first +
-                     "' declares format " + std::to_string(static_cast<int>(declared->second)));
+                 "uniform '" + entry.name + "' reflects format " + std::to_string(entry.format) +
+                     " but the constant '" + declared->first + "' declares format " +
+                     std::to_string(static_cast<int>(declared->second)));
           ++errors;
         }
       }

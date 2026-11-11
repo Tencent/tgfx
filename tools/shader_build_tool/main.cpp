@@ -30,8 +30,8 @@
 
 #include <iostream>
 #include <string>
-#include "compile/ShaderCompiler.h"
 #include "cli/BuildCommand.h"
+#include "compile/ShaderCompiler.h"
 
 int main(int argc, char** argv) {
   tgfx::BuildOptions options;

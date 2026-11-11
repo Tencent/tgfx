@@ -130,8 +130,8 @@ bool ExpandIncludes(const std::string& source, const std::string& shaderRoot, Fi
         }
         std::string includeContent;
         if (!files->read(fullPath, &includeContent)) {
-          *error = "cannot read #include \"" + includePath + "\": " + FormatChain(*chain) +
-                   " -> " + fullPath;
+          *error = "cannot read #include \"" + includePath + "\": " + FormatChain(*chain) + " -> " +
+                   fullPath;
           return false;
         }
         chain->push_back(fullPath);
@@ -150,7 +150,6 @@ bool ExpandIncludes(const std::string& source, const std::string& shaderRoot, Fi
 }
 
 }  // namespace
-
 
 std::string ExpandStageIncludes(const std::string& source, const std::string& shaderDir,
                                 std::string* error) {

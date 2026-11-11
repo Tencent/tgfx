@@ -27,9 +27,9 @@
 
 #include <cstdint>
 #include <string>
-#include "verify/BindingLayoutRule.h"
 #include "emit/GLSLDialect.h"
 #include "gtest/gtest.h"
+#include "verify/BindingLayoutRule.h"
 
 namespace tgfx {
 namespace {
@@ -139,8 +139,8 @@ void main() {
 }
 )";
   std::string error;
-  auto text = EmitDirectGLSLES300(FbfTemplate, ShaderStageType::Fragment, true, nullptr, nullptr,
-                                  &error);
+  auto text =
+      EmitDirectGLSLES300(FbfTemplate, ShaderStageType::Fragment, true, nullptr, nullptr, &error);
   EXPECT_TRUE(error.empty()) << error;
   ASSERT_FALSE(text.empty());
   EXPECT_EQ(text.find("subpassInput"), std::string::npos) << text;
@@ -175,12 +175,14 @@ void main() {
 }
 
 TEST(FindDirectFormLeakTest, AcceptsACleanTextOfEitherDialect) {
-  const std::string gl = "#version 330\nlayout(location = 0) out vec4 fragColor;\n"
-                         "void main() { fragColor = vec4(1.0); }\n";
+  const std::string gl =
+      "#version 330\nlayout(location = 0) out vec4 fragColor;\n"
+      "void main() { fragColor = vec4(1.0); }\n";
   EXPECT_EQ(FindDirectFormLeak(gl, false).reason, nullptr);
 
-  const std::string es = "#version 300 es\nprecision mediump float;\nprecision highp int;\n"
-                         "highp vec4 fragColor;\nvoid main() { fragColor = vec4(1.0); }\n";
+  const std::string es =
+      "#version 300 es\nprecision mediump float;\nprecision highp int;\n"
+      "highp vec4 fragColor;\nvoid main() { fragColor = vec4(1.0); }\n";
   EXPECT_EQ(FindDirectFormLeak(es, true).reason, nullptr);
 }
 
@@ -220,8 +222,9 @@ TEST(FindDirectFormLeakTest, ReportsSurvivingConditionalsAndSubpassSyntax) {
   const std::string conditional = "#version 330\n#ifdef X\nvoid main() {}\n#endif\n";
   EXPECT_STREQ(FindDirectFormLeak(conditional, false).reason, "surviving conditional");
 
-  const std::string subpass = "#version 300 es\nprecision mediump float;\n"
-                              "vec4 c = subpassLoad(tgfx_SubpassInput);\n";
+  const std::string subpass =
+      "#version 300 es\nprecision mediump float;\n"
+      "vec4 c = subpassLoad(tgfx_SubpassInput);\n";
   EXPECT_STREQ(FindDirectFormLeak(subpass, true).reason, "subpass syntax");
 }
 

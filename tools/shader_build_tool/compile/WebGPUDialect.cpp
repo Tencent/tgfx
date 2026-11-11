@@ -76,9 +76,8 @@ static std::vector<std::string> collectSamplerNames(const std::string& source) {
 static std::string replaceSeparatedSampler(const std::smatch& match, int& counter) {
   const auto& name = match[1].str();
   auto set = std::to_string(TEXTURE_DESCRIPTOR_SET);
-  auto textureDecl =
-      "layout(set = " + set + ", binding = " + std::to_string(counter++) + ") uniform texture2D " +
-      name + ";";
+  auto textureDecl = "layout(set = " + set + ", binding = " + std::to_string(counter++) +
+                     ") uniform texture2D " + name + ";";
   auto samplerDecl = "\nlayout(set = " + set + ", binding = " + std::to_string(counter++) +
                      ") uniform sampler " + name + "_Sampler;";
   return textureDecl + samplerDecl;

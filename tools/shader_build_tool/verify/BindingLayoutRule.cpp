@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BindingLayoutRule.h"
-
 #include <cstdint>
 #include <cstring>
 #include <map>
@@ -57,10 +56,9 @@ size_t FindLayoutMember(const std::string& text, const char* member) {
 DirectFormLeak FindDirectFormLeak(const std::string& text, bool esForm) {
   static const std::regex conditional(
       R"((^|\n)[ \t]*#[ \t]*(if|ifdef|ifndef|elif|else|endif|define)\b)");
-  bool headerOk =
-      esForm ? (text.find("#version 300 es") != std::string::npos &&
-                text.find("precision mediump float;") != std::string::npos)
-             : text.find("#version 330") != std::string::npos;
+  bool headerOk = esForm ? (text.find("#version 300 es") != std::string::npos &&
+                            text.find("precision mediump float;") != std::string::npos)
+                         : text.find("#version 330") != std::string::npos;
   if (!headerOk) {
     return {"dialect header", 0};
   }
@@ -153,7 +151,6 @@ void Report(Diagnostics* diagnostics, Severity severity, const char* code,
   diagnostic.message = std::move(message);
   diagnostics->report(std::move(diagnostic));
 }
-
 
 /// Reports the GL/GLES texts that still carry a set/binding qualifier, the wrong dialect header,
 /// a surviving conditional or Vulkan subpass syntax: the emitters strip all of them, so a
@@ -453,9 +450,8 @@ size_t CheckD3D12Variant(const VariantData& variant, Diagnostics* diagnostics) {
     for (auto cbuffer : registers.cbuffers) {
       if (cbuffer != expectedCbuffer) {
         Report(diagnostics, Severity::Error, DiagnosticCode::VerifyBindingLayout, variant,
-               std::string(stage) + " uniform block bound to register(b" +
-                   std::to_string(cbuffer) + "), expected register(b" +
-                   std::to_string(expectedCbuffer) +
+               std::string(stage) + " uniform block bound to register(b" + std::to_string(cbuffer) +
+                   "), expected register(b" + std::to_string(expectedCbuffer) +
                    "); the root signature builds its CBV from that binding point");
         errors++;
       }

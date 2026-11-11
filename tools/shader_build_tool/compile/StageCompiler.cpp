@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "StageCompiler.h"
-
 #include <cstring>
 #include <utility>
 
@@ -34,11 +33,12 @@ const std::string& MetalToolchainKey() {
 
 }  // namespace
 
-StageCompiler::StageCompiler(StageCache* persistentCache) : persistentCache(persistentCache) {}
+StageCompiler::StageCompiler(StageCache* persistentCache) : persistentCache(persistentCache) {
+}
 
 const SpirvStage& StageCompiler::compileSpirv(const std::string& source, ShaderStageType stage,
-                                              const std::string& shaderName,
-                                              uint32_t variantIndex, bool optimize) {
+                                              const std::string& shaderName, uint32_t variantIndex,
+                                              bool optimize) {
   const char* kind = optimize ? "spirv-optimized" : "spirv";
   auto& stats = persistentCache->stats(kind);
   stats.requests++;
@@ -66,8 +66,8 @@ const SpirvStage& StageCompiler::compileSpirv(const std::string& source, ShaderS
     entry.success = !entry.spirv.empty();
     if (entry.success) {
       auto* bytes = reinterpret_cast<const uint8_t*>(entry.spirv.data());
-      persistentCache->store(key,
-                             std::vector<uint8_t>(bytes, bytes + entry.spirv.size() * 4), &stats);
+      persistentCache->store(key, std::vector<uint8_t>(bytes, bytes + entry.spirv.size() * 4),
+                             &stats);
     }
   }
   return spirvCache.emplace(std::move(key), std::move(entry)).first->second;
@@ -118,8 +118,7 @@ std::vector<uint8_t> StageCompiler::compileMetallib(const std::string& msl, Shad
 }
 
 const TextStage& StageCompiler::compileWgsl(const std::string& source, ShaderStageType stage,
-                                            const std::string& shaderName,
-                                            uint32_t variantIndex) {
+                                            const std::string& shaderName, uint32_t variantIndex) {
   auto key = StageCacheKey("wgsl", persistentCache->toolIdentity())
                  .add(shaderName + "_variant_" + std::to_string(variantIndex))
                  .add(static_cast<uint64_t>(stage))
@@ -139,8 +138,8 @@ const TextStage& StageCompiler::compileWgsl(const std::string& source, ShaderSta
       entry.text = CompileGLSLToWGSL(source, stage, shaderName, variantIndex, &entry.error);
       entry.success = !entry.text.empty();
       if (entry.success) {
-        persistentCache->store(key,
-                               std::vector<uint8_t>(entry.text.begin(), entry.text.end()), &stats);
+        persistentCache->store(key, std::vector<uint8_t>(entry.text.begin(), entry.text.end()),
+                               &stats);
       }
     }
     it = wgslCache.emplace(std::move(key), std::move(entry)).first;

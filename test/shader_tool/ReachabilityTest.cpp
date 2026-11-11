@@ -24,11 +24,11 @@
 #include <set>
 #include <string>
 #include <vector>
-#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gtest/gtest.h"
 
 namespace tgfx {
@@ -194,8 +194,8 @@ TEST(ReachabilityTest, FramebufferFetchVariantsExistOnlyWhereTheProfileCanServeT
           ++compiled;
         }
       }
-      size_t expected = ProfileSupportsFramebufferFetch(profile) ? reachable->size()
-                                                                 : reachable->size() - fetch;
+      size_t expected =
+          ProfileSupportsFramebufferFetch(profile) ? reachable->size() : reachable->size() - fetch;
       EXPECT_EQ(compiled, expected) << info.name << " on " << ProfileTag(profile);
     }
   }
@@ -244,8 +244,8 @@ TEST(PermutationDomainTest, TheFirstDimensionVariesFastest) {
 }
 
 TEST(PermutationDomainTest, DefineListsCarryEveryDimensionEvenAtZero) {
-  PermutationDomain domain({PermutationBool("A"), PermutationEnum("B", {"x", "y"}),
-                            PermutationInt("C", 5)});
+  PermutationDomain domain(
+      {PermutationBool("A"), PermutationEnum("B", {"x", "y"}), PermutationInt("C", 5)});
   auto defines = domain.defineListFor(domain.encode({0, 1, 4}));
   ASSERT_EQ(defines.size(), 3u);
   EXPECT_EQ(defines[0], "A=0");

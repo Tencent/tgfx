@@ -17,15 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ReportWriter.h"
-
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <set>
 #include <tuple>
 #include <utility>
-#include "output/StageReport.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
+#include "output/StageReport.h"
 
 namespace tgfx {
 
@@ -250,7 +249,8 @@ bool WriteReportJson(const BuildReport& report, const std::string& outDir) {
     file << "    {\n";
     file << "      \"severity\": \"" << SeverityName(record.severity) << "\",\n";
     file << "      \"layer\": \"" << LayerName(record.layer) << "\",\n";
-    file << "      \"code\": \"" << JsonEscape(record.code != nullptr ? record.code : "") << "\",\n";
+    file << "      \"code\": \"" << JsonEscape(record.code != nullptr ? record.code : "")
+         << "\",\n";
     file << "      \"shader\": \"" << JsonEscape(record.shader) << "\",\n";
     file << "      \"profile\": \"" << JsonEscape(record.profile) << "\",\n";
     file << "      \"vert\": " << record.vertPermutationIndex << ",\n";

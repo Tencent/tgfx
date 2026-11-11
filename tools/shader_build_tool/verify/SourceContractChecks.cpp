@@ -16,9 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "verify/ContractChecks.h"
-#include "gpu/shaders/Families.h"
-#include "gpu/shaders/FamilyDomains.h"
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -32,10 +29,13 @@
 #include "core/DiagnosticCodes.h"
 #include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/aot/bind/AOTParamRegistry.h"
+#include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/contract/SpecContract.h"
 #include "verify/ContractCheckSupport.h"
+#include "verify/ContractChecks.h"
 
 namespace tgfx {
 
@@ -87,8 +87,7 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
     // The declared families have no stored entry files (their text is assembled), so only a
     // family with a real file name can be scanned for dead dimensions.
     const bool present =
-        (!info.vertexFile.empty() &&
-         std::filesystem::exists(shaderDir + "/" + info.vertexFile)) ||
+        (!info.vertexFile.empty() && std::filesystem::exists(shaderDir + "/" + info.vertexFile)) ||
         (!info.fragmentFile.empty() &&
          std::filesystem::exists(shaderDir + "/" + info.fragmentFile));
     for (const auto& dimension : info.vertDomain.getDimensions()) {
@@ -160,8 +159,7 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
   }
   const std::regex definePattern("^[ \t]*#[ \t]*define[ \t]+([A-Za-z_][A-Za-z0-9_]*)");
   const std::regex ifndefPattern("^[ \t]*#[ \t]*ifndef[ \t]+([A-Za-z_][A-Za-z0-9_]*)");
-  const std::regex conditionPattern(
-      "^[ \\t]*#[ \\t]*(?:ifdef|ifndef|elif|if)\\b[ \\t]*(.*)$");
+  const std::regex conditionPattern("^[ \\t]*#[ \\t]*(?:ifdef|ifndef|elif|if)\\b[ \\t]*(.*)$");
   const std::regex identifierPattern("([A-Za-z_][A-Za-z0-9_]*)");
   static const std::set<std::string> guardDefaultWhitelist = {"MAX_SIGMA"};
   std::set<std::string> usedInConditions;
@@ -281,8 +279,7 @@ size_t ValidatePointwiseDispatch(const std::string& shaderDir, Diagnostics* diag
     }
     const auto exemption = exemptions.find(name);
     if (exemption == exemptions.end()) {
-      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyPointwiseDispatch, "", "", -1,
-             -1,
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyPointwiseDispatch, "", "", -1, -1,
              relative + " has no dispatch branch for operator '" + name +
                  "' and no tgfx_pointwise_exempt entry; add a branch or state why the call "
                  "sites dispatch it");
@@ -290,8 +287,7 @@ size_t ValidatePointwiseDispatch(const std::string& shaderDir, Diagnostics* diag
       continue;
     }
     if (exemption->second.find_first_not_of(" \t") == std::string::npos) {
-      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyPointwiseDispatch, "", "", -1,
-             -1,
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyPointwiseDispatch, "", "", -1, -1,
              "operator '" + name +
                  "' is exempt from the shared dispatch without a reason; state why on its "
                  "tgfx_pointwise_exempt line");
@@ -307,8 +303,7 @@ size_t ValidatePointwiseDispatch(const std::string& shaderDir, Diagnostics* diag
       }
     }
     if (!known) {
-      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyPointwiseDispatch, "", "", -1,
-             -1,
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyPointwiseDispatch, "", "", -1, -1,
              "dispatch branch 'OP_" + define +
                  "' names no operator of the op list; remove the branch or restore the operator");
       ++errors;
@@ -316,10 +311,9 @@ size_t ValidatePointwiseDispatch(const std::string& shaderDir, Diagnostics* diag
   }
   for (const auto& entry : exemptions) {
     if (listed.count(entry.first) == 0) {
-      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyPointwiseDispatch, "", "", -1,
-             -1,
-             "exemption for '" + entry.first +
-                 "' names no operator of the op list; remove the entry");
+      Report(
+          diagnostics, Severity::Error, DiagnosticCode::VerifyPointwiseDispatch, "", "", -1, -1,
+          "exemption for '" + entry.first + "' names no operator of the op list; remove the entry");
       ++errors;
     }
   }
@@ -398,7 +392,7 @@ size_t ValidateSpecReaders(const std::string& shaderDir, Diagnostics* diagnostic
     bool readsSpec = false;
     for (size_t index = 0; index + 5 <= code.size(); ++index) {
       if (code.compare(index, std::strlen(SpecContract::FieldAccessorPrefix),
-                     SpecContract::FieldAccessorPrefix) != 0) {
+                       SpecContract::FieldAccessorPrefix) != 0) {
         continue;
       }
       if (index > 0 && IsScanIdentifierChar(code[index - 1])) {
@@ -470,8 +464,10 @@ size_t ValidateMirroredDimensions(Diagnostics* diagnostics) {
       if (vertex != vertexDimensions.end() && vertex->second != signature) {
         Report(diagnostics, Severity::Error, DiagnosticCode::VerifyMacroUnknown, "", "", -1, -1,
                "family '" + std::string(info.name) + "' mirrors dimension '" + name +
-                   "' with different declarations ('" + vertex->second + "' in the vertex "
-                   "domain, '" + signature +
+                   "' with different declarations ('" + vertex->second +
+                   "' in the vertex "
+                   "domain, '" +
+                   signature +
                    "' in the fragment domain); both stages build the same value, so kind and "
                    "value count must match");
         ++errors;

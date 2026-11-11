@@ -21,8 +21,8 @@
 #include <string>
 #include <utility>
 #include "core/DiagnosticCodes.h"
-#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/Uniform.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
 
@@ -37,8 +37,8 @@ void ReportUnknownType(Diagnostics* diagnostics, const spirv_cross::SPIRType& ty
   diagnostic.layer = Layer::Compile;
   diagnostic.code = DiagnosticCode::ReflectUnknownType;
   diagnostic.message = "unknown SPIR-V type (basetype=" + std::to_string(type.basetype) +
-                       " vec=" + std::to_string(type.vecsize) + " col=" +
-                       std::to_string(type.columns) + "); no UniformFormat maps to it";
+                       " vec=" + std::to_string(type.vecsize) +
+                       " col=" + std::to_string(type.columns) + "); no UniformFormat maps to it";
   diagnostics->report(std::move(diagnostic));
 }
 
@@ -86,7 +86,7 @@ static uint8_t MapSPIRVTypeToFormat(const spirv_cross::SPIRType& type, Diagnosti
 }
 
 static std::vector<VertexInputEntry> ExtractVertexInputs(spirv_cross::Compiler& compiler,
-                                                        Diagnostics* diagnostics) {
+                                                         Diagnostics* diagnostics) {
   // The runtime vertex binding walks attribute slots by location, so the entries are recorded in
   // location order; the loader requires the locations to strictly increase (a gap is legal, a
   // repeated or decreasing location is not).

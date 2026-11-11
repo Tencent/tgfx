@@ -29,28 +29,63 @@ if [[ $(uname) == 'Darwin' ]]; then
   fi
 fi
 
-echo "----begin to scan code format----"
-find include -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs $CLANG_FORMAT -i
-find src -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs $CLANG_FORMAT -i
-find hello2d -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs $CLANG_FORMAT -i
-find test/src -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs $CLANG_FORMAT -i
-find qt/src -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs $CLANG_FORMAT -i
-find ios/Hello2D -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs $CLANG_FORMAT -i
-find mac/Hello2D -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs $CLANG_FORMAT -i
-find linux/src -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs $CLANG_FORMAT -i
-find win/src -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs $CLANG_FORMAT -i
-find web/demo/src -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs $CLANG_FORMAT -i
-find android/app/src -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs $CLANG_FORMAT -i
-
-git diff
-result=`git diff`
-if [[ $result =~ "diff" ]]
-then
-    echo "----Failed to pass the code format check----"
-    exit 1
-else
-    echo "----Complete the code format check-----"
+if [ -z "$CLANG_FORMAT" ] || [ ! -x "$CLANG_FORMAT" ]; then
+  echo "clang-format not found; install clang-format 14 to run this check" >&2
+  exit 1
 fi
 
+# The directories this check covers: the project's own sources.
+#   - vendor/ and third_party/ are third-party trees, never formatted here.
+#   - web/ (besides demo/src) and ohos/ need toolchains this repository cannot build locally, so
+#     covering them would mean reformatting sources no local build can verify. They stay out until
+#     someone can build them.
+DIRS=(
+  include
+  src
+  hello2d
+  test/src
+  test/shader_tool
+  test/minimal
+  tools
+  qt/src
+  ios/Hello2D
+  mac/Hello2D
+  linux/src
+  win/src
+  web/demo/src
+  android/app/src
+)
 
+files=()
+for dir in "${DIRS[@]}"; do
+  if [ ! -d "$dir" ]; then
+    continue
+  fi
+  while IFS= read -r file; do
+    files+=("$file")
+  done < <(find "$dir" -type f \( -name "*.cpp" -o -name "*.c" -o -name "*.h" -o -name "*.mm" \
+    -o -name "*.m" \))
+done
 
+if [ ${#files[@]} -eq 0 ]; then
+  echo "No source files found to check" >&2
+  exit 1
+fi
+
+echo "----begin to scan code format----"
+# The verdict comes from clang-format itself, not from the working tree's git state: a local run
+# with uncommitted work and a clean CI checkout reach the same answer, and only real formatting
+# violations fail the check.
+report=$("$CLANG_FORMAT" --dry-run -Werror "${files[@]}" 2>&1)
+status=$?
+if [ $status -eq 0 ]; then
+  echo "----Complete the code format check-----"
+  exit 0
+fi
+
+echo "$report" | head -n 40
+echo "----Failed to pass the code format check----"
+# Format the offenders in place so running this locally fixes what it reports; the exit code still
+# says the tree was not clean when the check started.
+"$CLANG_FORMAT" -i "${files[@]}"
+exit 1

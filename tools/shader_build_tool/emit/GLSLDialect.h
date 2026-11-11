@@ -21,8 +21,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "compile/SpecCodegen.h"
 #include "compile/ShaderCompiler.h"
+#include "compile/SpecCodegen.h"
 
 namespace tgfx {
 

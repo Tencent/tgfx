@@ -17,11 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "emit/Assembler.h"
-
 #include <cstring>
-
-#include "gpu/shaders/Layout.h"
 #include "gpu/shaders/KernelContract.h"
+#include "gpu/shaders/Layout.h"
 #include "gpu/shaders/contract/SpecContract.h"
 
 namespace tgfx {
@@ -59,23 +57,25 @@ void AppendSpecBlock(const Family& family, const Variant& variant, const Variant
   if (specFields.empty()) {
     return;
   }
-  *text += "// The specialization contract: id 0 is the master switch; the runtime injects 1 plus\n";
+  *text +=
+      "// The specialization contract: id 0 is the master switch; the runtime injects 1 plus\n";
   *text += "// the field values per draw shape, and the generic compile keeps the defaults.\n";
-  *text += std::string("layout(constant_id = 0) const int ") + SpecContract::MasterSwitch +
-           " = 0;\n";
+  *text +=
+      std::string("layout(constant_id = 0) const int ") + SpecContract::MasterSwitch + " = 0;\n";
   // The master-switch accessor the shared text branches on (one per specialized shader).
-  *text += std::string("bool ") + SpecContract::ActiveAccessor + "() { int s = " +
-           SpecContract::MasterSwitch + "; return s == 1; }\n";
+  *text += std::string("bool ") + SpecContract::ActiveAccessor +
+           "() { int s = " + SpecContract::MasterSwitch + "; return s == 1; }\n";
   uint16_t nextId = 1;
   for (const auto& field : specFields) {
     const Module* module = modules.list[field.slot];
     const Element& element = module->elements[field.element];
-    const uint16_t count = ElementCountOf(element, DimOffsetOf(family, variant, field.slot), variant);
+    const uint16_t count =
+        ElementCountOf(element, DimOffsetOf(family, variant, field.slot), variant);
     const uint32_t idCount = element.type == ShaderType::Int4 ? count * 4u : 1u;
     for (uint32_t offset = 0; offset < idCount; ++offset) {
       const std::string id = std::to_string(nextId + offset);
-      *text += "layout(constant_id = " + id + ") const int " + SpecContract::ConstantPrefix +
-               id + " = 0;\n";
+      *text += "layout(constant_id = " + id + ") const int " + SpecContract::ConstantPrefix + id +
+               " = 0;\n";
     }
     nextId = static_cast<uint16_t>(nextId + idCount);
   }
@@ -92,7 +92,8 @@ void AppendSpecBlock(const Family& family, const Variant& variant, const Variant
                std::to_string(field.firstId) + "; } return " + fieldName + "; }\n";
       continue;
     }
-    const uint16_t count = ElementCountOf(element, DimOffsetOf(family, variant, field.slot), variant);
+    const uint16_t count =
+        ElementCountOf(element, DimOffsetOf(family, variant, field.slot), variant);
     *text += "ivec4 " + accessor + "(int i) {\n";
     *text += std::string("  int s = ") + SpecContract::MasterSwitch + ";\n";
     *text += "  if (s == 1) {\n";
@@ -149,8 +150,8 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
     }
     const uint8_t dimBase = DimOffsetOf(family, variant, slot);
     for (uint8_t dim = 0; dim < module->dimCount; ++dim) {
-      const std::string define = DimMacro(module, module->dims[dim]) + "=" +
-                                 std::to_string(variant.values[dimBase + dim]);
+      const std::string define =
+          DimMacro(module, module->dims[dim]) + "=" + std::to_string(variant.values[dimBase + dim]);
       assembled.vertDefines.push_back(define);
       assembled.fragDefines.push_back(define);
     }
@@ -160,8 +161,9 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
   vert += "// Assembled from the " + std::string(family.name) + " family declaration.\n";
   vert += "#version 450\n";
   vert += "struct Vertex { vec2 position; vec2 localCoord; };\n";
-  vert += "layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uniform "
-          "VertexUniformBlock {\n";
+  vert +=
+      "layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uniform "
+      "VertexUniformBlock {\n";
   std::string attributes;
   std::string varyings;
   std::string includes;
@@ -197,8 +199,7 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
         }
         varyingLocation++;
       } else if (present && element.kind == Element::Kind::VertexParam) {
-        AppendBlockMember(module, element, ElementCountOf(element, dimBase, variant),
-                        &vert);
+        AppendBlockMember(module, element, ElementCountOf(element, dimBase, variant), &vert);
       }
     }
     if (module->hasVertex) {
@@ -221,8 +222,9 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
   frag += "// Assembled from the " + std::string(family.name) + " family declaration.\n";
   frag += "#version 450\n";
   frag += "struct Fragment { vec4 color; vec4 coverage; };\n";
-  frag += "layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) "
-          "uniform FragmentUniformBlock {\n";
+  frag +=
+      "layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) "
+      "uniform FragmentUniformBlock {\n";
   std::string fragVaryings;
   std::string samplers;
   includes.clear();
@@ -249,8 +251,7 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
         }
         fragVaryingLocation++;
       } else if (present && element.kind == Element::Kind::Param) {
-        AppendBlockMember(module, element, ElementCountOf(element, dimBase, variant),
-                        &frag);
+        AppendBlockMember(module, element, ElementCountOf(element, dimBase, variant), &frag);
       } else if (present && element.kind == Element::Kind::Texture) {
         samplers += "layout(set = TGFX_TEXTURE_SET, binding = " + std::to_string(textureBinding) +
                     ") uniform sampler2D " + ElementNameOf(module, element) + ";\n";

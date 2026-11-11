@@ -17,41 +17,39 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BuildCommand.h"
-
-#include "core/CapacityDefines.h"
-
 #include <cstdint>
-#include <cstring>
 #include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <set>
 #include <utility>
 #include <vector>
-#include "output/BundleWriter.h"
+#include "cli/ReportWriter.h"
 #include "compile/InlineExpansion.h"
+#include "compile/ReflectionExtractor.h"
 #include "compile/ShaderCompiler.h"
 #include "compile/SpecCodegen.h"
-#include "core/ShaderSources.h"
-#include "gpu/shaders/contract/SpecContract.h"
-#include "compile/ReflectionExtractor.h"
 #include "compile/StageCache.h"
+#include "compile/StageCompiler.h"
+#include "core/CapacityDefines.h"
+#include "core/DiagnosticCodes.h"
+#include "core/Diagnostics.h"
+#include "core/ShaderSources.h"
+#include "emit/Assembler.h"
+#include "emit/ChainOpsGLSL.h"
+#include "emit/ProfileEmitter.h"
+#include "gpu/shaders/FamilyDomains.h"
+#include "gpu/shaders/KernelContract.h"
+#include "gpu/shaders/Layout.h"
+#include "gpu/shaders/PrecompiledShader.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
+#include "gpu/shaders/contract/SpecContract.h"
+#include "output/BundleWriter.h"
 #include "output/InlineExpansionReport.h"
 #include "output/StageDump.h"
 #include "output/StageReport.h"
-#include "cli/ReportWriter.h"
-#include "compile/StageCompiler.h"
-#include "core/DiagnosticCodes.h"
-#include "core/Diagnostics.h"
-#include "emit/Assembler.h"
-#include "gpu/shaders/FamilyDomains.h"
-#include "gpu/shaders/Layout.h"
-#include "emit/ChainOpsGLSL.h"
-#include "emit/ProfileEmitter.h"
-#include "gpu/shaders/contract/ShaderBundleContract.h"
-#include "gpu/shaders/KernelContract.h"
-#include "gpu/shaders/PrecompiledShader.h"
 #include "verify/ContractRules.h"
 
 namespace tgfx {
@@ -83,7 +81,6 @@ std::set<uint32_t> SpirvSpecIds(const std::vector<uint32_t>& spirv) {
   }
   return ids;
 }
-
 
 std::vector<std::string> SplitByComma(const std::string& input) {
   std::vector<std::string> result;
@@ -119,19 +116,17 @@ bool ParseProfileList(const std::string& input, std::vector<ShaderProfile>* prof
 static void RecordBuildError(Diagnostics* diagnostics, Layer layer, const char* code,
                              const std::string& shader, const std::string& profile, int vert,
                              int frag, std::string message) {
-                             Diagnostic diagnostic;
-                             diagnostic.severity = Severity::Error;
-                             diagnostic.layer = layer;
-                             diagnostic.code = code;
-                             diagnostic.shader = shader;
-                             diagnostic.profile = profile;
-                             diagnostic.vertPermutationIndex = vert;
-                             diagnostic.fragPermutationIndex = frag;
-                             diagnostic.message = std::move(message);
-                             diagnostics->report(std::move(diagnostic));
-                             }
-
-                             
+  Diagnostic diagnostic;
+  diagnostic.severity = Severity::Error;
+  diagnostic.layer = layer;
+  diagnostic.code = code;
+  diagnostic.shader = shader;
+  diagnostic.profile = profile;
+  diagnostic.vertPermutationIndex = vert;
+  diagnostic.fragPermutationIndex = frag;
+  diagnostic.message = std::move(message);
+  diagnostics->report(std::move(diagnostic));
+}
 
 }  // namespace
 
@@ -301,8 +296,10 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       // The assembled text carries module #includes; the compiler never sees one, so the same
       // expansion the handwritten files get runs here first.
       std::string expandError;
-      const auto vertText = ExpandStageIncludes(assembled.vertText, options.shaderDir, &expandError);
-      const auto fragText = ExpandStageIncludes(assembled.fragText, options.shaderDir, &expandError);
+      const auto vertText =
+          ExpandStageIncludes(assembled.vertText, options.shaderDir, &expandError);
+      const auto fragText =
+          ExpandStageIncludes(assembled.fragText, options.shaderDir, &expandError);
       // The interpreter assembly carries the chain-ops pragma the legacy kernels also use; the
       // declared path runs the same expansion after includes so both assemblies compile the same
       // operator table.
@@ -347,8 +344,8 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         continue;
       }
       const auto& reflection =
-          compiler->extractReflection(info.name, variant.ordinal, variant.ordinal,
-                                      vertResult.spirv, fragResult.spirv, &report->diagnostics);
+          compiler->extractReflection(info.name, variant.ordinal, variant.ordinal, vertResult.spirv,
+                                      fragResult.spirv, &report->diagnostics);
       const auto layout = DeriveLayout(variant);
       if (!layout.specFields.empty()) {
         // The declared spec ids must be exactly the ids the compiled module carries; a drift
@@ -373,11 +370,10 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
           for (uint32_t id : SpirvSpecIds(fragResult.spirv)) detail += " " + std::to_string(id);
           // SpecLayoutDrift is the code the retired tool-side drift check reported; this is the
           // declared path's replacement for exactly that failure mode.
-          RecordBuildError(&report->diagnostics, Layer::Emit, DiagnosticCode::SpecLayoutDrift,
-                           info.name, "", static_cast<int>(variant.ordinal),
-                           static_cast<int>(variant.ordinal),
-                           "the declared spec ids and the compiled constant_id set disagree: " +
-                               detail);
+          RecordBuildError(
+              &report->diagnostics, Layer::Emit, DiagnosticCode::SpecLayoutDrift, info.name, "",
+              static_cast<int>(variant.ordinal), static_cast<int>(variant.ordinal),
+              "the declared spec ids and the compiled constant_id set disagree: " + detail);
           continue;
         }
       }
@@ -481,7 +477,6 @@ int RunBuildCommand(const BuildOptions& options) {
     }
   }
   StageCompiler stageCompiler(&stageCache);
-
 
   CompileAssembledFamilies(options, &stageCompiler, &report);
 

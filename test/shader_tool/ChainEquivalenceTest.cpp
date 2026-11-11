@@ -26,7 +26,6 @@
 #include <set>
 #include <string>
 #include <vector>
-
 #include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/Layout.h"

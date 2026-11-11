@@ -50,9 +50,9 @@ void WriteUniformEntries(std::ofstream& file, const std::vector<UniformEntry>& e
     if (index > 0) {
       file << ",";
     }
-    file << "\n    {\"name\": \"" << entries[index].name << "\", \"format\": "
-         << static_cast<int>(entries[index].format) << ", \"arraySize\": " << entries[index].arraySize
-         << "}";
+    file << "\n    {\"name\": \"" << entries[index].name
+         << "\", \"format\": " << static_cast<int>(entries[index].format)
+         << ", \"arraySize\": " << entries[index].arraySize << "}";
   }
   if (!entries.empty()) {
     file << "\n  ";
@@ -66,8 +66,8 @@ void WriteVertexInputEntries(std::ofstream& file, const std::vector<VertexInputE
     if (index > 0) {
       file << ",";
     }
-    file << "\n    {\"name\": \"" << entries[index].name << "\", \"format\": "
-         << static_cast<int>(entries[index].format)
+    file << "\n    {\"name\": \"" << entries[index].name
+         << "\", \"format\": " << static_cast<int>(entries[index].format)
          << ", \"location\": " << static_cast<int>(entries[index].location) << "}";
   }
   if (!entries.empty()) {

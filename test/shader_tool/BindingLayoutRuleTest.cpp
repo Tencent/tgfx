@@ -27,10 +27,10 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "FailureAssertions.h"
 #include "core/DiagnosticCodes.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gtest/gtest.h"
-#include "FailureAssertions.h"
 #include "verify/BindingLayoutRule.h"
 
 namespace tgfx {
@@ -197,11 +197,12 @@ TEST(BindingLayoutRuleTest, AContractVulkanVariantPasses) {
   VariantData variant;
   variant.shaderName = "TestShader";
   variant.profileTag = "vulkan";
-  variant.vertexBlob = SpirvWithDecorations({{VERTEX_UBO_DESCRIPTOR_SET, VERTEX_UBO_BINDING_POINT}});
-  variant.fragmentBlob = SpirvWithDecorations(
-      {{FRAGMENT_UBO_DESCRIPTOR_SET, FRAGMENT_UBO_BINDING_POINT},
-       {TEXTURE_DESCRIPTOR_SET, 0},
-       {TEXTURE_DESCRIPTOR_SET, 1}});
+  variant.vertexBlob =
+      SpirvWithDecorations({{VERTEX_UBO_DESCRIPTOR_SET, VERTEX_UBO_BINDING_POINT}});
+  variant.fragmentBlob =
+      SpirvWithDecorations({{FRAGMENT_UBO_DESCRIPTOR_SET, FRAGMENT_UBO_BINDING_POINT},
+                            {TEXTURE_DESCRIPTOR_SET, 0},
+                            {TEXTURE_DESCRIPTOR_SET, 1}});
   std::vector<VariantData> variants = {variant};
   EXPECT_EQ(CheckVariants(variants), 0u);
 }
@@ -212,10 +213,10 @@ TEST(BindingLayoutRuleTest, AVulkanFragmentResourceInSetZeroFails) {
   VariantData variant;
   variant.shaderName = "TestShader";
   variant.profileTag = "vulkan";
-  variant.vertexBlob = SpirvWithDecorations({{VERTEX_UBO_DESCRIPTOR_SET, VERTEX_UBO_BINDING_POINT}});
+  variant.vertexBlob =
+      SpirvWithDecorations({{VERTEX_UBO_DESCRIPTOR_SET, VERTEX_UBO_BINDING_POINT}});
   variant.fragmentBlob = SpirvWithDecorations(
-      {{VERTEX_UBO_DESCRIPTOR_SET, FRAGMENT_UBO_BINDING_POINT},
-       {TEXTURE_DESCRIPTOR_SET, 0}});
+      {{VERTEX_UBO_DESCRIPTOR_SET, FRAGMENT_UBO_BINDING_POINT}, {TEXTURE_DESCRIPTOR_SET, 0}});
   std::vector<VariantData> variants = {variant};
   EXPECT_GE(CheckVariants(variants), 1u);
 }
@@ -386,8 +387,8 @@ TEST(BindingLayoutRuleTest, AnUnparseableVulkanModuleIsUnverifiable) {
   variant.shaderName = "TestShader";
   variant.profileTag = "vulkan";
   variant.vertexBlob = BytesOf("not a spir-v module");
-  variant.fragmentBlob = SpirvWithDecorations(
-      {{FRAGMENT_UBO_DESCRIPTOR_SET, FRAGMENT_UBO_BINDING_POINT}});
+  variant.fragmentBlob =
+      SpirvWithDecorations({{FRAGMENT_UBO_DESCRIPTOR_SET, FRAGMENT_UBO_BINDING_POINT}});
   std::vector<VariantData> variants = {variant};
   Diagnostics diagnostics;
   auto errors = rule.check(ContextOf(variants, noExpansions), &diagnostics);

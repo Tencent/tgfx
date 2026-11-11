@@ -97,15 +97,14 @@ std::string GenerateChainOpsGLSL() {
   std::string out =
       "// Generated from contract/ChainOps.h: the chain data-pool layout and its readers.\n";
 #define TGFX_EMIT_FIELD(type, name) emitter.Field(static_cast<type*>(nullptr), #name);
-#define TGFX_EMIT_OP(name, dataFields)                                                  \
-  {                                                                                     \
-    ReaderEmitter emitter;                                                              \
-    dataFields(TGFX_EMIT_FIELD)                                                         \
-    if (!emitter.members.empty()) {                                                     \
-      out += "struct " #name "Data {\n" + emitter.members + "};\n";                      \
-      out += #name "Data chainLoad" #name "(int at) {\n  " #name "Data d;\n" +           \
-             emitter.readers + "  return d;\n}\n";                                      \
-    }                                                                                   \
+#define TGFX_EMIT_OP(name, dataFields)                                                           \
+  {                                                                                              \
+    ReaderEmitter emitter;                                                                       \
+    dataFields(TGFX_EMIT_FIELD) if (!emitter.members.empty()) {                                  \
+      out += "struct " #name "Data {\n" + emitter.members + "};\n";                              \
+      out += #name "Data chainLoad" #name "(int at) {\n  " #name "Data d;\n" + emitter.readers + \
+             "  return d;\n}\n";                                                                 \
+    }                                                                                            \
   }
   TGFX_CHAIN_OP_FIELD_LISTS(TGFX_EMIT_OP)
 #undef TGFX_EMIT_OP

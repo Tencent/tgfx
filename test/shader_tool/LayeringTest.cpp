@@ -118,23 +118,15 @@ std::string NameOf(const std::string& path) {
 const std::set<std::string>& AllowedRuntimeHeaders() {
   static const std::set<std::string> allowed = {
       // contract layer
-      "gpu/aot/AOTResourceProfile.h",
-      "gpu/shaders/contract/ShaderBundleContract.h",
-      "gpu/shaders/contract/ChainISA.h",
-      "gpu/shaders/contract/ChainOps.h",
-      "gpu/shaders/contract/SpecContract.h",
-      "gpu/Uniform.h",
-      "gpu/shaders/BundleCodec.h",
+      "gpu/aot/AOTResourceProfile.h", "gpu/shaders/contract/ShaderBundleContract.h",
+      "gpu/shaders/contract/ChainISA.h", "gpu/shaders/contract/ChainOps.h",
+      "gpu/shaders/contract/SpecContract.h", "gpu/Uniform.h", "gpu/shaders/BundleCodec.h",
       "gpu/shaders/KernelContract.h",
       // declaration layer
-      "gpu/aot/bind/AOTParamRegistry.h",
-      "gpu/shaders/PrecompiledShader.h",
+      "gpu/aot/bind/AOTParamRegistry.h", "gpu/shaders/PrecompiledShader.h",
       // the module-declaration layer (families, layouts, domains)
-      "gpu/shaders/Module.h",
-      "gpu/shaders/Family.h",
-      "gpu/shaders/Families.h",
-      "gpu/shaders/FamilyDomains.h",
-      "gpu/shaders/Layout.h",
+      "gpu/shaders/Module.h", "gpu/shaders/Family.h", "gpu/shaders/Families.h",
+      "gpu/shaders/FamilyDomains.h", "gpu/shaders/Layout.h",
       // the fragment-stage declaration language (the emitter walks these tables)
   };
   return allowed;
@@ -143,14 +135,10 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
 // The contract headers: constants and pure functions shared by the tool and the runtime.
 const std::vector<std::string>& ContractHeaders() {
   static const std::vector<std::string> headers = {
-      "gpu/aot/AOTResourceProfile.h",
-      "gpu/shaders/contract/ShaderBundleContract.h",
-      "gpu/shaders/contract/ChainISA.h",
-      "gpu/shaders/contract/ChainOps.h",
-      "gpu/shaders/contract/SpecContract.h",
-      "gpu/Uniform.h",
-      "gpu/shaders/BundleCodec.h",
-      "gpu/shaders/KernelContract.h",
+      "gpu/aot/AOTResourceProfile.h",        "gpu/shaders/contract/ShaderBundleContract.h",
+      "gpu/shaders/contract/ChainISA.h",     "gpu/shaders/contract/ChainOps.h",
+      "gpu/shaders/contract/SpecContract.h", "gpu/Uniform.h",
+      "gpu/shaders/BundleCodec.h",           "gpu/shaders/KernelContract.h",
   };
   return headers;
 }
@@ -184,10 +172,9 @@ TEST(LayeringTest, TheToolIncludesOnlyAllowedRuntimeHeaders) {
       if (std::filesystem::exists(ToolDir() + "/" + include.target)) {
         continue;
       }
-      bool runtimePath = include.target.rfind("gpu/", 0) == 0 ||
-                         include.target.rfind("core/", 0) == 0 ||
-                         include.target.rfind("tgfx/", 0) == 0 ||
-                         include.target.rfind("platform/", 0) == 0;
+      bool runtimePath =
+          include.target.rfind("gpu/", 0) == 0 || include.target.rfind("core/", 0) == 0 ||
+          include.target.rfind("tgfx/", 0) == 0 || include.target.rfind("platform/", 0) == 0;
       if (!runtimePath) {
         continue;
       }
@@ -206,7 +193,8 @@ TEST(LayeringTest, TheToolIncludesNoRuntimeClassThroughAPublicHeader) {
   // The public headers (tgfx/...) are the runtime's API; the tool has no business with them.
   for (const auto& file : FilesIn(ToolDir(), {".cpp", ".h"})) {
     for (const auto& include : IncludesOf(file)) {
-      EXPECT_NE(include.target.rfind("tgfx/", 0), 0u) << NameOf(file) << " includes " << include.target;
+      EXPECT_NE(include.target.rfind("tgfx/", 0), 0u)
+          << NameOf(file) << " includes " << include.target;
     }
   }
 }
@@ -247,9 +235,8 @@ TEST(LayeringTest, ContractHeadersIncludeOnlyTheStandardLibraryAndEachOther) {
       // combining pure constants is safe — but nothing else: a runtime class would drag
       // implementation dependencies into the layer the tool shares.
       const auto& contractHeaders = ContractHeaders();
-      bool contractInclude =
-          std::find(contractHeaders.begin(), contractHeaders.end(), include.target) !=
-          contractHeaders.end();
+      bool contractInclude = std::find(contractHeaders.begin(), contractHeaders.end(),
+                                       include.target) != contractHeaders.end();
       EXPECT_TRUE(include.system || contractInclude)
           << header << " includes the project header " << include.target
           << "; a contract header may include only the standard library and other contract "
@@ -369,7 +356,8 @@ TEST(LayeringTest, TheAnalysesDoNotDependOnTheProductsTheyFeed) {
   // that travel between the stages are declared in BundleWriter.h, which is why that one is
   // allowed to be included.
   auto graph = ToolModuleGraph();
-  const std::vector<std::string> analyses = {"ReflectionExtractor", "InlineExpansion", "StageCache"};
+  const std::vector<std::string> analyses = {"ReflectionExtractor", "InlineExpansion",
+                                             "StageCache"};
   const std::vector<std::string> products = {"StageReport", "ContractChecks"};
   for (const auto& analysis : analyses) {
     ASSERT_EQ(graph.count(analysis), 1u) << analysis;
@@ -385,8 +373,7 @@ TEST(LayeringTest, TheCacheKnowsNothingOfShaders) {
   // knew about shaders would be something its key might forget to cover.
   auto graph = ToolModuleGraph();
   ASSERT_EQ(graph.count("StageCache"), 1u);
-  EXPECT_TRUE(graph["StageCache"].empty())
-      << "StageCache includes another module of the tool";
+  EXPECT_TRUE(graph["StageCache"].empty()) << "StageCache includes another module of the tool";
 }
 
 TEST(LayeringTest, CoreModulesDependOnNothing) {
@@ -437,8 +424,7 @@ TEST(LayeringTest, TheStageCompilerDependsOnlyOnTheCompilePrimitives) {
   const std::set<std::string> allowed = {"ShaderCompiler", "StageCache", "ReflectionExtractor"};
   for (const auto& dependency : graph["StageCompiler"]) {
     EXPECT_EQ(allowed.count(dependency), 1u)
-        << "StageCompiler depends on " << dependency
-        << ", which is not part of the compile layer";
+        << "StageCompiler depends on " << dependency << ", which is not part of the compile layer";
   }
 }
 
@@ -451,7 +437,7 @@ TEST(LayeringTest, TheProfileEmittersDependOnlyOnTheirDialectAndTheCompiler) {
   // "Types" is the core data-type header (the spec table and gate records an emitter consumes);
   // it carries no behaviour, so depending on it is not depending on a layer.
   const std::set<std::string> allowed = {"DiagnosticCodes", "Diagnostics", "ShaderCompiler",
-                                         "StageCompiler", "GLSLDialect", "Types"};
+                                         "StageCompiler",   "GLSLDialect", "Types"};
   for (const auto& dependency : graph["ProfileEmitter"]) {
     EXPECT_EQ(allowed.count(dependency), 1u)
         << "ProfileEmitter depends on " << dependency
@@ -521,9 +507,8 @@ TEST(LayeringTest, TheSublayersDependOnlyWhereTheArchitectureAllows) {
         continue;
       }
       auto to = SublayerOf(path);
-      EXPECT_TRUE(allowed(from, to))
-          << file << " (sublayer '" << from << "') includes " << include.target
-          << " (sublayer '" << to << "')";
+      EXPECT_TRUE(allowed(from, to)) << file << " (sublayer '" << from << "') includes "
+                                     << include.target << " (sublayer '" << to << "')";
     }
   }
 }
@@ -535,7 +520,9 @@ TEST(LayeringTest, TheCycleFinderFindsACycle) {
   std::vector<std::string> path;
   EXPECT_EQ(FindCycle(graph, "a", &path, &done), "a -> b -> c -> a");
 
-  std::map<std::string, std::set<std::string>> acyclic = {{"a", {"b", "c"}}, {"b", {"c"}}, {"c", {}}};
+  std::map<std::string, std::set<std::string>> acyclic = {{"a", {"b", "c"}},
+                                                          {"b", {"c"}},
+                                                          {"c", {}}};
   std::set<std::string> acyclicDone;
   std::vector<std::string> acyclicPath;
   EXPECT_EQ(FindCycle(acyclic, "a", &acyclicPath, &acyclicDone), "");

@@ -224,7 +224,8 @@ bool Sha256SelfTest() {
       {"abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"},
       {"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
        "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"},
-      {std::string(1000000, 'a'), "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"},
+      {std::string(1000000, 'a'),
+       "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"},
   };
   for (const auto& vector : vectors) {
     if (Sha256::Hex(Sha256Of(vector.input.data(), vector.input.size())) != vector.expected) {
@@ -318,8 +319,7 @@ bool StageCache::load(const std::string& key, std::vector<uint8_t>* payload,
   }
   std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)),
                              std::istreambuf_iterator<char>());
-  bool valid = bytes.size() >= EntryHeaderSize &&
-               std::memcmp(bytes.data(), EntryMagic, 4) == 0 &&
+  bool valid = bytes.size() >= EntryHeaderSize && std::memcmp(bytes.data(), EntryMagic, 4) == 0 &&
                GetLE(bytes, 4, 4) == SchemaVersion &&
                GetLE(bytes, 8, 8) == bytes.size() - EntryHeaderSize;
   if (valid) {

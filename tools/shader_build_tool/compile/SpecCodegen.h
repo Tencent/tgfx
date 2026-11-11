@@ -91,7 +91,8 @@ TextGateResult ApplyTextSpecGates(const std::string& preprocessedText,
 /// Replaces every gated function's body with the generated stub, in the 450 source form both
 /// real dialects derive from. The build compiles the result once per family, so a stub that
 /// cannot satisfy the call sites fails the build instead of surfacing on a device.
-std::string StubOutGatedFunctions(const std::string& source, const std::vector<SpecGateInfo>& gates);
+std::string StubOutGatedFunctions(const std::string& source,
+                                  const std::vector<SpecGateInfo>& gates);
 
 /// Expands every `#pragma tgfx_spec_unroll <fn> <capacity> <guard> (<args>)` line into one
 /// guarded call site per slot of the largest declared capacity, so the site count lives in the

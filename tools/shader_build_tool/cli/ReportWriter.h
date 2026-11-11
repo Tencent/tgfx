@@ -21,8 +21,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "core/Types.h"
 #include "core/Diagnostics.h"
+#include "core/Types.h"
 
 namespace tgfx {
 

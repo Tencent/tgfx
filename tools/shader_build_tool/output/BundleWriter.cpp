@@ -24,10 +24,10 @@
 #include <set>
 #include <sstream>
 #include <utility>
-#include "output/OutputFile.h"
 #include "core/DiagnosticCodes.h"
-#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/BundleCodec.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
+#include "output/OutputFile.h"
 #include "zstd.h"
 
 namespace tgfx {

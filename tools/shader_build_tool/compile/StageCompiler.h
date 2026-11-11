@@ -23,8 +23,8 @@
 #include <string>
 #include <tuple>
 #include <vector>
-#include "compile/ShaderCompiler.h"
 #include "compile/ReflectionExtractor.h"
+#include "compile/ShaderCompiler.h"
 #include "compile/StageCache.h"
 
 namespace tgfx {
@@ -150,8 +150,7 @@ class StageCompiler {
                                             uint32_t fragIndex,
                                             const std::vector<uint32_t>& vertSpirv,
                                             const std::vector<uint32_t>& fragSpirv,
-                                            Diagnostics* diagnostics,
-                                            bool specDialect = false);
+                                            Diagnostics* diagnostics, bool specDialect = false);
 
  private:
   struct BlobStage {
