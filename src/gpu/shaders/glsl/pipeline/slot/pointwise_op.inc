@@ -4,7 +4,7 @@
 // 3 = ColorSpaceXform, 4 = None, 6 = ConstColor, 7 = Blend), the parameters are the slot's
 // registers (SlotMat / SlotVec0..2; see pipeline/chain/pointwise_chain_uniforms.inc's allocation
 // table), and the operator's small value rides the selector's low byte.
-// OP_NONE lets a producer kernel (e.g. YUVTextureFillShader) emit its raw premultiplied output when
+// OP_NONE lets a producer kernel (e.g. the YUV tail) emit its raw premultiplied output when
 // no operator FP is composed on top of it, while the same slot record absorbs the composed case.
 //
 // One body serves every consumer: the chain interpreter calls it per slot, the YUV tail's loop

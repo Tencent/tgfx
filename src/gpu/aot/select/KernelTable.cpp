@@ -31,12 +31,11 @@
 namespace tgfx {
 namespace {
 
-/// The families that are not table rows: their acceptance is the carried IR, not the facts. After
-/// the chain's migration only the YUV shell remains on this path (it retires with its declared
-/// successor). Naming it here turns the exemption from a silent SFINAE default into an explicit,
-/// checked exception.
+/// The families that are not table rows: their acceptance is the carried IR, not the facts. Both
+/// IR-reading families migrated to the declaration layer (the chain and the YUV tail), so the
+/// legacy table has no such row left; the trait stays as the seam the macro uses.
 template <typename F>
-constexpr bool IsInterpreterFamily = std::is_same_v<F, YUVTextureFillShader>;
+constexpr bool IsInterpreterFamily = std::is_same_v<F, void>;
 
 #if DEBUG
 /// The offline exclusivity test enumerates the DrawShape field space with a null IR, so the
@@ -44,6 +43,8 @@ constexpr bool IsInterpreterFamily = std::is_same_v<F, YUVTextureFillShader>;
 /// draws. At most one table family may accept a shape — with two, the table order silently picks
 /// the winner and the second family's coverage is dead weight.
 void AssertAtMostOneFamilyAccepts(const DrawShape& facts) {
+  // The legacy table is empty once every family migrated; the macro below expands to nothing.
+  (void)facts;
   int accepting = 0;
   const char* first = nullptr;
 #define TGFX_COUNT_FAMILY(F)                                           \
@@ -69,34 +70,14 @@ void AssertAtMostOneFamilyAccepts(const DrawShape& facts) {
   }
 }
 
-/// The migration tripwire. While both tables coexist, a draw accepted by a legacy dedicated
-/// family and by a declared one is exactly the overlap the old table order arbitrates. The legacy
-/// family keeps the draw first, so pixels stay identical and this is a heat-map log rather than a
-/// failure: each (legacy, declared) pair prints once. A declared family that never shows up here
-/// either has no legacy counterpart left or never overlapped — the pair list is the migration's
-/// to-do list of rules that still need their legacy traffic drained before the table can go.
-void ReportDeclaredOverlap(const char* legacyName, const DrawShape& facts,
-                           const ProgramInfo* info) {
-  auto assembled = MatchAssembledFamily(info, facts);
-  if (!assembled.has_value()) {
-    return;
-  }
-  const std::string declared = Families()[assembled->variant.family].name;
-  static std::set<std::pair<std::string, std::string>> reported = {};
-  if (!reported.emplace(legacyName, declared).second) {
-    return;
-  }
-  LOGE(
-      "[family-overlap] the legacy %s and the declared %s both accept this shape; the legacy "
-      "family keeps it while both tables coexist — drain %s's traffic before removing it",
-      legacyName, declared.c_str(), legacyName);
-}
 #endif
 
 }  // namespace
 
 std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts, const ProgramInfo* info,
                                                 PermutationMatchFailure* failure) {
+  // An empty legacy table leaves the declared walk as the only reader of these.
+  (void)failure;
 #if DEBUG
   AssertAtMostOneFamilyAccepts(facts);
 #endif
@@ -106,16 +87,8 @@ std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts, const Pr
   // earlier in that order that still claims the draw would have won before the migration too —
   // so consulting the legacy table first reproduces the old outcome exactly, and the declared
   // families only serve what no legacy family claims (the draws of their deleted predecessors).
-  // Cross-table overlap is therefore expected here (QuadTextureFillShader still wins the
-  // QuadPerEdgeAA tiled draws the declared TiledTextureFill would also accept); it disappears
-  // with the legacy table in P3, where the declared order takes over.
   // Every family must either join the table (FillKernel) or be the named interpreter: a family
   // that forgets both would otherwise vanish from matching silently.
-#if DEBUG
-#define DEBUG_OVERLAP_REPORT(legacyName, facts) ReportDeclaredOverlap(legacyName, facts, info)
-#else
-#define DEBUG_OVERLAP_REPORT(legacyName, facts) ((void)0)
-#endif
 #define TGFX_TRY_FAMILY(F)                                                                 \
   static_assert(FamilyJoinsKernelTable<F>::value || IsInterpreterFamily<F>,                \
                 "a shader family must derive FillKernel (join the kernel table) or "       \
@@ -127,14 +100,12 @@ std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts, const Pr
                    {variant->vertPermutationIndex, variant->fragPermutationIndex}) != 0 && \
                "matched a variant outside the family's reachable set; the bundle "         \
                "lacks it and the draw would be dropped — extend its AllInputs");           \
-        DEBUG_OVERLAP_REPORT(F::Name, facts);                                              \
         return AOTKernelMatch{F::Name, *variant};                                          \
       }                                                                                    \
     }                                                                                      \
   }
   TGFX_FOR_EACH_SHADER_FAMILY(TGFX_TRY_FAMILY)
 #undef TGFX_TRY_FAMILY
-#undef DEBUG_OVERLAP_REPORT
   // The declaration-driven families' variants ride the same bundle under the ordinal the family
   // table's domains encode.
   if (auto assembled = MatchAssembledFamily(info, facts)) {

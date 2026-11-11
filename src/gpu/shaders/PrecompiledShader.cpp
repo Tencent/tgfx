@@ -45,7 +45,15 @@ struct FamilyEntry {
 #define TGFX_FAMILY_ENTRY(ShaderClass) \
   {ShaderClass::Name, &CreateShaderFamilyInstance<ShaderClass>, &ShaderClass::Reachable},
 
-constexpr FamilyEntry FamilyEntries[] = {TGFX_FOR_EACH_SHADER_FAMILY(TGFX_FAMILY_ENTRY)};
+/// The count comes from the same list, so an empty legacy table (every family migrated to the
+/// declaration layer) is a zero-length std::array rather than a zero-size C array.
+constexpr size_t FamilyEntryCount = 0
+#define TGFX_COUNT_FAMILY(ShaderClass) +1
+    TGFX_FOR_EACH_SHADER_FAMILY(TGFX_COUNT_FAMILY);
+#undef TGFX_COUNT_FAMILY
+
+constexpr std::array<FamilyEntry, FamilyEntryCount> FamilyEntries = {
+    TGFX_FOR_EACH_SHADER_FAMILY(TGFX_FAMILY_ENTRY)};
 
 #undef TGFX_FAMILY_ENTRY
 

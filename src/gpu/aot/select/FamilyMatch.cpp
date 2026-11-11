@@ -633,15 +633,28 @@ bool MatchQuadTexture(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// xfer. Color-graded YUV draws stay on the legacy kernel until the flatten fallback lands. The
 /// flattened dims are [UV_COORD, SUBSET=0, FORMAT, HAS_XP], so the ordinal is
 /// UV_COORD + 4*FORMAT + 8*HAS_XP.
-bool MatchYUVTexture(const ProgramInfo* /*info*/, const DrawShape& shape,
-                     FamilyMatchResult* result) {
+bool MatchYUVTexture(const ProgramInfo* info, const DrawShape& shape, FamilyMatchResult* result) {
+  // The acceptance is the legacy kernel's, verbatim: the QuadPerEdgeAA quad without a subset,
+  // the color graph is the multi-plane source with at most the tail's operators above it, and the
+  // staleness guard keeps the tree and the graph in agreement.
   if (shape.geometry.kind != GeometryKind::QuadPerEdgeAA || shape.geometry.hasSubset ||
-      shape.colorFPCount != 1 || shape.colorFPCount != shape.fragmentCount ||
+      shape.colorFPCount < 1 || shape.colorFPCount != shape.fragmentCount ||
       shape.xpType() < XP_NONE || shape.ir == nullptr) {
     return false;
   }
+  // The legacy shell declared ServesAlphaOnly = false: the YUV kernel has no write swizzle, so an
+  // alpha-only target keeps the runtime path.
+  if (RejectsAlphaOnlyTarget(/*servesAlphaOnly=*/false, info)) {
+    return false;
+  }
   AOTChainBuilder::AOTYUVTailShape tail = {};
-  if (!AOTChainBuilder::CollectYUVTail(shape.ir->color, &tail) || !tail.ops.empty()) {
+  if (!AOTChainBuilder::CollectYUVTail(shape.ir->color, &tail) ||
+      shape.colorFPCount > 1 + tail.ops.size()) {
+    return false;
+  }
+  // The tail's slot budget is the compiled program's: the same bound the legacy kernel enforced
+  // through the shared capacity, so a shape it refused stays refused.
+  if (info == nullptr || AOTChainBuilder::ResolveYUVProgram(info) == nullptr) {
     return false;
   }
   int format = tail.leaf->yuvFormat;
@@ -662,14 +675,13 @@ bool MatchYUVTexture(const ProgramInfo* /*info*/, const DrawShape& shape,
   }
   const uint8_t uvCoord = shape.geometry.hasUVMatrix ? 0 : 1;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  // The writer's data source: the multi-plane leaf the tail is built over (the same field the
+  // chain family carries its leaf in).
+  result->tiledLeaf = tail.leaf;
   // The free values in flattened order: [UV_COORD, SUBSET = 0, FORMAT, HAS_XP] — SUBSET is free in
   // the geometry but the allowed filter keeps its 0 half only (the YUV path never carries one).
-  if (!EncodeMatch(YUVTextureIndex, 0, {uvCoord, 0, static_cast<uint8_t>(format), hasXp},
-                   &result->variant)) {
-    return false;
-  }
-  result->tiledLeaf = tail.leaf;
-  return true;
+  return EncodeMatch(YUVTextureIndex, 0, {uvCoord, 0, static_cast<uint8_t>(format), hasXp},
+                     &result->variant);
 }
 
 /// The AtlasText family's rule, carried over from the former AtlasTextFillShader: the atlas

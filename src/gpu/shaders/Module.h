@@ -141,6 +141,11 @@ struct Module {
   /// Present on the modules that carry an unrolled executor (the chain family); the assembler
   /// emits the site's macro from it.
   const UnrollSite* unroll = nullptr;
+  /// The module's shared text reads the chain contract's C++ constants (the operator table and the
+  /// slot-pool capacities as OP_* / TGFX_CHAIN_* defines). The build injects them for a family
+  /// that declares such a module — the unrolled interpreter (Chain) and the bounded tail
+  /// (YUVChainTail) both do, and no other family's emitted bytes move.
+  bool chainContract = false;
 };
 
 /// The std140 byte size of one element of the type.

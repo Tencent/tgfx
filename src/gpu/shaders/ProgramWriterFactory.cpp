@@ -20,7 +20,6 @@
 #include "gpu/ProgramWriter.h"
 #include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
-#include "gpu/shaders/kernels/YUVTextureFillShader.h"
 
 namespace tgfx {
 
@@ -40,9 +39,6 @@ std::unique_ptr<ProgramWriter> MakeProgramWriter(const ProgramInfo& info,
     // The declared Chain family reuses the legacy interpreter's writer verbatim: the assembled
     // block carries the same names, so every by-name write lands unchanged.
     return std::make_unique<ChainProgramWriter>();
-  }
-  if (shaderName == YUVTextureFillShader::Name) {
-    return std::make_unique<YUVProgramWriter>();
   }
   for (size_t index = 0; index < FamilyCount(); ++index) {
     if (shaderName == Families()[index].name) {

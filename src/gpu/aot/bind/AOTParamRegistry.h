@@ -64,13 +64,11 @@ inline bool ParamTypeToUniformFormat(ParamType type, UniformFormat* format) {
 // name-addressed path), so the omission is self-reporting.
 inline const std::vector<std::pair<const ParamInfo*, size_t>>& ParamFieldTables() {
   static const std::vector<std::pair<const ParamInfo*, size_t>> tables = {
-      {EngineParams::Fields, std::size(EngineParams::Fields)},
       {ChainParams::Fields, std::size(ChainParams::Fields)},
       {ParamCatalog::Fields, std::size(ParamCatalog::Fields)},
       {AnalyticClipModule::Fields, std::size(AnalyticClipModule::Fields)},
       {DeviceMaskModule::Fields, std::size(DeviceMaskModule::Fields)},
       {PorterDuffXPModule::Fields, std::size(PorterDuffXPModule::Fields)},
-      {TextureSourceModule::Fields, std::size(TextureSourceModule::Fields)},
       {TiledSourceModule::Fields, std::size(TiledSourceModule::Fields)},
   };
   return tables;

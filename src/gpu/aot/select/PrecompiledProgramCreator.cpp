@@ -43,7 +43,6 @@
 #include "gpu/shaders/ProgramWriterFactory.h"
 #include "gpu/shaders/ShaderFamily.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
-#include "gpu/shaders/kernels/YUVTextureFillShader.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {

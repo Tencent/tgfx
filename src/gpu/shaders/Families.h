@@ -55,6 +55,7 @@
 #include "gpu/shaders/modules/ShapeInstancedGeometry.h"
 #include "gpu/shaders/modules/Texture.h"
 #include "gpu/shaders/modules/TiledTexture.h"
+#include "gpu/shaders/modules/YUVChainTail.h"
 #include "gpu/shaders/modules/YUVTexture.h"
 
 namespace tgfx {
@@ -180,16 +181,20 @@ bool QuadTextureVariantAllowed(const Variant& variant, const Family& family);
 inline constexpr Family QuadTextureFamily = {
     "QuadTexture", QuadTextureGeometries, 1, QuadTextureBody, 4, QuadTextureVariantAllowed};
 
-/// The YUVTexture family (the simplified former YUVTextureFillShader): the bare three-plane
-/// source with the analytic clip. Color-graded YUV draws keep the legacy kernel until the flatten
-/// fallback lands; the geometry's HAS_SUBSET stays at 0 (the YUV path never carries one).
-inline constexpr FamilyModule YUVTextureBody[] = {&YUVTexture, &AnalyticClip};
+/// The YUVTexture family (the former YUVTextureFillShader): the three-plane source with the
+/// bounded pointwise tail the legacy kernel embedded (the same slot encoding, the same operator
+/// table, three slots) and the analytic clip the composite folds in. The body owns the output
+/// (fragColor with the XP composite inside), like the chain interpreter, because the tail's last
+/// pass IS the XP advanced blend; the geometry's HAS_SUBSET stays at 0 (the YUV path never
+/// carries one).
+inline constexpr FamilyModule YUVTextureBody[] = {&YUVTexture, &YUVChainTail};
 
-/// Slot layout: Frame(0), QuadTextureGeometry(1), YUVTexture(2: FORMAT), AnalyticClip(3), Xfer(4).
+/// Slot layout: Frame(0), QuadTextureGeometry(1), YUVTexture(2: FORMAT), YUVChainTail(3), Xfer(4).
 bool YUVTextureVariantAllowed(const Variant& variant, const Family& family);
 
 inline constexpr Family YUVTextureFamily = {
-    "YUVTexture", QuadTextureGeometries, 1, YUVTextureBody, 2, YUVTextureVariantAllowed};
+    "YUVTexture",           QuadTextureGeometries, 1, YUVTextureBody, 2, YUVTextureVariantAllowed,
+    /*bodyOwnsOutput=*/true};
 
 /// The AtlasText family (the former AtlasTextFillShader): the glyph quad with the runtime device
 /// mask and the analytic clip. HAS_COVERAGE selects whether the geometry carries the per-vertex
@@ -325,7 +330,8 @@ inline constexpr Family FamilyTableStorage[] = {
     {"ComplexEllipse", ComplexEllipseGeometries, 1, ComplexEllipseBody, 2},
     {"RoundStrokeRect", RoundStrokeRectGeometries, 1, RoundStrokeRectBody, 1},
     {"QuadTexture", QuadTextureGeometries, 1, QuadTextureBody, 4, QuadTextureVariantAllowed},
-    {"YUVTexture", QuadTextureGeometries, 1, YUVTextureBody, 2, YUVTextureVariantAllowed},
+    {"YUVTexture", QuadTextureGeometries, 1, YUVTextureBody, 2, YUVTextureVariantAllowed,
+     /*bodyOwnsOutput=*/true},
     {"AtlasText", AtlasTextGeometries, 1, AtlasTextBody, 2},
     {"ShapeInstancedTextureCoverage", ShapeInstancedTextureCoverageGeometries, 1,
      ShapeInstancedTextureCoverageBody, 3, ShapeInstancedTextureCoverageVariantAllowed},

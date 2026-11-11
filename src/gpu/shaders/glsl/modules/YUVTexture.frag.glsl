@@ -1,6 +1,20 @@
-// YUVTexture fragment hook: the three-plane read and the YUV-to-RGB conversion (the simplified
-// former YUVTextureFillShader; the pointwise tail is stripped). The expressions are verbatim from
-// the old kernel's main.
+// YUVTexture fragment hook: the three-plane read, the YUV-to-RGB conversion and the bounded
+// pointwise tail the legacy kernel carried (the same slot encoding, the same operator table and
+// the same XP composite as the chain interpreter, at the tail's own capacity). The expressions
+// are verbatim from the old kernel's main; the field names are the declared ones (the tail module
+// keeps the legacy bare spellings so the shared slot loop and the clip helper bind unchanged).
+
+// The declared assembly declares the dst sampler among the Xfer module's elements, so the shared
+// xp include must skip its own legacy declaration (the same switch the chain assembly sets).
+#define TGFX_DECLARED_CHAIN 1
+
+#pragma tgfx_chain_ops
+
+#include "coverage/clip_coverage.inc"
+#include "pipeline/chain/pointwise_xp_support.inc"
+#include "pipeline/slot/pointwise_op.inc"
+#include "pipeline/slot/pointwise_slot_loop.inc"
+
 void YUVTexture_fragment(inout Fragment f) {
   highp vec2 texCoord = YUVTexture_vCoord.xy / YUVTexture_vCoord.z;
   highp vec2 finalCoord = clamp(texCoord, YUVTexture_Subset.xy, YUVTexture_Subset.zw);
@@ -29,5 +43,25 @@ void YUVTexture_fragment(inout Fragment f) {
   } else {
     color = vec4(rgb, 1.0);
   }
-  f.color = color * f.color.a;
+  color = color * f.color.a;
+
+  // The tail: operators apply after the plane readback, including the paint-alpha multiply above
+  // (the runtime Compose order). The XP advanced blend runs as the tail's last pass.
+#if HAS_XP >= 1
+  vec4 xpDst = xpReadDstColor();
+  vec4 xpBlended;
+  vec4 result = applyPointwiseSlots(color, xpDst, xpBlended);
+#else
+  vec4 result = applyPointwiseSlots(color);
+#endif
+
+  // The body owns the output: the geometry's coverage folded with the analytic clip, then the
+  // XP composite (the Xfer module contributes the interface but not its hook).
+  float totalCoverage = f.coverage.r * clipCoverage();
+#if HAS_XP >= 1
+  fragColor = xpCompositeBlendPass(result, xpDst, vec4(totalCoverage), xpBlended);
+#else
+  fragColor = result * totalCoverage;
+#endif
+#include "xp/output_swizzle.inc"
 }

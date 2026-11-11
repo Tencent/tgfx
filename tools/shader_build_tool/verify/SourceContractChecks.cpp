@@ -212,6 +212,15 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
     for (uint8_t index = 0; index < family.moduleCount; ++index) {
       addModuleDims(family.modules[index].module);
     }
+    // The framework appends Frame and Xfer to every family; their dims (Xfer's HAS_XP) gate code
+    // in the shared text like any declared dim.
+    const auto variant = DecodeVariant(static_cast<uint16_t>(familyIndex), 0);
+    if (variant.has_value()) {
+      const auto modules = ModulesOf(family, *variant);
+      for (uint8_t index = 0; index < modules.count; ++index) {
+        addModuleDims(modules.list[index]);
+      }
+    }
   }
   std::set<std::string> allowed = declaredDimensions;
   allowed.insert("GL_ES");

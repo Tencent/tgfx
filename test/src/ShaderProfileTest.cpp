@@ -22,10 +22,11 @@
 
 #include <string>
 #include "base/TGFXTest.h"
+#include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/contract/ShaderProfileResolver.h"
-#include "gpu/shaders/kernels/YUVTextureFillShader.h"
 
 namespace tgfx {
 
@@ -94,7 +95,8 @@ TGFX_TEST(ShaderProfileTest, PayloadFormsFollowTheProfileRule) {
 }
 
 TGFX_TEST(ShaderProfileTest, FramebufferFetchVariantsFollowTheProfileRule) {
-  auto info = YUVTextureFillShader().info();
+  // The declared Chain family carries the HAS_XP dim (the legacy YUV shell retired).
+  auto info = AssembledFamilyInfo(Families()[FamilyIndexOf("Chain")]);
   const auto& fragDomain = info.fragDomain;
   size_t checked = 0;
   for (uint32_t fragIndex = 0; fragIndex < fragDomain.totalCount(); ++fragIndex) {

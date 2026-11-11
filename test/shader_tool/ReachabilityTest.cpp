@@ -64,7 +64,7 @@ TEST(FamilyRegistryTest, EveryFamilyIsRegisteredOnceWithItsOwnFiles) {
   // serves, and GaussianBlur1DShader, GlassUDFTentBlurShader and GlassRefractionShader (the
   // declaration-driven families join Find/Enumerate without
   // a shell, see ShaderPermutationTest).
-  EXPECT_EQ(families.size(), 1u);
+  EXPECT_TRUE(families.empty());
   std::set<std::string> names;
   for (const auto& info : families) {
     EXPECT_TRUE(names.insert(info.name).second) << "duplicate family " << info.name;
@@ -279,20 +279,21 @@ TEST(PermutationDomainTest, BoolNamesBuildABooleanDomain) {
 
 TEST(PermutationDomainTest, ARealFamilyKeepsItsPublishedIndexLayout) {
   // The variant indices are stored in every published bundle and hashed into every stage key, so a
-  // family's index layout cannot change without invalidating them. YUVTextureFillShader's fragment
-  // dimensions are YUV_FORMAT (2 values) and HAS_XP (3); the first varies fastest.
-  auto info = YUVTextureFillShader().info();
+  // family's index layout cannot change without invalidating them. The declared YUVTexture
+  // family's domain is the geometry's (HAS_UV_COORD, HAS_SUBSET), the body's FORMAT and the Xfer's
+  // HAS_XP, in module order; the first varies fastest.
+  auto info = AssembledFamilyInfo(Families()[FamilyIndexOf("YUVTexture")]);
   const auto& domain = info.fragDomain;
-  ASSERT_EQ(domain.totalCount(), 6u);
-  // index = format + 2 * xp
-  EXPECT_EQ(domain.encode({0, 0}), 0u);
-  EXPECT_EQ(domain.encode({1, 0}), 1u);
-  EXPECT_EQ(domain.encode({0, 1}), 2u);
-  EXPECT_EQ(domain.encode({1, 2}), 5u);
-  auto defines = domain.defineListFor(3);  // 3 = 1 + 2 * 1
-  ASSERT_EQ(defines.size(), 2u);
-  EXPECT_EQ(defines[0], "YUV_FORMAT=1");
-  EXPECT_EQ(defines[1], std::string(XP_DEFINE_NAME) + "=1");
+  ASSERT_EQ(domain.dimensionCount(), 4u);
+  EXPECT_EQ(domain.totalCount(), 24u);
+  EXPECT_TRUE(domain.hasDimension("QuadTextureGeometry_HAS_UV_COORD"));
+  EXPECT_TRUE(domain.hasDimension("QuadTextureGeometry_HAS_SUBSET"));
+  EXPECT_TRUE(domain.hasDimension("YUVTexture_FORMAT"));
+  EXPECT_TRUE(domain.hasDimension(XP_DEFINE_NAME));
+  EXPECT_EQ(domain.encode({0, 0, 0, 0}), 0u);
+  EXPECT_EQ(domain.encode({1, 0, 0, 0}), 1u);
+  EXPECT_EQ(domain.encode({0, 1, 0, 0}), 2u);
+  EXPECT_EQ(domain.encode({1, 1, 1, 2}), 23u);
 }
 
 TEST(PermutationDomainTest, AnEmptyDomainHasExactlyOneVariant) {

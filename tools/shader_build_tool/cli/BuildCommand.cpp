@@ -523,7 +523,7 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
     bool familyNeedsChainContract = false;
     for (uint8_t moduleIndex = 0; moduleIndex < family.moduleCount; ++moduleIndex) {
       const FamilyModule& module = family.modules[moduleIndex];
-      if (module.module != nullptr && module.module->unroll != nullptr) {
+      if (module.module != nullptr && module.module->chainContract) {
         familyNeedsChainContract = true;
       }
     }
@@ -690,7 +690,9 @@ int RunBuildCommand(const BuildOptions& options) {
     report.diagnostics.registerProfile(ProfileTag(profile));
   }
   const auto& factories = ShaderRegistry::All();
-  if (factories.empty()) {
+  // The legacy registry is empty once every family has migrated to the declaration layer; the
+  // declared loop below is then the only source of work, which is the end state, not an error.
+  if (factories.empty() && FamilyCount() == 0) {
     std::cerr << "No shaders registered in ShaderRegistry.\n";
     return 1;
   }

@@ -24,6 +24,7 @@
 #include "gpu/UniformData.h"
 #include "gpu/YUVColorConversion.h"
 #include "gpu/aot/bind/Binder.h"
+#include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/select/FamilyMatch.h"
@@ -1109,6 +1110,13 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
     } else if (module == &YUVTexture) {
       if (match.tiledLeaf != nullptr) {
         WriteYUVTexture(info, *match.tiledLeaf, &writer);
+      }
+    } else if (module == &YUVChainTail) {
+      // The analytic clip fields live in this module (bare names, the legacy spelling); the tail's
+      // slot records come from the compiled program through the same binder the legacy kernel used.
+      WriteClipParams<YUVChainTail>(info, &writer);
+      if (const auto* program = AOTChainBuilder::ResolveYUVProgram(&info)) {
+        BindYUVProgram(*program, fragmentUniformData);
       }
     } else if (module == &TiledTexture) {
       if (match.tiledLeaf != nullptr) {

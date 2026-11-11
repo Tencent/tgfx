@@ -176,6 +176,7 @@ inline constexpr Module Chain = {
     true,
     true,
     /*bareNames=*/true,
-    &ChainUnroll};
+    &ChainUnroll,
+    /*chainContract=*/true};
 
 }  // namespace tgfx

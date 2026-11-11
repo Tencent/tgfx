@@ -50,8 +50,15 @@ namespace {
 // an alpha-only target, so the count must apply the same gate or it would report overlaps the
 // production dispatch never takes.
 int CountAcceptingFamilies(const DrawShape& shape, const char** first, const char** second) {
+  // Every family moved to the declaration layer, so the legacy table is empty and the macro walk
+  // below expands to nothing; the declared families' disjointness is checked by the matcher's
+  // tripwire over the same shape space. The parameters stay for the walk's shape.
+  (void)shape;
+  (void)first;
+  (void)second;
   int count = 0;
   PermutationMatchFailure failure = PermutationMatchFailure::None;
+  (void)failure;
 #define TGFX_COUNT_FAMILY(F)                            \
   if constexpr (FamilyJoinsKernelTable<F>::value) {     \
     if (!shape.alphaOnlyTarget || F::ServesAlphaOnly) { \
@@ -73,17 +80,11 @@ int CountAcceptingFamilies(const DrawShape& shape, const char** first, const cha
 }  // namespace
 
 TGFX_TEST(FamilyExclusivityTest, DedicatedFamiliesArePairwiseExclusiveOverTheFieldSpace) {
-  std::vector<const char*> dedicated;
-  // The declared table routes the basic field space now that the dedicated families are migrating;
-  // it must stay non-degenerate even when no legacy family claims a shape.
+  // Every family migrated to the declaration layer: the legacy walk is empty, so this test now
+  // guards the declared table's non-degeneracy over the same field space (the pairwise
+  // disjointness of the declared rules is enforced by the matcher's runtime tripwire and by the
+  // full-suite run).
   long long declaredAccepted = 0;
-#define TGFX_COLLECT_DEDICATED(F)                   \
-  if constexpr (FamilyJoinsKernelTable<F>::value) { \
-    dedicated.push_back(F::Name);                   \
-  }
-  TGFX_FOR_EACH_SHADER_FAMILY(TGFX_COLLECT_DEDICATED)
-#undef TGFX_COLLECT_DEDICATED
-  ASSERT_FALSE(dedicated.empty());
 
   const GeometryKind kinds[] = {
       GeometryKind::Other,          GeometryKind::Default,           GeometryKind::QuadPerEdgeAA,
