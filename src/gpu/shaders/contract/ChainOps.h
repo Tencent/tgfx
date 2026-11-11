@@ -309,7 +309,7 @@ TGFX_CHAIN_DECLARE_OP(PerlinNoise, TGFX_PERLIN_NOISE_DATA, TGFX_PERLIN_NOISE_STR
 
 /// The chain-wide block region: operators whose data exceeds the slot stride get a fixed offset
 /// here instead of a slot index. The region starts right after the slot region, so a reader takes
-/// `CHAIN_SLOT_CAPACITY * PoolSlotWords + <offset>` as its pool offset.
+/// the slot records' extent (`ChainData.length() - BlockWords`) plus `<offset>`.
 inline constexpr int BlockGradientOffset = 0;
 inline constexpr int BlockWords = BlockGradientOffset + GradientDataWords;
 

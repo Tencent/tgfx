@@ -38,6 +38,7 @@
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/shaders/modules/YUVChainTail.h"
 
 namespace tgfx {
 
@@ -255,7 +256,7 @@ bool AOTChainBuilder::CollectYUVTail(const AOTEffectGraph& graph, AOTYUVTailShap
   if (!tail.leaf->isYUV || tail.leaf->samplingKind != AOTTextureSamplingKind::Plain) {
     return false;
   }
-  if (tail.ops.size() > MaxPointwiseSlots) {
+  if (tail.ops.size() > YUVChainTailSlotCapacity) {
     return false;
   }
   shape->leaf = tail.leaf;

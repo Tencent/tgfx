@@ -94,7 +94,7 @@ bool chainLeafIsTiled(int leafIndex) {
 }
 #endif
 
-vec4 chainResults[16];
+vec4 chainResults[TGFX_CHAIN_REGISTERS];
 
 // Prefetched leaf samples. Fetched in main (the samplers stay statically bound, see aotChainRead);
 // the OP_TEXTURE branch of evalChainSlot reads them back by instruction index.

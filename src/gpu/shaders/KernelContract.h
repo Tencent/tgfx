@@ -31,12 +31,11 @@ namespace tgfx {
 // against these constants at bundle build time). Renaming a field or an op code anywhere fails
 // the bundle build instead of silently leaving contract fields unwritten or misinterpreting a
 // chain slot.
-// The YUV kernel's color-grade tail capacity: the size of the chain instruction arrays the tail
-// reads (the same slot encoding the interpreter uses). The GLSL side aliases CHAIN_SLOT_CAPACITY
-// from TGFX_TAIL_SLOT_CAPACITY (yuv_texture_fill.frag), which the build injects from
-// AOTResourceProfile::SlotCapacityDefines() into every compiled stage, so this constant is the
-// single source and the compiled arrays cannot drift from it.
-inline constexpr size_t MaxPointwiseSlots = 3;
+// The chain kernel's result-register file: chainResults holds one vec4 per live result, and the
+// register allocator recycles them by last use. A local array cannot be expressed by the module
+// declarations, so the size rides the kernel contract and the build injects it as
+// TGFX_CHAIN_REGISTERS into the shared chain text.
+inline constexpr size_t MaxChainRegisters = 16;
 
 namespace ClipContract {
 

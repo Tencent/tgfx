@@ -37,6 +37,7 @@
 #include "gpu/shaders/modules/PorterDuffXPModule.h"
 #include "gpu/shaders/modules/TextureSourceModule.h"
 #include "gpu/shaders/modules/TiledSourceModule.h"
+#include "gpu/shaders/modules/YUVChainTail.h"
 
 namespace tgfx {
 namespace {
@@ -286,7 +287,7 @@ void BindYUVProgram(const AOTProgram& program, UniformData* fragmentUniformData)
   // The declared capacity exceeds the real count: the inactive tail carries the OP_NONE marker,
   // matching the fixed-size storage every multi-slot kernel keeps.
   AOTChainSlot inactiveSlot = {};
-  for (size_t index = 0; index < MaxPointwiseSlots; ++index) {
+  for (size_t index = 0; index < YUVChainTailSlotCapacity; ++index) {
     UploadYUVTailSlot(fragmentUniformData, index,
                       index < slots.size() ? slots[index] : inactiveSlot);
   }

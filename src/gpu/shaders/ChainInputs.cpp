@@ -21,6 +21,7 @@
 #include <vector>
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
@@ -34,9 +35,39 @@
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/FamilyDomains.h"
+#include "gpu/shaders/contract/ChainISA.h"
 #include "gpu/shaders/contract/DrawFacts.h"
+#include "gpu/shaders/modules/YUVChainTail.h"
 
 namespace tgfx {
+
+// The contract-side budgets and the declaration-side array lengths are one contract. The contract
+// header cannot include the declaration layer (LayeringTest), so the agreement is pinned here, in
+// a translation unit that sees both: a drift fails the build instead of shipping a kernel whose
+// injected capacities disagree with the arrays it declares.
+static_assert(static_cast<size_t>(ChainSlotPackedCounts[0]) == ChainResourceCapacity.instructions,
+              "the plain chain's declared slot count drifted from the planner's budget");
+static_assert(static_cast<size_t>(ChainSlotPackedCounts[6]) ==
+                  NoiseGraphResourceCapacity.instructions,
+              "the noise chain's declared slot count drifted from the planner's budget");
+static_assert(static_cast<size_t>(ChainSlotPackedCounts[0]) ==
+                  TiledGraphResourceCapacity.instructions,
+              "the gradient shape shares the plain chain's slot storage");
+static_assert(static_cast<size_t>(ChainDataCounts[0]) ==
+                  static_cast<size_t>(ChainSlotPackedCounts[0]) * ChainISA::PoolSlotWords +
+                      ChainISA::BlockWords,
+              "the declared pool length is not slots * stride + block words");
+static_assert(static_cast<size_t>(ChainDataCounts[6]) ==
+                  static_cast<size_t>(ChainSlotPackedCounts[6]) * ChainISA::PoolSlotWords +
+                      ChainISA::BlockWords,
+              "the declared pool length is not slots * stride + block words");
+static_assert(YUVChainTailSlotWords == ChainISA::PoolSlotWords &&
+                  YUVChainTailBlockWords == ChainISA::BlockWords,
+              "the YUV tail's pool layout differs from the chain's");
+static_assert(static_cast<size_t>(YUVChainTailDataCount) ==
+                  static_cast<size_t>(YUVChainTailSlotCapacity) * ChainISA::PoolSlotWords +
+                      ChainISA::BlockWords,
+              "the YUV tail's declared pool length is not slots * stride + block words");
 
 std::optional<ChainInputs::Inputs> ChainInputs::DeriveInputs(const AOTProgram& program,
                                                              const ProgramInfo* programInfo,

@@ -66,19 +66,10 @@ inline constexpr AOTResourceCapacity NoiseGraphResourceCapacity = {32, 2, 1, 0};
 // gradient chain needs 7 slots (p100 over 2,468 constructed chains), so 16 keeps ample headroom.
 inline constexpr AOTResourceCapacity TiledGraphResourceCapacity = {16, 3, 0, 1};
 
-/// The slot capacities every compiled variant receives as defines: the kernels spell their
-/// instruction arrays with TGFX_*_SLOT_CAPACITY, so the sizes exist only in the C++ profiles above
-/// (and MaxPointwiseSlots, the YUV tail's capacity) and cannot drift from what the runtime
-/// uploads. shader_build_tool prepends this list to every stage's defines and the manifest's
-/// source digest covers it.
-inline std::vector<std::string> SlotCapacityDefines() {
-  return {"TGFX_CHAIN_SLOT_CAPACITY=" + std::to_string(ChainResourceCapacity.instructions),
-          "TGFX_NOISE_SLOT_CAPACITY=" + std::to_string(NoiseGraphResourceCapacity.instructions),
-          "TGFX_TAIL_SLOT_CAPACITY=" + std::to_string(MaxPointwiseSlots),
-          "TGFX_CHAIN_DATA_SLOT_WORDS=" + std::to_string(ChainISA::PoolSlotWords),
-          "TGFX_CHAIN_BLOCK_WORDS=" + std::to_string(ChainISA::BlockWords),
-          "TGFX_CHAIN_BLOCK_GRADIENT=" + std::to_string(ChainISA::BlockGradientOffset)};
-}
+// The capacity defines the compiled stages receive live in the tool (core/CapacityDefines.h):
+// they are read from the declaration the assembler sizes the arrays from, and the contract header
+// below cannot include the declaration layer. The planner's budgets stay here; ChainInputs.cpp
+// pins them to the declared counts with static_asserts.
 
 inline const AOTResourceCapacity* GetAOTResourceCapacity(AOTResourceProfile profile) {
   switch (profile) {

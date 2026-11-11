@@ -49,7 +49,6 @@ struct AOTChainLayout {
 // sets, four rrect array elements). ValidateSlots is the only place that enforces them; the
 // planner and the compile both run it on the same instruction array, so the two cannot disagree.
 inline constexpr size_t MaxChainSlots = NoiseGraphResourceCapacity.instructions;
-inline constexpr size_t MaxChainRegisters = 16;
 inline constexpr size_t MaxChainGradientSlots = TiledGraphResourceCapacity.gradients;
 inline constexpr size_t MaxChainColorSpaceXformSlots = 1;
 

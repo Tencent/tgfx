@@ -28,11 +28,11 @@ namespace tgfx {
 /// analytic clip contract the composite folds in. bareNames because the shared slot loop and the
 /// clip helper read the legacy spellings verbatim, exactly as they did inside the old kernel.
 ///
-/// The tail's capacity is MaxPointwiseSlots (3); a draw with no operators leaves SlotCount at 0
+/// The tail's capacity is YUVChainTailSlotCapacity (3); a draw with no operators leaves SlotCount at 0
 /// and the loop never runs, so the fields cost a uniform block slot but no variant and no pass.
 inline constexpr uint16_t YUVChainTailSlotCapacity = 3;
 
-/// Per-slot footprint (see pipeline/chain/pointwise_chain_uniforms.inc): ChainData carries the
+/// Per-slot footprint (the same pool layout the Chain module declares): ChainData carries the
 /// per-slot parameter blocks plus the shared block region.
 inline constexpr uint16_t YUVChainTailBlockWords = 32;
 inline constexpr uint16_t YUVChainTailSlotWords = 7;

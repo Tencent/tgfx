@@ -2,8 +2,8 @@
 // The legacy kernel received TEXTURE_COUNT / HAS_MASK_TEXTURE / RESOURCE_KIND as separate dims;
 // the declared assembly folds their seven reachable cells into PROFILE (see modules/Chain.h), and
 // this prologue restates the legacy spellings the shared body text reads, so the body stays
-// verbatim. CHAIN_SLOT_CAPACITY keeps its contract-macro form: the injected capacities are the
-// same C++ constants the runtime uploads from.
+// verbatim. CHAIN_SLOT_CAPACITY keeps its macro form; the build emits it from the Chain module's
+// declared slot count, so the declaration is the one source.
 
 //   PROFILE  0 = plain leaf-free        3 = gradient leaf-free        6 = noise four-leaf
 //            1 = plain mask             4 = gradient mask

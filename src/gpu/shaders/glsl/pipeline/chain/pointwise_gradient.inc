@@ -16,7 +16,9 @@ bool evalGradientSlot(ivec4 Packed, vec4 in0, out vec4 value) {
   // dedicated kernel. The epilogue premultiplies and modulates by the input alpha, matching
   // the runtime ClampedGradientEffect emission.
   // The gradient's block sits in the pool's chain-wide region: one gradient per chain, so the
-  // offset is the region base plus the block's fixed slot, not a per-slot index.
+  // offset is the region base plus the block's fixed slot, not a per-slot index. The capacity
+  // macro is emitted by the build from the Chain module's declared count, so the number exists
+  // once — in the declaration the assembler sizes the pool from.
   GradientData d = chainLoadGradient(CHAIN_SLOT_CAPACITY * TGFX_CHAIN_DATA_SLOT_WORDS +
                                      TGFX_CHAIN_BLOCK_GRADIENT);
   highp vec2 gradientCoord = SourceCoords.xy / SourceCoords.z;

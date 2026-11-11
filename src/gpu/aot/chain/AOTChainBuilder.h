@@ -117,7 +117,7 @@ class AOTChainBuilder {
    * cannot disagree about what a servable tail is. Fails on any non-pointwise node (a blend is
    * not unary), an operator the slot encoding cannot express, a second color-space transform
    * (the kernel's CS parameters are one shared block, like the interpreter's), a non-YUV /
-   * non-Plain leaf, or a tail over MaxPointwiseSlots.
+   * non-Plain leaf, or a tail over the YUV chain tail's declared capacity.
    */
   struct AOTYUVTailShape {
     const AOTTextureParameters* leaf = nullptr;

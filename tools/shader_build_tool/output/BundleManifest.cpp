@@ -33,7 +33,7 @@
 #include "compile/ShaderCompiler.h"
 #include <spirv_cross_c.h>
 #include "gpu/shaders/contract/ShaderBundleContract.h"
-#include "gpu/aot/AOTResourceProfile.h"
+#include "core/CapacityDefines.h"
 #include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {

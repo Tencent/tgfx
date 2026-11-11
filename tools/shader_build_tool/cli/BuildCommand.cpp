@@ -18,7 +18,7 @@
 
 #include "BuildCommand.h"
 
-#include "gpu/aot/AOTResourceProfile.h"
+#include "core/CapacityDefines.h"
 
 #include <cstdint>
 #include <cstring>
