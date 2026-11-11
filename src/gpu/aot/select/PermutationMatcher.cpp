@@ -27,6 +27,7 @@
 #include "gpu/aot/ir/Program.h"
 #include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/aot/select/PermutationMatch.h"
+#include "gpu/aot/select/ProgramSelection.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
 #include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
@@ -494,53 +495,9 @@ std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir,
   return shape;
 }
 
-// Per-family gate of the walk (see MatchPermutationImpl for the switch semantics): the two
+// Per-family gate of the walk (see SelectProgram for the switch semantics): the two
 // diagnostic switches exclude their half of the family list, decompositionEnabled gating the
 // interpreter and dedicatedKernelsEnabled every dedicated family.
-static std::optional<PermutationMatchResult> MatchPermutationImpl(
-    const ProgramInfo* programInfo, const DrawShape& shape, PermutationMatchFailure* failure) {
-  // Alpha-only (AAAA, Swizzle::ForWrite(ALPHA_8)) targets: only the kernels that apply the write
-  // swizzle at output (via the OutputAlphaSwizzle uniform) may serve the draw; the others assume
-  // RGBA output. Which kernels those are is each family's own ServesAlphaOnly declaration. The
-  // pointwise kernels carry the swizzle (output_swizzle.inc), so a chain-serving draw onto an
-  // alpha-only target — a const-color or gradient mask pass, the largest remaining libpag gap —
-  // is served by the same variants as the RGBA case. The gaussian blur kernel applies it too (an
-  // alpha-only blur pass writes its mask accumulation through the AAAA swizzle, with the
-  // AlphaChild flag carrying the .rrrr readback).
-  const bool alphaOnly = programInfo->getOutputSwizzle() == Swizzle::AAAA();
-
-  // The two diagnostic switches keep the retired walk's semantics: dedicatedKernelsEnabled gates
-  // every dedicated family (the whole executor table), decompositionEnabled the interpreter.
-  auto* shaderContext = programInfo->getContext();
-  auto* shaderCache = shaderContext != nullptr ? ContextCacheAccess::Cache(shaderContext) : nullptr;
-  const auto policy =
-      shaderCache != nullptr ? shaderCache->aotPolicy() : PrecompiledShaderCache::AOTPolicy{};
-  const bool allowDedicated = policy.dedicatedKernels;
-  // Gradients keep the interpreter even with the decomposition switch off (only the extended
-  // chain kind serves them), mirroring the required-gradient-lowering the switch always retained.
-  // The fact was computed once when the draw's facts were extracted.
-  const bool allowInterpreter = policy.decomposition || shape.hasGradientSource;
-  // The dedicated families dispatch through the executor table: the generated family list, each
-  // entry the family's own ExtractFacts pipeline, with one facts extraction replacing every
-  // family re-deriving the same facts from the processor tree. The gates keep the retired walk's
-  // semantics — alpha-only rejection is a row predicate (the ExtractFacts bodies), and
-  // dedicatedKernelsEnabled gates the whole table.
-  if (allowDedicated) {
-    if (auto declared = MatchDeclaredKernel(shape, programInfo, failure)) {
-      return PermutationMatchResult{declared->family, declared->variant};
-    }
-  }
-  // The interpreter is the decomposition route: its acceptance is the carried IR, not the shape,
-  // so it is gated by the decomposition policy alone (never by dedicatedKernels) and stays the
-  // walk's documented last resort.
-  if (allowInterpreter && (!alphaOnly || ChainInputs::ServesAlphaOnly)) {
-    if (auto result = MatchChainProgram(programInfo)) {
-      return PermutationMatchResult{Families()[result->variant.family].name,
-                                    {result->variant.ordinal, result->variant.ordinal}};
-    }
-  }
-  return alphaOnly ? Fail(failure, PermutationMatchFailure::NoMatchingFamily) : std::nullopt;
-}
 
 // The acceptance gates every route into a precompiled program shares (see ShaderMatchHelpers.h):
 // the output swizzles the kernels implement, the OpenGL profile/sampler gate, and the matched
@@ -573,57 +530,15 @@ bool AdmitMatchedProgram(const ProgramInfo* programInfo, const DrawShape& shape,
   return true;
 }
 
-// The uncached match: the full family walk plus the post-match validations. Both public entries
-// funnel through here.
-static std::optional<PermutationMatchResult> ComputeMatch(const ProgramInfo* programInfo,
-                                                          PermutationMatchFailure* failure) {
-  // The route-independent gates first, so a draw they refuse reports its reason before any family
-  // walk runs; the texture-read check needs the matched family and runs after the walk.
-  const auto shape = ExtractDrawShape(programInfo);
-  if (!AdmitMatchedProgram(programInfo, shape, nullptr, failure)) {
-    return std::nullopt;
-  }
-  auto matchFailure = PermutationMatchFailure::None;
-  auto result = MatchPermutationImpl(programInfo, shape, &matchFailure);
-  if (result) {
-    auto info = ShaderRegistry::Find(result->shaderName);
-    if (info == nullptr || !IsBuildablePermutation(*info, result->variant.vertPermutationIndex,
-                                                   result->variant.fragPermutationIndex)) {
-      result.reset();
-      matchFailure = PermutationMatchFailure::PermutationNotEnumerated;
-    } else if (!AdmitMatchedProgram(programInfo, shape, info, &matchFailure)) {
-      result.reset();
-    }
-  }
-  // No rejecting site recorded a reason: the generic no-matching-rule verdict. (A successful
-  // match above reports None.)
-  if (!result && matchFailure == PermutationMatchFailure::None) {
-    matchFailure = PermutationMatchFailure::NoMatchingRule;
-  }
-  if (failure != nullptr) {
-    *failure = result ? PermutationMatchFailure::None : matchFailure;
-  }
-  return result;
-}
-
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo,
                                                        PermutationMatchFailure* failure) {
-  // The lookup is idempotent: the first caller runs the walk, and every later caller — the program
-  // creator's lookup, a prepare-time probe — reuses the cached outcome, including the failure
-  // bookkeeping, so a draw the rewrite probes matches once.
-  if (programInfo->cachedMatch) {
-    if (failure != nullptr) {
-      *failure = programInfo->cachedMatch->failure;
-    }
-    return programInfo->cachedMatch->match;
+  auto selection =
+      SelectProgram(programInfo->getContext(), *programInfo, SelectionScope::AnyFamily, failure);
+  if (!selection) {
+    return std::nullopt;
   }
-  auto outcome = PermutationMatchOutcome{};
-  outcome.match = ComputeMatch(programInfo, &outcome.failure);
-  programInfo->cachedMatch = outcome;
-  if (failure != nullptr) {
-    *failure = outcome.failure;
-  }
-  return outcome.match;
+  return PermutationMatchResult{Families()[selection->variant.family].name,
+                                {selection->variant.ordinal, selection->variant.ordinal}};
 }
 
 }  // namespace tgfx

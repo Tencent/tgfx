@@ -343,14 +343,11 @@ static ConsistencyResult BuildConsistencyChecks(
   for (auto count : fallbackCounts) {
     fallbackEventCount += count;
   }
-  const auto attempts =
-      static_cast<uint64_t>(aotStageCounts[static_cast<size_t>(PrecompiledAOTStage::Attempt)]);
   const auto artifactsFound = static_cast<uint64_t>(
       aotStageCounts[static_cast<size_t>(PrecompiledAOTStage::ArtifactsFound)]);
   const auto pipelinesCreated = static_cast<uint64_t>(
       aotStageCounts[static_cast<size_t>(PrecompiledAOTStage::PipelineCreated)]);
   const bool stagesMonotonic = AOTStagesAreMonotonic(aotStageCounts);
-  const bool attemptsMatch = attempts == programStats.cacheMisses;
   const bool artifactHitsMatch = artifactHits == artifactsFound;
   const bool pipelineCreationsMatch = pipelinesCreated == programStats.precompiledArtifactCreations;
   const bool hitRecordsMatch = hitRecordCount == pipelinesCreated;
@@ -358,24 +355,22 @@ static ConsistencyResult BuildConsistencyChecks(
 
   ConsistencyResult result;
   // Program cache lookups and diagnostic AOT/fallback records are different event streams: one
-  // logical ProgramInfo request can probe decomposed and plain keys, and Builder creations can occur
-  // without a diagnostic fallback record. Keep those comparisons as legacy diagnostics, but do not
-  // let them mark the epoch inconsistent. The stage/artifact/pipeline/hit-record chain is the
-  // reliable same-epoch invariant.
+  // logical ProgramInfo request can probe decomposed and plain keys, and Builder creations can
+  // occur without a diagnostic fallback record. The stage/artifact/pipeline/hit-record chain is
+  // the reliable same-epoch invariant. (An attempt-versus-cache-miss comparison used to live here;
+  // every prepare now records an attempt because a program's key carries its matched variant, so
+  // the two counts stopped being comparable and the check only reported noise.)
   result.consistent =
       stagesMonotonic && artifactHitsMatch && pipelineCreationsMatch && hitRecordsMatch;
   result.checks = {
       {"consistent", result.consistent},
       {"aotStagesMonotonic", stagesMonotonic},
-      {"aotAttemptsMatchProgramCacheMissesLegacy", attemptsMatch},
       {"artifactHitsMatchArtifactsFound", artifactHitsMatch},
       {"pipelineCreationsMatchPrecompiledPrograms", pipelineCreationsMatch},
       {"hitRecordsMatchPipelineCreations", hitRecordsMatch},
       {"fallbackRecordsMatchFallbackEvents", fallbackRecordsMatch},
       {"deltas",
-       {{"aotAttemptsMinusProgramCacheMisses",
-         static_cast<int64_t>(attempts) - static_cast<int64_t>(programStats.cacheMisses)},
-        {"artifactHitsMinusArtifactsFound",
+       {{"artifactHitsMinusArtifactsFound",
          static_cast<int64_t>(artifactHits) - static_cast<int64_t>(artifactsFound)},
         {"pipelineCreationsMinusPrecompiledPrograms",
          static_cast<int64_t>(pipelinesCreated) -

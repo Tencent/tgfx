@@ -187,7 +187,7 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
     // IR through the writer's canWrite, so the IR must ride the pass info before the resolution
     // — the second set below is then idempotent and keeps the ownership flow unchanged.
     passInfo->setCarriedIR(resolvedPassIR);
-    AOTProgramInfo aotInfo(*passInfo, *resolvedPassIR->program);
+    AOTProgramInfo aotInfo(*passInfo);
     if (!aotInfo.valid()) {
       // The pass's shape has no variant, or the bundle lacks it: nothing can serve this draw.
       // As above, only the draw's own final lookup records the drop; a probe falls back.

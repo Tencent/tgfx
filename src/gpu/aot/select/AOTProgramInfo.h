@@ -28,15 +28,15 @@ struct AOTProgram;
 
 /**
  * The interpreter's program resolution for one draw, computed entirely at construction: the
- * variant derives from the compiled chain program and the draw's geometry and xfer processors
- * (never from a fragment-processor list — the program is the whole expression), the pipeline key
- * from the variant plus the pipeline state, and the program from the global cache, created from
- * the bundle on a miss. There is no mutable state and no lazy field: a draw either resolves here
- * or its caller falls back to the plain route.
+ * selection runs through the one SelectProgram entry in the pass scope (the compiled program
+ * rides the carried IR, so no fragment-processor list is read), the key from the variant plus
+ * the pipeline state, and the program from the global cache, created from the bundle on a miss.
+ * There is no mutable state and no lazy field: a draw either resolves here or its caller falls
+ * back to the plain route.
  */
 class AOTProgramInfo {
  public:
-  AOTProgramInfo(const ProgramInfo& info, const AOTProgram& program);
+  explicit AOTProgramInfo(const ProgramInfo& info);
 
   /**
    * Whether the route resolved. False means the draw's expression is not servable this way (no

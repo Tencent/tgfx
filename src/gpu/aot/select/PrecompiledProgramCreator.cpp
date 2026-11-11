@@ -35,6 +35,7 @@
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/aot/select/ProgramKey.h"
+#include "gpu/aot/select/ProgramSelection.h"
 #include "gpu/aot/spec/SpecInjector.h"
 #include "gpu/aot/spec/SpecResolver.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -286,8 +287,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   }
 
   PermutationMatchFailure matchFailure = PermutationMatchFailure::None;
-  auto matchResult = MatchPermutation(programInfo, &matchFailure);
-  if (!matchResult) {
+  auto selection = SelectProgram(context, *programInfo, SelectionScope::AnyFamily, &matchFailure);
+  if (!selection) {
     auto reason = ToFallbackReason(matchFailure);
     if (reason == PrecompiledFallbackReason::NoMatchingRule) {
       // A texture FP whose view is not instantiated yet (a lazy/deferred proxy) drops its
@@ -322,25 +323,21 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
-  // The specialization values are part of the program's identity: the processor tree cannot tell
-  // two chain shapes apart (a rect clip's anti-alias flag, for one, is not in it), so a program
-  // built for one shape must never answer the other. The key below carries them, so the generic
-  // form and every specialized form of one variant are distinct programs under distinct keys.
-  const SpecValues spec = SpecResolver::Resolve(
-      cache, context->backend(), *programInfo, matchResult->shaderName,
-      matchResult->variant.vertPermutationIndex, matchResult->variant.fragPermutationIndex);
-  const uint16_t familyIndex = FamilyIndexOf(matchResult->shaderName.c_str());
-  if (familyIndex == 0xFFFF) {
-    LOGE("PrecompiledShaderMiss: unknown family %s", matchResult->shaderName.c_str());
-    return nullptr;
-  }
-  const uint32_t variantId = VariantIdOf(familyIndex, matchResult->variant.fragPermutationIndex);
-  const BytesKey key = MakeProgramKey(context, *programInfo, variantId, spec);
+  // The selection names the program: its variant selects the blob pair and its specialization
+  // values tell two chain shapes of one variant apart (a rect clip's anti-alias flag, for one, is
+  // not in the processor tree), so the generic form and every specialized form of one variant
+  // are distinct programs under distinct keys.
+  PermutationMatchResult matchResult = {};
+  matchResult.shaderName = Families()[selection->variant.family].name;
+  matchResult.variant.vertPermutationIndex = selection->variant.ordinal;
+  matchResult.variant.fragPermutationIndex = selection->variant.ordinal;
+  const BytesKey key =
+      MakeProgramKey(context, *programInfo, selection->variant.id(), selection->spec);
   if (auto cached = context->globalCache()->findProgram(key)) {
     return cached;
   }
-  auto program =
-      CreateProgramFromMatch(context, programInfo, *matchResult, spec.empty() ? nullptr : &spec);
+  auto program = CreateProgramFromMatch(context, programInfo, matchResult,
+                                        selection->spec.empty() ? nullptr : &selection->spec);
   if (program != nullptr) {
     // A specialization that failed to build still returns the generic form (see the fallback in
     // CreateProgramFromMatch); caching it under this key keeps the failing compile from being

@@ -44,22 +44,10 @@ struct PermutationMatchResult {
 // coarse fallback category; they exist so a miss says where it was rejected.
 
 /**
- * One match outcome with its failure reason: the reason is meaningful only when match is nullopt,
- * but caching them together keeps "matched", "missed" and "never run" distinguishable with a
- * single optional on ProgramInfo.
- */
-struct PermutationMatchOutcome {
-  std::optional<PermutationMatchResult> match;
-  PermutationMatchFailure failure = PermutationMatchFailure::None;
-};
-
-/// Stable name of a failure value for diagnostics dumps. Never null.
-
-/**
- * Matches the program info against the precompiled families (the full family walk plus the
- * post-match validations) and caches the outcome on the info: the first caller runs the walk, and
- * every later lookup of the same info — the program creator's, a prepare-time probe's — reuses
- * it. The cache makes the lookup idempotent, so callers may probe freely.
+ * Matches the program info against the precompiled families through the one selection entry
+ * (SelectProgram, see ProgramSelection.h) with the draw's own expression in scope. Kept as a
+ * thin wrapper for the callers that only need the family and variant; the program creator and
+ * the pass route call SelectProgram directly.
  */
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo,
                                                        PermutationMatchFailure* failure = nullptr);

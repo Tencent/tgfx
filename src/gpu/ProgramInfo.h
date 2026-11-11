@@ -276,27 +276,20 @@ class ProgramInfo {
 
   BytesKey buildProgramKey() const;
 
-  // The caches below are the one deliberate exemption to the no-mutable rule: each holds an
+  // The cache below is the one deliberate exemption to the no-mutable rule: it holds an
   // idempotent derived value (the same inputs always produce the same result), computed lazily
   // because the key inputs (colorWriteMask, depthStencil, cullMode) are set after construction.
-  // No observable behavior depends on whether a cache is filled, so the object stays semantically
-  // immutable; removing them would mean re-running the matcher walk and rebuilding the
-  // re-expression per consumer, which is exactly the per-draw cost they exist to avoid.
+  // No observable behavior depends on whether it is filled, so the object stays semantically
+  // immutable.
 
-  // The cached program key (see programKey()), invalidated by the pipeline-state setters.
+  // The cached attempt key (see programKey()), invalidated by the pipeline-state setters.
   mutable std::optional<BytesKey> cachedProgramKey;
-
-  // The cached MatchPermutation outcome (see PermutationMatch.h): filled by the first caller and
-  // reused by every later lookup of the same info.
-  mutable std::optional<PermutationMatchOutcome> cachedMatch;
 
   // The draw's record-time DrawIR, attached through setCarriedIR() before first use. Mutable only
   // so the attachment can happen right after construction (the pipeline-state setters already
   // run in that window); it is an input, never recomputed, and null unless explicitly attached.
   mutable const DrawIR* carriedIR = nullptr;
 
-  friend std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo*,
-                                                                PermutationMatchFailure*);
   friend class ProgramWriter;
   friend class PrecompiledProgramWriter;
   friend class ChainProgramWriter;

@@ -22,13 +22,10 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/aot/ir/Program.h"
 #include "gpu/aot/select/PrecompiledProgramCreator.h"
 #include "gpu/aot/select/ProgramKey.h"
-#include "gpu/aot/select/ShaderMatchHelpers.h"
-#include "gpu/aot/spec/SpecResolver.h"
-#include "gpu/shaders/ChainInputs.h"
-#include "gpu/shaders/PrecompiledShader.h"
+#include "gpu/aot/select/ProgramSelection.h"
+#include "gpu/shaders/Families.h"
 #include "gpu/shaders/contract/DrawFacts.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"
@@ -36,27 +33,19 @@
 
 namespace tgfx {
 
-AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& program) {
+AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info) {
   auto context = info.getContext();
   auto cache = context != nullptr ? ContextCacheAccess::Cache(context) : nullptr;
   if (cache == nullptr || !cache->isLoaded()) {
     // Without a bundle there is no route; the plain fallback records the miss itself.
     return;
   }
-  auto variant = ChainInputs::MatchVariant(program, &info);
-  if (!variant) {
-    return;
-  }
-  auto shaderInfo = ShaderRegistry::Find("Chain");
-  if (shaderInfo == nullptr ||
-      !IsBuildablePermutation(*shaderInfo, variant->ordinal, variant->ordinal)) {
-    return;
-  }
-  // The same acceptance the plain lookup applies: a draw these gates refuse must not slip through
-  // the pass-IR route, or it would render with wrong pixels instead of falling back to the
-  // original draw.
-  const auto shape = ExtractDrawShape(&info);
-  if (!AdmitMatchedProgram(&info, shape, shaderInfo, nullptr)) {
+  // The pass scope: the expression is already compiled, so only the interpreter can serve it.
+  // SelectProgram runs the same admission, buildability, and specialization steps the plain
+  // lookup applies, so a draw these gates refuse falls back to the original draw instead of
+  // rendering wrong pixels.
+  auto selection = SelectProgram(context, info, SelectionScope::ChainOnly, nullptr);
+  if (!selection) {
     return;
   }
   // From here on the route proceeds like a plain attempt whose match already ran, so the stage
@@ -65,21 +54,19 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& progra
   cache->recordAOTStage(PrecompiledAOTStage::CacheAvailable);
   cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
 
-  // The variant's identity does not name the chain's shape: two effect trees of one variant
-  // (same GP, same XP, same slot-count class) encode different chains, so the specialization
-  // values join the key or the second shape would silently reuse the first shape's program. The
-  // entry is the same one the plain route uses (SpecResolver), so both routes agree.
-  const SpecValues spec =
-      SpecResolver::Resolve(ContextCacheAccess::Cache(context), context->backend(), info, "Chain",
-                            variant->ordinal, variant->ordinal);
-  const BytesKey key = MakeProgramKey(context, info, variant->id(), spec);
+  // The specialization values join the key: two effect trees of one variant (same GP, same XP,
+  // same slot-count class) encode different chains, so the second shape must not silently reuse
+  // the first shape's program. SelectProgram resolved them through the same SpecResolver entry
+  // the plain route uses, so both routes agree.
+  const BytesKey key = MakeProgramKey(context, info, selection->variant.id(), selection->spec);
 
   auto globalCache = context->globalCache();
   auto resolved = globalCache->findProgram(key);
   if (resolved == nullptr) {
-    PermutationMatchResult match = {"Chain", {variant->ordinal, variant->ordinal}};
-    resolved = PrecompiledProgramCreator::CreateProgramFromMatch(context, &info, match,
-                                                                 spec.empty() ? nullptr : &spec);
+    PermutationMatchResult match = {Families()[selection->variant.family].name,
+                                    {selection->variant.ordinal, selection->variant.ordinal}};
+    resolved = PrecompiledProgramCreator::CreateProgramFromMatch(
+        context, &info, match, selection->spec.empty() ? nullptr : &selection->spec);
     if (resolved == nullptr) {
       return;
     }
