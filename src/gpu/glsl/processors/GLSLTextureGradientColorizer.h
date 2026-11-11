@@ -26,6 +26,5 @@ class GLSLTextureGradientColorizer : public TextureGradientColorizer {
   explicit GLSLTextureGradientColorizer(std::shared_ptr<TextureProxy> gradient);
 
  private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 }  // namespace tgfx

@@ -29,22 +29,4 @@ GLSLColorMatrixFragmentProcessor::GLSLColorMatrixFragmentProcessor(
     : ColorMatrixFragmentProcessor(matrix) {
 }
 
-void GLSLColorMatrixFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
-                                                 UniformData* fragmentUniformData) const {
-  float m[] = {
-      matrix[0], matrix[5], matrix[10], matrix[15], matrix[1], matrix[6], matrix[11], matrix[16],
-      matrix[2], matrix[7], matrix[12], matrix[17], matrix[3], matrix[8], matrix[13], matrix[18],
-  };
-  float vec[] = {
-      matrix[4],
-      matrix[9],
-      matrix[14],
-      matrix[19],
-  };
-  fragmentUniformData->setArrayElement("ColorMatrix", 0, m);
-  fragmentUniformData->setArrayElement("ColorVector", 0, vec);
-  // Select the ColorMatrix operator in the chain interpreter's slot 0 (the only kernel that carries
-  // the operator word now that the single-operator family is gone).
-  fragmentUniformData->setArrayElementOptional("OpType", 0, 0);
-}
 }  // namespace tgfx

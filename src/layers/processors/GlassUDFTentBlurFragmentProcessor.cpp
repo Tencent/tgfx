@@ -53,8 +53,8 @@ GlassUDFTentBlurFragmentProcessor::GlassUDFTentBlurFragmentProcessor(
     bool inputIsPacked, GlassUDFField field)
     : FragmentProcessor(ClassID()), fineRadius(fineRadius), coarseRadius(coarseRadius),
       direction(direction), maxRadius(maxRadius), inputIsPacked(inputIsPacked), field(field) {
-  // The source of the requested field is always child 0, so onSetData reads the step matrix from a
-  // valid child either way.
+  // The lowered node reads its source off child 0 (see lowerToAOT), so the active source is the
+  // one registered child either way.
   if (field == GlassUDFField::EdgeLight) {
     registerChildProcessor(std::move(coarseSource));
   } else {
@@ -66,43 +66,6 @@ void GlassUDFTentBlurFragmentProcessor::onComputeProcessorKey(BytesKey* key) con
   key->write(maxRadius);
   key->write(static_cast<uint32_t>(inputIsPacked));
   key->write(static_cast<uint32_t>(field));
-}
-
-void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData*,
-                                                  UniformData* fragmentUniformData) const {
-  auto processor = childProcessor(0);
-  Point stepVectors[] = {{0, 0}, {1.0f, 0}};
-  if (direction == GlassUDFBlurDirection::Vertical) {
-    stepVectors[1] = {0, 1.0f};
-  }
-  DEBUG_ASSERT(processor->numCoordTransforms() == 1);
-  auto matrix = processor->coordTransform(0)->getTotalMatrix();
-  matrix.mapPoints(stepVectors, 2);
-  Point step = stepVectors[1] - stepVectors[0];
-  Point radii = {fineRadius, coarseRadius};
-  fragmentUniformData->setData("GlassUDFRadius", radii);
-  fragmentUniformData->setData("GlassUDFStep", step);
-  // The precompiled tent-blur kernel selects its tap path with this flag: a TiledTextureEffect
-  // child must run the Decal/tiling tap semantics (out-of-subset reads resolve to the border),
-  // while a plain TextureEffect child only clamps to the subset. GaussianBlur1D uploads the same
-  // flag for the same reason; without it the kernel stays on the plain-clamp path and pulls edge
-  // texels into the blur wherever the sampling window leaves the subset.
-  fragmentUniformData->setDataOptional("TiledChild",
-                                       IsProcessor<TiledTextureEffect>(processor) ? 1 : 0);
-  // Default for the shared kernel's runtime device mask; a present mask FP overwrites it with 1
-  // later in traversal. The uniform ring buffer is recycled without clearing, so leaving this
-  // unwritten makes the draw inherit an earlier draw's flag and sample the padded dummy mask
-  // (or skip a real one) — the same default GaussianBlur1D and the other runtime-mask kernels
-  // upload.
-  fragmentUniformData->setDataOptional("HasDeviceMask", 0);
-  // The precompiled tent-blur kernel folds the field selection and the packed-input decode into
-  // runtime uniforms, so both values ride this same onSetData path.
-  if (fragmentUniformData->hasField("Field")) {
-    fragmentUniformData->setData("Field", static_cast<int>(field));
-  }
-  if (fragmentUniformData->hasField("InputIsPacked")) {
-    fragmentUniformData->setData("InputIsPacked", inputIsPacked ? 1 : 0);
-  }
 }
 
 bool GlassUDFTentBlurFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,

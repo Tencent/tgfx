@@ -333,9 +333,8 @@ void WriteGaussianBlur(const AOTOpaqueKernelParameters& params, const AOTTexture
   WriteChildSamplingFields<GaussianBlur>(child, view.get(), writer);
 }
 
-// GlassRefraction: the optics and shape records, field for field the same values the runtime
-// GLSL processors' onSetData uploads (GLSLGlassRefractionFragmentProcessor and the two geometry
-// children), sourced from the IR node instead of the processor tree. The background-coordinate
+// GlassRefraction: the optics and shape records, sourced from the IR node instead of the
+// processor tree. The background-coordinate
 // transform is the tree's first coord transform (the standard helper upload).
 void WriteGlassRefraction(const AOTOpaqueKernelParameters& params, const ProgramInfo& info,
                           SlotWriter* writer) {
@@ -810,8 +809,7 @@ void WriteMaskTexture(const ProgramInfo& info, SlotWriter* writer) {
   WriteCoordMatrix<MaskTexture>(info, writer);
 }
 
-// AnalyticClip: the runtime clip contract. The values mirror GLSLRectEffect's and
-// GLSLRRectEffect's onSetData uploads field for field.
+// AnalyticClip: the runtime clip contract.
 /// Writes the analytic clip parameters (slot's module fields) from the draw's IR analytic term.
 /// The hairline families carry the same fields inside their geometry module, so the shared body
 /// templates on the module that owns the fields.
@@ -858,7 +856,7 @@ void WriteClipParams(const ProgramInfo& info, SlotWriter* writer) {
         writer->set(DeviceToLocal, deviceToLocal);
         if (deviceToLocal == Matrix::I()) {
           // The device-space form uploads half a pixel outward so the coverage ramp centers on the
-          // geometric boundary (GLSLRectEffect::onSetData).
+          // geometric boundary.
           writer->set(Rect, std::array<float, 4>{rect->rect[0] - 0.5f, rect->rect[1] - 0.5f,
                                                  rect->rect[2] + 0.5f, rect->rect[3] + 0.5f});
           writer->set(HasClip, static_cast<int32_t>(1));

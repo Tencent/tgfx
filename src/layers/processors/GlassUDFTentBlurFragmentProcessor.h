@@ -71,8 +71,6 @@ class GlassUDFTentBlurFragmentProcessor : public FragmentProcessor {
 
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
-
   float fineRadius = 0.0f;
   float coarseRadius = 0.0f;
   GlassUDFBlurDirection direction = GlassUDFBlurDirection::Horizontal;

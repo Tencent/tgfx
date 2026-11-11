@@ -30,6 +30,5 @@ class GLSLPerlinNoiseFragmentProcessor : public PerlinNoiseFragmentProcessor {
                                    bool hasOriginalLookupData = false);
 
  private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 }  // namespace tgfx

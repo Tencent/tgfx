@@ -29,7 +29,6 @@ class GLSLGaussianBlur1DFragmentProcessor : public GaussianBlur1DFragmentProcess
                                       int maxSigma);
 
  private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 
 }  // namespace tgfx

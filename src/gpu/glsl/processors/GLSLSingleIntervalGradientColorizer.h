@@ -28,6 +28,5 @@ class GLSLSingleIntervalGradientColorizer : public SingleIntervalGradientColoriz
   GLSLSingleIntervalGradientColorizer(Color start, Color end);
 
  private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 }  // namespace tgfx

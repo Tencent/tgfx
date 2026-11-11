@@ -32,15 +32,4 @@ GLSLDeviceSpaceTextureEffect::GLSLDeviceSpaceTextureEffect(
     : DeviceSpaceTextureEffect(std::move(textureProxy), uvMatrix) {
 }
 
-void GLSLDeviceSpaceTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
-                                             UniformData* fragmentUniformData) const {
-  auto textureView = textureProxy->getTextureView();
-  if (textureView == nullptr) {
-    return;
-  }
-  auto deviceCoordMatrix = uvMatrix;
-  auto scale = textureView->getTextureCoord(1, 1);
-  deviceCoordMatrix.postScale(scale.x, scale.y);
-  fragmentUniformData->setData("DeviceCoordMatrix", deviceCoordMatrix);
-}
 }  // namespace tgfx

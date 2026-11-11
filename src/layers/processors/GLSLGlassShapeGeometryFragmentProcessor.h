@@ -26,9 +26,6 @@ class GLSLGlassSDFGeometryFragmentProcessor : public GlassSDFGeometryFragmentPro
  public:
   GLSLGlassSDFGeometryFragmentProcessor(GlassShapeType shapeType,
                                         const GlassSDFGeometryParams& params);
-
- private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 
 class GLSLGlassUDFGeometryFragmentProcessor : public GlassUDFGeometryFragmentProcessor {
@@ -37,9 +34,6 @@ class GLSLGlassUDFGeometryFragmentProcessor : public GlassUDFGeometryFragmentPro
                                         std::shared_ptr<TextureProxy> edgeMask,
                                         const GlassUDFGeometryParams& params,
                                         bool enableEdgeLighting);
-
- private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 
 }  // namespace tgfx

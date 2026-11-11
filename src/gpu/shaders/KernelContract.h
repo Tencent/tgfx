@@ -27,7 +27,7 @@
 namespace tgfx {
 
 // Single source of truth for the cross-language kernel contracts, consumed by the runtime
-// (onSetData writers, the chain op enum) and by shader_build_tool (which validates the GLSL side
+// (the binder's uniform writers, the chain op enum) and by shader_build_tool (which validates the GLSL side
 // against these constants at bundle build time). Renaming a field or an op code anywhere fails
 // the bundle build instead of silently leaving contract fields unwritten or misinterpreting a
 // chain slot.
@@ -197,7 +197,7 @@ constexpr const char* TextureSamplerPrefix = "TextureSampler_";
 // Every semantic sampler name a precompiled kernel may declare. Ordinary texture bindings use the
 // generic TextureSampler_<N> pattern (N dense from zero, checked by shader_build_tool); the names
 // below carry dedicated meaning and appear verbatim in the kernels, the runtime emitters, and the
-// onSetData writers. A new semantic sampler must be registered here or the bundle build fails —
+// uniform writers. A new semantic sampler must be registered here or the bundle build fails —
 // the point is that adding a binding interface is a deliberate contract change, not a typo.
 constexpr const char* DstTexture = "DstTextureSampler";
 constexpr const char* MaskTexture = "MaskTextureSampler";

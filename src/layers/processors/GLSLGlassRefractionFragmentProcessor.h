@@ -30,7 +30,6 @@ class GLSLGlassRefractionFragmentProcessor : public GlassRefractionFragmentProce
                                        const Matrix& coordMatrix);
 
  private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 
 }  // namespace tgfx

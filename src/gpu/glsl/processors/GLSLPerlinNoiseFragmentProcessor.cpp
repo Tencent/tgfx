@@ -78,16 +78,4 @@ GLSLPerlinNoiseFragmentProcessor::GLSLPerlinNoiseFragmentProcessor(
                                    hasOriginalLookupData) {
 }
 
-void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
-                                                 UniformData* fragmentUniformData) const {
-  float baseFreq[2] = {paintingData->baseFrequencyX, paintingData->baseFrequencyY};
-  fragmentUniformData->setData("baseFrequency", baseFreq);
-
-  float stitchDataValues[2] = {0.0f, 0.0f};
-  if (stitchTiles) {
-    stitchDataValues[0] = static_cast<float>(paintingData->stitchWidth);
-    stitchDataValues[1] = static_cast<float>(paintingData->stitchHeight);
-  }
-  fragmentUniformData->setDataOptional("stitchData", stitchDataValues);
-}
 }  // namespace tgfx

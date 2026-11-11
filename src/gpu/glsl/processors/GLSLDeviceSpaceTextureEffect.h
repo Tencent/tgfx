@@ -27,6 +27,5 @@ class GLSLDeviceSpaceTextureEffect : public DeviceSpaceTextureEffect {
   GLSLDeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix);
 
  private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 }  // namespace tgfx

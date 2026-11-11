@@ -54,8 +54,6 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
-
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:

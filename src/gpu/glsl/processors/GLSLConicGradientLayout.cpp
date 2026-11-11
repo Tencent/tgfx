@@ -29,9 +29,4 @@ GLSLConicGradientLayout::GLSLConicGradientLayout(Matrix matrix, float bias, floa
     : ConicGradientLayout(matrix, bias, scale) {
 }
 
-void GLSLConicGradientLayout::onSetData(UniformData* /*vertexUniformData*/,
-                                        UniformData* fragmentUniformData) const {
-  fragmentUniformData->setData("Bias", bias);
-  fragmentUniformData->setData("Scale", scale);
-}
 }  // namespace tgfx

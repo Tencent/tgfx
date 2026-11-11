@@ -159,9 +159,4 @@ const CoordTransform* FragmentProcessor::CoordTransformIter::next() {
   return currFP->coordTransform(currentIndex++);
 }
 
-void FragmentProcessor::setData(UniformData* vertexUniformData,
-                                UniformData* fragmentUniformData) const {
-  onSetData(vertexUniformData, fragmentUniformData);
-}
-
 }  // namespace tgfx

@@ -29,6 +29,5 @@ class GLSLDualIntervalGradientColorizer : public DualIntervalGradientColorizer {
                                     float threshold);
 
  private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 }  // namespace tgfx

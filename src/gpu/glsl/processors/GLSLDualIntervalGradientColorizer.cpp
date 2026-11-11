@@ -49,14 +49,4 @@ GLSLDualIntervalGradientColorizer::GLSLDualIntervalGradientColorizer(Color scale
     : DualIntervalGradientColorizer(scale01, bias01, scale23, bias23, threshold) {
 }
 
-void GLSLDualIntervalGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,
-                                                  UniformData* fragmentUniformData) const {
-  fragmentUniformData->setData("scale01", scale01);
-  fragmentUniformData->setData("bias01", bias01);
-  fragmentUniformData->setData("scale23", scale23);
-  fragmentUniformData->setData("bias23", bias23);
-  fragmentUniformData->setData("threshold", threshold);
-  // Select this colorizer in the unified gradient kernel (absent in other programs).
-  fragmentUniformData->setDataOptional("ColorizerKind", 1);
-}
 }  // namespace tgfx

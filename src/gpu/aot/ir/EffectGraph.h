@@ -264,8 +264,7 @@ enum class AOTGlassGeometryKind : int {
 // The glass geometry child's record-time parameters (GlassSDFGeometryParams and
 // GlassUDFGeometryParams in one record): the shared fields carry every kind, and the writer
 // selects the SDF or UDF half by geometryKind. The UDF mask proxies ride here because the UDF
-// bind-time factors (FineMaskUV, EdgeMaskUV) derive from the proxies' sizes — the same
-// derivation GLSLGlassUDFGeometryFragmentProcessor::onSetData performs at upload time.
+// bind-time factors (FineMaskUV, EdgeMaskUV) derive from the proxies' sizes at upload time.
 struct AOTGlassShapeParameters {
   // Shared by both children (GlassGeometryParams).
   float halfW = 0.0f;
@@ -342,8 +341,7 @@ struct AOTOpaqueKernelParameters {
   // writer reads.
   AOTGlassShapeParameters glassShape = {};
   // The background source proxy: the optics block's source-relative factors (1/sourceWidth,
-  // 1/sourceHeight and the glassUVScale fallbacks) derive from its size at bind time, exactly as
-  // GLSLGlassRefractionFragmentProcessor::onSetData did.
+  // 1/sourceHeight and the glassUVScale fallbacks) derive from its size at bind time.
   std::shared_ptr<TextureProxy> glassSourceProxy = nullptr;
   float tentFineRadius = 0.0f;
   float tentCoarseRadius = 0.0f;

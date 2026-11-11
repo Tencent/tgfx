@@ -30,6 +30,5 @@ class GLSLClampedGradientEffect : public ClampedGradientEffect {
                             Color rightBorderColor);
 
  private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 }  // namespace tgfx

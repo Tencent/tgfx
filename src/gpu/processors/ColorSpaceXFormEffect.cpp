@@ -50,9 +50,4 @@ ColorSpaceXformEffect::ColorSpaceXformEffect(std::shared_ptr<ColorSpaceXformStep
     : FragmentProcessor(ClassID()), colorSpaceXformSteps(std::move(colorXform)) {
 }
 
-void ColorSpaceXformEffect::onSetData(UniformData* /*vertexUniformData*/,
-                                      UniformData* fragmentUniformData) const {
-  ColorSpaceXformHelper helper{};
-  helper.setData(fragmentUniformData, colorSpaceXformSteps.get());
-}
 }  // namespace tgfx

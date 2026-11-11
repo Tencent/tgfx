@@ -54,34 +54,4 @@ GLSLGaussianBlur1DFragmentProcessor::GLSLGaussianBlur1DFragmentProcessor(
                                       maxSigma) {
 }
 
-void GLSLGaussianBlur1DFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
-                                                    UniformData* fragmentUniformData) const {
-  auto processor = childProcessor(0);
-  Point stepVectors[] = {{0, 0}, {stepLength, 0}};
-  if (direction == GaussianBlurDirection::Vertical) {
-    stepVectors[1] = {0, stepLength};
-  }
-
-  DEBUG_ASSERT(processor->numCoordTransforms() == 1);
-  auto transform = processor->coordTransform(0);
-  auto matrix = transform->getTotalMatrix();
-  matrix.mapPoints(stepVectors, 2);
-  Point step = stepVectors[1] - stepVectors[0];
-
-  fragmentUniformData->setData("Step", step);
-  // Runtime flags of the shared blur kernel; a present mask FP overwrites HasDeviceMask with 1
-  // later in traversal.
-  fragmentUniformData->setDataOptional("HasDeviceMask", 0);
-  fragmentUniformData->setDataOptional("TiledChild",
-                                       IsProcessor<TiledTextureEffect>(processor) ? 1 : 0);
-  // Alpha-only child flag: the kernel splats each tap's sample .rrrr, mirroring the
-  // Swizzle::ForRead(ALPHA_8) readback. The optional write tolerates layouts that omit the field.
-  bool alphaChild = false;
-  if (IsProcessor<TextureEffect>(processor)) {
-    alphaChild = static_cast<const TextureEffect*>(processor)->isAlphaOnly();
-  } else if (IsProcessor<TiledTextureEffect>(processor)) {
-    alphaChild = static_cast<const TiledTextureEffect*>(processor)->isAlphaOnly();
-  }
-  fragmentUniformData->setDataOptional("AlphaChild", alphaChild ? 1 : 0);
-}
 }  // namespace tgfx

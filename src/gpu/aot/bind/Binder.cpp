@@ -213,7 +213,7 @@ void BindConstColorSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
 void BindAARectCoverageSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
                             const AOTChainSlot& slot) {
   // The AA math evaluates to 0 at the rect coordinates, so outset by 0.5 to interpolate from 0
-  // at a half-pixel inset to 1 at a half-pixel outset (same as GLSLRectEffect::onSetData).
+  // at a half-pixel inset to 1 at a half-pixel outset.
   const auto& rect = slot.rectCoverage.rect;
   ChainISA::AARectCoverageData data = {};
   data.rect = {rect[0] - 0.5f, rect[1] - 0.5f, rect[2] + 0.5f, rect[3] + 0.5f};
@@ -334,8 +334,7 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
   fragmentUniformData->setDataOptional(ChainParams::DeviceLeafMask.name,
                                        static_cast<int>(deviceMask));
   for (const auto& deviceLeaf : program.deviceLeaves) {
-    // Same mapping as GLSLDeviceSpaceTextureEffect::onSetData: destination fragment coordinates
-    // to the texture's sampling space.
+    // The leaf's uniform: destination fragment coordinates to the texture's sampling space.
     auto textureView = deviceLeaf.textureProxy->getTextureView();
     if (textureView == nullptr) {
       continue;
@@ -510,7 +509,7 @@ void BindingSubsetRect(const AOTBinding& binding, const TextureView* view, float
   LeafSubsetRect(binding.textureProxy, view, binding.args.sampleArea, binding.args.sampling, rect);
 }
 
-// The device mask child's writes, replicating GLSLDeviceSpaceTextureEffect::onSetData.
+// The device mask child's writes: its uv matrix scaled into the texture's sampling space.
 void BindDeviceMaskBinding(const AOTBinding& binding, UniformData* uniformData) {
   auto textureView = binding.textureProxy->getTextureView();
   if (textureView == nullptr) {

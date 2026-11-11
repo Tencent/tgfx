@@ -29,6 +29,5 @@ class GLSLTextureEffect : public TextureEffect {
                     const Matrix& uvMatrix, const std::optional<Rect>& subset);
 
  private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 }  // namespace tgfx

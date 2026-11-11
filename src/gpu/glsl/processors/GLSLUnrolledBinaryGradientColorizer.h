@@ -42,6 +42,5 @@ class GLSLUnrolledBinaryGradientColorizer : public UnrolledBinaryGradientColoriz
                                       Rect thresholds1_7, Rect thresholds9_13);
 
  private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 }  // namespace tgfx

@@ -42,29 +42,4 @@ GLSLTextureEffect::GLSLTextureEffect(std::shared_ptr<TextureProxy> proxy, const 
     : TextureEffect(std::move(proxy), samplerState, constraint, alphaStart, uvMatrix, subset) {
 }
 
-void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
-                                  UniformData* fragmentUniformData) const {
-  auto textureView = getTextureView();
-  if (textureView == nullptr || fragmentUniformData == nullptr) {
-    return;
-  }
-  if (alphaStart != Point::Zero()) {
-    auto alphaStartValue = textureView->getTextureCoord(alphaStart.x, alphaStart.y);
-    fragmentUniformData->setData("AlphaStart", alphaStartValue);
-  }
-  auto yuvTexture = getYUVTexture();
-  if (yuvTexture) {
-    if (auto conversion = YUVColorConversionMatrix(yuvTexture->yuvColorSpace())) {
-      fragmentUniformData->setData("Mat3ColorConversion", *conversion);
-    }
-  }
-  // Set the Subset uniform when the runtime-generated shader declares it, which happens exactly
-  // when needSubset() holds; the hasField gate mirrors that decision instead of re-deriving it.
-  if (fragmentUniformData->hasField("Subset")) {
-    float rect[4];
-    computeSubsetRect(rect);
-    fragmentUniformData->setData("Subset", rect);
-  }
-}
-
 }  // namespace tgfx

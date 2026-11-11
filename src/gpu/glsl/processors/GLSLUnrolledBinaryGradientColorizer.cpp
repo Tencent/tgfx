@@ -92,36 +92,4 @@ GLSLUnrolledBinaryGradientColorizer::GLSLUnrolledBinaryGradientColorizer(
                                       thresholds9_13) {
 }
 
-static void SetColorUniform(UniformData* uniformData, const std::string& name, const Color& value) {
-  if (uniformData->hasField(name)) {
-    uniformData->setData(name, value);
-  }
-}
-
-void GLSLUnrolledBinaryGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,
-                                                    UniformData* fragmentUniformData) const {
-  if (fragmentUniformData->hasField("IntervalCount")) {
-    fragmentUniformData->setData("IntervalCount", intervalCount);
-  }
-  SetColorUniform(fragmentUniformData, "scale0_1", scale0_1);
-  SetColorUniform(fragmentUniformData, "scale2_3", scale2_3);
-  SetColorUniform(fragmentUniformData, "scale4_5", scale4_5);
-  SetColorUniform(fragmentUniformData, "scale6_7", scale6_7);
-  SetColorUniform(fragmentUniformData, "scale8_9", scale8_9);
-  SetColorUniform(fragmentUniformData, "scale10_11", scale10_11);
-  SetColorUniform(fragmentUniformData, "scale12_13", scale12_13);
-  SetColorUniform(fragmentUniformData, "scale14_15", scale14_15);
-  SetColorUniform(fragmentUniformData, "bias0_1", bias0_1);
-  SetColorUniform(fragmentUniformData, "bias2_3", bias2_3);
-  SetColorUniform(fragmentUniformData, "bias4_5", bias4_5);
-  SetColorUniform(fragmentUniformData, "bias6_7", bias6_7);
-  SetColorUniform(fragmentUniformData, "bias8_9", bias8_9);
-  SetColorUniform(fragmentUniformData, "bias10_11", bias10_11);
-  SetColorUniform(fragmentUniformData, "bias12_13", bias12_13);
-  SetColorUniform(fragmentUniformData, "bias14_15", bias14_15);
-  fragmentUniformData->setData("thresholds1_7", thresholds1_7);
-  fragmentUniformData->setData("thresholds9_13", thresholds9_13);
-  // Select this colorizer in the unified gradient kernel (absent in other programs).
-  fragmentUniformData->setDataOptional("ColorizerKind", 2);
-}
 }  // namespace tgfx

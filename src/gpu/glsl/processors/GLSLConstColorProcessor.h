@@ -27,6 +27,5 @@ class GLSLConstColorProcessor : public ConstColorProcessor {
   GLSLConstColorProcessor(PMColor color, InputMode mode);
 
  private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 }  // namespace tgfx

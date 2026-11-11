@@ -31,9 +31,4 @@ GLSLTextureGradientColorizer::GLSLTextureGradientColorizer(std::shared_ptr<Textu
     : TextureGradientColorizer(std::move(gradient)) {
 }
 
-void GLSLTextureGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,
-                                             UniformData* fragmentUniformData) const {
-  // Select the LUT colorizer in the unified gradient kernel (absent in other programs).
-  fragmentUniformData->setDataOptional("ColorizerKind", 3);
-}
 }  // namespace tgfx

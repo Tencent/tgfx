@@ -28,6 +28,5 @@ class GLSLColorMatrixFragmentProcessor : public ColorMatrixFragmentProcessor {
   explicit GLSLColorMatrixFragmentProcessor(const std::array<float, 20>& matrix);
 
  private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 }  // namespace tgfx

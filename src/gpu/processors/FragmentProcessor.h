@@ -194,8 +194,6 @@ class FragmentProcessor : public Processor {
     size_t transformIndex = 0;
   };
 
-  void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const;
-
  protected:
   std::vector<PlacementPtr<FragmentProcessor>> childProcessors = {};
 
@@ -227,9 +225,6 @@ class FragmentProcessor : public Processor {
    */
   void addCoordTransform(const CoordTransform* transform) {
     coordTransforms.push_back(transform);
-  }
-
-  virtual void onSetData(UniformData*, UniformData*) const {
   }
 
  private:

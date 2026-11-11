@@ -29,14 +29,4 @@ PlacementPtr<FragmentProcessor> LumaFragmentProcessor::Make(BlockAllocator* allo
   return allocator->make<GLSLLumaFragmentProcessor>(kr, kg, kb);
 }
 
-void GLSLLumaFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
-                                          UniformData* fragmentUniformData) const {
-  fragmentUniformData->setArrayElement("Kr", 0, _lumaFactor.kr);
-  fragmentUniformData->setArrayElement("Kg", 0, _lumaFactor.kg);
-  fragmentUniformData->setArrayElement("Kb", 0, _lumaFactor.kb);
-  // Select the Luma operator in the chain interpreter's slot 0 (the only kernel that carries
-  // the operator word now that the single-operator family is gone).
-  fragmentUniformData->setArrayElementOptional("OpType", 0, 1);
-}
-
 }  // namespace tgfx

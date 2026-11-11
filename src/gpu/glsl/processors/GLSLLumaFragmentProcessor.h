@@ -30,6 +30,5 @@ class GLSLLumaFragmentProcessor : public LumaFragmentProcessor {
   }
 
  protected:
-  void onSetData(UniformData*, UniformData*) const override;
 };
 }  // namespace tgfx

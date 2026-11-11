@@ -27,7 +27,6 @@ class GLSLRectEffect : public RectEffect {
   GLSLRectEffect(const Rect& localRect, const Matrix& deviceToLocal, bool antiAlias);
 
  private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 
 }  // namespace tgfx

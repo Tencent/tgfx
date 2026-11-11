@@ -65,57 +65,6 @@ XfermodeFragmentProcessor::XfermodeFragmentProcessor(PlacementPtr<FragmentProces
   }
 }
 
-void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
-                                          UniformData* fragmentUniformData) const {
-  if (fragmentUniformData == nullptr) {
-    return;
-  }
-  if (fragmentUniformData->hasField(BlendParams::BlendModeValue.name)) {
-    int modeInt = static_cast<int>(mode);
-    fragmentUniformData->setArrayElement(BlendParams::BlendModeValue.name, 0, modeInt);
-  }
-  // Selects how the operands map onto the blend's src/dst in the fused chain kernel. The
-  // single-child roles (DstChild/SrcChild) share one compiled variant and are told apart here, so
-  // this must be written on every draw rather than relying on the uniform buffer's prior contents.
-  if (fragmentUniformData->hasField(BlendParams::ChildType.name)) {
-    int childTypeValue = static_cast<int>(child);
-    fragmentUniformData->setData(BlendParams::ChildType.name, childTypeValue);
-  }
-  if (fragmentUniformData->hasField(AnalyticClipModule::HasClip.name)) {
-    int hasClip = 0;
-    fragmentUniformData->setData(AnalyticClipModule::HasClip.name, hasClip);
-  }
-  // The former HasLocalMask write left with the legacy glass kernel: the declared
-  // GlassRefractionQuad family reads the mask's presence off its IR match instead of a uniform
-  // this processor would turn on.
-  // Populate the per-child subset uniforms for the precompiled blend path. Each plain
-  // TextureEffect child that requires subset clamping writes its normalized subset rect into a
-  // dedicated uniform (Child0Subset for child[0], Child1Subset for child[1]). Distinct names are
-  // required because the precompiled path strips uniform name suffixes: if we relied on the
-  // children's own "Subset" emission, the two texture children would collide on a single field and
-  // the last writer would overwrite the first. Layouts without these fields skip the writes.
-  static const char* const subsetFieldNames[] = {BlendParams::Child0Subset.name,
-                                                 BlendParams::Child1Subset.name};
-  static const char* const alphaOnlyFieldNames[] = {BlendParams::Child0AlphaOnly.name,
-                                                    BlendParams::Child1AlphaOnly.name};
-  size_t childCount = std::min<size_t>(numChildProcessors(), 2);
-  for (size_t i = 0; i < childCount; i++) {
-    auto childFP = childProcessor(i);
-    if (childFP == nullptr || !IsProcessor<TextureEffect>(childFP)) {
-      continue;
-    }
-    auto childTE = static_cast<const TextureEffect*>(childFP);
-    if (fragmentUniformData->hasField(subsetFieldNames[i])) {
-      float rect[4];
-      childTE->computeSubsetRect(rect);
-      fragmentUniformData->setData(subsetFieldNames[i], rect);
-    }
-    // Alpha-only stays a runtime semantic flag so the same compiled variant handles
-    // RGBA and R8 operands. The optional write tolerates layouts that omit the field.
-    fragmentUniformData->setDataOptional(alphaOnlyFieldNames[i], childTE->isAlphaOnly() ? 1 : 0);
-  }
-}
-
 void XfermodeFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(mode) | (static_cast<uint32_t>(child) << 16));
 }

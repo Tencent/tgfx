@@ -1,7 +1,6 @@
 // Runtime clip uniform fields — include inside FragmentUniformBlock, after Rect/HasClip.
-// These carry the rrect and local-space clip parameters for the runtime clip contract; the field
-// names intentionally match the JIT uniforms of RectEffect/RRectEffect (GLSLRectEffect /
-// GLSLRRectEffect onSetData), so the existing uploads populate them without extra wiring.
+// These carry the rrect and local-space clip parameters for the runtime clip contract; the
+// declared families' writers populate them from the draw's IR analytic term.
 // LocalRect doubles as the local-space rect of the HasClip==3 path (same producer, same value).
 vec4 LocalRect;
 // Per-corner radii in [TL, TR, BR, BL] order, consumed only by the HasClip==2 path.

@@ -27,6 +27,5 @@ class GLSLConicGradientLayout : public ConicGradientLayout {
   GLSLConicGradientLayout(Matrix matrix, float bias, float scale);
 
  private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 }  // namespace tgfx
