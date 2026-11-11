@@ -956,13 +956,8 @@ if (TGFX_EMBED_SHADER_BUNDLES)
 
     set(TGFX_SHADER_BUNDLE_STAMP "${TGFX_SHADER_BUNDLE_DIR}/bundle_stamp")
     set(TGFX_SHADER_BUNDLE_FILES "")
-    # Every bundle the tool writes comes with a manifest that records the sources it was built
-    # from; shader_build_tool --verify-bundle uses it to tell a stale bundle from a fresh one.
-    set(TGFX_SHADER_MANIFEST_FILES "")
     foreach (B ${TGFX_SHADER_BACKENDS})
         list(APPEND TGFX_SHADER_BUNDLE_FILES "${TGFX_SHADER_BUNDLE_DIR}/shader_bundle.${B}.bin")
-        list(APPEND TGFX_SHADER_MANIFEST_FILES
-                "${TGFX_SHADER_BUNDLE_DIR}/shader_bundle.${B}.manifest")
     endforeach ()
     file(GLOB_RECURSE TGFX_SHADER_SOURCES CONFIGURE_DEPENDS
             src/gpu/shaders/glsl/*.frag
@@ -1043,7 +1038,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
         endif ()
         add_custom_command(
                 OUTPUT ${TGFX_SHADER_BUNDLE_STAMP}
-                BYPRODUCTS ${TGFX_SHADER_BUNDLE_FILES} ${TGFX_SHADER_MANIFEST_FILES}
+                BYPRODUCTS ${TGFX_SHADER_BUNDLE_FILES}
                 COMMAND ${TGFX_SHADER_TOOL_COMMAND}
                         --shader-dir ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/glsl
                         --out-dir ${TGFX_SHADER_BUNDLE_DIR}

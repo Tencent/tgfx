@@ -19,7 +19,7 @@
 // The thin command line of the tool: parse the arguments, pin the Metal target, and hand the
 // run to one of the three commands. Everything the commands do lives in the sublayers:
 //
-//   main ─▶ cli (BuildCommand, VerifyCommand, ReportWriter)
+//   main ─▶ cli (BuildCommand, ReportWriter)
 //             ├─▶ plan        the variants a build must emit
 //             ├─▶ compile     the compiler primitives and the stage caches
 //             ├─▶ emit        the per-backend storage forms
@@ -32,7 +32,6 @@
 #include <string>
 #include "compile/ShaderCompiler.h"
 #include "cli/BuildCommand.h"
-#include "cli/VerifyCommand.h"
 
 int main(int argc, char** argv) {
   tgfx::BuildOptions options;
@@ -49,9 +48,6 @@ int main(int argc, char** argv) {
   if (!tgfx::SetD3D12ShaderFormat(options.d3d12ShaderFormat, &targetError)) {
     std::cerr << "ERROR: " << targetError << "\n";
     return 2;
-  }
-  if (!options.verifyBundleDir.empty()) {
-    return tgfx::RunVerifyCommand(options);
   }
   return tgfx::RunBuildCommand(options);
 }

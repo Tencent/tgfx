@@ -393,8 +393,7 @@ TEST(LayeringTest, TheAnalysesDoNotDependOnTheProductsTheyFeed) {
   // allowed to be included.
   auto graph = ToolModuleGraph();
   const std::vector<std::string> analyses = {"ReflectionExtractor", "InlineExpansion", "StageCache"};
-  const std::vector<std::string> products = {"BundleManifest", "BundleVerifier", "StageReport",
-                                             "ContractChecks"};
+  const std::vector<std::string> products = {"StageReport", "ContractChecks"};
   for (const auto& analysis : analyses) {
     ASSERT_EQ(graph.count(analysis), 1u) << analysis;
     for (const auto& product : products) {

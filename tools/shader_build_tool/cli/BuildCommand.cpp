@@ -29,7 +29,6 @@
 #include <set>
 #include <utility>
 #include <vector>
-#include "output/BundleManifest.h"
 #include "output/BundleWriter.h"
 #include "compile/InlineExpansion.h"
 #include "compile/ShaderCompiler.h"
@@ -186,10 +185,6 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->stageDumpDir = argv[++i];
     } else if (std::strcmp(argv[i], "--inline-report") == 0 && i + 1 < argc) {
       options->inlineReportPath = argv[++i];
-    } else if (std::strcmp(argv[i], "--verify-bundle") == 0 && i + 1 < argc) {
-      options->verifyBundleDir = argv[++i];
-    } else if (std::strcmp(argv[i], "--require-backends") == 0 && i + 1 < argc) {
-      options->requiredBackends = SplitByComma(argv[++i]);
     } else if (std::strcmp(argv[i], "--compress") == 0) {
       options->compress = true;
     } else if (std::strcmp(argv[i], "--cache-dir") == 0 && i + 1 < argc) {
@@ -473,20 +468,7 @@ int RunBuildCommand(const BuildOptions& options) {
     return 1;
   }
 
-  // The contract headers generate the stage text through the chain-ops pragma; they are C++
-  // headers, so no stage includes them and the digest below must cover them here.
-  std::string generatorContract;
   const bool compiling = !options.shaderDir.empty();
-  if (compiling) {
-    std::string contractError;
-    if (!ReadGeneratorContract(options.shaderDir, &generatorContract, &contractError)) {
-      RecordBuildError(&report.diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable, "",
-                       "", -1, -1, contractError);
-      PrintDiagnostics(report.diagnostics);
-      std::cerr << "Build failed: " << contractError << ".\n";
-      return 1;
-    }
-  }
 
   StageCache stageCache;
   if (compiling && !options.noCache) {
@@ -585,21 +567,6 @@ int RunBuildCommand(const BuildOptions& options) {
         return 1;
       }
       std::cout << "Bundle written: " << filename << " (" << pair.second.size() << " entries)\n";
-      // The manifest ties the bundle to the exact sources it was built from; --verify-bundle
-      // recomputes the digest to tell a stale bundle from a fresh one.
-      auto profile = ParseProfileTag(pair.first);
-      if (!profile) {
-        std::cerr << "Cannot write the manifest of " << filename << ": unknown profile "
-                  << pair.first << "\n";
-        return 1;
-      }
-      auto digest = ComputeSourceDigest(options.shaderDir, *profile, generatorContract);
-      std::string manifestError;
-      if (!digest.ok || !WriteBundleManifest(path, *profile, digest, &manifestError)) {
-        std::cerr << "Failed to write the manifest of " << filename << ": "
-                  << (digest.ok ? manifestError : digest.error) << "\n";
-        return 1;
-      }
     }
   }
 

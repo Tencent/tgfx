@@ -36,9 +36,6 @@ struct BuildOptions {
   // Set by --dump-stages: the per-variant stage dump two builds are compared with.
   std::string stageDumpDir;
   std::string inlineReportPath;
-  std::string verifyBundleDir;
-  // Set by --require-backends; stays empty (nullopt) when the flag is absent.
-  std::optional<std::vector<std::string>> requiredBackends;
   // Persistent stage cache. Defaults to <out-dir>/stage_cache; --no-cache keeps it memory-only.
   std::string cacheDir;
   bool noCache = false;

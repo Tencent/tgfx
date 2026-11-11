@@ -26,7 +26,6 @@
 #include <iterator>
 #include <string>
 #include <vector>
-#include "verify/BundleVerifier.h"
 #include "output/BundleWriter.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
