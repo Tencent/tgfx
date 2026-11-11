@@ -1,8 +1,8 @@
 // Complex rounded-rect (per-corner radii) edge coverage, shared by the ComplexEllipse family and the
-// pointwise chain kernel's GP_LAYOUT==3 (fill) / GP_LAYOUT==4 (stroke) paths. The math is verbatim
-// from GLSLComplexEllipseGeometryProcessor::emitCode (offset-based region dispatch: corner ellipse
-// distance, linear edge distance, full interior; then the inner curve for strokes); keep it
-// character-identical so the precompiled path stays byte-exact with the runtime. Every caller
+// pointwise chain kernel's GP_LAYOUT==3 (fill) / GP_LAYOUT==4 (stroke) paths. The math is the
+// offset-based region dispatch: corner ellipse distance, linear edge distance, full interior, then
+// the inner curve for strokes. Both callers share this file so they stay byte-exact with each
+// other. Every caller
 // passes a compile-time constant for stroke, so the unused branch folds away; strokeWidth is only
 // read when stroke is set.
 float complexEllipseEdgeCoverage(vec2 ellipseOffsets, vec4 ellipseRadii, vec2 edgeDist,

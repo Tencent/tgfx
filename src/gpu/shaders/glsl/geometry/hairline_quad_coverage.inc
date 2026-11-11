@@ -1,6 +1,6 @@
 // Hairline quad edge coverage, Loop-Blinn quadratic curve anti-aliasing: u^2 - v = 0 defines the
-// curve. The math is verbatim from GLSLHairlineQuadGeometryProcessor::emitCode; keep it
-// character-identical so any other user of the same formula (runtime, chain) stays byte-exact.
+// curve. Both callers (the HairlineQuad family and the chain kernel) share this file so they stay
+// byte-exact with each other.
 float hairlineQuadEdgeCoverage(vec4 hairQuadEdge, float coverageScale, int aaEnabled) {
   highp vec2 duvdx = dFdx(hairQuadEdge.xy);
   highp vec2 duvdy = dFdy(hairQuadEdge.xy);

@@ -104,8 +104,8 @@ bool ParseBundleReflection(const uint8_t* data, size_t length, BundleReflection*
 
 /**
  * The bundle file header as every reader sees it. The field layout is BundleFormat's (contract
- * header); this struct is the one extraction of it, shared by the runtime loader, the offline
- * verifier and the manifest writer. Byte order is little-endian, as the format specifies.
+ * header); this struct is the one extraction of it, shared by the runtime loader and the offline
+ * bundle writer. Byte order is little-endian, as the format specifies.
  */
 struct BundleHeader {
   uint32_t magic = 0;

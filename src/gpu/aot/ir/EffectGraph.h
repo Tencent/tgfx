@@ -107,8 +107,8 @@ enum class AOTEffectKind {
   // An opaque-kernel operand (GaussianBlur1D, GlassRefraction, GlassUDFTentBlur): the processor's
   // math cannot be expressed in the pointwise chain, so the node marks the barrier. The planner
   // refuses such a graph (the dedicated family's kernel runs it on the plain route), and the
-  // family's matching reads the node's facts from the IR instead of walking the processor tree
-  // (P4.2). The chain input rides along as the modulate operand, mirroring TextureSource; the
+  // family's matching reads the node's facts from the IR instead of walking the processor tree.
+  // The chain input rides along as the modulate operand, mirroring TextureSource; the
   // kernel's own sampled textures and geometry children stay inside the family's kernel.
   OpaqueKernel,
 };

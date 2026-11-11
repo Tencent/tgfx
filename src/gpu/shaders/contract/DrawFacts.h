@@ -22,8 +22,8 @@
 #include <optional>
 #include "gpu/shaders/ShaderPermutation.h"
 
-// The draw facts a family's Accept/Select reads. They live in the contract layer because the
-// families (shaders/kernels) declare against them: a fact type must not force the declaration
+// The draw facts a family's match rule reads. They live in the contract layer because the
+// families' declarations are contract-layer too: a fact type must not force the declaration
 // layer to include the selection layer that extracts it.
 
 namespace tgfx {

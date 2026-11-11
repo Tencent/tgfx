@@ -843,26 +843,23 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     set(TGFX_SHADER_TOOL_FROM_HOST ON)
   endif ()
   if (NOT CMAKE_CROSSCOMPILING)
-    file(GLOB_RECURSE TGFX_SHADER_DECL_FILES
+    file(GLOB_RECURSE TGFX_SHADER_DECL_FILES CONFIGURE_DEPENDS
             src/gpu/shaders/BundleCodec.*
             src/gpu/shaders/Family.cpp
             src/gpu/shaders/FamilyDomains.cpp
             src/gpu/shaders/Layout.cpp
             src/gpu/shaders/PrecompiledShader.*
             src/gpu/shaders/ShaderPermutation.*
-            src/gpu/shaders/kernels/*.h
             src/gpu/shaders/modules/*.h)
     add_library(tgfx_shader_declarations STATIC ${TGFX_SHADER_DECL_FILES})
     set_target_properties(tgfx_shader_declarations PROPERTIES PREFIX "")
     target_compile_options(tgfx_shader_declarations PRIVATE ${TGFX_COMPILE_OPTIONS})
-    # The include roots exposed to the tool are `src` — every shared header spells its path as
+    # The include root exposed to the tool is `src` — every shared header spells its path as
     # gpu/... or core/utils/..., and an include path is a directory root, so the per-header
     # boundary (contract layer plus declaration layer only) is what ShaderBuildToolTest's
-    # LayeringTest enforces, not this list — and the generated dir for
-    # gpu/shaders/AllShaderFamilies.h. The runtime's public API root (`include`, the tgfx/...
+    # LayeringTest enforces, not this list. The runtime's public API root (`include`, the tgfx/...
     # headers) is deliberately not exposed: the tool has no business with it.
-    target_include_directories(tgfx_shader_declarations PUBLIC src
-            ${TGFX_GENERATED_INCLUDE_DIR})
+    target_include_directories(tgfx_shader_declarations PUBLIC src)
 
     # The tool is two targets so its parts can be unit tested without running a process:
     #   shader_build_tool_core  every source of the tool except main.cpp, as a static library
@@ -1075,8 +1072,10 @@ if (TGFX_EMBED_SHADER_BUNDLES)
             # The ES profile bundle registers under the same Backend::OpenGL key; the runtime
             # serves it only to ES contexts (ProgramInfo glProfileMatchesCache).
             set(BACKEND_ENUM "OpenGL")
-        else ()
+        elseif (B STREQUAL "opengl")
             set(BACKEND_ENUM "OpenGL")
+        else ()
+            message(FATAL_ERROR "No Backend enum is mapped to the shader profile '${B}'")
         endif ()
         set(BUNDLE_CPP "${TGFX_EMBEDDED_BUNDLE_DIR}/EmbeddedShaderBundle_${B}.cpp")
         add_custom_command(

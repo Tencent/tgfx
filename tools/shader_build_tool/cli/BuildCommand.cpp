@@ -85,39 +85,6 @@ std::set<uint32_t> SpirvSpecIds(const std::vector<uint32_t>& spirv) {
 }
 
 
-void PrintUsage() {
-  std::cerr
-      << "Usage: shader_build_tool [options]\n"
-      << "  --shader-dir <path>   Directory containing shader sources\n"
-      << "  --out-dir <path>      Output directory for build artifacts\n"
-      << "  --backends <list>     Comma-separated backend list "
-         "(opengl,opengles,vulkan,metal,webgpu,d3d12)\n"
-
-      << "  --stage-report <path> Write the per-stage audit report (requires a full compile)\n"
-      << "  --dump-stages <dir>  Write the per-variant stage dump (code hashes, reflection, and\n"
-      << "                        the expanded include text) two builds are compared with\n"
-      << "  --inline-report <path>\n"
-      << "                        Write each fragment variant's inline expansion (functions the\n"
-      << "                        driver compiles more than once) as JSON\n"
-      << "  --verify-bundle <dir> Verify existing bundles in <dir> against the reachable set and\n"
-      << "                        exit; checks headers, identity hash, and pool completeness.\n"
-      << "                        With --shader-dir it also fails any bundle whose manifest\n"
-      << "                        records different sources than the ones in that directory\n"
-      << "  --require-backends <list>\n"
-      << "                        With --verify-bundle: backends whose bundle must exist; a\n"
-      << "                        missing one is a violation. Without it, missing bundles pass\n"
-      << "  --compress            Compress data pool with zlib in output bundles\n"
-      << "  --cache-dir <path>    Persistent stage cache (default: <out-dir>/stage_cache)\n"
-      << "  --no-cache            Compile every stage, reading and writing no persistent cache\n"
-
-      << "  --metal-sdk <sdk>     Platform of the Metal bundle: macosx (default), iphoneos or\n"
-      << "                        iphonesimulator. A metallib only works on its own platform\n"
-      << "  --metal-min-os <ver>  Minimum OS version of the Metal bundle, e.g. 15.0\n"
-      << "  --d3d12-shader-format <form>\n"
-      << "                        What a d3d12 bundle stores: dxbc (default, bytecode compiled\n"
-      << "                        here) or hlsl (source the backend compiles at module creation)\n";
-}
-
 std::vector<std::string> SplitByComma(const std::string& input) {
   std::vector<std::string> result;
   size_t start = 0;
@@ -167,6 +134,35 @@ static void RecordBuildError(Diagnostics* diagnostics, Layer layer, const char* 
                              
 
 }  // namespace
+
+std::string UsageText() {
+  return "Usage: shader_build_tool [options]\n"
+         "  --shader-dir <path>   Directory containing shader sources\n"
+         "  --out-dir <path>      Output directory for build artifacts\n"
+         "  --backends <list>     Comma-separated backend list "
+         "(opengl,opengles,vulkan,metal,webgpu,d3d12)\n"
+         "\n"
+         "  --stage-report <path> Write the per-stage audit report (requires a full compile)\n"
+         "  --dump-stages <dir>  Write the per-variant stage dump (code hashes, reflection, and\n"
+         "                        the expanded include text) two builds are compared with\n"
+         "  --inline-report <path>\n"
+         "                        Write each fragment variant's inline expansion (functions the\n"
+         "                        driver compiles more than once) as JSON\n"
+         "  --compress            Compress data pool with zstd in output bundles\n"
+         "  --cache-dir <path>    Persistent stage cache (default: <out-dir>/stage_cache)\n"
+         "  --no-cache            Compile every stage, reading and writing no persistent cache\n"
+         "\n"
+         "  --metal-sdk <sdk>     Platform of the Metal bundle: macosx (default), iphoneos or\n"
+         "                        iphonesimulator. A metallib only works on its own platform\n"
+         "  --metal-min-os <ver>  Minimum OS version of the Metal bundle, e.g. 15.0\n"
+         "  --d3d12-shader-format <form>\n"
+         "                        What a d3d12 bundle stores: dxbc (default, bytecode compiled\n"
+         "                        here) or hlsl (source the backend compiles at module creation)\n";
+}
+
+void PrintUsage() {
+  std::cerr << UsageText();
+}
 
 bool ParseArgs(int argc, char** argv, BuildOptions* options) {
   for (int i = 1; i < argc; i++) {

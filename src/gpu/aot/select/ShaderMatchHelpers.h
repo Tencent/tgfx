@@ -80,7 +80,7 @@ int GetXPType(const ProgramInfo* programInfo);
 /// Whether a ShaderMode value is one the tiled fill kernel implements.
 bool TiledFillModeSupported(int mode);
 
-/// The opaque-kernel families' IR contract (P4.1's barrier node, read by P4.2's matching): the
+/// The opaque-kernel families' IR contract (the barrier node, read by the family's matching): the
 /// named kernel's node facts, and — for the blur kernels — the servable texture leaf it reads.
 /// The families walk no processor tree; the node IS the contract.
 struct OpaqueKernelIRShape {

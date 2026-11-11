@@ -25,8 +25,8 @@ layout(set = TGFX_TEXTURE_SET, binding = XP_DST_TEX_BINDING) uniform sampler2D D
 
 #if HAS_XP == 1
 vec4 applyPorterDuffXP(vec4 srcColor, vec4 coverage) {
-  // Zero-coverage discard, identical to GLSLPorterDuffXferProcessor::emitCode, which emits it
-  // whenever a dst texture sampler is bound. It is not optional: the dst texture is either a copy
+  // Zero-coverage discard, emitted whenever a dst texture sampler is bound. It is not optional:
+  // the dst texture is either a copy
   // of the target taken before the draw or the target itself read without a barrier between the
   // draw's own primitives, so a zero-coverage fragment that wrote `dstColor` back would replace
   // what an earlier primitive of the same draw already blended there with the pre-draw value.

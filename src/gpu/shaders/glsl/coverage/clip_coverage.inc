@@ -2,8 +2,7 @@
 //   0 = no clip; 1 = device-space AA rect (Rect, uploaded half a pixel outward);
 //   2 = rounded rect (LocalRect/RadiiX/RadiiY/AntiAlias/DeviceToLocal);
 //   3 = local-space AA rect (LocalRect/DeviceToLocal).
-// The shared math lives in analytic_clip_math.inc (line-by-line translations of
-// GLSLRectEffect / GLSLRRectEffect emitCode).
+// The shared math lives in analytic_clip_math.inc.
 #include "coverage/analytic_clip_math.inc"
 
 float clipCoverage() {

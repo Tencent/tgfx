@@ -25,8 +25,7 @@
 
 namespace tgfx {
 
-/// The parsed command line of a build run, shared by the two commands (build, verify) because
-/// they share the shader directory and the Metal target options.
+/// The parsed command line of a build run.
 struct BuildOptions {
   std::string shaderDir;
   std::string outDir;
@@ -48,13 +47,20 @@ struct BuildOptions {
   std::string metalMinOS;
 };
 
+/// The usage text, one entry per option ParseArgs accepts. Returned rather than printed so a test
+/// can assert the documented options and the parser agree (see test/shader_tool/CliTest.cpp).
+std::string UsageText();
+
+/// Writes UsageText() to stderr.
+void PrintUsage();
+
 /// Parses argv into options. Prints the usage and returns false on an unknown option or an
 /// unknown backend tag.
 bool ParseArgs(int argc, char** argv, BuildOptions* options);
 
 /// Runs the build: loads the sources, plans and compiles every family's variants through the
-/// emitters, runs the contract rules, and writes the bundles with their manifests and the
-/// reports. Returns the process exit code.
+/// emitters, runs the contract rules, and writes the bundles and the reports. Returns the process
+/// exit code.
 int RunBuildCommand(const BuildOptions& options);
 
 }  // namespace tgfx

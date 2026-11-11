@@ -3,13 +3,13 @@
 // 5=RepeatLinearMipmap, 6=MirrorRepeat, 7=ClampToBorderNearest, 8=ClampToBorderLinear.
 // The single-tap modes share tiled_sample.inc; the mipmap-repeat modes (4/5) take a 4-tap seam
 // blend; RepeatLinearNone blends across the seam when the mod-wrapped coordinate clamps at a
-// subset edge. Everything mirrors the runtime GLSLTiledTextureEffect codegen, including the
+// subset edge. This file is the single source of truth for the nine modes, including the
 // Dimension normalization of the unnormalized ClampToBorder modes. AlphaOnly (alpha-only source)
 // and Strict (SrcRectConstraint::Strict) are runtime uniforms rather than compile-time
 // permutations: both are pure fragment math, so folding them into coherent uniform branches
 // shrinks the variant count (mirrors the QuadTexture family). The coordinate is always affine
-// (vec2); perspective TiledTextureEffect draws fall back to ProgramBuilder, so no perspective
-// path exists here.
+// (vec2); a perspective TiledTextureEffect has no servable family (there is no runtime fallback),
+// so no perspective path exists here.
 // Requires: tiled_sample.inc and texture_read_swizzle.inc already included; TextureSampler_0 and
 // the recipe uniforms (ShaderModeX, ShaderModeY, Subset, Clamp, Dimension, AlphaOnly, Strict,
 // ReadSwizzle) declared by the family's interface.

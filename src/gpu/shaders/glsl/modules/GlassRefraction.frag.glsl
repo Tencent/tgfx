@@ -24,9 +24,8 @@ float glassEdgeBandWeight(float edgeDistance, float band) {
 
 #if GlassRefraction_SHAPE <= 1
 
-// The SDF functions and gradient math mirror GLSLGlassSDFGeometryFragmentProcessor::emitCode
-// expression-for-expression. glassUV arrives with the refraction emission's orientation; the
-// geometry emission flips it once (EmitGeometryCoordinates).
+// The SDF functions and gradient math the shape branch is built from. glassUV arrives with the
+// refraction emission's orientation; the geometry emission flips it once (EmitGeometryCoordinates).
 float glassShapeSDFRoundedRect(float px, float py, float hw, float hh, float r) {
   float dx = abs(px) - hw + r;
   float dy = abs(py) - hh + r;
@@ -150,10 +149,9 @@ vec4 glassGeometry(vec2 glassUV) {
 
 #else
 
-// The UDF gradient reconstruction mirrors GLSLGlassUDFGeometryFragmentProcessor::emitCode
-// expression-for-expression: the fine mask packs the refraction height into RGB, the edge mask
-// carries the edge light height in A, and the edge center difference spans the tent radius that
-// produced the edge field.
+// The UDF gradient reconstruction: the fine mask packs the refraction height into RGB, the edge
+// mask carries the edge light height in A, and the edge center difference spans the tent radius
+// that produced the edge field.
 vec4 glassGeometry(vec2 glassUV) {
   glassUV = vec2(glassUV.x, 1.0 - glassUV.y);
   float halfW = GlassRefraction_ShapeP0.x;
@@ -228,9 +226,8 @@ vec4 glassGeometry(vec2 glassUV) {
 #endif
 
 void GlassRefraction_fragment(inout Fragment f) {
-  // The refraction body mirrors GLSLGlassRefractionFragmentProcessor::emitCode
-  // expression-for-expression; the static dispersion/lighting branches of the runtime emission
-  // ride the DISPERSION dim and the LightingOn uniform here with identical math. The color
+  // The refraction body: the static dispersion/lighting branches ride the DISPERSION dim and the
+  // LightingOn uniform. The color
   // replaces the geometry's (the refraction output is the drawn color); the coverage stays
   // whatever the geometry seeded.
   vec2 backgroundUV = GlassRefraction_vCoord;

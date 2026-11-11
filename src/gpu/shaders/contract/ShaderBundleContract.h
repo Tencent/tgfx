@@ -37,12 +37,14 @@ namespace tgfx {
 //        ^                                   ^
 //        |                                   |
 //   shader_build_tool                    runtime loader
-//   BundleWriter  BundleVerifier   PrecompiledShaderCache  UniformData  pipelines
-//        (writes)      (checks)              (reads)
+//   BundleWriter                  PrecompiledShaderCache  UniformData  pipelines
+//        (writes)                           (reads)
 //
-// It carries five facts that must agree byte for byte on both sides: the shader profile (the
-// dialect a bundle is built for), the stage-key hash, the shader resource binding layout, the
-// on-disk bundle format, and the bundle identity (content hash + toolchain ABI). Changing any of
+// It carries four facts that must agree byte for byte on both sides: the shader profile (the
+// dialect a bundle is built for), the shader resource binding layout, the on-disk bundle format,
+// and the bundle identity (content hash + toolchain ABI). A bundle entry is keyed by variant id
+// (see VariantIdOf), so the tool and the runtime only have to agree on the family table and the
+// variant encoding. Changing any of
 // them is a bundle-format or toolchain-ABI change: bump CurrentVersion below for an on-disk layout
 // change and/or ExpectedToolchainABI (see the end of this file) for a semantic change. Every
 // build generates its own bundle, so there is nothing to republish: the bump takes effect the
@@ -151,13 +153,12 @@ inline bool ProfileSupportsFramebufferFetch(ShaderProfile profile) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Stage-key hash: single source for the shader key/blob encoding shared by the runtime loader
-// (PrecompiledShaderCache), the offline bundle writer (tools/shader_build_tool/BundleWriter), and
-// the audit verifier (BundleVerifier). Header-only on purpose: the build tool links only
-// src/gpu/shaders sources, so a .cpp here would be compiled twice or not at all on one side.
-// Any change to the serialization order, the length prefixes, or the hash constants is a
-// compatibility break between bundles and the runtime — see the fixed test vectors in
-// test/src/ShaderKeyHashTest.cpp.
+// Stage-key hash: the tool-side identity of one compiled stage, used by the stage report and the
+// stage dump two builds are diffed with. The runtime never computes it — a bundle entry is keyed
+// by variant id. Header-only on purpose: the build tool links only src/gpu/shaders sources, so a
+// .cpp here would be compiled twice or not at all on one side. Any change to the serialization
+// order, the length prefixes, or the hash constants changes every reported stage key — see the
+// fixed test vectors in test/src/ShaderKeyHashTest.cpp.
 
 struct ShaderKeyHash {
   uint64_t hi = 0;
@@ -310,7 +311,7 @@ inline std::pair<int, int> SamplerBinding(ShaderProfile profile, int i) {
 /// The contract macros injected into every compiled variant, as "NAME=value" strings: the GLSL
 /// templates spell their layout qualifiers with these names, so the numbers above exist in the
 /// sources only through this list. shader_build_tool prepends it to every stage's defines, and
-/// the manifests' source digest covers it, so a value change rebuilds and invalidates bundles.
+/// this header is a bundle dependency, so a value change rebuilds every bundle.
 inline std::vector<std::string> BindingContractDefines() {
   return {"TGFX_VERTEX_UBO_SET=" + std::to_string(VERTEX_UBO_DESCRIPTOR_SET),
           "TGFX_FRAGMENT_UBO_SET=" + std::to_string(FRAGMENT_UBO_DESCRIPTOR_SET),

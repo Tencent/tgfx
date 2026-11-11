@@ -31,8 +31,8 @@ GLSLConstColorProcessor::GLSLConstColorProcessor(PMColor color, InputMode mode)
 void GLSLConstColorProcessor::onSetData(UniformData* /*vertexUniformData*/,
                                         UniformData* fragmentUniformData) const {
   fragmentUniformData->setData("ConstColor", color);
-  // Precompiled variants fold INPUT_MODE into a runtime uniform; the JIT program bakes it into
-  // emitCode and has no such field, so guard the write with hasField.
+  // Precompiled variants fold INPUT_MODE into a runtime uniform, except the ones whose permutation
+  // bakes it in and declares no such field; guard the write with hasField.
   if (fragmentUniformData->hasField("InputMode")) {
     int mode = static_cast<int>(inputMode);
     fragmentUniformData->setData("InputMode", mode);

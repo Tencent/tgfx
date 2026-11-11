@@ -523,7 +523,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
       }
     // fallthrough
     case PendingOpType::Image: {
-      // P4 group three: capture the device-space rect union before the provider construction
+      // Capture the device-space rect union before the provider construction
       // below moves pendingRects away; the image FP built later decides whether the decomposition
       // gate needs the bounds recomputed (see the composite-tree recompute after the FP build).
       imageDeviceBounds = Rect::MakeEmpty();
@@ -577,7 +577,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
     if (processor == nullptr) {
       return;
     }
-    // P4 group three: a filtered image builds a composite processor tree (e.g. a filter's nested
+    // A filtered image builds a composite processor tree (e.g. a filter's nested
     // blend) that the plain route cannot match directly — exactly what needComputeBounds'
     // "needs the chain" features exist to flag, except the filter is hidden behind the image, so
     // none of brush.colorFilter/shader-derived-chain/maskFilter is set here and the bounds
@@ -787,7 +787,7 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
   // rect fill is chain-served at prepare anyway, and computing its device bounds is what admits
   // it to the record-time lowering — without the bounds such draws re-lower at every prepare
   // (twice on the first one, with nowhere to cache the compiled program). A clipped draw needs
-  // its bounds for the same reason (P4.0b): the coverage classification reads the record-time
+  // its bounds for the same reason: the coverage classification reads the record-time
   // IR's terms, so a clip-carrying draw without an IR fails every dedicated family's walk. The
   // decomposition toggle no longer gates this (the IR is matching infrastructure, not the
   // decomposition route): it only turns the route's plan/task arm off.

@@ -83,13 +83,6 @@ inline constexpr const char* EmitFormLeak = "emit.form-leak";
 /// A variant carries the clip contract but is missing one of its uniform fields.
 inline constexpr const char* VerifyClipField = "verify.clip.missing-field";
 
-/// An OP_* macro is defined outside the injected table, or the single-slot interpreter references
-/// an op the C++ side cannot emit into a slot.
-
-/// A shader source refers to a file that does not exist.
-
-/// A shader source refers to a shader family that is not registered.
-
 /// A reflected sampler/uniform violates the reflection contract the loader enforces on read.
 inline constexpr const char* VerifyReflection = "verify.reflection.invalid";
 
@@ -102,30 +95,6 @@ inline constexpr const char* VerifyInlinePolicy = "verify.inline-policy";
 /// A check could not run at all (a pattern it scans for is absent, a file it reads is not the
 /// format it expects). Reported as Unverifiable, never as a silent skip.
 inline constexpr const char* VerifyNotApplicable = "verify.unverifiable";
-
-/// A bundle the reader contract rejects: bad magic, an out-of-range format version, a wrong
-/// toolchain ABI, a mismatched profile tag, an inconsistent pool layout, or a data pool that
-/// does not decompress.
-
-/// A pool entry that is not a sound stage: outside the file, a duplicate key, a key with no
-/// rule-reachable candidate or several, or a data/reflection range outside its pool.
-
-/// A rule-reachable stage key missing from the bundle.
-
-/// The recomputed identity hash disagrees with the stored one: the file changed after writing.
-
-/// The manifest beside the bundle does not describe exactly that file.
-
-/// The bundle's source digest disagrees with the current sources (or could not be compared):
-/// the bundle is stale.
-
-/// Freshness was not checked because no --shader-dir was given; a warning, not a failure.
-
-/// A backend whose bundle was required is absent.
-
-/// No bundle was found in the directory the verification was pointed at.
-
-/// The --require-backends list is empty or names a backend that does not exist.
 
 /// A reflected uniform name has no declared writer constant, or the declared type does not match
 /// the reflected format.

@@ -63,7 +63,7 @@ bool ComposeFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID inp
     return false;
   }
   // Compose is a pure structural container: it produces no pixels itself, it feeds each child's
-  // output into the next in registration order (matching GLSLComposeFragmentProcessor::emitCode).
+  // output into the next in registration order.
   // Lower it transparently by chaining the children; any child without an AOT lowering aborts the
   // whole chain, so coverage is decided by the leaf processors rather than by Compose.
   AOTNodeID current = input;

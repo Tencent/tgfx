@@ -457,7 +457,7 @@ static bool IsServableBlurChildIR(const AOTTextureParameters& child) {
   return false;
 }
 
-// Reads the carried IR's color graph for an opaque-kernel draw (P4.1's barrier node): the color
+// Reads the carried IR's color graph for an opaque-kernel draw (its barrier node): the color
 // root must be the named kernel's node. The blur kernels require their input to be a single
 // servable texture leaf (returned alongside); the refraction sits directly on the geometry color,
 // with its variant dimensions on the node. Nullopt when the info carries no IR or the shape does

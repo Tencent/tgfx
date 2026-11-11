@@ -1,6 +1,5 @@
 // Complex non-AA rounded-rect (per-corner radii) edge coverage, shared by
-// the ComplexRRect family's fill and stroke variants. The math is verbatim from the family's
-// geometry emission (GLSLComplexNonAARRectGeometryProcessor::emitCode): the corner quadrant selects
+// the ComplexRRect family's fill and stroke variants. The corner quadrant selects
 // one arc center through the prefix-sum trick, the normalized-space inside-ellipse test is the outer
 // coverage, and for strokes the inner arc and inner rect tests are subtracted from it. Every caller
 // passes a compile-time constant for stroke, so the unused branch folds away; strokeWidth is only

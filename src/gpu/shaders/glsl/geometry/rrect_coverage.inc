@@ -1,6 +1,5 @@
 // Non-AA rounded-rect (uniform radii) edge coverage, shared by the RRect family's fill and
-// stroke variants. The math is verbatim from the family's geometry emission
-// (GLSLNonAARRectGeometryProcessor::emitCode): a rounded-rect SDF per pixel, a hard step for the
+// stroke variants. A rounded-rect SDF per pixel, a hard step for the
 // outer edge, and for strokes the inner edge SDF subtracted from it. Every caller passes a
 // compile-time constant for stroke, so the unused branch folds away; strokeWidth is only read when
 // stroke is set.

@@ -1,7 +1,7 @@
 // Parameterized analytic clip coverage math, shared by the level1 runtime clip contract
 // (clip_coverage.inc) and the pointwise chain kernel (OP_LOCAL_RECT_COVERAGE / OP_RRECT_COVERAGE).
-// The bodies are line-by-line translations of GLSLRectEffect / GLSLRRectEffect emitCode so every
-// consumer stays pixel-identical to the JIT route.
+// The two consumers (clip_coverage.inc and the chain kernel's OP_LOCAL_RECT_COVERAGE /
+// OP_RRECT_COVERAGE) share this file so they stay pixel-identical to each other.
 // analyticLocalRectCoverage: rect is exact (no outset); the AA ramp clamps each edge distance to
 // half a pixel. analyticRRectCoverage: arc-box dispatch with Sampson-distance corner SDF and the
 // AA / nonAA mix driven by the antiAlias uniform value.

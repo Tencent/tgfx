@@ -58,11 +58,10 @@ using FamilyMatchFunction = bool (*)(const ProgramInfo* info, const DrawShape& s
 const FamilyMatchFunction* FamilyMatchers();
 
 /// Matches a draw against the declaration-driven family table. The rules are pairwise disjoint
-/// (a debug-build tripwire walks them all and reports any second acceptor as a
-/// [family-conflict] failure), so in release the first acceptor — whichever it is — is the only
-/// one and the walk order carries no priority. Returns nullopt when no assembled family serves
-/// the shape; the caller then falls back to the legacy kernel table (the transitional route
-/// until P3 removes it).
+/// (a debug-build tripwire walks the rows after the first acceptor and reports any second one as
+/// a [family-conflict] failure), so the first acceptor is the only one and the walk order carries
+/// no priority. Returns nullopt when no curated rule accepts the shape; the caller then consults
+/// the fallback rows (the Chain interpreter) and, failing those, drops the draw.
 std::optional<FamilyMatchResult> MatchAssembledFamily(const ProgramInfo* info,
                                                       const DrawShape& shape);
 

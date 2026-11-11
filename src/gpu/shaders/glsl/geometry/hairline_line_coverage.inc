@@ -1,7 +1,6 @@
 // Hairline line edge coverage, shared by the HairlineLine family and the pointwise chain kernel's
-// GP_LAYOUT==2 path. The math is verbatim from GLSLHairlineLineGeometryProcessor::emitCode
-// (edge alpha, the non-AA step, then the Coverage scale); keep it character-identical so the
-// precompiled path stays byte-exact with the runtime.
+// GP_LAYOUT==2 path. The math is the edge alpha, the non-AA step, then the Coverage scale; both
+// callers share this file so they stay byte-exact with each other.
 float hairlineLineEdgeCoverage(float edgeDistance, float coverageScale, int aaEnabled) {
   highp float edgeAlpha = abs(edgeDistance);
   edgeAlpha = clamp(edgeAlpha, 0.0, 1.0);

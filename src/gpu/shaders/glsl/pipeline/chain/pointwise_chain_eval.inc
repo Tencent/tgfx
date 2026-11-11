@@ -95,8 +95,8 @@ vec4 evalChainSlot(int slot) {
     // A texture whose runtime input is a computed value splits into a raw sampling slot in the
     // leading block (static sampler binding) plus this modulate instruction in topological
     // order. chainLeafTex is prefetched in main and never recycled, so any later slot may read
-    // it by index. The two modulations mirror the runtime TextureEffect readback line for line
-    // (GLSLTextureEffect::emitCode): alpha-only is sample.a * inputColor, RGBA is
+    // it by index. The two modulations follow the TextureEffect readback: alpha-only is
+    // sample.a * inputColor, RGBA is
     // sample * inputColor.a. The source slot ordinal and the alpha-only flag ride the
     // selector (bits 16-19 and bit 0), not Packed.z, because the register allocator rewrites
     // every non-negative Packed.y/Packed.z into a result register index.

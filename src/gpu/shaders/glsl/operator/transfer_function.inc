@@ -4,10 +4,9 @@
 // its own uniform names: tf0 packs (G, A, B, C), tf1 packs (D, E, F), tfType selects the curve
 // family.
 //
-// The curve is applied to r, g and b in one call. The runtime (ShaderBuilder::
-// appendColorGamutXform) calls a scalar function once per channel; a per-channel call here would
+// The curve is applied to r, g and b in one call. A scalar function called once per channel would
 // put six inlined copies of the four-way curve selection into every kernel. Each lane performs the
-// runtime's scalar operations in the same order, and mix() with a boolean vector is a true
+// scalar operations in the same order, and mix() with a boolean vector is a true
 // component-wise select (SPIR-V OpSelect): a lane keeps exactly the arm the scalar ternary would
 // have taken, and whatever the other arm computed on that lane (NaN included) is discarded.
 #ifndef TGFX_TRANSFER_FUNCTION_INC
