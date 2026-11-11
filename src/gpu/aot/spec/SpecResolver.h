@@ -19,9 +19,9 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 #include "gpu/aot/spec/SpecSource.h"
 #include "gpu/aot/spec/SpecValues.h"
+#include "gpu/shaders/Family.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/ShaderModule.h"
 
@@ -37,17 +37,15 @@ class SpecResolver {
  public:
   /**
    * Resolves the specialization values of one draw.
-   * @param source      The artifact store the draw's reflected layouts come from.
-   * @param backend     The backend whose injector decides whether the values are consumable.
-   * @param info        The draw's processor tree and pipeline state.
-   * @param shaderName  The variant's family name.
-   * @param vertIndex   The variant's vertex permutation index.
-   * @param fragIndex   The variant's fragment permutation index.
-   * @return            The values in spec-table order (the master switch first), or an empty set
-   *                    when the draw serves the generic form.
+   * @param source    The artifact store the draw's reflected layouts come from.
+   * @param backend   The backend whose injector decides whether the values are consumable.
+   * @param info      The draw's processor tree and pipeline state.
+   * @param variant   The matched variant; its id selects the bundle's spec table.
+   * @return          The values in spec-table order (the master switch first), or an empty set
+   *                  when the draw serves the generic form.
    */
   static SpecValues Resolve(SpecSource* source, Backend backend, const ProgramInfo& info,
-                            const std::string& shaderName, uint32_t vertIndex, uint32_t fragIndex);
+                            const Variant& variant);
 };
 
 /// The code format a backend's payload arrives in. The backend picks the dialect and the bundle

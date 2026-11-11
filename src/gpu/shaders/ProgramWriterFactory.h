@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include "gpu/shaders/Family.h"
 
 namespace tgfx {
 
@@ -32,12 +33,9 @@ class ProgramWriter;
  * layout-addressed writer. It lives with the families it names — the program creator and the
  * specialization capture both ask here, so the one place a family's writer is chosen is the
  * declaration layer rather than the artifact store. The info feeds the once-per-program checks
- * (the declared families' vertex pairing contract); the permutation ordinal lets a declared
- * family's writer derive its layout at construction instead of once per draw.
- * Returns null for a name outside the family table, which no matched variant can carry.
+ * (the declared families' vertex pairing contract); the matched variant lets a declared family's
+ * writer derive its layout at construction instead of once per draw.
  */
-std::unique_ptr<ProgramWriter> MakeProgramWriter(const ProgramInfo& info,
-                                                 const std::string& shaderName,
-                                                 uint32_t permutationOrdinal);
+std::unique_ptr<ProgramWriter> MakeProgramWriter(const ProgramInfo& info, const Variant& variant);
 
 }  // namespace tgfx

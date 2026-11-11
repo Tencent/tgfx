@@ -38,7 +38,7 @@
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/Lowering.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
-#include "gpu/aot/select/PermutationMatch.h"
+#include "gpu/aot/select/ProgramSelection.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
@@ -612,15 +612,14 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
           // not the family walk (whose dedicated families would claim the empty processor list).
           auto match = ChainInputs::MatchProgram(chain, &programInfo);
           ASSERT_TRUE(match.has_value());
-          ASSERT_LT(match->vertPermutationIndex, info.vertDomain.totalCount());
-          ASSERT_LT(match->fragPermutationIndex, info.fragDomain.totalCount());
-          auto vertValues = info.vertDomain.decode(match->vertPermutationIndex);
-          auto fragValues = info.fragDomain.decode(match->fragPermutationIndex);
+          ASSERT_LT(match->first, info.vertDomain.totalCount());
+          ASSERT_LT(match->second, info.fragDomain.totalCount());
+          auto vertValues = info.vertDomain.decode(match->first);
+          auto fragValues = info.fragDomain.decode(match->second);
           EXPECT_TRUE(MirroredDimsAgree(info.vertDomain, info.fragDomain, vertValues, fragValues));
-          vertexIndices.insert(match->vertPermutationIndex);
-          fragmentIndices.insert(match->fragPermutationIndex);
-          pairs.insert((static_cast<uint64_t>(match->vertPermutationIndex) << 32u) |
-                       match->fragPermutationIndex);
+          vertexIndices.insert(match->first);
+          fragmentIndices.insert(match->second);
+          pairs.insert((static_cast<uint64_t>(match->first) << 32u) | match->second);
         }
       }
     }
@@ -665,8 +664,8 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
     // family walk (whose dedicated families would claim the empty processor list).
     auto match = ChainInputs::MatchProgram(chain, &programInfo);
     ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "RESOURCE_KIND"), 1);
-    EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "TEXTURE_COUNT"), 1);
+    EXPECT_EQ(info.fragDomain.valueOf(match->second, "RESOURCE_KIND"), 1);
+    EXPECT_EQ(info.fragDomain.valueOf(match->second, "TEXTURE_COUNT"), 1);
   }
 }
 
@@ -770,8 +769,8 @@ TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
     // family walk (whose dedicated families would claim the empty processor list).
     auto match = ChainInputs::MatchProgram(program, &programInfo);
     ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "RESOURCE_KIND"), 1);
-    EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "TEXTURE_COUNT"), 1);
+    EXPECT_EQ(info.fragDomain.valueOf(match->second, "RESOURCE_KIND"), 1);
+    EXPECT_EQ(info.fragDomain.valueOf(match->second, "TEXTURE_COUNT"), 1);
   }
 }
 
@@ -808,7 +807,7 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskServesBothCoveragePolaritie
     auto lowered = LowerDraw({color.get()}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(lowered.has_value());
     programInfo.setCarriedIR(&*lowered);
-    auto match = MatchPermutation(&programInfo);
+    auto match = SelectProgram(context, programInfo, SelectionScope::AnyFamily);
     // Both polarities are servable: an inverted local mask lowers to an SrcOut xfer node the IR
     // expresses, so the walk claims the draw through the chain family (the xfer operator rides
     // the pointwise table) instead of the dedicated local-mask kernel. The pre-IR matcher
@@ -816,9 +815,9 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskServesBothCoveragePolaritie
     // the shader cannot evaluate it; what matters is that neither polarity is dropped.
     ASSERT_TRUE(match.has_value()) << (inverted ? "inverted" : "straight");
     if (inverted) {
-      EXPECT_EQ(match->shaderName, "Chain");
+      EXPECT_EQ(Families()[match->variant.family].name, "Chain");
     } else {
-      EXPECT_EQ(match->shaderName, "QuadTexture");
+      EXPECT_EQ(Families()[match->variant.family].name, "QuadTexture");
     }
   }
 }
@@ -883,8 +882,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderCacheStats) {
   PrecompiledHitRecord hitRecord;
   hitRecord.shaderName = "TestShader";
   hitRecord.pipelineSignature = "GP=Test;ColorFP=[];CoverageFP=[];XP=Test";
-  hitRecord.vertPermutationIndex = 1;
-  hitRecord.fragPermutationIndex = 2;
+  hitRecord.variantId = 3;
   cache.recordAOTStage(PrecompiledAOTStage::PipelineCreated, hitRecord);
 
   cache.recordAOTStage(PrecompiledAOTStage::Attempt);
@@ -2089,13 +2087,12 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    auto match = MatchPermutation(&programInfo);
+    auto match = SelectProgram(context, programInfo, SelectionScope::AnyFamily);
     ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverage");
+    EXPECT_EQ(Families()[match->variant.family].name, "ShapeInstancedTextureCoverage");
     // The bare coverage form is GRADIENT=0, and the family's allowed rule keeps VERTEX_COLOR and
     // HAS_XP at 0, so the ordinal is the gradient radix alone.
-    EXPECT_EQ(match->variant.vertPermutationIndex, 0u);
-    EXPECT_EQ(match->variant.fragPermutationIndex, 0u);
+    EXPECT_EQ(match->variant.ordinal, 0u);
   }
 
   {
@@ -2113,11 +2110,10 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    auto match = MatchPermutation(&programInfo);
+    auto match = SelectProgram(context, programInfo, SelectionScope::AnyFamily);
     ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverage");
-    EXPECT_EQ(match->variant.vertPermutationIndex, 0u);
-    EXPECT_EQ(match->variant.fragPermutationIndex, 0u);
+    EXPECT_EQ(Families()[match->variant.family].name, "ShapeInstancedTextureCoverage");
+    EXPECT_EQ(match->variant.ordinal, 0u);
   }
 
   {
@@ -2132,7 +2128,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+    EXPECT_FALSE(SelectProgram(context, programInfo, SelectionScope::AnyFamily).has_value());
   }
 
   {
@@ -2149,7 +2145,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto ir = LowerDraw({color.get()}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+    EXPECT_FALSE(SelectProgram(context, programInfo, SelectionScope::AnyFamily).has_value());
   }
 
   {
@@ -2164,7 +2160,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+    EXPECT_FALSE(SelectProgram(context, programInfo, SelectionScope::AnyFamily).has_value());
   }
 
   {
@@ -2181,7 +2177,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+    EXPECT_FALSE(SelectProgram(context, programInfo, SelectionScope::AnyFamily).has_value());
   }
 
   // A rounded clip next to the coverage texture: the clip rides the runtime clip contract uniforms,
@@ -2212,12 +2208,11 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
     auto failure = PermutationMatchFailure::CoverageShape;
-    auto match = MatchPermutation(&programInfo, &failure);
+    auto match = SelectProgram(context, programInfo, SelectionScope::AnyFamily, &failure);
     ASSERT_TRUE(match.has_value()) << "clipFirst=" << clipFirst;
     EXPECT_EQ(failure, PermutationMatchFailure::None);
-    EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverage");
-    EXPECT_EQ(match->variant.vertPermutationIndex, expectedIndex);
-    EXPECT_EQ(match->variant.fragPermutationIndex, expectedIndex);
+    EXPECT_EQ(Families()[match->variant.family].name, "ShapeInstancedTextureCoverage");
+    EXPECT_EQ(match->variant.ordinal, expectedIndex);
   }
 
   // Two masks (no clip) are still not a shape this kernel evaluates.
@@ -2239,7 +2234,8 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_TRUE(twoMaskIR.has_value());
     programInfo.setCarriedIR(&*twoMaskIR);
     auto failure = PermutationMatchFailure::None;
-    EXPECT_FALSE(MatchPermutation(&programInfo, &failure).has_value());
+    EXPECT_FALSE(
+        SelectProgram(context, programInfo, SelectionScope::AnyFamily, &failure).has_value());
     // The rejection itself is the contract. The reason is a diagnostic classification that
     // collapses to NoMatchingRule for the fallback report, so asserting one specific sub-reason
     // would freeze an internal detail of the family's predicate shape.
@@ -2273,14 +2269,14 @@ TGFX_TEST(ShaderPermutationTest, ComplexEllipseTextureCoverageIsServedByChain) {
                        BlendMode::SrcOver);
   rejected.setCarriedIR(&*ir);
   auto failure = PermutationMatchFailure::None;
-  auto served = MatchPermutation(&rejected, &failure);
+  auto served = SelectProgram(context, rejected, SelectionScope::AnyFamily, &failure);
   ASSERT_TRUE(served.has_value());
-  EXPECT_TRUE(served->shaderName == "PointwiseChainShader" || served->shaderName == "Chain");
+  EXPECT_STREQ(Families()[served->variant.family].name, "Chain");
 
   ProgramInfo accepted(renderTarget.get(), gp.get(), {}, 0, nullptr, BlendMode::SrcOver);
-  auto match = MatchPermutation(&accepted, &failure);
+  auto match = SelectProgram(context, accepted, SelectionScope::AnyFamily, &failure);
   ASSERT_TRUE(match.has_value());
-  EXPECT_EQ(match->shaderName, "ComplexEllipse");
+  EXPECT_EQ(Families()[match->variant.family].name, "ComplexEllipse");
   EXPECT_EQ(failure, PermutationMatchFailure::None);
 }
 
@@ -2341,9 +2337,9 @@ static void ExpectDirectAARectMatch(ProgramInfo* programInfo, const char* shader
   auto lowered = LowerDraw(color, coverage, BlendMode::SrcOver, &allocator);
   ASSERT_TRUE(lowered.has_value());
   programInfo->setCarriedIR(&*lowered);
-  auto match = MatchPermutation(programInfo);
+  auto match = SelectProgram(programInfo->getContext(), *programInfo, SelectionScope::AnyFamily);
   ASSERT_TRUE(match.has_value());
-  EXPECT_EQ(match->shaderName, shaderName);
+  EXPECT_EQ(Families()[match->variant.family].name, shaderName);
 }
 
 TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) {
@@ -2490,9 +2486,9 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectComposedCoverageIsServedByChain) {
                           nullptr, BlendMode::SrcOver);
   programInfo.setCarriedIR(&*ir);
   auto failure = PermutationMatchFailure::None;
-  auto served = MatchPermutation(&programInfo, &failure);
+  auto served = SelectProgram(context, programInfo, SelectionScope::AnyFamily, &failure);
   ASSERT_TRUE(served.has_value());
-  EXPECT_TRUE(served->shaderName == "PointwiseChainShader" || served->shaderName == "Chain");
+  EXPECT_STREQ(Families()[served->variant.family].name, "Chain");
 }
 
 // --- MirroredDim: permanent desync guard --------------------------------------------------------

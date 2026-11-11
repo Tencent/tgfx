@@ -57,6 +57,6 @@ enum class SelectionScope {
  */
 std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInfo& info,
                                               SelectionScope scope,
-                                              PermutationMatchFailure* failure);
+                                              PermutationMatchFailure* failure = nullptr);
 
 }  // namespace tgfx

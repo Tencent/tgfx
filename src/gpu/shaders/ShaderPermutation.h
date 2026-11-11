@@ -196,16 +196,6 @@ class PermutationEnumDim {
 };
 
 /**
- * The vertex/fragment variant a family's Match resolved a draw to, within the family's declared
- * permutation domains. The family name is filled by the matcher dispatch loop, so a Match
- * implementation cannot misspell it.
- */
-struct PermutationVariant {
-  uint32_t vertPermutationIndex;
-  uint32_t fragPermutationIndex;
-};
-
-/**
  * Dimension values a matcher rule produces for both stages, before domain encoding.
  */
 struct RuleComposedValues {

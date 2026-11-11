@@ -178,8 +178,7 @@ TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, const
     // Deduplicated variant list from this window's creation events (see TimingResult).
     std::set<std::string> variants;
     for (const auto& record : cache->hitRecords()) {
-      variants.insert(record.shaderName + "(v" + std::to_string(record.vertPermutationIndex) +
-                      ",f" + std::to_string(record.fragPermutationIndex) + ")");
+      variants.insert(record.shaderName + "#" + std::to_string(record.variantId));
     }
     std::string joined;
     for (const auto& variant : variants) {

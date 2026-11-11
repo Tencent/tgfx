@@ -1141,15 +1141,8 @@ void DeclaredFamilyProgramWriter::writeProcessors(const ProgramInfo&, UniformDat
 }
 
 std::unique_ptr<ProgramWriter> MakeDeclaredFamilyProgramWriter(const ProgramInfo& info,
-                                                               uint16_t familyIndex,
-                                                               uint32_t permutationOrdinal) {
-  auto variant = DecodeVariant(familyIndex, permutationOrdinal);
-  if (!variant.has_value()) {
-    LOGE("MakeDeclaredFamilyProgramWriter: %s has no variant %u in the family table",
-         Families()[familyIndex].name, permutationOrdinal);
-    return nullptr;
-  }
-  return std::make_unique<DeclaredFamilyProgramWriter>(info, *variant);
+                                                               const Variant& variant) {
+  return std::make_unique<DeclaredFamilyProgramWriter>(info, variant);
 }
 
 }  // namespace tgfx

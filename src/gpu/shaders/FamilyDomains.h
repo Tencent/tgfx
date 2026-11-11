@@ -56,4 +56,14 @@ uint8_t ChainProfileOfCell(const ChainLegacyCell& cell);
 /// without a name hash. Returns UINT32_MAX beyond the id's field widths.
 uint32_t VariantIdOf(uint16_t familyIndex, uint32_t ordinal);
 
+/// The family index the variant id carries (the high bits; see Variant::id).
+inline uint16_t FamilyIndexOfVariantId(uint32_t variantId) {
+  return static_cast<uint16_t>(variantId >> 20);
+}
+
+/// The family-local ordinal the variant id carries (the low 20 bits; see Variant::id).
+inline uint32_t OrdinalOfVariantId(uint32_t variantId) {
+  return variantId & ((1u << 20) - 1u);
+}
+
 }  // namespace tgfx

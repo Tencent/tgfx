@@ -25,7 +25,6 @@
 #include "gpu/aot/select/PrecompiledProgramCreator.h"
 #include "gpu/aot/select/ProgramKey.h"
 #include "gpu/aot/select/ProgramSelection.h"
-#include "gpu/shaders/Families.h"
 #include "gpu/shaders/contract/DrawFacts.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"
@@ -63,10 +62,8 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info) {
   auto globalCache = context->globalCache();
   auto resolved = globalCache->findProgram(key);
   if (resolved == nullptr) {
-    PermutationMatchResult match = {Families()[selection->variant.family].name,
-                                    {selection->variant.ordinal, selection->variant.ordinal}};
-    resolved = PrecompiledProgramCreator::CreateProgramFromMatch(
-        context, &info, match, selection->spec.empty() ? nullptr : &selection->spec);
+    resolved = PrecompiledProgramCreator::CreateProgramForVariant(
+        context, &info, selection->variant, selection->spec.empty() ? nullptr : &selection->spec);
     if (resolved == nullptr) {
       return;
     }

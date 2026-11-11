@@ -22,6 +22,7 @@
 #include "gpu/Program.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/spec/SpecValues.h"
+#include "gpu/shaders/Family.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -36,21 +37,21 @@ class PrecompiledProgramCreator {
   static std::shared_ptr<Program> CreateProgram(Context* context, const ProgramInfo* programInfo);
 
   /**
-   * Creates the Program a resolved match points at: the deny list, the blob lookup, the shader
-   * modules and the pipeline. The caller supplies the match (the plain route from the matcher
-   * walk, the AOT route from the compiled program's variant) and an info carrying the geometry
-   * processor and the pipeline state; no fragment-processor list is read. Returns nullptr when
-   * the variant is denied, missing from the bundle, or fails to build.
+   * Creates the Program a resolved selection points at: the deny list, the blob lookup, the
+   * shader modules and the pipeline. The caller supplies the matched variant (the plain route
+   * from the selection walk, the AOT route from the compiled program's variant) and an info
+   * carrying the geometry processor and the pipeline state; no fragment-processor list is read.
+   * Returns nullptr when the variant is denied, missing from the bundle, or fails to build.
    *
    * When spec carries captured values (see SpecCapture) and the backend stores GLSL text, the
    * fragment source is specialized before compilation; a specialized module or pipeline that
    * fails to build falls back to this call with a null spec, so specialization stays strictly an
    * optimization.
    */
-  static std::shared_ptr<Program> CreateProgramFromMatch(Context* context,
-                                                         const ProgramInfo* programInfo,
-                                                         const PermutationMatchResult& match,
-                                                         const SpecValues* spec = nullptr);
+  static std::shared_ptr<Program> CreateProgramForVariant(Context* context,
+                                                          const ProgramInfo* programInfo,
+                                                          const Variant& variant,
+                                                          const SpecValues* spec = nullptr);
 };
 
 }  // namespace tgfx

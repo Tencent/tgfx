@@ -35,7 +35,6 @@
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/bundle/EmbeddedShaderBundles.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/FamilyDomains.h"
@@ -418,12 +417,13 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
       if (record.effectSignature.find(gpName) == std::string::npos) {
         continue;
       }
-      seen += record.shaderName + "#" + std::to_string(record.fragPermutationIndex) + " ";
+      const uint32_t recordOrdinal = OrdinalOfVariantId(record.variantId);
+      seen += record.shaderName + "#" + std::to_string(record.variantId) + " ";
       if (record.shaderName == "Chain") {
         // The declared chain serves the same cell through its own variant space; decode it back
         // into the legacy dims so this assertion keeps checking the cell, not the route.
         const uint16_t chainIndex = FamilyIndexOf("Chain");
-        auto decoded = DecodeVariant(chainIndex, record.fragPermutationIndex);
+        auto decoded = DecodeVariant(chainIndex, recordOrdinal);
         ChainLegacyCell cell = {};
         if (!decoded.has_value() || !DecodeChainCell(Families()[chainIndex], *decoded, &cell)) {
           continue;
@@ -439,7 +439,7 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
       if (record.shaderName != variant.shaderName) {
         continue;
       }
-      auto frag = fragDomain.decode(record.fragPermutationIndex);
+      auto frag = fragDomain.decode(recordOrdinal);
       if (frag.size() < fragDomain.dimensionCount()) {
         continue;
       }

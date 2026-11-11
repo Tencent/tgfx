@@ -25,7 +25,6 @@
 #include "gpu/aot/spec/SpecResolver.h"
 #include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
-#include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
 
@@ -82,18 +81,11 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
     }
     return std::nullopt;
   }
-  const char* shaderName = Families()[variant->family].name;
-  auto shaderInfo = ShaderRegistry::Find(shaderName);
-  if (shaderInfo == nullptr ||
-      !IsBuildablePermutation(*shaderInfo, variant->ordinal, variant->ordinal)) {
-    if (failure != nullptr) {
-      *failure = PermutationMatchFailure::PermutationNotEnumerated;
-    }
-    return std::nullopt;
-  }
   // The same acceptance every route shares, now with the matched family's declared texture-read
-  // semantics in play.
-  if (!AdmitMatchedProgram(&info, shape, shaderInfo, failure)) {
+  // semantics in play. The variant came out of EncodeVariant, so it is inside the family's
+  // reachable set by construction — the former buildable-permutation re-check here was a tautology
+  // over the same declaration.
+  if (!AdmitMatchedProgram(&info, shape, &Families()[variant->family], failure)) {
     return std::nullopt;
   }
   // The specialization values are part of the program's identity: the processor tree cannot tell
@@ -101,7 +93,7 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
   // built for one shape must never answer the other.
   const SpecValues spec =
       SpecResolver::Resolve(context != nullptr ? ContextCacheAccess::Cache(context) : nullptr,
-                            info.backend(), info, shaderName, variant->ordinal, variant->ordinal);
+                            info.backend(), info, *variant);
   if (failure != nullptr) {
     *failure = PermutationMatchFailure::None;
   }

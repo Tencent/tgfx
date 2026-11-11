@@ -26,7 +26,6 @@
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/Program.h"
 #include "gpu/aot/select/FamilyMatch.h"
-#include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/aot/select/ProgramSelection.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
@@ -509,8 +508,7 @@ std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir,
 // yet: with a bundle loaded there is no runtime route, so their draws are dropped and counted as
 // droppedDraws.
 bool AdmitMatchedProgram(const ProgramInfo* programInfo, const DrawShape& shape,
-                         const PrecompiledShaderInfo* shaderInfo,
-                         PermutationMatchFailure* failure) {
+                         const Family* family, PermutationMatchFailure* failure) {
   auto outputSwizzle = programInfo->getOutputSwizzle();
   if (outputSwizzle != Swizzle::RGBA() && outputSwizzle != Swizzle::AAAA()) {
     Fail(failure, PermutationMatchFailure::UnsupportedOutputSwizzle);
@@ -521,24 +519,13 @@ bool AdmitMatchedProgram(const ProgramInfo* programInfo, const DrawShape& shape,
     Fail(failure, PermutationMatchFailure::GlGateRejected);
     return false;
   }
-  if (shaderInfo != nullptr && (shape.requiredTextureReads & ~shaderInfo->textureReads) != 0) {
+  if (family != nullptr && (shape.requiredTextureReads & ~family->textureReads) != 0) {
     // Default deny: the matched family's shader would read these textures without the semantic
     // the runtime applies, so the draw is a reported miss rather than wrong pixels.
     Fail(failure, PermutationMatchFailure::UnsupportedTextureRead);
     return false;
   }
   return true;
-}
-
-std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo,
-                                                       PermutationMatchFailure* failure) {
-  auto selection =
-      SelectProgram(programInfo->getContext(), *programInfo, SelectionScope::AnyFamily, failure);
-  if (!selection) {
-    return std::nullopt;
-  }
-  return PermutationMatchResult{Families()[selection->variant.family].name,
-                                {selection->variant.ordinal, selection->variant.ordinal}};
 }
 
 }  // namespace tgfx

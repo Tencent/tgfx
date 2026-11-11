@@ -32,7 +32,7 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/aot/bundle/EmbeddedShaderBundles.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/aot/select/PermutationMatch.h"
+#include "gpu/aot/select/ProgramSelection.h"
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
@@ -592,7 +592,8 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
                             BlendMode::SrcOver);
     programInfo.setCarriedIR(&*ir);
     EXPECT_TRUE(programInfo.glProfileMatchesCache());
-    EXPECT_TRUE(MatchPermutation(&programInfo).has_value());
+    EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo, SelectionScope::AnyFamily)
+                    .has_value());
   }
 
   {
@@ -611,7 +612,8 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    EXPECT_TRUE(MatchPermutation(&programInfo).has_value());
+    EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo, SelectionScope::AnyFamily)
+                    .has_value());
   }
 
   {
@@ -637,7 +639,8 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     EXPECT_FALSE(programInfo.samplersAre2D());
     // A rectangle sampler has no precompiled variant and is rejected by the matcher gate (it
     // would otherwise bind to a plain sampler2D).
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+    EXPECT_FALSE(SelectProgram(programInfo.getContext(), programInfo, SelectionScope::AnyFamily)
+                     .has_value());
   }
 
   {
@@ -661,7 +664,8 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
                             BlendMode::SrcOver);
     programInfo.setCarriedIR(&*ir);
     // SrcOver needs no dst readback, so the chain kernel serves this draw.
-    EXPECT_TRUE(MatchPermutation(&programInfo).has_value());
+    EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo, SelectionScope::AnyFamily)
+                    .has_value());
   }
 }
 

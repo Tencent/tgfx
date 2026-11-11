@@ -73,15 +73,14 @@ enum class PrecompiledAOTStage : uint8_t {
 };
 
 /// The fields every program-creation record carries: the key an issue reproduces by, the two
-/// signatures a diagnostic groups by, and the matched family variant. Shared by the hit and the
-/// fallback records so a new diagnostic field lands once.
+/// signatures a diagnostic groups by, and the matched variant (family index << 20 | ordinal, see
+/// Variant::id). Shared by the hit and the fallback records so a new diagnostic field lands once.
 struct PrecompiledProgramRecord {
   std::string programKey;
   std::string effectSignature;
   std::string pipelineSignature;
   std::string shaderName;
-  uint32_t vertPermutationIndex = std::numeric_limits<uint32_t>::max();
-  uint32_t fragPermutationIndex = std::numeric_limits<uint32_t>::max();
+  uint32_t variantId = std::numeric_limits<uint32_t>::max();
 };
 
 struct PrecompiledHitRecord : PrecompiledProgramRecord {};

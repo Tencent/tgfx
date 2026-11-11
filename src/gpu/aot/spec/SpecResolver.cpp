@@ -21,8 +21,6 @@
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/chain/AOTChainSpec.h"
 #include "gpu/aot/spec/SpecInjector.h"
-#include "gpu/shaders/Families.h"
-#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
@@ -44,8 +42,7 @@ ShaderCodeFormat SpecFormatForBackend(Backend backend, uint16_t payloadFormat) {
 }
 
 SpecValues SpecResolver::Resolve(SpecSource* source, Backend backend, const ProgramInfo& info,
-                                 const std::string& shaderName, uint32_t vertIndex,
-                                 uint32_t fragIndex) {
+                                 const Variant& variant) {
   if (source == nullptr || !source->specializationEnabled() || !source->isLoaded()) {
     return {};
   }
@@ -56,12 +53,7 @@ SpecValues SpecResolver::Resolve(SpecSource* source, Backend backend, const Prog
   }
   // The values come straight off the compiled program (the same fields the runtime binder
   // uploads); the bundle's spec table supplies the order and the array lengths.
-  (void)vertIndex;
-  const uint16_t familyIndex = FamilyIndexOf(shaderName.c_str());
-  if (familyIndex == 0xFFFF) {
-    return {};
-  }
-  const auto* fields = source->findFragmentSpecFields(VariantIdOf(familyIndex, fragIndex));
+  const auto* fields = source->findFragmentSpecFields(variant.id());
   if (fields == nullptr) {
     return {};
   }

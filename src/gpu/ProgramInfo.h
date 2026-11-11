@@ -24,7 +24,6 @@
 #include "gpu/Program.h"
 #include "gpu/Swizzle.h"
 #include "gpu/aot/ir/Program.h"
-#include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"

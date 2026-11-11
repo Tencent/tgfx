@@ -30,7 +30,6 @@ namespace tgfx {
 
 class ProgramInfo;
 struct AOTProgram;
-struct PermutationVariant;
 
 /// This family is the AOT interpreter and stays on ShaderFamily by design, not by omission. Its
 /// acceptance is the carried IR's compilability (the chain builder's slot budget and op support),
@@ -271,8 +270,8 @@ struct ChainInputs {
 
   /// The legacy (vert, frag) permutation the compiled program maps to — the reference encoding
   /// the equivalence test and the retained composition tests compare against.
-  static std::optional<PermutationVariant> MatchProgram(const AOTProgram& program,
-                                                        const ProgramInfo* programInfo);
+  static std::optional<std::pair<uint32_t, uint32_t>> MatchProgram(const AOTProgram& program,
+                                                                   const ProgramInfo* programInfo);
 
   /// The frozen legacy reference set: every (vert, frag) permutation AllInputs maps through
   /// Compose. The declared family's equivalence test pairs it against the declared enumeration.

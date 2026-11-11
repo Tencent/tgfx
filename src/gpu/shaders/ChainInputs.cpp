@@ -23,7 +23,6 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
-#include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
@@ -212,8 +211,8 @@ std::optional<Variant> ChainInputs::MatchVariant(const AOTProgram& program,
                         static_cast<uint8_t>(cell.xp)});
 }
 
-std::optional<PermutationVariant> ChainInputs::MatchProgram(const AOTProgram& program,
-                                                            const ProgramInfo* programInfo) {
+std::optional<std::pair<uint32_t, uint32_t>> ChainInputs::MatchProgram(
+    const AOTProgram& program, const ProgramInfo* programInfo) {
   auto inputs = DeriveInputs(program, programInfo, nullptr);
   if (!inputs) {
     return std::nullopt;
@@ -222,8 +221,8 @@ std::optional<PermutationVariant> ChainInputs::MatchProgram(const AOTProgram& pr
   if (!composed) {
     return std::nullopt;
   }
-  return PermutationVariant{VertDims::domain().encode(composed->vertValues),
-                            FragDims::domain().encode(composed->fragValues)};
+  return std::make_pair(VertDims::domain().encode(composed->vertValues),
+                        FragDims::domain().encode(composed->fragValues));
 }
 
 std::set<std::pair<uint32_t, uint32_t>> ChainInputs::Reachable() {

@@ -404,9 +404,7 @@ static nlohmann::json FallbackCountsToJSON(
 
 static std::string HitPermutationKey(const PrecompiledHitRecord& record) {
   std::stringstream stream;
-  stream << record.shaderName << "\n"
-         << record.vertPermutationIndex << "\n"
-         << record.fragPermutationIndex;
+  stream << record.shaderName << "\n" << record.variantId;
   return stream.str();
 }
 
@@ -441,8 +439,7 @@ static std::string FallbackKey(const PrecompiledFallbackRecord& record) {
   stream << static_cast<uint32_t>(record.reason) << "\n"
          << record.deliberate << "\n"
          << record.shaderName << "\n"
-         << record.vertPermutationIndex << "\n"
-         << record.fragPermutationIndex << "\n"
+         << record.variantId << "\n"
          << record.pipelineSignature;
   return stream.str();
 }
@@ -473,8 +470,7 @@ static nlohmann::json HitRecordToJSON(const PrecompiledHitRecord& record) {
           {"effect", record.effectSignature},
           {"pipeline", record.pipelineSignature},
           {"shader", record.shaderName},
-          {"vertPermutationIndex", record.vertPermutationIndex},
-          {"fragPermutationIndex", record.fragPermutationIndex}};
+          {"variantId", record.variantId}};
 }
 
 static bool ContainsRootCause(const std::string& effect, const std::string& token) {
@@ -549,12 +545,8 @@ static nlohmann::json FallbackRecordToJSON(const PrecompiledFallbackRecord& reco
                            {"pipeline", record.pipelineSignature},
                            {"shader", record.shaderName}};
   auto invalidIndex = std::numeric_limits<uint32_t>::max();
-  result["vertPermutationIndex"] = record.vertPermutationIndex == invalidIndex
-                                       ? nlohmann::json(nullptr)
-                                       : nlohmann::json(record.vertPermutationIndex);
-  result["fragPermutationIndex"] = record.fragPermutationIndex == invalidIndex
-                                       ? nlohmann::json(nullptr)
-                                       : nlohmann::json(record.fragPermutationIndex);
+  result["variantId"] =
+      record.variantId == invalidIndex ? nlohmann::json(nullptr) : nlohmann::json(record.variantId);
   return result;
 }
 
@@ -907,12 +899,10 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     }
     nlohmann::json successfulPermutationsJSON = nlohmann::json::array();
     for (const auto& permutation : sortedPermutations) {
-      successfulPermutationsJSON.push_back(
-          {{"shader", permutation.record.shaderName},
-           {"vertPermutationIndex", permutation.record.vertPermutationIndex},
-           {"fragPermutationIndex", permutation.record.fragPermutationIndex},
-           {"count", permutation.count},
-           {"tests", permutation.tests}});
+      successfulPermutationsJSON.push_back({{"shader", permutation.record.shaderName},
+                                            {"variantId", permutation.record.variantId},
+                                            {"count", permutation.count},
+                                            {"tests", permutation.tests}});
     }
     nlohmann::json successfulEffectsJSON = nlohmann::json::array();
     for (const auto& effect : sortedHitEffects) {
