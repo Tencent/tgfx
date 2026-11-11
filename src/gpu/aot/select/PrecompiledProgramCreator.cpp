@@ -282,7 +282,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   }
 
   PermutationMatchFailure matchFailure = PermutationMatchFailure::None;
-  auto selection = SelectProgram(context, *programInfo, SelectionScope::AnyFamily, &matchFailure);
+  auto selection =
+      SelectProgram(context, *programInfo, programInfo->getSelectionScope(), &matchFailure);
   if (!selection) {
     auto reason = ToFallbackReason(matchFailure);
     if (reason == PrecompiledFallbackReason::NoMatchingRule) {

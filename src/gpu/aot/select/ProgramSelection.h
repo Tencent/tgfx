@@ -20,6 +20,7 @@
 
 #include <optional>
 #include "gpu/aot/select/FamilyMatchResult.h"
+#include "gpu/aot/select/SelectionScope.h"
 #include "gpu/aot/spec/SpecValues.h"
 #include "gpu/shaders/Family.h"
 #include "gpu/shaders/contract/AOTFailure.h"
@@ -39,16 +40,6 @@ struct ProgramSelection {
   Variant variant = {};
   SpecValues spec = {};
   FamilyMatchResult sources = {};
-};
-
-/**
- * Which expressions a lookup may consider:
- *   AnyFamily  a draw's own expression — the curated rules, then the interpreter's fallback row
- *   ChainOnly  a plan pass — the expression is already compiled, only the interpreter carries it
- */
-enum class SelectionScope {
-  AnyFamily,
-  ChainOnly,
 };
 
 /**

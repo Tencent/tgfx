@@ -25,7 +25,7 @@
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/chain/AOTShapeRules.h"
 #include "gpu/aot/ir/DrawIR.h"
-#include "gpu/aot/select/AOTProgramInfo.h"
+#include "gpu/aot/select/SelectionScope.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/processors/TextureEffect.h"
@@ -183,12 +183,14 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
       passInfo->setDepthStencil(depthStencil);
     }
     onConfigureProgramInfo(*passInfo);
-    // The AOT program resolution (and the specialization capture it runs) consults the carried
-    // IR through the writer's canWrite, so the IR must ride the pass info before the resolution
-    // — the second set below is then idempotent and keeps the ownership flow unchanged.
+    // The pass's expression is already compiled into its carried IR, so only the interpreter can
+    // serve it; the scope is the one difference from a draw's own lookup, and the one entry
+    // resolves both. The resolution (and the specialization capture it runs) consults the
+    // carried IR through the writer's canWrite, so the IR must ride the pass info first.
+    passInfo->setSelectionScope(SelectionScope::ChainOnly);
     passInfo->setCarriedIR(resolvedPassIR);
-    AOTProgramInfo aotInfo(passInfo.get());
-    if (!aotInfo.valid()) {
+    auto program = passInfo->getProgram();
+    if (program == nullptr) {
       // The pass's shape has no variant, or the bundle lacks it: nothing can serve this draw.
       // As above, only the draw's own final lookup records the drop; a probe falls back.
       if (isFinalLookup) {
@@ -202,9 +204,8 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
       }
       return false;
     }
-    passInfo->setCarriedIR(resolvedPassIR);
     preparedProgramInfo = std::move(passInfo);
-    preparedProgram = aotInfo.program();
+    preparedProgram = std::move(program);
     preparedViaDecomposition = true;
     preparedRenderTarget = renderTarget;
     return true;
