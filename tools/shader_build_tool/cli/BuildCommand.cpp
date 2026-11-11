@@ -631,7 +631,7 @@ int RunBuildCommand(const BuildOptions& options) {
                   << pair.first << "\n";
         return 1;
       }
-      auto digest = ComputeSourceDigest(sources, *profile, generatorContract);
+      auto digest = ComputeSourceDigest(options.shaderDir, *profile, generatorContract);
       std::string manifestError;
       if (!digest.ok || !WriteBundleManifest(path, *profile, digest, &manifestError)) {
         std::cerr << "Failed to write the manifest of " << filename << ": "

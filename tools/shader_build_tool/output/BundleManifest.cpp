@@ -18,6 +18,7 @@
 
 #include "output/BundleManifest.h"
 #include <algorithm>
+#include <filesystem>
 #include "gpu/shaders/BundleCodec.h"
 #include <cstdio>
 #include <cstdlib>
@@ -30,12 +31,10 @@
 #include <vector>
 #include "output/OutputFile.h"
 #include "compile/ShaderCompiler.h"
-#include "core/ShaderSources.h"
 #include <spirv_cross_c.h>
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/shaders/KernelContract.h"
-#include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
 namespace {
@@ -113,15 +112,16 @@ bool ParseDecimal(const std::string& text, uint64_t* value) {
 
 }  // namespace
 
-SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderProfile profile,
+SourceDigestResult ComputeSourceDigest(const std::string& shaderDir, ShaderProfile profile,
                                        const std::string& generatorContract) {
   SourceDigestResult result;
-  if (!sources.ok) {
-    result.error = sources.errors.empty() ? "the shader sources failed to load" : sources.errors[0];
+  std::error_code walkError;
+  if (!std::filesystem::is_directory(shaderDir, walkError) || walkError) {
+    result.error = "the shader directory " + shaderDir + " cannot be read";
     return result;
   }
   DigestStream stream;
-  stream.feedString("tgfx-shader-source-digest-v1");
+  stream.feedString("tgfx-shader-source-digest-v2");
   stream.feedU32(ExpectedToolchainABI);
   stream.feedString(ProfileTag(profile));
   // The binding contract macros ride with the digest: a layout value change must invalidate
@@ -138,7 +138,7 @@ SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderPro
   }
   // The operator table and the data-pool field lists generate the stage text through the
   // chain-ops pragma, so a change there changes what was compiled without touching any shader
-  // source. They are C++ headers, so the per-shader loop below cannot see them.
+  // source. They are C++ headers, so the directory walk below cannot see them.
   stream.feedString(generatorContract);
   // The freshness contract stops at the sources: the tool's own build, the vendored translators
   // and the compiler versions change what the same text compiles to, and are covered by the
@@ -151,32 +151,47 @@ SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderPro
     // while its bytes mean something else.
     stream.feedString(HLSLCompilerFingerprint());
   }
-
-  // The set is ordered by shader name, so the digest does not depend on registration order, which
-  // follows static initialization across translation units.
-  for (const auto& shader : sources.shaders) {
-    const auto& info = shader.info;
-    auto reachable = EnumerateBackendStages(info, profile);
-    if (!reachable) {
-      result.error = "no rule enumerator for " + info.name;
+  // The whole shader tree, in a canonical order: every whitelisted file's path and bytes. A
+  // change anywhere — a module hook, a shared include — moves the digest; the paths make the
+  // walk independent of the directory iteration order.
+  std::vector<std::string> paths = {};
+  for (std::filesystem::recursive_directory_iterator it(shaderDir, walkError), end;
+       !walkError && it != end; it.increment(walkError)) {
+    if (walkError || !it->is_regular_file(walkError)) {
+      continue;
+    }
+    const auto extension = it->path().extension().string();
+    if (extension != ".glsl" && extension != ".inc" && extension != ".vert" &&
+        extension != ".frag") {
+      continue;
+    }
+    auto relative = std::filesystem::relative(it->path(), shaderDir, walkError).generic_string();
+    if (walkError) {
+      result.error = "cannot resolve " + it->path().string() + " against " + shaderDir;
       return result;
     }
-    stream.feedString(info.name);
-    stream.feedString(info.vertexFile);
-    stream.feedString(info.fragmentFile);
-    stream.feedString(shader.vertex);
-    stream.feedString(shader.fragment);
-    auto vertDomain = info.vertDomain;
-    auto fragDomain = info.fragDomain;
-    for (const auto& permutation : *reachable) {
-      stream.feedU32(permutation.first);
-      stream.feedU32(permutation.second);
-      stream.feedStrings(vertDomain.defineListFor(permutation.first));
-      stream.feedStrings(fragDomain.defineListFor(permutation.second));
-      result.stageCount++;
+    paths.push_back(relative);
+  }
+  if (walkError) {
+    result.error = "cannot walk " + shaderDir + ": " + walkError.message();
+    return result;
+  }
+  std::sort(paths.begin(), paths.end());
+  for (const auto& path : paths) {
+    std::ifstream file(shaderDir + "/" + path, std::ios::binary);
+    if (!file.is_open()) {
+      result.error = "cannot read " + path + " under " + shaderDir;
+      return result;
     }
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    stream.feedString(path);
+    stream.feedString(buffer.str());
     result.shaderCount++;
   }
+  // Both counters describe the same tree now: the per-stage counting retired with the loaded
+  // source set, and the stale report prints these as files.
+  result.stageCount = result.shaderCount;
   result.digest = stream.state;
   result.ok = true;
   return result;

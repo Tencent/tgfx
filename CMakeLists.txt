@@ -967,7 +967,8 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     file(GLOB_RECURSE TGFX_SHADER_SOURCES CONFIGURE_DEPENDS
             src/gpu/shaders/glsl/*.frag
             src/gpu/shaders/glsl/*.vert
-            src/gpu/shaders/glsl/*.inc)
+            src/gpu/shaders/glsl/*.inc
+            src/gpu/shaders/glsl/*.glsl)
     # The toolchain ABI constant rides in a regular header outside the shader directory; a bump
     # changes what the writer stamps into every bundle, so it must trigger a rebuild like a
     # shader-source change (otherwise the bundles keep the old ABI and the runtime rejects them).

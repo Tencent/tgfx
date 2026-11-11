@@ -32,7 +32,6 @@
 #include <utility>
 #include <vector>
 #include "core/DiagnosticCodes.h"
-#include "core/ShaderSources.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/BundleCodec.h"
 #include "gpu/shaders/PrecompiledShader.h"
@@ -150,8 +149,7 @@ struct BundleCheckResult {
 // the bundle's bytes: a bundle built from yesterday's shaders is perfectly self-consistent.
 size_t CheckManifest(const std::string& bundlePath, ShaderProfile profile,
                      const std::vector<uint8_t>& fileBytes, const BundleHeader& header,
-                     const std::string& shaderDir, const ShaderSourceSet* sources,
-                     Diagnostics* diagnostics) {
+                     const std::string& shaderDir,                      Diagnostics* diagnostics) {
   const std::string expectedTag = ProfileTag(profile);
   size_t violations = 0;
   auto manifestPath = ManifestPathFor(bundlePath);
@@ -202,7 +200,7 @@ size_t CheckManifest(const std::string& bundlePath, ShaderProfile profile,
            "cannot read the generator contract: " + contractError);
     return violations + 1;
   }
-  auto current = ComputeSourceDigest(*sources, profile, generatorContract);
+  auto current = ComputeSourceDigest(shaderDir, profile, generatorContract);
   if (!current.ok) {
     Report(diagnostics, Severity::Error, DiagnosticCode::VerifyStale, expectedTag.c_str(),
            "cannot compute the current source digest: " + current.error);
@@ -212,8 +210,8 @@ size_t CheckManifest(const std::string& bundlePath, ShaderProfile profile,
     auto message = "bundle is stale: built from sources with digest 0x" +
                    NumberInHex(manifest.sourceDigest) + ", the current sources in " + shaderDir +
                    " have 0x" + NumberInHex(current.digest) + " (" +
-                   std::to_string(manifest.stageCount) + " stages recorded, " +
-                   std::to_string(current.stageCount) + " now)";
+                   std::to_string(manifest.shaderCount) + " shader files recorded, " +
+                   std::to_string(current.shaderCount) + " now)";
     if (profile == ShaderProfile::Metal) {
       message += "; a Metal bundle's digest also covers the platform it was compiled for: verify "
                  "it with the same --metal-sdk and --metal-min-os";
@@ -226,8 +224,7 @@ size_t CheckManifest(const std::string& bundlePath, ShaderProfile profile,
 }
 
 BundleCheckResult VerifyOneBundle(const std::string& path, ShaderProfile profile,
-                                  const std::string& shaderDir, const ShaderSourceSet* sources,
-                                  Diagnostics* diagnostics) {
+                                  const std::string& shaderDir, Diagnostics* diagnostics) {
   const std::string expectedTag = ProfileTag(profile);
   BundleCheckResult result;
   std::ifstream file(path, std::ios::binary);
@@ -437,8 +434,7 @@ BundleCheckResult VerifyOneBundle(const std::string& path, ShaderProfile profile
     result.violations++;
   }
 
-  result.violations += CheckManifest(path, profile, fileBytes, header, shaderDir, sources,
-                                     diagnostics);
+  result.violations += CheckManifest(path, profile, fileBytes, header, shaderDir, diagnostics);
 
   return result;
 }
@@ -447,8 +443,7 @@ BundleCheckResult VerifyOneBundle(const std::string& path, ShaderProfile profile
 
 int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir,
                   const std::optional<std::vector<std::string>>& requiredBackends,
-                  Diagnostics* diagnostics, BundleVerifyCounts* counts,
-                  const std::map<std::string, std::string>* stageOverrides) {
+                  Diagnostics* diagnostics, BundleVerifyCounts* counts) {
   std::set<ShaderProfile> required;
   if (requiredBackends) {
     // A typo must not turn into "nothing is required": reject names that are not profiles, and
@@ -468,21 +463,13 @@ int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir,
       required.insert(*profile);
     }
   }
-  // The current sources are read once for every bundle checked, the same way a build reads them.
-  ShaderSourceSet sources;
-  if (!shaderDir.empty()) {
-    sources = LoadShaderSources(shaderDir, stageOverrides);
-    for (const auto& error : sources.errors) {
-      Report(diagnostics, Severity::Error, DiagnosticCode::SourcesUnreadable, "", error);
-    }
-  }
   int totalViolations = 0;
   size_t openedBundles = 0;
   size_t absentNotRequired = 0;
   for (auto profile : AllShaderProfiles) {
     const std::string tag = ProfileTag(profile);
     auto path = bundleDir + "/shader_bundle." + tag + ".bin";
-    auto result = VerifyOneBundle(path, profile, shaderDir, &sources, diagnostics);
+    auto result = VerifyOneBundle(path, profile, shaderDir, diagnostics);
     if (result.opened) {
       openedBundles++;
     } else if (required.count(profile) > 0) {
