@@ -17,10 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TestEnvironment.h"
+#include "utils/Baseline.h"
 
 int main(int argc, char** argv) {
   printf("Running main() from %s\n", __FILE__);
   AddGlobalTestEnvironment(new tgfx::TestEnvironment());
   testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
+  auto result = RUN_ALL_TESTS();
+  tgfx::Baseline::ReportMissingCache();
+  return result;
 }

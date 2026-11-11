@@ -42,7 +42,7 @@ class GlassStyle : public LayerStyle {
   /**
    * Creates a new GlassStyle with the specified parameters.
    * @param refraction The amount of optical distortion along curved edges, range [0, 100].
-   * @param depth The inward extent of the refraction region from edges, range [1, 100].
+   * @param depth The inward refraction thickness from the layer edge, in layer-space pixels.
    * @param frost The amount of background blur (frosted glass), range [0, 100].
    * @param dispersion The intensity of chromatic aberration (rainbow prism effect), range [0, 100].
    * @param splay The blend factor for the refraction direction, range [0, 100]. At 0, refraction
@@ -67,12 +67,12 @@ class GlassStyle : public LayerStyle {
   /** Sets the optical distortion strength. */
   void setRefraction(float value);
 
-  /** Inward extent of refraction region from edges in percentage. Range [1, 100]. */
+  /** Inward refraction thickness from the layer edge, in layer-space pixels. */
   float depth() const {
     return _depth;
   }
 
-  /** Sets the depth of the refraction region. */
+  /** Sets the inward refraction thickness in layer-space pixels. */
   void setDepth(float value);
 
   /** Background blur amount (frosted glass). Range [0, 100]. */
@@ -179,10 +179,6 @@ class GlassStyle : public LayerStyle {
     return std::clamp(_refraction / 100.0f, 0.0f, 1.0f);
   }
 
-  float getDepthRatio() const {
-    return std::clamp(_depth / 100.0f, 0.0f, 1.0f);
-  }
-
   // Scales the stored percentage to the shader factor: the shader offsets R/B UVs by
   // uvOffset * (1 ± dispersion), so 100% maps to a 5% additional offset. The stored value is
   // constrained to [0, 100] at the setters, so no clamping is needed here.
@@ -195,10 +191,22 @@ class GlassStyle : public LayerStyle {
     return std::clamp(_lightIntensity / 100.0f, 0.0f, 1.0f);
   }
 
-  // Figma-style refraction distance: depth maps 1:1 to layer-space pixels, capped at minHalf
-  // so the gradient band never exceeds the distance from edge to center.
+  // The refraction thickness is in layer-space pixels and is capped by half of the shorter content
+  // bound, min(halfWidth, halfHeight). This is a geometry-bound cap, not the shortest edge-to-center
+  // distance for arbitrary paths. A caller scaling geometry must also scale depth; no scale factor
+  // is applied here.
   float getGlassThickness(float minHalf) const {
-    return std::clamp(_depth, 0.0f, minHalf);
+    if (std::isnan(_depth) || !std::isfinite(minHalf)) {
+      return 0.0f;
+    }
+    return std::clamp(_depth, 0.0f, std::max(minHalf, 0.0f));
+  }
+
+  // Single physical displacement bound shared by the SDF and UDF shaders and the background-filter
+  // outset. The SDF displacement is already within this vector-length bound and retains its original
+  // component-wise clamp; the UDF profile can exceed it, so the UDF path clamps its scalar distance.
+  float getRefractionMaxDisplacement(float minHalf) const {
+    return getGlassThickness(minHalf) * getRefractionFactor();
   }
 
   float _refraction = 80.0f;
