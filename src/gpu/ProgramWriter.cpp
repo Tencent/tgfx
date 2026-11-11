@@ -188,8 +188,9 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
   // than the draw supplies (e.g. an absent device mask on a runtime-guarded kernel), the holes sit
   // before the dst, so hold the dst aside and pad with the shared dummy texture first; the guarded
   // shader path never samples the padded slots.
-  bool holdDst = expected > samplers.size() && !samplers.empty() && info.xferProcessor != nullptr &&
-                 info.xferProcessor->dstTextureView() != nullptr;
+  const auto& xferDstProxy = info.getXferFacts().dstTexture.textureProxy;
+  auto xferDstView = xferDstProxy != nullptr ? xferDstProxy->getTextureView() : nullptr;
+  bool holdDst = expected > samplers.size() && !samplers.empty() && xferDstView != nullptr;
   size_t sequentialCount = holdDst ? samplers.size() - 1 : samplers.size();
   // The device-mask slot in precompiled kernels sits immediately after the color-side textures
   // (geometry-processor textures plus the color fragment-processor subtrees); the dummy for an
@@ -285,12 +286,10 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
   BindChainProgram(*program, vertexUniformData, fragmentUniformData);
   BindChainBindings(*program, fragmentUniformData);
   ParamWriter paramWriter(fragmentUniformData);
-  const auto processor = info.getXferProcessor();
+  const auto& xfer = info.getXferFacts();
   const auto* chainIR = info.getCarriedIR();
-  if (chainIR != nullptr && ClassifyXferForMatch(processor) != XferKind::None) {
-    BindPorterDuffXfer(static_cast<int>(chainIR->blendMode), processor, &paramWriter);
-  } else {
-    processor->setData(vertexUniformData, fragmentUniformData);
+  if (chainIR != nullptr && xfer.shaderBlend) {
+    BindPorterDuffXfer(static_cast<int>(chainIR->blendMode), xfer.dstTexture, &paramWriter);
   }
 }
 
@@ -322,8 +321,8 @@ void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program
     renderPass->setTexture(textureBinding++, textureView->getTexture(), sampler);
   }
   // The dst texture always binds last.
-  auto dstTextureView =
-      info.xferProcessor != nullptr ? info.xferProcessor->dstTextureView() : nullptr;
+  const auto& dstProxy = info.getXferFacts().dstTexture.textureProxy;
+  auto dstTextureView = dstProxy != nullptr ? dstProxy->getTextureView() : nullptr;
   if (dstTextureView != nullptr) {
     auto state = SamplerState();
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),

@@ -19,6 +19,7 @@
 #pragma once
 
 #include <optional>
+#include "gpu/aot/ir/XferFacts.h"
 #include "gpu/shaders/contract/AOTFailure.h"
 #include "gpu/shaders/contract/DrawFacts.h"
 
@@ -64,8 +65,8 @@ inline constexpr int ComplexEllipseStroke = 7;
 std::optional<int> PointwiseGpKind(const AOTGeometryDesc& geometry);
 
 /// The xfer classification the matcher facts read — what GetXPType reports for the draw's info,
-/// taken off the made xfer processor at match time.
-XferKind ClassifyXferForMatch(const XferProcessor* xp);
+/// taken off its output-formula facts.
+XferKind ClassifyXferForMatch(const XferFacts& xfer);
 
 /// Whether a color-space transform's steps fit the single-slot fill kernel's precompiled
 /// evaluation (the transfer functions must be of an indexable type when linearize/encode run) —

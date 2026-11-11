@@ -98,7 +98,7 @@ DrawShape ExtractDrawShape(const ProgramInfo* programInfo) {
   // The geometry and xfer facts are match-time facts: the matching runs after the processors
   // exist, so they are described off the made processors — one description, no record-time copy.
   facts.geometry = DescribeGeometryProcessor(programInfo->getGeometryProcessor());
-  facts.xfer = ClassifyXferForMatch(programInfo->getXferProcessor());
+  facts.xfer = ClassifyXferForMatch(programInfo->getXferFacts());
   if (facts.ir != nullptr) {
     facts.hasGradientSource = GraphHasGradientSource(facts.ir->color);
   } else {

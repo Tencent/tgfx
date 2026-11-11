@@ -956,17 +956,16 @@ void WriteXfer(const ProgramInfo& info, SlotWriter* writer) {
   // The write swizzle is unconditional (the HAS_XP == 0 path composes too).
   writer->set(OutputAlphaSwizzle,
               static_cast<int32_t>(info.getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0));
-  const auto* processor = info.getXferProcessor();
-  // Only the PorterDuff processor carries a blend mode and a dst texture; the passthrough XP
+  const auto& xfer = info.getXferFacts();
+  // Only a shader-side formula carries a blend mode and a dst texture; the passthrough
   // (the HAS_XP == 0 variants) declares neither field.
-  if (!IsProcessor<PorterDuffXferProcessor>(processor)) {
+  if (!xfer.shaderBlend) {
     return;
   }
-  const auto* porterDuff = static_cast<const PorterDuffXferProcessor*>(processor);
   // The dst-dialect fields are `when HAS_XP != 0`: absent when the draw's xfer is the
-  // passthrough, which the processor check above already excludes.
-  writer->setIfPresent(XPBlendMode, static_cast<int32_t>(porterDuff->getBlendMode()));
-  const auto& dstInfo = porterDuff->getDstTextureInfo();
+  // passthrough, which the flag above already excludes.
+  writer->setIfPresent(XPBlendMode, static_cast<int32_t>(info.getBlendMode()));
+  const auto& dstInfo = xfer.dstTexture;
   if (dstInfo.textureProxy == nullptr) {
     return;
   }

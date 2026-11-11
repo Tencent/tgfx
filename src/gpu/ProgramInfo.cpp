@@ -26,6 +26,8 @@
 #include "gpu/ProgramWriter.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/select/PrecompiledProgramCreator.h"
+#include "gpu/processors/EmptyXferProcessor.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/shaders/contract/ShaderProfileResolver.h"
 #include "tgfx/gpu/GPU.h"
@@ -48,6 +50,7 @@ ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometry
       xferProcessor(xferProcessor), blendMode(blendMode) {
   hasCoverageForBlend = numColorProcessors < this->fragmentProcessors.size();
   updateProcessorIndices();
+  updateXferFacts();
 }
 
 ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
@@ -57,6 +60,22 @@ ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometry
       xferProcessor(xferProcessor), blendMode(blendMode),
       hasCoverageForBlend(blendFormulaHasCoverage) {
   updateProcessorIndices();
+  updateXferFacts();
+}
+
+void ProgramInfo::updateXferFacts() {
+  xferFacts = {};
+  // The passthrough processor (and an absent one) leaves the output to the fixed-function blend.
+  if (xferProcessor == nullptr || IsProcessor<EmptyXferProcessor>(xferProcessor)) {
+    return;
+  }
+  // Any other processor runs the formula in the shader: only PorterDuff carries a destination,
+  // and a missing one selects the backend's framebuffer fetch.
+  xferFacts.shaderBlend = true;
+  if (IsProcessor<PorterDuffXferProcessor>(xferProcessor)) {
+    xferFacts.dstTexture =
+        static_cast<const PorterDuffXferProcessor*>(xferProcessor)->getDstTextureInfo();
+  }
 }
 
 void ProgramInfo::updateProcessorIndices() {

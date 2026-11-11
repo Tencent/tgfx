@@ -65,7 +65,7 @@ bool RejectsAlphaOnlyTarget(bool servesAlphaOnly, const ProgramInfo* programInfo
 // Returns XP_NONE for EmptyXferProcessor, XP_DST_TEXTURE / XP_FRAMEBUFFER_FETCH for the
 // PorterDuff modes, or XP_UNSUPPORTED for XP types no kernel can serve.
 int GetXPType(const ProgramInfo* programInfo) {
-  switch (ClassifyXferForMatch(programInfo->getXferProcessor())) {
+  switch (ClassifyXferForMatch(programInfo->getXferFacts())) {
     case XferKind::None:
       return XP_NONE;
     case XferKind::DstTexture:
@@ -78,17 +78,13 @@ int GetXPType(const ProgramInfo* programInfo) {
   return XP_UNSUPPORTED;
 }
 
-XferKind ClassifyXferForMatch(const XferProcessor* xp) {
-  if (xp == nullptr || xp == EmptyXferProcessor::GetInstance()) {
+XferKind ClassifyXferForMatch(const XferFacts& xfer) {
+  if (!xfer.shaderBlend) {
     return XferKind::None;
   }
-  if (IsProcessor<PorterDuffXferProcessor>(xp)) {
-    if (xp->dstTextureView() != nullptr) {
-      return XferKind::DstTexture;
-    }
-    return XferKind::FrameBufferFetch;
-  }
-  return XferKind::Unsupported;
+  const auto& proxy = xfer.dstTexture.textureProxy;
+  auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
+  return view != nullptr ? XferKind::DstTexture : XferKind::FrameBufferFetch;
 }
 
 // Determines whether a texture-based coverage child can be served by the local-space mask path

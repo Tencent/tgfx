@@ -20,16 +20,12 @@
 
 #include <memory>
 #include "gpu/UniformData.h"
+#include "gpu/aot/ir/XferFacts.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
 class ParamWriter;
-
-struct DstTextureInfo {
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  Point offset = {};
-};
 
 class XferProcessor : public Processor {
  public:

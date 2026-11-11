@@ -26,7 +26,7 @@
 // structural fact of the codebase — never by a text occurrence in the matcher, which moves
 // whenever matching is restructured:
 //   - GeometryClassified: DescribeGeometryProcessor (the one geometry classifier) references it;
-//   - XferClassified: ClassifyXferForMatch (the one xfer classifier) references it;
+//   - XferClassified: ProgramInfo::updateXferFacts (the one xfer facts derivation) references it;
 //   - Lowering: the class declares lowerToAOT (verified in its header), so the FP tree can
 //     become IR;
 //   - ParentLowering: it is consumed by its parent's lowerToAOT (gradient layouts and
@@ -352,8 +352,12 @@ TGFX_TEST(AOTCoverageGateTest, AllProcessorsAreClaimed) {
   // classifier fails here loudly instead of silently emptying the evidence set.
   auto geometryClassifier = ExtractFunctionBody(
       matcherSource, "DescribeGeometryProcessor(const GeometryProcessor* gp) {");
+  // The xfer axis evidence lives where the processor types are still discriminated: the facts
+  // derivation snapshots them into XferFacts, and every reader addresses that value instead.
+  auto programInfoSource = ReadTextFile(ProjectPath::Absolute("src/gpu/ProgramInfo.cpp"));
+  ASSERT_FALSE(programInfoSource.empty());
   auto xferClassifier =
-      ExtractFunctionBody(matcherSource, "ClassifyXferForMatch(const XferProcessor* xp) {");
+      ExtractFunctionBody(programInfoSource, "void ProgramInfo::updateXferFacts() {");
   ASSERT_FALSE(geometryClassifier.empty());
   ASSERT_FALSE(xferClassifier.empty());
   auto violations = EvaluateProcessorClaims(scanned, ProcessorClaims,

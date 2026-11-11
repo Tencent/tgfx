@@ -87,6 +87,16 @@ class ProgramInfo {
 
   const XferProcessor* getXferProcessor() const;
 
+  /// The output formula facts: whether the shader runs the xfer stage and where its destination
+  /// comes from. Every reader below (writer, matcher, program key) addresses this value.
+  const XferFacts& getXferFacts() const {
+    return xferFacts;
+  }
+
+  BlendMode getBlendMode() const {
+    return blendMode;
+  }
+
   Swizzle getOutputSwizzle() const;
 
   const std::vector<Attribute>& getVertexAttributes() const {
@@ -297,6 +307,9 @@ class ProgramInfo {
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
   XferProcessor* xferProcessor = nullptr;
+  /// The xfer facts derived from the processor once per program: the shader-side blend flag and
+  /// the destination it samples. The writers and the matcher read this, not the processor.
+  XferFacts xferFacts = {};
   BlendMode blendMode = BlendMode::SrcOver;
   // Whether coverage processors follow the color ones — the only fragment-list fact the pipeline's
   // blend formula reads (see the AOT-route constructor for the list-free form).
@@ -306,6 +319,9 @@ class ProgramInfo {
   uint32_t colorWriteMask = ColorWriteMask::All;
 
   void updateProcessorIndices();
+
+  /// Derives the xfer facts from the processor once, at construction.
+  void updateXferFacts();
 
   BytesKey buildProgramKey() const;
 

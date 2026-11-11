@@ -22,6 +22,7 @@
 #include "gpu/CoordTransform.h"
 #include "gpu/UniformData.h"
 #include "gpu/aot/ir/Program.h"
+#include "gpu/aot/ir/XferFacts.h"
 
 namespace tgfx {
 
@@ -103,7 +104,7 @@ void BindRRectClipNode(const AOTRRectCoverageParameters& params, ParamWriter* wr
 void UploadPointwiseSlot(UniformData* uniformData, const AOTChainSlot& slot);
 /// The xfer bind: the blend mode off the IR, the dst texture's instance-time facts off the made
 /// processor (the same layer the geometry facts read).
-void BindPorterDuffXfer(int blendMode, const XferProcessor* processor, ParamWriter* writer);
+void BindPorterDuffXfer(int blendMode, const DstTextureInfo& dstInfo, ParamWriter* writer);
 
 /**
  * The coordinate transforms the chain kernel's vertex stage consumes, in the order the geometry

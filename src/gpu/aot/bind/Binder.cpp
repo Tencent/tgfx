@@ -723,10 +723,8 @@ void BindRRectClipNode(const AOTRRectCoverageParameters& params, ParamWriter* wr
   writer->set(AnalyticClipModule::HasClip, 2);
 }
 
-void BindPorterDuffXfer(int blendMode, const XferProcessor* processor, ParamWriter* writer) {
+void BindPorterDuffXfer(int blendMode, const DstTextureInfo& dstInfo, ParamWriter* writer) {
   writer->set(PorterDuffXPModule::XPBlendMode, blendMode);
-  auto* xp = static_cast<const PorterDuffXferProcessor*>(processor);
-  const auto& dstInfo = xp->getDstTextureInfo();
   if (dstInfo.textureProxy == nullptr) {
     return;
   }
