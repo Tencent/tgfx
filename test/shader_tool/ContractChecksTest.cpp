@@ -29,7 +29,6 @@
 #include "FailureAssertions.h"
 #include "ScratchDir.h"
 #include "gpu/Uniform.h"
-#include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/KernelContract.h"
@@ -80,9 +79,10 @@ Report CheckReflection(const std::vector<VariantData>& variants) {
 }
 
 std::vector<std::string> RegisteredShaderNames() {
+  // Every family is a row of the declaration table; the reference check resolves those names.
   std::vector<std::string> names;
-  for (const auto& factory : ShaderRegistry::All()) {
-    names.push_back(factory()->info().name);
+  for (size_t index = 0; index < FamilyCount(); ++index) {
+    names.push_back(Families()[index].name);
   }
   return names;
 }

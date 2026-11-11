@@ -164,15 +164,16 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
   // the registered families (a fixture, a partial copy), and demanding references for dimensions
   // whose sources are not here would report every one of them as dead.
   std::set<std::string> checkedDimensions;
-  for (const auto& factory : ShaderRegistry::All()) {
-    const auto shader = factory();
-    // The domains are members of the info value, so a local keeps them alive through the loops:
-    // ranging over shader->info().vertDomain.getDimensions() directly would hold a reference into
-    // a destroyed temporary.
-    const auto info = shader->info();
+  for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
+    // The domains are members of the info value, so a local keeps them alive through the loops.
+    const auto info = AssembledFamilyInfo(Families()[familyIndex]);
+    // The declared families have no stored entry files (their text is assembled), so only a
+    // family with a real file name can be scanned for dead dimensions.
     const bool present =
-        std::filesystem::exists(shaderDir + "/" + info.vertexFile) ||
-        std::filesystem::exists(shaderDir + "/" + info.fragmentFile);
+        (!info.vertexFile.empty() &&
+         std::filesystem::exists(shaderDir + "/" + info.vertexFile)) ||
+        (!info.fragmentFile.empty() &&
+         std::filesystem::exists(shaderDir + "/" + info.fragmentFile));
     for (const auto& dimension : info.vertDomain.getDimensions()) {
       auto name = std::visit(DimensionNameVisitor(), dimension);
       declaredDimensions.insert(name);
@@ -542,9 +543,8 @@ std::string DimensionNameOf(const std::string& signature) {
 // renamed values) would slip through, and the build-time check is where the author can fix it.
 size_t ValidateMirroredDimensions(Diagnostics* diagnostics) {
   size_t errors = 0;
-  for (const auto& factory : ShaderRegistry::All()) {
-    const auto shader = factory();
-    const auto info = shader->info();
+  for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
+    const auto info = AssembledFamilyInfo(Families()[familyIndex]);
     std::map<std::string, std::string> vertexDimensions;
     for (const auto& dimension : info.vertDomain.getDimensions()) {
       const auto signature = std::visit(DimensionSignatureVisitor(), dimension);

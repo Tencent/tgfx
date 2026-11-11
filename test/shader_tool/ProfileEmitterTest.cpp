@@ -27,7 +27,8 @@
 #include "compile/StageCompiler.h"
 #include "core/DiagnosticCodes.h"
 #include "emit/ProfileEmitter.h"
-#include "gpu/shaders/AllShaderFamilies.h"
+#include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gtest/gtest.h"
 
@@ -52,11 +53,10 @@ const std::string BrokenVertex = "#version 450\nvoid main() { this is not glsl }
 // still have a factory.
 const PrecompiledShaderInfo* TestFamilyInfo() {
   static const PrecompiledShaderInfo stored = [] {
-    const auto& factories = ShaderRegistry::All();
-    if (factories.empty()) {
+    if (FamilyCount() == 0) {
       return PrecompiledShaderInfo{"", "", "", PermutationDomain({}), PermutationDomain({}), 0};
     }
-    return factories.front()()->info();
+    return AssembledFamilyInfo(Families()[0]);
   }();
   return &stored;
 }

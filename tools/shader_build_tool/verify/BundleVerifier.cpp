@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "verify/BundleVerifier.h"
+
+#include "gpu/shaders/Families.h"
+#include "gpu/shaders/FamilyDomains.h"
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -118,9 +121,8 @@ std::map<std::pair<uint64_t, uint64_t>, std::set<std::string>, KeyPairLess> Buil
     ShaderProfile profile) {
   const std::string profileTag = ProfileTag(profile);
   std::map<std::pair<uint64_t, uint64_t>, std::set<std::string>, KeyPairLess> expected;
-  for (const auto& factory : ShaderRegistry::All()) {
-    auto shader = factory();
-    auto info = shader->info();
+  for (size_t index = 0; index < FamilyCount(); ++index) {
+    auto info = AssembledFamilyInfo(Families()[index]);
     auto reachable = EnumerateBackendStages(info, profile);
     if (!reachable) {
       continue;

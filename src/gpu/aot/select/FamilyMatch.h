@@ -19,7 +19,9 @@
 #pragma once
 
 #include <optional>
+#include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/shaders/Family.h"
+#include "gpu/shaders/ShaderPermutation.h"
 
 namespace tgfx {
 
@@ -63,6 +65,19 @@ const FamilyMatchFunction* FamilyMatchers();
 /// until P3 removes it).
 std::optional<FamilyMatchResult> MatchAssembledFamily(const ProgramInfo* info,
                                                       const DrawShape& shape);
+
+/// A declared family's match result: the family's name (for the writer lookup and the program
+/// key) plus the variant it encodes.
+struct FamilyKernelMatch {
+  const char* family = nullptr;
+  PermutationVariant variant = {};
+};
+
+/// The declared walk: the curated rules first, the fallback rows last, translated into the kernel
+/// match shape the creator consumes (the legacy kernel table is gone; this is its replacement).
+std::optional<FamilyKernelMatch> MatchDeclaredKernel(const DrawShape& facts,
+                                                     const ProgramInfo* info,
+                                                     PermutationMatchFailure* failure);
 
 /// The declared Chain's own match, for the decomposition route: the interpreter is not a shape
 /// rule but the carried IR's compilability, so it is consulted behind the decomposition policy

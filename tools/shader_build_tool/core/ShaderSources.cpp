@@ -206,8 +206,10 @@ bool ReadGeneratorContract(const std::string& shaderDir, std::string* text, std:
 ShaderSourceSet LoadShaderSources(const std::string& shaderDir,
                                   const std::map<std::string, std::string>* stageOverrides) {
   ShaderSourceSet set;
-  for (const auto& factory : ShaderRegistry::All()) {
-    set.shaders.push_back(ShaderSource{factory()->info(), "", ""});
+  // The declared families' text is assembled from their modules, so the loader has no family
+  // entries left to hand out; the overrides below are the assembled stages, if any.
+  if (stageOverrides == nullptr) {
+    return set;
   }
   std::sort(set.shaders.begin(), set.shaders.end(),
             [](const ShaderSource& left, const ShaderSource& right) {

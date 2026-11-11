@@ -44,10 +44,8 @@ namespace DiagnosticCode {
 inline constexpr const char* SourcesUnreadable = "sources.unreadable";
 
 /// A registered family has no Compose enumerator, so the build cannot plan its variants.
-inline constexpr const char* PlanNoEnumerator = "plan.missing-enumerator";
 
 /// A reachable variant pair the declared domains cannot serve.
-inline constexpr const char* PlanUnbuildable = "plan.unbuildable-permutation";
 
 /// A stage failed to compile to SPIR-V.
 inline constexpr const char* CompileGlsl = "compile.glsl";
@@ -173,8 +171,7 @@ inline constexpr const char* OutputDuplicateKey = "output.duplicate-key";
 /// must be referenced by at least one site (an unreferenced one is dead, or a site that still
 /// reports through something else).
 inline constexpr const char* AllCodes[] = {
-    SourcesUnreadable,     PlanNoEnumerator,   PlanUnbuildable,
-    CompileGlsl,           CompileCacheDisabled, ReflectUnknownType,
+    SourcesUnreadable,     CompileGlsl,           CompileCacheDisabled, ReflectUnknownType,
     EmitFailed,            EmitFormLeak,
     SpecReader,
     SpecLayoutDrift,

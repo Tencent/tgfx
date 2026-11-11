@@ -813,6 +813,21 @@ const FamilyMatchFunction* FamilyMatchers() {
   return matchers.data();
 }
 
+std::optional<FamilyKernelMatch> MatchDeclaredKernel(const DrawShape& facts,
+                                                     const ProgramInfo* info,
+                                                     PermutationMatchFailure* failure) {
+  auto assembled = MatchAssembledFamily(info, facts);
+  if (!assembled.has_value()) {
+    return std::nullopt;
+  }
+  FamilyKernelMatch match = {};
+  match.family = Families()[assembled->variant.family].name;
+  match.variant.vertPermutationIndex = assembled->variant.ordinal;
+  match.variant.fragPermutationIndex = assembled->variant.ordinal;
+  (void)failure;
+  return match;
+}
+
 std::optional<FamilyMatchResult> MatchChainProgram(const ProgramInfo* info) {
   if (info == nullptr) {
     return std::nullopt;

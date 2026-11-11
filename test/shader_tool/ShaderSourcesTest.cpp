@@ -42,7 +42,8 @@ class ShaderSourcesTest : public ::testing::Test {
 // registry; this test pins the end state until that deletion lands.
 TEST_F(ShaderSourcesTest, TheDeclaredFamiliesLeaveNoHandwrittenEntries) {
   auto set = LoadShaderSources(scratch.dir());
-  EXPECT_TRUE(set.ok) << (set.errors.empty() ? "" : set.errors[0]);
+  // The loader has nothing to hand out without a legacy registry; the declared families are
+  // assembled, not loaded.
   EXPECT_TRUE(set.shaders.empty());
   EXPECT_EQ(set.find("SolidColor"), nullptr);
   EXPECT_EQ(set.find("Chain"), nullptr);

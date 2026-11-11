@@ -25,7 +25,6 @@
 #include <string>
 #include <vector>
 #include "gpu/shaders/contract/ShaderBundleContract.h"
-#include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/PrecompiledShader.h"
@@ -36,9 +35,10 @@ namespace tgfx {
 namespace {
 
 std::vector<PrecompiledShaderInfo> AllFamilies() {
+  // The legacy factory list is gone; every family is a row of the declaration table.
   std::vector<PrecompiledShaderInfo> families;
-  for (const auto& factory : ShaderRegistry::All()) {
-    families.push_back(factory()->info());
+  for (size_t index = 0; index < FamilyCount(); ++index) {
+    families.push_back(AssembledFamilyInfo(Families()[index]));
   }
   return families;
 }
@@ -64,14 +64,14 @@ TEST(FamilyRegistryTest, EveryFamilyIsRegisteredOnceWithItsOwnFiles) {
   // serves, and GaussianBlur1DShader, GlassUDFTentBlurShader and GlassRefractionShader (the
   // declaration-driven families join Find/Enumerate without
   // a shell, see ShaderPermutationTest).
-  EXPECT_TRUE(families.empty());
+  EXPECT_FALSE(families.empty());
   std::set<std::string> names;
   for (const auto& info : families) {
     EXPECT_TRUE(names.insert(info.name).second) << "duplicate family " << info.name;
-    EXPECT_FALSE(info.vertexFile.empty()) << info.name;
-    EXPECT_FALSE(info.fragmentFile.empty()) << info.name;
-    EXPECT_EQ(info.vertexFile.rfind("kernels/", 0), 0u) << info.name;
-    EXPECT_EQ(info.fragmentFile.rfind("kernels/", 0), 0u) << info.name;
+    // Every family is a declaration row: its text is assembled, so it stores no entry files.
+    EXPECT_TRUE(info.vertexFile.empty()) << info.name;
+    EXPECT_TRUE(info.fragmentFile.empty()) << info.name;
+    EXPECT_NE(ShaderRegistry::Find(info.name), nullptr) << info.name;
   }
 }
 
@@ -213,19 +213,6 @@ TEST(MirroredDimensionsTest, DomainsWithoutACommonDimensionAlwaysAgree) {
   EXPECT_TRUE(MirroredDimsAgree(vertex, fragment, {0}, {1}));
 }
 
-TEST(MirroredDimensionsTest, TheRetainedFamiliesAgreeOnEveryVariant) {
-  // The last family with disagreeing stage domains was the chain interpreter, whose stages
-  // mirrored five dims; it retired into one declared domain set. The retained shell (YUV) exposes
-  // the same dims on both stages, so the mirrored check must accept every variant — the rejection
-  // path itself stays covered by the synthetic cases above.
-  for (const auto& info : AllFamilies()) {
-    for (uint32_t vert = 0; vert < info.vertDomain.totalCount(); ++vert) {
-      for (uint32_t frag = 0; frag < info.fragDomain.totalCount(); ++frag) {
-        EXPECT_TRUE(IsBuildablePermutation(info, vert, frag)) << info.name;
-      }
-    }
-  }
-}
 
 // ---- PermutationDomain ----------------------------------------------------------------------
 

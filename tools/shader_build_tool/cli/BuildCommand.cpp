@@ -53,7 +53,6 @@
 #include "emit/StageEmitter.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/KernelContract.h"
-#include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "verify/ContractRules.h"
 
@@ -168,226 +167,6 @@ static void RecordBuildError(Diagnostics* diagnostics, Layer layer, const char* 
                              }
 
                              
-// source is the shader's text from the build's single read of the sources (nullptr in report-only
-// mode); the bundle's source digest is computed from the same text. compiler owns the stage
-// caches of this build.
-ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
-                                       const BuildOptions& options, const ShaderSource* source,
-                                       StageCompiler* compiler,
-                                       std::vector<VariantData>* outVariants,
-                                       std::vector<InlineExpansionRecord>* outInlineExpansions,
-                                       Diagnostics* diagnostics);
-
-ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOptions& options,
-                              const ShaderSource* source, StageCompiler* compiler,
-                              std::vector<VariantData>* outVariants,
-                              std::vector<InlineExpansionRecord>* outInlineExpansions,
-                              Diagnostics* diagnostics) {
-  // The ledger is the single source of failure counts: the per-shader figure the progress line
-  // and report.json carry is derived from the records this compilation added, so nothing can be
-  // counted without being reported, or reported without being counted. RuleCountingTest pins
-  // the same pairing for the verify rules the build gate reads.
-  const size_t ledgerBefore = diagnostics->records().size();
-  auto report = CompileOneShaderUncounted(info, options, source, compiler, outVariants,
-                                          outInlineExpansions, diagnostics);
-  size_t failures = 0;
-  for (size_t i = ledgerBefore; i < diagnostics->records().size(); i++) {
-    auto severity = diagnostics->records()[i].severity;
-    if (severity == Severity::Error || severity == Severity::Unverifiable) {
-      failures++;
-    }
-  }
-  report.errorCount = static_cast<uint32_t>(failures);
-  return report;
-}
-
-ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
-                                       const BuildOptions& options, const ShaderSource* source,
-                                       StageCompiler* compiler,
-                                       std::vector<VariantData>* outVariants,
-                                       std::vector<InlineExpansionRecord>* outInlineExpansions,
-                                       Diagnostics* diagnostics) {
-  ShaderReport report;
-  std::set<uint32_t> analyzedFrags;
-  report.name = info.name;
-  auto vertDomain = info.vertDomain;
-  auto fragDomain = info.fragDomain;
-  report.rawCount = vertDomain.totalCount() * fragDomain.totalCount();
-  report.compiledCount = 0;
-  report.errorCount = 0;
-
-  // One emitter per requested backend, built once for the whole shader: the loop below only
-  // feeds them variants.
-  std::vector<std::pair<ShaderProfile, std::unique_ptr<ProfileEmitter>>> emitters;
-  for (auto profile : options.backends) {
-    emitters.emplace_back(profile, MakeProfileEmitter(profile));
-  }
-
-  // Unreadable files and broken includes were rejected when the sources were loaded, so a
-  // present source is complete.
-  std::string vertSource = source != nullptr ? source->vertex : "";
-  std::string fragSource = source != nullptr ? source->fragment : "";
-
-  // The chain data-pool layout rides in the same way: a stage carrying the marker receives the
-  // structs and readers generated from the C++ operator declarations.
-  for (auto* stage : {&vertSource, &fragSource}) {
-    if (stage->empty()) {
-      continue;
-    }
-    // The chain data-pool layout rides in the same way: a stage carrying the marker receives the
-    // structs and readers generated from the C++ operator declarations.
-    *stage = ExpandChainOpsPragma(*stage);
-  }
-
-
-  // The Compose-reachable set is the single source of truth the runtime matcher uses too. A pair
-  // the declared domains cannot serve would compile against a broken vertex/fragment interface,
-  // so the family fails closed instead of emitting it.
-  auto reachable = EnumerateReachablePermutations(info.name);
-  if (!reachable) {
-    RecordBuildError(diagnostics, Layer::Plan, DiagnosticCode::PlanNoEnumerator, info.name, "", -1,
-                     -1, "every shader must be migrated to the Compose pattern");
-    return report;
-  }
-  bool hasUnbuildable = false;
-  for (const auto& pair : *reachable) {
-    if (!IsBuildablePermutation(info, pair.first, pair.second)) {
-      hasUnbuildable = true;
-      RecordBuildError(diagnostics, Layer::Plan, DiagnosticCode::PlanUnbuildable, info.name, "",
-                       static_cast<int>(pair.first), static_cast<int>(pair.second),
-                       "a reachable variant pair the declared domains cannot serve");
-    }
-  }
-  if (hasUnbuildable) {
-    return report;
-  }
-  // What each backend's bundle must hold: the same filter the manifest and the verifier read, so
-  // the emitted stages and the recorded stage set cannot disagree.
-  std::map<ShaderProfile, std::set<std::pair<uint32_t, uint32_t>>> backendStages;
-  for (const auto& emitterEntry : emitters) {
-    auto stages = EnumerateBackendStages(info, emitterEntry.first);
-    if (!stages) {
-      RecordBuildError(diagnostics, Layer::Plan, DiagnosticCode::PlanNoEnumerator, info.name, "",
-                       -1, -1, "every shader must be migrated to the Compose pattern");
-      return report;
-    }
-    backendStages.emplace(emitterEntry.first, std::move(*stages));
-  }
-  for (const auto& permutation : *reachable) {
-    uint32_t vi = permutation.first;
-    uint32_t fi = permutation.second;
-
-    if (vertSource.empty() || fragSource.empty()) {
-      continue;
-    }
-
-    auto vertDefines = vertDomain.defineListFor(vi);
-    auto fragDefines = fragDomain.defineListFor(fi);
-    // The binding contract rides in as defines: the templates spell their layout qualifiers
-    // with the TGFX_* macro names, so the numbers exist only in ShaderBundleContract.h. The
-    // source digest covers the same list, so a value change invalidates every bundle.
-    for (const auto& contractDefine : BindingContractDefines()) {
-      vertDefines.push_back(contractDefine);
-      fragDefines.push_back(contractDefine);
-    }
-    // The op table rides in the same way: the kernels use the OP_* macros without defining them,
-    // so their values exist only in KernelContract.h's Op table.
-    for (const auto& opDefine : Op::Defines()) {
-      vertDefines.push_back(opDefine);
-      fragDefines.push_back(opDefine);
-    }
-    // The slot capacities ride in the same way: the kernels size their instruction arrays from
-    // the C++ resource profiles, so a literal cannot drift from what the runtime uploads.
-    for (const auto& capacityDefine : SlotCapacityDefines()) {
-      vertDefines.push_back(capacityDefine);
-      fragDefines.push_back(capacityDefine);
-    }
-
-    // Compile vertex shader. The shared cache also covers the multiple-frag-per-vert reuse the
-    // old per-backend vertCache handled, plus the cross-backend repeats.
-    const auto& vertResult = compiler->compileSpirv(PrependDefines(vertSource, vertDefines),
-                                                    ShaderStageType::Vertex, info.name, vi, false);
-    if (!vertResult.success) {
-      RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl, info.name, "",
-                       static_cast<int>(vi), -1, vertResult.error);
-      continue;
-    }
-    const auto* vertSpirv = &vertResult.spirv;
-
-    // The legacy kernels compile their template as written; the declarations own the
-    // specialization prologue now (the declared families generate it per variant).
-    const std::string fragCompileSource = fragSource;
-    const auto& fragResult =
-        compiler->compileSpirv(PrependDefines(fragCompileSource, fragDefines),
-                               ShaderStageType::Fragment, info.name, fi, false);
-    if (!fragResult.success) {
-      RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl, info.name, "",
-                       static_cast<int>(vi), static_cast<int>(fi), fragResult.error);
-      continue;
-    }
-
-    // The unoptimized SPIR-V still has one function per GLSL function and one OpFunctionCall per
-    // call site, so it shows what every backend's driver ends up inlining.
-    if (analyzedFrags.insert(fi).second) {
-      outInlineExpansions->push_back({info.name, fi, AnalyzeInlineExpansion(fragResult.spirv)});
-    }
-
-    // Extract reflection from SPIR-V (shared across backend passes, like the compiles above).
-    const auto& reflection =
-        compiler->extractReflection(info.name, vi, fi, *vertSpirv, fragResult.spirv,
-                                    diagnostics);
-    // Counted only here — after both stages compiled successfully — so compiledCount is the
-    // true "compiled" figure, distinct from rawCount (the reachable-permutation total) and
-    // independent of backend-level exclusions counted below.
-    report.compiledCount++;
-
-    const std::string genericFragSource = fragSource;
-    const std::vector<SpecEntry> specEntries = {};
-
-    for (auto& emitterEntry : emitters) {
-      const ShaderProfile profile = emitterEntry.first;
-      const std::string backend = ProfileTag(profile);
-      // Profile-specific exclusions (the framebuffer fetch variants) live in EnumerateBackendStages
-      // alone, shared with the manifest and the verifier.
-      if (backendStages.at(profile).count({vi, fi}) == 0) {
-        continue;
-      }
-      EmitInput input;
-      input.info = &info;
-      input.vertIndex = vi;
-      input.fragIndex = fi;
-      input.vertSource = &vertSource;
-      input.fragSource = &genericFragSource;
-      input.vertDefines = &vertDefines;
-      input.fragDefines = &fragDefines;
-      input.vertSpirv = vertSpirv;
-      input.fragStage = &fragResult;
-      input.fragSpecSource = nullptr;
-      input.fragGates = nullptr;
-      input.fragSpecEntries = nullptr;
-      input.diagnostics = diagnostics;
-      auto stages = emitterEntry.second->emit(input, compiler);
-      if (!stages) {
-        // The emitter reported why (with this profile and variant); the wrapper counts the
-        // record it added.
-        continue;
-      }
-      VariantData variant;
-      variant.shaderName = info.name;
-      variant.vertPermutationIndex = vi;
-      variant.fragPermutationIndex = fi;
-      variant.profileTag = backend;
-      variant.payloadKind = stages->payloadKind;
-      variant.vertexBlob = std::move(stages->vertexBlob);
-      variant.fragmentBlob = std::move(stages->fragmentBlob);
-      variant.vertexReflection = reflection.vertexReflection;
-      variant.fragmentReflection = reflection.fragmentReflection;
-      variant.fragmentReflection.specEntries = specEntries;
-      outVariants->push_back(std::move(variant));
-    }
-  }
-  return report;
-}
 
 }  // namespace
 
@@ -689,11 +468,9 @@ int RunBuildCommand(const BuildOptions& options) {
   for (auto profile : options.backends) {
     report.diagnostics.registerProfile(ProfileTag(profile));
   }
-  const auto& factories = ShaderRegistry::All();
-  // The legacy registry is empty once every family has migrated to the declaration layer; the
-  // declared loop below is then the only source of work, which is the end state, not an error.
-  if (factories.empty() && FamilyCount() == 0) {
-    std::cerr << "No shaders registered in ShaderRegistry.\n";
+  // Every family is a row of the declaration table; nothing else can register work.
+  if (FamilyCount() == 0) {
+    std::cerr << "No shaders registered in the declaration table.\n";
     return 1;
   }
 
@@ -764,26 +541,6 @@ int RunBuildCommand(const BuildOptions& options) {
   }
   StageCompiler stageCompiler(&stageCache);
 
-  for (const auto& factory : factories) {
-    auto shader = factory();
-    auto info = shader->info();
-    const ShaderSource* source = compiling ? sources.find(info.name) : nullptr;
-    if (compiling && source == nullptr) {
-      RecordBuildError(&report.diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
-                       info.name, "", -1, -1, "no loaded source for this family");
-      PrintDiagnostics(report.diagnostics);
-      return 1;
-    }
-    auto shaderReport = CompileOneShader(info, options, source, &stageCompiler, &report.variants,
-                                         &report.inlineExpansions, &report.diagnostics);
-    std::cout << "[" << shaderReport.name << "] raw=" << shaderReport.rawCount
-              << " compiled=" << shaderReport.compiledCount;
-    if (shaderReport.errorCount > 0) {
-      std::cout << " errors=" << shaderReport.errorCount;
-    }
-    std::cout << "\n";
-    report.shaders.push_back(std::move(shaderReport));
-  }
 
   CompileAssembledFamilies(options, &stageCompiler, &report);
 
@@ -832,9 +589,6 @@ int RunBuildCommand(const BuildOptions& options) {
   if (!options.shaderDir.empty()) {
     SourceRuleContext sourceContext;
     sourceContext.shaderDir = options.shaderDir;
-    for (auto factory : ShaderRegistry::All()) {
-      sourceContext.registeredShaders.push_back(factory()->info().name);
-    }
     for (size_t index = 0; index < FamilyCount(); ++index) {
       sourceContext.registeredShaders.push_back(Families()[index].name);
     }

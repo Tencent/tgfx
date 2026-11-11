@@ -26,7 +26,6 @@
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/Program.h"
 #include "gpu/aot/select/FamilyMatch.h"
-#include "gpu/aot/select/KernelTable.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
@@ -43,7 +42,6 @@
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
-#include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/contract/DrawFacts.h"
@@ -528,8 +526,8 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
   // semantics — alpha-only rejection is a row predicate (the ExtractFacts bodies), and
   // dedicatedKernelsEnabled gates the whole table.
   if (allowDedicated) {
-    if (auto table = KernelTableLookup(shape, programInfo, failure)) {
-      return PermutationMatchResult{table->family, table->variant};
+    if (auto declared = MatchDeclaredKernel(shape, programInfo, failure)) {
+      return PermutationMatchResult{declared->family, declared->variant};
     }
   }
   // The interpreter is the decomposition route: its acceptance is the carried IR, not the shape,

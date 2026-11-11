@@ -4,6 +4,7 @@
 //   TGFXFullTest_OpenGL --gtest_filter='DiagnosticFamilyBreakdown.*'
 #include <cstdio>
 #include "base/TGFXTest.h"
+#include "gpu/shaders/Families.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
 
@@ -11,15 +12,13 @@ namespace tgfx {
 
 TGFX_TEST(DiagnosticFamilyBreakdown, Print) {
   size_t total = 0;
-  for (const auto& factory : ShaderRegistry::All()) {
-    auto shader = factory();
-    const auto& info = shader->info();
-    auto pairs = EnumerateReachablePermutations(info.name);
+  for (size_t index = 0; index < FamilyCount(); ++index) {
+    auto pairs = EnumerateReachablePermutations(Families()[index].name);
     if (!pairs.has_value()) {
       continue;
     }
     total += pairs->size();
-    std::printf("[FB] %-44s %3zu\n", info.name.c_str(), pairs->size());
+    std::printf("[FB] %-44s %3zu\n", Families()[index].name, pairs->size());
   }
   std::printf("[FB] TOTAL %zu\n", total);
 }

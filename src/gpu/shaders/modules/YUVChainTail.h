@@ -67,15 +67,12 @@ inline constexpr Element YUVChainTailElements[] = {
     {Element::Kind::Param, ShaderType::Mat3, "DeviceToLocal"},
 };
 
-inline constexpr Module YUVChainTail = {"YUVChainTail",
-                                        nullptr,
-                                        0,
-                                        YUVChainTailElements,
-                                        std::size(YUVChainTailElements),
-                                        /*hasVertex=*/false,
-                                        /*hasFragment=*/false,
-                                        /*bareNames=*/true,
-                                        /*unroll=*/nullptr,
-                                        /*chainContract=*/true};
+inline constexpr Module YUVChainTail = {
+    "YUVChainTail",        nullptr, 0, YUVChainTailElements, std::size(YUVChainTailElements),
+    /*hasVertex=*/false,
+    /*hasFragment=*/false,
+    /*bareNames=*/true,
+    /*unroll=*/nullptr,
+    /*chainContract=*/true};
 
 }  // namespace tgfx

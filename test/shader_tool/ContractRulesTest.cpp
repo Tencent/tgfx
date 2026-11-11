@@ -23,7 +23,7 @@
 
 #include <string>
 #include <vector>
-#include "gpu/shaders/AllShaderFamilies.h"
+#include "gpu/shaders/Families.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gtest/gtest.h"
 #include "verify/ContractRules.h"
@@ -36,8 +36,8 @@ const std::string RealShaderDir = std::string(TGFX_SOURCE_DIR) + "/src/gpu/shade
 SourceRuleContext RealSourceContext() {
   SourceRuleContext context;
   context.shaderDir = RealShaderDir;
-  for (auto factory : ShaderRegistry::All()) {
-    context.registeredShaders.push_back(factory()->info().name);
+  for (size_t index = 0; index < FamilyCount(); ++index) {
+    context.registeredShaders.push_back(Families()[index].name);
   }
   return context;
 }

@@ -128,7 +128,6 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
       "gpu/shaders/KernelContract.h",
       // declaration layer
       "gpu/aot/bind/AOTParamRegistry.h",
-      "gpu/shaders/AllShaderFamilies.h",
       "gpu/shaders/PrecompiledShader.h",
       // the module-declaration layer (families, layouts, domains)
       "gpu/shaders/Module.h",
@@ -144,8 +143,9 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
 }
 
 // Headers of the allowed list that CMake generates into the build tree instead of keeping in src.
+// The declaration layer needs none: every family is a src header now.
 const std::set<std::string>& GeneratedHeaders() {
-  static const std::set<std::string> generated = {"gpu/shaders/AllShaderFamilies.h"};
+  static const std::set<std::string> generated = {};
   return generated;
 }
 
@@ -223,9 +223,6 @@ TEST(LayeringTest, TheToolIncludesNoRuntimeClassThroughAPublicHeader) {
 TEST(LayeringTest, EveryAllowedHeaderExists) {
   for (const auto& header : AllowedRuntimeHeaders()) {
     if (GeneratedHeaders().count(header) > 0) {
-      // CMake writes this header into the build tree; the generator is what guarantees it. What
-      // can be checked here is that the name is the one the generator produces.
-      EXPECT_EQ(header, "gpu/shaders/AllShaderFamilies.h");
       continue;
     }
     EXPECT_TRUE(std::filesystem::exists(SourceDir + "/src/" + header)) << header;

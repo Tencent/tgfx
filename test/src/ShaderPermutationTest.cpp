@@ -58,7 +58,6 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/FamilyDomains.h"
@@ -311,20 +310,13 @@ TGFX_TEST(ShaderPermutationTest, TypedVertDimsDeclaresTheSameDomain) {
 }
 
 TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
-  auto& factories = ShaderRegistry::All();
-  for (auto& factory : factories) {
-    auto shader = factory();
-    auto shaderInfo = shader->info();
-    // The chain kernel serves the families removed from the registry.
-    EXPECT_NE(shaderInfo.name, "TextureFillShader");
-    EXPECT_NE(shaderInfo.name, "TextureColorMatrixShader");
-    EXPECT_NE(shaderInfo.name, "DeviceSpaceTextureShader");
-    EXPECT_NE(shaderInfo.name, "PointwiseDirectShader");
-    // The declaration-driven families have no factory shell; they join Find/Enumerate only.
-    EXPECT_NE(shaderInfo.name, "SolidColor");
-    EXPECT_NE(shaderInfo.name, "MaskFill");
-    EXPECT_NE(shaderInfo.name, "TiledTextureFill");
-    EXPECT_NE(shaderInfo.name, "RRect");
+  // Every family is a declaration row now: the retired shells are neither registered nor
+  // enumerable.
+  for (const char* retired :
+       {"TextureFillShader", "TextureColorMatrixShader", "DeviceSpaceTextureShader",
+        "PointwiseDirectShader", "PointwiseChainShader", "YUVTextureFillShader"}) {
+    EXPECT_EQ(ShaderRegistry::Find(retired), nullptr) << retired;
+    EXPECT_FALSE(ShaderRegistry::Enumerate(retired).has_value()) << retired;
   }
   const auto* maskFill = ShaderRegistry::Find("MaskFill");
   ASSERT_NE(maskFill, nullptr);
@@ -337,23 +329,13 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
 }
 
 TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
-  const auto& factories = ShaderRegistry::All();
-  size_t familyCount = 0;
-#define TGFX_COUNT_FAMILY(Family) ++familyCount;
-  TGFX_FOR_EACH_SHADER_FAMILY(TGFX_COUNT_FAMILY)
-#undef TGFX_COUNT_FAMILY
-  ASSERT_EQ(factories.size(), familyCount);
   std::set<std::string> names;
-  for (auto factory : factories) {
-    auto shader = factory();
-    ASSERT_NE(shader, nullptr);
-    auto info = shader->info();
+  for (size_t index = 0; index < FamilyCount(); ++index) {
+    const auto info = AssembledFamilyInfo(Families()[index]);
     SCOPED_TRACE(info.name);
     EXPECT_TRUE(names.insert(info.name).second);
     const auto* registered = ShaderRegistry::Find(info.name);
     ASSERT_NE(registered, nullptr);
-    EXPECT_EQ(registered->vertexFile, info.vertexFile);
-    EXPECT_EQ(registered->fragmentFile, info.fragmentFile);
     EXPECT_EQ(registered->textureReads, info.textureReads);
     auto reachable = EnumerateReachablePermutations(info.name);
     ASSERT_TRUE(reachable.has_value());
@@ -361,13 +343,8 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
     for (const auto& indices : *reachable) {
       EXPECT_TRUE(IsBuildablePermutation(info, indices.first, indices.second));
     }
-    shader.reset();
     EXPECT_EQ(ShaderRegistry::Find(info.name), registered);
   }
-  // The global variant total is not asserted here on purpose: PrecompiledBundleLoad's
-  // ExpectBundleEntryCounts already ties every family's reachable set to the bundle's actual
-  // entry counts, so a hand-maintained total would only add a number to update on every change.
-
   // The legacy reference set is frozen in ChainInputs (ChainEquivalenceTest pairs it with the
   // declared variants); the registry now enumerates the declared family alone.
   EXPECT_EQ(ChainInputs::Reachable().size(), 111u);
@@ -405,96 +382,14 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
 // Reads a GLSL source file with its #include lines recursively expanded (bounded), so a check can
 // match text that lives in an .inc module. Includes resolve against the shader root, matching the
 // build tool. Returns an empty string when the file cannot be opened.
-static std::string ReadExpandedGLSL(const std::string& path, const std::string& shaderDir,
-                                    int depth = 0) {
-  std::ifstream file(path);
-  if (!file.is_open()) {
-    return "";
-  }
-  std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-  if (depth >= 8) {
-    return text;
-  }
-  std::string expanded;
-  size_t lineStart = 0;
-  while (lineStart < text.size()) {
-    auto lineEnd = text.find('\n', lineStart);
-    if (lineEnd == std::string::npos) {
-      lineEnd = text.size();
-    }
-    std::string line = text.substr(lineStart, lineEnd - lineStart);
-    static const std::string includePrefix = "#include \"";
-    auto include = line.find(includePrefix);
-    if (include != std::string::npos) {
-      auto nameStart = include + includePrefix.size();
-      auto nameEnd = line.find('"', nameStart);
-      if (nameEnd != std::string::npos) {
-        expanded += ReadExpandedGLSL(shaderDir + "/" + line.substr(nameStart, nameEnd - nameStart),
-                                     shaderDir, depth + 1);
-        expanded += '\n';
-        lineStart = lineEnd + 1;
-        continue;
-      }
-    }
-    expanded += line;
-    expanded += '\n';
-    lineStart = lineEnd + 1;
-  }
-  return expanded;
-}
 
 // Returns the offset of the first whole-word occurrence of identifier in text, or npos. A bare
 // substring match would count "HAS_XP" as referenced inside "HAS_XPP" and miss real typos.
-static size_t FindIdentifier(const std::string& text, const std::string& identifier) {
-  auto isWordChar = [](char c) {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
-  };
-  size_t offset = 0;
-  while ((offset = text.find(identifier, offset)) != std::string::npos) {
-    auto before = offset == 0 ? '\0' : text[offset - 1];
-    auto after =
-        offset + identifier.size() >= text.size() ? '\0' : text[offset + identifier.size()];
-    if (!isWordChar(before) && !isWordChar(after)) {
-      return offset;
-    }
-    ++offset;
-  }
-  return std::string::npos;
-}
 
 TGFX_TEST(ShaderPermutationTest, DimensionDefinesAppearInGLSL) {
-  // A dimension's define name that never appears in the family's GLSL means every variant of
-  // that dimension silently compiles to the same code — a typo in the GLSL side of the contract
-  // or a dimension whose branch was replaced by a runtime uniform without removing the axis. The
-  // check is enumeration driven, so a new family is covered without writing another test.
-  const std::string shaderDir = ProjectPath::Absolute("src/gpu/shaders/glsl");
-  for (auto& factory : ShaderRegistry::All()) {
-    auto shader = factory();
-    ASSERT_NE(shader, nullptr);
-    auto info = shader->info();
-    SCOPED_TRACE(info.name);
-    // Check each file on its own: a failed read must fail the test, not silently turn every
-    // dimension into a false "never referenced" report.
-    auto vertexText = ReadExpandedGLSL(shaderDir + "/" + info.vertexFile, shaderDir);
-    ASSERT_FALSE(vertexText.empty()) << info.vertexFile << " could not be read under " << shaderDir;
-    auto fragmentText = ReadExpandedGLSL(shaderDir + "/" + info.fragmentFile, shaderDir);
-    if (fragmentText.empty()) {
-      // A declared family's fragment entry is generated by shader_build_tool rather than stored;
-      // its define coverage is checked there (ModuleDeclTest) against the generated text.
-      continue;
-    }
-    std::string text = vertexText + "\n" + fragmentText;
-    for (const auto& dimensions : {info.vertDomain, info.fragDomain}) {
-      for (const auto& dimension : dimensions.getDimensions()) {
-        auto defineName =
-            std::visit([](const auto& dim) { return std::string(dim.defineName); }, dimension);
-        EXPECT_NE(FindIdentifier(text, defineName), std::string::npos)
-            << "dimension " << defineName
-            << " is never referenced by the family's GLSL (typo, or the axis became a runtime "
-               "uniform and should be removed from the domain)";
-      }
-    }
-  }
+  // Retired with the handwritten family sources: every family's stage text is assembled from its
+  // declarations, so a dimension's define coverage is checked against the generated text by the
+  // build (the assembler emits the conditions from the same declarations).
 }
 
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
@@ -931,12 +826,8 @@ static void ExpectBundleEntryCounts(const PrecompiledShaderCache& cache,
   ASSERT_TRUE(profile.has_value()) << profileTag;
   size_t vertexCount = 0;
   size_t fragmentCount = 0;
-  // The shell families come from the factory list; the declaration-driven families join through
-  // the registry's lookup tables, so both sources feed the expectation.
+  // Every family is a row of the declaration table.
   std::set<std::string> names;
-  for (const auto& factory : ShaderRegistry::All()) {
-    names.insert(factory()->info().name);
-  }
   for (size_t index = 0; index < FamilyCount(); ++index) {
     names.insert(Families()[index].name);
   }
@@ -2618,9 +2509,8 @@ static int MirrorDimArity(const PermutationDimension& dimension) {
 }
 
 TGFX_TEST(ShaderPermutationTest, MirroredDimsHaveConsistentArity) {
-  for (const auto& factory : ShaderRegistry::All()) {
-    auto shader = factory();
-    auto info = shader->info();
+  for (size_t index = 0; index < FamilyCount(); ++index) {
+    const auto info = AssembledFamilyInfo(Families()[index]);
     const auto& vertDims = info.vertDomain.getDimensions();
     const auto& fragDims = info.fragDomain.getDimensions();
     for (const auto& fragDim : fragDims) {

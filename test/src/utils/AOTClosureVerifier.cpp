@@ -50,12 +50,6 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
   // registry's lookup tables without a shell. Collect both into one name set and resolve each
   // through EnumerateReachablePermutations, the shared single source of the reachable sets.
   std::set<std::string> names;
-  for (const auto& factory : ShaderRegistry::All()) {
-    auto shader = factory();
-    if (shader != nullptr) {
-      names.insert(shader->info().name);
-    }
-  }
   for (size_t index = 0; index < FamilyCount(); ++index) {
     names.insert(Families()[index].name);
   }

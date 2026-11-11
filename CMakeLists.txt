@@ -772,43 +772,6 @@ if (TGFX_EXCLUDE_FILES)
     list(REMOVE_ITEM TGFX_FILES ${TGFX_EXCLUDE_FILES})
 endif ()
 
-# The one list of shader families: every src/gpu/shaders/kernels/<Name>.h that declares
-# static constexpr const char* Name = "<Name>". Adding a family means adding its header; nothing
-# else lists it, and no registration step runs at startup. The
-# list is generated into gpu/shaders/AllShaderFamilies.h (the includes plus a
-# TGFX_FOR_EACH_SHADER_FAMILY X-macro) so the registry, the matcher, the build tool and the tests
-# all derive from it.
-file(GLOB TGFX_SHADER_FAMILY_HEADERS CONFIGURE_DEPENDS
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/kernels/*.h)
-set(TGFX_SHADER_FAMILY_NAMES "")
-foreach (FAMILY_HEADER ${TGFX_SHADER_FAMILY_HEADERS})
-    get_filename_component(FAMILY_NAME "${FAMILY_HEADER}" NAME_WE)
-    file(READ "${FAMILY_HEADER}" FAMILY_HEADER_TEXT)
-    if (NOT FAMILY_HEADER_TEXT MATCHES "static constexpr const char\\* Name = \"${FAMILY_NAME}\"")
-        message(FATAL_ERROR "${FAMILY_HEADER} does not declare static constexpr const char* Name = "
-                "\"${FAMILY_NAME}\"; every header under src/gpu/shaders/kernels is a family "
-                "named after its class.")
-    endif ()
-    list(APPEND TGFX_SHADER_FAMILY_NAMES ${FAMILY_NAME})
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${FAMILY_HEADER}")
-endforeach ()
-set(TGFX_SHADER_FAMILY_INCLUDES "")
-set(TGFX_SHADER_FAMILY_ENTRIES "")
-foreach (FAMILY_NAME ${TGFX_SHADER_FAMILY_NAMES})
-    string(APPEND TGFX_SHADER_FAMILY_INCLUDES "#include \"gpu/shaders/kernels/${FAMILY_NAME}.h\"\n")
-    string(APPEND TGFX_SHADER_FAMILY_ENTRIES " \\\n  X(${FAMILY_NAME})")
-endforeach ()
-set(TGFX_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated/include")
-file(CONFIGURE OUTPUT "${TGFX_GENERATED_INCLUDE_DIR}/gpu/shaders/AllShaderFamilies.h" CONTENT
-"// Auto-generated from src/gpu/shaders/kernels/*.h by CMakeLists.txt. Do not edit.
-#pragma once
-
-${TGFX_SHADER_FAMILY_INCLUDES}
-// Calls X(FamilyName) once per registered shader family: dedicated families in file-name order,
-// then the generic interpreter (PointwiseChainShader) last as the walk's fallback.
-#define TGFX_FOR_EACH_SHADER_FAMILY(X)${TGFX_SHADER_FAMILY_ENTRIES}
-" @ONLY NEWLINE_STYLE UNIX)
-list(APPEND TGFX_INCLUDES ${TGFX_GENERATED_INCLUDE_DIR})
 
 add_library(tgfx STATIC ${TGFX_FILES})
 add_dependencies(tgfx tgfx-vendor tgfx_zstd)
