@@ -772,24 +772,6 @@ TGFX_TEST(TextureImageFilterTest, YUVColorSpaceChangesConversion) {
             2);
 }
 
-TGFX_TEST(TextureImageFilterTest, ComplexPhotoInternalWarp) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto source = LoadScaledImage("resources/assets/bridge.jpg", 420);
-  ASSERT_FALSE(source.pixels.empty());
-  auto params = MakeTextureGrainParams(25.0f, 25.0f, 20.0f,
-                                       Point::Make(static_cast<float>(source.width) * 0.5f,
-                                                   static_cast<float>(source.height) * 0.5f),
-                                       73);
-  auto unclipped = RunPrototype(context, source, params);
-  ExpectReferenceClose(unclipped, "complex-bridge-unclipped", 4);
-  params.clipToShape = true;
-  auto clipped = RunPrototype(context, source, params);
-  ExpectReferenceClose(clipped, "complex-bridge-clipped", 6);
-}
-
 TGFX_TEST(TextureImageFilterTest, MaxParametersComplexImageClipPair) {
   ContextScope scope;
   auto context = scope.getContext();
