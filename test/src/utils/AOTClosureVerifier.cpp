@@ -59,7 +59,7 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
     if (!ShaderSelected(name, shaderNames)) {
       continue;
     }
-    const auto* info = ShaderRegistry::Find(name);
+    const auto* info = FindShaderInfo(name);
     if (info == nullptr) {
       continue;
     }

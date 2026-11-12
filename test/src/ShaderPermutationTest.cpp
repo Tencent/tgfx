@@ -291,7 +291,7 @@ TGFX_TEST(ShaderPermutationTest, TypedVertDimsDeclaresTheSameDomain) {
   // A declared family's domain is built from the module declarations; the RoundStrokeRect family
   // carries the geometry's UV_MATRIX radix (2) and the Xfer HAS_XP radix (3), and the flattened
   // ordinal is UV_MATRIX + 2 * HAS_XP.
-  const auto* family = ShaderRegistry::Find("RoundStrokeRect");
+  const auto* family = FindShaderInfo("RoundStrokeRect");
   ASSERT_NE(family, nullptr);
   const auto& domain = family->vertDomain;
   EXPECT_EQ(domain.dimensionCount(), 2u);
@@ -305,10 +305,10 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
   for (const char* retired :
        {"TextureFillShader", "TextureColorMatrixShader", "DeviceSpaceTextureShader",
         "PointwiseDirectShader", "PointwiseChainShader", "YUVTextureFillShader"}) {
-    EXPECT_EQ(ShaderRegistry::Find(retired), nullptr) << retired;
+    EXPECT_EQ(FindShaderInfo(retired), nullptr) << retired;
     EXPECT_FALSE(EnumerateReachablePermutations(retired).has_value()) << retired;
   }
-  const auto* maskFill = ShaderRegistry::Find("MaskFill");
+  const auto* maskFill = FindShaderInfo("MaskFill");
   ASSERT_NE(maskFill, nullptr);
   // The declaration-driven families encode HAS_XP(int3) = 3 permutations; the one domain drives
   // both stages (the vertex text just never reads the dimension).
@@ -324,16 +324,16 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
     const auto info = AssembledFamilyInfo(Families()[index]);
     SCOPED_TRACE(info.name);
     EXPECT_TRUE(names.insert(info.name).second);
-    const auto* registered = ShaderRegistry::Find(info.name);
+    const auto* registered = FindShaderInfo(info.name);
     ASSERT_NE(registered, nullptr);
     EXPECT_EQ(registered->textureReads, info.textureReads);
     auto reachable = EnumerateReachablePermutations(info.name);
     ASSERT_TRUE(reachable.has_value());
     ASSERT_FALSE(reachable->empty());
     for (const auto& indices : *reachable) {
-      EXPECT_TRUE(IsBuildablePermutation(info, indices.first, indices.second));
+      EXPECT_TRUE(info.IsBuildable(indices.first, indices.second));
     }
-    EXPECT_EQ(ShaderRegistry::Find(info.name), registered);
+    EXPECT_EQ(FindShaderInfo(info.name), registered);
   }
   // The legacy reference set is frozen in ChainInputs (ChainEquivalenceTest pairs it with the
   // declared variants); the registry now enumerates the declared family alone.
@@ -357,7 +357,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   const auto rrectPairs = EnumerateReachablePermutations("RRect");
   ASSERT_TRUE(rrectPairs.has_value());
   EXPECT_EQ(rrectPairs->size(), 6u);
-  EXPECT_EQ(ShaderRegistry::Find("UnknownShader"), nullptr);
+  EXPECT_EQ(FindShaderInfo("UnknownShader"), nullptr);
   EXPECT_FALSE(EnumerateReachablePermutations("UnknownShader").has_value());
   EXPECT_FALSE(EnumerateReachablePermutations("UnknownShader").has_value());
 }
@@ -408,7 +408,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
         ASSERT_TRUE(composed.has_value());
         auto vertexIndex = info.vertDomain.encode(composed->vertValues);
         auto fragmentIndex = info.fragDomain.encode(composed->fragValues);
-        EXPECT_TRUE(IsBuildablePermutation(info, vertexIndex, fragmentIndex));
+        EXPECT_TRUE(info.IsBuildable(vertexIndex, fragmentIndex));
         EXPECT_EQ(referenceSet.count({vertexIndex, fragmentIndex}), 1u);
         EXPECT_EQ(info.fragDomain.valueOf(fragmentIndex, ChainInputs::FD::RESOURCE_KIND.defineName),
                   1);
@@ -809,7 +809,7 @@ static void ExpectBundleEntryCounts(const PrecompiledShaderCache& cache,
     names.insert(Families()[index].name);
   }
   for (const auto& name : names) {
-    const auto* info = ShaderRegistry::Find(name);
+    const auto* info = FindShaderInfo(name);
     ASSERT_NE(info, nullptr) << name;
     auto reachable = EnumerateReachablePermutations(info->name);
     ASSERT_TRUE(reachable.has_value()) << info->name;
@@ -2030,7 +2030,7 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
   // domain spans the geometry's HAS_UV_COORD/HAS_SUBSET, Texture's HAS_SUBSET, LocalMask's
   // PRESENT and Xfer's HAS_XP (2 * 2 * 2 * 2 * 3); the product rule prunes the enumerated bundle
   // to the 24 real programs.
-  const auto* registered = ShaderRegistry::Find("QuadTexture");
+  const auto* registered = FindShaderInfo("QuadTexture");
   ASSERT_NE(registered, nullptr);
   EXPECT_EQ(registered->vertDomain.totalCount(), 48u);
   EXPECT_EQ(registered->fragDomain.totalCount(), 48u);
@@ -2241,7 +2241,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageRegistry) {
   // The family is declaration-driven now: its domain spans the geometry's VERTEX_COLOR, the
   // Gradient module's PRESENT and Xfer's HAS_XP (2 * 2 * 3); the product rule prunes the
   // enumerated bundle to the 2 real programs.
-  const auto* registered = ShaderRegistry::Find("ShapeInstancedTextureCoverage");
+  const auto* registered = FindShaderInfo("ShapeInstancedTextureCoverage");
   ASSERT_NE(registered, nullptr);
   EXPECT_EQ(registered->vertDomain.totalCount(), 12u);
   EXPECT_EQ(registered->fragDomain.totalCount(), 12u);
@@ -2391,7 +2391,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectPreservesPermutationDomains) {
   for (const auto& expectedDomain : expected) {
     // The lookup goes through Find so the declaration-driven families (SolidColor) are covered
     // alongside the factory families.
-    const auto* registered = ShaderRegistry::Find(expectedDomain.name);
+    const auto* registered = FindShaderInfo(expectedDomain.name);
     EXPECT_NE(registered, nullptr) << expectedDomain.name;
     if (registered == nullptr) {
       continue;

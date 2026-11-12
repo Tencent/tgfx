@@ -332,7 +332,7 @@ TGFX_TEST(AOTCoverageGateTest, AllProcessorsAreClaimed) {
   auto scanned = ScanProcessorHeaders();
   ASSERT_FALSE(scanned.empty());
   auto matcherSource =
-      ReadTextFile(ProjectPath::Absolute("src/gpu/aot/select/PermutationMatcher.cpp"));
+      ReadTextFile(ProjectPath::Absolute("src/gpu/aot/select/ShaderMatchHelpers.cpp"));
   ASSERT_FALSE(matcherSource.empty());
   // The evidence is the classifiers' own bodies, not the file around them: a renamed or moved
   // classifier fails here loudly instead of silently emptying the evidence set.

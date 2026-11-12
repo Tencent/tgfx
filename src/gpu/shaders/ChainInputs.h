@@ -323,7 +323,7 @@ struct ChainInputs {
         // The atlas chain route exists to sample the atlas coverage leaf: the decomposer always
         // attaches it, so a leaf-free atlas chain is structurally producible but semantically
         // vacuous. Rejecting it here keeps the reachable set equal to the compiled set (the gap was
-        // previously masked by the IsBuildablePermutation post-check falling back to JIT).
+        // previously masked by the retired buildable-permutation post-check falling back to JIT).
         if (inputs.textureCount == 0) {
           return false;
         }

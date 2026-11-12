@@ -54,14 +54,11 @@ struct PrecompiledShaderInfo {
   PermutationDomain fragDomain;
   /// ShaderTextureRead bits this family implements. Zero (the default) declares none.
   uint32_t textureReads = 0;
-};
 
-/**
- * Returns true when the vertex/fragment indices belong to the shader's declared domains and
- * agree on every mirrored dimension.
- */
-bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertIndex,
-                            uint32_t fragIndex);
+  /// Whether the vertex/fragment indices belong to the declared domains and agree on every
+  /// mirrored dimension.
+  bool IsBuildable(uint32_t vertIndex, uint32_t fragIndex) const;
+};
 
 /**
  * Returns true when the permutation is compiled into the bundle of the given profile. This is the
@@ -74,24 +71,10 @@ bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t v
                                    uint32_t fragIndex, ShaderProfile profile);
 
 /**
- * Base class for all precompiled shader declarations. Each concrete shader must override info()
- * to provide its metadata.
+ * The declared family's metadata, addressed by name. Every family lives in the declaration table
+ * (Families.h), so there is no registration step and no dependence on static-initialization order.
+ * Returns nullptr when no family carries the name.
  */
-class PrecompiledShader {
- public:
-  virtual ~PrecompiledShader() = default;
-
-  virtual PrecompiledShaderInfo info() const = 0;
-};
-
-/**
- * The declared families' metadata. Every family lives in the declaration table (Families.h), so
- * there is no registration step and no dependence on static-initialization order.
- */
-class ShaderRegistry {
- public:
-  /** Returns the registered metadata for a shader name, or nullptr when no shader is registered. */
-  static const PrecompiledShaderInfo* Find(const std::string& name);
-};
+const PrecompiledShaderInfo* FindShaderInfo(const std::string& name);
 
 }  // namespace tgfx

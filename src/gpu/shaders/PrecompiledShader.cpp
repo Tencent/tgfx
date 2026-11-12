@@ -48,14 +48,13 @@ const std::map<std::string, PrecompiledShaderInfo>& ShaderInfos() {
 
 }  // namespace
 
-bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertIndex,
-                            uint32_t fragIndex) {
-  if (vertIndex >= info.vertDomain.totalCount() || fragIndex >= info.fragDomain.totalCount()) {
+bool PrecompiledShaderInfo::IsBuildable(uint32_t vertIndex, uint32_t fragIndex) const {
+  if (vertIndex >= vertDomain.totalCount() || fragIndex >= fragDomain.totalCount()) {
     return false;
   }
-  auto vertValues = info.vertDomain.decode(vertIndex);
-  auto fragValues = info.fragDomain.decode(fragIndex);
-  return MirroredDimsAgree(info.vertDomain, info.fragDomain, vertValues, fragValues);
+  auto vertValues = vertDomain.decode(vertIndex);
+  auto fragValues = fragDomain.decode(fragIndex);
+  return MirroredDimsAgree(vertDomain, fragDomain, vertValues, fragValues);
 }
 
 bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t vertIndex,
@@ -68,7 +67,7 @@ bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t v
   return true;
 }
 
-const PrecompiledShaderInfo* ShaderRegistry::Find(const std::string& name) {
+const PrecompiledShaderInfo* FindShaderInfo(const std::string& name) {
   const auto& infos = ShaderInfos();
   auto result = infos.find(name);
   return result == infos.end() ? nullptr : &result->second;

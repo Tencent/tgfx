@@ -25,7 +25,7 @@
 #include "gpu/shaders/contract/DrawFacts.h"
 
 // Shared predicates of the per-family Match functions. Declared here and defined once in
-// PermutationMatcher.cpp (their private helper chains stay internal to that translation unit);
+// ShaderMatchHelpers.cpp (their private helper chains stay internal to that translation unit);
 // each family's .cpp includes this header, so family matching code never duplicates them.
 namespace tgfx {
 

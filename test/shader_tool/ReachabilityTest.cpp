@@ -93,7 +93,7 @@ TEST(FamilyRegistryTest, EveryFamilyIsRegisteredOnceWithItsOwnFiles) {
     // Every family is a declaration row: its text is assembled, so it stores no entry files.
     EXPECT_TRUE(info.vertexFile.empty()) << info.name;
     EXPECT_TRUE(info.fragmentFile.empty()) << info.name;
-    EXPECT_NE(ShaderRegistry::Find(info.name), nullptr) << info.name;
+    EXPECT_NE(FindShaderInfo(info.name), nullptr) << info.name;
   }
 }
 
@@ -113,7 +113,7 @@ TEST(ReachabilityTest, EveryReachableVariantIsBuildable) {
     auto reachable = EnumerateReachablePermutations(info.name);
     ASSERT_TRUE(reachable.has_value()) << info.name;
     for (const auto& pair : *reachable) {
-      EXPECT_TRUE(IsBuildablePermutation(info, pair.first, pair.second))
+      EXPECT_TRUE(info.IsBuildable(pair.first, pair.second))
           << info.name << " (" << pair.first << ", " << pair.second << ")";
     }
   }
@@ -143,8 +143,8 @@ TEST(ReachabilityTest, TheReachableSetIsSmallerThanTheFullProductWherePossible) 
 
 TEST(ReachabilityTest, ADomainIndexOutsideTheDomainIsNotBuildable) {
   for (const auto& info : AllFamilies()) {
-    EXPECT_FALSE(IsBuildablePermutation(info, info.vertDomain.totalCount(), 0)) << info.name;
-    EXPECT_FALSE(IsBuildablePermutation(info, 0, info.fragDomain.totalCount())) << info.name;
+    EXPECT_FALSE(info.IsBuildable(info.vertDomain.totalCount(), 0)) << info.name;
+    EXPECT_FALSE(info.IsBuildable(0, info.fragDomain.totalCount())) << info.name;
   }
 }
 
