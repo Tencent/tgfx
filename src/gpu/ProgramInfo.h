@@ -51,35 +51,19 @@ struct SamplerInfo {
  */
 class ProgramInfo {
  public:
-  ProgramInfo(RenderTarget* renderTarget, const GeometryLayout& geometryLayout,
-              std::vector<FragmentProcessor*> fragmentProcessors, size_t numColorProcessors,
-              const std::optional<DstTextureInfo>& dstTexture, BlendMode blendMode);
-
   /**
-   * The AOT route's form: no fragment processors ride the info — the draw's whole expression
-   * travels as a compiled chain program, so the matcher, the program key and the upload never read
-   * the processor list. blendFormulaHasCoverage carries the one fact the pipeline's blend formula
-   * takes from that list on the plain route: whether coverage processors follow the color ones.
+   * The draw's program description: the expression rides the carried DrawIR (attached through
+   * setCarriedIR before first use), so the matcher, the program key and the upload never read a
+   * processor list. blendFormulaHasCoverage carries the one blend-formula fact that used to come
+   * from the processor order: whether coverage processors follow the color ones.
    */
   ProgramInfo(RenderTarget* renderTarget, const GeometryLayout& geometryLayout,
               const std::optional<DstTextureInfo>& dstTexture, BlendMode blendMode,
               bool blendFormulaHasCoverage);
 
-  size_t numColorFragmentProcessors() const {
-    return numColorProcessors;
-  }
-
-  size_t numFragmentProcessors() const {
-    return fragmentProcessors.size();
-  }
-
   /// The draw's render target: the engine-level writers (RTAdjust) read its size and origin.
   RenderTarget* getRenderTarget() const {
     return renderTarget;
-  }
-
-  const FragmentProcessor* getFragmentProcessor(size_t idx) const {
-    return fragmentProcessors[idx];
   }
 
   /// The output formula facts: whether the shader runs the xfer stage and where its destination
@@ -277,6 +261,18 @@ class ProgramInfo {
   }
 
   /**
+   * The diagnostics-only effect signature, built by the op from its processor lists (empty when
+   * diagnostic recording is off). Nothing that selects, keys or writes a program reads it.
+   */
+  void setEffectSignature(std::string signature) const {
+    effectSignature = std::move(signature);
+  }
+
+  const std::string& getEffectSignature() const {
+    return effectSignature;
+  }
+
+  /**
    * Returns the context owning this program's render target, or null when the target is absent.
    */
   Context* getContext() const {
@@ -304,9 +300,6 @@ class ProgramInfo {
 
  private:
   RenderTarget* renderTarget = nullptr;
-  std::vector<FragmentProcessor*> fragmentProcessors = {};
-  // This value is also the index in fragmentProcessors where coverage processors begin.
-  size_t numColorProcessors = 0;
   GeometryLayout geometryLayout = {};
   /// The xfer facts derived from the processor once per program: the shader-side blend flag and
   /// the destination it samples. The writers and the matcher read this, not the processor.
@@ -337,6 +330,9 @@ class ProgramInfo {
   // so the attachment can happen right after construction (the pipeline-state setters already
   // run in that window); it is an input, never recomputed, and null unless explicitly attached.
   mutable const DrawIR* carriedIR = nullptr;
+
+  // The diagnostics-only signature (see setEffectSignature).
+  mutable std::string effectSignature = {};
 
   // The draw's single selection result, filled by getProgram()'s first call. An input to the
   // upload, never recomputed; null when no selection ran.

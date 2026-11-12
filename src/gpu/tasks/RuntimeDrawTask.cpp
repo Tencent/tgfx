@@ -136,19 +136,18 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   }
   auto geometryLayout = QuadGeometryLayoutOf(renderTarget->width(), renderTarget->height(),
                                              AAType::None, PMColor::White(), Matrix::I(), false);
-  std::vector fragmentProcessors = {colorProcessor.get()};
-  auto programInfo =
-      std::make_unique<ProgramInfo>(renderTarget.get(), geometryLayout,
-                                    std::move(fragmentProcessors), 1, std::nullopt, BlendMode::Src);
-  // This flatten draw never passes through the record-time router, so it carries no IR of its own.
-  // Lower the same expression here: no match rule accepts a draw that carries processors without
-  // one, and a missing program would silently drop the whole runtime effect. The handle outlives
-  // the program resolution below; only its memory remains after this scope.
-  PlacementPtr<DrawIR> carriedIR = nullptr;
-  if (auto lowered = LowerDraw({colorProcessor.get()}, {}, BlendMode::Src, allocator)) {
-    carriedIR = allocator->make<DrawIR>(std::move(*lowered));
-    programInfo->setCarriedIR(carriedIR.get());
+  // This flatten draw never passes through the record-time router, so it lowers its own
+  // expression here: the program is resolved from the IR alone, and a draw that fails to lower
+  // has nothing to serve. The handle outlives the resolution below.
+  auto lowered = LowerDraw({colorProcessor.get()}, {}, BlendMode::Src, allocator);
+  if (!lowered.has_value()) {
+    LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to lower the flatten draw!");
+    return nullptr;
   }
+  PlacementPtr<DrawIR> carriedIR = allocator->make<DrawIR>(std::move(*lowered));
+  auto programInfo = std::make_unique<ProgramInfo>(renderTarget.get(), geometryLayout, std::nullopt,
+                                                   BlendMode::Src, false);
+  programInfo->setCarriedIR(carriedIR.get());
   auto program = programInfo->getProgram();
   if (program == nullptr) {
     LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to get the program!");

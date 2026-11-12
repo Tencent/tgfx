@@ -48,13 +48,16 @@ uint32_t RequiredTextureReads(const ProgramInfo* programInfo) {
       AddReadSwizzle(atlasView->getTexture(), &required);
     }
   }
-  FragmentProcessor::Iter iter(programInfo);
-  for (auto fp = iter.next(); fp != nullptr; fp = iter.next()) {
-    if (IsProcessor<TextureEffect>(fp) && static_cast<const TextureEffect*>(fp)->isYUV()) {
-      continue;
-    }
-    for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
-      AddReadSwizzle(fp->textureAt(i), &required);
+  const auto* ir = programInfo->getCarriedIR();
+  if (ir != nullptr) {
+    // The recorded sampler entries are the draw's whole sampler set, in binding order: a view
+    // that is not instantiated yet contributes no texture (the same rule the bind applies).
+    for (const auto& ref : ir->samplers) {
+      auto view = ref.textureProxy != nullptr ? ref.textureProxy->getTextureView() : nullptr;
+      if (view == nullptr || view->isYUV()) {
+        continue;
+      }
+      AddReadSwizzle(view->getTexture(), &required);
     }
   }
   return required;
@@ -72,47 +75,24 @@ bool GraphHasGradientSource(const AOTEffectGraph& graph) {
   return false;
 }
 
-// The no-IR fallback, kept for the paths that match without a carried IR (tests and the
-// pre-lowering probes): the production path reads the IR.
-bool ContainsGradientSource(const FragmentProcessor* processor) {
-  if (processor == nullptr) {
-    return false;
-  }
-  if (IsProcessor<ClampedGradientEffect>(processor)) {
-    return true;
-  }
-  for (size_t index = 0; index < processor->numChildProcessors(); ++index) {
-    if (ContainsGradientSource(processor->childProcessor(index))) {
-      return true;
-    }
-  }
-  return false;
-}
-
 }  // namespace
 
 DrawShape ExtractDrawShape(const ProgramInfo* programInfo) {
   DrawShape facts = {};
   facts.alphaOnlyTarget = programInfo->getOutputSwizzle() == Swizzle::AAAA();
-  facts.colorFPCount = programInfo->numColorFragmentProcessors();
-  facts.fragmentCount = programInfo->numFragmentProcessors();
+  const auto* ir = programInfo->getCarriedIR();
+  // The IR's counts are the expression's: the processor lists no longer exist as a second
+  // description, so the shape's processor counts come from the lowering that produced them.
+  facts.colorFPCount = ir != nullptr ? ir->colorFPCount : 0;
+  facts.fragmentCount = ir != nullptr ? ir->colorFPCount + ir->coverageFPCount : 0;
   facts.requiredTextureReads = RequiredTextureReads(programInfo);
   facts.coverage = ClassifyCoverageTerms(programInfo);
-  facts.ir = programInfo->getCarriedIR();
+  facts.ir = ir;
   // The geometry and xfer facts are match-time facts: the matching runs after the processors
   // exist, so they are described off the made processors — one description, no record-time copy.
   facts.geometry = DescribeGeometryProcessor(programInfo->getGeometryLayout());
   facts.xfer = ClassifyXferForMatch(programInfo->getXferFacts());
-  if (facts.ir != nullptr) {
-    facts.hasGradientSource = GraphHasGradientSource(facts.ir->color);
-  } else {
-    for (size_t index = 0; index < programInfo->numFragmentProcessors(); ++index) {
-      if (ContainsGradientSource(programInfo->getFragmentProcessor(index))) {
-        facts.hasGradientSource = true;
-        break;
-      }
-    }
-  }
+  facts.hasGradientSource = ir != nullptr && GraphHasGradientSource(ir->color);
   return facts;
 }
 

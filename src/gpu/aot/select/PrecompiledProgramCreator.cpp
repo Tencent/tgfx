@@ -32,6 +32,7 @@
 #include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/select/ProgramKey.h"
 #include "gpu/aot/select/ProgramSelection.h"
@@ -70,25 +71,26 @@ static void AppendFragmentProcessor(std::stringstream& stream, const FragmentPro
   stream << ")";
 }
 
-std::string BuildEffectSignature(const ProgramInfo* programInfo) {
+std::string BuildEffectSignature(const GeometryLayout& geometry,
+                                 const std::vector<const FragmentProcessor*>& colorProcessors,
+                                 const std::vector<const FragmentProcessor*>& coverageProcessors,
+                                 const XferFacts& xfer) {
   std::stringstream stream;
-  stream << "GP=" << GeometryKindName(programInfo->getGeometryLayout().parameters.kind)
-         << ";ColorFP=[";
-  for (size_t i = 0; i < programInfo->numColorFragmentProcessors(); ++i) {
+  stream << "GP=" << GeometryKindName(geometry.parameters.kind) << ";ColorFP=[";
+  for (size_t i = 0; i < colorProcessors.size(); ++i) {
     if (i > 0) {
       stream << ",";
     }
-    AppendFragmentProcessor(stream, programInfo->getFragmentProcessor(i));
+    AppendFragmentProcessor(stream, colorProcessors[i]);
   }
   stream << "];CoverageFP=[";
-  for (size_t i = programInfo->numColorFragmentProcessors();
-       i < programInfo->numFragmentProcessors(); ++i) {
-    if (i > programInfo->numColorFragmentProcessors()) {
+  for (size_t i = 0; i < coverageProcessors.size(); ++i) {
+    if (i > 0) {
       stream << ",";
     }
-    AppendFragmentProcessor(stream, programInfo->getFragmentProcessor(i));
+    AppendFragmentProcessor(stream, coverageProcessors[i]);
   }
-  stream << "];XP=" << (programInfo->getXferFacts().shaderBlend() ? "shader" : "fixed");
+  stream << "];XP=" << (xfer.shaderBlend() ? "shader" : "fixed");
   return stream.str();
 }
 
@@ -104,7 +106,7 @@ static std::string BuildPipelineSignature(const ProgramInfo* programInfo) {
   std::stringstream stream;
   const auto colorAttachment = programInfo->getPipelineColorAttachment();
   const auto& depthStencil = programInfo->getDepthStencil();
-  stream << BuildEffectSignature(programInfo)
+  stream << programInfo->getEffectSignature()
          << ";Swizzle=" << programInfo->getOutputSwizzle().c_str()
          << ";Format=" << static_cast<uint32_t>(colorAttachment.format)
          << ";BlendEnable=" << static_cast<uint32_t>(colorAttachment.blendEnable)
@@ -135,7 +137,7 @@ static PrecompiledFallbackRecord MakeFallbackRecord(const PrecompiledShaderCache
     return record;
   }
   record.programKey = ProgramInfo::FormatDiagnosticKey(programInfo->programKey());
-  record.effectSignature = BuildEffectSignature(programInfo);
+  record.effectSignature = programInfo->getEffectSignature();
   record.pipelineSignature = BuildPipelineSignature(programInfo);
   if (variant != nullptr) {
     record.shaderName = Families()[variant->family].name;
@@ -151,7 +153,7 @@ static PrecompiledHitRecord MakeHitRecord(const PrecompiledShaderCache* cache,
     return record;
   }
   record.programKey = ProgramInfo::FormatDiagnosticKey(programInfo->programKey());
-  record.effectSignature = BuildEffectSignature(programInfo);
+  record.effectSignature = programInfo->getEffectSignature();
   record.pipelineSignature = BuildPipelineSignature(programInfo);
   record.shaderName = Families()[variant.family].name;
   record.variantId = variant.id();
@@ -288,16 +290,17 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   if (!selection) {
     auto reason = ToFallbackReason(matchFailure);
     if (reason == PrecompiledFallbackReason::NoMatchingRule) {
-      // A texture FP whose view is not instantiated yet (a lazy/deferred proxy) drops its
-      // content through the runtime stub program by design; classify it apart from real
-      // coverage gaps so the production metrics stay honest.
-      for (size_t i = 0; i < programInfo->numFragmentProcessors(); ++i) {
-        auto fp = programInfo->getFragmentProcessor(i);
-        bool textureFP = IsProcessor<TextureEffect>(fp) || IsProcessor<TiledTextureEffect>(fp) ||
-                         IsProcessor<DeviceSpaceTextureEffect>(fp);
-        if (textureFP && fp->numTextureSamplers() == 0) {
-          reason = PrecompiledFallbackReason::DeferredTexture;
-          break;
+      // A sampler whose proxy resolves no view yet (a lazy/deferred upload) drops its content
+      // through the runtime stub program by design; classify it apart from real coverage gaps so
+      // the production metrics stay honest. The record rides the IR, not the processor list.
+      const auto* ir = programInfo->getCarriedIR();
+      if (ir != nullptr) {
+        for (const auto& ref : ir->samplers) {
+          if (ref.textureProxy != nullptr && !ref.countsWithoutView &&
+              ref.textureProxy->getTextureView() == nullptr) {
+            reason = PrecompiledFallbackReason::DeferredTexture;
+            break;
+          }
         }
       }
     }

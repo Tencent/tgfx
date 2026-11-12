@@ -25,7 +25,16 @@ namespace tgfx {
 
 class Context;
 class ProgramInfo;
+struct DrawIR;
 struct SpecValues;
+
+/**
+ * Hashes the draw's lowered expression: every node's kind and matching-relevant parameter, the
+ * texture identities (a content key when the view exists, the proxy otherwise), the coverage terms
+ * and the color/coverage boundary. The negative cache keys on this now that the processor list is
+ * gone: two draws with the same hash must be refused the same way.
+ */
+void HashDrawIR(const DrawIR& ir, BytesKey* key);
 
 /**
  * The one program-cache key. A precompiled program is named by everything a program is: the

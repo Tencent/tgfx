@@ -111,12 +111,6 @@ size_t FragmentProcessor::registerChildProcessor(PlacementPtr<FragmentProcessor>
   return index;
 }
 
-FragmentProcessor::Iter::Iter(const ProgramInfo* programInfo) {
-  for (auto i = programInfo->numFragmentProcessors(); i >= 1; --i) {
-    fpStack.push_back(programInfo->getFragmentProcessor(i - 1));
-  }
-}
-
 const FragmentProcessor* FragmentProcessor::Iter::next() {
   if (fpStack.empty()) {
     return nullptr;
@@ -129,34 +123,16 @@ const FragmentProcessor* FragmentProcessor::Iter::next() {
   return back;
 }
 
-FragmentProcessor::CoordTransformIter::CoordTransformIter(const ProgramInfo* programInfo)
-    : fpIter(programInfo) {
-  currFP = fpIter.next();
-}
-
 FragmentProcessor::CoordTransformIter::CoordTransformIter(
     const std::vector<CoordTransform>* transformList)
     : transforms(transformList) {
 }
 
 const CoordTransform* FragmentProcessor::CoordTransformIter::next() {
-  if (transforms != nullptr) {
-    if (transformIndex >= transforms->size()) {
-      return nullptr;
-    }
-    return &(*transforms)[transformIndex++];
-  }
-  if (!currFP) {
+  if (transforms == nullptr || transformIndex >= transforms->size()) {
     return nullptr;
   }
-  while (currentIndex == currFP->numCoordTransforms()) {
-    currentIndex = 0;
-    currFP = fpIter.next();
-    if (!currFP) {
-      return nullptr;
-    }
-  }
-  return currFP->coordTransform(currentIndex++);
+  return &(*transforms)[transformIndex++];
 }
 
 }  // namespace tgfx

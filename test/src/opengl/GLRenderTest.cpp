@@ -583,8 +583,7 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     // The chain serves a draw from its record-time IR; a ProgramInfo without one is not served.
     auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
-    ProgramInfo programInfo(renderTarget.get(), gp, {fp.get()}, 1, std::nullopt,
-                            BlendMode::SrcOver);
+    ProgramInfo programInfo(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, false);
     programInfo.setCarriedIR(&*ir);
     EXPECT_TRUE(programInfo.glProfileMatchesCache());
     EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo, SelectionScope::AnyFamily)
@@ -598,8 +597,7 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
         context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
     auto fp = TextureEffect::Make(&allocator, std::move(textureProxy));
     ASSERT_NE(fp, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp, {fp.get()}, 1, std::nullopt,
-                            BlendMode::SrcOver);
+    ProgramInfo programInfo(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, false);
     // QuadPerEdgeAA + TextureEffect is served by QuadTextureFillShader. The matcher reads the
     // carried IR, so this info needs the same record-time lowering a draw gets.
     auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
@@ -625,8 +623,7 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     ASSERT_NE(textureProxy, nullptr);
     auto fp = TextureEffect::Make(&allocator, std::move(textureProxy));
     ASSERT_NE(fp, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp, {fp.get()}, 1, std::nullopt,
-                            BlendMode::SrcOver);
+    ProgramInfo programInfo(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, false);
     // The sampler list is read off the carried IR, so the draw needs the same lowering a real op
     // gets before the gate can see its rectangle sampler.
     auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
@@ -654,7 +651,7 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     ASSERT_NE(fp, nullptr);
     auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
-    ProgramInfo programInfo(renderTarget.get(), gp, {fp.get()}, 1, dst, BlendMode::SrcOver);
+    ProgramInfo programInfo(renderTarget.get(), gp, dst, BlendMode::SrcOver, false);
     programInfo.setCarriedIR(&*ir);
     // SrcOver needs no dst readback, so the chain kernel serves this draw.
     EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo, SelectionScope::AnyFamily)

@@ -28,6 +28,7 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/select/PrecompiledProgramCreator.h"
+#include "gpu/aot/select/ProgramKey.h"
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/contract/ShaderProfileResolver.h"
@@ -40,16 +41,6 @@ static void EncodeStencilFace(BytesKey& key, const StencilDescriptor& face) {
   key.write(static_cast<uint32_t>(face.failOp));
   key.write(static_cast<uint32_t>(face.depthFailOp));
   key.write(static_cast<uint32_t>(face.passOp));
-}
-
-ProgramInfo::ProgramInfo(RenderTarget* renderTarget, const GeometryLayout& geometryLayout,
-                         std::vector<FragmentProcessor*> fragmentProcessors,
-                         size_t numColorProcessors, const std::optional<DstTextureInfo>& dstTexture,
-                         BlendMode blendMode)
-    : renderTarget(renderTarget), fragmentProcessors(std::move(fragmentProcessors)),
-      numColorProcessors(numColorProcessors), geometryLayout(geometryLayout), blendMode(blendMode) {
-  hasCoverageForBlend = numColorProcessors < this->fragmentProcessors.size();
-  updateXferFacts(dstTexture);
 }
 
 ProgramInfo::ProgramInfo(RenderTarget* renderTarget, const GeometryLayout& geometryLayout,
@@ -113,8 +104,6 @@ const BytesKey& ProgramInfo::programKey() const {
 
 BytesKey ProgramInfo::buildProgramKey() const {
   BytesKey key = {};
-  auto context = renderTarget->getContext();
-  (void)context;
   // The geometry's key contribution (see the precompiled-side key): kind, perspective and the
   // live attribute formats.
   key.write(static_cast<uint32_t>(geometryLayout.parameters.kind));
@@ -129,15 +118,15 @@ BytesKey ProgramInfo::buildProgramKey() const {
       key.write(static_cast<uint32_t>(attribute.format()));
     }
   }
-  for (const auto& processor : fragmentProcessors) {
-    processor->computeProcessorKey(context, &key);
+  // The expression's identity: the lowered IR carries every matching-relevant fact now that the
+  // processor list is gone — node kinds, parameters, texture identities, and the color/coverage
+  // boundary, which stays semantic (the same sequence on the other side of the boundary
+  // composites differently, so it must ride the key or a negative hit can poison the wrong role).
+  if (carriedIR != nullptr) {
+    HashDrawIR(*carriedIR, &key);
+  } else {
+    key.write(static_cast<uint32_t>(0));
   }
-  // The color/coverage boundary is semantic, not structural: the same processor sequence with a
-  // different boundary composites differently (a color FP replaces the paint color; a coverage FP
-  // modulates the draw coverage). The cache lookup happens before any matcher or validation can
-  // re-check it, so the boundary itself must ride the key or a hot hit can return a program built
-  // for the other role.
-  key.write(static_cast<uint32_t>(numColorProcessors));
   // The output formula's contribution, the same encoding the precompiled-side key writes: the
   // shader-stage flag and the sampled destination's identity (a null proxy is the framebuffer
   // fetch; blendMode rides the pipeline state key below).

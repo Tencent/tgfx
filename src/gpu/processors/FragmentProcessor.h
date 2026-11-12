@@ -172,8 +172,6 @@ class FragmentProcessor : public Processor {
       fpStack.push_back(fp);
     }
 
-    explicit Iter(const ProgramInfo* programInfo);
-
     const FragmentProcessor* next();
 
    private:
@@ -181,24 +179,17 @@ class FragmentProcessor : public Processor {
   };
 
   /**
-   * Iterates over all the CoordTransforms owned by the forest of FragmentProcessors in a
-   * ProgramInfo.
+   * Iterates a caller-supplied sequence of coordinate transforms: the AOT upload feeds the
+   * geometry writer the leaf-ordered transforms the compiled program's binding table describes,
+   * so no processor tree exists to walk. The sequence must outlive the iterator.
    */
   class CoordTransformIter {
    public:
-    explicit CoordTransformIter(const ProgramInfo* programInfo);
-
-    // Iterates a caller-supplied sequence instead of a ProgramInfo: the AOT upload feeds the
-    // geometry processor the leaf-ordered transforms the compiled program's binding table
-    // describes, so no processor exists to walk. The sequence must outlive the iterator.
     explicit CoordTransformIter(const std::vector<CoordTransform>* transforms);
 
     const CoordTransform* next();
 
    private:
-    const FragmentProcessor* currFP = nullptr;
-    size_t currentIndex = 0;
-    FragmentProcessor::Iter fpIter;
     const std::vector<CoordTransform>* transforms = nullptr;
     size_t transformIndex = 0;
   };

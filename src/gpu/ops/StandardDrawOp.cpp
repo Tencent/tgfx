@@ -21,6 +21,7 @@
 #include "gpu/ContextInternal.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/Program.h"
+#include "gpu/ProgramSignature.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/chain/AOTShapeRules.h"
@@ -163,8 +164,6 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
   preparedProgramInfo = nullptr;
   preparedRenderTarget = nullptr;
 
-  std::vector<FragmentProcessor*> fragmentProcessors = {};
-  size_t colorCount = colors.size();
   // Plan-pass serving: the pass IR is the whole expression, so the AOT route resolves the draw
   // from the program it compiles onto — no processor travels through the info. A fill pass carries
   // the IR on itself; the terminal pass hands it in from the plan.
@@ -210,24 +209,36 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
     preparedRenderTarget = renderTarget;
     return true;
   }
-  fragmentProcessors.reserve(colors.size() + coverages.size());
-  for (auto& color : colors) {
-    fragmentProcessors.emplace_back(color.get());
-  }
-  for (auto& coverage : coverages) {
-    fragmentProcessors.emplace_back(coverage.get());
-  }
-  preparedProgramInfo =
-      std::make_unique<ProgramInfo>(renderTarget, *geometryLayout, std::move(fragmentProcessors),
-                                    colorCount, dstTexture, blendMode);
-  configureProgramInfo(preparedProgramInfo.get(), depthStencilFormat);
-  // The draw's record-time IR is the expression every later stage reads. A coverage processor
-  // attached only at prepare (a rasterized shape's mask, added by onMakeGeometry) is
+  // The draw's record-time IR is the whole expression every later stage reads. A coverage
+  // processor attached only at prepare (a rasterized shape's mask, added by onMakeGeometry) is
   // appended to the IR's terms instead of dropping the IR — the color graph cannot change after
-  // record time, so a color-count mismatch is the only case the IR does not describe.
-  if (loweredIR() != nullptr && loweredIR()->colorFPCount == colors.size() &&
-      appendGrownCoverage()) {
-    preparedProgramInfo->setCarriedIR(loweredIR());
+  // record time, so a color-count mismatch is the only case the IR does not describe. A draw
+  // that never lowered has no expression any rule accepts, so it is dropped here.
+  auto* carried = loweredIR();
+  if (carried == nullptr || carried->colorFPCount != colors.size() || !appendGrownCoverage()) {
+    return failLookup(renderTarget, isFinalLookup, "the draw carries no expression");
+  }
+  preparedProgramInfo = std::make_unique<ProgramInfo>(renderTarget, *geometryLayout, dstTexture,
+                                                      blendMode, !coverages.empty());
+  configureProgramInfo(preparedProgramInfo.get(), depthStencilFormat);
+  preparedProgramInfo->setCarriedIR(carried);
+  // Diagnostics only: the effect signature stays processor-based until the processors themselves
+  // go away, and it is built only when the cache records diagnostics, so a production draw pays
+  // nothing. Nothing that selects, keys or writes the program reads it.
+  auto* cache = ContextCacheAccess::Cache(renderTarget->getContext());
+  if (cache != nullptr && cache->diagnosticRecordingEnabled()) {
+    std::vector<const FragmentProcessor*> colorList = {};
+    std::vector<const FragmentProcessor*> coverageList = {};
+    colorList.reserve(colors.size());
+    coverageList.reserve(coverages.size());
+    for (const auto& color : colors) {
+      colorList.push_back(color.get());
+    }
+    for (const auto& coverage : coverages) {
+      coverageList.push_back(coverage.get());
+    }
+    preparedProgramInfo->setEffectSignature(BuildEffectSignature(
+        *geometryLayout, colorList, coverageList, preparedProgramInfo->getXferFacts()));
   }
   preparedProgram = preparedProgramInfo->getProgram();
   if (preparedProgram == nullptr) {

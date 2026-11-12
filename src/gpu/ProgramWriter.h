@@ -73,12 +73,12 @@ class ProgramWriter {
   virtual void writeEngineDefaults(const ProgramInfo& info, UniformData* fragmentUniformData) const;
 
   /**
-   * Writes the geometry processor's uniforms. The default feeds the processor the draw's
-   * coordinate transforms in tree order; the chain writer feeds it the compiled program's
-   * leaf-ordered transforms instead.
+   * Writes the geometry processor's uniforms. A concrete writer either declares them from the
+   * variant's layout (the declared families) or feeds the compiled program's leaf-ordered
+   * transforms (the chain writer); there is no processor-tree default left.
    */
   virtual void writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
-                                      UniformData* fragmentUniformData) const;
+                                      UniformData* fragmentUniformData) const = 0;
 
   /** Writes the fragment and xfer processors' per-instance uniforms. */
   virtual void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,

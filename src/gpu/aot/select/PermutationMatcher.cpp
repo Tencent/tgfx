@@ -215,16 +215,16 @@ const AOTTextureParameters* DeviceMaskCoverageLeaf(const DrawIR* ir) {
 // term is the geometry processor's own coverage — the matcher never saw it as a coverage FP, and
 // the prepare-time synthesis adds it only for the compile — so it is skipped here.
 std::optional<Coverage> ClassifyCoverageTerms(const ProgramInfo* programInfo) {
-  auto numFP = programInfo->numFragmentProcessors();
-  auto numColorFP = programInfo->numColorFragmentProcessors();
-  if (numFP == numColorFP) {
+  const auto* ir = programInfo->getCarriedIR();
+  if (ir == nullptr) {
+    // No expression: an FP-free draw has no coverage stage, and a draw that failed to lower is
+    // dropped before selection (see StandardDrawOp::prepare).
     return Coverage::None;
   }
-  if (numFP != numColorFP + 1) {
-    return std::nullopt;
+  if (ir->coverageFPCount == 0) {
+    return Coverage::None;
   }
-  auto* ir = programInfo->getCarriedIR();
-  if (ir == nullptr) {
+  if (ir->coverageFPCount != 1) {
     return std::nullopt;
   }
   const AOTCoverageTerm* classified = nullptr;

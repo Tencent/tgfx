@@ -321,13 +321,6 @@ void WriteGeometryUniformsByName(const GeometryLayout& layout, UniformData* vert
   }
 }
 
-void ProgramWriter::writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
-                                           UniformData* fragmentUniformData) const {
-  FragmentProcessor::CoordTransformIter coordTransformIter(&info);
-  WriteGeometryUniformsByName(info.getGeometryLayout(), vertexUniformData, fragmentUniformData,
-                              &coordTransformIter);
-}
-
 void PrecompiledProgramWriter::writeEngineDefaults(const ProgramInfo& info,
                                                    UniformData* fragmentUniformData) const {
   if (fragmentUniformData == nullptr) {
