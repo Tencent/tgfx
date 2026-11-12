@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DeviceSpaceTextureEffect.h"
+#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
 
@@ -42,6 +43,10 @@ bool DeviceSpaceTextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID inp
   parameters.isAlphaOnly = textureProxy->isAlphaOnly();
   parameters.hasPerspective = uvMatrix.hasPerspective();
   return builder->addTextureSource(input, parameters, output);
+}
+
+void DeviceSpaceTextureEffect::appendSamplers(std::vector<AOTSamplerRef>* samplers) const {
+  samplers->push_back({textureProxy, {}, false, false});
 }
 
 size_t DeviceSpaceTextureEffect::onCountTextureSamplers() const {

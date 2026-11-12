@@ -26,8 +26,10 @@
 #include "gpu/ProgramWriter.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/select/PrecompiledProgramCreator.h"
 #include "gpu/resources/RenderTarget.h"
+#include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/contract/ShaderProfileResolver.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -306,14 +308,27 @@ std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
       samplers.push_back(sampler);
     }
   }
-  FragmentProcessor::Iter iter(this);
-  const FragmentProcessor* fp = iter.next();
-  while (fp) {
-    for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
-      SamplerInfo sampler = {fp->textureAt(i), fp->samplerStateAt(i)};
-      samplers.push_back(sampler);
+  // The expression's samplers, recorded at lowering in the tree walk's order. A view that has not
+  // been instantiated yet contributes nothing unless the processor declared a view-independent
+  // count; a YUV view expands to its planes here, exactly as the processor enumeration did.
+  if (carriedIR != nullptr) {
+    for (const auto& ref : carriedIR->samplers) {
+      auto view = ref.textureProxy != nullptr ? ref.textureProxy->getTextureView() : nullptr;
+      if (view == nullptr) {
+        if (ref.countsWithoutView) {
+          samplers.push_back({nullptr, ref.state});
+        }
+        continue;
+      }
+      if (view->isYUV()) {
+        auto* yuvView = static_cast<const YUVTextureView*>(view.get());
+        for (size_t index = 0; index < yuvView->textureCount(); ++index) {
+          samplers.push_back({yuvView->getTextureAt(index), ref.state});
+        }
+      } else {
+        samplers.push_back({view->getTexture(), ref.state});
+      }
     }
-    fp = iter.next();
   }
   const auto& dstProxy = xferFacts.dstTexture.has_value() ? xferFacts.dstTexture->textureProxy
                                                           : DstTextureInfo{}.textureProxy;
@@ -324,5 +339,24 @@ std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
     samplers.push_back(sampler);
   }
   return samplers;
+}
+
+size_t ProgramInfo::suppliedColorSamplerCount() const {
+  if (carriedIR == nullptr) {
+    return 0;
+  }
+  size_t count = 0;
+  for (const auto& ref : carriedIR->samplers) {
+    if (ref.coverageSide) {
+      continue;
+    }
+    auto view = ref.textureProxy != nullptr ? ref.textureProxy->getTextureView() : nullptr;
+    if (view == nullptr) {
+      count += ref.countsWithoutView ? 1 : 0;
+      continue;
+    }
+    count += view->isYUV() ? static_cast<const YUVTextureView*>(view.get())->textureCount() : 1;
+  }
+  return count;
 }
 }  // namespace tgfx

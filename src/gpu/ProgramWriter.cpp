@@ -371,14 +371,7 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
   // (geometry-processor textures plus the color fragment-processor subtrees); the dummy for an
   // absent device mask must occupy that slot, pushing local-mask textures right.
   size_t colorSamplerCount = info.getGeometryLayout().parameters.atlasProxy != nullptr ? 1 : 0;
-  for (size_t i = 0; i < info.numColorFragmentProcessors(); ++i) {
-    FragmentProcessor::Iter colorIter(info.fragmentProcessors[i]);
-    const FragmentProcessor* cfp = colorIter.next();
-    while (cfp) {
-      colorSamplerCount += cfp->numTextureSamplers();
-      cfp = colorIter.next();
-    }
-  }
+  colorSamplerCount += info.suppliedColorSamplerCount();
   unsigned textureBinding = 0;
   auto gpu = info.renderTarget->getContext()->gpu();
   auto* cache = info.renderTarget->getContext()->globalCache();

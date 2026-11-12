@@ -623,10 +623,15 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     auto textureProxy = context->proxyProvider()->wrapTextureView(
         TextureView::MakeFrom(context, BackendTexture(glInfo, 7, 5), ImageOrigin::TopLeft, true));
     ASSERT_NE(textureProxy, nullptr);
-    auto fp = DeviceSpaceTextureEffect::Make(&allocator, std::move(textureProxy), Matrix::I());
+    auto fp = TextureEffect::Make(&allocator, std::move(textureProxy));
     ASSERT_NE(fp, nullptr);
     ProgramInfo programInfo(renderTarget.get(), gp, {fp.get()}, 1, std::nullopt,
                             BlendMode::SrcOver);
+    // The sampler list is read off the carried IR, so the draw needs the same lowering a real op
+    // gets before the gate can see its rectangle sampler.
+    auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
+    ASSERT_TRUE(ir.has_value());
+    programInfo.setCarriedIR(&*ir);
     EXPECT_FALSE(programInfo.samplersAre2D());
     // A rectangle sampler has no precompiled variant and is rejected by the matcher gate (it
     // would otherwise bind to a plain sampler2D).

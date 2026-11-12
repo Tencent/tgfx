@@ -158,6 +158,32 @@ std::optional<std::vector<AOTCoverageTerm>> LowerCoverageTerms(
 
 namespace {
 
+// The samplers one processor list consumes, in the legacy tree walk's enumeration order: a
+// pre-order traversal (each processor's own samplers, then its children), parents before children
+// so the order matches what the runtime sampler list reported before the IR existed.
+void AppendTreeSamplers(const std::vector<const FragmentProcessor*>& processors, bool coverageSide,
+                        std::vector<AOTSamplerRef>* samplers) {
+  std::vector<const FragmentProcessor*> stack = {};
+  for (auto it = processors.rbegin(); it != processors.rend(); ++it) {
+    stack.push_back(*it);
+  }
+  while (!stack.empty()) {
+    auto* processor = stack.back();
+    stack.pop_back();
+    if (processor == nullptr) {
+      continue;
+    }
+    const size_t before = samplers->size();
+    processor->appendSamplers(samplers);
+    for (size_t i = before; i < samplers->size(); ++i) {
+      (*samplers)[i].coverageSide = coverageSide;
+    }
+    for (size_t i = 0; i < processor->numChildProcessors(); ++i) {
+      stack.push_back(processor->childProcessor(processor->numChildProcessors() - 1 - i));
+    }
+  }
+}
+
 // The shared lowering core both LowerDraw entries converge on. atlasGlyphLeaf, when non-null, is
 // the already-synthesized AtlasText glyph leaf (ownedLeaves keeps it alive until the terms have
 // copied their plain data out); the atlas coverage-count gate keys on its presence.
@@ -200,6 +226,11 @@ std::optional<DrawIR> LowerDrawCore(const std::vector<const FragmentProcessor*>&
     return std::nullopt;
   }
   ir.coverage = std::move(*terms);
+  // The samplers the expression consumes, recorded while the processors are still reachable: the
+  // color trees first, then the coverage trees, each in the tree walk's pre-order. The runtime
+  // sampler list and the dummy-hole position read this record instead of walking the tree.
+  AppendTreeSamplers(colorProcessors, false, &ir.samplers);
+  AppendTreeSamplers(coverageProcessors, true, &ir.samplers);
   // The synthesized leaves only had to outlive LowerCoverageTerms; the arena owns the memory.
   (void)ownedLeaves;
   return ir;
@@ -213,6 +244,14 @@ std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& col
   // No glyph leaf: an AtlasText draw's glyph term comes from the op's own record-time facts
   // through LowerDrawWithAtlas, which is the only entry that produces one.
   return LowerDrawCore(colorProcessors, coverageProcessors, nullptr, {}, blendMode, allocator);
+}
+
+void AppendCoverageSamplers(const std::vector<const FragmentProcessor*>& coverageProcessors,
+                            DrawIR* ir) {
+  if (ir == nullptr) {
+    return;
+  }
+  AppendTreeSamplers(coverageProcessors, true, &ir->samplers);
 }
 
 std::optional<DrawIR> LowerDrawWithAtlas(

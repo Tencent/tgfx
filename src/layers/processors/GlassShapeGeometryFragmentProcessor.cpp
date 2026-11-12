@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
+#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {
@@ -40,6 +41,14 @@ GlassUDFGeometryFragmentProcessor::GlassUDFGeometryFragmentProcessor(
 
 void GlassUDFGeometryFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(enableEdgeLighting));
+}
+
+void GlassUDFGeometryFragmentProcessor::appendSamplers(std::vector<AOTSamplerRef>* samplers) const {
+  const SamplerState state(TileMode::Decal, TileMode::Decal);
+  samplers->push_back({maskProxy, state, false, true});
+  if (enableEdgeLighting) {
+    samplers->push_back({edgeMaskProxy, state, false, true});
+  }
 }
 
 size_t GlassUDFGeometryFragmentProcessor::onCountTextureSamplers() const {

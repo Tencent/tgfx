@@ -22,6 +22,7 @@
 #include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/YUVColorConversion.h"
+#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/shaders/modules/TextureSourceModule.h"
 
@@ -146,6 +147,10 @@ void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   flags |= constraint == SrcRectConstraint::Strict ? 32 : 0;
   flags |= coordTransform.matrix.hasPerspective() ? 64 : 0;
   bytesKey->write(flags);
+}
+
+void TextureEffect::appendSamplers(std::vector<AOTSamplerRef>* samplers) const {
+  samplers->push_back({textureProxy, samplerState, false, false});
 }
 
 size_t TextureEffect::onCountTextureSamplers() const {

@@ -54,6 +54,8 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
  protected:
   DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix);
 
+  void appendSamplers(std::vector<AOTSamplerRef>* samplers) const override;
+
   size_t onCountTextureSamplers() const override;
 
   std::shared_ptr<Texture> onTextureAt(size_t) const override;

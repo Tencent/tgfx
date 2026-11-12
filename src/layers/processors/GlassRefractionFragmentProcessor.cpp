@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
+#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/resources/TextureView.h"
 #include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
@@ -42,6 +43,10 @@ void GlassRefractionFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey)
     flags |= 2;
   }
   bytesKey->write(flags);
+}
+
+void GlassRefractionFragmentProcessor::appendSamplers(std::vector<AOTSamplerRef>* samplers) const {
+  samplers->push_back({sourceProxy, SamplerState(TileMode::Clamp, TileMode::Clamp), false, true});
 }
 
 size_t GlassRefractionFragmentProcessor::onCountTextureSamplers() const {

@@ -25,6 +25,7 @@
 #include "gpu/SamplerState.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/Swizzle.h"
+#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/shaders/modules/TiledSourceModule.h"
@@ -327,6 +328,10 @@ void TiledTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   flags |= sampling->strict ? static_cast<uint32_t>(1) << 8 : 0;
   flags |= sampling->hasPerspective ? static_cast<uint32_t>(1) << 9 : 0;
   bytesKey->write(flags);
+}
+
+void TiledTextureEffect::appendSamplers(std::vector<AOTSamplerRef>* samplers) const {
+  samplers->push_back({textureProxy, samplerState, false, false});
 }
 
 size_t TiledTextureEffect::onCountTextureSamplers() const {

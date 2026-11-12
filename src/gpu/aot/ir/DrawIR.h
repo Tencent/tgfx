@@ -20,6 +20,7 @@
 
 #include <optional>
 #include <vector>
+#include "gpu/SamplerState.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/ir/Program.h"
 #include "tgfx/core/BlendMode.h"
@@ -30,6 +31,24 @@ namespace tgfx {
 class BlockAllocator;
 class FragmentProcessor;
 class TextureProxy;
+
+/**
+ * One sampler the draw's expression consumes, recorded at lowering in the tree walk's order
+ * (parent before children, colors before coverages). The proxy resolves to a texture at bind
+ * time: an upload that has not landed yet contributes no sampler (or, for a processor whose
+ * declared count is view-independent, a null entry), and a YUV proxy expands to its planes.
+ * This is the data the runtime sampler list is built from, so no processor tree is read then.
+ */
+struct AOTSamplerRef {
+  std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  SamplerState state = {};
+  /// The entry came from a coverage processor (the writers' dummy-hole position reads it).
+  bool coverageSide = false;
+  /// The processor's declared sampler count does not depend on the view being instantiated
+  /// (GlassRefraction declares one, the glass shape declares one or two); such an entry occupies
+  /// a slot even before the texture exists. A view-derived count instead contributes nothing.
+  bool countsWithoutView = false;
+};
 
 /** What one coverage term of a draw is, decided once at lowering time by what the term is. */
 enum class AOTCoverageTermKind {
@@ -67,6 +86,9 @@ struct AOTCoverageTerm {
 struct DrawIR {
   AOTEffectGraph color = {};
   std::vector<AOTCoverageTerm> coverage = {};
+  /// The samplers the expression consumes, in the tree walk's enumeration order. Recorded at
+  /// lowering so the runtime sampler list and the writers read the IR instead of the processors.
+  std::vector<AOTSamplerRef> samplers = {};
   BlendMode blendMode = BlendMode::SrcOver;
   /// The sizes of the processor lists this IR was lowered from. The color graph cannot change
   /// after record time, so a color-count mismatch means the IR does not describe this draw. The
@@ -113,6 +135,15 @@ struct AOTAtlasGlyphSource {
 std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& colorProcessors,
                                 const std::vector<const FragmentProcessor*>& coverageProcessors,
                                 BlendMode blendMode, BlockAllocator* allocator);
+
+/**
+ * Appends the samplers of a coverage processor list that was attached after record time (a
+ * rasterized shape's mask grown at prepare) to the draw's sampler record, in the tree walk's
+ * order. The terms themselves are lowered separately (see DrawOp::appendGrownCoverage), so the
+ * sampler record must be extended in lockstep or the bind loses the mask texture.
+ */
+void AppendCoverageSamplers(const std::vector<const FragmentProcessor*>& coverageProcessors,
+                            DrawIR* ir);
 
 /**
  * The record-time entry: same classification and rejections as LowerDraw, but the glyph leaf is
