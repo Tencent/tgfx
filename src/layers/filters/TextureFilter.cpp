@@ -92,8 +92,8 @@ Rect TextureFilter::filterBounds(const Rect& srcRect, float contentScale, MapDir
   if (!std::isfinite(contentScale) || contentScale <= 0.0f) {
     return srcRect;
   }
-  auto params = MakeTextureGrainParams(_sizeX, _sizeY, _radius, Point::Zero(), _seed,
-                                       Point::Zero(), contentScale, _clipToShape);
+  auto params = MakeTextureGrainParams(_sizeX, _sizeY, _radius, Point::Zero(), _seed, Point::Zero(),
+                                       contentScale, _clipToShape);
   TextureImageFilter filter(params);
   return filter.filterBounds(srcRect, direction);
 }
