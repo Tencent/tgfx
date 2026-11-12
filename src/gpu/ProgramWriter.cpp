@@ -459,14 +459,14 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
         "unwritten kernel uniforms");
     return;
   }
+  // The leaf records and the shape selectors are addressed through the derived layout now; the
+  // rest of the chain block still rides the by-name binder until the remaining arrays migrate.
+  ParamBuffer buffer(vertexUniformData, fragmentUniformData);
+  SlotWriter chainWriter(layout, Chain, chainSlot, &buffer);
   // The shell-free value write: the draw's whole uniform content comes from the compiled program —
   // the root block plus every binding's per-child records — so no processor tree is walked. The
   // xfer processor still writes through its own bind until the xfer contract lands.
-  BindChainProgram(*program, vertexUniformData, fragmentUniformData);
-  // The leaf records are addressed through the derived layout now; the rest of the chain block
-  // still rides the by-name binder until the remaining arrays migrate.
-  ParamBuffer buffer(vertexUniformData, fragmentUniformData);
-  SlotWriter chainWriter(layout, Chain, chainSlot, &buffer);
+  BindChainProgram(*program, vertexUniformData, fragmentUniformData, &chainWriter);
   BindChainBindings(*program, &chainWriter);
   ParamWriter paramWriter(fragmentUniformData);
   const auto& xfer = info.getXferFacts();

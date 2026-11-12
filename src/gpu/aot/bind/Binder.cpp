@@ -304,36 +304,45 @@ void BindYUVProgram(const AOTProgram& program, UniformData* fragmentUniformData)
 }
 
 void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
-                      UniformData* fragmentUniformData) {
+                      UniformData* fragmentUniformData, SlotWriter* chainWriter) {
   const auto& slots = program.slots;
   const auto slotCount = slots.size();
   if (vertexUniformData != nullptr) {
-    // Absent in variants without a uvCoord attribute (the field is compiled out there).
+    // Absent in variants without a uvCoord attribute (the field is compiled out there). The mask
+    // belongs to the geometry module, not to Chain, so it stays name-addressed for now.
     vertexUniformData->setDataOptional(ChainParams::CoordSourceMask.name,
                                        static_cast<int>(program.coordSourceMask));
   }
-  if (fragmentUniformData == nullptr) {
+  if (fragmentUniformData == nullptr || chainWriter == nullptr) {
     return;
   }
+  // The shape selectors are addressed by their index in the Chain module's declaration: the
+  // writer's layout resolves each one to the field's block and offset once per program, so a draw
+  // composes no name. The four spec selectors exist in every variant; the rest carry a `when`
+  // mask, so an absent field is a legitimate cell of the profile set.
+  constexpr uint8_t SlotCount = UniformElementIndexOf(Chain, "SlotCount");
+  constexpr uint8_t RootIndex = UniformElementIndexOf(Chain, "RootIndex");
+  constexpr uint8_t CoverageRootIndex = UniformElementIndexOf(Chain, "CoverageRootIndex");
+  constexpr uint8_t ClipCoverageRegister = UniformElementIndexOf(Chain, "ClipCoverageRegister");
+  constexpr uint8_t HasMaskTexture = UniformElementIndexOf(Chain, "HasMaskTexture");
+  constexpr uint8_t DeviceLeafMask = UniformElementIndexOf(Chain, "DeviceLeafMask");
+  constexpr uint8_t GradientLUTLeaf = UniformElementIndexOf(Chain, "GradientLUTLeaf");
+  constexpr uint8_t TiledLeafIndex = UniformElementIndexOf(Chain, "TiledLeafIndex");
+  constexpr uint8_t TiledLeafIndex2 = UniformElementIndexOf(Chain, "TiledLeafIndex2");
   // The mask sampler slot is always bound in four-leaf variants; this flag selects the
   // runtime application. Absent in leaf-free variants (compile-time mask there).
-  fragmentUniformData->setDataOptional(ChainParams::HasMaskTexture.name,
-                                       program.hasMaskTexture ? 1 : 0);
-  fragmentUniformData->setDataOptional(ChainParams::RootIndex.name,
-                                       static_cast<int>(program.rootRegister));
-  fragmentUniformData->setDataOptional(ChainParams::CoverageRootIndex.name,
-                                       program.coverageRootRegister);
-  fragmentUniformData->setDataOptional(ChainParams::ClipCoverageRegister.name,
-                                       program.clipCoverageRegister);
-  fragmentUniformData->setDataOptional(ChainParams::SlotCount.name, static_cast<int>(slotCount));
+  chainWriter->setIfPresent(HasMaskTexture, program.hasMaskTexture ? 1 : 0);
+  chainWriter->set(RootIndex, static_cast<int>(program.rootRegister));
+  chainWriter->set(CoverageRootIndex, program.coverageRootRegister);
+  chainWriter->set(ClipCoverageRegister, program.clipCoverageRegister);
+  chainWriter->set(SlotCount, static_cast<int>(slotCount));
   // Written for every draw (absent in leaf-free variants): a stale mask from an earlier draw
   // would make an ordinary leaf sample in device space.
   uint32_t deviceMask = 0;
   for (const auto& deviceLeaf : program.deviceLeaves) {
     deviceMask |= 1u << static_cast<uint32_t>(deviceLeaf.leafIndex);
   }
-  fragmentUniformData->setDataOptional(ChainParams::DeviceLeafMask.name,
-                                       static_cast<int>(deviceMask));
+  chainWriter->setIfPresent(DeviceLeafMask, static_cast<int>(deviceMask));
   for (const auto& deviceLeaf : program.deviceLeaves) {
     // The leaf's uniform: destination fragment coordinates to the texture's sampling space.
     auto textureView = deviceLeaf.textureProxy->getTextureView();
@@ -370,7 +379,7 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
   }
   // Each selector names the leaf that reads the matching recipe set; the kernel never reads a set
   // whose selector is -1, so an absent recipe needs no upload.
-  fragmentUniformData->setDataOptional(ChainParams::GradientLUTLeaf.name, program.lutLeafIndex);
+  chainWriter->setIfPresent(GradientLUTLeaf, program.lutLeafIndex);
   if (program.profile == AOTResourceProfile::TiledGraph) {
     for (size_t index = 0; index < TiledGraphResourceCapacity.tiledRecipes; ++index) {
       int modes[] = {-1, 0, 0, 0};
@@ -395,8 +404,8 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
   } else {
     auto tiledLeaf = program.tiledLeaves.empty() ? -1 : program.tiledLeaves[0].leafIndex;
     auto tiledLeaf2 = program.tiledLeaves.size() < 2 ? -1 : program.tiledLeaves[1].leafIndex;
-    fragmentUniformData->setDataOptional(ChainParams::TiledLeafIndex.name, tiledLeaf);
-    fragmentUniformData->setDataOptional(ChainParams::TiledLeafIndex2.name, tiledLeaf2);
+    chainWriter->setIfPresent(TiledLeafIndex, tiledLeaf);
+    chainWriter->setIfPresent(TiledLeafIndex2, tiledLeaf2);
     for (size_t index = 0; index < program.tiledLeaves.size(); ++index) {
       UploadTiledRecipe(fragmentUniformData, program.tiledLeaves[index].recipe,
                         index == 0 ? ChainParams::TiledRecipe : ChainParams::TiledRecipe2);
