@@ -84,24 +84,6 @@ bool SlotIsDeclared(const std::vector<uint32_t>& slots, uint32_t location) {
 }
 #endif
 
-std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
-  std::array<float, 4> result = {};
-  result[0] = 2.f / static_cast<float>(renderTarget->width());
-  result[2] = 2.f / static_cast<float>(renderTarget->height());
-  result[1] = -1.f;
-  result[3] = -1.f;
-  if (renderTarget->origin() == ImageOrigin::BottomLeft) {
-    result[2] = -result[2];
-    result[3] = -result[3];
-  }
-  if (renderTarget->getContext()->backend() == Backend::WebGPU &&
-      renderTarget->origin() == ImageOrigin::TopLeft) {
-    result[2] = -result[2];
-    result[3] = -result[3];
-  }
-  return result;
-}
-
 // Frame (slot 0): the render-target adjust vector.
 void WriteFrame(const ProgramInfo& info, SlotWriter* writer) {
   constexpr uint8_t RTAdjust = UniformElementIndexOf(Frame, "RTAdjust");

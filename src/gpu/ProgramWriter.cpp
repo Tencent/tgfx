@@ -47,7 +47,7 @@
 #include "gpu/shaders/ParamBuffer.h"
 #include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/shaders/modules/Chain.h"
-#include "gpu/shaders/modules/EngineParams.h"
+#include "gpu/shaders/modules/Frame.h"
 #include "gpu/shaders/modules/Xfer.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
@@ -57,7 +57,7 @@ namespace tgfx {
 // The compiled YUV tail program, mirroring ChainProgram: kept on the draw's IR, compiled here
 // once when the match never needed to (the family's matching reads IR facts only).
 
-static std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
+std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
   std::array<float, 4> result = {};
   result[0] = 2.f / static_cast<float>(renderTarget->width());
   result[2] = 2.f / static_cast<float>(renderTarget->height());
@@ -127,14 +127,9 @@ bool ProgramWriter::canWrite(const ProgramInfo&) const {
 
 void ProgramWriter::writeUniformValues(const ProgramInfo& info, UniformData* vertexUniformData,
                                        UniformData* fragmentUniformData) const {
-  auto array = GetRTAdjustArray(info.renderTarget);
-  if (vertexUniformData != nullptr) {
-    // The legacy kernels spell the vector through EngineParams ("tgfx_RTAdjust"); the declared
-    // families' Frame module spell it "RTAdjust". Write whichever spelling the program carries —
-    // both are optional so the other one is a silent no-op instead of a log line per draw.
-    vertexUniformData->setDataOptional(EngineParams::RTAdjust.name, array);
-    vertexUniformData->setDataOptional("RTAdjust", array);
-  }
+  // The Frame module's RTAdjust is written by each route's geometry pass, addressed through its
+  // own derived layout: every writer here is a precompiled one, so no route needs a by-name
+  // fallback for it.
   writeEngineDefaults(info, fragmentUniformData);
 
   writeGeometryProcessor(info, vertexUniformData, fragmentUniformData);
@@ -478,6 +473,12 @@ void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
   // was compiled for owns the geometry fields, and Chain owns the coordinate transforms.
   const auto modules = ModulesOf(Families()[variant.family], variant);
   ParamBuffer buffer(vertexUniformData, fragmentUniformData);
+  // Frame (slot 0): the render-target adjust, the same element-addressed write as every other
+  // Chain-family field.
+  constexpr uint8_t FrameSlot = 0;
+  constexpr uint8_t RTAdjust = UniformElementIndexOf(Frame, "RTAdjust");
+  SlotWriter frameWriter(layout, Frame, FrameSlot, &buffer);
+  frameWriter.set(RTAdjust, GetRTAdjustArray(info.getRenderTarget()));
   SlotWriter chainWriter(layout, Chain, chainSlot, &buffer);
   SlotWriter geometryWriter(layout, *modules.list[geometrySlot], geometrySlot, &buffer);
   WriteChainGeometryUniforms(&geometryWriter, &chainWriter, info.getGeometryLayout().parameters,

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <array>
 #include "gpu/UniformData.h"
 #include "gpu/shaders/Family.h"
 #include "gpu/shaders/Layout.h"
@@ -27,6 +28,12 @@ namespace tgfx {
 class Program;
 class ProgramInfo;
 class RenderPass;
+class RenderTarget;
+
+/// The render-target adjust vector (2/width, -1, ±2/height, ±1): the Frame module's single field.
+/// The declared routes address it through their derived layouts, so both the chain and the
+/// declaration-driven writers take the value from here rather than each carrying a copy.
+std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget);
 
 /**
  * Writes one program's per-draw uniform values and texture bindings. A Program owns its writer;
