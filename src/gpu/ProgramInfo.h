@@ -115,8 +115,6 @@ class ProgramInfo {
    * Returns the index of the processor in the ProgramInfo. Returns -1 if the processor is not in
    * the ProgramInfo.
    */
-  int getProcessorIndex(const Processor* processor) const;
-
   /**
    * Resolves the program for this info from the caches. Precompiled artifacts are the only
    * program source: a miss drops the draw, with no runtime fallback. The first call also runs the
@@ -303,7 +301,6 @@ class ProgramInfo {
   RenderTarget* renderTarget = nullptr;
   GeometryProcessor* geometryProcessor = nullptr;
   std::vector<FragmentProcessor*> fragmentProcessors = {};
-  std::unordered_map<const Processor*, int> processorIndices = {};
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
   XferProcessor* xferProcessor = nullptr;
@@ -317,8 +314,6 @@ class ProgramInfo {
   CullMode cullMode = CullMode::None;
   DepthStencilDescriptor depthStencil = {};
   uint32_t colorWriteMask = ColorWriteMask::All;
-
-  void updateProcessorIndices();
 
   /// Derives the xfer facts from the processor once, at construction.
   void updateXferFacts();

@@ -36,9 +36,18 @@ BytesKey MakeProgramKey(Context* context, const ProgramInfo& info, uint32_t vari
   if (geometryProcessor != nullptr) {
     geometryProcessor->computeProcessorKey(context, &key);
   }
-  auto* xferProcessor = info.getXferProcessor();
-  if (xferProcessor != nullptr) {
-    xferProcessor->computeProcessorKey(context, &key);
+  // The output formula's key contribution: whether the shader runs the xfer stage, and the
+  // destination texture when the formula samples one. blendMode already rides the pipeline state
+  // key below, and a null proxy means the backend's framebuffer fetch (the third state the old
+  // processor's class ID used to encode).
+  const auto& xfer = info.getXferFacts();
+  key.write(static_cast<uint32_t>(xfer.shaderBlend ? 1u : 0u));
+  if (xfer.shaderBlend) {
+    const auto& dstProxy = xfer.dstTexture.textureProxy;
+    auto dstView = dstProxy != nullptr ? dstProxy->getTextureView() : nullptr;
+    if (dstView != nullptr) {
+      TextureView::ComputeTextureKey(dstView->getTexture(), &key);
+    }
   }
   // The blend formula reads this bit (see ProgramInfo::getPipelineColorAttachment), so it is
   // pipeline state even though it rides the processor list.

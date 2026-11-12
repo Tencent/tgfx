@@ -49,7 +49,6 @@ ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometry
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
       xferProcessor(xferProcessor), blendMode(blendMode) {
   hasCoverageForBlend = numColorProcessors < this->fragmentProcessors.size();
-  updateProcessorIndices();
   updateXferFacts();
 }
 
@@ -59,7 +58,6 @@ ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometry
     : renderTarget(renderTarget), geometryProcessor(geometryProcessor),
       xferProcessor(xferProcessor), blendMode(blendMode),
       hasCoverageForBlend(blendFormulaHasCoverage) {
-  updateProcessorIndices();
   updateXferFacts();
 }
 
@@ -76,20 +74,6 @@ void ProgramInfo::updateXferFacts() {
     xferFacts.dstTexture =
         static_cast<const PorterDuffXferProcessor*>(xferProcessor)->getDstTextureInfo();
   }
-}
-
-void ProgramInfo::updateProcessorIndices() {
-  int index = 0;
-  processorIndices[geometryProcessor] = index++;
-  for (auto& fragmentProcessor : fragmentProcessors) {
-    FragmentProcessor::Iter iter(fragmentProcessor);
-    const FragmentProcessor* fp = iter.next();
-    while (fp) {
-      processorIndices[fp] = index++;
-      fp = iter.next();
-    }
-  }
-  processorIndices[getXferProcessor()] = index++;
 }
 
 const XferProcessor* ProgramInfo::getXferProcessor() const {
@@ -126,14 +110,6 @@ PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
   colorAttachment.dstAlphaBlendFactor = blendFormula.dstFactor();
   colorAttachment.alphaBlendOp = blendFormula.operation();
   return colorAttachment;
-}
-
-int ProgramInfo::getProcessorIndex(const Processor* processor) const {
-  auto result = processorIndices.find(processor);
-  if (result == processorIndices.end()) {
-    return -1;
-  }
-  return result->second;
 }
 
 std::string ProgramInfo::FormatDiagnosticKey(const BytesKey& key) {
