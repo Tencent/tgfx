@@ -37,9 +37,7 @@ std::unique_ptr<ProgramWriter> MakeProgramWriter(const ProgramInfo& info, const 
   // instead of silently returning another family's writer at runtime.
   constexpr uint16_t chainIndex = FamilyIndexOf("Chain");
   if (variant.family == chainIndex) {
-    // The declared Chain family reuses the legacy interpreter's writer verbatim: the assembled
-    // block carries the same names, so every by-name write lands unchanged.
-    return std::make_unique<ChainProgramWriter>();
+    return std::make_unique<ChainProgramWriter>(variant);
   }
   if (variant.family >= FamilyCount()) {
     // Every variant reaching here came out of the family table's match rules, so an out-of-range

@@ -28,6 +28,7 @@ namespace tgfx {
 
 class UniformData;
 class ParamWriter;
+class SlotWriter;
 
 // The instruction contract's bind column (Binder.cpp's AOTOpContract): one function per op
 // that writes a per-slot parameter block. The caller writes the packed word and its selector with
@@ -74,7 +75,7 @@ void BindYUVProgram(const AOTProgram& program, UniformData* fragmentUniformData)
  * TextureEffects' module bind and the DeviceSpaceTextureEffect writer produced; this replaces
  * that walk, so the upload no longer depends on the child processors existing.
  */
-void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformData);
+void BindChainBindings(const AOTProgram& program, SlotWriter* chainWriter);
 
 ///
 /// Uploads one pointwise operator as chain slot 0: the packed word (operator value and selector

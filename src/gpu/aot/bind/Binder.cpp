@@ -27,9 +27,11 @@
 #include "gpu/resources/TextureView.h"
 #include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/KernelContract.h"
+#include "gpu/shaders/ParamBuffer.h"
 #include "gpu/shaders/contract/ChainOps.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/BlendParams.h"
+#include "gpu/shaders/modules/Chain.h"
 #include "gpu/shaders/modules/ChainParams.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
 #include "gpu/shaders/modules/ParamWriter.h"
@@ -509,7 +511,7 @@ void BindingSubsetRect(const AOTBinding& binding, const TextureView* view, float
 }
 
 // The device mask child's writes: its uv matrix scaled into the texture's sampling space.
-void BindDeviceMaskBinding(const AOTBinding& binding, UniformData* uniformData) {
+void BindDeviceMaskBinding(const AOTBinding& binding, SlotWriter* chainWriter) {
   auto textureView = binding.textureProxy->getTextureView();
   if (textureView == nullptr) {
     return;
@@ -517,39 +519,19 @@ void BindDeviceMaskBinding(const AOTBinding& binding, UniformData* uniformData) 
   auto deviceCoordMatrix = binding.uvMatrix;
   auto scale = textureView->getTextureCoord(1, 1);
   deviceCoordMatrix.postScale(scale.x, scale.y);
-  uniformData->setData("DeviceCoordMatrix", deviceCoordMatrix);
-  // Kernels with a runtime device mask read this flag; absent in compile-time-mask programs.
-  uniformData->setDataOptional("HasDeviceMask", 1);
-  // Shared precompiled kernels (a device mask alongside texture fills) declare a
-  // DeviceMaskSubset decoy: the mask's Subset/AlphaOnly writes would clobber the leaf processor's
-  // same-named fields, so they are routed there. The decoy is never read — these kernels sample
-  // the mask unclamped, matching the runtime emission.
-  bool sharedKernel = uniformData->hasField("DeviceMaskSubset");
-  if (sharedKernel) {
+  constexpr uint8_t DeviceCoordMatrix = UniformElementIndexOf(Chain, "DeviceCoordMatrix");
+  constexpr uint8_t DeviceMaskSubset = UniformElementIndexOf(Chain, "DeviceMaskSubset");
+  chainWriter->setIfPresent(DeviceCoordMatrix, deviceCoordMatrix);
+  // The Chain module declares the mask's decoy subset (the leaves own the shared kernel's
+  // Subset/Rect names); the fields the declared chain does not carry were silent no-ops in the
+  // by-name writer and stay absent here.
+  if (chainWriter->present(DeviceMaskSubset)) {
     float rect[4] = {0.0f, 0.0f, 1.0f, 1.0f};
     if (textureView->getTexture()->type() == TextureType::Rectangle) {
       rect[2] = static_cast<float>(textureView->width());
       rect[3] = static_cast<float>(textureView->height());
     }
-    uniformData->setData("DeviceMaskSubset", rect);
-  }
-  if (!sharedKernel && uniformData->hasField("Subset")) {
-    float rect[4] = {0.0f, 0.0f, 1.0f, 1.0f};
-    if (textureView->getTexture()->type() == TextureType::Rectangle) {
-      rect[2] = static_cast<float>(textureView->width());
-      rect[3] = static_cast<float>(textureView->height());
-    }
-    uniformData->setData("Subset", rect);
-  }
-  // AlphaOnly belongs to the draw's color source, not to the mask: the kernel samples the mask as
-  // .r unconditionally, so writing it here would overwrite a color atlas's AlphaOnly=0.
-  if (!sharedKernel && uniformData->hasField("Rect")) {
-    // The shared coverage_output.inc always evaluates the AARect clip term when HAS_COVERAGE >= 1.
-    // A bare device-space mask carries no RectEffect, so upload a rect that covers the whole plane.
-    uniformData->setData("Rect", Rect::MakeLTRB(-1e9f, -1e9f, 1e9f, 1e9f));
-  }
-  if (!sharedKernel && uniformData->hasField("HasClip")) {
-    uniformData->setData("HasClip", 0);
+    chainWriter->set(DeviceMaskSubset, rect);
   }
 }
 
@@ -616,44 +598,58 @@ void BindPorterDuffXfer(int blendMode, const DstTextureInfo& dstInfo, ParamWrite
   writer->set(PorterDuffXPModule::DstTextureCoordScale, scales);
 }
 
-void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformData) {
-  if (fragmentUniformData == nullptr) {
+void BindChainBindings(const AOTProgram& program, SlotWriter* chainWriter) {
+  if (chainWriter == nullptr) {
     return;
   }
-  ParamWriter writer(fragmentUniformData);
+  // The leaf records live in the Chain module, one declared element per leaf slot: the legacy
+  // ParamWriter composed "Subset_1".."Subset_3" from an instance ordinal, while the declared
+  // module spells the same fields as elements, so the slot index selects the element directly.
+  constexpr uint8_t Subsets[4] = {
+      UniformElementIndexOf(Chain, "Subset"), UniformElementIndexOf(Chain, "Subset_1"),
+      UniformElementIndexOf(Chain, "Subset_2"), UniformElementIndexOf(Chain, "Subset_3")};
+  constexpr uint8_t Clamps[4] = {UniformElementIndexOf(Chain, "SubsetClampOn"),
+                                 UniformElementIndexOf(Chain, "SubsetClampOn_1"),
+                                 UniformElementIndexOf(Chain, "SubsetClampOn_2"),
+                                 UniformElementIndexOf(Chain, "SubsetClampOn_3")};
+  constexpr uint8_t AlphaStarts[4] = {
+      UniformElementIndexOf(Chain, "AlphaStart"), UniformElementIndexOf(Chain, "AlphaStart_1"),
+      UniformElementIndexOf(Chain, "AlphaStart_2"), UniformElementIndexOf(Chain, "AlphaStart_3")};
+  constexpr uint8_t HasRgbaaas[4] = {
+      UniformElementIndexOf(Chain, "HasRgbaaa"), UniformElementIndexOf(Chain, "HasRgbaaa_1"),
+      UniformElementIndexOf(Chain, "HasRgbaaa_2"), UniformElementIndexOf(Chain, "HasRgbaaa_3")};
   // The TextureEffect-class children (leaves, the LUT gradient, the padding) share one
   // structural-ordinal sequence, exactly as the processor-tree walk numbered them; the device
   // mask is the only child of its class and keeps the base names.
   int textureOrdinal = 0;
   for (const auto& binding : program.bindings) {
     if (binding.kind == AOTBinding::Kind::Mask) {
-      writer.setInstanceOrdinal(0);
-      BindDeviceMaskBinding(binding, fragmentUniformData);
+      BindDeviceMaskBinding(binding, chainWriter);
       continue;
     }
-    writer.setInstanceOrdinal(static_cast<size_t>(textureOrdinal));
+    const int ordinal = textureOrdinal;
     ++textureOrdinal;
     auto textureView = binding.textureProxy->getTextureView();
-    if (textureView == nullptr) {
-      // The texture is not instantiated (a failed or deferred upload): the module writer returns
-      // without touching any field in this state, and so does the binder.
+    if (textureView == nullptr || ordinal >= 4) {
+      // A deferred upload writes nothing; a fifth texture child has no declared element (its
+      // ordinal-qualified name missed the block too).
       continue;
     }
     float rect[4] = {};
     BindingSubsetRect(binding, textureView.get(), rect);
-    writer.set(TextureSourceModule::Subset, rect);
+    chainWriter->setIfPresent(Subsets[ordinal], rect);
     // The lowering's own decision (a bounded sample area), not the fill-leaf gate's view facts:
     // a leaf can carry view facts that say "clamp" while this says off. Two gates, two facts —
     // deliberately.
-    writer.set(TextureSourceModule::SubsetClampOn, binding.args.sampleArea.has_value() ? 1 : 0);
+    chainWriter->setIfPresent(Clamps[ordinal], binding.args.sampleArea.has_value() ? 1 : 0);
     if (binding.alphaStart != Point::Zero()) {
       // Value-gated exactly like the module bind: single-plane draws leave the field at its
       // previous content, which the shader never reads (HasRgbaaa is 0).
       auto coord = textureView->getTextureCoord(binding.alphaStart.x, binding.alphaStart.y);
       const float alphaStart[2] = {coord.x, coord.y};
-      writer.set(TextureSourceModule::AlphaStart, alphaStart);
+      chainWriter->setIfPresent(AlphaStarts[ordinal], alphaStart);
     }
-    writer.set(TextureSourceModule::HasRgbaaa, binding.alphaStart != Point::Zero() ? 1 : 0);
+    chainWriter->setIfPresent(HasRgbaaas[ordinal], binding.alphaStart != Point::Zero() ? 1 : 0);
   }
 }
 

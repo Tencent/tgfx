@@ -44,8 +44,11 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/resources/RenderTarget.h"
+#include "gpu/shaders/Families.h"
+#include "gpu/shaders/ParamBuffer.h"
 #include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
+#include "gpu/shaders/modules/Chain.h"
 #include "gpu/shaders/modules/ColorSpaceParams.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
 #include "gpu/shaders/modules/EngineParams.h"
@@ -409,6 +412,20 @@ bool PrecompiledProgramWriter::canWrite(const ProgramInfo&) const {
 // write compiles it there, and every later caller reads it back — the transform, uniform and
 // sampler writes share one description, and a repeated prepare never recompiles.
 
+ChainProgramWriter::ChainProgramWriter(Variant variant)
+    : variant(std::move(variant)), layout(DeriveLayout(this->variant)) {
+  // The Chain module's slot in the variant's module sequence (after Frame and the geometry): the
+  // layout's elementField table is indexed by that slot, so the writers address the chain's
+  // fields by element index instead of by name.
+  const auto modules = ModulesOf(Families()[this->variant.family], this->variant);
+  for (uint8_t slot = 0; slot < modules.count; ++slot) {
+    if (modules.list[slot] == &Chain) {
+      chainSlot = slot;
+      break;
+    }
+  }
+}
+
 bool ChainProgramWriter::canWrite(const ProgramInfo& info) const {
   // The chain kernel's whole uniform content, transforms and sampler order come from the compiled
   // program; without it there is nothing correct to upload.
@@ -446,7 +463,11 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
   // the root block plus every binding's per-child records — so no processor tree is walked. The
   // xfer processor still writes through its own bind until the xfer contract lands.
   BindChainProgram(*program, vertexUniformData, fragmentUniformData);
-  BindChainBindings(*program, fragmentUniformData);
+  // The leaf records are addressed through the derived layout now; the rest of the chain block
+  // still rides the by-name binder until the remaining arrays migrate.
+  ParamBuffer buffer(vertexUniformData, fragmentUniformData);
+  SlotWriter chainWriter(layout, Chain, chainSlot, &buffer);
+  BindChainBindings(*program, &chainWriter);
   ParamWriter paramWriter(fragmentUniformData);
   const auto& xfer = info.getXferFacts();
   const auto* chainIR = info.getCarriedIR();

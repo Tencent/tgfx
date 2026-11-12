@@ -19,6 +19,8 @@
 #pragma once
 
 #include "gpu/UniformData.h"
+#include "gpu/shaders/Family.h"
+#include "gpu/shaders/Layout.h"
 
 namespace tgfx {
 
@@ -114,6 +116,10 @@ class PrecompiledProgramWriter : public ProgramWriter {
  */
 class ChainProgramWriter final : public PrecompiledProgramWriter {
  public:
+  /// The writer addresses the chain's uniform block by the variant's derived layout: the slot
+  /// index of the Chain module and the element indices of its fields are fixed per program.
+  explicit ChainProgramWriter(Variant variant);
+
   bool canWrite(const ProgramInfo& info) const override;
 
  protected:
@@ -123,6 +129,11 @@ class ChainProgramWriter final : public PrecompiledProgramWriter {
                        UniformData* fragmentUniformData) const override;
   void writeSamplers(const ProgramInfo& info, Program* program,
                      RenderPass* renderPass) const override;
+
+ private:
+  Variant variant;
+  Layout layout;
+  uint8_t chainSlot = 0;
 };
 
 }  // namespace tgfx
