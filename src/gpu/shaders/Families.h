@@ -98,17 +98,15 @@ inline constexpr FamilyModule QuadColorBody[] = {&DeviceMask, &AnalyticClip};
 
 /// The RRect family (the former NonAARRectFillShader): a non-AA rounded rect, optionally filled
 /// with a single-tap tiled texture, with the analytic clip riding the runtime contract. The
-/// textured form never combines with stroke (the old family's `allowed` rule carried over); FULL
-/// is pinned to 0 because this family serves the single-tap recipe only.
+/// textured form never combines with stroke at runtime (the match rule rejects that draw), so the
+/// product needs no variant-level exclusion. FULL is pinned to 0 because this family serves the
+/// single-tap recipe only.
 inline constexpr const Module* RRectGeometries[] = {&RRectGeometry};
 
 /// Dim pins for the TiledTexture slot: FULL fixed to 0, PRESENT free.
 inline constexpr int8_t RRectTiledTexturePins[] = {0, -1};
 
 inline constexpr FamilyModule RRectBody[] = {{&TiledTexture, RRectTiledTexturePins}, &AnalyticClip};
-
-/// Slot layout: Frame(0), RRectGeometry(1), TiledTexture(2), AnalyticClip(3), Xfer(4).
-bool RRectVariantAllowed(const Variant& variant, const Family& family);
 
 /// The Mesh family (the former MeshFillShader): the triangle mesh with no fragment processor. The
 /// top-level color comes from the per-vertex varying or the exact Color uniform; the family carried
@@ -282,49 +280,34 @@ inline constexpr FamilyModule ChainBody[] = {&Chain};
 /// with the legacy permutation set, so this function cannot drift from the old matcher's reachable
 /// set without failing the build.
 inline bool ChainVariantAllowed(const Variant& variant, const Family& family) {
-  // Every geometry declares the same (SUBSET, STROKE) pair so the family's ordinals decode against
-  // one flat domain; each geometry pins the dim it does not use to 0 here.
+  // Every geometry declares the same SUBSET dim so the family's ordinals decode against one flat
+  // domain; each geometry pins the dim it does not use to 0 here. The stroke form is the runtime
+  // StrokeEnabled uniform, so it is no dimension any more.
   const uint8_t subset = DimValueOf(family, variant, 1, 0);
-  const uint8_t stroke = DimValueOf(family, variant, 1, 1);
   const uint8_t profile = DimValueOf(family, variant, 2, 0);
   switch (variant.geometry) {
     case 0:
       // ChainRectGeometry: every profile is reachable; the per-quad subset exists only on the
       // plain four-leaf profile (the extended resource kinds carry no subset).
-      return stroke == 0 && (subset == 0 || profile == 2);
+      return subset == 0 || profile == 2;
     case 1:
       // ChainRectUVGeometry: the uvCoord layouts — a mask-only profile requires the attribute-less
       // layouts, and noise requires the uvless quad profile.
-      if (stroke != 0 || profile == 1 || profile == 4 || profile == 6) {
+      if (profile == 1 || profile == 4 || profile == 6) {
         return false;
       }
       return subset == 0 || profile == 2;
     case 2:
       // ChainAtlasGeometry: the atlas route always carries the four leaf slots.
-      return subset == 0 && stroke == 0 && (profile == 2 || profile == 5);
+      return subset == 0 && (profile == 2 || profile == 5);
     case 3:
       // ChainEllipseGeometry: the ellipse layout has no coverage or uvCoord attribute, so the
       // mask-only profiles and noise are unreachable.
-      return subset == 0 && stroke == 0 &&
-             (profile == 0 || profile == 2 || profile == 3 || profile == 5);
-    case 4:
-      // ChainHairlineGeometry: the mask is reachable, noise is not.
-      return subset == 0 && stroke == 0 && profile != 6;
-    case 5:
-      // ChainComplexGeometry: the STROKE dim selects fill (3) or stroke (4); the mask is
-      // reachable, noise is not.
-      return subset == 0 && profile != 6;
-    case 6:
-      // ChainRRectGeometry: the non-AA rounded rect's per-pixel SDF, mask reachable.
-      return subset == 0 && profile != 6;
-    case 7:
-      // ChainComplexRRectGeometry: the per-corner-radius rounded rect, same reachable set.
-      return subset == 0 && profile != 6;
-    case 8:
-      // ChainHairlineQuadGeometry: no stroke form; the Loop-Blinn edge is the coverage.
-      return subset == 0 && stroke == 0 && profile != 6;
+      return subset == 0 && (profile == 0 || profile == 2 || profile == 3 || profile == 5);
     default:
-      return false;
+      // The per-pixel coverage layouts (hairline line, complex rounded rect, the two non-AA
+      // rounded rects and the hairline quad): the mask is reachable, noise is not.
+      return subset == 0 && profile != 6;
   }
 }
 
@@ -336,7 +319,7 @@ inline constexpr Family FamilyTableStorage[] = {
     {"MaskFill", RectGeometries, 1, MaskFillBody, 1},
     {"TiledTextureFill", RectQuadGeometries, 2, TiledTextureFillBody, 1},
     {"QuadColor", QuadColorGeometries, 1, QuadColorBody, 2},
-    {"RRect", RRectGeometries, 1, RRectBody, 2, RRectVariantAllowed},
+    {"RRect", RRectGeometries, 1, RRectBody, 2},
     {"Mesh", MeshGeometries, 1, nullptr, 0},
     {"ShapeInstanced", ShapeInstancedGeometries, 1, nullptr, 0, ShapeInstancedVariantAllowed},
     {"ComplexRRect", ComplexRRectGeometries, 1, nullptr, 0},

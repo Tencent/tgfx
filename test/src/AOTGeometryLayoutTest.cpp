@@ -62,7 +62,6 @@ namespace {
 /// still checks the cell.
 bool DecodeChainCell(const Family& family, const Variant& variant, ChainLegacyCell* cell) {
   const uint8_t subset = DimValueOf(family, variant, 1, 0);
-  const uint8_t stroke = DimValueOf(family, variant, 1, 1);
   const uint8_t profile = DimValueOf(family, variant, 2, 0);
   cell->subset = subset;
   cell->xp = DimValueOf(family, variant, 3, 0);
@@ -87,7 +86,7 @@ bool DecodeChainCell(const Family& family, const Variant& variant, ChainLegacyCe
       cell->coverage = 0;
       break;
     default:
-      cell->gpLayout = 3 + stroke;
+      cell->gpLayout = 3;
       cell->coverage = 0;
       break;
   }
@@ -127,8 +126,9 @@ namespace {
 
 constexpr int SceneSize = 160;
 constexpr int HairlineLineLayout = 2;
-constexpr int ComplexRRectFillLayout = 3;
-constexpr int ComplexRRectStrokeLayout = 4;
+// The complex rounded rect's layout serves both the fill and the stroke form (StrokeEnabled is a
+// runtime uniform), so there is one value, not two.
+constexpr int ComplexRRectLayout = 3;
 
 enum class LayoutPaint { Solid, Image, Gradient, GradientTimesImage };
 enum class LayoutClip { None, TwoRRects, PathMask, PathMaskRRect };
@@ -489,7 +489,7 @@ void ExpectHairlineLineVariant(LayoutVariant variant) {
 
 void ExpectComplexRRectVariant(LayoutVariant variant, bool stroke) {
   variant.geometry = stroke ? LayoutGeometry::ComplexRRectStroke : LayoutGeometry::ComplexRRectFill;
-  variant.gpLayout = stroke ? ComplexRRectStrokeLayout : ComplexRRectFillLayout;
+  variant.gpLayout = ComplexRRectLayout;
   ExpectLayoutVariant(variant, "ComplexEllipse");
 }
 
@@ -690,7 +690,8 @@ void ExpectReportedShapeServed(const ReportedShape& shape) {
                             << seen;
     std::string misses = {};
     for (const auto& record : cache->fallbackRecords()) {
-      misses += record.effectSignature + "\n";
+      misses += record.effectSignature + " [" + PrecompiledFallbackReasonName(record.reason) +
+                "]\n";
     }
     EXPECT_TRUE(misses.empty()) << shape.label << " misses:\n" << misses;
     cache->setDiagnosticRecordingEnabled(false);

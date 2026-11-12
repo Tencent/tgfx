@@ -337,7 +337,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   }
   // The legacy reference set is frozen in ChainInputs (ChainEquivalenceTest pairs it with the
   // declared variants); the registry now enumerates the declared family alone.
-  EXPECT_EQ(ChainInputs::Reachable().size(), 201u);
+  EXPECT_EQ(ChainInputs::Reachable().size(), 147u);
   EXPECT_FALSE(EnumerateReachablePermutations("PointwiseChainShader").has_value());
   // The declaration-driven families enumerate their own ordinals: the geometry IS the family, so
   // SolidColor/MaskFill list HAS_XP alone and TiledTextureFill leads with the geometry radix.
@@ -351,19 +351,12 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   // geometry's VERTEX_COLOR and the Xfer's HAS_XP pinned to 0 by the product rule.
   const std::set<std::pair<uint32_t, uint32_t>> shapeCoveragePairs = {{0, 0}, {2, 2}};
   EXPECT_EQ(*EnumerateReachablePermutations("ShapeInstancedTextureCoverage"), shapeCoveragePairs);
-  // The RRect family (the declaration-driven successor of NonAARRectFillShader) keeps 9 pairs:
-  // the 12 forms of [STROKE, PRESENT, HAS_XP] minus the three PRESENT && STROKE combinations the
-  // family never serves (one form times three XP kinds). The property check restates the allowed
-  // rule independently of the shared enumerator.
-  const auto* rrectInfo = ShaderRegistry::Find("RRect");
-  ASSERT_NE(rrectInfo, nullptr);
+  // The RRect family (the declaration-driven successor of NonAARRectFillShader) keeps 6 pairs: the
+  // [PRESENT, HAS_XP] product. The stroke form is the runtime StrokeEnabled uniform, so it is no
+  // dimension; the match rule still rejects a textured stroke draw at runtime.
   const auto rrectPairs = EnumerateReachablePermutations("RRect");
   ASSERT_TRUE(rrectPairs.has_value());
-  EXPECT_EQ(rrectPairs->size(), 9u);
-  for (const auto& indices : *rrectPairs) {
-    EXPECT_FALSE(rrectInfo->fragDomain.valueOf(indices.second, "TiledTexture_PRESENT") != 0 &&
-                 rrectInfo->fragDomain.valueOf(indices.second, "RRectGeometry_STROKE") != 0);
-  }
+  EXPECT_EQ(rrectPairs->size(), 6u);
   EXPECT_EQ(ShaderRegistry::Find("UnknownShader"), nullptr);
   EXPECT_FALSE(EnumerateReachablePermutations("UnknownShader").has_value());
   EXPECT_FALSE(EnumerateReachablePermutations("UnknownShader").has_value());

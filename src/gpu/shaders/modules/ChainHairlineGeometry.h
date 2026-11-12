@@ -29,7 +29,7 @@ namespace tgfx {
 // geometry declares the same dim pair: SUBSET belongs to the rect classes, STROKE to the complex
 // class, and the family's allowed filter pins each geometry's unused dim to 0 (the variant space
 // multiplies by four and filters back to the reachable set).
-inline constexpr ModuleDim ChainHairlineGeometryDims[] = {{"SUBSET", 2}, {"STROKE", 2}};
+inline constexpr ModuleDim ChainHairlineGeometryDims[] = {{"SUBSET", 2}};
 
 inline constexpr Element ChainHairlineGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "aPosition"},
@@ -46,7 +46,7 @@ inline constexpr Element ChainHairlineGeometryElements[] = {
 
 inline constexpr Module ChainHairlineGeometry = {"ChainHairlineGeometry",
                                                  ChainHairlineGeometryDims,
-                                                 2,
+                                                 1,
                                                  ChainHairlineGeometryElements,
                                                  10,
                                                  true,

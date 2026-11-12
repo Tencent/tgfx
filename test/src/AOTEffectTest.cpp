@@ -2256,7 +2256,7 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
       chainSubsetPairs += fragValues[hasSubsetPos] != 0 ? 1 : 0;
     }
   }
-  EXPECT_EQ(plainPairs.size(), 102u);
+  EXPECT_EQ(plainPairs.size(), 75u);
   EXPECT_EQ(chainSubsetPairs, 6u);
   EXPECT_EQ(gradientPairs.size(), plainPairs.size() - chainSubsetPairs);
   EXPECT_EQ(reachable.size(), plainPairs.size() + gradientPairs.size() + noisePairs.size());

@@ -178,13 +178,6 @@ size_t FamilyCount() {
 
 /// The RRect family's product rule: the textured form never combines with stroke (the former
 /// NonAARRectFillShader's `allowed` predicate, carried over).
-bool RRectVariantAllowed(const Variant& variant, const Family& family) {
-  // Slot layout: Frame(0), RRectGeometry(1), TiledTexture(2), AnalyticClip(3), Xfer(4).
-  const uint8_t stroke = DimValueOf(family, variant, 1, 0);
-  const uint8_t present = DimValueOf(family, variant, 2, 1);
-  return !(present != 0 && stroke != 0);
-}
-
 /// The ShapeInstanced family's product rule: VERTEX_COLOR only reserves the geometry's
 /// stride-filler color slot, so the variant where it is present is never a real program.
 bool ShapeInstancedVariantAllowed(const Variant& variant, const Family&) {

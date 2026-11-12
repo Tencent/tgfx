@@ -1,10 +1,9 @@
 // Non-AA rounded-rect (uniform radii) edge coverage, shared by the RRect family's fill and
 // stroke variants. A rounded-rect SDF per pixel, a hard step for the
-// outer edge, and for strokes the inner edge SDF subtracted from it. Every caller passes a
-// compile-time constant for stroke, so the unused branch folds away; strokeWidth is only read when
-// stroke is set.
+// outer edge, and for strokes the inner edge SDF subtracted from it. The strokeEnabled uniform
+// selects the form at runtime, so fill draws skip the inner-edge math without a second variant.
 float nonAARRectCoverage(vec2 localCoord, vec4 rectBounds, vec2 radii, vec2 strokeWidth,
-                         bool stroke) {
+                         int strokeEnabled) {
   highp vec2 center = (rectBounds.xy + rectBounds.zw) * 0.5;
   highp vec2 halfSize = (rectBounds.zw - rectBounds.xy) * 0.5;
   highp vec2 q = abs(localCoord - center) - halfSize + radii;
@@ -12,7 +11,7 @@ float nonAARRectCoverage(vec2 localCoord, vec4 rectBounds, vec2 radii, vec2 stro
                   length(max(q / radii, vec2(0.0))) - 1.0;
   highp float outerCoverage = step(d, 0.0);
 
-  if (!stroke) {
+  if (strokeEnabled == 0) {
     return outerCoverage;
   }
 

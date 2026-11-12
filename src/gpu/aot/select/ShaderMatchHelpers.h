@@ -55,15 +55,11 @@ inline constexpr int Mesh = 2;
 inline constexpr int AtlasText = 3;
 inline constexpr int Ellipse = 4;
 inline constexpr int HairlineLine = 5;
-inline constexpr int ComplexEllipseFill = 6;
-inline constexpr int ComplexEllipseStroke = 7;
-// Appended: the layouts the non-AA rounded rects and the hairline quad ride. Append-only, like the
-// rest; the numbers are the axis values, not the kernels' GP_LAYOUT macros.
-inline constexpr int NonAARRectFill = 8;
-inline constexpr int NonAARRectStroke = 9;
-inline constexpr int ComplexRRectFill = 10;
-inline constexpr int ComplexRRectStroke = 11;
-inline constexpr int HairlineQuad = 12;
+// The stroke form is a runtime uniform on every layout, so no kind splits into fill/stroke.
+inline constexpr int ComplexEllipse = 6;
+inline constexpr int NonAARRect = 7;
+inline constexpr int ComplexRRect = 8;
+inline constexpr int HairlineQuad = 9;
 }  // namespace GpKind
 
 /// Maps the one geometry classification onto the chain's gpKind axis; nullopt when the chain has no

@@ -1,11 +1,11 @@
 // Complex non-AA rounded-rect (per-corner radii) edge coverage, shared by
 // the ComplexRRect family's fill and stroke variants. The corner quadrant selects
 // one arc center through the prefix-sum trick, the normalized-space inside-ellipse test is the outer
-// coverage, and for strokes the inner arc and inner rect tests are subtracted from it. Every caller
-// passes a compile-time constant for stroke, so the unused branch folds away; strokeWidth is only
-// read when stroke is set.
+// coverage, and for strokes the inner arc and inner rect tests are subtracted from it. The
+// strokeEnabled uniform selects the form at runtime, so fill draws skip the inner-edge math without
+// a second variant.
 float complexRRectCoverage(vec2 localCoord, vec4 rectBounds, vec4 xRadii, vec4 yRadii,
-                           vec2 strokeWidth, bool stroke) {
+                           vec2 strokeWidth, int strokeEnabled) {
   // Per-corner radii: xR/yR order is [TL, TR, BR, BL]
   highp vec4 cornersX = vec4(rectBounds.x, rectBounds.z, rectBounds.z, rectBounds.x);
   highp vec4 cornersY = vec4(rectBounds.y, rectBounds.y, rectBounds.w, rectBounds.w);
@@ -27,7 +27,7 @@ float complexRRectCoverage(vec2 localCoord, vec4 rectBounds, vec4 xRadii, vec4 y
   highp float insideEllipse = step(dot(ellipseOffset, ellipseOffset), 1.0);
   highp float outerCoverage = mix(1.0, insideEllipse, inAnyCorner);
 
-  if (!stroke) {
+  if (strokeEnabled == 0) {
     return outerCoverage;
   }
 

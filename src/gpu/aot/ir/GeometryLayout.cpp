@@ -148,7 +148,9 @@ GeometryLayout NonAARRectGeometryLayout(bool stroke, const std::optional<PMColor
   AppendSlot(&layout, Attribute{"inRadii", VertexFormat::Float2}, 2);
   AppendSlot(&layout, Attribute{"inRectBounds", VertexFormat::Float4}, 3);
   AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 4);
-  AppendSlot(&layout, stroke ? Attribute{"inStrokeWidth", VertexFormat::Float2} : Attribute{}, 5);
+  // The stroke width slot is unconditional (a fill batch writes zeros), matching the module's
+  // always-declared attribute and the provider's constant stride.
+  AppendSlot(&layout, Attribute{"inStrokeWidth", VertexFormat::Float2}, 5);
   return layout;
 }
 
@@ -165,7 +167,7 @@ GeometryLayout ComplexNonAARRectGeometryLayout(bool stroke,
   AppendSlot(&layout, Attribute{"inYRadii", VertexFormat::Float4}, 3);
   AppendSlot(&layout, Attribute{"inRectBounds", VertexFormat::Float4}, 4);
   AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 5);
-  AppendSlot(&layout, stroke ? Attribute{"inStrokeWidth", VertexFormat::Float2} : Attribute{}, 6);
+  AppendSlot(&layout, Attribute{"inStrokeWidth", VertexFormat::Float2}, 6);
   return layout;
 }
 
@@ -194,7 +196,9 @@ GeometryLayout ComplexEllipseGeometryLayout(bool stroke,
   AppendSlot(&layout, Attribute{"inEllipseOffset", VertexFormat::Float2}, 2);
   AppendSlot(&layout, Attribute{"inEllipseRadii", VertexFormat::Float4}, 3);
   AppendSlot(&layout, Attribute{"inEdgeDist", VertexFormat::Float2}, 4);
-  AppendSlot(&layout, stroke ? Attribute{"inStrokeWidth", VertexFormat::Float2} : Attribute{}, 5);
+  // The stroke width slot is unconditional (a fill batch writes zeros), matching the module's
+  // always-declared attribute and the provider's constant stride.
+  AppendSlot(&layout, Attribute{"inStrokeWidth", VertexFormat::Float2}, 5);
   return layout;
 }
 

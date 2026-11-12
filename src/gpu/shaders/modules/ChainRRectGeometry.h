@@ -22,14 +22,15 @@
 
 namespace tgfx {
 
-// The chain's non-AA rounded-rect layout (GP_LAYOUT 5 fill / 6 stroke): device-space vertices like
-// the RRect family's, the local coord and radii the per-pixel SDF reads, and the half-stroke-width
-// attribute only the stroke form carries. The attributes pair by ordinal with
-// RRectsVertexProvider's non-AA buffer, so the vertex buffer the RRect family consumes serves this
-// layout unchanged.
-// The family's ordinals decode against one flat domain across the geometries, so the dim pair
-// matches every other chain geometry and the allowed filter pins this geometry's unused dim.
-inline constexpr ModuleDim ChainRRectGeometryDims[] = {{"SUBSET", 2}, {"STROKE", 2}};
+// The chain's non-AA rounded-rect layout (GP_LAYOUT 5): device-space vertices like the RRect
+// family's, the local coord and radii the per-pixel SDF reads, and the half-stroke-width attribute.
+// The attribute is unconditional (the fill buffers write zeros) and the StrokeEnabled uniform
+// selects the coverage form at runtime, so one variant serves both forms. The attributes pair by
+// ordinal with RRectsVertexProvider's non-AA buffer, so the vertex buffer the RRect family consumes
+// serves this layout unchanged.
+// The family's ordinals decode against one flat domain across the geometries, so the dim matches
+// every other chain geometry and the allowed filter pins this geometry's unused value.
+inline constexpr ModuleDim ChainRRectGeometryDims[] = {{"SUBSET", 2}};
 
 inline constexpr Element ChainRRectGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "inPosition"},
@@ -37,18 +38,19 @@ inline constexpr Element ChainRRectGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "inRadii"},
     {Element::Kind::Attribute, ShaderType::Float4, "inRectBounds"},
     {Element::Kind::Attribute, ShaderType::Float4, "inColor"},
-    {Element::Kind::Attribute, ShaderType::Float2, "inStrokeWidth", 1, 1, 0x02},
+    {Element::Kind::Attribute, ShaderType::Float2, "inStrokeWidth"},
     {Element::Kind::Varying, ShaderType::Float2, "vLocalCoord"},
     {Element::Kind::Varying, ShaderType::Float2, "vRadii"},
     {Element::Kind::Varying, ShaderType::Float4, "vRectBounds"},
-    {Element::Kind::Varying, ShaderType::Float2, "vStrokeWidth", 1, 1, 0x02},
+    {Element::Kind::Varying, ShaderType::Float2, "vStrokeWidth"},
     {Element::Kind::Varying, ShaderType::Float4, "vColor"},
     {Element::Kind::Param, ShaderType::Float4, "Color"},
     {Element::Kind::Param, ShaderType::Int, "HasCommonColor"},
+    {Element::Kind::Param, ShaderType::Int, "StrokeEnabled"},
 };
 
 inline constexpr Module ChainRRectGeometry = {
-    "ChainRRectGeometry", ChainRRectGeometryDims, 2, ChainRRectGeometryElements, 13, true, true,
+    "ChainRRectGeometry", ChainRRectGeometryDims, 1, ChainRRectGeometryElements, 14, true, true,
     /*bareNames=*/true};
 
 }  // namespace tgfx

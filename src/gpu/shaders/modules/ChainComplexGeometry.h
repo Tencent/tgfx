@@ -22,14 +22,14 @@
 
 namespace tgfx {
 
-// The chain's complex rounded-rect layouts (GP_LAYOUT 3 fill / 4 stroke): device-space vertices
-// like the ellipse, the per-corner edge distances, and the half-stroke-width attribute that exists
-// only for the stroke form (hence the STROKE dim rather than a runtime flag).
+// The chain's complex rounded-rect layout (GP_LAYOUT 3): device-space vertices like the ellipse,
+// the per-corner edge distances, and the half-stroke-width attribute. The attribute is
+// unconditional (the fill buffers write zeros) and the StrokeEnabled uniform selects the coverage
+// form at runtime, so one variant serves both forms.
 // The family's ordinals decode against one flat domain across the geometries, so every chain
-// geometry declares the same dim pair: SUBSET belongs to the rect classes, STROKE to the complex
-// class, and the family's allowed filter pins each geometry's unused dim to 0 (the variant space
-// multiplies by four and filters back to the reachable set).
-inline constexpr ModuleDim ChainComplexGeometryDims[] = {{"SUBSET", 2}, {"STROKE", 2}};
+// geometry declares the same dim: SUBSET belongs to the rect classes, and the family's allowed
+// filter pins each geometry's unused value to 0.
+inline constexpr ModuleDim ChainComplexGeometryDims[] = {{"SUBSET", 2}};
 
 inline constexpr Element ChainComplexGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "inPosition"},
@@ -37,21 +37,22 @@ inline constexpr Element ChainComplexGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "inEllipseOffset"},
     {Element::Kind::Attribute, ShaderType::Float4, "inEllipseRadii"},
     {Element::Kind::Attribute, ShaderType::Float2, "inEdgeDist"},
-    {Element::Kind::Attribute, ShaderType::Float2, "inStrokeWidth", 1, 1, 0x02},
+    {Element::Kind::Attribute, ShaderType::Float2, "inStrokeWidth"},
     {Element::Kind::Varying, ShaderType::Float2, "vEllipseOffsets"},
     {Element::Kind::Varying, ShaderType::Float4, "vEllipseRadii"},
     {Element::Kind::Varying, ShaderType::Float2, "vEdgeDist"},
-    {Element::Kind::Varying, ShaderType::Float2, "vStrokeWidth", 1, 1, 0x02},
+    {Element::Kind::Varying, ShaderType::Float2, "vStrokeWidth"},
     {Element::Kind::Varying, ShaderType::Float4, "vColor"},
     {Element::Kind::Param, ShaderType::Float4, "Color"},
     {Element::Kind::Param, ShaderType::Int, "HasCommonColor"},
+    {Element::Kind::Param, ShaderType::Int, "StrokeEnabled"},
 };
 
 inline constexpr Module ChainComplexGeometry = {"ChainComplexGeometry",
                                                 ChainComplexGeometryDims,
-                                                2,
+                                                1,
                                                 ChainComplexGeometryElements,
-                                                13,
+                                                14,
                                                 true,
                                                 true,
                                                 /*bareNames=*/true};

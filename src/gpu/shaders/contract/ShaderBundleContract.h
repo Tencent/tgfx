@@ -474,7 +474,7 @@ inline bool ProfileAllowsPayload(ShaderProfile profile, uint16_t payloadFormat) 
  * still refuses bundles whose recorded ABI is not this value, which guards hand-carried or
  * cached bundle files.
  */
-inline constexpr uint32_t ExpectedToolchainABI = 0x00010020u;
+inline constexpr uint32_t ExpectedToolchainABI = 0x00010021u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

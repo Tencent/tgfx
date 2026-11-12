@@ -229,13 +229,13 @@ bool MatchRRect(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatch
   if (shape.xpType() < XP_NONE) {
     return false;
   }
-  // Slot layout: Frame(0), RRectGeometry(1: STROKE), TiledTexture(2: FULL pinned, PRESENT),
-  // AnalyticClip(3), Xfer(4: HAS_XP). The ordinal encodes [STROKE, PRESENT, HAS_XP].
-  const uint8_t stroke = shape.geometry.isStroke ? 1 : 0;
+  // Slot layout: Frame(0), RRectGeometry(1), TiledTexture(2: FULL pinned, PRESENT), AnalyticClip(3),
+  // Xfer(4: HAS_XP). The ordinal encodes [PRESENT, HAS_XP]; the stroke form is the runtime
+  // StrokeEnabled uniform, so it is no dimension.
   const uint8_t present = tiledLeaf != nullptr ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  // The free values in flattened order: [STROKE, PRESENT, HAS_XP] (FULL is pinned to 0).
-  if (!EncodeMatch(RRectIndex, 0, {stroke, present, hasXp}, &result->variant)) {
+  // The free values in flattened order: [PRESENT, HAS_XP] (FULL is pinned to 0).
+  if (!EncodeMatch(RRectIndex, 0, {present, hasXp}, &result->variant)) {
     return false;
   }
   result->tiledLeaf = tiledLeaf;
@@ -482,17 +482,16 @@ bool MatchGlassRefractionQuad(const ProgramInfo* /*info*/, const DrawShape& shap
 }
 
 /// The ComplexRRect family's rule, carried over from the former ComplexNonAARRectFillShader: the
-/// per-corner-radius rounded rect with no fragment processor and any xfer. STROKE is the geometry's
-/// own flag, so the ordinal is STROKE + 2 * HAS_XP.
+/// per-corner-radius rounded rect with no fragment processor and any xfer. The stroke form is the
+/// runtime StrokeEnabled uniform, so the ordinal is HAS_XP alone.
 bool MatchComplexRRect(const ProgramInfo* /*info*/, const DrawShape& shape,
                        FamilyMatchResult* result) {
   if (shape.geometry.kind != GeometryKind::ComplexNonAARRect || shape.fragmentCount != 0 ||
       shape.xpType() < XP_NONE) {
     return false;
   }
-  const uint8_t stroke = shape.geometry.isStroke ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(ComplexRRectIndex, 0, {stroke, hasXp}, &result->variant);
+  return EncodeMatch(ComplexRRectIndex, 0, {hasXp}, &result->variant);
 }
 
 /// The hairline families' shared rule, carried over from the former HairlineLineShader and
@@ -554,10 +553,9 @@ bool MatchComplexEllipse(const ProgramInfo* /*info*/, const DrawShape& shape,
       shape.xpType() < XP_NONE) {
     return false;
   }
-  const uint8_t stroke = shape.geometry.isStroke ? 1 : 0;
   const uint8_t present = *shape.coverage == Coverage::DeviceMask ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(ComplexEllipseIndex, 0, {stroke, present, hasXp}, &result->variant);
+  return EncodeMatch(ComplexEllipseIndex, 0, {present, hasXp}, &result->variant);
 }
 
 /// The RoundStrokeRect family's rule, carried over from the former RoundStrokeRectFillShader: the

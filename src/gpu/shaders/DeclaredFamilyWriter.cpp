@@ -140,8 +140,10 @@ void WriteTextureLeafParams(const AOTTextureParameters& leaf, SlotWriter* writer
 void WriteComplexRRectGeometry(const AOTGeometryParameters& params, SlotWriter* writer) {
   constexpr uint8_t Color = UniformElementIndexOf(ComplexRRectGeometry, "Color");
   constexpr uint8_t HasCommonColor = UniformElementIndexOf(ComplexRRectGeometry, "HasCommonColor");
+  constexpr uint8_t StrokeEnabled = UniformElementIndexOf(ComplexRRectGeometry, "StrokeEnabled");
   writer->set(Color, params.commonColor);
   writer->set(HasCommonColor, static_cast<int32_t>(params.hasCommonColor ? 1 : 0));
+  writer->set(StrokeEnabled, static_cast<int32_t>(params.isStroke ? 1 : 0));
 }
 
 // MeshGeometry: the view transform, the color pair and the texture coordinate chain.
@@ -631,13 +633,15 @@ void WriteEllipseGeometry(const AOTGeometryParameters& params, SlotWriter* write
   writer->set(StrokeEnabled, static_cast<int32_t>(params.isStroke ? 1 : 0));
 }
 
-// ComplexEllipseGeometry: the color pair; the ellipse data rides the varyings.
+// ComplexEllipseGeometry: the color pair and the stroke form; the ellipse data rides the varyings.
 void WriteComplexEllipseGeometry(const AOTGeometryParameters& params, SlotWriter* writer) {
   constexpr uint8_t Color = UniformElementIndexOf(ComplexEllipseGeometry, "Color");
   constexpr uint8_t HasCommonColor =
       UniformElementIndexOf(ComplexEllipseGeometry, "HasCommonColor");
+  constexpr uint8_t StrokeEnabled = UniformElementIndexOf(ComplexEllipseGeometry, "StrokeEnabled");
   writer->set(Color, params.commonColor);
   writer->set(HasCommonColor, static_cast<int32_t>(params.hasCommonColor ? 1 : 0));
+  writer->set(StrokeEnabled, static_cast<int32_t>(params.isStroke ? 1 : 0));
 }
 
 // RoundStrokeRectGeometry: the color pair, the AA flag and the analytic clip.
@@ -672,8 +676,10 @@ void WriteHairlineGeometry(const ProgramInfo& info, const AOTGeometryParameters&
 void WriteRRectGeometry(const AOTGeometryParameters& params, SlotWriter* writer) {
   constexpr uint8_t CommonColor = UniformElementIndexOf(RRectGeometry, "CommonColor");
   constexpr uint8_t HasCommonColor = UniformElementIndexOf(RRectGeometry, "HasCommonColor");
+  constexpr uint8_t StrokeEnabled = UniformElementIndexOf(RRectGeometry, "StrokeEnabled");
   writer->set(CommonColor, params.commonColor);
   writer->set(HasCommonColor, static_cast<int32_t>(params.hasCommonColor ? 1 : 0));
+  writer->set(StrokeEnabled, static_cast<int32_t>(params.isStroke ? 1 : 0));
 }
 
 /// The texture-space coordinate transform: the FP tree's coord transform at the given position

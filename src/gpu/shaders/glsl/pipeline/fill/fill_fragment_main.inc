@@ -64,12 +64,8 @@
 #define FILL_DEVICE_MASK_ALWAYS 1  // MaskTextureSampler through DeviceCoordMatrix
 #define FILL_DEVICE_MASK_RUNTIME 2  // the same, when HasDeviceMask != 0
 
-// STROKE selects the stroke form of the shape-coverage branches below. The families that
-// used them are declared now, so the guards resolve to the fill form here; the default
-// keeps the macro defined for the reference checker.
-#ifndef STROKE
-#define STROKE 0
-#endif
+// The shape-coverage branches select the stroke form through the runtime StrokeEnabled uniform, so
+// no compile-time STROKE macro exists any more.
 
 #ifndef FILL_COLOR
 #define FILL_COLOR FILL_COLOR_UNIFORM
@@ -251,23 +247,13 @@ float fillCoverageStage(inout vec4 result) {
 #elif FILL_COVERAGE == FILL_COVERAGE_HAIRLINE_QUAD
   return hairlineQuadEdgeCoverage(vHairQuadEdge, Coverage, AAEnabled);
 #elif FILL_COVERAGE == FILL_COVERAGE_RRECT
-#if STROKE
-  return nonAARRectCoverage(vLocalCoord, vRectBounds, vRadii, vStrokeWidth, true);
-#else
-  return nonAARRectCoverage(vLocalCoord, vRectBounds, vRadii, vec2(0.0), false);
-#endif
+  return nonAARRectCoverage(vLocalCoord, vRectBounds, vRadii, vStrokeWidth, StrokeEnabled);
 #elif FILL_COVERAGE == FILL_COVERAGE_COMPLEX_RRECT
-#if STROKE
-  return complexRRectCoverage(vLocalCoord, vRectBounds, vXRadii, vYRadii, vStrokeWidth, true);
-#else
-  return complexRRectCoverage(vLocalCoord, vRectBounds, vXRadii, vYRadii, vec2(0.0), false);
-#endif
+  return complexRRectCoverage(vLocalCoord, vRectBounds, vXRadii, vYRadii, vStrokeWidth,
+                              StrokeEnabled);
 #elif FILL_COVERAGE == FILL_COVERAGE_COMPLEX_ELLIPSE
-#if STROKE
-  return complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vStrokeWidth, true);
-#else
-  return complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vec2(0.0), false);
-#endif
+  return complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vStrokeWidth,
+                                    StrokeEnabled);
 #elif FILL_COVERAGE == FILL_COVERAGE_ROUND_STROKE
   // AA is a runtime select (AAEnabled): the non-AA branch reads only the offsets, so the coverage
   // and radii varyings are inert when it is off.

@@ -139,9 +139,8 @@ struct ChainInputs {
 
   /// Shared input contract for the plain chains and the extended resource kinds. gpKind selects
   /// (0 = DefaultGP, 1 = QuadPerEdgeAA, 2 = Mesh, 3 = sampler-free AtlasText twin, 4 = Ellipse,
-  /// 5 = HairlineLine, 6 = ComplexEllipse fill, 7 = ComplexEllipse stroke, 8 = NonAARRect fill,
-  /// 9 = NonAARRect stroke, 10 = ComplexNonAARRect fill, 11 = ComplexNonAARRect stroke,
-  /// 12 = HairlineQuad); each profile fixes
+  /// 5 = HairlineLine, 6 = ComplexEllipse, 7 = NonAARRect, 8 = ComplexNonAARRect,
+  /// 9 = HairlineQuad); each profile fixes
   /// which attribute slots its vertex buffers carry, and Compose rejects profile-inconsistent
   /// combinations. The chain slot topology (ops, indices) is runtime data; only the leaf-count
   /// class, the mask flag, and the transfer type shape the shared dimensions. TiledGraph adds a
@@ -346,34 +345,27 @@ struct ChainInputs {
         gpLayout = 2;
         break;
       case 6:
-      case 7:
         // ComplexEllipseGP buffers are (position, color, ellipseOffset, ellipseRadii, edgeDist,
-        // [strokeWidth]): device-space like the ellipse, with per-pixel coverage and no coverage or
-        // uvCoord attribute. The stroke form (7) adds the strokeWidth attribute, hence its own
-        // layout.
+        // strokeWidth): device-space like the ellipse, with per-pixel coverage and no coverage or
+        // uvCoord attribute. The stroke form is the StrokeEnabled uniform, so one layout serves
+        // both forms.
         if (inputs.hasCoverage || inputs.hasUVCoord) {
           return false;
         }
-        gpLayout = inputs.gpKind == GpKind::ComplexEllipseFill ? 3 : 4;
+        gpLayout = 3;
         break;
+      case 7:
       case 8:
       case 9:
-      case 10:
-      case 11:
-      case 12:
         // The non-AA rounded-rect SDFs and the hairline quad evaluate per-pixel edge coverage from
         // their own varyings: like the ellipse layouts they carry no coverage or uvCoord slot.
         if (inputs.hasCoverage || inputs.hasUVCoord) {
           return false;
         }
-        if (inputs.gpKind == GpKind::NonAARRectFill) {
+        if (inputs.gpKind == GpKind::NonAARRect) {
           gpLayout = 5;
-        } else if (inputs.gpKind == GpKind::NonAARRectStroke) {
-          gpLayout = 6;
-        } else if (inputs.gpKind == GpKind::ComplexRRectFill) {
+        } else if (inputs.gpKind == GpKind::ComplexRRect) {
           gpLayout = 7;
-        } else if (inputs.gpKind == GpKind::ComplexRRectStroke) {
-          gpLayout = 8;
         } else {
           gpLayout = 9;
         }

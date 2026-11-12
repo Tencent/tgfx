@@ -104,14 +104,13 @@ TEST(ChainEquivalenceTest, DeclaredVariantsBijectTheLegacyReachableSet) {
                           fragDomain.valueOf(pair.second, "HAS_SUBSET"),
                           fragDomain.valueOf(pair.second, "RESOURCE_KIND")));
   }
-  ASSERT_EQ(legacy.size(), 201u);
+  ASSERT_EQ(legacy.size(), 147u);
 
   const Family& family = Families()[chainIndex];
   const auto variants = EnumerateVariants(family, chainIndex);
   std::set<std::string> declared;
   for (const auto& variant : variants) {
     const uint8_t subset = DimValueOf(family, variant, 1, 0);
-    const uint8_t stroke = DimValueOf(family, variant, 1, 1);
     const uint8_t profile = DimValueOf(family, variant, 2, 0);
     const uint8_t xp = DimValueOf(family, variant, 3, 0);
     int gpLayout = 0;
@@ -136,15 +135,15 @@ TEST(ChainEquivalenceTest, DeclaredVariantsBijectTheLegacyReachableSet) {
         coverage = 0;
         break;
       case 5:  // ChainComplexGeometry
-        gpLayout = 3 + stroke;
+        gpLayout = 3;
         coverage = 0;
         break;
       case 6:  // ChainRRectGeometry
-        gpLayout = 5 + stroke;
+        gpLayout = 5;
         coverage = 0;
         break;
       case 7:  // ChainComplexRRectGeometry
-        gpLayout = 7 + stroke;
+        gpLayout = 7;
         coverage = 0;
         break;
       default:  // ChainHairlineQuadGeometry

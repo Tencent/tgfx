@@ -2,11 +2,10 @@
 // pointwise chain kernel's GP_LAYOUT==3 (fill) / GP_LAYOUT==4 (stroke) paths. The math is the
 // offset-based region dispatch: corner ellipse distance, linear edge distance, full interior, then
 // the inner curve for strokes. Both callers share this file so they stay byte-exact with each
-// other. Every caller
-// passes a compile-time constant for stroke, so the unused branch folds away; strokeWidth is only
-// read when stroke is set.
+// other. The strokeEnabled uniform selects the form at runtime, so fill draws skip the inner-curve
+// math without a second variant.
 float complexEllipseEdgeCoverage(vec2 ellipseOffsets, vec4 ellipseRadii, vec2 edgeDist,
-                                 vec2 strokeWidth, bool stroke) {
+                                 vec2 strokeWidth, int strokeEnabled) {
   highp vec2 offset = ellipseOffsets;
   highp vec2 eDist = edgeDist;
 
@@ -16,7 +15,7 @@ float complexEllipseEdgeCoverage(vec2 ellipseOffsets, vec4 ellipseRadii, vec2 ed
   highp float outerAlpha;
   if (hasXCurve && hasYCurve) {
     highp vec2 safeOffset = max(offset, vec2(1.0 / 4096.0));
-    if (stroke) {
+    if (strokeEnabled != 0) {
       safeOffset *= ellipseRadii.xy;
     }
     highp float test = dot(safeOffset, safeOffset) - 1.0;
@@ -32,7 +31,7 @@ float complexEllipseEdgeCoverage(vec2 ellipseOffsets, vec4 ellipseRadii, vec2 ed
     outerAlpha = 1.0;
   }
 
-  if (stroke) {
+  if (strokeEnabled != 0) {
     highp vec2 sw = strokeWidth;
     highp float innerAlpha;
     if (hasXCurve && hasYCurve) {

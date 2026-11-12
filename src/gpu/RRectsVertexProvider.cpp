@@ -352,13 +352,10 @@ class NonAARRectsVertexProvider final : public RRectsVertexProvider {
 
   size_t vertexCount() const override {
     // Non-AA simple: 4 vertices per RRect.
-    //   position(2) + localCoord(2) + radii(2) + rectBounds(4) + color(1) = 11
-    //   Optional: halfStrokeWidth(2). The color slot is unconditional: the consuming geometry
-    //   processor (NonAARRectGP) declares the color attribute in every variant.
-    size_t floatsPerVertex = 11;
-    if (bitFields.hasStroke) {
-      floatsPerVertex += 2;
-    }
+    //   position(2) + localCoord(2) + radii(2) + rectBounds(4) + color(1) + strokeWidth(2) = 13.
+    //   The stroke width slot is unconditional (a fill batch writes zeros) so one vertex layout
+    //   serves both forms; the color slot is unconditional for the same reason.
+    size_t floatsPerVertex = 13;
     return rects.size() * 4 * floatsPerVertex;
   }
 
@@ -419,11 +416,9 @@ class NonAARRectsVertexProvider final : public RRectsVertexProvider {
         vertices[index++] = rect.bottom;
         // The color slot is unconditional: common-color batches broadcast the paint color.
         std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
-        // strokeWidth (2 floats) - only for stroke mode
-        if (bitFields.hasStroke) {
-          vertices[index++] = strokeParams.halfStrokeX;
-          vertices[index++] = strokeParams.halfStrokeY;
-        }
+        // strokeWidth (2 floats): zeros for a fill batch, so the slot stays unconditional.
+        vertices[index++] = strokeParams.halfStrokeX;
+        vertices[index++] = strokeParams.halfStrokeY;
       }
       currentIndex++;
     }
@@ -446,14 +441,10 @@ class AAComplexRRectsVertexProvider final : public RRectsVertexProvider {
 
   size_t vertexCount() const override {
     // AA complex: 16 vertices per RRect.
-    //   position(2) + color(1) + ellipseOffset(2) + ellipseRadii(4) + edgeDist(2) = 11
-    //   Optional: halfStrokeWidth(2).
-    // The color slot is unconditional: the consuming geometry processors (ComplexEllipseGP and
-    // the chain's L3/L4 layouts) declare the color attribute in every variant.
-    size_t floatsPerVertex = 11;
-    if (bitFields.hasStroke) {
-      floatsPerVertex += 2;
-    }
+    //   position(2) + color(1) + ellipseOffset(2) + ellipseRadii(4) + edgeDist(2) + strokeWidth(2)
+    //   = 13. The stroke width and color slots are unconditional (a fill batch writes zeros) so one
+    //   vertex layout serves both forms.
+    size_t floatsPerVertex = 13;
     return rects.size() * 16 * floatsPerVertex;
   }
 
@@ -537,10 +528,9 @@ class AAComplexRRectsVertexProvider final : public RRectsVertexProvider {
           vertices[index++] = recipRadii[corner][3];
           vertices[index++] = ComplexCornerEdgeDistanceX(corner, localX, rectBounds);
           vertices[index++] = ComplexCornerEdgeDistanceY(corner, localY, rectBounds);
-          if (bitFields.hasStroke) {
-            vertices[index++] = strokeParams.halfStrokeX;
-            vertices[index++] = strokeParams.halfStrokeY;
-          }
+          // strokeWidth (2 floats): zeros for a fill batch, so the slot stays unconditional.
+          vertices[index++] = strokeParams.halfStrokeX;
+          vertices[index++] = strokeParams.halfStrokeY;
         }
       }
       currentIndex++;
@@ -564,13 +554,10 @@ class NonAAComplexRRectsVertexProvider final : public RRectsVertexProvider {
 
   size_t vertexCount() const override {
     // Non-AA complex: 4 vertices per RRect.
-    //   position(2) + localCoord(2) + xRadii(4) + yRadii(4) + rectBounds(4) + color(1) = 17
-    //   Optional: halfStrokeWidth(2). The color slot is unconditional: the consuming geometry
-    //   processor (ComplexNonAARRectGP) declares the color attribute in every variant.
-    size_t floatsPerVertex = 17;
-    if (bitFields.hasStroke) {
-      floatsPerVertex += 2;
-    }
+    //   position(2) + localCoord(2) + xRadii(4) + yRadii(4) + rectBounds(4) + color(1) +
+    //   strokeWidth(2) = 19. The stroke width and color slots are unconditional (a fill batch
+    //   writes zeros) so one vertex layout serves both forms.
+    size_t floatsPerVertex = 19;
     return rects.size() * 4 * floatsPerVertex;
   }
 
@@ -637,11 +624,9 @@ class NonAAComplexRRectsVertexProvider final : public RRectsVertexProvider {
         vertices[index++] = rect.bottom;
         // The color slot is unconditional: common-color batches broadcast the paint color.
         std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
-        // strokeWidth (2 floats) - only for stroke mode
-        if (bitFields.hasStroke) {
-          vertices[index++] = strokeParams.halfStrokeX;
-          vertices[index++] = strokeParams.halfStrokeY;
-        }
+        // strokeWidth (2 floats): zeros for a fill batch, so the slot stays unconditional.
+        vertices[index++] = strokeParams.halfStrokeX;
+        vertices[index++] = strokeParams.halfStrokeY;
       }
       currentIndex++;
     }

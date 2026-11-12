@@ -8,11 +8,11 @@
 #include "geometry/ellipse_coverage.inc"
 #elif GP_LAYOUT == 2
 #include "geometry/hairline_line_coverage.inc"
-#elif GP_LAYOUT == 3 || GP_LAYOUT == 4
+#elif GP_LAYOUT == 3
 #include "geometry/complex_ellipse_coverage.inc"
-#elif GP_LAYOUT == 5 || GP_LAYOUT == 6
+#elif GP_LAYOUT == 5
 #include "geometry/rrect_coverage.inc"
-#elif GP_LAYOUT == 7 || GP_LAYOUT == 8
+#elif GP_LAYOUT == 7
 #include "geometry/complex_rrect_coverage.inc"
 #elif GP_LAYOUT == 9
 #include "geometry/hairline_quad_coverage.inc"

@@ -1,6 +1,8 @@
 // ComplexRRectGeometry vertex hook: the corner data forwarded to the fragment stage. The position
-// is already in device space. The expressions are verbatim from the former
-// kernels/complex_non_aa_rrect_fill.vert.
+// is already in device space. The stroke width attribute is unconditional and the StrokeEnabled
+// uniform selects the coverage form, so one variant serves the fill and the stroke form. The
+// expressions are verbatim from the former kernels/complex_non_aa_rrect_fill.vert.
+
 void ComplexRRectGeometry_vertex(inout Vertex v) {
   v.position = ComplexRRectGeometry_Position;
   v.localCoord = ComplexRRectGeometry_LocalCoord;
@@ -9,7 +11,5 @@ void ComplexRRectGeometry_vertex(inout Vertex v) {
   ComplexRRectGeometry_vYRadii = ComplexRRectGeometry_YRadii;
   ComplexRRectGeometry_vRectBounds = ComplexRRectGeometry_RectBounds;
   ComplexRRectGeometry_vColor = ComplexRRectGeometry_InColor;
-#if ComplexRRectGeometry_STROKE
   ComplexRRectGeometry_vStrokeWidth = ComplexRRectGeometry_StrokeWidth;
-#endif
 }

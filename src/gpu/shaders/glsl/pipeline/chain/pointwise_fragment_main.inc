@@ -100,10 +100,10 @@ vec4 chainResults[TGFX_CHAIN_REGISTERS];
 // the OP_TEXTURE branch of evalChainSlot reads them back by instruction index.
 vec4 chainLeafTex[4];
 
-// The per-pixel GP edge coverage of the layouts that carry one (GP_LAYOUT 1..9: ellipse,
-// hairline-line, complex ellipse, non-AA rounded rects and hairline quad). Computed ahead of the
-// chain evaluation in main so the coverage subtree's unit input can consume it like the rect
-// layouts' vCoverage varying; 1.0 keeps the define valid for every other variant.
+// The per-pixel GP edge coverage of the layouts that carry one (GP_LAYOUT 1, 2, 3, 5, 7, 9:
+// ellipse, hairline-line, complex rounded rect, the non-AA rounded rects and the hairline quad).
+// Computed ahead of the chain evaluation in main so the coverage subtree's unit input can consume
+// it like the rect layouts' vCoverage varying; 1.0 keeps the define valid for the rect variants.
 highp float gpPixelCoverage = 1.0;
 
 // Geometry color source: the per-vertex color attribute, or the exact Color uniform for
@@ -183,25 +183,18 @@ void chainMain() {
   // The hairline edge coverage (Coverage * edge alpha), with the same contract as the ellipse.
   gpPixelCoverage = hairlineLineEdgeCoverage(vEdgeDistance, Coverage, AAEnabled);
 #elif GP_LAYOUT == 3
-  // The complex rounded-rect fill coverage (per-corner radii), same contract as the ellipse.
-  gpPixelCoverage =
-      complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vec2(0.0), false);
-#elif GP_LAYOUT == 4
-  // The complex rounded-rect stroke coverage: the outer curve times the inner one.
-  gpPixelCoverage =
-      complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vStrokeWidth, true);
+  // The complex rounded-rect coverage (per-corner radii), same contract as the ellipse;
+  // StrokeEnabled selects the fill or the stroke form at runtime.
+  gpPixelCoverage = complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist,
+                                               vStrokeWidth, StrokeEnabled);
 #elif GP_LAYOUT == 5
   // The non-AA rounded-rect SDF, hard-stepped exactly like the RRect family.
-  gpPixelCoverage = nonAARRectCoverage(vLocalCoord, vRectBounds, vRadii, vec2(0.0), false);
-#elif GP_LAYOUT == 6
-  gpPixelCoverage = nonAARRectCoverage(vLocalCoord, vRectBounds, vRadii, vStrokeWidth, true);
+  gpPixelCoverage =
+      nonAARRectCoverage(vLocalCoord, vRectBounds, vRadii, vStrokeWidth, StrokeEnabled);
 #elif GP_LAYOUT == 7
   // The per-corner-radius rounded-rect SDF, the ComplexRRect family's formula.
-  gpPixelCoverage =
-      complexRRectCoverage(vLocalCoord, vRectBounds, vXRadii, vYRadii, vec2(0.0), false);
-#elif GP_LAYOUT == 8
-  gpPixelCoverage =
-      complexRRectCoverage(vLocalCoord, vRectBounds, vXRadii, vYRadii, vStrokeWidth, true);
+  gpPixelCoverage = complexRRectCoverage(vLocalCoord, vRectBounds, vXRadii, vYRadii, vStrokeWidth,
+                                         StrokeEnabled);
 #elif GP_LAYOUT == 9
   // The Loop-Blinn quad edge (Coverage * edge alpha), the same call the dedicated family makes.
   gpPixelCoverage = hairlineQuadEdgeCoverage(vHairQuadEdge, Coverage, AAEnabled);

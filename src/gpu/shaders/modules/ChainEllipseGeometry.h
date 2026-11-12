@@ -28,7 +28,7 @@ namespace tgfx {
 // geometry declares the same dim pair: SUBSET belongs to the rect classes, STROKE to the complex
 // class, and the family's allowed filter pins each geometry's unused dim to 0 (the variant space
 // multiplies by four and filters back to the reachable set).
-inline constexpr ModuleDim ChainEllipseGeometryDims[] = {{"SUBSET", 2}, {"STROKE", 2}};
+inline constexpr ModuleDim ChainEllipseGeometryDims[] = {{"SUBSET", 2}};
 
 inline constexpr Element ChainEllipseGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "inPosition"},
@@ -45,7 +45,7 @@ inline constexpr Element ChainEllipseGeometryElements[] = {
 
 inline constexpr Module ChainEllipseGeometry = {"ChainEllipseGeometry",
                                                 ChainEllipseGeometryDims,
-                                                2,
+                                                1,
                                                 ChainEllipseGeometryElements,
                                                 10,
                                                 true,

@@ -235,9 +235,9 @@ void WriteGeometryUniformsByName(const GeometryLayout& layout, UniformData* vert
         if (fragmentUniformData->hasField("HasCommonColor")) {
           fragmentUniformData->setData("HasCommonColor", p.hasCommonColor ? 1 : 0);
         }
-        if (p.kind == GeometryKind::Ellipse) {
-          fragmentUniformData->setData("StrokeEnabled", p.isStroke ? 1 : 0);
-        }
+        // The stroke form is a runtime uniform on every rounded-rect layout: the coverage formulas
+        // read it instead of a per-form kernel.
+        fragmentUniformData->setData("StrokeEnabled", p.isStroke ? 1 : 0);
         if (p.kind == GeometryKind::ComplexEllipse) {
           fragmentUniformData->setDataOptional("HasDeviceMask", 0);
         }

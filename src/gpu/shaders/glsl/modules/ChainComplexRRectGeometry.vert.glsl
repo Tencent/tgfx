@@ -1,8 +1,9 @@
-// The chain's per-corner-radius non-AA rounded-rect layout vertex hook (GP_LAYOUT 7 fill / 8
-// stroke): device-space vertices, the corner radii and bounds the per-pixel SDF reads, and the
-// half-stroke-width attribute of the stroke form.
+// The chain's per-corner-radius non-AA rounded-rect layout vertex hook (GP_LAYOUT 7): device-space
+// vertices, the corner radii and bounds the per-pixel SDF reads, and the half-stroke-width
+// attribute. The attribute is unconditional and the StrokeEnabled uniform selects the coverage
+// form, so one layout serves fill and stroke.
 
-#define GP_LAYOUT (7 + STROKE)
+#define GP_LAYOUT 7
 #define HAS_COVERAGE 0
 #define HAS_UV_COORD 0
 #define HAS_SUBSET 0
@@ -15,7 +16,5 @@ void ChainComplexRRectGeometry_vertex(inout Vertex v) {
   vYRadii = inYRadii;
   vRectBounds = inRectBounds;
   vColor = inColor;
-#if GP_LAYOUT == 8
   vStrokeWidth = inStrokeWidth;
-#endif
 }

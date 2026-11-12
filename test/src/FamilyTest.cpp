@@ -110,9 +110,10 @@ TGFX_TEST(FamilyTest, EncodeAndDecodeRejectWhatTheDeclarationRejects) {
   // A family index past the table.
   EXPECT_FALSE(EncodeVariant(PastTheTable, 0, {0}).has_value());
   EXPECT_FALSE(DecodeVariant(PastTheTable, 0).has_value());
-  // The RRect family's allowed rule drops the textured-stroke combination: its ordinal
-  // (STROKE = 1, PRESENT = 1, HAS_XP = 0 encodes to 3) must not decode.
-  EXPECT_FALSE(DecodeVariant(RRectIndex, 3).has_value());
+  // The RRect family keeps the [PRESENT, HAS_XP] product (6 forms): the stroke form is a runtime
+  // uniform now, so every form decodes and only an ordinal past the space is rejected.
+  EXPECT_TRUE(DecodeVariant(RRectIndex, 5).has_value());
+  EXPECT_FALSE(DecodeVariant(RRectIndex, 6).has_value());
   // The old hand-rolled ShapeInstanced ordinal (HAS_XP alone) landed outside the reachable set
   // for every blended xfer: ordinal 1 is VERTEX_COLOR's filtered-out value, and the dst-texture
   // form lives at 2 * HAS_XP = 2.

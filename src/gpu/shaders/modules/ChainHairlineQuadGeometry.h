@@ -28,7 +28,7 @@ namespace tgfx {
 // always rides the Color uniform (the layout always has a common color).
 // The family's ordinals decode against one flat domain across the geometries, so the dim pair
 // matches every other chain geometry and the allowed filter pins both dims to 0.
-inline constexpr ModuleDim ChainHairlineQuadGeometryDims[] = {{"SUBSET", 2}, {"STROKE", 2}};
+inline constexpr ModuleDim ChainHairlineQuadGeometryDims[] = {{"SUBSET", 2}};
 
 inline constexpr Element ChainHairlineQuadGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "aPosition"},
@@ -44,7 +44,7 @@ inline constexpr Element ChainHairlineQuadGeometryElements[] = {
 
 inline constexpr Module ChainHairlineQuadGeometry = {"ChainHairlineQuadGeometry",
                                                      ChainHairlineQuadGeometryDims,
-                                                     2,
+                                                     1,
                                                      ChainHairlineQuadGeometryElements,
                                                      9,
                                                      true,

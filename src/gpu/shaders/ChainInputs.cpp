@@ -149,7 +149,7 @@ std::optional<ChainInputs::Inputs> ChainInputs::DeriveInputs(const AOTProgram& p
   } else if (gpKind == GpKind::HairlineLine) {
     // The hairline edge AA is per-pixel (edge-distance varying); the color is a uniform.
     inputs.hasCoverage = false;
-  } else if (gpKind >= GpKind::ComplexEllipseFill) {
+  } else if (gpKind >= GpKind::ComplexEllipse) {
     // Per-pixel edge coverage like the ellipse (the complex ellipse, the two non-AA rounded-rect
     // SDFs and the hairline quad); the color attribute is unconditional where the buffer has one.
     inputs.hasCoverage = false;
@@ -198,10 +198,9 @@ std::optional<Variant> ChainInputs::MatchVariant(const AOTProgram& program,
   cell.textureCount = frag("TEXTURE_COUNT");
   cell.mask = frag("HAS_MASK_TEXTURE");
   cell.resource = frag("RESOURCE_KIND");
-  const uint8_t stroke = cell.gpLayout == 4 ? 1 : 0;
-  return EncodeVariant(FamilyIndexOf("Chain"), ChainGeometryOfCell(cell),
-                       {static_cast<uint8_t>(cell.subset), stroke, ChainProfileOfCell(cell),
-                        static_cast<uint8_t>(cell.xp)});
+  return EncodeVariant(
+      FamilyIndexOf("Chain"), ChainGeometryOfCell(cell),
+      {static_cast<uint8_t>(cell.subset), ChainProfileOfCell(cell), static_cast<uint8_t>(cell.xp)});
 }
 
 std::optional<std::pair<uint32_t, uint32_t>> ChainInputs::MatchProgram(
