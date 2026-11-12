@@ -6830,9 +6830,14 @@ TGFX_TEST(LayerTest, GroupBlurTiledZoom) {
   centerContent(1.0f);
   displayList.render(surface.get());
   centerContent(36.505f);
-  for (int i = 0; i < 40; ++i) {
+  // Refine one tile per frame until every tile is rasterized at the target zoom; a fixed frame
+  // count would leave the last tiles at the stale zoom and make the image depend on scheduling.
+  int frames = 0;
+  do {
     displayList.render(surface.get());
-  }
+    ++frames;
+  } while (displayList.hasContentChanged() && frames < 200);
+  ASSERT_FALSE(displayList.hasContentChanged()) << "tile refinement did not settle";
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GroupBlurTiledZoom"));
 }
 
