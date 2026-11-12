@@ -1043,7 +1043,7 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       // slot records come from the compiled program through the same binder the legacy kernel used.
       WriteClipParams<YUVChainTail>(info, &writer);
       if (const auto* program = AOTChainBuilder::ResolveYUVProgram(&info)) {
-        BindYUVProgram(*program, fragmentUniformData);
+        BindYUVProgram(*program, &writer, fragmentUniformData);
       }
     } else if (module == &TiledTexture) {
       if (match->tiledLeaf != nullptr) {

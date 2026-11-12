@@ -43,13 +43,49 @@
 namespace tgfx {
 namespace {
 
+// The Chain module's field indices: the declared module is the single source of the slot block's
+// element order, so a writer addresses fields by index and a rename cannot drift.
+constexpr uint8_t ChainElement(const char* name) {
+  return UniformElementIndexOf(Chain, name);
+}
+
+// The YUV tail declares the same slot pool under its own module (a different element order).
+constexpr uint8_t YUVElement(const char* name) {
+  return UniformElementIndexOf(YUVChainTail, name);
+}
+
+// Every field the binder addresses, evaluated once as constants: a name missing from the
+// declaration is a link error (Module.h's ElementNameNotFound), so the indices must be constant.
+struct ChainIndices {
+  uint8_t chainData = ChainElement("ChainData");
+  uint8_t clipCoverageRegister = ChainElement("ClipCoverageRegister");
+  uint8_t coverageRootIndex = ChainElement("CoverageRootIndex");
+  uint8_t deviceLeafMask = ChainElement("DeviceLeafMask");
+  uint8_t gradientColorizerKind = ChainElement("GradientColorizerKind");
+  uint8_t gradientIntervalCount = ChainElement("GradientIntervalCount");
+  uint8_t gradientLayoutType = ChainElement("GradientLayoutType");
+  uint8_t gradientLUTLeaf = ChainElement("GradientLUTLeaf");
+  uint8_t hasMaskTexture = ChainElement("HasMaskTexture");
+  uint8_t rootIndex = ChainElement("RootIndex");
+  uint8_t slotCount = ChainElement("SlotCount");
+  uint8_t slotPacked = ChainElement("SlotPacked");
+};
+constexpr ChainIndices ChainField = {};
+struct YUVTailIndices {
+  uint8_t chainData = YUVElement("ChainData");
+  uint8_t slotCount = YUVElement("SlotCount");
+  uint8_t slotPacked = YUVElement("SlotPacked");
+};
+constexpr YUVTailIndices YUVField = {};
+
 /// One chain instruction's per-slot parameter write. The packed word and its selector stay with
 /// the caller's dialect (the chain encodes result registers, the YUV tail encodes the op's small
-/// value), so the table carries only the parameter arrays: `index` is the slot's index (the
-/// per-op arrays), `ordinal` is its ordinal into a per-kind array (the coverage capacities; the
-/// slot index for every other op). A null row means the instruction writes no parameter block.
-using AOTOpBinder = void (*)(UniformData* uniformData, size_t index, int ordinal,
-                             const AOTChainSlot& slot);
+/// value), so the table carries only the parameter arrays: `dataElement` is the parameter pool's
+/// element index in the caller's module, `index` is the slot's index (the per-op arrays),
+/// `ordinal` is its ordinal into a per-kind array (the coverage capacities; the slot index for
+/// every other op). A null row means the instruction writes no parameter block.
+using AOTOpBinder = void (*)(SlotWriter* chainWriter, uint8_t dataElement, size_t index,
+                             int ordinal, const AOTChainSlot& slot);
 
 /// One row per AOTChainOp, in the op ABI value order (Op::* in KernelContract.h): the
 /// instruction's uniform write. A separate table on purpose — the instruction vocabulary and the
@@ -105,16 +141,17 @@ void UploadTiledRecipe(UniformData* uniformData, const AOTTiledTextureRecipe& re
   uniformData->setDataOptional(names.strict, recipe.strict ? 1 : 0);
 }
 
-void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot) {
+void UploadChainSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index,
+                     const AOTChainSlot& slot) {
   // The packed record's selector is shared with the specialization values (Program.h).
   const int selector = ChainSlotSelector(slot);
 
   int packed[] = {static_cast<int>(slot.op), slot.in0, slot.in1, selector};
-  uniformData->setArrayElementOptional(ChainParams::SlotPacked.name, index, packed);
+  chainWriter->setArrayElement(ChainField.slotPacked, index, packed);
   // The parameter block is the instruction contract's bind column: one function per op that
   // writes one, a null row for the instructions that carry none (they ride the packed word).
   if (auto bind = OpContractOf(slot.op).bind) {
-    bind(uniformData, index, static_cast<int>(index), slot);
+    bind(chainWriter, dataElement, index, static_cast<int>(index), slot);
   }
 }
 
@@ -122,7 +159,7 @@ void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot&
 // the packer both come from contract/ChainOps.h, so a field cannot be written at one offset and
 // read at another.
 template <typename Data>
-void UploadSlotData(UniformData* uniformData, size_t index, const Data& data,
+void UploadSlotData(SlotWriter* chainWriter, uint8_t dataElement, size_t index, const Data& data,
                     void (*pack)(const Data&, float*)) {
   float words[ChainISA::PoolSlotWords * 4] = {};
   pack(data, words);
@@ -130,7 +167,7 @@ void UploadSlotData(UniformData* uniformData, size_t index, const Data& data,
   for (size_t word = 0; word < static_cast<size_t>(ChainISA::PoolSlotWords); ++word) {
     const std::array<float, 4> word4 = {words[word * 4], words[word * 4 + 1], words[word * 4 + 2],
                                         words[word * 4 + 3]};
-    uniformData->setArrayElementOptional(ChainParams::ChainData.name, base + word, word4);
+    chainWriter->setArrayElement(dataElement, base + word, word4);
   }
 }
 
@@ -140,11 +177,11 @@ ChainISA::Float4 ToFloat4(const std::array<float, 4>& values) {
 
 // Writes the chain's gradient parameter block into the pool's chain-wide region. The three
 // selectors stay runtime uniforms until the structural fields move to specialization constants.
-void UploadGradientParams(UniformData* uniformData, size_t blockBase,
+void UploadGradientParams(SlotWriter* chainWriter, size_t blockBase,
                           const AOTGradientParameters& params) {
-  uniformData->setDataOptional(ChainParams::GradientLayoutType.name, params.layoutType);
-  uniformData->setDataOptional(ChainParams::GradientColorizerKind.name, params.colorizerKind);
-  uniformData->setDataOptional(ChainParams::GradientIntervalCount.name, params.intervalCount);
+  chainWriter->setIfPresent(ChainField.gradientLayoutType, params.layoutType);
+  chainWriter->setIfPresent(ChainField.gradientColorizerKind, params.colorizerKind);
+  chainWriter->setIfPresent(ChainField.gradientIntervalCount, params.intervalCount);
   ChainISA::GradientData data = {};
   data.leftBorder = ToFloat4(params.leftBorder);
   data.rightBorder = ToFloat4(params.rightBorder);
@@ -168,61 +205,54 @@ void UploadGradientParams(UniformData* uniformData, size_t blockBase,
   for (size_t word = 0; word < static_cast<size_t>(ChainISA::GradientDataWords); ++word) {
     const std::array<float, 4> word4 = {words[word * 4], words[word * 4 + 1], words[word * 4 + 2],
                                         words[word * 4 + 3]};
-    uniformData->setArrayElementOptional(ChainParams::ChainData.name, blockBase + word, word4);
+    chainWriter->setArrayElement(ChainField.chainData, blockBase + word, word4);
   }
 }
 
 }  // namespace
 
-void UploadPointwiseSlot(UniformData* uniformData, const AOTChainSlot& slot) {
-  // One pointwise operator as chain slot 0: the packed word and the parameter registers the slot
-  // interpreter reads (pointwise_op.inc). The YUV tail and the chain thus share one parameter ABI. The single-operator kernels accept the four color operators
-  // only; a Blend's operand encoding belongs to UploadYUVTailSlot, whose selector bit 8 carries
-  // the operand order where the chain's carries multiplyInputAlpha.
-  UploadChainSlot(uniformData, 0, slot);
-}
-
 // The instruction contract's bind column (declared in Binder.h): each function writes one op's
 // per-slot parameter block into the chain arrays.
-void BindColorMatrixSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
-                         const AOTChainSlot& slot) {
+void BindColorMatrixSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index,
+                         int /*ordinal*/, const AOTChainSlot& slot) {
   ChainISA::ColorMatrixData data = {};
   float translate[4] = {};
   PackAOTColorMatrix(slot.colorMatrix.matrix, data.linear.m, translate);
   data.translate = {translate[0], translate[1], translate[2], translate[3]};
-  UploadSlotData(uniformData, index, data, ChainISA::PackColorMatrix);
+  UploadSlotData(chainWriter, dataElement, index, data, ChainISA::PackColorMatrix);
 }
 
-void BindLumaSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
+void BindLumaSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index, int /*ordinal*/,
                   const AOTChainSlot& slot) {
-  UploadSlotData(uniformData, index, slot.luma, ChainISA::PackLuma);
+  UploadSlotData(chainWriter, dataElement, index, slot.luma, ChainISA::PackLuma);
 }
 
-void BindAlphaThresholdSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
-                            const AOTChainSlot& slot) {
-  UploadSlotData(uniformData, index, slot.alphaThreshold, ChainISA::PackAlphaThreshold);
+void BindAlphaThresholdSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index,
+                            int /*ordinal*/, const AOTChainSlot& slot) {
+  UploadSlotData(chainWriter, dataElement, index, slot.alphaThreshold,
+                 ChainISA::PackAlphaThreshold);
 }
 
-void BindConstColorSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
+void BindConstColorSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index, int /*ordinal*/,
                         const AOTChainSlot& slot) {
   const auto& color = slot.constColor.color;
   ChainISA::ConstColorData data = {};
   data.color = {color[0], color[1], color[2], color[3]};
-  UploadSlotData(uniformData, index, data, ChainISA::PackConstColor);
+  UploadSlotData(chainWriter, dataElement, index, data, ChainISA::PackConstColor);
 }
 
-void BindAARectCoverageSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
-                            const AOTChainSlot& slot) {
+void BindAARectCoverageSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index,
+                            int /*ordinal*/, const AOTChainSlot& slot) {
   // The AA math evaluates to 0 at the rect coordinates, so outset by 0.5 to interpolate from 0
   // at a half-pixel inset to 1 at a half-pixel outset.
   const auto& rect = slot.rectCoverage.rect;
   ChainISA::AARectCoverageData data = {};
   data.rect = {rect[0] - 0.5f, rect[1] - 0.5f, rect[2] + 0.5f, rect[3] + 0.5f};
-  UploadSlotData(uniformData, index, data, ChainISA::PackAARectCoverage);
+  UploadSlotData(chainWriter, dataElement, index, data, ChainISA::PackAARectCoverage);
 }
 
-void BindLocalRectCoverageSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
-                               const AOTChainSlot& slot) {
+void BindLocalRectCoverageSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index,
+                               int /*ordinal*/, const AOTChainSlot& slot) {
   // The local rect keeps its exact coordinates; the kernel's AA ramp clamps each edge distance to
   // half a pixel after mapping through the device-to-local matrix.
   const auto& params = slot.localRectCoverage;
@@ -234,11 +264,11 @@ void BindLocalRectCoverageSlot(UniformData* uniformData, size_t index, int /*ord
       data.deviceToLocal.m[column * 3 + row] = columns[column * 4 + row];
     }
   }
-  UploadSlotData(uniformData, index, data, ChainISA::PackLocalRectCoverage);
+  UploadSlotData(chainWriter, dataElement, index, data, ChainISA::PackLocalRectCoverage);
 }
 
-void BindRRectCoverageSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
-                           const AOTChainSlot& slot) {
+void BindRRectCoverageSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index,
+                           int /*ordinal*/, const AOTChainSlot& slot) {
   const auto& params = slot.rrectCoverage;
   ChainISA::RRectCoverageData data = {};
   data.rect = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
@@ -251,12 +281,13 @@ void BindRRectCoverageSlot(UniformData* uniformData, size_t index, int /*ordinal
     }
   }
   data.antiAlias = params.antiAlias;
-  UploadSlotData(uniformData, index, data, ChainISA::PackRRectCoverage);
+  UploadSlotData(chainWriter, dataElement, index, data, ChainISA::PackRRectCoverage);
 }
 
 // One YUV-tail instruction's records (see BindYUVProgram): the chain's uniform arrays with the
 // linear-tail selector — the kernel's macro binding reads exactly these bits.
-void UploadYUVTailSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot) {
+void UploadYUVTailSlot(SlotWriter* yuvWriter, uint8_t dataElement, size_t index,
+                       const AOTChainSlot& slot) {
   int selector = 0;
   if (slot.op == AOTChainOp::ConstColor) {
     selector = slot.constColor.inputMode;
@@ -264,7 +295,7 @@ void UploadYUVTailSlot(UniformData* uniformData, size_t index, const AOTChainSlo
     selector = slot.blend.blendMode | (slot.blend.childType == 1 ? 0x100 : 0);
   }
   int packed[] = {static_cast<int>(slot.op), -2, -2, selector};
-  uniformData->setArrayElementOptional(ChainParams::SlotPacked.name, index, packed);
+  yuvWriter->setArrayElement(YUVField.slotPacked, index, packed);
   // The parameter block comes from the instruction contract — except the linear tail's Blend,
   // whose operand is the const color (the chain's blend reads registers, so its row writes
   // nothing; the tail's dialect supplies the color instead).
@@ -273,23 +304,24 @@ void UploadYUVTailSlot(UniformData* uniformData, size_t index, const AOTChainSlo
     const auto& color = slot.constColor.color;
     ChainISA::BlendData data = {};
     data.color = {color[0], color[1], color[2], color[3]};
-    UploadSlotData(uniformData, index, data, ChainISA::PackBlend);
+    UploadSlotData(yuvWriter, dataElement, index, data, ChainISA::PackBlend);
   } else if (auto bind = OpContractOf(slot.op).bind) {
-    bind(uniformData, index, static_cast<int>(index), slot);
+    bind(yuvWriter, dataElement, index, static_cast<int>(index), slot);
   }
 }
 
-void BindYUVProgram(const AOTProgram& program, UniformData* fragmentUniformData) {
-  if (fragmentUniformData == nullptr) {
+void BindYUVProgram(const AOTProgram& program, SlotWriter* yuvWriter,
+                    UniformData* fragmentUniformData) {
+  if (yuvWriter == nullptr || fragmentUniformData == nullptr) {
     return;
   }
   const auto& slots = program.slots;
-  fragmentUniformData->setDataOptional(ChainParams::SlotCount.name, static_cast<int>(slots.size()));
+  yuvWriter->set(YUVField.slotCount, static_cast<int>(slots.size()));
   // The declared capacity exceeds the real count: the inactive tail carries the OP_NONE marker,
   // matching the fixed-size storage every multi-slot kernel keeps.
   AOTChainSlot inactiveSlot = {};
   for (size_t index = 0; index < YUVChainTailSlotCapacity; ++index) {
-    UploadYUVTailSlot(fragmentUniformData, index,
+    UploadYUVTailSlot(yuvWriter, YUVField.chainData, index,
                       index < slots.size() ? slots[index] : inactiveSlot);
   }
   // The color-space parameters are one shared block (at most one transform per tail, enforced
@@ -316,33 +348,20 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
   if (fragmentUniformData == nullptr || chainWriter == nullptr) {
     return;
   }
-  // The shape selectors are addressed by their index in the Chain module's declaration: the
-  // writer's layout resolves each one to the field's block and offset once per program, so a draw
-  // composes no name. The four spec selectors exist in every variant; the rest carry a `when`
-  // mask, so an absent field is a legitimate cell of the profile set.
-  constexpr uint8_t SlotCount = UniformElementIndexOf(Chain, "SlotCount");
-  constexpr uint8_t RootIndex = UniformElementIndexOf(Chain, "RootIndex");
-  constexpr uint8_t CoverageRootIndex = UniformElementIndexOf(Chain, "CoverageRootIndex");
-  constexpr uint8_t ClipCoverageRegister = UniformElementIndexOf(Chain, "ClipCoverageRegister");
-  constexpr uint8_t HasMaskTexture = UniformElementIndexOf(Chain, "HasMaskTexture");
-  constexpr uint8_t DeviceLeafMask = UniformElementIndexOf(Chain, "DeviceLeafMask");
-  constexpr uint8_t GradientLUTLeaf = UniformElementIndexOf(Chain, "GradientLUTLeaf");
-  constexpr uint8_t TiledLeafIndex = UniformElementIndexOf(Chain, "TiledLeafIndex");
-  constexpr uint8_t TiledLeafIndex2 = UniformElementIndexOf(Chain, "TiledLeafIndex2");
   // The mask sampler slot is always bound in four-leaf variants; this flag selects the
   // runtime application. Absent in leaf-free variants (compile-time mask there).
-  chainWriter->setIfPresent(HasMaskTexture, program.hasMaskTexture ? 1 : 0);
-  chainWriter->set(RootIndex, static_cast<int>(program.rootRegister));
-  chainWriter->set(CoverageRootIndex, program.coverageRootRegister);
-  chainWriter->set(ClipCoverageRegister, program.clipCoverageRegister);
-  chainWriter->set(SlotCount, static_cast<int>(slotCount));
+  chainWriter->setIfPresent(ChainField.hasMaskTexture, program.hasMaskTexture ? 1 : 0);
+  chainWriter->set(ChainField.rootIndex, static_cast<int>(program.rootRegister));
+  chainWriter->set(ChainField.coverageRootIndex, program.coverageRootRegister);
+  chainWriter->set(ChainField.clipCoverageRegister, program.clipCoverageRegister);
+  chainWriter->set(ChainField.slotCount, static_cast<int>(slotCount));
   // Written for every draw (absent in leaf-free variants): a stale mask from an earlier draw
   // would make an ordinary leaf sample in device space.
   uint32_t deviceMask = 0;
   for (const auto& deviceLeaf : program.deviceLeaves) {
     deviceMask |= 1u << static_cast<uint32_t>(deviceLeaf.leafIndex);
   }
-  chainWriter->setIfPresent(DeviceLeafMask, static_cast<int>(deviceMask));
+  chainWriter->setIfPresent(ChainField.deviceLeafMask, static_cast<int>(deviceMask));
   for (const auto& deviceLeaf : program.deviceLeaves) {
     // The leaf's uniform: destination fragment coordinates to the texture's sampling space.
     auto textureView = deviceLeaf.textureProxy->getTextureView();
@@ -379,7 +398,7 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
   }
   // Each selector names the leaf that reads the matching recipe set; the kernel never reads a set
   // whose selector is -1, so an absent recipe needs no upload.
-  chainWriter->setIfPresent(GradientLUTLeaf, program.lutLeafIndex);
+  chainWriter->setIfPresent(ChainField.gradientLUTLeaf, program.lutLeafIndex);
   if (program.profile == AOTResourceProfile::TiledGraph) {
     for (size_t index = 0; index < TiledGraphResourceCapacity.tiledRecipes; ++index) {
       int modes[] = {-1, 0, 0, 0};
@@ -404,8 +423,8 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
   } else {
     auto tiledLeaf = program.tiledLeaves.empty() ? -1 : program.tiledLeaves[0].leafIndex;
     auto tiledLeaf2 = program.tiledLeaves.size() < 2 ? -1 : program.tiledLeaves[1].leafIndex;
-    chainWriter->setIfPresent(TiledLeafIndex, tiledLeaf);
-    chainWriter->setIfPresent(TiledLeafIndex2, tiledLeaf2);
+    fragmentUniformData->setDataOptional(ChainParams::TiledLeafIndex.name, tiledLeaf);
+    fragmentUniformData->setDataOptional(ChainParams::TiledLeafIndex2.name, tiledLeaf2);
     for (size_t index = 0; index < program.tiledLeaves.size(); ++index) {
       UploadTiledRecipe(fragmentUniformData, program.tiledLeaves[index].recipe,
                         index == 0 ? ChainParams::TiledRecipe : ChainParams::TiledRecipe2);
@@ -420,7 +439,7 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
   AOTChainSlot inactiveSlot = {};
   for (size_t index = 0; index < capacity->instructions; ++index) {
     const auto& slot = index < slotCount ? slots[index] : inactiveSlot;
-    UploadChainSlot(fragmentUniformData, index, slot);
+    UploadChainSlot(chainWriter, ChainField.chainData, index, slot);
   }
   // The color-space parameters are one shared chain-wide block, so the kernel supports at most one
   // color-space op per chain (enforced by the matcher). The helper writes the same field names the
@@ -440,7 +459,7 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
       const size_t blockBase =
           GetAOTResourceCapacity(program.profile)->instructions * ChainISA::PoolSlotWords +
           ChainISA::BlockGradientOffset;
-      UploadGradientParams(fragmentUniformData, blockBase, slots[index].gradient);
+      UploadGradientParams(chainWriter, blockBase, slots[index].gradient);
       break;
     }
     if (slots[index].op == AOTChainOp::PerlinNoise) {
@@ -449,7 +468,7 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
       data.frequencyStitch = {noise.baseFrequencyX, noise.baseFrequencyY,
                               static_cast<float>(noise.stitchWidth),
                               static_cast<float>(noise.stitchHeight)};
-      UploadSlotData(fragmentUniformData, index, data, ChainISA::PackPerlinNoise);
+      UploadSlotData(chainWriter, ChainField.chainData, index, data, ChainISA::PackPerlinNoise);
       int modeOctaves[] = {noise.noiseType, noise.numOctaves, noise.stitchTiles ? 1 : 0,
                            program.noiseSamplerBase};
       fragmentUniformData->setDataOptional(ChainParams::NoiseModeOctaves.name, modeOctaves);

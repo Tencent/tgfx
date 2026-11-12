@@ -34,18 +34,19 @@ class SlotWriter;
 // that writes a per-slot parameter block. The caller writes the packed word and its selector with
 // its own dialect, then dispatches here with the slot's index and its ordinal into the per-kind
 // parameter array (the coverage capacities; the slot index for every other op).
-void BindColorMatrixSlot(UniformData* uniformData, size_t index, int ordinal,
+void BindColorMatrixSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index, int ordinal,
                          const AOTChainSlot& slot);
-void BindLumaSlot(UniformData* uniformData, size_t index, int ordinal, const AOTChainSlot& slot);
-void BindAlphaThresholdSlot(UniformData* uniformData, size_t index, int ordinal,
+void BindLumaSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index, int ordinal,
+                  const AOTChainSlot& slot);
+void BindAlphaThresholdSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index, int ordinal,
                             const AOTChainSlot& slot);
-void BindConstColorSlot(UniformData* uniformData, size_t index, int ordinal,
+void BindConstColorSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index, int ordinal,
                         const AOTChainSlot& slot);
-void BindAARectCoverageSlot(UniformData* uniformData, size_t index, int ordinal,
+void BindAARectCoverageSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index, int ordinal,
                             const AOTChainSlot& slot);
-void BindLocalRectCoverageSlot(UniformData* uniformData, size_t index, int ordinal,
-                               const AOTChainSlot& slot);
-void BindRRectCoverageSlot(UniformData* uniformData, size_t index, int ordinal,
+void BindLocalRectCoverageSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index,
+                               int ordinal, const AOTChainSlot& slot);
+void BindRRectCoverageSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index, int ordinal,
                            const AOTChainSlot& slot);
 
 /**
@@ -67,7 +68,8 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
  * and the shared color-space block. Like the chain upload, this reads the program only, never
  * a FragmentProcessor.
  */
-void BindYUVProgram(const AOTProgram& program, UniformData* fragmentUniformData);
+void BindYUVProgram(const AOTProgram& program, SlotWriter* yuvWriter,
+                    UniformData* fragmentUniformData);
 
 /**
  * Writes the program's per-binding child uniforms: every sampler-binding child's
@@ -79,12 +81,6 @@ void BindYUVProgram(const AOTProgram& program, UniformData* fragmentUniformData)
  */
 void BindChainBindings(const AOTProgram& program, SlotWriter* chainWriter);
 
-///
-/// Uploads one pointwise operator as chain slot 0: the packed word (operator value and selector
-/// bits) plus the operator's parameter registers -- the same encoding the chain's slots use, so a
-/// dedicated single-operator kernel and the chain share one parameter ABI. The shader side reads
-/// it through applyPointwiseOp (pipeline/slot/pointwise_op.inc).
-void UploadPointwiseSlot(UniformData* uniformData, const AOTChainSlot& slot);
 /// The xfer bind: the blend mode off the IR, the dst texture's instance-time facts off the made
 /// processor (the same layer the geometry facts read).
 void BindPorterDuffXfer(int blendMode, const DstTextureInfo& dstInfo, ParamWriter* writer);
