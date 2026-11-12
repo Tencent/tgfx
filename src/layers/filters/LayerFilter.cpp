@@ -34,6 +34,7 @@ Rect LayerFilter::filterBounds(const Rect& srcRect, float, MapDirection) {
 
 void LayerFilter::invalidateFilter() {
   onInvalidateFilter();
+  invalidateSubtree();
   invalidateTransform();
 }
 

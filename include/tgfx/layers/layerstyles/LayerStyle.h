@@ -213,6 +213,11 @@ class LayerStyle : public LayerProperty {
    */
   virtual Rect filterBackgroundSharp(const Rect& srcRect, float contentScale);
 
+  /**
+   * Invalidates the layerStyle output and any rendered subtree containing it.
+   */
+  void invalidateStyle();
+
   virtual void onDraw(Canvas* canvas, const LayerStyleInput& input, float alpha,
                       BlendMode blendMode) = 0;
 

@@ -28,6 +28,7 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/LumaColorFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
+#include "core/filters/TextureImageFilter.h"
 #include "core/shaders/ColorFilterShader.h"
 #include "core/shaders/PerlinNoiseShader.h"
 #include "core/utils/ColorHelper.h"
@@ -47,9 +48,65 @@
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/layers/filters/TextureFilter.h"
 #include "tgfx/svg/SVGPathParser.h"
 
 namespace tgfx {
+
+namespace {
+
+void WriteTextureImageFilter(XMLWriter* writer, const TextureImageFilter* filter) {
+  const auto& params = filter->getParams();
+  if (params.frequencyX <= 0.0f || params.frequencyY <= 0.0f || params.radius == 0.0f) {
+    ElementWriter identityElement("feOffset", writer);
+    identityElement.addAttribute("in", "SourceGraphic");
+    identityElement.addAttribute("dx", 0);
+    identityElement.addAttribute("dy", 0);
+    return;
+  }
+  const auto baseFrequencyX = params.frequencyX / params.pixelsPerLocalUnit;
+  const auto baseFrequencyY = params.frequencyY / params.pixelsPerLocalUnit;
+  {
+    ElementWriter turbulenceElement("feTurbulence", writer);
+    turbulenceElement.addAttribute("type", "fractalNoise");
+    turbulenceElement.addAttribute(
+        "baseFrequency", FloatToString(baseFrequencyX) + " " + FloatToString(baseFrequencyY));
+    turbulenceElement.addAttribute("numOctaves", 3);
+    turbulenceElement.addAttribute("seed", std::to_string(TextureFilter::ToSVGSeed(params.seed)));
+    turbulenceElement.addAttribute("data-pagx-seed", std::to_string(params.seed));
+    turbulenceElement.addAttribute("data-pagx-size-x", FloatToString(1.0f / params.frequencyX));
+    turbulenceElement.addAttribute("data-pagx-size-y", FloatToString(1.0f / params.frequencyY));
+    turbulenceElement.addAttribute("data-pagx-clip-to-shape",
+                                   params.clipToShape ? "true" : "false");
+    turbulenceElement.addAttribute("result", "textureNoise");
+  }
+  {
+    ElementWriter displacementElement("feDisplacementMap", writer);
+    displacementElement.addAttribute("in", "SourceGraphic");
+    displacementElement.addAttribute("in2", "textureNoise");
+    displacementElement.addAttribute("scale",
+                                     2.0f * std::abs(params.radius) * params.pixelsPerLocalUnit);
+    displacementElement.addAttribute("xChannelSelector", "R");
+    displacementElement.addAttribute("yChannelSelector", "G");
+    displacementElement.addAttribute("result", "textureDisplaced");
+  }
+  if (params.clipToShape) {
+    {
+      ElementWriter transferElement("feComponentTransfer", writer);
+      transferElement.addAttribute("in", "textureDisplaced");
+      transferElement.addAttribute("result", "textureValidColor");
+      ElementWriter alphaElement("feFuncA", writer);
+      alphaElement.addAttribute("type", "discrete");
+      alphaElement.addAttribute("tableValues", TextureFilter::SVGClipAlphaTable());
+    }
+    ElementWriter clipElement("feComposite", writer);
+    clipElement.addAttribute("in", "textureValidColor");
+    clipElement.addAttribute("in2", "SourceGraphic");
+    clipElement.addAttribute("operator", "atop");
+  }
+}
+
+}  // namespace
 
 Resources::Resources(const Color& color) {
   colorValue = color;
@@ -356,13 +413,20 @@ bool ElementWriter::writeFilterPrimitives(const std::shared_ptr<ImageFilter>& im
       addColorImageFilter(colorFilter);
       break;
     }
+    case Types::ImageFilterType::Texture: {
+      const auto textureFilter = static_cast<const TextureImageFilter*>(imageFilter.get());
+      WriteTextureImageFilter(writer, textureFilter);
+      break;
+    }
     case Types::ImageFilterType::Blend: {
       const auto blendFilter = static_cast<const BlendImageFilter*>(imageFilter.get());
-      addBlendImageFilter(blendFilter, "", bound ? &*bound : nullptr, context, pendings);
+      if (!addBlendImageFilter(blendFilter, "", bound ? &*bound : nullptr, context, pendings)) {
+        return false;
+      }
       break;
     }
     default:
-      reportUnsupportedElement("Unsupported image filter");
+      reportUnsupportedElement("Rasterizing unsupported image filter");
       return false;
   }
   return true;
@@ -903,24 +967,24 @@ std::string ElementWriter::emitShaderAsPrimitive(const Shader* shader, const Mat
   }
 }
 
-void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
+bool ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
                                         const std::string& inputResult, const Rect* filterBounds,
                                         Context* context, std::vector<PendingImage>* pendings) {
   if (!filter->shader) {
     reportUnsupportedElement("Missing shader in BlendImageFilter");
-    return;
+    return false;
   }
   auto sourceRef = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
   if (filter->blendMode == BlendMode::DstIn) {
     if (Types::Get(filter->shader.get()) != Types::ShaderType::Image) {
       reportUnsupportedElement("Unsupported DstIn shader type in BlendImageFilter");
-      return;
+      return false;
     }
     const auto imageShader = static_cast<const ImageShader*>(filter->shader.get());
     auto dataUri = SVGExportContext::EncodeImageToDataUri(imageShader->image, context, pendings);
     if (!dataUri) {
       reportUnsupportedElement("Failed to encode DstIn image shader in BlendImageFilter");
-      return;
+      return false;
     }
     {
       ElementWriter imageElement("feImage", writer);
@@ -939,12 +1003,12 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       compositeElement.addAttribute("in2", "blendMask");
       compositeElement.addAttribute("operator", "in");
     }
-    return;
+    return true;
   }
   auto blendModeString = ToSVGBlendMode(filter->blendMode);
   if (blendModeString.empty()) {
     reportUnsupportedElement("Unsupported blend mode in BlendImageFilter");
-    return;
+    return false;
   }
   // Unwrap MatrixShader to get the actual shader type and accumulated matrix.
   auto [blendShader, shaderMatrix] = ShaderUtils::UnwrapMatrixShader(filter->shader);
@@ -961,7 +1025,7 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
         emitShaderAsPrimitive(innerShader.get(), innerMatrix, filterBounds, context, pendings);
     if (shaderResult.empty()) {
       reportUnsupportedElement("Unsupported inner shader in ColorFilterShader BlendImageFilter");
-      return;
+      return false;
     }
     // Step 2: Apply the color filter on top of the inner shader output.
     std::string finalResult = shaderResult;
@@ -969,7 +1033,7 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       auto cfResult = resourceStore->addFilterResult();
       if (!addColorFilterPrimitives(colorFilterShader->colorFilter, shaderResult, cfResult)) {
         reportUnsupportedElement("Unsupported color filter in ColorFilterShader BlendImageFilter");
-        return;
+        return false;
       }
       finalResult = cfResult;
     }
@@ -978,7 +1042,7 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
     blendElement.addAttribute("in", finalResult);
     blendElement.addAttribute("in2", sourceRef);
     blendElement.addAttribute("mode", blendModeString);
-    return;
+    return true;
   }
   // Color, PerlinNoise, Gradient, Image shaders share the same pattern:
   // emit shader as filter primitive, then blend with source.
@@ -986,12 +1050,13 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       emitShaderAsPrimitive(blendShader.get(), shaderMatrix, filterBounds, context, pendings);
   if (resultName.empty()) {
     reportUnsupportedElement("Unsupported shader type in BlendImageFilter");
-    return;
+    return false;
   }
   ElementWriter blendElement("feBlend", writer);
   blendElement.addAttribute("in", resultName);
   blendElement.addAttribute("in2", sourceRef);
   blendElement.addAttribute("mode", blendModeString);
+  return true;
 }
 
 bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>& colorFilter,

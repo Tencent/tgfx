@@ -374,6 +374,66 @@ TGFX_TEST_PRIVATE(LayerCacheTest, StaticSubtree) {
                       EXPECT_TRUE(childLayer->bitFields.staticSubtree));
 }
 
+TGFX_TEST_PRIVATE(LayerCacheTest, FilterMutationInvalidatesSubtreeCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Direct);
+  displayList.setSubtreeCacheMaxSize(2048);
+  displayList.root()->setPassThroughBackground(false);
+
+  auto filter = BlurFilter::Make(4.0f, 4.0f);
+  auto layer = SolidLayer::Make();
+  layer->setWidth(100.0f);
+  layer->setHeight(100.0f);
+  layer->setColor(Color::Red());
+  layer->setMatrix(Matrix::MakeTrans(20.0f, 20.0f));
+  layer->setFilters({filter});
+  displayList.root()->addChild(layer);
+
+  displayList.render(surface.get());
+  displayList.render(surface.get());
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(layer->subtreeCache != nullptr));
+
+  filter->setBlurrinessX(12.0f);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(layer->subtreeCache == nullptr);
+                      EXPECT_FALSE(layer->bitFields.staticSubtree));
+}
+
+TGFX_TEST_PRIVATE(LayerCacheTest, LayerStyleMutationInvalidatesSubtreeCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Direct);
+  displayList.setSubtreeCacheMaxSize(2048);
+  displayList.root()->setPassThroughBackground(false);
+
+  auto style = DropShadowStyle::Make(4.0f, 4.0f, 2.0f, 2.0f, Color::Black(), false);
+  auto layer = SolidLayer::Make();
+  layer->setWidth(100.0f);
+  layer->setHeight(100.0f);
+  layer->setColor(Color::Red());
+  layer->setMatrix(Matrix::MakeTrans(20.0f, 20.0f));
+  layer->setLayerStyles({style});
+  displayList.root()->addChild(layer);
+
+  displayList.render(surface.get());
+  displayList.render(surface.get());
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(layer->subtreeCache != nullptr));
+
+  style->setSpread(6.0f);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(layer->subtreeCache == nullptr);
+                      EXPECT_FALSE(layer->bitFields.staticSubtree));
+}
+
 /**
  * Test that simple Rect/RRect leaf nodes skip subtree caching.
  */

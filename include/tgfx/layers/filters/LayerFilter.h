@@ -72,7 +72,8 @@ class LayerFilter : public LayerProperty {
     InnerShadowFilter,
     MonoNoiseFilter,
     DuoNoiseFilter,
-    MultiNoiseFilter
+    MultiNoiseFilter,
+    TextureFilter
   };
 
   virtual Type type() const {
