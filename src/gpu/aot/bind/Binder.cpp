@@ -69,6 +69,24 @@ struct ChainIndices {
   uint8_t rootIndex = ChainElement("RootIndex");
   uint8_t slotCount = ChainElement("SlotCount");
   uint8_t slotPacked = ChainElement("SlotPacked");
+  uint8_t tiledClamp = ChainElement("TiledClamp");
+  uint8_t tiledClamp2 = ChainElement("TiledClamp2");
+  uint8_t tiledDimension = ChainElement("TiledDimension");
+  uint8_t tiledDimension2 = ChainElement("TiledDimension2");
+  uint8_t tiledLeafIndex = ChainElement("TiledLeafIndex");
+  uint8_t tiledLeafIndex2 = ChainElement("TiledLeafIndex2");
+  uint8_t tiledModeX = ChainElement("TiledModeX");
+  uint8_t tiledModeX2 = ChainElement("TiledModeX2");
+  uint8_t tiledModeY = ChainElement("TiledModeY");
+  uint8_t tiledModeY2 = ChainElement("TiledModeY2");
+  uint8_t tiledRecipeClamps = ChainElement("TiledRecipeClamps");
+  uint8_t tiledRecipeDimensions = ChainElement("TiledRecipeDimensions");
+  uint8_t tiledRecipeModes = ChainElement("TiledRecipeModes");
+  uint8_t tiledRecipeSubsets = ChainElement("TiledRecipeSubsets");
+  uint8_t tiledStrict = ChainElement("TiledStrict");
+  uint8_t tiledStrict2 = ChainElement("TiledStrict2");
+  uint8_t tiledSubset = ChainElement("TiledSubset");
+  uint8_t tiledSubset2 = ChainElement("TiledSubset2");
 };
 constexpr ChainIndices ChainField = {};
 struct YUVTailIndices {
@@ -123,22 +141,39 @@ const AOTOpContract& OpContractOf(AOTChainOp op) {
   return index < OpContractCount ? OpContracts[index] : fallback;
 }
 
-// Uploads one tiled recipe into the kernel's Tiled<field><suffix> uniform set ("" for the first
-// recipe, "2" for the second).
-void UploadTiledRecipe(UniformData* uniformData, const AOTTiledTextureRecipe& recipe,
-                       const ChainParams::TiledRecipeNames& names) {
-  uniformData->setDataOptional(names.modeX, static_cast<int>(recipe.shaderModeX));
-  uniformData->setDataOptional(names.modeY, static_cast<int>(recipe.shaderModeY));
+// One tiled recipe set's element indices: the first recipe's fields, then the "2"-suffixed ones.
+struct TiledRecipeIndices {
+  uint8_t modeX;
+  uint8_t modeY;
+  uint8_t subset;
+  uint8_t clamp;
+  uint8_t dimension;
+  uint8_t strict;
+};
+
+constexpr TiledRecipeIndices TiledRecipe0 = {ChainField.tiledModeX,     ChainField.tiledModeY,
+                                             ChainField.tiledSubset,    ChainField.tiledClamp,
+                                             ChainField.tiledDimension, ChainField.tiledStrict};
+constexpr TiledRecipeIndices TiledRecipe1 = {ChainField.tiledModeX2,     ChainField.tiledModeY2,
+                                             ChainField.tiledSubset2,    ChainField.tiledClamp2,
+                                             ChainField.tiledDimension2, ChainField.tiledStrict2};
+
+// Uploads one tiled recipe into the kernel's element set (the first recipe, then the second),
+// addressed through the derived layout.
+void UploadTiledRecipe(SlotWriter* chainWriter, const AOTTiledTextureRecipe& recipe,
+                       const TiledRecipeIndices& indices) {
+  chainWriter->setIfPresent(indices.modeX, static_cast<int>(recipe.shaderModeX));
+  chainWriter->setIfPresent(indices.modeY, static_cast<int>(recipe.shaderModeY));
   float subsetRect[] = {recipe.shaderSubset.left, recipe.shaderSubset.top,
                         recipe.shaderSubset.right, recipe.shaderSubset.bottom};
-  uniformData->setDataOptional(names.subset, subsetRect);
+  chainWriter->setIfPresent(indices.subset, subsetRect);
   float clampRect[] = {recipe.shaderClamp.left, recipe.shaderClamp.top, recipe.shaderClamp.right,
                        recipe.shaderClamp.bottom};
-  uniformData->setDataOptional(names.clamp, clampRect);
+  chainWriter->setIfPresent(indices.clamp, clampRect);
   if (recipe.usesShaderDimensions) {
-    uniformData->setDataOptional(names.dimension, recipe.shaderDimensions);
+    chainWriter->setIfPresent(indices.dimension, recipe.shaderDimensions);
   }
-  uniformData->setDataOptional(names.strict, recipe.strict ? 1 : 0);
+  chainWriter->setIfPresent(indices.strict, recipe.strict ? 1 : 0);
 }
 
 void UploadChainSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index,
@@ -412,22 +447,21 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
         const auto& clamp = tiled.recipe.shaderClamp;
         float subsetData[] = {subset.left, subset.top, subset.right, subset.bottom};
         float clampData[] = {clamp.left, clamp.top, clamp.right, clamp.bottom};
-        fragmentUniformData->setArrayElement(ChainParams::TiledRecipeSubsets.name, index,
-                                             subsetData);
-        fragmentUniformData->setArrayElement(ChainParams::TiledRecipeClamps.name, index, clampData);
-        fragmentUniformData->setArrayElement(ChainParams::TiledRecipeDimensions.name, index,
-                                             tiled.recipe.shaderDimensions);
+        chainWriter->setArrayElement(ChainField.tiledRecipeSubsets, index, subsetData);
+        chainWriter->setArrayElement(ChainField.tiledRecipeClamps, index, clampData);
+        chainWriter->setArrayElement(ChainField.tiledRecipeDimensions, index,
+                                     tiled.recipe.shaderDimensions);
       }
-      fragmentUniformData->setArrayElement(ChainParams::TiledRecipeModes.name, index, modes);
+      chainWriter->setArrayElement(ChainField.tiledRecipeModes, index, modes);
     }
   } else {
     auto tiledLeaf = program.tiledLeaves.empty() ? -1 : program.tiledLeaves[0].leafIndex;
     auto tiledLeaf2 = program.tiledLeaves.size() < 2 ? -1 : program.tiledLeaves[1].leafIndex;
-    fragmentUniformData->setDataOptional(ChainParams::TiledLeafIndex.name, tiledLeaf);
-    fragmentUniformData->setDataOptional(ChainParams::TiledLeafIndex2.name, tiledLeaf2);
+    chainWriter->setIfPresent(ChainField.tiledLeafIndex, tiledLeaf);
+    chainWriter->setIfPresent(ChainField.tiledLeafIndex2, tiledLeaf2);
     for (size_t index = 0; index < program.tiledLeaves.size(); ++index) {
-      UploadTiledRecipe(fragmentUniformData, program.tiledLeaves[index].recipe,
-                        index == 0 ? ChainParams::TiledRecipe : ChainParams::TiledRecipe2);
+      UploadTiledRecipe(chainWriter, program.tiledLeaves[index].recipe,
+                        index == 0 ? TiledRecipe0 : TiledRecipe1);
     }
   }
   // Fill all declared slots (including inactive ones, whose OP_NONE marker protects the static
