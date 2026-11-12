@@ -36,6 +36,7 @@
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/TextContent.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
+#include "tgfx/core/ImageProvider.h"
 #include "tgfx/core/Mesh.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Shape.h"
@@ -267,6 +268,109 @@ TGFX_TEST(LayerTest, imageLayer) {
   imageLayer->setMatrix(Matrix::MakeScale(5.0f));
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/imageLayer"));
+}
+
+namespace {
+/**
+ * Creates a solid color image from raw RGBA bytes, where rgba is laid out as R, G, B, A.
+ */
+std::shared_ptr<Image> MakeSolidColorImage(int width, int height, uint32_t rgba) {
+  auto info = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  std::vector<uint32_t> pixels(static_cast<size_t>(width) * static_cast<size_t>(height), rgba);
+  auto data = Data::MakeWithCopy(pixels.data(), pixels.size() * sizeof(uint32_t));
+  return Image::MakeFrom(info, std::move(data));
+}
+
+class TestImageProvider : public ImageProvider {
+ public:
+  TestImageProvider(int width, int height, std::shared_ptr<Image> low, std::shared_ptr<Image> high)
+      : _width(width), _height(height), _low(std::move(low)), _high(std::move(high)) {
+  }
+
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
+  std::shared_ptr<Image> getImage(float scale) const override {
+    lastScale = scale;
+    ++callCount;
+    return scale >= 2.0f ? _high : _low;
+  }
+
+  mutable int callCount = 0;
+  mutable float lastScale = 0.0f;
+
+ private:
+  int _width = 0;
+  int _height = 0;
+  std::shared_ptr<Image> _low = nullptr;
+  std::shared_ptr<Image> _high = nullptr;
+};
+}  // namespace
+
+TGFX_TEST(LayerTest, imageLayerProvider) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  // Opaque red at logical size and opaque green at twice the pixel density.
+  auto lowImage = MakeSolidColorImage(10, 10, 0xFF0000FF);
+  auto highImage = MakeSolidColorImage(20, 20, 0xFF00FF00);
+  ASSERT_TRUE(lowImage != nullptr);
+  ASSERT_TRUE(highImage != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto imageLayer = ImageLayer::Make();
+  displayList->root()->addChild(imageLayer);
+  auto provider = std::make_shared<TestImageProvider>(10, 10, lowImage, highImage);
+  auto providerImage = Image::MakeFrom(provider);
+  ASSERT_TRUE(providerImage != nullptr);
+  imageLayer->setImage(providerImage);
+  EXPECT_FLOAT_EQ(imageLayer->getBounds().width(), 10.0f);
+  EXPECT_FLOAT_EQ(imageLayer->getBounds().height(), 10.0f);
+
+  imageLayer->setMatrix(Matrix::MakeScale(2.0f));
+  auto surface = Surface::Make(context, 20, 20);
+  ASSERT_TRUE(surface != nullptr);
+  displayList->render(surface.get());
+  EXPECT_GT(provider->callCount, 0);
+  EXPECT_NEAR(provider->lastScale, 2.0f, 0.01f);
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  uint32_t pixel = 0;
+  ASSERT_TRUE(surface->readPixels(info, &pixel, 10, 10));
+  EXPECT_EQ(pixel, 0xFF00FF00u);
+
+  auto secondList = std::make_unique<DisplayList>();
+  auto secondLayer = ImageLayer::Make();
+  secondList->root()->addChild(secondLayer);
+  auto secondProvider = std::make_shared<TestImageProvider>(10, 10, lowImage, highImage);
+  secondLayer->setImage(Image::MakeFrom(secondProvider));
+  auto secondSurface = Surface::Make(context, 10, 10);
+  ASSERT_TRUE(secondSurface != nullptr);
+  secondList->render(secondSurface.get());
+  EXPECT_GT(secondProvider->callCount, 0);
+  EXPECT_NEAR(secondProvider->lastScale, 1.0f, 0.01f);
+  ASSERT_TRUE(secondSurface->readPixels(info, &pixel, 5, 5));
+  EXPECT_EQ(pixel, 0xFF0000FFu);
+
+  // The same image switches to the variant of the new draw scale instead of keeping the first one.
+  auto switchingProvider = std::make_shared<TestImageProvider>(10, 10, lowImage, highImage);
+  auto switchingLayer = ImageLayer::Make();
+  auto switchingList = std::make_unique<DisplayList>();
+  switchingList->root()->addChild(switchingLayer);
+  switchingLayer->setImage(Image::MakeFrom(switchingProvider));
+  auto switchingSurface = Surface::Make(context, 20, 20);
+  ASSERT_TRUE(switchingSurface != nullptr);
+  switchingList->render(switchingSurface.get());
+  ASSERT_TRUE(switchingSurface->readPixels(info, &pixel, 5, 5));
+  EXPECT_EQ(pixel, 0xFF0000FFu);
+  switchingLayer->setMatrix(Matrix::MakeScale(2.0f));
+  switchingList->render(switchingSurface.get());
+  ASSERT_TRUE(switchingSurface->readPixels(info, &pixel, 10, 10));
+  EXPECT_EQ(pixel, 0xFF00FF00u);
 }
 
 TGFX_TEST_PRIVATE(LayerTest, Layer_getTotalMatrix) {
