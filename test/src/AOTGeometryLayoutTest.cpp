@@ -690,8 +690,8 @@ void ExpectReportedShapeServed(const ReportedShape& shape) {
                             << seen;
     std::string misses = {};
     for (const auto& record : cache->fallbackRecords()) {
-      misses += record.effectSignature + " [" + PrecompiledFallbackReasonName(record.reason) +
-                "]\n";
+      misses +=
+          record.effectSignature + " [" + PrecompiledFallbackReasonName(record.reason) + "]\n";
     }
     EXPECT_TRUE(misses.empty()) << shape.label << " misses:\n" << misses;
     cache->setDiagnosticRecordingEnabled(false);

@@ -43,7 +43,7 @@ inline constexpr Element RRectGeometryElements[] = {
     {Element::Kind::Param, ShaderType::Int, "StrokeEnabled"},
 };
 
-inline constexpr Module RRectGeometry =
-    {"RRectGeometry", nullptr, 0, RRectGeometryElements, 14, true, true};
+inline constexpr Module RRectGeometry = {
+    "RRectGeometry", nullptr, 0, RRectGeometryElements, 14, true, true};
 
 }  // namespace tgfx
