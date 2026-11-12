@@ -26,7 +26,7 @@
 #include <set>
 #include <string>
 #include <vector>
-#include "gpu/shaders/ChainInputs.h"
+#include "ChainReachableFixture.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/Layout.h"
 #include "gpu/shaders/PrecompiledShader.h"
@@ -87,22 +87,11 @@ void ProfileCell(int profile, int* textureCount, int* mask, int* resource) {
 TEST(ChainEquivalenceTest, DeclaredVariantsBijectTheLegacyReachableSet) {
   const auto chainIndex = ChainFamilyIndex();
   ASSERT_NE(chainIndex, 0xFFFF);
-  // The legacy family retired; its composition rules remain in ChainInputs, which enumerates the
-  // frozen reference set in the legacy (vert, frag) encoding.
-  const auto reachable = ChainInputs::Reachable();
-  const auto vertDomain = ChainInputs::VertDims::domain();
-  const auto fragDomain = ChainInputs::FragDims::domain();
-
+  // The legacy family retired; its 147-cell reachable set is frozen in the fixture, so the
+  // declared variants must keep bijecting exactly those cells after the vocabulary is gone.
   std::set<std::string> legacy;
-  for (const auto& pair : reachable) {
-    legacy.insert(CellKey(fragDomain.valueOf(pair.second, "GP_LAYOUT"),
-                          fragDomain.valueOf(pair.second, "HAS_XP"),
-                          fragDomain.valueOf(pair.second, "HAS_COVERAGE"),
-                          vertDomain.valueOf(pair.first, "HAS_UV_COORD"),
-                          fragDomain.valueOf(pair.second, "TEXTURE_COUNT"),
-                          fragDomain.valueOf(pair.second, "HAS_MASK_TEXTURE"),
-                          fragDomain.valueOf(pair.second, "HAS_SUBSET"),
-                          fragDomain.valueOf(pair.second, "RESOURCE_KIND")));
+  for (const auto cell : ChainReachableCells) {
+    legacy.emplace(cell);
   }
   ASSERT_EQ(legacy.size(), 147u);
 
