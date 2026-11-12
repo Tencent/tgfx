@@ -34,10 +34,9 @@
 #include "gpu/shaders/modules/Chain.h"
 #include "gpu/shaders/modules/ChainParams.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
-#include "gpu/shaders/modules/ParamWriter.h"
-#include "gpu/shaders/modules/PorterDuffXPModule.h"
 #include "gpu/shaders/modules/TextureSourceModule.h"
 #include "gpu/shaders/modules/TiledSourceModule.h"
+#include "gpu/shaders/modules/Xfer.h"
 #include "gpu/shaders/modules/YUVChainTail.h"
 
 namespace tgfx {
@@ -642,8 +641,11 @@ std::vector<CoordTransform> BuildChainCoordTransforms(const AOTProgram& program)
   return transforms;
 }
 
-void BindPorterDuffXfer(int blendMode, const DstTextureInfo& dstInfo, ParamWriter* writer) {
-  writer->set(PorterDuffXPModule::XPBlendMode, blendMode);
+void BindPorterDuffXfer(int blendMode, const DstTextureInfo& dstInfo, SlotWriter* xferWriter) {
+  constexpr uint8_t XPBlendMode = UniformElementIndexOf(Xfer, "XPBlendMode");
+  constexpr uint8_t DstTextureUpperLeft = UniformElementIndexOf(Xfer, "DstTextureUpperLeft");
+  constexpr uint8_t DstTextureCoordScale = UniformElementIndexOf(Xfer, "DstTextureCoordScale");
+  xferWriter->setIfPresent(XPBlendMode, blendMode);
   if (dstInfo.textureProxy == nullptr) {
     return;
   }
@@ -652,7 +654,7 @@ void BindPorterDuffXfer(int blendMode, const DstTextureInfo& dstInfo, ParamWrite
     return;
   }
   const float upperLeft[2] = {dstInfo.offset.x, dstInfo.offset.y};
-  writer->set(PorterDuffXPModule::DstTextureUpperLeft, upperLeft);
+  xferWriter->setIfPresent(DstTextureUpperLeft, upperLeft);
   int width = dstView->width();
   int height = dstView->height();
   if (dstView->getTexture()->type() == TextureType::Rectangle) {
@@ -660,7 +662,7 @@ void BindPorterDuffXfer(int blendMode, const DstTextureInfo& dstInfo, ParamWrite
     height = 1;
   }
   const float scales[2] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
-  writer->set(PorterDuffXPModule::DstTextureCoordScale, scales);
+  xferWriter->setIfPresent(DstTextureCoordScale, scales);
 }
 
 void BindChainBindings(const AOTProgram& program, SlotWriter* chainWriter) {

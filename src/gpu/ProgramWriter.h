@@ -102,8 +102,6 @@ class PrecompiledProgramWriter : public ProgramWriter {
   bool canWrite(const ProgramInfo& info) const override;
 
  protected:
-  void writeEngineDefaults(const ProgramInfo& info,
-                           UniformData* fragmentUniformData) const override;
   void writeSamplers(const ProgramInfo& info, Program* program,
                      RenderPass* renderPass) const override;
 };
@@ -123,6 +121,8 @@ class ChainProgramWriter final : public PrecompiledProgramWriter {
   bool canWrite(const ProgramInfo& info) const override;
 
  protected:
+  void writeEngineDefaults(const ProgramInfo& info,
+                           UniformData* fragmentUniformData) const override;
   void writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
                               UniformData* fragmentUniformData) const override;
   void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
@@ -134,6 +134,7 @@ class ChainProgramWriter final : public PrecompiledProgramWriter {
   Variant variant;
   Layout layout;
   uint8_t chainSlot = 0;
+  uint8_t xferSlot = 0;
 };
 
 }  // namespace tgfx

@@ -24,7 +24,6 @@
 #include "Program.h"
 #include "ProgramInfo.h"
 #include "core/utils/Log.h"
-#include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/aot/bind/Binder.h"
@@ -47,12 +46,9 @@
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/ParamBuffer.h"
 #include "gpu/shaders/contract/DrawFacts.h"
-#include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/Chain.h"
-#include "gpu/shaders/modules/ColorSpaceParams.h"
-#include "gpu/shaders/modules/DeviceMaskModule.h"
 #include "gpu/shaders/modules/EngineParams.h"
-#include "gpu/shaders/modules/ParamWriter.h"
+#include "gpu/shaders/modules/Xfer.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -324,31 +320,20 @@ void WriteGeometryUniformsByName(const GeometryLayout& layout, UniformData* vert
   }
 }
 
-void PrecompiledProgramWriter::writeEngineDefaults(const ProgramInfo& info,
-                                                   UniformData* fragmentUniformData) const {
+void ChainProgramWriter::writeEngineDefaults(const ProgramInfo& info,
+                                             UniformData* fragmentUniformData) const {
   if (fragmentUniformData == nullptr) {
     return;
   }
-  // Precompiled fill kernels apply the render-target write swizzle at output via this uniform.
-  // Only the alpha-only (AAAA) case is non-identity; RGBA targets leave it 0 (no-op). The
-  // runtime-generated shader bakes the swizzle into code and does not declare it, so set it
-  // optionally. Set in the base (unmangled) context, like RTAdjust.
-  int outputAlphaSwizzle = info.getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0;
-  int zero = 0;
-  if (!fragmentUniformData->writeParamKey(&EngineParams::OutputAlphaSwizzle, 0, &outputAlphaSwizzle,
-                                          sizeof(outputAlphaSwizzle))) {
-    fragmentUniformData->setDataOptional(EngineParams::OutputAlphaSwizzle.name, outputAlphaSwizzle);
-  }
-  if (!fragmentUniformData->writeParamKey(&AnalyticClipModule::HasClip, 0, &zero, sizeof(zero))) {
-    fragmentUniformData->setDataOptional(AnalyticClipModule::HasClip.name, zero);
-  }
-  // Same engine-default treatment as HasClip: only quad_texture_fill declares it, and a present
-  // mask FP overwrites it with 1 later in traversal. The color TextureEffect's writer used to
-  // carry this default alongside its own fields.
-  if (!fragmentUniformData->writeParamKey(&DeviceMaskModule::HasDeviceMask, 0, &zero,
-                                          sizeof(zero))) {
-    fragmentUniformData->setDataOptional(DeviceMaskModule::HasDeviceMask.name, zero);
-  }
+  // Precompiled fill kernels apply the render-target write swizzle at output via this uniform;
+  // only the alpha-only (AAAA) case is non-identity, RGBA targets leave it 0 (a no-op). The Xfer
+  // module declares the field in every variant, so the write goes straight through the derived
+  // layout. The former HasClip / HasDeviceMask defaults no longer apply: no Chain-family module
+  // declares either field, so both writes were silent no-ops on this route.
+  ParamBuffer buffer(nullptr, fragmentUniformData);
+  SlotWriter xferWriter(layout, Xfer, xferSlot, &buffer);
+  constexpr uint8_t OutputAlphaSwizzle = UniformElementIndexOf(Xfer, "OutputAlphaSwizzle");
+  xferWriter.set(OutputAlphaSwizzle, info.getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0);
 }
 
 void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
@@ -414,14 +399,15 @@ bool PrecompiledProgramWriter::canWrite(const ProgramInfo&) const {
 
 ChainProgramWriter::ChainProgramWriter(Variant variant)
     : variant(std::move(variant)), layout(DeriveLayout(this->variant)) {
-  // The Chain module's slot in the variant's module sequence (after Frame and the geometry): the
-  // layout's elementField table is indexed by that slot, so the writers address the chain's
-  // fields by element index instead of by name.
+  // The Chain and Xfer modules' slots in the variant's module sequence (after Frame and the
+  // geometry): the layout's elementField table is indexed by those slots, so the writers address
+  // the two modules' fields by element index instead of by name.
   const auto modules = ModulesOf(Families()[this->variant.family], this->variant);
   for (uint8_t slot = 0; slot < modules.count; ++slot) {
     if (modules.list[slot] == &Chain) {
       chainSlot = slot;
-      break;
+    } else if (modules.list[slot] == &Xfer) {
+      xferSlot = slot;
     }
   }
 }
@@ -468,11 +454,11 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
   // xfer processor still writes through its own bind until the xfer contract lands.
   BindChainProgram(*program, vertexUniformData, fragmentUniformData, &chainWriter);
   BindChainBindings(*program, &chainWriter);
-  ParamWriter paramWriter(fragmentUniformData);
+  SlotWriter xferWriter(layout, Xfer, xferSlot, &buffer);
   const auto& xfer = info.getXferFacts();
   const auto* chainIR = info.getCarriedIR();
   if (chainIR != nullptr && xfer.shaderBlend()) {
-    BindPorterDuffXfer(static_cast<int>(chainIR->blendMode), *xfer.dstTexture, &paramWriter);
+    BindPorterDuffXfer(static_cast<int>(chainIR->blendMode), *xfer.dstTexture, &xferWriter);
   }
 }
 

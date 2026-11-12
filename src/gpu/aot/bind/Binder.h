@@ -27,7 +27,6 @@
 namespace tgfx {
 
 class UniformData;
-class ParamWriter;
 class SlotWriter;
 
 // The instruction contract's bind column (Binder.cpp's AOTOpContract): one function per op
@@ -82,8 +81,9 @@ void BindYUVProgram(const AOTProgram& program, SlotWriter* yuvWriter,
 void BindChainBindings(const AOTProgram& program, SlotWriter* chainWriter);
 
 /// The xfer bind: the blend mode off the IR, the dst texture's instance-time facts off the made
-/// processor (the same layer the geometry facts read).
-void BindPorterDuffXfer(int blendMode, const DstTextureInfo& dstInfo, ParamWriter* writer);
+/// processor (the same layer the geometry facts read). The fields are addressed by their index in
+/// the Xfer module's declaration; an HAS_XP-less variant simply carries none of them.
+void BindPorterDuffXfer(int blendMode, const DstTextureInfo& dstInfo, SlotWriter* xferWriter);
 
 /**
  * The coordinate transforms the chain kernel's vertex stage consumes, in the order the geometry
