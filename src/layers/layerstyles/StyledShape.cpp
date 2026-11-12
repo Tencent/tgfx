@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/StyledShape.h"
+#include "core/utils/ShapeUtils.h"
 #include "layers/SpreadUtils.h"
 
 namespace tgfx {
@@ -39,7 +40,7 @@ StyledShape StyledShape::Make(std::shared_ptr<Shape> shape, StyledShapeType type
 }
 
 Rect StyledShape::getBounds() const {
-  auto [innerShape, matrix] = SpreadUtils::UnwrapMatrixShape(shape);
+  auto [innerShape, matrix] = ShapeUtils::UnwrapMatrixShape(shape);
   auto bounds = innerShape->getPath().getBounds();
   if (type == StyledShapeType::Stroke || type == StyledShapeType::FillStroke) {
     const auto outset = SpreadUtils::StrokeOutset(strokeWidth, strokeAlign);

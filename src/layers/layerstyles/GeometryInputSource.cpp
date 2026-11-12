@@ -18,6 +18,7 @@
 
 #include <memory>
 #include <utility>
+#include "core/utils/PictureUtils.h"
 #include "layers/GeometryShapeContext.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/ColorSpace.h"
@@ -34,7 +35,8 @@ std::shared_ptr<GeometryInputSource> GeometryInputSource::Make(
   // Read the shape before the conversion consumes the picture, so both describe one recording.
   auto shape = GeometryShapeContext::Extract(picture, contentScale);
   Point offset = Point::Zero();
-  auto image = ToImageWithOffset(std::move(picture), &offset, nullptr, std::move(colorSpace));
+  auto image =
+      PictureUtils::ToImageWithOffset(std::move(picture), &offset, nullptr, std::move(colorSpace));
   if (image == nullptr) {
     return nullptr;
   }

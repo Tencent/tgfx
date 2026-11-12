@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <tuple>
+#include <utility>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Shape.h"
@@ -49,6 +50,13 @@ class ShapeUtils {
    * Returns the shape as a MatrixShape pointer, or nullptr if it is not a MatrixShape.
    */
   static const MatrixShape* AsMatrixShape(const Shape* shape);
+
+  /**
+   * Peels off the nested MatrixShape wrappers from a shape, returning the innermost unwrapped shape
+   * together with the accumulated matrix. The returned matrix maps the returned shape's local
+   * space to the space where the passed-in shape is used.
+   */
+  static std::pair<std::shared_ptr<Shape>, Matrix> UnwrapMatrixShape(std::shared_ptr<Shape> shape);
 
   /**
    * Decomposes a shape into its underlying StrokeShape and the associated matrix, or returns

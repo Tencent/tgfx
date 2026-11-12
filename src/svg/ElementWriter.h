@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include <vector>
 #include "PendingImage.h"
 #include "ResourceStore.h"
@@ -102,13 +103,25 @@ class ElementWriter {
    */
   Resources addColorFilterResource(const std::shared_ptr<ColorFilter>& colorFilter);
 
+  /**
+   * Emits an SVG <mask> resource that reproduces the given mask filter and returns its
+   * Resources::mask url. Returns empty Resources::mask when the mask filter cannot be expressed as
+   * an SVG mask. matrix maps the mask filter's coordinate space to the user space of the element
+   * that references the mask. bounds is the area, in the mask filter's coordinate space, that the
+   * mask must cover; content outside it may be masked out. Must be called within a parent <defs>
+   * element.
+   */
+  Resources addMaskResource(const std::shared_ptr<MaskFilter>& maskFilter, Context* context,
+                            SVGExportContext* svgContext, std::vector<PendingImage>* pendings,
+                            const Matrix& matrix, const Rect& bounds);
+
  private:
   Resources addResources(const Brush& brush, Context* context, SVGExportContext* svgContext,
                          std::vector<PendingImage>* pendings);
 
   void addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                           Resources* resources, std::vector<PendingImage>* pendings = nullptr);
-  void addShaderFilterPrimitives(const Shader* shader);
+  void addShaderFilterPrimitives(const std::shared_ptr<Shader>& shader);
   void addPerlinNoisePrimitives(const Shader* noiseShader, const std::string& resultName = "");
   void addColorShaderResources(const ColorShader* shader, Resources* resources);
   void addGradientShaderResources(const GradientShader* shader, const Matrix& matrix,
@@ -130,17 +143,19 @@ class ElementWriter {
 
   void addMaskResources(const std::shared_ptr<MaskFilter>& maskFilter, Resources* resources,
                         Context* context, SVGExportContext* svgContext,
-                        std::vector<PendingImage>* pendings);
+                        std::vector<PendingImage>* pendings, const Matrix& matrix = Matrix::I(),
+                        const std::optional<Rect>& bounds = std::nullopt);
 
-  void addImageMaskResources(const ImageShader* imageShader, const std::string& filterID,
-                             Context* context, SVGExportContext* svgContext,
-                             std::vector<PendingImage>* pendings);
+  void addImageMaskResources(const ImageShader* imageShader, const Matrix& matrix,
+                             const std::string& filterID, Context* context,
+                             SVGExportContext* svgContext, std::vector<PendingImage>* pendings);
 
-  void addPictureImageMaskResources(const PictureImage* pictureImage, const std::string& filterID,
-                                    SVGExportContext* svgContext);
+  void addPictureImageMaskResources(const PictureImage* pictureImage, const Matrix& matrix,
+                                    const std::string& filterID, SVGExportContext* svgContext);
 
-  void addRenderImageMaskResources(const ImageShader* imageShaders, const std::string& filterID,
-                                   Context* context, std::vector<PendingImage>* pendings = nullptr);
+  void addRenderImageMaskResources(const ImageShader* imageShaders, const Matrix& matrix,
+                                   const std::string& filterID, Context* context,
+                                   std::vector<PendingImage>* pendings = nullptr);
 
   void addShaderMaskResources(const std::shared_ptr<Shader>& shader, const std::string& filterID,
                               Context* context, std::vector<PendingImage>* pendings = nullptr);
@@ -155,15 +170,16 @@ class ElementWriter {
   std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
                              const std::shared_ptr<SVGCustomWriter>& exportWriter, Context* context,
                              std::vector<PendingImage>* pendings = nullptr);
-  std::string emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
+  std::string emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter,
                                 const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                 Context* context, bool preserveSoftAlpha = false,
+                                const std::optional<Rect>& bound = std::nullopt,
                                 std::vector<PendingImage>* pendings = nullptr);
   bool writeFilterPrimitives(const std::shared_ptr<ImageFilter>& imageFilter,
                              ElementWriter& filterElement,
                              const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                             const Rect& bound, Context* context, bool preserveSoftAlpha,
-                             std::vector<PendingImage>* pendings = nullptr);
+                             const std::optional<Rect>& bound, Context* context,
+                             bool preserveSoftAlpha, std::vector<PendingImage>* pendings = nullptr);
   void callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                ElementWriter& filterElement);
