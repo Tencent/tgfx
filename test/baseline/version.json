@@ -210,6 +210,7 @@
         "scaled_imageCodec_box_filter": "bf48e614",
         "scaled_mipmap": "1b8d95f2",
         "scaled_scale_up": "1b8d95f2",
+        "subset_crop_downscale": "a5eaa6cd8",
         "tile_mode_normal": "c5cfce4d",
         "tile_mode_rgbaaa": "bf48e614",
         "tile_mode_subset": "c5cfce4d"
