@@ -18,7 +18,6 @@
 #include "ColorSpaceXformHelper.h"
 #include <array>
 #include "core/utils/Log.h"
-#include "gpu/shaders/modules/ColorSpaceParams.h"
 namespace tgfx {
 
 int TFTypeToIndex(gfx::skcms_TFType type) {
@@ -71,32 +70,6 @@ enum class CSField {
   DstTFType,
 };
 
-const char* CSFieldName(CSField field) {
-  switch (field) {
-    case CSField::CSFlags:
-      return ColorSpaceParams::CSFlags.name;
-    case CSField::SrcTF0:
-      return ColorSpaceParams::SrcTF0.name;
-    case CSField::SrcTF1:
-      return ColorSpaceParams::SrcTF1.name;
-    case CSField::SrcTFType:
-      return ColorSpaceParams::SrcTFType.name;
-    case CSField::SrcOOTF:
-      return ColorSpaceParams::SrcOOTF.name;
-    case CSField::ColorXform:
-      return ColorSpaceParams::ColorXform.name;
-    case CSField::DstOOTF:
-      return ColorSpaceParams::DstOOTF.name;
-    case CSField::DstTF0:
-      return ColorSpaceParams::DstTF0.name;
-    case CSField::DstTF1:
-      return ColorSpaceParams::DstTF1.name;
-    case CSField::DstTFType:
-      return ColorSpaceParams::DstTFType.name;
-  }
-  return "";
-}
-
 ColorMatrix33 CSIdentityMatrix() {
   return {{{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}};
 }
@@ -107,53 +80,6 @@ std::array<float, 12> PackColorXform(const ColorMatrix33& matrix) {
           matrix.values[0][1], matrix.values[1][1], matrix.values[2][1], 0.0f,
           matrix.values[0][2], matrix.values[1][2], matrix.values[2][2], 0.0f};
 }
-
-// The name mode: the prefixed plain names, or per-slot array elements when the helper carries a
-// slot. `required` writes land unconditionally (the precompiled shader always declares an enabled
-// step's fields); `optional` ones tolerate the runtime-generated shader's absent fields.
-struct NameSink {
-  UniformData* data;
-  const std::string& prefix;
-  int slot;
-
-  void optionalInt(CSField field, int value) const {
-    if (slot >= 0) {
-      data->setArrayElementOptional(CSFieldName(field), static_cast<size_t>(slot), value);
-    } else {
-      data->setDataOptional(prefix + CSFieldName(field), value);
-    }
-  }
-
-  void optionalFloat4(CSField field, const float (&value)[4]) const {
-    if (slot >= 0) {
-      data->setArrayElementOptional(CSFieldName(field), static_cast<size_t>(slot), value);
-    } else {
-      data->setDataOptional(prefix + CSFieldName(field), value);
-    }
-  }
-
-  void requiredFloat4(CSField field, const float (&value)[4]) const {
-    if (slot >= 0) {
-      data->setArrayElement(CSFieldName(field), static_cast<size_t>(slot), value);
-    } else {
-      data->setData(prefix + CSFieldName(field), value);
-    }
-  }
-
-  void colorXform(const ColorSpaceXformSteps* steps, bool gamut) const {
-    if (slot >= 0) {
-      const auto& matrix = gamut ? steps->srcToDstMatrix : CSIdentityMatrix();
-      data->setArrayElementOptional(ColorSpaceParams::ColorXform.name, static_cast<size_t>(slot),
-                                    PackColorXform(matrix));
-      return;
-    }
-    if (gamut) {
-      data->setData(prefix + ColorSpaceParams::ColorXform.name, steps->srcToDstMatrix);
-    } else if (data->hasField(prefix + ColorSpaceParams::ColorXform.name)) {
-      data->setData(prefix + ColorSpaceParams::ColorXform.name, CSIdentityMatrix());
-    }
-  }
-};
 
 // The element mode: one module's color-space block addressed by element index through the derived
 // layout. The disabled steps still write their identity placeholders when the module declares the
@@ -204,13 +130,12 @@ uint8_t ElementSink::indexOf(CSField field) const {
   return 0;
 }
 
-// The one upload body every addressing mode runs: the flags bitmask, each enabled step's real
-// parameters (disabled steps write identity placeholders their flags bit keeps unread), and the
-// gamut matrix or its identity stand-in.
+// The one upload body: the flags bitmask, each enabled step's real parameters (disabled steps
+// write identity placeholders their flags bit keeps unread), and the gamut matrix or its identity
+// stand-in.
 template <typename Sink>
-void UploadColorSpaceSteps(Sink& sink, const ColorSpaceXformSteps* colorSpaceXform,
-                           ColorSpaceXformSteps::Flags& flags) {
-  flags = colorSpaceXform->flags;
+void UploadColorSpaceSteps(Sink& sink, const ColorSpaceXformSteps* colorSpaceXform) {
+  const auto flags = colorSpaceXform->flags;
 
   static const float Zero4[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   sink.optionalInt(CSField::CSFlags, static_cast<int>(flags.mask()));
@@ -284,21 +209,12 @@ void UploadColorSpaceSteps(Sink& sink, const ColorSpaceXformSteps* colorSpaceXfo
 
 }  // namespace
 
-void ColorSpaceXformHelper::setData(UniformData* uniformData,
-                                    const ColorSpaceXformSteps* colorSpaceXform) {
-  if (!colorSpaceXform) {
-    return;
-  }
-  NameSink sink = {uniformData, prefix, slot};
-  UploadColorSpaceSteps(sink, colorSpaceXform, flags);
-}
-
 void ColorSpaceXformHelper::setData(SlotWriter* writer, const FieldElements& fields,
                                     const ColorSpaceXformSteps* colorSpaceXform) {
   if (!colorSpaceXform) {
     return;
   }
   ElementSink sink = {writer, fields};
-  UploadColorSpaceSteps(sink, colorSpaceXform, flags);
+  UploadColorSpaceSteps(sink, colorSpaceXform);
 }
 }  // namespace tgfx

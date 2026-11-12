@@ -18,9 +18,7 @@
 
 #pragma once
 #include <skcms.h>
-#include <string>
-#include <utility>
-#include "UniformData.h"
+#include <cstdint>
 #include "core/ColorSpaceXformSteps.h"
 #include "gpu/shaders/ParamBuffer.h"
 
@@ -45,30 +43,16 @@ int TFTypeToIndex(gfx::skcms_TFType type);
  */
 bool ColorSpaceXformStepsSupported(const ColorSpaceXformSteps* steps);
 
-class SlotWriter;
-
 /**
- * Uploads the uniforms of a color-space transform, in one of three addressing modes: bare names
- * (the standalone ColorSpaceXformEffect), prefix-composed names (the chain blocks), or per-slot
- * array elements. All uniform names are prefixed with namePrefix; an empty prefix yields the
- * plain names used by the standalone effect. When slotIndex >= 0 the plain names are written as
- * per-slot arrays instead, letting a multi-slot kernel give each slot an independent parameter
- * set (SrcTF0[0], SrcTF0[1], ...).
+ * Uploads the uniforms of a color-space transform through one module's color-space block: the
+ * caller names the module's field elements and the helper packs the steps into them. The fields
+ * are addressed by element index through the variant's derived layout, so no name is composed per
+ * draw and a field the module gates out is simply skipped.
  */
 class ColorSpaceXformHelper {
  public:
-  ColorSpaceXformHelper() = default;
-
-  explicit ColorSpaceXformHelper(std::string namePrefix) : prefix(std::move(namePrefix)) {
-  }
-
-  ColorSpaceXformHelper(int slotIndex, uint32_t) : slot(slotIndex) {
-  }
-
   /**
-   * The element indices of one module's color-space block (the Chain and YUVChainTail spellings):
-   * the element mode addresses the fields through the module's derived layout, so no name is
-   * composed per draw. A field the module gates out is simply skipped.
+   * The element indices of one module's color-space block (the Chain and YUVChainTail spellings).
    */
   struct FieldElements {
     uint8_t csFlags = 0;
@@ -83,36 +67,7 @@ class ColorSpaceXformHelper {
     uint8_t dstTFType = 0;
   };
 
-  void setData(UniformData* uniformData, const ColorSpaceXformSteps* colorSpaceXform);
-
   void setData(SlotWriter* writer, const FieldElements& fields,
                const ColorSpaceXformSteps* colorSpaceXform);
-
-  bool applyUnpremul() const {
-    return flags.unPremul;
-  }
-  bool applySrcTF() const {
-    return flags.linearize;
-  }
-  bool applySrcOOTF() const {
-    return flags.srcOOTF;
-  }
-  bool applyGamutXform() const {
-    return flags.gamutTransform;
-  }
-  bool applyDstOOTF() const {
-    return flags.dstOOTF;
-  }
-  bool applyDstTF() const {
-    return flags.encode;
-  }
-  bool applyPremul() const {
-    return flags.premul;
-  }
-
- private:
-  std::string prefix;
-  int slot = -1;
-  ColorSpaceXformSteps::Flags flags;
 };
 }  // namespace tgfx
