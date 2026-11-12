@@ -585,10 +585,11 @@ TGFX_TEST(TextureImageFilterTest, RadiusZeroIsIdentity) {
   EXPECT_EQ(bounds,
             Rect::MakeWH(static_cast<float>(source.width), static_cast<float>(source.height)));
 
-  auto reference = EvaluateReference(source, params, bounds, false);
-  auto gpu = RenderOnGPU(context, source, reference, filter, bounds);
-  auto metrics = Compare(gpu, reference);
-  EXPECT_EQ(metrics.maxDifference, 0);
+  auto sourceImage = MakeImage(source);
+  auto unfiltered = RenderImageOnGPU(context, sourceImage, source.width, source.height);
+  EXPECT_EQ(PixelAt(unfiltered, 20, 40)[3], 255);
+  auto gpu = RenderOnGPU(context, sourceImage, unfiltered, filter, bounds);
+  EXPECT_EQ(Compare(gpu, unfiltered).maxDifference, 0);
 }
 
 TGFX_TEST(TextureImageFilterTest, NoiseFixedVectors) {
