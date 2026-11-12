@@ -188,8 +188,8 @@ class DrawOp {
   /**
    * Lowers the op's colors, coverages, xfer processor and blend mode into a DrawIR placed on the
    * drawing allocator. Call once at record time, after those members are set and only while the
-   * precompiled route is active. A lowering failure leaves the IR null — the draw keeps the plain
-   * path, which is exactly the pre-IR behavior.
+   * precompiled route is active. A lowering failure leaves the IR null, and no match rule accepts
+   * a draw that carries processors without one, so such a draw is dropped and recorded as a miss.
    */
   void tryLowerIR();
 };

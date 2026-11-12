@@ -57,8 +57,9 @@ void DrawOp::tryLowerIR() {
     }
   } else {
     // No geometry processor exists at record time, so the IR carries no glyph leaf — matching the
-    // null-GP contract of LowerDraw. A lowering failure leaves the IR null, and the plain FP path
-    // serves the draw exactly as it did before the IR existed.
+    // null-GP contract of LowerDraw. A lowering failure leaves the IR null: no match rule accepts
+    // a draw that carries processors without an IR, so the draw is dropped and accounted as a
+    // miss instead of drawing with an expression the program cannot name.
     lowered = LowerDraw(colorList, coverageList, blendMode, allocator);
   }
   if (!lowered.has_value()) {

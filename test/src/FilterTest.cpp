@@ -32,7 +32,9 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/GradientType.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
@@ -40,6 +42,7 @@
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
+#include "tgfx/core/YUVData.h"
 #include "utils/EffectCache.h"
 #include "utils/TestUtils.h"
 #include "utils/common.h"
@@ -353,6 +356,43 @@ TGFX_TEST(FilterTest, RuntimeEffect) {
   image = image->makeWithFilter(std::move(composeFilter));
   canvas->drawImage(image, 200, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/RuntimeEffect"));
+}
+
+// A runtime effect cannot sample a YUV input directly: RuntimeDrawTask first flattens it through a
+// plain texture draw. That internal draw carries no record-time IR, so it must still resolve a
+// program — the regression this test pins is a dropped flatten draw that leaves the effect output
+// empty.
+TGFX_TEST(FilterTest, RuntimeEffectYUVInput) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int size = 64;
+  std::vector<uint8_t> yPlane(static_cast<size_t>(size) * size, 128);
+  std::vector<uint8_t> uvPlane(static_cast<size_t>(size) * size / 4, 128);
+  const void* addresses[3] = {yPlane.data(), uvPlane.data(), uvPlane.data()};
+  const size_t rowBytes[3] = {size, size / 2, size / 2};
+  auto yuvData = YUVData::MakeFrom(size, size, addresses, rowBytes, YUVData::I420_PLANE_COUNT);
+  ASSERT_TRUE(yuvData != nullptr);
+  auto image = Image::MakeI420(std::move(yuvData));
+  ASSERT_TRUE(image != nullptr);
+
+  EffectCache effectCache = {};
+  auto effect = CornerPinEffect::Make(&effectCache, {0, 0}, {size, 0}, {size, size}, {0, size});
+  auto filtered = image->makeWithFilter(ImageFilter::Runtime(std::move(effect)));
+  ASSERT_TRUE(filtered != nullptr);
+  auto surface = Surface::Make(context, size, size);
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->drawImage(filtered);
+
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  std::array<uint8_t, 4> pixel = {};
+  ASSERT_TRUE(surface->readPixels(info, pixel.data(), size / 2, size / 2));
+  // Mid-gray I420 (Y=U=V=128) flattens to a near-gray opaque pixel; a dropped flatten draw leaves
+  // the surface transparent.
+  EXPECT_EQ(pixel[3], 255);
+  EXPECT_GT(pixel[0], 100);
+  EXPECT_GT(pixel[1], 100);
+  EXPECT_GT(pixel[2], 100);
 }
 
 TGFX_TEST(FilterTest, InnerShadow) {

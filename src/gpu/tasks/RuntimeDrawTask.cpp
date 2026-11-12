@@ -21,8 +21,9 @@
 #include "gpu/Program.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/Quad.h"
-#include "gpu/RectsVertexProvider.h"
+#include "gpu/QuadsVertexProvider.h"
+#include "gpu/aot/ir/DrawIR.h"
+#include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
@@ -42,11 +43,11 @@ RuntimeDrawTask::RuntimeDrawTask(BlockAllocator* allocator,
     auto textureProxy = input.textureProxy;
     if (textureProxy != nullptr) {
       auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
-      // The DefaultGP binds the color and coverage attributes unconditionally; the mask quad
-      // broadcasts the record's white filler (this draw's Color uniform is white too) and a 1.0
-      // coverage.
+      // The flatten draw is a QuadPerEdgeAA quad, the geometry the texture families accept (a YUV
+      // leaf has no other layout): the provider writes the position, coverage and color slots, the
+      // white color rides the common-color uniform.
       auto maskVertexProvider =
-          RectsVertexProvider::MakeFrom(allocator, maskRect, AAType::None, true);
+          QuadsVertexProvider::MakeFrom(allocator, maskRect, AAType::None, Color::White());
       auto maskBuffer = context->proxyProvider()->createVertexBufferProxy(
           std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
       inputVertexBuffers.push_back(std::move(maskBuffer));
@@ -133,11 +134,21 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     colorProcessor =
         FragmentProcessor::Compose(allocator, std::move(colorProcessor), std::move(xformEffect));
   }
-  auto geometryLayout = DefaultGeometryLayout({}, AAType::None, {}, {});
+  auto geometryLayout = QuadGeometryLayoutOf(renderTarget->width(), renderTarget->height(),
+                                             AAType::None, PMColor::White(), Matrix::I(), false);
   std::vector fragmentProcessors = {colorProcessor.get()};
   auto programInfo =
       std::make_unique<ProgramInfo>(renderTarget.get(), geometryLayout,
                                     std::move(fragmentProcessors), 1, std::nullopt, BlendMode::Src);
+  // This flatten draw never passes through the record-time router, so it carries no IR of its own.
+  // Lower the same expression here: no match rule accepts a draw that carries processors without
+  // one, and a missing program would silently drop the whole runtime effect. The handle outlives
+  // the program resolution below; only its memory remains after this scope.
+  PlacementPtr<DrawIR> carriedIR = nullptr;
+  if (auto lowered = LowerDraw({colorProcessor.get()}, {}, BlendMode::Src, allocator)) {
+    carriedIR = allocator->make<DrawIR>(std::move(*lowered));
+    programInfo->setCarriedIR(carriedIR.get());
+  }
   auto program = programInfo->getProgram();
   if (program == nullptr) {
     LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to get the program!");
