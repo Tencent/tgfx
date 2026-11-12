@@ -142,12 +142,6 @@ constexpr AOTKnownGap AOTKnownGaps[] = {
     {"VectorLayerTest.GlassStyleMultiStrokeRoundedCorner",
      "ColorFP=[GlassRefractionFragmentProcessor",
      "same glass + device-mask coverage shape as GlassParentChildRenderedCoverage"},
-    {"LayerTest.DropShadow", "GP=NonAARRect;ColorFP=[TiledTextureEffect,",
-     "the alpha-step op is declared only by the textured family, which does not accept the non-AA "
-     "rounded-rect geometry"},
-    {"LayerTest.InnerShadow", "",
-     "inherits the same uncovered shadow shapes as DropShadow; the negative cache recorded no "
-     "signature for this test's misses"},
     {"LayerTest.CollapsedFillGeometryLeavesBandOnly", "",
      "the fill geometry collapses to a band whose shape no rule accepts; the negative cache "
      "recorded no signature for this test's misses"},

@@ -337,7 +337,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   }
   // The legacy reference set is frozen in ChainInputs (ChainEquivalenceTest pairs it with the
   // declared variants); the registry now enumerates the declared family alone.
-  EXPECT_EQ(ChainInputs::Reachable().size(), 111u);
+  EXPECT_EQ(ChainInputs::Reachable().size(), 201u);
   EXPECT_FALSE(EnumerateReachablePermutations("PointwiseChainShader").has_value());
   // The declaration-driven families enumerate their own ordinals: the geometry IS the family, so
   // SolidColor/MaskFill list HAS_XP alone and TiledTextureFill leads with the geometry radix.

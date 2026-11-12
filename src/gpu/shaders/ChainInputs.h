@@ -94,7 +94,7 @@ struct ChainInputs {
     // lists the handles in the bundle's dimension order, and Compose assigns through the handles
     // by name (ComposedDims) — there is no index enum whose positions could drift from the
     // domain list.
-    static inline const PermutationIntDim<VertDims> GP_LAYOUT{"GP_LAYOUT", 5};
+    static inline const PermutationIntDim<VertDims> GP_LAYOUT{"GP_LAYOUT", 10};
     static inline const PermutationBoolDim<VertDims> HAS_COVERAGE{"HAS_COVERAGE"};
     static inline const PermutationBoolDim<VertDims> HAS_UV_COORD{"HAS_UV_COORD"};
     // 0 = no texture leaves, 1 = the four-leaf artifacts (chains with 1-3 sampler children bind
@@ -117,7 +117,7 @@ struct ChainInputs {
     // Same declaration shape as VertDims: handles typed by this stage, domain() in bundle order.
     // RESOURCE_KIND stays last (see its comment) — the order feeds encode(), so it is pinned by
     // the compiled-space tests, not by an enum.
-    static inline const PermutationIntDim<FragDims> GP_LAYOUT{"GP_LAYOUT", 5};
+    static inline const PermutationIntDim<FragDims> GP_LAYOUT{"GP_LAYOUT", 10};
     static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
     static inline const PermutationBoolDim<FragDims> HAS_COVERAGE{"HAS_COVERAGE"};
     static inline const PermutationIntDim<FragDims> TEXTURE_COUNT{"TEXTURE_COUNT", 2};
@@ -139,7 +139,9 @@ struct ChainInputs {
 
   /// Shared input contract for the plain chains and the extended resource kinds. gpKind selects
   /// (0 = DefaultGP, 1 = QuadPerEdgeAA, 2 = Mesh, 3 = sampler-free AtlasText twin, 4 = Ellipse,
-  /// 5 = HairlineLine, 6 = ComplexEllipse fill, 7 = ComplexEllipse stroke); each profile fixes
+  /// 5 = HairlineLine, 6 = ComplexEllipse fill, 7 = ComplexEllipse stroke, 8 = NonAARRect fill,
+  /// 9 = NonAARRect stroke, 10 = ComplexNonAARRect fill, 11 = ComplexNonAARRect stroke,
+  /// 12 = HairlineQuad); each profile fixes
   /// which attribute slots its vertex buffers carry, and Compose rejects profile-inconsistent
   /// combinations. The chain slot topology (ops, indices) is runtime data; only the leaf-count
   /// class, the mask flag, and the transfer type shape the shared dimensions. TiledGraph adds a
@@ -213,7 +215,7 @@ struct ChainInputs {
     const AOTResourceProfile profiles[] = {AOTResourceProfile::Automatic,
                                            AOTResourceProfile::TiledGraph};
     for (auto profile : profiles) {
-      for (int gpKind = GpKind::Default; gpKind <= GpKind::ComplexEllipseStroke; ++gpKind) {
+      for (int gpKind = GpKind::Default; gpKind <= GpKind::HairlineQuad; ++gpKind) {
         for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
           for (int hasUVCoord = 0; hasUVCoord <= 1; ++hasUVCoord) {
             for (int textureCount = 0; textureCount <= 1; ++textureCount) {
@@ -353,6 +355,28 @@ struct ChainInputs {
           return false;
         }
         gpLayout = inputs.gpKind == GpKind::ComplexEllipseFill ? 3 : 4;
+        break;
+      case 8:
+      case 9:
+      case 10:
+      case 11:
+      case 12:
+        // The non-AA rounded-rect SDFs and the hairline quad evaluate per-pixel edge coverage from
+        // their own varyings: like the ellipse layouts they carry no coverage or uvCoord slot.
+        if (inputs.hasCoverage || inputs.hasUVCoord) {
+          return false;
+        }
+        if (inputs.gpKind == GpKind::NonAARRectFill) {
+          gpLayout = 5;
+        } else if (inputs.gpKind == GpKind::NonAARRectStroke) {
+          gpLayout = 6;
+        } else if (inputs.gpKind == GpKind::ComplexRRectFill) {
+          gpLayout = 7;
+        } else if (inputs.gpKind == GpKind::ComplexRRectStroke) {
+          gpLayout = 8;
+        } else {
+          gpLayout = 9;
+        }
         break;
       default:
         return false;

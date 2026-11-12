@@ -26,8 +26,11 @@
 #include "gpu/shaders/modules/Chain.h"
 #include "gpu/shaders/modules/ChainAtlasGeometry.h"
 #include "gpu/shaders/modules/ChainComplexGeometry.h"
+#include "gpu/shaders/modules/ChainComplexRRectGeometry.h"
 #include "gpu/shaders/modules/ChainEllipseGeometry.h"
 #include "gpu/shaders/modules/ChainHairlineGeometry.h"
+#include "gpu/shaders/modules/ChainHairlineQuadGeometry.h"
+#include "gpu/shaders/modules/ChainRRectGeometry.h"
 #include "gpu/shaders/modules/ChainRectGeometry.h"
 #include "gpu/shaders/modules/ChainRectUVGeometry.h"
 #include "gpu/shaders/modules/ComplexEllipseGeometry.h"
@@ -259,16 +262,18 @@ inline constexpr const Module* GlassRefractionQuadGeometries[] = {&QuadGeometry}
 inline constexpr FamilyModule GlassRefractionQuadBody[] = {&GlassRefraction, &GlassLocalMask,
                                                            &AnalyticClip};
 
-/// The Chain family: the pointwise interpreter as a declared assembly. The legacy kernel's five
-/// GP_LAYOUT values split into the six geometry modules whose attribute orders each pair by order
-/// with the GPs they share (see the module headers); the profile dimension folds the legacy
+/// The Chain family: the pointwise interpreter as a declared assembly. The legacy kernel's GP
+/// layouts split into the nine geometry modules whose attribute orders each pair by order with the
+/// GPs they share (see the module headers); the non-AA rounded rects and the hairline quad close the
+/// geometries the legacy kernel never carried. The profile dimension folds the legacy
 /// (TEXTURE_COUNT, HAS_MASK_TEXTURE, RESOURCE_KIND) product into its seven reachable cells; the
 /// body is the shared interpreter text itself, spelled with the legacy interface names verbatim.
 /// The body owns the fragment output (it runs the XferProcessor's blend pass inside its own
 /// evaluation), so the Xfer module contributes its interface but not its hook.
-inline constexpr const Module* ChainGeometries[] = {&ChainRectGeometry,     &ChainRectUVGeometry,
-                                                    &ChainAtlasGeometry,    &ChainEllipseGeometry,
-                                                    &ChainHairlineGeometry, &ChainComplexGeometry};
+inline constexpr const Module* ChainGeometries[] = {
+    &ChainRectGeometry,    &ChainRectUVGeometry,       &ChainAtlasGeometry,
+    &ChainEllipseGeometry, &ChainHairlineGeometry,     &ChainComplexGeometry,
+    &ChainRRectGeometry,   &ChainComplexRRectGeometry, &ChainHairlineQuadGeometry};
 
 inline constexpr FamilyModule ChainBody[] = {&Chain};
 
@@ -305,10 +310,21 @@ inline bool ChainVariantAllowed(const Variant& variant, const Family& family) {
     case 4:
       // ChainHairlineGeometry: the mask is reachable, noise is not.
       return subset == 0 && stroke == 0 && profile != 6;
-    default:
+    case 5:
       // ChainComplexGeometry: the STROKE dim selects fill (3) or stroke (4); the mask is
       // reachable, noise is not.
       return subset == 0 && profile != 6;
+    case 6:
+      // ChainRRectGeometry: the non-AA rounded rect's per-pixel SDF, mask reachable.
+      return subset == 0 && profile != 6;
+    case 7:
+      // ChainComplexRRectGeometry: the per-corner-radius rounded rect, same reachable set.
+      return subset == 0 && profile != 6;
+    case 8:
+      // ChainHairlineQuadGeometry: no stroke form; the Loop-Blinn edge is the coverage.
+      return subset == 0 && stroke == 0 && profile != 6;
+    default:
+      return false;
   }
 }
 
@@ -339,7 +355,7 @@ inline constexpr Family FamilyTableStorage[] = {
     {"GlassUDFTentBlur", GlassUDFTentBlurGeometries, 1, GlassUDFTentBlurBody, 3},
     {"GlassRefraction", GlassRefractionGeometries, 1, GlassRefractionBody, 2},
     {"GlassRefractionQuad", GlassRefractionQuadGeometries, 1, GlassRefractionQuadBody, 3},
-    {"Chain", ChainGeometries, 6, ChainBody, 1, ChainVariantAllowed, /*bodyOwnsOutput=*/true,
+    {"Chain", ChainGeometries, 9, ChainBody, 1, ChainVariantAllowed, /*bodyOwnsOutput=*/true,
      /*fallback=*/true, /*textureReads=*/ShaderTextureReadSwizzle},
 };
 

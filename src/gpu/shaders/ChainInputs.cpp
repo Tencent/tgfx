@@ -149,8 +149,9 @@ std::optional<ChainInputs::Inputs> ChainInputs::DeriveInputs(const AOTProgram& p
   } else if (gpKind == GpKind::HairlineLine) {
     // The hairline edge AA is per-pixel (edge-distance varying); the color is a uniform.
     inputs.hasCoverage = false;
-  } else if (gpKind == GpKind::ComplexEllipseFill || gpKind == GpKind::ComplexEllipseStroke) {
-    // Per-pixel edge AA like the ellipse; the color attribute is unconditional.
+  } else if (gpKind >= GpKind::ComplexEllipseFill) {
+    // Per-pixel edge coverage like the ellipse (the complex ellipse, the two non-AA rounded-rect
+    // SDFs and the hairline quad); the color attribute is unconditional where the buffer has one.
     inputs.hasCoverage = false;
   } else {
     // The DefaultGP's coverage attribute is unconditional (the non-AA path triangles carry a

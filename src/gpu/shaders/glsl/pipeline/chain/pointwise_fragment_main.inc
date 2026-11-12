@@ -100,10 +100,10 @@ vec4 chainResults[TGFX_CHAIN_REGISTERS];
 // the OP_TEXTURE branch of evalChainSlot reads them back by instruction index.
 vec4 chainLeafTex[4];
 
-// The per-pixel GP edge coverage of the ellipse (GP_LAYOUT=1), hairline-line (GP_LAYOUT=2) and
-// complex rounded-rect (GP_LAYOUT=3/4) layouts. Computed ahead of the chain evaluation in main so
-// the coverage subtree's unit input can consume it like the rect layouts' vCoverage varying; 1.0
-// keeps the define valid for every other variant.
+// The per-pixel GP edge coverage of the layouts that carry one (GP_LAYOUT 1..9: ellipse,
+// hairline-line, complex ellipse, non-AA rounded rects and hairline quad). Computed ahead of the
+// chain evaluation in main so the coverage subtree's unit input can consume it like the rect
+// layouts' vCoverage varying; 1.0 keeps the define valid for every other variant.
 highp float gpPixelCoverage = 1.0;
 
 // Geometry color source: the per-vertex color attribute, or the exact Color uniform for
@@ -190,6 +190,21 @@ void chainMain() {
   // The complex rounded-rect stroke coverage: the outer curve times the inner one.
   gpPixelCoverage =
       complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vStrokeWidth, true);
+#elif GP_LAYOUT == 5
+  // The non-AA rounded-rect SDF, hard-stepped exactly like the RRect family.
+  gpPixelCoverage = nonAARRectCoverage(vLocalCoord, vRectBounds, vRadii, vec2(0.0), false);
+#elif GP_LAYOUT == 6
+  gpPixelCoverage = nonAARRectCoverage(vLocalCoord, vRectBounds, vRadii, vStrokeWidth, true);
+#elif GP_LAYOUT == 7
+  // The per-corner-radius rounded-rect SDF, the ComplexRRect family's formula.
+  gpPixelCoverage =
+      complexRRectCoverage(vLocalCoord, vRectBounds, vXRadii, vYRadii, vec2(0.0), false);
+#elif GP_LAYOUT == 8
+  gpPixelCoverage =
+      complexRRectCoverage(vLocalCoord, vRectBounds, vXRadii, vYRadii, vStrokeWidth, true);
+#elif GP_LAYOUT == 9
+  // The Loop-Blinn quad edge (Coverage * edge alpha), the same call the dedicated family makes.
+  gpPixelCoverage = hairlineQuadEdgeCoverage(vHairQuadEdge, Coverage, AAEnabled);
 #endif
   // Active slots are contiguous from 0 by construction (texture leaves first, then the rest in
   // topological order), so a uniform guard skips the whole evaluation of unused slots —

@@ -132,9 +132,10 @@ constexpr int ComplexRRectStrokeLayout = 4;
 
 enum class LayoutPaint { Solid, Image, Gradient, GradientTimesImage };
 enum class LayoutClip { None, TwoRRects, PathMask, PathMaskRRect };
-// The geometry under test: hairline zigzags (HairlineLineGeometryProcessor), or rounded rects with
-// per-corner radii (ComplexEllipseGeometryProcessor), filled or stroked.
-enum class LayoutGeometry { Hairline, ComplexRRectFill, ComplexRRectStroke };
+// The geometry under test: hairline zigzags (HairlineLineGeometryProcessor), rounded rects with
+// uniform radii (NonAARRectGeometryProcessor) or per-corner radii (ComplexEllipseGeometryProcessor),
+// filled or stroked, and curved hairlines (HairlineQuadGeometryProcessor).
+enum class LayoutGeometry { Hairline, ComplexRRectFill, ComplexRRectStroke, RRect, HairlineQuad };
 
 struct LayoutVariant {
   const char* label = "";
@@ -213,6 +214,16 @@ std::shared_ptr<Shader> MakeLayoutShader(LayoutPaint paint, const std::shared_pt
   return nullptr;
 }
 
+// A zigzag with quadratic segments: the hairline decomposition emits HairlineQuadOp for the curves,
+// so every quad record of the scene belongs to the hairline-quad layout under test.
+Path MakeCurvedPath() {
+  Path path = {};
+  path.moveTo(16, 118);
+  path.quadTo(48, 20, 80, 118);
+  path.quadTo(112, 20, 144, 118);
+  return path;
+}
+
 // A zigzag of straight segments only: the hairline decomposition emits HairlineLineOp alone (no
 // quad op), so every hairline record of the scene belongs to the layout under test.
 Path MakeZigzagPath() {
@@ -226,8 +237,19 @@ Path MakeZigzagPath() {
   return path;
 }
 
-const char* GeometryProcessorName(LayoutGeometry geometry) {
-  return geometry == LayoutGeometry::Hairline ? "HairlineLine" : "ComplexEllipse";
+const char* GeometryProcessorName(LayoutGeometry geometry, bool nonAA) {
+  switch (geometry) {
+    case LayoutGeometry::Hairline:
+      return "HairlineLine";
+    case LayoutGeometry::HairlineQuad:
+      return "HairlineQuad";
+    case LayoutGeometry::RRect:
+      return "NonAARRect";
+    case LayoutGeometry::ComplexRRectFill:
+    case LayoutGeometry::ComplexRRectStroke:
+      return nonAA ? "ComplexNonAARRect" : "ComplexEllipse";
+  }
+  return "";
 }
 
 // Per-corner radii mark the rrect complex, which routes it onto ComplexEllipseGeometryProcessor.
@@ -242,9 +264,10 @@ RRect MakeComplexRRect(const Rect& rect) {
 }
 
 // Two complex rrects batched into one op. With multiColor the second paint color differs, so the
-// op carries per-vertex colors; otherwise both share the common Color uniform.
-void DrawComplexRRects(Canvas* canvas, Paint paint, bool stroke, bool multiColor) {
-  paint.setAntiAlias(true);
+// op carries per-vertex colors; otherwise both share the common Color uniform. A non-antialiased
+// batch routes the op onto the non-AA complex geometry instead of the AA per-corner one.
+void DrawComplexRRects(Canvas* canvas, Paint paint, bool stroke, bool multiColor, bool antiAlias) {
+  paint.setAntiAlias(antiAlias);
   if (stroke) {
     paint.setStyle(PaintStyle::Stroke);
     paint.setStrokeWidth(6.0f);
@@ -312,7 +335,7 @@ void RenderLayoutScene(Context* context, const LayoutVariant& variant,
     canvas->scale(1.04f, 0.96f);
     if (drawGeometry) {
       DrawComplexRRects(canvas, paint, variant.geometry == LayoutGeometry::ComplexRRectStroke,
-                        variant.multiColor);
+                        variant.multiColor, /*antiAlias=*/true);
     }
     canvas->restore();
     context->flushAndSubmit(true);
@@ -494,6 +517,10 @@ struct ReportedShape {
   bool tiledImage = false;
   // Apply the RRect clip before the Rect clip: the composed coverage lists its FPs in clip order.
   bool rrectBeforeRect = false;
+  // A non-antialiased draw: the rounded-rect ops then emit the non-AA geometry kinds.
+  bool nonAA = false;
+  // A three-stop radial gradient (DualIntervalGradientColorizer over RadialGradientLayout).
+  bool radialGradient = false;
 };
 
 void ApplyReportedRectClip(Canvas* canvas) {
@@ -552,10 +579,16 @@ void RenderReportedShape(Context* context, const ReportedShape& shape,
   }
   canvas->translate(6, 4);
   Paint paint = {};
-  paint.setAntiAlias(true);
+  paint.setAntiAlias(!shape.nonAA);
   paint.setColor(Color::FromRGBA(250, 245, 235, 255));
   if (shape.gradient) {
-    if (shape.dualGradient) {
+    if (shape.radialGradient) {
+      paint.setShader(Shader::MakeRadialGradient(
+          Point::Make(80, 74), 72,
+          {Color::FromRGBA(255, 80, 40, 230), Color::FromRGBA(250, 230, 60, 255),
+           Color::FromRGBA(40, 220, 120, 200)},
+          {}));
+    } else if (shape.dualGradient) {
       paint.setShader(Shader::MakeLinearGradient(
           Point::Make(0, 0), Point::Make(150, 120),
           {Color::FromRGBA(255, 80, 40, 230), Color::FromRGBA(250, 230, 60, 255),
@@ -570,16 +603,40 @@ void RenderReportedShape(Context* context, const ReportedShape& shape,
   if (shape.alphaThreshold) {
     paint.setColorFilter(ColorFilter::AlphaThreshold(0.85f));
   }
-  if (shape.geometry == LayoutGeometry::Hairline) {
-    canvas->rotate(8);
-    paint.setStyle(PaintStyle::Stroke);
-    paint.setStrokeWidth(0.0f);
-    auto path = MakeZigzagPath();
-    canvas->drawPath(path, paint);
-    canvas->translate(0, 20);
-    canvas->drawPath(path, paint);
-  } else {
-    DrawComplexRRects(canvas, paint, shape.geometry == LayoutGeometry::ComplexRRectStroke, false);
+  switch (shape.geometry) {
+    case LayoutGeometry::Hairline: {
+      canvas->rotate(8);
+      paint.setStyle(PaintStyle::Stroke);
+      paint.setStrokeWidth(0.0f);
+      auto path = MakeZigzagPath();
+      canvas->drawPath(path, paint);
+      canvas->translate(0, 20);
+      canvas->drawPath(path, paint);
+      break;
+    }
+    case LayoutGeometry::HairlineQuad: {
+      canvas->rotate(8);
+      paint.setStyle(PaintStyle::Stroke);
+      paint.setStrokeWidth(0.0f);
+      auto path = MakeCurvedPath();
+      canvas->drawPath(path, paint);
+      canvas->translate(0, 20);
+      canvas->drawPath(path, paint);
+      break;
+    }
+    case LayoutGeometry::RRect: {
+      RRect first = {};
+      first.setRectXY(Rect::MakeXYWH(14, 12, 128, 70), 24, 18);
+      canvas->drawRRect(first, paint);
+      RRect second = {};
+      second.setRectXY(Rect::MakeXYWH(26, 92, 116, 56), 16, 22);
+      canvas->drawRRect(second, paint);
+      break;
+    }
+    default:
+      DrawComplexRRects(canvas, paint, shape.geometry == LayoutGeometry::ComplexRRectStroke,
+                        /*multiColor=*/false, /*antiAlias=*/!shape.nonAA);
+      break;
   }
   canvas->restore();
   context->flushAndSubmit(true);
@@ -600,7 +657,7 @@ void ExpectReportedShapeServed(const ReportedShape& shape) {
     image = MakePatternImage();
     ASSERT_NE(image, nullptr);
   }
-  const char* gpName = GeometryProcessorName(shape.geometry);
+  const char* gpName = GeometryProcessorName(shape.geometry, shape.nonAA);
   auto* cache = ContextCacheAccess::Cache(context);
   Bitmap candidate = {};
   {
@@ -800,6 +857,52 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineGradientDeviceMaskRectRRect) {
                              "ComposeFragmentProcessor("
                              "DeviceSpaceTextureEffect,RectEffect,RRectEffect)];XP=fixed",
                              true, false, ClipPath | ClipRect | ClipRRect});
+}
+
+// Rows 23-27 of the integration miss report: the non-AA rounded rects and the hairline quad under
+// effects only the pointwise chain evaluates. The chain serves them after the geometry layouts
+// landed, so each row must reproduce its signature and take zero misses.
+
+TGFX_TEST(AOTGeometryLayoutTest, ReportedNonAARRectGradientThreshold) {
+  ExpectReportedShapeServed(
+      {"row23",
+       "GP=NonAARRect;ColorFP=[ClampedGradientEffect(DualIntervalGradientColorizer,"
+       "RadialGradientLayout),AlphaStepFragmentProcessor];CoverageFP=[];XP=fixed",
+       /*gradient=*/true, /*alphaThreshold=*/true, ClipNone, LayoutGeometry::RRect,
+       /*dualGradient=*/false, /*tiledImage=*/false, /*rrectBeforeRect=*/false, /*nonAA=*/true,
+       /*radialGradient=*/true});
+}
+
+TGFX_TEST(AOTGeometryLayoutTest, ReportedComplexNonAARRectGradientThreshold) {
+  ExpectReportedShapeServed(
+      {"row24",
+       "GP=ComplexNonAARRect;ColorFP=[ClampedGradientEffect(SingleIntervalGradientColorizer,"
+       "LinearGradientLayout),AlphaStepFragmentProcessor];CoverageFP=[];XP=fixed",
+       /*gradient=*/true, /*alphaThreshold=*/true, ClipNone, LayoutGeometry::ComplexRRectFill,
+       /*dualGradient=*/false, /*tiledImage=*/false, /*rrectBeforeRect=*/false, /*nonAA=*/true});
+}
+
+TGFX_TEST(AOTGeometryLayoutTest, ReportedNonAARRectTiledThreshold) {
+  ExpectReportedShapeServed(
+      {"row25",
+       "GP=NonAARRect;ColorFP=[TiledTextureEffect,AlphaStepFragmentProcessor];"
+       "CoverageFP=[];XP=fixed",
+       /*gradient=*/false, /*alphaThreshold=*/true, ClipNone, LayoutGeometry::RRect,
+       /*dualGradient=*/false, /*tiledImage=*/true, /*rrectBeforeRect=*/false, /*nonAA=*/true});
+}
+
+TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineQuadDeviceMaskRect) {
+  ExpectReportedShapeServed({"row26",
+                             "GP=HairlineQuad;ColorFP=[];CoverageFP=[ComposeFragmentProcessor("
+                             "DeviceSpaceTextureEffect,RectEffect)];XP=fixed",
+                             false, false, ClipPath | ClipRect, LayoutGeometry::HairlineQuad});
+}
+
+TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineQuadDeviceMask) {
+  ExpectReportedShapeServed({"row27",
+                             "GP=HairlineQuad;ColorFP=[];CoverageFP=[DeviceSpaceTextureEffect];"
+                             "XP=fixed",
+                             false, false, ClipPath, LayoutGeometry::HairlineQuad});
 }
 
 namespace {}  // namespace

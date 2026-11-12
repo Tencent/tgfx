@@ -283,6 +283,12 @@ std::optional<int> PointwiseGpKind(const AOTGeometryDesc& geometry) {
       return GpKind::HairlineLine;
     case GeometryKind::ComplexEllipse:
       return geometry.isStroke ? GpKind::ComplexEllipseStroke : GpKind::ComplexEllipseFill;
+    case GeometryKind::NonAARRect:
+      return geometry.isStroke ? GpKind::NonAARRectStroke : GpKind::NonAARRectFill;
+    case GeometryKind::ComplexNonAARRect:
+      return geometry.isStroke ? GpKind::ComplexRRectStroke : GpKind::ComplexRRectFill;
+    case GeometryKind::HairlineQuad:
+      return GpKind::HairlineQuad;
     default:
       return std::nullopt;
   }

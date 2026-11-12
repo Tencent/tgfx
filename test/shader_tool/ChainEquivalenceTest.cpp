@@ -104,7 +104,7 @@ TEST(ChainEquivalenceTest, DeclaredVariantsBijectTheLegacyReachableSet) {
                           fragDomain.valueOf(pair.second, "HAS_SUBSET"),
                           fragDomain.valueOf(pair.second, "RESOURCE_KIND")));
   }
-  ASSERT_EQ(legacy.size(), 111u);
+  ASSERT_EQ(legacy.size(), 201u);
 
   const Family& family = Families()[chainIndex];
   const auto variants = EnumerateVariants(family, chainIndex);
@@ -135,8 +135,20 @@ TEST(ChainEquivalenceTest, DeclaredVariantsBijectTheLegacyReachableSet) {
         gpLayout = 2;
         coverage = 0;
         break;
-      default:  // ChainComplexGeometry
+      case 5:  // ChainComplexGeometry
         gpLayout = 3 + stroke;
+        coverage = 0;
+        break;
+      case 6:  // ChainRRectGeometry
+        gpLayout = 5 + stroke;
+        coverage = 0;
+        break;
+      case 7:  // ChainComplexRRectGeometry
+        gpLayout = 7 + stroke;
+        coverage = 0;
+        break;
+      default:  // ChainHairlineQuadGeometry
+        gpLayout = 9;
         coverage = 0;
         break;
     }

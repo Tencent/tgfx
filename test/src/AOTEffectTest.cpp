@@ -2200,7 +2200,7 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
   // TiledGraph profile composes exactly where the plain chain does, with RESOURCE_KIND 1 and
   // HAS_SOURCE_COORDS 1 on top of the plain values.
   std::set<std::pair<uint32_t, uint32_t>> gradientPairs;
-  for (int gpKind = 0; gpKind <= 7; ++gpKind) {
+  for (int gpKind = 0; gpKind <= GpKind::HairlineQuad; ++gpKind) {
     for (int flags = 0; flags < 32; ++flags) {
       for (int xp = 0; xp < 3; ++xp) {
         SCOPED_TRACE(gpKind * 1000 + flags * 10 + xp);
@@ -2256,7 +2256,7 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
       chainSubsetPairs += fragValues[hasSubsetPos] != 0 ? 1 : 0;
     }
   }
-  EXPECT_EQ(plainPairs.size(), 57u);
+  EXPECT_EQ(plainPairs.size(), 102u);
   EXPECT_EQ(chainSubsetPairs, 6u);
   EXPECT_EQ(gradientPairs.size(), plainPairs.size() - chainSubsetPairs);
   EXPECT_EQ(reachable.size(), plainPairs.size() + gradientPairs.size() + noisePairs.size());

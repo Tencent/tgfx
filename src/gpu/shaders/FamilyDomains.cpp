@@ -125,7 +125,16 @@ uint8_t ChainGeometryOfCell(const ChainLegacyCell& cell) {
   if (cell.gpLayout == 2) {
     return 4;
   }
-  return 5;
+  if (cell.gpLayout == 3 || cell.gpLayout == 4) {
+    return 5;
+  }
+  if (cell.gpLayout == 5 || cell.gpLayout == 6) {
+    return 6;
+  }
+  if (cell.gpLayout == 7 || cell.gpLayout == 8) {
+    return 7;
+  }
+  return 8;
 }
 
 uint8_t ChainProfileOfCell(const ChainLegacyCell& cell) {

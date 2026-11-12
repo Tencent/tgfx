@@ -264,6 +264,10 @@ void WriteGeometryUniformsByName(const GeometryLayout& layout, UniformData* vert
         WriteGeometryCoordTransforms(p.uvMatrix, false, vertexUniformData, transformIter);
       }
       if (fragmentUniformData != nullptr) {
+        // The chain layout declares the common-color flag; the dedicated family does not.
+        if (fragmentUniformData->hasField("HasCommonColor")) {
+          fragmentUniformData->setData("HasCommonColor", 1);
+        }
         fragmentUniformData->setData("Color", p.commonColor);
         fragmentUniformData->setData("Coverage", p.coverage);
         fragmentUniformData->setData("AAEnabled", p.aaType == AAType::Coverage ? 1 : 0);
