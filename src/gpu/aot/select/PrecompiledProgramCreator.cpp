@@ -466,7 +466,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
   // physical slot. A one-to-one interface therefore pairs in order, and only a shader that reads a
   // strict subset of the attribute list is matched by physical slot. Instance inputs take the slots
   // after the vertex ones.
-  const auto& attributeLocations = programInfo->getGeometryProcessor()->vertexAttributeLocations();
+  const auto& attributeLocations = programInfo->getVertexAttributeLocations();
   uint32_t instanceBase = 0;
   for (auto location : attributeLocations) {
     instanceBase = std::max(instanceBase, location + 1);

@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include "gpu/Program.h"
 #include "gpu/Swizzle.h"
+#include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/aot/ir/Program.h"
 #include "gpu/aot/ir/XferFacts.h"
 #include "gpu/aot/select/FamilyMatchResult.h"
@@ -98,12 +99,26 @@ class ProgramInfo {
 
   Swizzle getOutputSwizzle() const;
 
+  /// Snapshots the draw's geometry into the layout value (the geometry may be null on a build
+  /// whose draw never reaches a program).
+  void setGeometryLayout(GeometryLayout layout) {
+    geometryLayout = std::move(layout);
+  }
+
+  /// The geometry value every reader addresses: the attribute layout and slots came off the
+  /// geometry at prepare; a build that never set one falls back to the live geometry.
+  const GeometryLayout& getGeometryLayout() const;
+
   const std::vector<Attribute>& getVertexAttributes() const {
-    return geometryProcessor->vertexAttributes();
+    return getGeometryLayout().vertexAttributes;
   }
 
   const std::vector<Attribute>& getInstanceAttributes() const {
-    return geometryProcessor->instanceAttributes();
+    return getGeometryLayout().instanceAttributes;
+  }
+
+  const std::vector<uint32_t>& getVertexAttributeLocations() const {
+    return getGeometryLayout().physicalSlots;
   }
 
   PipelineColorAttachment getPipelineColorAttachment() const;
@@ -303,6 +318,7 @@ class ProgramInfo {
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
   std::optional<DstTextureInfo> dstTexture = std::nullopt;
+  mutable std::optional<GeometryLayout> geometryLayout = std::nullopt;
   /// The xfer facts derived from the processor once per program: the shader-side blend flag and
   /// the destination it samples. The writers and the matcher read this, not the processor.
   XferFacts xferFacts = {};

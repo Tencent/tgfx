@@ -68,6 +68,13 @@ void ProgramInfo::updateXferFacts() {
   }
 }
 
+const GeometryLayout& ProgramInfo::getGeometryLayout() const {
+  if (!geometryLayout.has_value()) {
+    geometryLayout = GeometryLayoutOf(geometryProcessor);
+  }
+  return *geometryLayout;
+}
+
 Swizzle ProgramInfo::getOutputSwizzle() const {
   return Swizzle::ForWrite(renderTarget->format());
 }

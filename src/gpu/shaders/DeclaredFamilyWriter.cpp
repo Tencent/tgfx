@@ -27,7 +27,7 @@
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
-#include "gpu/aot/ir/GeometryParameters.h"
+#include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/aot/select/FamilyMatchResult.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
@@ -113,90 +113,6 @@ std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
     result[3] = -result[3];
   }
   return result;
-}
-
-/// One snapshot of the geometry facts the module walk uploads: read off the draw's geometry
-/// processor once per program, then addressed by every writer below. The concrete geometry type
-/// stays here alone, so the writers no longer cast and P6's geometry removal touches this function
-/// only.
-AOTGeometryParameters GeometryParametersOf(const ProgramInfo& info) {
-  AOTGeometryParameters params = {};
-  const auto* geometry = info.getGeometryProcessor();
-  if (geometry == nullptr) {
-    return params;
-  }
-  if (IsProcessor<DefaultGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const DefaultGeometryProcessor*>(geometry);
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = true;
-    params.viewMatrix = gp->getViewMatrix();
-    params.uvMatrix = gp->getUVMatrix();
-    params.aaType = gp->getAAType();
-  } else if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const QuadPerEdgeAAGeometryProcessor*>(geometry);
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = gp->hasCommonColor();
-    params.uvMatrix = gp->getUVMatrix();
-    params.aaType = gp->getAAType();
-  } else if (IsProcessor<NonAARRectGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const NonAARRectGeometryProcessor*>(geometry);
-    const auto color = gp->getCommonColor();
-    params.commonColor = color.value_or(PMColor());
-    params.hasCommonColor = color.has_value();
-    params.isStroke = gp->isStroke();
-  } else if (IsProcessor<ComplexNonAARRectGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const ComplexNonAARRectGeometryProcessor*>(geometry);
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = gp->hasCommonColor();
-    params.isStroke = gp->isStroke();
-  } else if (IsProcessor<EllipseGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const EllipseGeometryProcessor*>(geometry);
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = gp->hasCommonColor();
-    params.isStroke = gp->isStroke();
-  } else if (IsProcessor<ComplexEllipseGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const ComplexEllipseGeometryProcessor*>(geometry);
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = gp->hasCommonColor();
-    params.isStroke = gp->isStroke();
-  } else if (IsProcessor<HairlineLineGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const HairlineLineGeometryProcessor*>(geometry);
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = true;
-    params.viewMatrix = gp->getViewMatrix();
-    params.coverage = gp->getCoverage();
-    params.aaType = gp->getAAType();
-  } else if (IsProcessor<HairlineQuadGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const HairlineQuadGeometryProcessor*>(geometry);
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = true;
-    params.viewMatrix = gp->getViewMatrix();
-    params.coverage = gp->getCoverage();
-    params.aaType = gp->getAAType();
-  } else if (IsProcessor<MeshGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const MeshGeometryProcessor*>(geometry);
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = !gp->getHasColors();
-    params.viewMatrix = gp->getViewMatrix();
-    params.hasColors = gp->getHasColors();
-  } else if (IsProcessor<RoundStrokeRectGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const RoundStrokeRectGeometryProcessor*>(geometry);
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = gp->hasCommonColor();
-    params.aaType = gp->getAAType();
-  } else if (IsProcessor<ShapeInstancedGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const ShapeInstancedGeometryProcessor*>(geometry);
-    params.viewMatrix = gp->getViewMatrix();
-    params.uvMatrix = gp->getUVMatrix();
-  } else if (IsProcessor<AtlasTextGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const AtlasTextGeometryProcessor*>(geometry);
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = gp->hasCommonColor();
-    params.isAlphaOnly = gp->isAlphaOnly();
-    params.atlasProxy = gp->getTextureProxy();
-    params.aaType = gp->getAAType();
-  }
-  return params;
 }
 
 // Frame (slot 0): the render-target adjust vector.
@@ -1023,7 +939,7 @@ DeclaredFamilyProgramWriter::DeclaredFamilyProgramWriter([[maybe_unused]] const 
   // Checked once per program, not once per draw.
   {
     const auto& geometryAttributes = info.getVertexAttributes();
-    const auto& geometrySlots = info.getGeometryProcessor()->vertexAttributeLocations();
+    const auto& geometrySlots = info.getVertexAttributeLocations();
     // Instance inputs occupy the slots after the vertex ones (the creator's own split), so the
     // pairing checks below see the vertex inputs alone.
     uint32_t instanceBase = 0;
@@ -1097,7 +1013,7 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
   }
   const Family& family = Families()[variant.family];
   const auto modules = ModulesOf(family, variant);
-  const auto geometryParams = GeometryParametersOf(info);
+  const auto& geometryParams = info.getGeometryLayout().parameters;
   ParamBuffer buffer(vertexUniformData, fragmentUniformData);
   for (uint8_t slot = 0; slot < modules.count; ++slot) {
     const Module* module = modules.list[slot];

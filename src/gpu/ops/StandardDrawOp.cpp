@@ -123,6 +123,9 @@ void StandardDrawOp::configureProgramInfo(ProgramInfo* info, PixelFormat depthSt
     depthStencil.format = depthStencilFormat;
     info->setDepthStencil(depthStencil);
   }
+  // Snapshot the geometry into the layout value every reader addresses; a draw that never
+  // reaches a program keeps the live geometry via ProgramInfo's fallback.
+  info->setGeometryLayout(GeometryLayoutOf(geometryProcessor.get()));
   onConfigureProgramInfo(*info);
 }
 
