@@ -20,6 +20,7 @@
 #include <hb.h>
 #include <cstring>
 #include "base/TGFXTest.h"
+#include "core/filters/TextureImageFilter.h"
 #include "core/utils/MD5.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
@@ -49,6 +50,7 @@
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/filters/InnerShadowFilter.h"
 #include "tgfx/layers/filters/NoiseFilter.h"
+#include "tgfx/layers/filters/TextureFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/layers/layerstyles/NoiseStyle.h"
@@ -1339,16 +1341,21 @@ EmittedStream RunPDFStreamOut(const std::string& input,
   return EmittedStream{};
 }
 
-// Searches `bytes` for the byte sequence `needle` and returns its start offset, or
+// Searches [`start`, `end`) in `bytes` for `needle` and returns its start offset, or
 // std::string::npos if not found.
-size_t IndexOf(const std::shared_ptr<Data>& bytes, const char* needle) {
+size_t IndexOf(const std::shared_ptr<Data>& bytes, const char* needle, size_t start = 0,
+               size_t end = std::string::npos) {
   size_t needleSize = std::strlen(needle);
-  if (bytes == nullptr || needleSize == 0 || bytes->size() < needleSize) {
+  if (bytes == nullptr || needleSize == 0 || start > bytes->size()) {
     return std::string::npos;
   }
   const auto* base = static_cast<const uint8_t*>(bytes->data());
   size_t size = bytes->size();
-  for (size_t i = 0; i + needleSize <= size; ++i) {
+  size_t limit = end < size ? end : size;
+  if (limit < start || limit - start < needleSize) {
+    return std::string::npos;
+  }
+  for (size_t i = start; i + needleSize <= limit; ++i) {
     if (memcmp(base + i, needle, needleSize) == 0) {
       return i;
     }
@@ -1370,6 +1377,42 @@ size_t ParseUnsigned(const std::shared_ptr<Data>& bytes, size_t offset, size_t* 
   }
   *consumed = i - offset;
   return value;
+}
+
+bool ReadDictionaryUnsigned(const std::shared_ptr<Data>& bytes, size_t start, size_t end,
+                            const char* key, size_t* value) {
+  auto at = IndexOf(bytes, key, start, end);
+  if (at == std::string::npos) {
+    return false;
+  }
+  size_t consumed = 0;
+  *value = ParseUnsigned(bytes, at + std::strlen(key), &consumed);
+  return consumed > 0;
+}
+
+bool HasImageLargerThan(const std::shared_ptr<Data>& bytes, size_t width, size_t height) {
+  static constexpr auto imageSubtype = "/Subtype /Image";
+  size_t search = 0;
+  while ((search = IndexOf(bytes, imageSubtype, search)) != std::string::npos) {
+    size_t dictionaryStart = 0;
+    size_t scan = 0;
+    size_t candidate = 0;
+    while ((candidate = IndexOf(bytes, "<<", scan, search)) != std::string::npos) {
+      dictionaryStart = candidate;
+      scan = candidate + 2;
+    }
+    auto dictionaryEnd = IndexOf(bytes, ">>", search);
+    size_t imageWidth = 0;
+    size_t imageHeight = 0;
+    if (dictionaryEnd != std::string::npos &&
+        ReadDictionaryUnsigned(bytes, dictionaryStart, dictionaryEnd, "/Width ", &imageWidth) &&
+        ReadDictionaryUnsigned(bytes, dictionaryStart, dictionaryEnd, "/Height ", &imageHeight) &&
+        imageWidth > width && imageHeight > height) {
+      return true;
+    }
+    search += std::strlen(imageSubtype);
+  }
+  return false;
 }
 
 // Reads "/Length <N>" from the emitted bytes and returns N. Fails the current test if the entry
@@ -1614,6 +1657,72 @@ TGFX_TEST(PDFExportTest, NoiseEffects) {
   surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
   root->draw(surface->getCanvas());
   EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/NoiseEffects"));
+}
+
+TGFX_TEST(PDFExportTest, TextureFilterRasterFallback) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto root = Layer::Make();
+  auto layer = ShapeLayer::Make();
+  Path path = {};
+  path.addOval(Rect::MakeXYWH(40, 30, 120, 90));
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
+  layer->setFilters({TextureFilter::Make(16.0f, 16.0f, 8.0f, 3491, false)});
+  root->addChild(layer);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(200.0f, 160.0f);
+  root->draw(canvas);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  auto data = PDFStream->readData();
+  ASSERT_TRUE(data != nullptr);
+  auto bytes = std::string(reinterpret_cast<const char*>(data->data()), data->size());
+  EXPECT_FALSE(bytes.empty());
+  EXPECT_NE(bytes.find("/Subtype /Image"), std::string::npos);
+  EXPECT_TRUE(HasImageLargerThan(data, 120, 90));
+}
+
+TGFX_TEST(PDFExportTest, TextureFilterDrawLayerFallback) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  PictureRecorder recorder;
+  auto* recordingCanvas = recorder.beginRecording();
+  Paint bluePaint = {};
+  bluePaint.setColor(Color::Blue());
+  recordingCanvas->drawRect(Rect::MakeXYWH(10, 10, 90, 70), bluePaint);
+  Paint redPaint = {};
+  redPaint.setColor(Color::Red());
+  recordingCanvas->drawRect(Rect::MakeXYWH(90, 50, 80, 70), redPaint);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  auto params = MakeTextureGrainParams(16.0f, 12.0f, 8.0f, Point::Make(90.0f, 65.0f), 3491);
+  Paint paint = {};
+  paint.setImageFilter(std::make_shared<TextureImageFilter>(params));
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+  auto canvas = document->beginPage(180.0f, 130.0f);
+  canvas->drawPicture(picture, nullptr, &paint);
+  document->endPage();
+  document->close();
+  PDFStream->flush();
+
+  auto data = PDFStream->readData();
+  ASSERT_TRUE(data != nullptr);
+  auto bytes = std::string(reinterpret_cast<const char*>(data->data()), data->size());
+  EXPECT_FALSE(bytes.empty());
+  EXPECT_NE(bytes.find("/Subtype /Image"), std::string::npos);
+  EXPECT_TRUE(HasImageLargerThan(data, 160, 110));
 }
 
 TGFX_TEST(PDFExportTest, TextLayerStyleAlignment) {

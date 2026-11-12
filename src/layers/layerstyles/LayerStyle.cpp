@@ -24,7 +24,7 @@ void LayerStyle::setBlendMode(BlendMode blendMode) {
     return;
   }
   _blendMode = blendMode;
-  invalidateTransform();
+  invalidateStyle();
 }
 
 Rect LayerStyle::filterBackground(const Rect& srcRect, float contentScale) {
@@ -46,6 +46,11 @@ void LayerStyle::setExcludeChildEffects(bool value) {
     return;
   }
   _excludeChildEffects = value;
+  invalidateStyle();
+}
+
+void LayerStyle::invalidateStyle() {
+  invalidateSubtree();
   invalidateTransform();
 }
 

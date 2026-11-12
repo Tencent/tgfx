@@ -58,6 +58,9 @@ class ShaderBuilder {
    */
   void appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName);
 
+  // Use when the lookup expression must be composed before emission.
+  std::string getTextureLookupExpression(SamplerHandle samplerHandle, const std::string& coordName);
+
   void appendColorGamutXform(std::string* out, const char* srcColor,
                              ColorSpaceXformHelper* colorXformHelper);
   /**

@@ -37,6 +37,7 @@
 #include "core/shaders/MatrixShader.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/PlacementPtr.h"
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/Types.h"
@@ -818,6 +819,29 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
       drawBlurLayer(picture, imageFilter, matrix, clip, brush);
       return;
     }
+    auto pictureBounds = picture->getBounds();
+    if (!pictureBounds.isEmpty()) {
+      auto imageMatrix = Matrix::MakeTrans(-pictureBounds.left, -pictureBounds.top);
+      auto image = Image::MakeFrom(picture, FloatCeilToInt(pictureBounds.width()),
+                                   FloatCeilToInt(pictureBounds.height()), &imageMatrix,
+                                   document->dstColorSpace());
+      if (image != nullptr) {
+        Point filterOffset = {};
+        auto filtered = image->makeWithFilter(imageFilter, &filterOffset);
+        if (filtered != nullptr) {
+          auto drawMatrix = matrix;
+          drawMatrix.preTranslate(pictureBounds.left + filterOffset.x,
+                                  pictureBounds.top + filterOffset.y);
+          auto brushMatrix = Matrix::MakeTrans(-pictureBounds.left - filterOffset.x,
+                                               -pictureBounds.top - filterOffset.y);
+          drawImage(std::move(filtered), SamplingOptions(), drawMatrix, clip,
+                    brush.makeWithMatrix(brushMatrix));
+          return;
+        }
+      }
+    }
+    LOGE("PDFExportContext: failed to rasterize unsupported image filter.");
+    return;
   }
   picture->playback(this, matrix, clip);
 }

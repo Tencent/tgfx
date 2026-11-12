@@ -54,6 +54,11 @@ class LayerProperty {
   void invalidateTransform();
 
   /**
+   *  Called when the property changes the rendered subtree.
+   */
+  void invalidateSubtree();
+
+  /**
    *  Replaces a child property with a new one, handling owner attach/detach.
    */
   void replaceChildProperty(LayerProperty* oldChild, LayerProperty* newChild);

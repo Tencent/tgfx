@@ -94,11 +94,16 @@ static std::string TextureSwizzleString(const Swizzle& swizzle) {
   return ret;
 }
 
-void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName) {
+std::string ShaderBuilder::getTextureLookupExpression(SamplerHandle samplerHandle,
+                                                      const std::string& coordName) {
   auto uniformHandler = programBuilder->uniformHandler();
   auto sampler = uniformHandler->getSamplerVariable(samplerHandle);
-  codeAppendf("texture(%s, %s)", sampler.name().c_str(), coordName.c_str());
-  codeAppend(TextureSwizzleString(uniformHandler->getSamplerSwizzle(samplerHandle)));
+  return "texture(" + sampler.name() + ", " + coordName + ")" +
+         TextureSwizzleString(uniformHandler->getSamplerSwizzle(samplerHandle));
+}
+
+void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName) {
+  codeAppend(getTextureLookupExpression(samplerHandle, coordName));
 }
 
 void ShaderBuilder::appendColorGamutXform(std::string* out, const char* srcColor,
