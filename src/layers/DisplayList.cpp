@@ -574,8 +574,10 @@ void DisplayList::invalidateCurrentTileCache(TileCache* tileCache,
   for (auto& dirtyRect : dirtyRects) {
     bool continuous = false;
     auto tiles = tileCache->getTilesUnderRect(dirtyRect, false, &continuous);
-    std::vector<std::shared_ptr<Tile>> visibleTiles = {};
-    visibleTiles.reserve(tiles.size());
+    if (continuous && viewportRect.contains(dirtyRect)) {
+      tileTasks->emplace_back(std::move(tiles), _tileSize, dirtyRect);
+      continue;
+    }
     for (auto& tile : tiles) {
       auto tileRect = tile->getTileRect(_tileSize);
       if (!Rect::Intersects(tileRect, viewportRect)) {
@@ -587,16 +589,6 @@ void DisplayList::invalidateCurrentTileCache(TileCache* tileCache,
         }
         continue;
       }
-      visibleTiles.push_back(std::move(tile));
-    }
-    if (continuous && !visibleTiles.empty()) {
-      auto drawRect = dirtyRect;
-      drawRect.intersect(viewportRect);
-      tileTasks->emplace_back(std::move(visibleTiles), _tileSize, drawRect);
-      continue;
-    }
-    for (auto& tile : visibleTiles) {
-      auto tileRect = tile->getTileRect(_tileSize);
       auto drawRect = tileRect;
       // The unclipped dirty rect is used here so that a tile straddling the viewport edge does not
       // keep stale pixels in the part outside the viewport.
