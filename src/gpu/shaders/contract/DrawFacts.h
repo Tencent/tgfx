@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <optional>
 #include "gpu/shaders/ShaderPermutation.h"
+#include "gpu/shaders/contract/GeometryKind.h"
 
 // The draw facts a family's match rule reads. They live in the contract layer because the
 // families' declarations are contract-layer too: a fact type must not force the declaration
@@ -30,33 +31,6 @@ namespace tgfx {
 
 class ProgramInfo;
 struct DrawIR;
-
-/**
- * The draw's geometry kind as the matchers see it: one value per processor class the precompiled
- * kernels serve, and Other for everything else.
- */
-enum class GeometryKind : uint8_t {
-  Other = 0,
-  Default,
-  QuadPerEdgeAA,
-  // The rounded-rect pairs (RRectDrawOp): the non-AA forms at AAType::None and the AA forms, each
-  // in a plain and a per-corner-radii variant.
-  NonAARRect,
-  ComplexNonAARRect,
-  Ellipse,
-  ComplexEllipse,
-  // The hairline line/quad pair (HairlineLineOp / HairlineQuadOp) and the triangle mesh
-  // (MeshDrawOp).
-  HairlineLine,
-  HairlineQuad,
-  Mesh,
-  // The round-capped/joined stroke rect (RectDrawOp's round line join) and the instanced shape
-  // batch (ShapeInstancedDrawOp; two families share this processor).
-  RoundStrokeRect,
-  ShapeInstanced,
-  // The glyph atlas geometry (AtlasTextOp).
-  AtlasText,
-};
 
 /**
  * The geometry facts a draw's matcher rules read, as plain data. Described off the made geometry

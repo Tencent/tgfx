@@ -72,7 +72,8 @@ static void AppendFragmentProcessor(std::stringstream& stream, const FragmentPro
 
 std::string BuildEffectSignature(const ProgramInfo* programInfo) {
   std::stringstream stream;
-  stream << "GP=" << programInfo->getGeometryProcessor()->name() << ";ColorFP=[";
+  stream << "GP=" << GeometryKindName(programInfo->getGeometryLayout().parameters.kind)
+         << ";ColorFP=[";
   for (size_t i = 0; i < programInfo->numColorFragmentProcessors(); ++i) {
     if (i > 0) {
       stream << ",";

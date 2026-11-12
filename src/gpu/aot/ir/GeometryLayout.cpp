@@ -39,6 +39,7 @@ AOTGeometryParameters GeometryParametersOf(const GeometryProcessor* geometry) {
   }
   if (IsProcessor<DefaultGeometryProcessor>(geometry)) {
     const auto* gp = static_cast<const DefaultGeometryProcessor*>(geometry);
+    params.kind = GeometryKind::Default;
     params.commonColor = gp->getCommonColor();
     params.hasCommonColor = true;
     params.viewMatrix = gp->getViewMatrix();
@@ -46,33 +47,39 @@ AOTGeometryParameters GeometryParametersOf(const GeometryProcessor* geometry) {
     params.aaType = gp->getAAType();
   } else if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(geometry)) {
     const auto* gp = static_cast<const QuadPerEdgeAAGeometryProcessor*>(geometry);
+    params.kind = GeometryKind::QuadPerEdgeAA;
     params.commonColor = gp->getCommonColor();
     params.hasCommonColor = gp->hasCommonColor();
     params.uvMatrix = gp->getUVMatrix();
     params.aaType = gp->getAAType();
   } else if (IsProcessor<NonAARRectGeometryProcessor>(geometry)) {
     const auto* gp = static_cast<const NonAARRectGeometryProcessor*>(geometry);
+    params.kind = GeometryKind::NonAARRect;
     const auto color = gp->getCommonColor();
     params.commonColor = color.value_or(PMColor());
     params.hasCommonColor = color.has_value();
     params.isStroke = gp->isStroke();
   } else if (IsProcessor<ComplexNonAARRectGeometryProcessor>(geometry)) {
     const auto* gp = static_cast<const ComplexNonAARRectGeometryProcessor*>(geometry);
+    params.kind = GeometryKind::ComplexNonAARRect;
     params.commonColor = gp->getCommonColor();
     params.hasCommonColor = gp->hasCommonColor();
     params.isStroke = gp->isStroke();
   } else if (IsProcessor<EllipseGeometryProcessor>(geometry)) {
     const auto* gp = static_cast<const EllipseGeometryProcessor*>(geometry);
+    params.kind = GeometryKind::Ellipse;
     params.commonColor = gp->getCommonColor();
     params.hasCommonColor = gp->hasCommonColor();
     params.isStroke = gp->isStroke();
   } else if (IsProcessor<ComplexEllipseGeometryProcessor>(geometry)) {
     const auto* gp = static_cast<const ComplexEllipseGeometryProcessor*>(geometry);
+    params.kind = GeometryKind::ComplexEllipse;
     params.commonColor = gp->getCommonColor();
     params.hasCommonColor = gp->hasCommonColor();
     params.isStroke = gp->isStroke();
   } else if (IsProcessor<HairlineLineGeometryProcessor>(geometry)) {
     const auto* gp = static_cast<const HairlineLineGeometryProcessor*>(geometry);
+    params.kind = GeometryKind::HairlineLine;
     params.commonColor = gp->getCommonColor();
     params.hasCommonColor = true;
     params.viewMatrix = gp->getViewMatrix();
@@ -80,6 +87,7 @@ AOTGeometryParameters GeometryParametersOf(const GeometryProcessor* geometry) {
     params.aaType = gp->getAAType();
   } else if (IsProcessor<HairlineQuadGeometryProcessor>(geometry)) {
     const auto* gp = static_cast<const HairlineQuadGeometryProcessor*>(geometry);
+    params.kind = GeometryKind::HairlineQuad;
     params.commonColor = gp->getCommonColor();
     params.hasCommonColor = true;
     params.viewMatrix = gp->getViewMatrix();
@@ -87,21 +95,25 @@ AOTGeometryParameters GeometryParametersOf(const GeometryProcessor* geometry) {
     params.aaType = gp->getAAType();
   } else if (IsProcessor<MeshGeometryProcessor>(geometry)) {
     const auto* gp = static_cast<const MeshGeometryProcessor*>(geometry);
+    params.kind = GeometryKind::Mesh;
     params.commonColor = gp->getCommonColor();
     params.hasCommonColor = !gp->getHasColors();
     params.viewMatrix = gp->getViewMatrix();
     params.hasColors = gp->getHasColors();
   } else if (IsProcessor<RoundStrokeRectGeometryProcessor>(geometry)) {
     const auto* gp = static_cast<const RoundStrokeRectGeometryProcessor*>(geometry);
+    params.kind = GeometryKind::RoundStrokeRect;
     params.commonColor = gp->getCommonColor();
     params.hasCommonColor = gp->hasCommonColor();
     params.aaType = gp->getAAType();
   } else if (IsProcessor<ShapeInstancedGeometryProcessor>(geometry)) {
     const auto* gp = static_cast<const ShapeInstancedGeometryProcessor*>(geometry);
+    params.kind = GeometryKind::ShapeInstanced;
     params.viewMatrix = gp->getViewMatrix();
     params.uvMatrix = gp->getUVMatrix();
   } else if (IsProcessor<AtlasTextGeometryProcessor>(geometry)) {
     const auto* gp = static_cast<const AtlasTextGeometryProcessor*>(geometry);
+    params.kind = GeometryKind::AtlasText;
     params.commonColor = gp->getCommonColor();
     params.hasCommonColor = gp->hasCommonColor();
     params.isAlphaOnly = gp->isAlphaOnly();
@@ -109,6 +121,38 @@ AOTGeometryParameters GeometryParametersOf(const GeometryProcessor* geometry) {
     params.aaType = gp->getAAType();
   }
   return params;
+}
+
+const char* GeometryKindName(GeometryKind kind) {
+  switch (kind) {
+    case GeometryKind::Other:
+      return "Other";
+    case GeometryKind::Default:
+      return "Default";
+    case GeometryKind::QuadPerEdgeAA:
+      return "QuadPerEdgeAA";
+    case GeometryKind::NonAARRect:
+      return "NonAARRect";
+    case GeometryKind::ComplexNonAARRect:
+      return "ComplexNonAARRect";
+    case GeometryKind::Ellipse:
+      return "Ellipse";
+    case GeometryKind::ComplexEllipse:
+      return "ComplexEllipse";
+    case GeometryKind::HairlineLine:
+      return "HairlineLine";
+    case GeometryKind::HairlineQuad:
+      return "HairlineQuad";
+    case GeometryKind::Mesh:
+      return "Mesh";
+    case GeometryKind::RoundStrokeRect:
+      return "RoundStrokeRect";
+    case GeometryKind::ShapeInstanced:
+      return "ShapeInstanced";
+    case GeometryKind::AtlasText:
+      return "AtlasText";
+  }
+  return "Other";
 }
 
 GeometryLayout GeometryLayoutOf(const GeometryProcessor* geometry) {

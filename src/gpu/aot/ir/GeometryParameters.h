@@ -20,6 +20,7 @@
 
 #include <memory>
 #include "gpu/AAType.h"
+#include "gpu/shaders/contract/GeometryKind.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 
@@ -33,6 +34,9 @@ class TextureProxy;
 /// concrete geometry-processor type, so the geometry stays one data source whatever object
 /// produced it. Fields a geometry does not use keep their defaults.
 struct AOTGeometryParameters {
+  /// Which geometry produced these facts: the matching layer's one classification and the
+  /// diagnostic signature read it.
+  GeometryKind kind = GeometryKind::Other;
   /// The paint color uniform and its flag (the exact color; per-vertex colors ride the attributes).
   PMColor commonColor = PMColor::Transparent();
   bool hasCommonColor = false;

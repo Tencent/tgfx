@@ -142,7 +142,7 @@ constexpr AOTKnownGap AOTKnownGaps[] = {
     {"VectorLayerTest.GlassStyleMultiStrokeRoundedCorner",
      "ColorFP=[GlassRefractionFragmentProcessor",
      "same glass + device-mask coverage shape as GlassParentChildRenderedCoverage"},
-    {"LayerTest.DropShadow", "GP=NonAARRectGeometryProcessor;ColorFP=[TiledTextureEffect,",
+    {"LayerTest.DropShadow", "GP=NonAARRect;ColorFP=[TiledTextureEffect,",
      "the alpha-step op is declared only by the textured family, which does not accept the non-AA "
      "rounded-rect geometry"},
     {"LayerTest.InnerShadow", "",

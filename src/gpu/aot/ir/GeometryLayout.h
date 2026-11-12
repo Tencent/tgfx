@@ -40,6 +40,9 @@ struct GeometryLayout {
   std::vector<uint32_t> physicalSlots = {};
 };
 
+/// The diagnostic name of a geometry kind (the signature's `GP=` field).
+const char* GeometryKindName(GeometryKind kind);
+
 /// Snapshots the geometry of the given processor. The one place the concrete geometry types are
 /// discriminated; returns a default layout for a null processor.
 GeometryLayout GeometryLayoutOf(const GeometryProcessor* geometryProcessor);
