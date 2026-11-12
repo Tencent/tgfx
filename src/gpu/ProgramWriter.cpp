@@ -38,7 +38,6 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"

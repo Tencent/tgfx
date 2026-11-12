@@ -87,7 +87,7 @@ std::string BuildEffectSignature(const ProgramInfo* programInfo) {
     }
     AppendFragmentProcessor(stream, programInfo->getFragmentProcessor(i));
   }
-  stream << "];XP=" << programInfo->getXferProcessor()->name();
+  stream << "];XP=" << (programInfo->getXferFacts().shaderBlend ? "shader" : "fixed");
   return stream.str();
 }
 

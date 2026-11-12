@@ -94,8 +94,6 @@ const ProcessorClaim ProcessorClaims[] = {
     {"ShapeInstancedGeometryProcessor", GeometryClassified, ""},
     // Xfer processors: ClassifyXferForMatch names both (the empty one through its singleton
     // identity).
-    {"EmptyXferProcessor", XferClassified, ""},
-    {"PorterDuffXferProcessor", XferClassified, ""},
     // Fragment processors carrying an AOT lowering: lowerToAOT is the structural fact, and the
     // families read the resulting IR instead of walking the processor tree.
     {"AlphaThresholdFragmentProcessor", Lowering, ""},

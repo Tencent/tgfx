@@ -48,7 +48,6 @@
 #include "gpu/processors/HairlineLineGeometryProcessor.h"
 #include "gpu/processors/HairlineQuadGeometryProcessor.h"
 #include "gpu/processors/MeshGeometryProcessor.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RadialGradientLayout.h"
@@ -186,20 +185,21 @@ static PlacementPtr<FragmentProcessor> MakeSingleIntervalCoverage(Context* conte
   return DeviceSpaceTextureEffect::Make(allocator, std::move(proxy), Matrix::I());
 }
 
-static PlacementPtr<XferProcessor> MakeSingleIntervalXP(Context* context, BlockAllocator* allocator,
-                                                        int xpType) {
+static std::optional<DstTextureInfo> MakeSingleIntervalDst(Context* context, int xpType) {
   if (xpType == 0) {
-    return nullptr;
+    return std::nullopt;
   }
   DstTextureInfo dstTextureInfo = {};
   if (xpType == 1) {
     auto proxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::RGBA_8888);
     if (proxy == nullptr || proxy->getTextureView() == nullptr) {
-      return nullptr;
+      ADD_FAILURE() << "the dst texture proxy could not be created";
+      return std::nullopt;
     }
     dstTextureInfo = {std::move(proxy), {}};
   }
-  return PorterDuffXferProcessor::Make(allocator, BlendMode::SrcOver, std::move(dstTextureInfo));
+  // A present value with an empty proxy is the framebuffer-fetch state (xpType == 2).
+  return dstTextureInfo;
 }
 
 TGFX_TEST(ShaderPermutationTest, DimTypes) {
@@ -579,14 +579,14 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
           auto gp = MakeSingleIntervalGeometry(&allocator, gpType, hasVertexCoverage != 0);
           auto gradient = MakeSingleIntervalGradient(&allocator);
           auto coverage = MakeSingleIntervalCoverage(context, &allocator, coverageType);
-          auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
+          auto dst = MakeSingleIntervalDst(context, xpType);
           ASSERT_NE(gp, nullptr);
           ASSERT_NE(gradient, nullptr);
           if (coverageType != 0) {
             ASSERT_NE(coverage, nullptr);
           }
           if (xpType != 0) {
-            ASSERT_NE(xp, nullptr);
+            ASSERT_TRUE(dst.has_value());
           }
           AOTEffectGraph graph;
           ASSERT_TRUE(LowerToGraph({gradient.get()}, &graph));
@@ -606,7 +606,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
           }
           AOTProgram chain = {};
           ASSERT_TRUE(AOTChainBuilder::Compile(graph, plan.passes[0], &coverageTerms, &chain));
-          ProgramInfo programInfo(renderTarget.get(), gp.get(), xp.get(), BlendMode::SrcOver,
+          ProgramInfo programInfo(renderTarget.get(), gp.get(), dst, BlendMode::SrcOver,
                                   !coverageProcessors.empty());
           // The interpreter's own match: a program-holding draw resolves through MatchProgram,
           // not the family walk (whose dedicated families would claim the empty processor list).
@@ -659,7 +659,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
     ASSERT_TRUE(terms.has_value());
     AOTProgram chain = {};
     ASSERT_TRUE(AOTChainBuilder::Compile(graph, plan.passes[0], &*terms, &chain));
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), nullptr, BlendMode::SrcOver, true);
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), std::nullopt, BlendMode::SrcOver, true);
     // The interpreter's own match: a program-holding draw resolves through MatchProgram, not the
     // family walk (whose dedicated families would claim the empty processor list).
     auto match = ChainInputs::MatchProgram(chain, &programInfo);
@@ -687,7 +687,7 @@ TGFX_TEST(ShaderPermutationTest, ProgramMatchRejectsOverBudgetWithoutFailureSink
   gradientSlot.op = AOTChainOp::Gradient;
   program.slots.push_back(gradientSlot);
   program.slots.push_back(gradientSlot);
-  ProgramInfo programInfo(renderTarget.get(), gp.get(), nullptr, BlendMode::SrcOver, false);
+  ProgramInfo programInfo(renderTarget.get(), gp.get(), std::nullopt, BlendMode::SrcOver, false);
   // Two gradient slots exceed the one-gradient budget: this is the rejection path that used to
   // write through a null failure pointer.
   EXPECT_FALSE(ChainInputs::MatchProgram(program, &programInfo).has_value());
@@ -764,7 +764,7 @@ TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
         lutProxy->getTextureView()->getTexture());
     auto gp = MakeSingleIntervalGeometry(&allocator, 1, true);
     ASSERT_NE(gp, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), nullptr, BlendMode::SrcOver, false);
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), std::nullopt, BlendMode::SrcOver, false);
     // The interpreter's own match: a program-holding draw resolves through MatchProgram, not the
     // family walk (whose dedicated families would claim the empty processor list).
     auto match = ChainInputs::MatchProgram(program, &programInfo);
@@ -799,8 +799,8 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskServesBothCoveragePolaritie
     ASSERT_NE(gp, nullptr);
     ASSERT_NE(color, nullptr);
     ASSERT_NE(coverage, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {color.get(), coverage.get()}, 1, nullptr,
-                            BlendMode::SrcOver);
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), {color.get(), coverage.get()}, 1,
+                            std::nullopt, BlendMode::SrcOver);
     // The matcher reads the draw's lowering graph through the carried IR; a hand-built ProgramInfo
     // carries none, and the families reject an IR-less shape outright. Lower the same processors
     // the way StandardDrawOp would and attach the result before matching.
@@ -2083,7 +2083,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(gp, nullptr);
     ASSERT_NE(coverage, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
-                            0, nullptr, BlendMode::SrcOver);
+                            0, std::nullopt, BlendMode::SrcOver);
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
@@ -2106,7 +2106,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(gp, nullptr);
     ASSERT_NE(coverage, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
-                            0, nullptr, BlendMode::SrcOver);
+                            0, std::nullopt, BlendMode::SrcOver);
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
@@ -2124,7 +2124,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(gp, nullptr);
     ASSERT_NE(coverage, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
-                            0, nullptr, BlendMode::SrcOver);
+                            0, std::nullopt, BlendMode::SrcOver);
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
@@ -2141,7 +2141,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(color, nullptr);
     ASSERT_NE(coverage, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(),
-                            {color.get(), coverage.get()}, 1, nullptr, BlendMode::SrcOver);
+                            {color.get(), coverage.get()}, 1, std::nullopt, BlendMode::SrcOver);
     auto ir = LowerDraw({color.get()}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
@@ -2156,7 +2156,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(gp, nullptr);
     ASSERT_NE(coverage, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
-                            0, nullptr, BlendMode::SrcOver);
+                            0, std::nullopt, BlendMode::SrcOver);
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
@@ -2168,12 +2168,12 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto gp = ShapeInstancedGeometryProcessor::Make(&allocator, 8, 8, AAType::None, true,
                                                     Matrix::I(), Matrix::I());
     auto coverage = TextureEffect::Make(&allocator, textureProxy);
-    auto xp = PorterDuffXferProcessor::Make(&allocator, BlendMode::SrcOver, {});
+    // A present value with an empty proxy: the framebuffer-fetch state.
+    std::optional<DstTextureInfo> dst = DstTextureInfo{};
     ASSERT_NE(gp, nullptr);
     ASSERT_NE(coverage, nullptr);
-    ASSERT_NE(xp, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
-                            0, xp.get(), BlendMode::SrcOver);
+                            0, dst, BlendMode::SrcOver);
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
@@ -2199,7 +2199,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
         clipFirst != 0 ? std::vector<FragmentProcessor*>{clip.get(), coverage.get()}
                        : std::vector<FragmentProcessor*>{coverage.get(), clip.get()};
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), processors, 0,
-                            nullptr, BlendMode::SrcOver);
+                            std::nullopt, BlendMode::SrcOver);
     // The coverage classification reads the carried IR's terms: lower the same expression the op
     // would have lowered at record time and carry it, as the plain route's prepare does. The
     // geometry and xfer facts the matchers read come off the made processors at match time.
@@ -2226,7 +2226,8 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(coverage, nullptr);
     ASSERT_NE(secondCoverage, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(),
-                            {coverage.get(), secondCoverage.get()}, 0, nullptr, BlendMode::SrcOver);
+                            {coverage.get(), secondCoverage.get()}, 0, std::nullopt,
+                            BlendMode::SrcOver);
     auto twoMaskIR = LowerDraw({},
                                {static_cast<const FragmentProcessor*>(coverage.get()),
                                 static_cast<const FragmentProcessor*>(secondCoverage.get())},
@@ -2265,7 +2266,7 @@ TGFX_TEST(ShaderPermutationTest, ComplexEllipseTextureCoverageIsServedByChain) {
   ASSERT_NE(coverage, nullptr);
   auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
   ASSERT_TRUE(ir.has_value());
-  ProgramInfo rejected(renderTarget.get(), gp.get(), {coverage.get()}, 0, nullptr,
+  ProgramInfo rejected(renderTarget.get(), gp.get(), {coverage.get()}, 0, std::nullopt,
                        BlendMode::SrcOver);
   rejected.setCarriedIR(&*ir);
   auto failure = PermutationMatchFailure::None;
@@ -2273,7 +2274,7 @@ TGFX_TEST(ShaderPermutationTest, ComplexEllipseTextureCoverageIsServedByChain) {
   ASSERT_TRUE(served.has_value());
   EXPECT_STREQ(Families()[served->variant.family].name, "Chain");
 
-  ProgramInfo accepted(renderTarget.get(), gp.get(), {}, 0, nullptr, BlendMode::SrcOver);
+  ProgramInfo accepted(renderTarget.get(), gp.get(), {}, 0, std::nullopt, BlendMode::SrcOver);
   auto match = SelectProgram(context, accepted, SelectionScope::AnyFamily, &failure);
   ASSERT_TRUE(match.has_value());
   EXPECT_EQ(Families()[match->variant.family].name, "ComplexEllipse");
@@ -2360,13 +2361,13 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
       auto gp = QuadPerEdgeAAGeometryProcessor::Make(&allocator, 8, 8, AAType::Coverage,
                                                      PMColor::White(), Matrix::I(), false);
       auto clip = RectEffect::Make(&allocator, Rect::MakeWH(8, 8));
-      auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
+      auto dst = MakeSingleIntervalDst(context, xpType);
       ASSERT_NE(gp, nullptr);
       ASSERT_NE(clip, nullptr);
       if (xpType != 0) {
-        ASSERT_NE(xp, nullptr);
+        ASSERT_TRUE(dst.has_value());
       }
-      ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, xp.get(),
+      ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, dst,
                               BlendMode::SrcOver);
       ExpectDirectAARectMatch(&programInfo, "QuadColor");
     }
@@ -2379,14 +2380,14 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
                                                      PMColor::White(), Matrix::I(), false);
       auto color = TextureEffect::Make(&allocator, std::move(textureProxy));
       auto clip = RectEffect::Make(&allocator, Rect::MakeWH(8, 8));
-      auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
+      auto dst = MakeSingleIntervalDst(context, xpType);
       ASSERT_NE(gp, nullptr);
       ASSERT_NE(color, nullptr);
       ASSERT_NE(clip, nullptr);
       if (xpType != 0) {
-        ASSERT_NE(xp, nullptr);
+        ASSERT_TRUE(dst.has_value());
       }
-      ProgramInfo programInfo(renderTarget.get(), gp.get(), {color.get(), clip.get()}, 1, xp.get(),
+      ProgramInfo programInfo(renderTarget.get(), gp.get(), {color.get(), clip.get()}, 1, dst,
                               BlendMode::SrcOver);
       ExpectDirectAARectMatch(&programInfo, "QuadTexture");
     }
@@ -2395,13 +2396,13 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
       auto gp = DefaultGeometryProcessor::Make(&allocator, PMColor::White(), 8, 8, AAType::Coverage,
                                                Matrix::I(), Matrix::I());
       auto clip = RectEffect::Make(&allocator, Rect::MakeWH(8, 8));
-      auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
+      auto dst = MakeSingleIntervalDst(context, xpType);
       ASSERT_NE(gp, nullptr);
       ASSERT_NE(clip, nullptr);
       if (xpType != 0) {
-        ASSERT_NE(xp, nullptr);
+        ASSERT_TRUE(dst.has_value());
       }
-      ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, xp.get(),
+      ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, dst,
                               BlendMode::SrcOver);
       ExpectDirectAARectMatch(&programInfo, "SolidColor");
     }
@@ -2410,13 +2411,13 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
       auto gp = HairlineLineGeometryProcessor::Make(&allocator, PMColor::White(), Matrix::I(),
                                                     Matrix::I(), 1.0f, AAType::Coverage);
       auto clip = RectEffect::Make(&allocator, Rect::MakeWH(8, 8));
-      auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
+      auto dst = MakeSingleIntervalDst(context, xpType);
       ASSERT_NE(gp, nullptr);
       ASSERT_NE(clip, nullptr);
       if (xpType != 0) {
-        ASSERT_NE(xp, nullptr);
+        ASSERT_TRUE(dst.has_value());
       }
-      ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, xp.get(),
+      ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, dst,
                               BlendMode::SrcOver);
       ExpectDirectAARectMatch(&programInfo, "HairlineLine");
     }
@@ -2425,13 +2426,13 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
       auto gp = HairlineQuadGeometryProcessor::Make(&allocator, PMColor::White(), Matrix::I(),
                                                     Matrix::I(), 1.0f, AAType::Coverage);
       auto clip = RectEffect::Make(&allocator, Rect::MakeWH(8, 8));
-      auto xp = MakeSingleIntervalXP(context, &allocator, xpType);
+      auto dst = MakeSingleIntervalDst(context, xpType);
       ASSERT_NE(gp, nullptr);
       ASSERT_NE(clip, nullptr);
       if (xpType != 0) {
-        ASSERT_NE(xp, nullptr);
+        ASSERT_TRUE(dst.has_value());
       }
-      ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, xp.get(),
+      ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, dst,
                               BlendMode::SrcOver);
       ExpectDirectAARectMatch(&programInfo, "HairlineQuad");
     }
@@ -2483,7 +2484,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectComposedCoverageIsServedByChain) {
   auto ir = LowerDraw({}, {composed.get()}, BlendMode::SrcOver, &allocator);
   ASSERT_TRUE(ir.has_value());
   ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {composed.get()}, 0,
-                          nullptr, BlendMode::SrcOver);
+                          std::nullopt, BlendMode::SrcOver);
   programInfo.setCarriedIR(&*ir);
   auto failure = PermutationMatchFailure::None;
   auto served = SelectProgram(context, programInfo, SelectionScope::AnyFamily, &failure);

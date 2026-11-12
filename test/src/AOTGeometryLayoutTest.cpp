@@ -719,7 +719,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineDeviceMask) {
   ExpectReportedShapeServed(
       {"row12",
        "GP=HairlineLineGeometryProcessor;ColorFP=[];CoverageFP=[DeviceSpaceTextureEffect];"
-       "XP=EmptyXferProcessor",
+       "XP=fixed",
        false, false, ClipPath});
 }
 
@@ -727,7 +727,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineDeviceMaskRect) {
   ExpectReportedShapeServed(
       {"row13",
        "GP=HairlineLineGeometryProcessor;ColorFP=[];CoverageFP=[ComposeFragmentProcessor("
-       "DeviceSpaceTextureEffect,RectEffect)];XP=EmptyXferProcessor",
+       "DeviceSpaceTextureEffect,RectEffect)];XP=fixed",
        false, false, ClipPath | ClipRect});
 }
 
@@ -736,7 +736,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineGradientDeviceMaskRRect) {
                              "GP=HairlineLineGeometryProcessor;ColorFP=[ClampedGradientEffect("
                              "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=["
                              "ComposeFragmentProcessor("
-                             "DeviceSpaceTextureEffect,RRectEffect)];XP=EmptyXferProcessor",
+                             "DeviceSpaceTextureEffect,RRectEffect)];XP=fixed",
                              true, false, ClipPath | ClipRRect});
 }
 
@@ -744,7 +744,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineGradientDeviceMask) {
   ExpectReportedShapeServed({"row15",
                              "GP=HairlineLineGeometryProcessor;ColorFP=[ClampedGradientEffect("
                              "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=["
-                             "DeviceSpaceTextureEffect];XP=EmptyXferProcessor",
+                             "DeviceSpaceTextureEffect];XP=fixed",
                              true, false, ClipPath});
 }
 
@@ -752,7 +752,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineTwoRRects) {
   ExpectReportedShapeServed(
       {"row16",
        "GP=HairlineLineGeometryProcessor;ColorFP=[];CoverageFP=[ComposeFragmentProcessor("
-       "RRectEffect,RRectEffect)];XP=EmptyXferProcessor",
+       "RRectEffect,RRectEffect)];XP=fixed",
        false, false, ClipRRect | ClipSecondRRect});
 }
 
@@ -760,7 +760,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineRectRRect) {
   ExpectReportedShapeServed(
       {"row17",
        "GP=HairlineLineGeometryProcessor;ColorFP=[];CoverageFP=[ComposeFragmentProcessor("
-       "RectEffect,RRectEffect)];XP=EmptyXferProcessor",
+       "RectEffect,RRectEffect)];XP=fixed",
        false, false, ClipRect | ClipRRect});
 }
 
@@ -768,7 +768,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineDeviceMaskRRect) {
   ExpectReportedShapeServed(
       {"row18",
        "GP=HairlineLineGeometryProcessor;ColorFP=[];CoverageFP=[ComposeFragmentProcessor("
-       "DeviceSpaceTextureEffect,RRectEffect)];XP=EmptyXferProcessor",
+       "DeviceSpaceTextureEffect,RRectEffect)];XP=fixed",
        false, false, ClipPath | ClipRRect});
 }
 
@@ -777,7 +777,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineGradientRRect) {
       {"row19",
        "GP=HairlineLineGeometryProcessor;ColorFP=[ClampedGradientEffect("
        "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=[RRectEffect];"
-       "XP=EmptyXferProcessor",
+       "XP=fixed",
        true, false, ClipRRect});
 }
 
@@ -786,7 +786,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineGradientThresholdRRect) {
       {"row20",
        "GP=HairlineLineGeometryProcessor;ColorFP=[ClampedGradientEffect("
        "SingleIntervalGradientColorizer,LinearGradientLayout),AlphaStepFragmentProcessor];"
-       "CoverageFP=[RRectEffect];XP=EmptyXferProcessor",
+       "CoverageFP=[RRectEffect];XP=fixed",
        true, true, ClipRRect});
 }
 
@@ -795,18 +795,17 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineGradientDeviceMaskRect) {
                              "GP=HairlineLineGeometryProcessor;ColorFP=[ClampedGradientEffect("
                              "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=["
                              "ComposeFragmentProcessor("
-                             "DeviceSpaceTextureEffect,RectEffect)];XP=EmptyXferProcessor",
+                             "DeviceSpaceTextureEffect,RectEffect)];XP=fixed",
                              true, false, ClipPath | ClipRect});
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineGradientDeviceMaskRectRRect) {
-  ExpectReportedShapeServed(
-      {"row22",
-       "GP=HairlineLineGeometryProcessor;ColorFP=[ClampedGradientEffect("
-       "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=["
-       "ComposeFragmentProcessor("
-       "DeviceSpaceTextureEffect,RectEffect,RRectEffect)];XP=EmptyXferProcessor",
-       true, false, ClipPath | ClipRect | ClipRRect});
+  ExpectReportedShapeServed({"row22",
+                             "GP=HairlineLineGeometryProcessor;ColorFP=[ClampedGradientEffect("
+                             "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=["
+                             "ComposeFragmentProcessor("
+                             "DeviceSpaceTextureEffect,RectEffect,RRectEffect)];XP=fixed",
+                             true, false, ClipPath | ClipRect | ClipRRect});
 }
 
 namespace {}  // namespace
@@ -890,7 +889,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedComplexRRectGradient) {
   ReportedShape shape = {"row4",
                          "GP=ComplexEllipseGeometryProcessor;ColorFP=[ClampedGradientEffect("
                          "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=[];"
-                         "XP=EmptyXferProcessor",
+                         "XP=fixed",
                          true, false, ClipNone};
   shape.geometry = LayoutGeometry::ComplexRRectFill;
   ExpectReportedShapeServed(shape);
@@ -900,7 +899,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedComplexRRectGradientThreshold) {
   ReportedShape shape = {"row5",
                          "GP=ComplexEllipseGeometryProcessor;ColorFP=[ClampedGradientEffect("
                          "SingleIntervalGradientColorizer,LinearGradientLayout),"
-                         "AlphaStepFragmentProcessor];CoverageFP=[];XP=EmptyXferProcessor",
+                         "AlphaStepFragmentProcessor];CoverageFP=[];XP=fixed",
                          true, true, ClipNone};
   shape.geometry = LayoutGeometry::ComplexRRectFill;
   ExpectReportedShapeServed(shape);
@@ -910,7 +909,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedComplexRRectDualGradientRRect) {
   ReportedShape shape = {"row6",
                          "GP=ComplexEllipseGeometryProcessor;ColorFP=[ClampedGradientEffect("
                          "DualIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=["
-                         "RRectEffect];XP=EmptyXferProcessor",
+                         "RRectEffect];XP=fixed",
                          true, false, ClipRRect};
   shape.geometry = LayoutGeometry::ComplexRRectFill;
   shape.dualGradient = true;
@@ -920,7 +919,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedComplexRRectDualGradientRRect) {
 TGFX_TEST(AOTGeometryLayoutTest, ReportedComplexRRectTiledImage) {
   ReportedShape shape = {"row7",
                          "GP=ComplexEllipseGeometryProcessor;ColorFP=[TiledTextureEffect];"
-                         "CoverageFP=[];XP=EmptyXferProcessor",
+                         "CoverageFP=[];XP=fixed",
                          false, false, ClipNone};
   shape.geometry = LayoutGeometry::ComplexRRectFill;
   shape.tiledImage = true;
@@ -930,7 +929,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedComplexRRectTiledImage) {
 TGFX_TEST(AOTGeometryLayoutTest, ReportedComplexRRectRRectRect) {
   ReportedShape shape = {"row8",
                          "GP=ComplexEllipseGeometryProcessor;ColorFP=[];CoverageFP=["
-                         "ComposeFragmentProcessor(RRectEffect,RectEffect)];XP=EmptyXferProcessor",
+                         "ComposeFragmentProcessor(RRectEffect,RectEffect)];XP=fixed",
                          false, false, ClipRRect | ClipRect};
   shape.geometry = LayoutGeometry::ComplexRRectFill;
   shape.rrectBeforeRect = true;
@@ -941,7 +940,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedComplexRRectTiledImageRRectRect) {
   ReportedShape shape = {"row9",
                          "GP=ComplexEllipseGeometryProcessor;ColorFP=[TiledTextureEffect];"
                          "CoverageFP=[ComposeFragmentProcessor(RRectEffect,RectEffect)];"
-                         "XP=EmptyXferProcessor",
+                         "XP=fixed",
                          false, false, ClipRRect | ClipRect};
   shape.geometry = LayoutGeometry::ComplexRRectFill;
   shape.tiledImage = true;
@@ -1018,23 +1017,22 @@ TGFX_TEST(AOTGeometryLayoutTest, ComplexRRectChainVertexColor) {
 // Row 23: a non-AA rounded rect under an analytic rounded clip. The dedicated NonAARRectFillShader
 // reads the clip from the runtime clip contract uniforms.
 TGFX_TEST(AOTGeometryLayoutTest, ReportedNonAARRectClip) {
-  ExpectSceneServed(
-      "row23", "NonAARRectGeometryProcessor",
-      "GP=NonAARRectGeometryProcessor;ColorFP=[];CoverageFP=[RRectEffect];XP=EmptyXferProcessor",
-      [](Canvas* canvas) {
-        // A large radius keeps the clip on the coverage-FP route: it cuts into the shape, so it
-        // cannot be reduced to a device-space rect test.
-        RRect clip = {};
-        clip.setRectXY(Rect::MakeXYWH(10, 12, 122, 112), 46, 46);
-        canvas->clipRRect(clip);
-        // Uniform radii keep the draw on the non-complex NonAARRect path.
-        RRect shape = {};
-        shape.setRectXY(Rect::MakeXYWH(20, 20, 120, 120), 18, 22);
-        Paint paint = {};
-        paint.setColor(Color::FromRGBA(70, 130, 180, 255));
-        paint.setAntiAlias(false);
-        canvas->drawRRect(shape, paint);
-      });
+  ExpectSceneServed("row23", "NonAARRectGeometryProcessor",
+                    "GP=NonAARRectGeometryProcessor;ColorFP=[];CoverageFP=[RRectEffect];XP=fixed",
+                    [](Canvas* canvas) {
+                      // A large radius keeps the clip on the coverage-FP route: it cuts into the shape, so it
+                      // cannot be reduced to a device-space rect test.
+                      RRect clip = {};
+                      clip.setRectXY(Rect::MakeXYWH(10, 12, 122, 112), 46, 46);
+                      canvas->clipRRect(clip);
+                      // Uniform radii keep the draw on the non-complex NonAARRect path.
+                      RRect shape = {};
+                      shape.setRectXY(Rect::MakeXYWH(20, 20, 120, 120), 18, 22);
+                      Paint paint = {};
+                      paint.setColor(Color::FromRGBA(70, 130, 180, 255));
+                      paint.setAntiAlias(false);
+                      canvas->drawRRect(shape, paint);
+                    });
 }
 
 // Row 37: a round-capped stroke segment (RoundStrokeRectGeometryProcessor) under an analytic rect
@@ -1042,7 +1040,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedNonAARRectClip) {
 TGFX_TEST(AOTGeometryLayoutTest, ReportedRoundStrokeRectClip) {
   ExpectSceneServed("row37", "RoundStrokeRectGeometryProcessor",
                     "GP=RoundStrokeRectGeometryProcessor;ColorFP=[];CoverageFP=[RectEffect];XP="
-                    "EmptyXferProcessor",
+                    "fixed",
                     [](Canvas* canvas) {
                       // Rotated and fractional, so the clip stays an analytic AA rect in local space.
                       canvas->rotate(4, 80, 80);
@@ -1063,7 +1061,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedTwoRectClips) {
   ExpectSceneServed("row24", "QuadPerEdgeAAGeometryProcessor",
                     "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[];CoverageFP=["
                     "ComposeFragmentProcessor(RectEffect,"
-                    "RectEffect)];XP=EmptyXferProcessor",
+                    "RectEffect)];XP=fixed",
                     [](Canvas* canvas) {
                       // Two overlapping fractional clips under different transforms: neither contains the other
                       // and neither is a device-space rect.
@@ -1084,7 +1082,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedTwoRectClipsTexture) {
   auto image = MakePatternImage();
   ExpectSceneServed("row26", "QuadPerEdgeAAGeometryProcessor",
                     "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[TextureEffect];CoverageFP=["
-                    "ComposeFragmentProcessor(RectEffect,RectEffect)];XP=EmptyXferProcessor",
+                    "ComposeFragmentProcessor(RectEffect,RectEffect)];XP=fixed",
                     [image](Canvas* canvas) {
                       canvas->rotate(5, 80, 80);
                       canvas->clipRect(Rect::MakeLTRB(12.25f, 8.5f, 132.75f, 118.25f));
@@ -1109,7 +1107,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedAtlasTextTwoRectClips) {
   ExpectSceneServed(
       "row1", "AtlasTextGeometryProcessor",
       "GP=AtlasTextGeometryProcessor;ColorFP=[];CoverageFP=[ComposeFragmentProcessor(RectEffect,"
-      "RectEffect)];XP=EmptyXferProcessor",
+      "RectEffect)];XP=fixed",
       [textBlob](Canvas* canvas) {
         canvas->rotate(5, 80, 80);
         canvas->clipRect(Rect::MakeLTRB(10.5f, 26.25f, 150.75f, 118.5f));
@@ -1131,7 +1129,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedShaderMaskTwoRectClips) {
   ExpectSceneServed(
       "coverage-mask-two-rect-clips", "QuadPerEdgeAAGeometryProcessor",
       "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[];CoverageFP=[XfermodeFragmentProcessor - "
-      "dst(TextureEffect),ComposeFragmentProcessor(RectEffect,RectEffect)];XP=EmptyXferProcessor",
+      "dst(TextureEffect),ComposeFragmentProcessor(RectEffect,RectEffect)];XP=fixed",
       [image](Canvas* canvas) {
         canvas->rotate(5, 80, 80);
         canvas->clipRect(Rect::MakeLTRB(10.5f, 26.25f, 150.75f, 118.5f));
@@ -1164,7 +1162,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ComplexRRectGradient) {
 TGFX_TEST(AOTGeometryLayoutTest, ReportedPathMaskRectClipShapeMask) {
   ExpectSceneServed("row11", "DefaultGeometryProcessor",
                     "GP=DefaultGeometryProcessor;ColorFP=[];CoverageFP=[ComposeFragmentProcessor("
-                    "DeviceSpaceTextureEffect,RectEffect),TextureEffect];XP=EmptyXferProcessor",
+                    "DeviceSpaceTextureEffect,RectEffect),TextureEffect];XP=fixed",
                     [](Canvas* canvas) {
                       Path clipPath = {};
                       clipPath.moveTo(4, 12);
@@ -1205,7 +1203,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ShaderMaskPathMaskRectClip) {
       "shader-mask-path-mask-rect", "QuadPerEdgeAAGeometryProcessor",
       "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[];CoverageFP=[XfermodeFragmentProcessor - "
       "dst(TextureEffect),ComposeFragmentProcessor(DeviceSpaceTextureEffect,RectEffect)];"
-      "XP=EmptyXferProcessor",
+      "XP=fixed",
       [image](Canvas* canvas) {
         Path clipPath = {};
         clipPath.moveTo(4, 12);
@@ -1266,7 +1264,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedConstantMaskCoverage) {
   auto image = MakePatternImage();
   ExpectSceneServed(
       "row28", "QuadPerEdgeAAGeometryProcessor",
-      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor];XP=EmptyXferProcessor",
+      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor];XP=fixed",
       [image](Canvas* canvas) { DrawConstantMaskImage(canvas, image, 0, BlendMode::SrcOver); });
 }
 
@@ -1274,7 +1272,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedConstantMaskCoverageRect) {
   auto image = MakePatternImage();
   ExpectSceneServed(
       "row33", "QuadPerEdgeAAGeometryProcessor",
-      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor,RectEffect];XP=EmptyXferProcessor",
+      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor,RectEffect];XP=fixed",
       [image](Canvas* canvas) { DrawConstantMaskImage(canvas, image, 1, BlendMode::SrcOver); });
 }
 
@@ -1282,7 +1280,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedConstantMaskCoverageRRect) {
   auto image = MakePatternImage();
   ExpectSceneServed(
       "row34", "QuadPerEdgeAAGeometryProcessor",
-      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor,RRectEffect];XP=EmptyXferProcessor",
+      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor,RRectEffect];XP=fixed",
       [image](Canvas* canvas) { DrawConstantMaskImage(canvas, image, 2, BlendMode::SrcOver); });
 }
 
@@ -1292,13 +1290,11 @@ TGFX_TEST(AOTGeometryLayoutTest, ConstantMaskCoverageBlendModes) {
   auto image = MakePatternImage();
   ExpectSceneServed(
       "constant-mask-multiply", "QuadPerEdgeAAGeometryProcessor",
-      TGFX_CONST_MASK_COLOR
-      "CoverageFP=[ConstColorProcessor,RectEffect];XP=PorterDuffXferProcessor",
+      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor,RectEffect];XP=shader",
       [image](Canvas* canvas) { DrawConstantMaskImage(canvas, image, 1, BlendMode::Multiply); });
   ExpectSceneServed(
       "constant-mask-src", "QuadPerEdgeAAGeometryProcessor",
-      TGFX_CONST_MASK_COLOR
-      "CoverageFP=[ConstColorProcessor,RectEffect];XP=PorterDuffXferProcessor",
+      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor,RectEffect];XP=shader",
       [image](Canvas* canvas) { DrawConstantMaskImage(canvas, image, 1, BlendMode::Src); });
 }
 
@@ -1349,7 +1345,7 @@ void DrawStrictImage(Canvas* canvas, const std::shared_ptr<Image>& image, Strict
 TGFX_TEST(AOTGeometryLayoutTest, StrictImageMaskRectClip) {
   auto image = MakePatternImage();
   ExpectSceneServed("strict-mask-rect", "QuadPerEdgeAAGeometryProcessor",
-                    TGFX_STRICT_QUAD TGFX_STRICT_MASK "RectEffect];XP=EmptyXferProcessor",
+                    TGFX_STRICT_QUAD TGFX_STRICT_MASK "RectEffect];XP=fixed",
                     [image](Canvas* canvas) {
                       DrawStrictImage(canvas, image, StrictCoverage::MaskRect, BlendMode::SrcOver);
                     });
@@ -1357,34 +1353,31 @@ TGFX_TEST(AOTGeometryLayoutTest, StrictImageMaskRectClip) {
 
 TGFX_TEST(AOTGeometryLayoutTest, StrictImageMaskTwoRectClips) {
   auto image = MakePatternImage();
-  ExpectSceneServed("strict-mask-two-rects", "QuadPerEdgeAAGeometryProcessor",
-                    TGFX_STRICT_QUAD TGFX_STRICT_MASK
-                    "ComposeFragmentProcessor(RectEffect,RectEffect)];XP=EmptyXferProcessor",
-                    [image](Canvas* canvas) {
-                      DrawStrictImage(canvas, image, StrictCoverage::MaskTwoRects,
-                                      BlendMode::SrcOver);
-                    });
+  ExpectSceneServed(
+      "strict-mask-two-rects", "QuadPerEdgeAAGeometryProcessor",
+      TGFX_STRICT_QUAD TGFX_STRICT_MASK "ComposeFragmentProcessor(RectEffect,RectEffect)];XP=fixed",
+      [image](Canvas* canvas) {
+        DrawStrictImage(canvas, image, StrictCoverage::MaskTwoRects, BlendMode::SrcOver);
+      });
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, StrictImageMaskRRectClipDstRead) {
   auto image = MakePatternImage();
-  ExpectSceneServed("strict-mask-rrect-multiply", "QuadPerEdgeAAGeometryProcessor",
-                    TGFX_STRICT_QUAD TGFX_STRICT_MASK "RRectEffect];XP=PorterDuffXferProcessor",
-                    [image](Canvas* canvas) {
-                      DrawStrictImage(canvas, image, StrictCoverage::MaskRRect,
-                                      BlendMode::Multiply);
-                    });
+  ExpectSceneServed(
+      "strict-mask-rrect-multiply", "QuadPerEdgeAAGeometryProcessor",
+      TGFX_STRICT_QUAD TGFX_STRICT_MASK "RRectEffect];XP=shader", [image](Canvas* canvas) {
+        DrawStrictImage(canvas, image, StrictCoverage::MaskRRect, BlendMode::Multiply);
+      });
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, StrictImageTwoRectClips) {
   auto image = MakePatternImage();
-  ExpectSceneServed(
-      "strict-two-rects", "QuadPerEdgeAAGeometryProcessor",
-      TGFX_STRICT_QUAD
-      "CoverageFP=[ComposeFragmentProcessor(RectEffect,RectEffect)];XP=EmptyXferProcessor",
-      [image](Canvas* canvas) {
-        DrawStrictImage(canvas, image, StrictCoverage::TwoRects, BlendMode::SrcOver);
-      });
+  ExpectSceneServed("strict-two-rects", "QuadPerEdgeAAGeometryProcessor",
+                    TGFX_STRICT_QUAD
+                    "CoverageFP=[ComposeFragmentProcessor(RectEffect,RectEffect)];XP=fixed",
+                    [image](Canvas* canvas) {
+                      DrawStrictImage(canvas, image, StrictCoverage::TwoRects, BlendMode::SrcOver);
+                    });
 }
 
 #undef TGFX_STRICT_QUAD

@@ -190,8 +190,8 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
       // promise was broken, so the draw is dropped instead of compiled on the spot.
       return failLookup(renderTarget, isFinalLookup, "the pass carries no compiled program");
     }
-    auto passInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
-                                                  xferProcessor.get(), blendMode, false);
+    auto passInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(), dstTexture,
+                                                  blendMode, false);
     configureProgramInfo(passInfo.get(), depthStencilFormat);
     // The pass's expression is already compiled into its carried IR, so only the interpreter can
     // serve it; the scope is the one difference from a draw's own lookup, and the one entry
@@ -218,7 +218,7 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
   }
   preparedProgramInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
                                                       std::move(fragmentProcessors), colorCount,
-                                                      xferProcessor.get(), blendMode);
+                                                      dstTexture, blendMode);
   configureProgramInfo(preparedProgramInfo.get(), depthStencilFormat);
   // The draw's record-time IR is the expression every later stage reads. A coverage processor
   // attached only at prepare (a rasterized shape's mask, added by onMakeGeometryProcessor) is

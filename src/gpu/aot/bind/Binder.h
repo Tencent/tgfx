@@ -28,7 +28,6 @@ namespace tgfx {
 
 class UniformData;
 class ParamWriter;
-class XferProcessor;
 
 // The instruction contract's bind column (Binder.cpp's AOTOpContract): one function per op
 // that writes a per-slot parameter block. The caller writes the packed word and its selector with

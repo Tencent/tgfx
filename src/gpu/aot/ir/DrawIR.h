@@ -31,7 +31,6 @@ class BlockAllocator;
 class FragmentProcessor;
 class GeometryProcessor;
 class TextureProxy;
-class XferProcessor;
 
 /** What one coverage term of a draw is, decided once at lowering time by what the term is. */
 enum class AOTCoverageTermKind {

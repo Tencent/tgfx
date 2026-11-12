@@ -23,7 +23,6 @@
 #include "gpu/YUVColorConversion.h"
 #include "gpu/aot/ir/ChainLayoutMath.h"
 #include "gpu/aot/ir/NodeContract.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
 #include "gpu/resources/YUVTextureView.h"

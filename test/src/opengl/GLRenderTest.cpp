@@ -42,7 +42,6 @@
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -588,7 +587,7 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     // The chain serves a draw from its record-time IR; a ProgramInfo without one is not served.
     auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, std::nullopt,
                             BlendMode::SrcOver);
     programInfo.setCarriedIR(&*ir);
     EXPECT_TRUE(programInfo.glProfileMatchesCache());
@@ -605,7 +604,7 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     auto fp = TextureEffect::Make(&allocator, std::move(textureProxy));
     ASSERT_NE(gp, nullptr);
     ASSERT_NE(fp, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, std::nullopt,
                             BlendMode::SrcOver);
     // QuadPerEdgeAA + TextureEffect is served by QuadTextureFillShader. The matcher reads the
     // carried IR, so this info needs the same record-time lowering a draw gets.
@@ -634,7 +633,7 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     auto fp = DeviceSpaceTextureEffect::Make(&allocator, std::move(textureProxy), Matrix::I());
     ASSERT_NE(gp, nullptr);
     ASSERT_NE(fp, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, std::nullopt,
                             BlendMode::SrcOver);
     EXPECT_FALSE(programInfo.samplersAre2D());
     // A rectangle sampler has no precompiled variant and is rejected by the matcher gate (it
@@ -654,14 +653,13 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
                                           0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
     auto matrix = ColorMatrixFragmentProcessor::Make(&allocator, matrixValues);
     auto fp = FragmentProcessor::Compose(&allocator, std::move(texture), std::move(matrix));
-    auto xp = PorterDuffXferProcessor::Make(&allocator, BlendMode::SrcOver, {});
+    // A present value with an empty proxy: the framebuffer-fetch state.
+    std::optional<DstTextureInfo> dst = DstTextureInfo{};
     ASSERT_NE(gp, nullptr);
     ASSERT_NE(fp, nullptr);
-    ASSERT_NE(xp, nullptr);
     auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, xp.get(),
-                            BlendMode::SrcOver);
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, dst, BlendMode::SrcOver);
     programInfo.setCarriedIR(&*ir);
     // SrcOver needs no dst readback, so the chain kernel serves this draw.
     EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo, SelectionScope::AnyFamily)

@@ -828,7 +828,7 @@ TGFX_TEST(GPURenderTest, ProgramInfoStencilAccessors) {
   ASSERT_TRUE(geometryProcessor != nullptr);
   std::vector<FragmentProcessor*> fragmentProcessors = {};
   ProgramInfo info(renderTarget.get(), geometryProcessor.get(), std::move(fragmentProcessors),
-                   /*numColorProcessors=*/0, /*xferProcessor=*/nullptr, BlendMode::SrcOver);
+                   /*numColorProcessors=*/0, /*dstTexture=*/std::nullopt, BlendMode::SrcOver);
 
   // Defaults: no-op stencil, all colour channels writable.
   EXPECT_EQ(info.getColorWriteMask(), ColorWriteMask::All);
@@ -884,18 +884,18 @@ TGFX_TEST(GPURenderTest, ProgramInfoStencilCacheKey) {
   stencilDS.stencilBack = stencilDS.stencilFront;
 
   // Variant A: defaults.
-  ProgramInfo infoA(renderTarget.get(), gpA.get(), {}, 0, nullptr, BlendMode::SrcOver);
+  ProgramInfo infoA(renderTarget.get(), gpA.get(), {}, 0, std::nullopt, BlendMode::SrcOver);
   auto programA = infoA.getProgram();
   ASSERT_TRUE(programA != nullptr);
 
   // Variant A again: equivalent inputs must hit the same cached program.
-  ProgramInfo infoA2(renderTarget.get(), gpA2.get(), {}, 0, nullptr, BlendMode::SrcOver);
+  ProgramInfo infoA2(renderTarget.get(), gpA2.get(), {}, 0, std::nullopt, BlendMode::SrcOver);
   auto programA2 = infoA2.getProgram();
   EXPECT_EQ(programA2.get(), programA.get())
       << "identical ProgramInfo inputs should reuse the cached Program";
 
   // Variant B: differ only in colour write mask.
-  ProgramInfo infoB(renderTarget.get(), gpB.get(), {}, 0, nullptr, BlendMode::SrcOver);
+  ProgramInfo infoB(renderTarget.get(), gpB.get(), {}, 0, std::nullopt, BlendMode::SrcOver);
   infoB.setColorWriteMask(0);
   auto programB = infoB.getProgram();
   ASSERT_TRUE(programB != nullptr);
@@ -903,7 +903,7 @@ TGFX_TEST(GPURenderTest, ProgramInfoStencilCacheKey) {
       << "differing colorWriteMask must not collapse onto the same cached Program";
 
   // Variant C: differ only in stencil configuration.
-  ProgramInfo infoC(renderTarget.get(), gpC.get(), {}, 0, nullptr, BlendMode::SrcOver);
+  ProgramInfo infoC(renderTarget.get(), gpC.get(), {}, 0, std::nullopt, BlendMode::SrcOver);
   infoC.setDepthStencil(stencilDS);
   auto programC = infoC.getProgram();
   ASSERT_TRUE(programC != nullptr);

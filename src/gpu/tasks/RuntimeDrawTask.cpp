@@ -139,7 +139,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   std::vector fragmentProcessors = {colorProcessor.get()};
   auto programInfo =
       std::make_unique<ProgramInfo>(renderTarget.get(), geometryProcessor.get(),
-                                    std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);
+                                    std::move(fragmentProcessors), 1, std::nullopt, BlendMode::Src);
   auto program = programInfo->getProgram();
   if (program == nullptr) {
     LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to get the program!");

@@ -31,7 +31,6 @@ namespace tgfx {
 class ProgramInfo;
 class GeometryProcessor;
 class FragmentProcessor;
-class XferProcessor;
 struct DrawIR;
 struct ColorSpaceXformSteps;
 enum class AOTOpaqueKernel : int;

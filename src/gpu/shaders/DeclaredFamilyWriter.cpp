@@ -39,7 +39,6 @@
 #include "gpu/processors/HairlineQuadGeometryProcessor.h"
 #include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"

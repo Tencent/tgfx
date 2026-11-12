@@ -24,9 +24,9 @@
 #include "gpu/Program.h"
 #include "gpu/Swizzle.h"
 #include "gpu/aot/ir/Program.h"
+#include "gpu/aot/ir/XferFacts.h"
 #include "gpu/aot/select/FamilyMatchResult.h"
 #include "gpu/aot/select/SelectionScope.h"
-#include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
 #include "gpu/resources/RenderTarget.h"
@@ -53,7 +53,7 @@ class ProgramInfo {
  public:
   ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
               std::vector<FragmentProcessor*> fragmentProcessors, size_t numColorProcessors,
-              XferProcessor* xferProcessor, BlendMode blendMode);
+              const std::optional<DstTextureInfo>& dstTexture, BlendMode blendMode);
 
   /**
    * The AOT route's form: no fragment processors ride the info — the draw's whole expression
@@ -62,7 +62,8 @@ class ProgramInfo {
    * takes from that list on the plain route: whether coverage processors follow the color ones.
    */
   ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
-              XferProcessor* xferProcessor, BlendMode blendMode, bool blendFormulaHasCoverage);
+              const std::optional<DstTextureInfo>& dstTexture, BlendMode blendMode,
+              bool blendFormulaHasCoverage);
 
   size_t numColorFragmentProcessors() const {
     return numColorProcessors;
@@ -84,8 +85,6 @@ class ProgramInfo {
   const FragmentProcessor* getFragmentProcessor(size_t idx) const {
     return fragmentProcessors[idx];
   }
-
-  const XferProcessor* getXferProcessor() const;
 
   /// The output formula facts: whether the shader runs the xfer stage and where its destination
   /// comes from. Every reader below (writer, matcher, program key) addresses this value.
@@ -303,7 +302,7 @@ class ProgramInfo {
   std::vector<FragmentProcessor*> fragmentProcessors = {};
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
-  XferProcessor* xferProcessor = nullptr;
+  std::optional<DstTextureInfo> dstTexture = std::nullopt;
   /// The xfer facts derived from the processor once per program: the shader-side blend flag and
   /// the destination it samples. The writers and the matcher read this, not the processor.
   XferFacts xferFacts = {};

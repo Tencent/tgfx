@@ -22,8 +22,8 @@
 #include "gpu/AAType.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/DrawIR.h"
+#include "gpu/aot/ir/XferFacts.h"
 #include "gpu/processors/FragmentProcessor.h"
-#include "gpu/processors/XferProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/RenderPass.h"
 
@@ -68,8 +68,11 @@ class DrawOp {
     cullMode = mode;
   }
 
-  void setXferProcessor(PlacementPtr<XferProcessor> processor) {
-    xferProcessor = std::move(processor);
+  /// Declares the destination texture the draw's shader-side blend formula samples. A present
+  /// value with an empty proxy selects the backend's framebuffer fetch; an absent value means the
+  /// fixed-function blend (or Src) writes the output, no shader xfer stage.
+  void setDstTexture(DstTextureInfo dstTexture) {
+    this->dstTexture = std::move(dstTexture);
   }
 
   void addColorFP(PlacementPtr<FragmentProcessor> colorProcessor) {
@@ -158,7 +161,9 @@ class DrawOp {
   Rect scissorRect = {};
   std::vector<PlacementPtr<FragmentProcessor>> colors = {};
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
-  PlacementPtr<XferProcessor> xferProcessor = nullptr;
+  /// The draw's destination texture (present but empty = framebuffer fetch; absent = no shader
+  /// xfer stage); see setDstTexture.
+  std::optional<DstTextureInfo> dstTexture = std::nullopt;
   PlacementPtr<DrawIR> ir = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;

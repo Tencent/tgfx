@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsCompositor.h"
+#include "BlendFormula.h"
 #include "core/MeshBase.h"
 #include "core/PathRef.h"
 #include "core/VertexMesh.h"
@@ -43,7 +44,6 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "processors/ColorSpaceXFormEffect.h"
-#include "processors/PorterDuffXferProcessor.h"
 #include "processors/XfermodeFragmentProcessor.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -1138,9 +1138,9 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     if (!UsesFrameBufferFetch(context) && dstTextureInfo.textureProxy == nullptr) {
       return;
     }
-    auto xferProcessor = PorterDuffXferProcessor::Make(drawingAllocator(), brush.blendMode,
-                                                       std::move(dstTextureInfo));
-    op->setXferProcessor(std::move(xferProcessor));
+    // A present value with an empty proxy selects the framebuffer fetch; the gate above already
+    // rejected a dst-less draw on backends without it.
+    op->setDstTexture(std::move(dstTextureInfo));
   }
 
   // The record-time AOT route's one entry: a null return leaves the op on the plain route (or

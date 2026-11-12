@@ -26,8 +26,6 @@
 #include "gpu/ProgramWriter.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/select/PrecompiledProgramCreator.h"
-#include "gpu/processors/EmptyXferProcessor.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/shaders/contract/ShaderProfileResolver.h"
 #include "tgfx/gpu/GPU.h"
@@ -43,44 +41,31 @@ static void EncodeStencilFace(BytesKey& key, const StencilDescriptor& face) {
 
 ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
                          std::vector<FragmentProcessor*> fragmentProcessors,
-                         size_t numColorProcessors, XferProcessor* xferProcessor,
+                         size_t numColorProcessors, const std::optional<DstTextureInfo>& dstTexture,
                          BlendMode blendMode)
     : renderTarget(renderTarget), geometryProcessor(geometryProcessor),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
-      xferProcessor(xferProcessor), blendMode(blendMode) {
+      dstTexture(dstTexture), blendMode(blendMode) {
   hasCoverageForBlend = numColorProcessors < this->fragmentProcessors.size();
   updateXferFacts();
 }
 
 ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
-                         XferProcessor* xferProcessor, BlendMode blendMode,
+                         const std::optional<DstTextureInfo>& dstTexture, BlendMode blendMode,
                          bool blendFormulaHasCoverage)
-    : renderTarget(renderTarget), geometryProcessor(geometryProcessor),
-      xferProcessor(xferProcessor), blendMode(blendMode),
-      hasCoverageForBlend(blendFormulaHasCoverage) {
+    : renderTarget(renderTarget), geometryProcessor(geometryProcessor), dstTexture(dstTexture),
+      blendMode(blendMode), hasCoverageForBlend(blendFormulaHasCoverage) {
   updateXferFacts();
 }
 
 void ProgramInfo::updateXferFacts() {
+  // An absent value leaves the output to the fixed-function blend; a present one runs the formula
+  // in the shader, its empty proxy selecting the backend's framebuffer fetch.
   xferFacts = {};
-  // The passthrough processor (and an absent one) leaves the output to the fixed-function blend.
-  if (xferProcessor == nullptr || IsProcessor<EmptyXferProcessor>(xferProcessor)) {
-    return;
+  if (dstTexture.has_value()) {
+    xferFacts.shaderBlend = true;
+    xferFacts.dstTexture = *dstTexture;
   }
-  // Any other processor runs the formula in the shader: only PorterDuff carries a destination,
-  // and a missing one selects the backend's framebuffer fetch.
-  xferFacts.shaderBlend = true;
-  if (IsProcessor<PorterDuffXferProcessor>(xferProcessor)) {
-    xferFacts.dstTexture =
-        static_cast<const PorterDuffXferProcessor*>(xferProcessor)->getDstTextureInfo();
-  }
-}
-
-const XferProcessor* ProgramInfo::getXferProcessor() const {
-  if (xferProcessor == nullptr) {
-    return EmptyXferProcessor::GetInstance();
-  }
-  return xferProcessor;
 }
 
 Swizzle ProgramInfo::getOutputSwizzle() const {
@@ -95,7 +80,7 @@ PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
   PipelineColorAttachment colorAttachment = {};
   colorAttachment.format = renderTarget->format();
   colorAttachment.colorWriteMask = colorWriteMask;
-  if (xferProcessor != nullptr || blendMode == BlendMode::Src) {
+  if (xferFacts.shaderBlend || blendMode == BlendMode::Src) {
     return colorAttachment;
   }
   BlendFormula blendFormula = {};
@@ -141,8 +126,16 @@ BytesKey ProgramInfo::buildProgramKey() const {
   // re-check it, so the boundary itself must ride the key or a hot hit can return a program built
   // for the other role.
   key.write(static_cast<uint32_t>(numColorProcessors));
-  if (xferProcessor != nullptr) {
-    xferProcessor->computeProcessorKey(context, &key);
+  // The output formula's contribution, the same encoding the precompiled-side key writes: the
+  // shader-stage flag and the sampled destination's identity (a null proxy is the framebuffer
+  // fetch; blendMode rides the pipeline state key below).
+  key.write(static_cast<uint32_t>(xferFacts.shaderBlend ? 1u : 0u));
+  if (xferFacts.shaderBlend) {
+    const auto& dstProxy = xferFacts.dstTexture.textureProxy;
+    auto dstView = dstProxy != nullptr ? dstProxy->getTextureView() : nullptr;
+    if (dstView != nullptr) {
+      TextureView::ComputeTextureKey(dstView->getTexture(), &key);
+    }
   }
   writePipelineStateKey(&key);
   return key;
@@ -308,9 +301,11 @@ std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
     }
     fp = iter.next();
   }
-  auto dstTextureView = xferProcessor != nullptr ? xferProcessor->dstTextureView() : nullptr;
-  if (dstTextureView != nullptr) {
-    SamplerInfo sampler = {dstTextureView->getTexture(), {}};
+  const auto& dstProxy = xferFacts.dstTexture.textureProxy;
+  auto dstView =
+      xferFacts.shaderBlend && dstProxy != nullptr ? dstProxy->getTextureView() : nullptr;
+  if (dstView != nullptr) {
+    SamplerInfo sampler = {dstView->getTexture(), {}};
     samplers.push_back(sampler);
   }
   return samplers;

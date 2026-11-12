@@ -20,7 +20,6 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/spec/SpecValues.h"
 #include "gpu/processors/GeometryProcessor.h"
-#include "gpu/processors/XferProcessor.h"
 
 namespace tgfx {
 
