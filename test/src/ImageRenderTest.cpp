@@ -22,6 +22,8 @@
 #include "core/images/TransformImage.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/SamplingArgs.h"
+#include "gpu/processors/FragmentProcessor.h"
 #include "gpu/resources/TextureView.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
@@ -651,6 +653,41 @@ TGFX_TEST(ImageRenderTest, drawScaleImage) {
   canvas->setMatrix(matrix);
   canvas->drawImage(scaleImage);
   EXPECT_TRUE(Baseline::Compare(surface, "ImageRenderTest/drawScaleBufferImage"));
+}
+
+/**
+ * A subset draw whose rect starts inside the subset bounds and overflows them renders the
+ * cropped area into a texture at the draw scale. The uv matrix therefore has to subtract the
+ * crop origin before applying that scale: the crop origin must map to texel (0, 0) and the far
+ * corner of the crop to the texture size, no matter what the draw scale is.
+ */
+TGFX_TEST(ImageRenderTest, SubsetImageCropUVMatrix) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  Bitmap bitmap(96, 64, false, false, ColorSpace::SRGB());
+  ASSERT_FALSE(bitmap.isEmpty());
+  auto source = Image::MakeFrom(bitmap);
+  ASSERT_TRUE(source != nullptr);
+  auto subsetBounds = Rect::MakeXYWH(16, 8, 64, 48);
+  auto subset = source->makeSubset(subsetBounds);
+  ASSERT_TRUE(subset != nullptr);
+  // The draw rect starts inside the subset bounds and overflows them on both axes.
+  auto drawRect = Rect::MakeXYWH(8, 4, 64, 48);
+  constexpr float DRAW_SCALE = 0.5f;
+  FPArgs args(context, 0, drawRect, DRAW_SCALE);
+  auto processor = subset->asFragmentProcessor(args, SamplingArgs(), nullptr);
+  ASSERT_NE(processor, nullptr);
+  ASSERT_EQ(processor->numCoordTransforms(), 1u);
+  auto coordTransform = processor->coordTransform(0);
+  ASSERT_NE(coordTransform, nullptr);
+  auto& matrix = coordTransform->matrix;
+  auto textureOrigin = matrix.mapXY(drawRect.left, drawRect.top);
+  EXPECT_NEAR(textureOrigin.x, 0.0f, 0.001f) << "the crop origin has to sample texel (0, 0)";
+  EXPECT_NEAR(textureOrigin.y, 0.0f, 0.001f) << "the crop origin has to sample texel (0, 0)";
+  auto textureCorner = matrix.mapXY(subsetBounds.width(), subsetBounds.height());
+  EXPECT_NEAR(textureCorner.x, (subsetBounds.width() - drawRect.left) * DRAW_SCALE, 0.001f);
+  EXPECT_NEAR(textureCorner.y, (subsetBounds.height() - drawRect.top) * DRAW_SCALE, 0.001f);
 }
 
 }  // namespace tgfx
