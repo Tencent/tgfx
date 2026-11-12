@@ -98,6 +98,19 @@ struct YUVTailIndices {
 };
 constexpr YUVTailIndices YUVField = {};
 
+// The chain-wide color-space block's element indices: the Chain and YUVChainTail modules spell
+// the same ten fields, each through its own element order.
+constexpr ColorSpaceXformHelper::FieldElements ChainCSFields = {
+    ChainElement("ChainCSFlags"),   ChainElement("ChainSrcTF0"),  ChainElement("ChainSrcTF1"),
+    ChainElement("ChainSrcTFType"), ChainElement("ChainSrcOOTF"), ChainElement("ChainColorXform"),
+    ChainElement("ChainDstOOTF"),   ChainElement("ChainDstTF0"),  ChainElement("ChainDstTF1"),
+    ChainElement("ChainDstTFType")};
+constexpr ColorSpaceXformHelper::FieldElements YUVCSFields = {
+    YUVElement("ChainCSFlags"),   YUVElement("ChainSrcTF0"),  YUVElement("ChainSrcTF1"),
+    YUVElement("ChainSrcTFType"), YUVElement("ChainSrcOOTF"), YUVElement("ChainColorXform"),
+    YUVElement("ChainDstOOTF"),   YUVElement("ChainDstTF0"),  YUVElement("ChainDstTF1"),
+    YUVElement("ChainDstTFType")};
+
 /// One chain instruction's per-slot parameter write. The packed word and its selector stay with
 /// the caller's dialect (the chain encodes result registers, the YUV tail encodes the op's small
 /// value), so the table carries only the parameter arrays: `dataElement` is the parameter pool's
@@ -347,9 +360,8 @@ void UploadYUVTailSlot(SlotWriter* yuvWriter, uint8_t dataElement, size_t index,
   }
 }
 
-void BindYUVProgram(const AOTProgram& program, SlotWriter* yuvWriter,
-                    UniformData* fragmentUniformData) {
-  if (yuvWriter == nullptr || fragmentUniformData == nullptr) {
+void BindYUVProgram(const AOTProgram& program, SlotWriter* yuvWriter) {
+  if (yuvWriter == nullptr) {
     return;
   }
   const auto& slots = program.slots;
@@ -362,18 +374,17 @@ void BindYUVProgram(const AOTProgram& program, SlotWriter* yuvWriter,
                       index < slots.size() ? slots[index] : inactiveSlot);
   }
   // The color-space parameters are one shared block (at most one transform per tail, enforced
-  // by the matching walk): the helper writes the same Chain-prefixed fields the interpreter's
-  // binder writes.
+  // by the matching walk), addressed through the tail module's element indices.
   for (const auto& slot : slots) {
     if (slot.op == AOTChainOp::ColorSpaceXform) {
-      ColorSpaceXformHelper("Chain").setData(fragmentUniformData, slot.colorSpaceXform.steps.get());
+      ColorSpaceXformHelper().setData(yuvWriter, YUVCSFields, slot.colorSpaceXform.steps.get());
       break;
     }
   }
 }
 
 void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
-                      UniformData* fragmentUniformData, SlotWriter* chainWriter) {
+                      SlotWriter* chainWriter) {
   const auto& slots = program.slots;
   const auto slotCount = slots.size();
   if (vertexUniformData != nullptr) {
@@ -382,7 +393,7 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
     vertexUniformData->setDataOptional(ChainParams::CoordSourceMask.name,
                                        static_cast<int>(program.coordSourceMask));
   }
-  if (fragmentUniformData == nullptr || chainWriter == nullptr) {
+  if (chainWriter == nullptr) {
     return;
   }
   // The mask sampler slot is always bound in four-leaf variants; this flag selects the
@@ -478,12 +489,12 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
     UploadChainSlot(chainWriter, ChainField.chainData, index, slot);
   }
   // The color-space parameters are one shared chain-wide block, so the kernel supports at most one
-  // color-space op per chain (enforced by the matcher). The helper writes the same field names the
-  // standalone ColorSpaceXformEffect uses, prefixed with "Chain".
+  // color-space op per chain (enforced by the matcher), addressed through the Chain module's
+  // element indices.
   for (size_t index = 0; index < slotCount; ++index) {
     if (slots[index].op == AOTChainOp::ColorSpaceXform) {
-      ColorSpaceXformHelper("Chain").setData(fragmentUniformData,
-                                             slots[index].colorSpaceXform.steps.get());
+      ColorSpaceXformHelper().setData(chainWriter, ChainCSFields,
+                                      slots[index].colorSpaceXform.steps.get());
       break;
     }
   }

@@ -22,6 +22,7 @@
 #include <utility>
 #include "UniformData.h"
 #include "core/ColorSpaceXformSteps.h"
+#include "gpu/shaders/ParamBuffer.h"
 
 namespace tgfx {
 
@@ -44,11 +45,15 @@ int TFTypeToIndex(gfx::skcms_TFType type);
  */
 bool ColorSpaceXformStepsSupported(const ColorSpaceXformSteps* steps);
 
+class SlotWriter;
+
 /**
- * Uploads the uniforms of a color-space transform. All uniform names are prefixed with namePrefix;
- * an empty prefix yields the plain names used by the standalone ColorSpaceXformEffect. When
- * slotIndex >= 0 the plain names are written as per-slot arrays instead, letting a multi-slot
- * kernel give each slot an independent parameter set (SrcTF0[0], SrcTF0[1], ...).
+ * Uploads the uniforms of a color-space transform, in one of three addressing modes: bare names
+ * (the standalone ColorSpaceXformEffect), prefix-composed names (the chain blocks), or per-slot
+ * array elements. All uniform names are prefixed with namePrefix; an empty prefix yields the
+ * plain names used by the standalone effect. When slotIndex >= 0 the plain names are written as
+ * per-slot arrays instead, letting a multi-slot kernel give each slot an independent parameter
+ * set (SrcTF0[0], SrcTF0[1], ...).
  */
 class ColorSpaceXformHelper {
  public:
@@ -60,7 +65,28 @@ class ColorSpaceXformHelper {
   ColorSpaceXformHelper(int slotIndex, uint32_t) : slot(slotIndex) {
   }
 
+  /**
+   * The element indices of one module's color-space block (the Chain and YUVChainTail spellings):
+   * the element mode addresses the fields through the module's derived layout, so no name is
+   * composed per draw. A field the module gates out is simply skipped.
+   */
+  struct FieldElements {
+    uint8_t csFlags = 0;
+    uint8_t srcTF0 = 0;
+    uint8_t srcTF1 = 0;
+    uint8_t srcTFType = 0;
+    uint8_t srcOOTF = 0;
+    uint8_t colorXform = 0;
+    uint8_t dstOOTF = 0;
+    uint8_t dstTF0 = 0;
+    uint8_t dstTF1 = 0;
+    uint8_t dstTFType = 0;
+  };
+
   void setData(UniformData* uniformData, const ColorSpaceXformSteps* colorSpaceXform);
+
+  void setData(SlotWriter* writer, const FieldElements& fields,
+               const ColorSpaceXformSteps* colorSpaceXform);
 
   bool applyUnpremul() const {
     return flags.unPremul;
@@ -85,24 +111,6 @@ class ColorSpaceXformHelper {
   }
 
  private:
-  template <typename T>
-  void writeRequired(UniformData* uniformData, const std::string& field, const T& value) const {
-    if (slot >= 0) {
-      uniformData->setArrayElement(field, static_cast<size_t>(slot), value);
-    } else {
-      uniformData->setData(prefix + field, value);
-    }
-  }
-
-  template <typename T>
-  void writeOptional(UniformData* uniformData, const std::string& field, const T& value) const {
-    if (slot >= 0) {
-      uniformData->setArrayElementOptional(field, static_cast<size_t>(slot), value);
-    } else {
-      uniformData->setDataOptional(prefix + field, value);
-    }
-  }
-
   std::string prefix;
   int slot = -1;
   ColorSpaceXformSteps::Flags flags;

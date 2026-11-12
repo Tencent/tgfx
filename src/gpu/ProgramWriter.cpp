@@ -452,7 +452,7 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
   // The shell-free value write: the draw's whole uniform content comes from the compiled program —
   // the root block plus every binding's per-child records — so no processor tree is walked. The
   // xfer processor still writes through its own bind until the xfer contract lands.
-  BindChainProgram(*program, vertexUniformData, fragmentUniformData, &chainWriter);
+  BindChainProgram(*program, vertexUniformData, &chainWriter);
   BindChainBindings(*program, &chainWriter);
   SlotWriter xferWriter(layout, Xfer, xferSlot, &buffer);
   const auto& xfer = info.getXferFacts();
