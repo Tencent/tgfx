@@ -67,4 +67,14 @@ LumaFragmentProcessor::LumaFactor LumaFragmentProcessor::AcquireLumaFactorFromCo
   return LumaFactor{};
 }
 
+PlacementPtr<FragmentProcessor> LumaFragmentProcessor::Make(
+    BlockAllocator* allocator, std::shared_ptr<ColorSpace> colorSpace) {
+  return allocator->make<LumaFragmentProcessor>(std::move(colorSpace));
+}
+
+PlacementPtr<FragmentProcessor> LumaFragmentProcessor::Make(BlockAllocator* allocator, float kr,
+                                                            float kg, float kb) {
+  return allocator->make<LumaFragmentProcessor>(kr, kg, kb);
+}
+
 }  // namespace tgfx

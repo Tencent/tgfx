@@ -22,7 +22,11 @@
 #include "TextureEffect.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/SamplerState.h"
+#include "gpu/ShaderCaps.h"
+#include "gpu/Swizzle.h"
 #include "gpu/aot/ir/EffectGraph.h"
+#include "gpu/processors/TextureEffect.h"
 #include "gpu/shaders/modules/TiledSourceModule.h"
 
 namespace tgfx {
@@ -349,6 +353,27 @@ const TextureView* TiledTextureEffect::getTextureView() const {
     return textureView;
   }
   return nullptr;
+}
+
+PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(BlockAllocator* allocator,
+                                                         std::shared_ptr<TextureProxy> proxy,
+                                                         const SamplingArgs& args,
+                                                         const Matrix* uvMatrix, bool forceAsMask) {
+  if (proxy == nullptr) {
+    return nullptr;
+  }
+  if (args.tileModeX == TileMode::Clamp && args.tileModeY == TileMode::Clamp) {
+    return TextureEffect::Make(allocator, std::move(proxy), args, uvMatrix, forceAsMask);
+  }
+  auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
+  SamplerState samplerState(args.tileModeX, args.tileModeY, args.sampling);
+  auto isAlphaOnly = proxy->isAlphaOnly();
+  PlacementPtr<FragmentProcessor> processor = allocator->make<TiledTextureEffect>(
+      std::move(proxy), samplerState, args.constraint, matrix, args.sampleArea);
+  if (forceAsMask && !isAlphaOnly) {
+    processor = FragmentProcessor::MulInputByChildAlpha(allocator, std::move(processor));
+  }
+  return processor;
 }
 
 }  // namespace tgfx

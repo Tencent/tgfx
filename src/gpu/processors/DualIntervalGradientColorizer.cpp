@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -12,23 +12,34 @@
 //  unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#include "gpu/processors/LumaFragmentProcessor.h"
+#include "DualIntervalGradientColorizer.h"
 
 namespace tgfx {
-class GLSLLumaFragmentProcessor : public LumaFragmentProcessor {
- public:
-  GLSLLumaFragmentProcessor(std::shared_ptr<ColorSpace> colorSpace = nullptr)
-      : LumaFragmentProcessor(std::move(colorSpace)) {
+PlacementPtr<DualIntervalGradientColorizer> DualIntervalGradientColorizer::Make(
+    BlockAllocator* allocator, Color c0, Color c1, Color c2, Color c3, float threshold) {
+  Color scale01;
+  // Derive scale and biases from the 4 colors and threshold
+  for (int i = 0; i < 4; ++i) {
+    auto vc0 = c0[i];
+    auto vc1 = c1[i];
+    scale01[i] = (vc1 - vc0) / threshold;
+  }
+  // bias01 = c0
+
+  Color scale23;
+  Color bias23;
+  for (int i = 0; i < 4; ++i) {
+    auto vc2 = c2[i];
+    auto vc3 = c3[i];
+    scale23[i] = (vc3 - vc2) / (1 - threshold);
+    bias23[i] = vc2 - threshold * scale23[i];
   }
 
-  GLSLLumaFragmentProcessor(float kr, float kg, float kb) : LumaFragmentProcessor(kr, kg, kb) {
-  }
+  return allocator->make<DualIntervalGradientColorizer>(scale01, c0, scale23, bias23, threshold);
+}
 
- protected:
-};
 }  // namespace tgfx

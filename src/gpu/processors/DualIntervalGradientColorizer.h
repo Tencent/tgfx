@@ -24,6 +24,7 @@
 namespace tgfx {
 class DualIntervalGradientColorizer : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<DualIntervalGradientColorizer> Make(BlockAllocator* allocator, Color c0,
                                                           Color c1, Color c2, Color c3,

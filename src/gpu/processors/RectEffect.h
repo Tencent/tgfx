@@ -29,6 +29,7 @@ namespace tgfx {
  */
 class RectEffect : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
   /**
    * @param localRect    The rectangle in local space.

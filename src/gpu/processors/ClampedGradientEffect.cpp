@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ClampedGradientEffect.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/processors/ConicGradientLayout.h"
 #include "gpu/processors/DualIntervalGradientColorizer.h"
@@ -130,6 +131,14 @@ bool ClampedGradientEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
     return false;
   }
   return builder->addGradientSource(input, parameters, output);
+}
+
+// Mirrors the gradient layout ordering used by the precompiled gradient shaders'
+PlacementPtr<ClampedGradientEffect> ClampedGradientEffect::Make(
+    BlockAllocator* allocator, PlacementPtr<FragmentProcessor> colorizer,
+    PlacementPtr<FragmentProcessor> gradLayout, Color leftBorderColor, Color rightBorderColor) {
+  return allocator->make<ClampedGradientEffect>(std::move(colorizer), std::move(gradLayout),
+                                                leftBorderColor, rightBorderColor);
 }
 
 }  // namespace tgfx

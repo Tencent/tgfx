@@ -30,4 +30,9 @@ bool AlphaThresholdFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNod
   return builder->addAlphaThreshold(input, parameters, output);
 }
 
+PlacementPtr<AlphaThresholdFragmentProcessor> AlphaThresholdFragmentProcessor::Make(
+    BlockAllocator* allocator, float threshold) {
+  return allocator->make<AlphaThresholdFragmentProcessor>(threshold);
+}
+
 }  // namespace tgfx

@@ -53,4 +53,12 @@ std::shared_ptr<Texture> DeviceSpaceTextureEffect::onTextureAt(size_t) const {
   return textureView == nullptr ? nullptr : textureView->getTexture();
 }
 
+PlacementPtr<DeviceSpaceTextureEffect> DeviceSpaceTextureEffect::Make(
+    BlockAllocator* allocator, std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix) {
+  if (textureProxy == nullptr) {
+    return nullptr;
+  }
+  return allocator->make<DeviceSpaceTextureEffect>(std::move(textureProxy), uvMatrix);
+}
+
 }  // namespace tgfx

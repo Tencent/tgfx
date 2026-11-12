@@ -18,8 +18,10 @@
 
 #include "TextureEffect.h"
 #include <algorithm>
+#include <unordered_map>
 #include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/YUVColorConversion.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/shaders/modules/TextureSourceModule.h"
 
@@ -245,6 +247,22 @@ void TextureEffect::computeSubsetRect(float rect[4]) const {
     rect[2] = rb.x;
     rect[3] = rb.y;
   }
+}
+
+PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(BlockAllocator* allocator,
+                                                          std::shared_ptr<TextureProxy> proxy,
+                                                          const SamplingArgs& args,
+                                                          const Point& alphaStart,
+                                                          const Matrix* uvMatrix) {
+  if (proxy == nullptr) {
+    return nullptr;
+  }
+  auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
+  SamplerState samplerState(args.tileModeX, args.tileModeY, args.sampling);
+  // The base constructor's parameter order (sampler state before the alpha start); the shell used
+  // to reorder them for its own signature.
+  return allocator->make<TextureEffect>(std::move(proxy), samplerState, args.constraint, alphaStart,
+                                        matrix, args.sampleArea);
 }
 
 }  // namespace tgfx

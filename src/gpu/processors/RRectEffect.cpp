@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectEffect.h"
+#include "core/utils/Log.h"
 #include "gpu/aot/ir/EffectGraph.h"
+#include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 
 namespace tgfx {
@@ -50,4 +52,35 @@ bool RRectEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID
   parameters.antiAlias = antiAlias ? 1.0f : 0.0f;
   return builder->addRRectCoverage(input, parameters, output);
 }
+
+PlacementPtr<RRectEffect> RRectEffect::Make(BlockAllocator* allocator, const RRect& rRect,
+                                            const Matrix& matrix, bool antiAlias) {
+  DEBUG_ASSERT(rRect.type() != RRect::Type::Rect);
+  // The analytic AA relies on a linear device-to-local inverse map, which cannot represent a
+  // perspective matrix.
+  DEBUG_ASSERT(!matrix.hasPerspective());
+  if (matrix.hasPerspective()) {
+    return nullptr;
+  }
+
+  RRect adjustedRRect = rRect;
+  Matrix deviceToLocal = Matrix::I();
+  if (!matrix.isIdentity()) {
+    const auto scales = matrix.getAxisScales();
+    if (scales.x == 0 || scales.y == 0) {
+      return nullptr;
+    }
+    // Bake axisScales into the rrect so the shader's local-space distance comparison
+    // matches device-space half-pixel AA semantics.
+    adjustedRRect.scale(scales.x, scales.y);
+    Matrix adjustedMatrix = matrix;
+    adjustedMatrix.preScale(1.0f / scales.x, 1.0f / scales.y);
+    if (!adjustedMatrix.invert(&deviceToLocal)) {
+      return nullptr;
+    }
+  }
+  return allocator->make<RRectEffect>(adjustedRRect.rect(), adjustedRRect.radii(), deviceToLocal,
+                                      antiAlias);
+}
+
 }  // namespace tgfx

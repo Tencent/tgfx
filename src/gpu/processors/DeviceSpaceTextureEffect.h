@@ -23,6 +23,7 @@
 namespace tgfx {
 class DeviceSpaceTextureEffect : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<DeviceSpaceTextureEffect> Make(BlockAllocator* allocator,
                                                      std::shared_ptr<TextureProxy> textureProxy,

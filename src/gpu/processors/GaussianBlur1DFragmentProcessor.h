@@ -26,6 +26,7 @@ enum class GaussianBlurDirection { Horizontal, Vertical };
 
 class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
  public:
+  friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
   /**
    * Creates a gaussian blur processor that samples the child along the given direction with the

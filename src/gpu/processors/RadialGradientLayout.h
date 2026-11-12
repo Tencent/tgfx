@@ -23,6 +23,7 @@
 namespace tgfx {
 class RadialGradientLayout : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   static PlacementPtr<RadialGradientLayout> Make(BlockAllocator* allocator, Matrix matrix);
 
   std::string name() const override {

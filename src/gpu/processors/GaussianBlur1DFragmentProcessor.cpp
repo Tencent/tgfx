@@ -20,7 +20,11 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <string>
+#include <string_view>
 #include "gpu/aot/ir/EffectGraph.h"
+#include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
@@ -90,4 +94,26 @@ bool GaussianBlur1DFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNod
   parameters.packedKernel = packedKernel();
   return builder->addOpaqueKernel(childNode, parameters, output);
 }
+
+PlacementPtr<FragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
+    BlockAllocator* allocator, PlacementPtr<FragmentProcessor> processor, float sigma,
+    GaussianBlurDirection direction, float stepLength, int maxSigma) {
+  if (!processor) {
+    return nullptr;
+  }
+  if (maxSigma < 0) {
+    return nullptr;
+  }
+  if (sigma <= 0 || stepLength <= 0 || !std::isfinite(sigma)) {
+    return processor;
+  }
+  // The kernel table and the shader loop bound are dimensioned for maxSigma and sigma, so the
+  // caller must respect both limits. Clamping here would silently mask contract violations.
+  DEBUG_ASSERT(maxSigma <= MAX_KERNEL_RADIUS / 2);
+  DEBUG_ASSERT(sigma <= static_cast<float>(maxSigma));
+
+  return allocator->make<GaussianBlur1DFragmentProcessor>(std::move(processor), sigma, direction,
+                                                          stepLength, maxSigma);
+}
+
 }  // namespace tgfx

@@ -22,6 +22,7 @@
 namespace tgfx {
 class LumaFragmentProcessor : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);

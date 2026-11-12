@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -12,23 +12,19 @@
 //  unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <optional>
-#include "gpu/processors/ClampedGradientEffect.h"
-#include "tgfx/core/Color.h"
+#include "TextureGradientColorizer.h"
 
 namespace tgfx {
-class GLSLClampedGradientEffect : public ClampedGradientEffect {
- public:
-  GLSLClampedGradientEffect(PlacementPtr<FragmentProcessor> colorizer,
-                            PlacementPtr<FragmentProcessor> gradLayout, Color leftBorderColor,
-                            Color rightBorderColor);
+PlacementPtr<TextureGradientColorizer> TextureGradientColorizer::Make(
+    BlockAllocator* allocator, std::shared_ptr<TextureProxy> gradient) {
+  if (gradient == nullptr) {
+    return nullptr;
+  }
+  return allocator->make<TextureGradientColorizer>(std::move(gradient));
+}
 
- private:
-};
 }  // namespace tgfx

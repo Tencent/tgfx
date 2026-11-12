@@ -168,4 +168,23 @@ bool XfermodeFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID in
   parameters.multiplyInputAlpha = child == Child::TwoChild && inputIsPlainGeometryColor;
   return builder->addBlend(src, dst, parameters, output);
 }
+
+PlacementPtr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromTwoProcessors(
+    BlockAllocator* allocator, PlacementPtr<FragmentProcessor> src,
+    PlacementPtr<FragmentProcessor> dst, BlendMode mode) {
+  if (src == nullptr && dst == nullptr) {
+    return nullptr;
+  }
+  switch (mode) {
+    case BlendMode::Clear:
+      return ConstColorProcessor::Make(allocator, PMColor::Transparent(), InputMode::Ignore);
+    case BlendMode::Src:
+      return src;
+    case BlendMode::Dst:
+      return dst;
+    default:
+      return allocator->make<XfermodeFragmentProcessor>(std::move(src), std::move(dst), mode);
+  }
+}
+
 }  // namespace tgfx

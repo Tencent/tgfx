@@ -24,6 +24,7 @@
 namespace tgfx {
 class XfermodeFragmentProcessor : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   /**
    * The color input to the returned processor is treated as the src and the passed in processor is
    * the dst.

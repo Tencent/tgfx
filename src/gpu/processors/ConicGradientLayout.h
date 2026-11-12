@@ -23,6 +23,7 @@
 namespace tgfx {
 class ConicGradientLayout : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
 
   static PlacementPtr<ConicGradientLayout> Make(BlockAllocator* allocator, Matrix matrix,

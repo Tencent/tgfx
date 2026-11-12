@@ -23,6 +23,7 @@
 namespace tgfx {
 class ComposeFragmentProcessor : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               PlacementPtr<FragmentProcessor> first,

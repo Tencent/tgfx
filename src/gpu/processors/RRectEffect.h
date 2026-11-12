@@ -33,6 +33,7 @@ namespace tgfx {
  */
 class RRectEffect : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
   /**
    * @param rRect       Rounded rectangle in local space. For Rect type, prefer RectEffect for

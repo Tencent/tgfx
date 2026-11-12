@@ -58,4 +58,9 @@ bool ColorMatrixFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID
   return builder->addColorMatrix(input, parameters, output);
 }
 
+PlacementPtr<ColorMatrixFragmentProcessor> ColorMatrixFragmentProcessor::Make(
+    BlockAllocator* allocator, const std::array<float, 20>& matrix) {
+  return allocator->make<ColorMatrixFragmentProcessor>(matrix);
+}
+
 }  // namespace tgfx

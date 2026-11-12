@@ -34,6 +34,7 @@ class TextureView;
 // chain slots — the dedicated perlin kernel and its folded slot records were removed with it.
 class PerlinNoiseFragmentProcessor : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
 
   static PlacementPtr<PerlinNoiseFragmentProcessor> Make(

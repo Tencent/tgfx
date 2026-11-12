@@ -29,4 +29,10 @@ void ConicGradientLayout::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(flags);
 }
 
+PlacementPtr<ConicGradientLayout> ConicGradientLayout::Make(BlockAllocator* allocator,
+                                                            Matrix matrix, float bias,
+                                                            float scale) {
+  return allocator->make<ConicGradientLayout>(matrix, bias, scale);
+}
+
 }  // namespace tgfx

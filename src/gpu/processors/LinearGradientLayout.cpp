@@ -28,4 +28,10 @@ void LinearGradientLayout::onComputeProcessorKey(BytesKey* bytesKey) const {
   const uint32_t flags = coordTransform.matrix.hasPerspective() ? 1 : 0;
   bytesKey->write(flags);
 }
+
+PlacementPtr<LinearGradientLayout> LinearGradientLayout::Make(BlockAllocator* allocator,
+                                                              Matrix matrix) {
+  return allocator->make<LinearGradientLayout>(matrix);
+}
+
 }  // namespace tgfx

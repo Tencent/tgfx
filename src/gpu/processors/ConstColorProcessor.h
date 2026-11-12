@@ -26,6 +26,7 @@ enum class InputMode { Ignore = 0, ModulateRGBA = 1, ModulateA = 2 };
 
 class ConstColorProcessor : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   static PlacementPtr<ConstColorProcessor> Make(BlockAllocator* allocator, PMColor color,
                                                 InputMode inputMode);
 

@@ -25,6 +25,7 @@
 namespace tgfx {
 class ClampedGradientEffect : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<ClampedGradientEffect> Make(BlockAllocator* allocator,
                                                   PlacementPtr<FragmentProcessor> colorizer,

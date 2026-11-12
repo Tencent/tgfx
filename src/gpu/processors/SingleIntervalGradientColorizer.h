@@ -24,6 +24,7 @@
 namespace tgfx {
 class SingleIntervalGradientColorizer : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<SingleIntervalGradientColorizer> Make(BlockAllocator* allocator, Color start,
                                                             Color end);

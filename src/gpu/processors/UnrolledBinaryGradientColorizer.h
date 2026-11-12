@@ -24,6 +24,7 @@
 namespace tgfx {
 class UnrolledBinaryGradientColorizer : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
   static constexpr int MaxColorCount = 16;
 

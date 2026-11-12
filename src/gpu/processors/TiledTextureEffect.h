@@ -27,6 +27,7 @@
 namespace tgfx {
 class TiledTextureEffect : public FragmentProcessor {
  public:
+  friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               std::shared_ptr<TextureProxy> textureProxy,
