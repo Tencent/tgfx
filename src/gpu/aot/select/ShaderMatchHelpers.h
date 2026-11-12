@@ -19,6 +19,7 @@
 #pragma once
 
 #include <optional>
+#include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/aot/ir/XferFacts.h"
 #include "gpu/shaders/contract/AOTFailure.h"
 #include "gpu/shaders/contract/DrawFacts.h"
@@ -29,7 +30,6 @@
 namespace tgfx {
 
 class ProgramInfo;
-class GeometryProcessor;
 class FragmentProcessor;
 struct DrawIR;
 struct ColorSpaceXformSteps;
@@ -44,7 +44,7 @@ struct Family;
 /// Describes a geometry processor's matcher-relevant facts — the one description of the draw's
 /// geometry the executor-table matching reads, taken off the made processor at match time. The
 /// type dispatch uses IsProcessor, never name() strings, so a rename cannot silently reclassify.
-AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp);
+AOTGeometryDesc DescribeGeometryProcessor(const GeometryLayout& layout);
 
 /// The pointwise chain's gpKind axis: one value per vertex layout its kernels have. The numbers are
 /// permutation values baked into the kernels' GP layouts, so they are ABI — append only.
@@ -120,8 +120,7 @@ bool TiledModeSupported(int mode);
 
 /// Whether a subset-carrying quad's subset is servable by the chain kernel's runtime uniforms; the
 /// decision reads the compiled chain program's binding table and tiled/device leaf records.
-bool IsChainQuadSubsetServable(const QuadPerEdgeAAGeometryProcessor* quadGP,
-                               const AOTProgram& program);
+bool IsChainQuadSubsetServable(const AOTGeometryParameters& quad, const AOTProgram& program);
 
 /// Each family's Match opens with this guard: a kernel that does not apply the write swizzle at
 /// output (ServesAlphaOnly == false) refuses draws onto alpha-only (ALPHA_8) targets, so the

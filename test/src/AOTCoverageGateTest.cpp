@@ -80,18 +80,6 @@ struct ProcessorClaim {
 // entry (or a reason) fails the gate, and removing a class leaves a stale entry that also fails.
 const ProcessorClaim ProcessorClaims[] = {
     // Geometry processors: each is classified by DescribeGeometryProcessor.
-    {"AtlasTextGeometryProcessor", GeometryClassified, ""},
-    {"ComplexEllipseGeometryProcessor", GeometryClassified, ""},
-    {"ComplexNonAARRectGeometryProcessor", GeometryClassified, ""},
-    {"DefaultGeometryProcessor", GeometryClassified, ""},
-    {"EllipseGeometryProcessor", GeometryClassified, ""},
-    {"HairlineLineGeometryProcessor", GeometryClassified, ""},
-    {"HairlineQuadGeometryProcessor", GeometryClassified, ""},
-    {"MeshGeometryProcessor", GeometryClassified, ""},
-    {"NonAARRectGeometryProcessor", GeometryClassified, ""},
-    {"QuadPerEdgeAAGeometryProcessor", GeometryClassified, ""},
-    {"RoundStrokeRectGeometryProcessor", GeometryClassified, ""},
-    {"ShapeInstancedGeometryProcessor", GeometryClassified, ""},
     // Xfer processors: ClassifyXferForMatch names both (the empty one through its singleton
     // identity).
     // Fragment processors carrying an AOT lowering: lowerToAOT is the structural fact, and the
@@ -349,7 +337,7 @@ TGFX_TEST(AOTCoverageGateTest, AllProcessorsAreClaimed) {
   // The evidence is the classifiers' own bodies, not the file around them: a renamed or moved
   // classifier fails here loudly instead of silently emptying the evidence set.
   auto geometryClassifier = ExtractFunctionBody(
-      matcherSource, "DescribeGeometryProcessor(const GeometryProcessor* gp) {");
+      matcherSource, "DescribeGeometryProcessor(const GeometryLayout& layout) {");
   // The xfer axis evidence lives where the processor types are still discriminated: the facts
   // derivation snapshots them into XferFacts, and every reader addresses that value instead.
   auto programInfoSource = ReadTextFile(ProjectPath::Absolute("src/gpu/ProgramInfo.cpp"));

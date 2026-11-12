@@ -146,10 +146,182 @@ void ProgramWriter::writeUniformValues(const ProgramInfo& info, UniformData* ver
 void ProgramWriter::writeEngineDefaults(const ProgramInfo&, UniformData*) const {
 }
 
+namespace {
+
+/// The geometry's coordinate transforms, the setTransformDataHelper equivalent: the uv matrix
+/// concatenated onto each transform's own matrix, written by ordinal name. The quad geometry's
+/// legacy hook additionally writes the first transform's bare matrix as texSubsetMatrix when the
+/// draw carries a subset and no uv coordinate (the subset bounds' own mapping).
+void WriteGeometryCoordTransforms(const Matrix& uvMatrix, bool writeSubsetMatrix,
+                                  UniformData* vertexUniformData,
+                                  FragmentProcessor::CoordTransformIter* transformIter) {
+  int index = 0;
+  while (const CoordTransform* coordTransform = transformIter->next()) {
+    Matrix combined = {};
+    combined.setConcat(coordTransform->getTotalMatrix(), uvMatrix);
+    vertexUniformData->setData("CoordTransformMatrix_" + std::to_string(index), combined);
+    if (writeSubsetMatrix && index == 0) {
+      vertexUniformData->setData("texSubsetMatrix", coordTransform->getTotalMatrix());
+    }
+    ++index;
+  }
+}
+
+}  // namespace
+
+/// Writes the geometry's uniform values by name: the one geometry upload the JIT and chain
+/// writers take, the successor of the processors' setData. The fields and their guards are the
+/// processors' own (each guard keeps the runtime-compiled layouts working, where a field may be
+/// absent).
+void WriteGeometryUniformsByName(const GeometryLayout& layout, UniformData* vertexUniformData,
+                                 UniformData* fragmentUniformData,
+                                 FragmentProcessor::CoordTransformIter* transformIter) {
+  if (vertexUniformData == nullptr) {
+    return;
+  }
+  const auto& p = layout.parameters;
+  switch (p.kind) {
+    case GeometryKind::Default: {
+      WriteGeometryCoordTransforms(p.uvMatrix, false, vertexUniformData, transformIter);
+      if (fragmentUniformData != nullptr) {
+        fragmentUniformData->setDataOptional("Color", p.commonColor);
+        if (fragmentUniformData->hasField("HasCommonColor")) {
+          fragmentUniformData->setData("HasCommonColor", 1);
+        }
+      }
+      vertexUniformData->setData("Matrix", p.viewMatrix);
+      break;
+    }
+    case GeometryKind::QuadPerEdgeAA: {
+      WriteGeometryCoordTransforms(p.uvMatrix, p.hasSubset && p.hasUVMatrix, vertexUniformData,
+                                   transformIter);
+      if (vertexUniformData->hasField("Matrix")) {
+        vertexUniformData->setData("Matrix", Matrix::I());
+      }
+      if (fragmentUniformData != nullptr) {
+        if (fragmentUniformData->hasField("HasCommonColor")) {
+          fragmentUniformData->setData("HasCommonColor", p.hasCommonColor ? 1 : 0);
+        }
+        if (p.hasCommonColor && fragmentUniformData->hasField("Color")) {
+          fragmentUniformData->setData("Color", p.commonColor);
+        }
+      }
+      break;
+    }
+    case GeometryKind::RoundStrokeRect: {
+      WriteGeometryCoordTransforms(p.uvMatrix, false, vertexUniformData, transformIter);
+      if (fragmentUniformData != nullptr) {
+        if (p.hasCommonColor) {
+          fragmentUniformData->setDataOptional("Color", p.commonColor);
+        }
+        if (fragmentUniformData->hasField("HasCommonColor")) {
+          fragmentUniformData->setData("HasCommonColor", p.hasCommonColor ? 1 : 0);
+        }
+        if (fragmentUniformData->hasField("AAEnabled")) {
+          fragmentUniformData->setData("AAEnabled", p.aaType == AAType::Coverage ? 1 : 0);
+        }
+      }
+      break;
+    }
+    case GeometryKind::NonAARRect:
+    case GeometryKind::ComplexNonAARRect:
+    case GeometryKind::Ellipse:
+    case GeometryKind::ComplexEllipse: {
+      WriteGeometryCoordTransforms(Matrix::I(), false, vertexUniformData, transformIter);
+      if (fragmentUniformData != nullptr) {
+        if (p.hasCommonColor) {
+          fragmentUniformData->setDataOptional("Color", p.commonColor);
+        }
+        if (fragmentUniformData->hasField("HasCommonColor")) {
+          fragmentUniformData->setData("HasCommonColor", p.hasCommonColor ? 1 : 0);
+        }
+        if (p.kind == GeometryKind::Ellipse) {
+          fragmentUniformData->setData("StrokeEnabled", p.isStroke ? 1 : 0);
+        }
+        if (p.kind == GeometryKind::ComplexEllipse) {
+          fragmentUniformData->setDataOptional("HasDeviceMask", 0);
+        }
+      }
+      break;
+    }
+    case GeometryKind::HairlineLine: {
+      if (p.hasUVMatrix) {
+        WriteGeometryCoordTransforms(p.uvMatrix, false, vertexUniformData, transformIter);
+      }
+      if (fragmentUniformData != nullptr && fragmentUniformData->hasField("HasCommonColor")) {
+        fragmentUniformData->setData("HasCommonColor", 1);
+      }
+      if (fragmentUniformData != nullptr) {
+        fragmentUniformData->setData("Color", p.commonColor);
+        fragmentUniformData->setData("Coverage", p.coverage);
+        fragmentUniformData->setData("AAEnabled", p.aaType == AAType::Coverage ? 1 : 0);
+      }
+      vertexUniformData->setData("Matrix", p.viewMatrix);
+      break;
+    }
+    case GeometryKind::HairlineQuad: {
+      if (p.hasUVMatrix) {
+        WriteGeometryCoordTransforms(p.uvMatrix, false, vertexUniformData, transformIter);
+      }
+      if (fragmentUniformData != nullptr) {
+        fragmentUniformData->setData("Color", p.commonColor);
+        fragmentUniformData->setData("Coverage", p.coverage);
+        fragmentUniformData->setData("AAEnabled", p.aaType == AAType::Coverage ? 1 : 0);
+      }
+      vertexUniformData->setData("Matrix", p.viewMatrix);
+      break;
+    }
+    case GeometryKind::Mesh: {
+      vertexUniformData->setData("Matrix", p.viewMatrix);
+      WriteGeometryCoordTransforms(Matrix::I(), false, vertexUniformData, transformIter);
+      if (fragmentUniformData != nullptr) {
+        fragmentUniformData->setDataOptional("Color", p.commonColor);
+        fragmentUniformData->setDataOptional("HasCommonColor", p.hasColors ? 0 : 1);
+      }
+      break;
+    }
+    case GeometryKind::ShapeInstanced: {
+      vertexUniformData->setData("UVMatrix", p.uvMatrix);
+      vertexUniformData->setData("ViewMatrix", p.viewMatrix);
+      WriteGeometryCoordTransforms(Matrix::I(), false, vertexUniformData, transformIter);
+      break;
+    }
+    case GeometryKind::AtlasText: {
+      if (p.atlasProxy != nullptr) {
+        auto atlasView = p.atlasProxy->getTextureView();
+        if (atlasView != nullptr) {
+          auto atlasSizeInv = atlasView->getTextureCoord(1.f, 1.f);
+          vertexUniformData->setDataOptional("atlasSizeInv", atlasSizeInv);
+        }
+      }
+      if (vertexUniformData->hasField("Matrix")) {
+        vertexUniformData->setData("Matrix", Matrix::I());
+      }
+      WriteGeometryCoordTransforms(Matrix::I(), false, vertexUniformData, transformIter);
+      if (fragmentUniformData != nullptr) {
+        if (p.hasCommonColor) {
+          fragmentUniformData->setDataOptional("Color", p.commonColor);
+        }
+        if (fragmentUniformData->hasField("HasCommonColor")) {
+          fragmentUniformData->setData("HasCommonColor", p.hasCommonColor ? 1 : 0);
+        }
+        if (fragmentUniformData->hasField("AlphaOnly")) {
+          fragmentUniformData->setData("AlphaOnly", p.isAlphaOnly ? 1 : 0);
+        }
+        fragmentUniformData->setDataOptional("HasDeviceMask", 0);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 void ProgramWriter::writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
                                            UniformData* fragmentUniformData) const {
   FragmentProcessor::CoordTransformIter coordTransformIter(&info);
-  info.geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
+  WriteGeometryUniformsByName(info.getGeometryLayout(), vertexUniformData, fragmentUniformData,
+                              &coordTransformIter);
 }
 
 void PrecompiledProgramWriter::writeEngineDefaults(const ProgramInfo& info,
@@ -194,7 +366,7 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
   // The device-mask slot in precompiled kernels sits immediately after the color-side textures
   // (geometry-processor textures plus the color fragment-processor subtrees); the dummy for an
   // absent device mask must occupy that slot, pushing local-mask textures right.
-  size_t colorSamplerCount = info.geometryProcessor->numTextureSamplers();
+  size_t colorSamplerCount = info.getGeometryLayout().parameters.atlasProxy != nullptr ? 1 : 0;
   for (size_t i = 0; i < info.numColorFragmentProcessors(); ++i) {
     FragmentProcessor::Iter colorIter(info.fragmentProcessors[i]);
     const FragmentProcessor* cfp = colorIter.next();
@@ -267,7 +439,8 @@ void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
   // processor tree orders them differently, so the GP must not consume the tree's iteration.
   auto transforms = BuildChainCoordTransforms(*program);
   FragmentProcessor::CoordTransformIter coordTransformIter(&transforms);
-  info.geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
+  WriteGeometryUniformsByName(info.getGeometryLayout(), vertexUniformData, fragmentUniformData,
+                              &coordTransformIter);
 }
 
 void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,

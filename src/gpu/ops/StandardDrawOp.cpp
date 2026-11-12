@@ -124,11 +124,6 @@ void StandardDrawOp::configureProgramInfo(ProgramInfo* info, PixelFormat depthSt
     info->setDepthStencil(depthStencil);
   }
   // Snapshot the geometry into the layout value every reader addresses; a draw that never
-  // reaches a program keeps the live geometry via ProgramInfo's fallback. An op that built its
-  // own layout wins (the geometry-processor path is the double-track fallback).
-  info->setGeometryLayout(geometryLayoutOverride.has_value()
-                              ? *geometryLayoutOverride
-                              : GeometryLayoutOf(geometryProcessor.get()));
   onConfigureProgramInfo(*info);
 }
 
@@ -148,20 +143,11 @@ bool StandardDrawOp::failLookup(RenderTarget* renderTarget, bool isFinalLookup,
 
 bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStencilFormat,
                              bool isFinalLookup, const DrawIR* passIR) {
-  if (!geometryProcessorInitialized) {
-    geometryProcessorInitialized = true;
-    geometryProcessor = onMakeGeometryProcessor(renderTarget);
-    geometryLayoutOverride = onMakeGeometry(renderTarget);
-#ifdef DEBUG
-    if (geometryLayoutOverride.has_value()) {
-      // The double-track check: the op's own layout must equal the one derived from the processor
-      // it built, or the deletion of the processor would change the geometry facts.
-      DEBUG_ASSERT(
-          SameGeometryLayout(*geometryLayoutOverride, GeometryLayoutOf(geometryProcessor.get())));
-    }
-#endif
+  if (!geometryInitialized) {
+    geometryInitialized = true;
+    geometryLayout = onMakeGeometry(renderTarget);
   }
-  if (geometryProcessor == nullptr) {
+  if (!geometryLayout.has_value()) {
     return false;
   }
 #if DEBUG
@@ -205,8 +191,8 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
       // promise was broken, so the draw is dropped instead of compiled on the spot.
       return failLookup(renderTarget, isFinalLookup, "the pass carries no compiled program");
     }
-    auto passInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(), dstTexture,
-                                                  blendMode, false);
+    auto passInfo =
+        std::make_unique<ProgramInfo>(renderTarget, *geometryLayout, dstTexture, blendMode, false);
     configureProgramInfo(passInfo.get(), depthStencilFormat);
     // The pass's expression is already compiled into its carried IR, so only the interpreter can
     // serve it; the scope is the one difference from a draw's own lookup, and the one entry
@@ -231,12 +217,12 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
   for (auto& coverage : coverages) {
     fragmentProcessors.emplace_back(coverage.get());
   }
-  preparedProgramInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
-                                                      std::move(fragmentProcessors), colorCount,
-                                                      dstTexture, blendMode);
+  preparedProgramInfo =
+      std::make_unique<ProgramInfo>(renderTarget, *geometryLayout, std::move(fragmentProcessors),
+                                    colorCount, dstTexture, blendMode);
   configureProgramInfo(preparedProgramInfo.get(), depthStencilFormat);
   // The draw's record-time IR is the expression every later stage reads. A coverage processor
-  // attached only at prepare (a rasterized shape's mask, added by onMakeGeometryProcessor) is
+  // attached only at prepare (a rasterized shape's mask, added by onMakeGeometry) is
   // appended to the IR's terms instead of dropping the IR — the color graph cannot change after
   // record time, so a color-count mismatch is the only case the IR does not describe.
   if (loweredIR() != nullptr && loweredIR()->colorFPCount == colors.size() &&

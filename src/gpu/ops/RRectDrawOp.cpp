@@ -21,10 +21,6 @@
 #include "core/utils/ColorHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/processors/ComplexEllipseGeometryProcessor.h"
-#include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
-#include "gpu/processors/EllipseGeometryProcessor.h"
-#include "gpu/processors/NonAARRectGeometryProcessor.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -64,21 +60,13 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
   }
 }
 
-PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+std::optional<GeometryLayout> RRectDrawOp::onMakeGeometry(RenderTarget* /*renderTarget*/) {
   if (aaType == AAType::None) {
-    if (isComplex) {
-      return ComplexNonAARRectGeometryProcessor::Make(
-          allocator, renderTarget->width(), renderTarget->height(), hasStroke, commonColor);
-    }
-    return NonAARRectGeometryProcessor::Make(allocator, renderTarget->width(),
-                                             renderTarget->height(), hasStroke, commonColor);
+    return isComplex ? ComplexNonAARRectGeometryLayout(hasStroke, commonColor)
+                     : NonAARRectGeometryLayout(hasStroke, commonColor);
   }
-  if (isComplex) {
-    return ComplexEllipseGeometryProcessor::Make(allocator, renderTarget->width(),
-                                                 renderTarget->height(), hasStroke, commonColor);
-  }
-  return EllipseGeometryProcessor::Make(allocator, renderTarget->width(), renderTarget->height(),
-                                        hasStroke, commonColor);
+  return isComplex ? ComplexEllipseGeometryLayout(hasStroke, commonColor)
+                   : EllipseGeometryLayout(hasStroke, commonColor);
 }
 
 void RRectDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {

@@ -18,6 +18,7 @@
 
 #include "OpsCompositor.h"
 #include "BlendFormula.h"
+#include "ShaderCaps.h"
 #include "core/MeshBase.h"
 #include "core/PathRef.h"
 #include "core/VertexMesh.h"

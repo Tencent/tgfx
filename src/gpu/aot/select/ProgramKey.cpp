@@ -19,7 +19,6 @@
 #include "gpu/aot/select/ProgramKey.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/spec/SpecValues.h"
-#include "gpu/processors/GeometryProcessor.h"
 
 namespace tgfx {
 
@@ -31,9 +30,21 @@ BytesKey MakeProgramKey(Context* context, const ProgramInfo& info, uint32_t vari
   // the key into the words of a shorter one and collide.
   key.write(static_cast<uint32_t>(spec.values.size()));
   spec.writeKey(&key);
-  auto* geometryProcessor = info.getGeometryProcessor();
-  if (geometryProcessor != nullptr) {
-    geometryProcessor->computeProcessorKey(context, &key);
+  (void)context;
+  // The geometry's key contribution, the same facts Processor::computeProcessorKey wrote: the
+  // kind (the class ID's replacement), the perspective flag, and every live attribute's format.
+  const auto& geometryLayout = info.getGeometryLayout();
+  key.write(static_cast<uint32_t>(geometryLayout.parameters.kind));
+  key.write(static_cast<uint32_t>(geometryLayout.parameters.hasUVPerspective ? 1u : 0u));
+  for (const auto& attribute : geometryLayout.vertexAttributes) {
+    if (!attribute.empty()) {
+      key.write(static_cast<uint32_t>(attribute.format()));
+    }
+  }
+  for (const auto& attribute : geometryLayout.instanceAttributes) {
+    if (!attribute.empty()) {
+      key.write(static_cast<uint32_t>(attribute.format()));
+    }
   }
   // The output formula's key contribution: whether the shader runs the xfer stage, and the
   // destination texture when the formula samples one. blendMode already rides the pipeline state

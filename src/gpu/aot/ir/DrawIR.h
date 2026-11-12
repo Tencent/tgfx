@@ -29,7 +29,6 @@ namespace tgfx {
 
 class BlockAllocator;
 class FragmentProcessor;
-class GeometryProcessor;
 class TextureProxy;
 
 /** What one coverage term of a draw is, decided once at lowering time by what the term is. */

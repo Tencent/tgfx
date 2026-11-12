@@ -42,7 +42,7 @@ class ShapeInstancedDrawOp : public StandardDrawOp {
   bool hasCoverage() const override;
 
  protected:
-  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
+  std::optional<GeometryLayout> onMakeGeometry(RenderTarget* renderTarget) override;
 
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 

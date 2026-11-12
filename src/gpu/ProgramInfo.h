@@ -29,7 +29,6 @@
 #include "gpu/aot/select/FamilyMatchResult.h"
 #include "gpu/aot/select/SelectionScope.h"
 #include "gpu/processors/FragmentProcessor.h"
-#include "gpu/processors/GeometryProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ColorWriteMask.h"
@@ -52,7 +51,7 @@ struct SamplerInfo {
  */
 class ProgramInfo {
  public:
-  ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
+  ProgramInfo(RenderTarget* renderTarget, const GeometryLayout& geometryLayout,
               std::vector<FragmentProcessor*> fragmentProcessors, size_t numColorProcessors,
               const std::optional<DstTextureInfo>& dstTexture, BlendMode blendMode);
 
@@ -62,7 +61,7 @@ class ProgramInfo {
    * the processor list. blendFormulaHasCoverage carries the one fact the pipeline's blend formula
    * takes from that list on the plain route: whether coverage processors follow the color ones.
    */
-  ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
+  ProgramInfo(RenderTarget* renderTarget, const GeometryLayout& geometryLayout,
               const std::optional<DstTextureInfo>& dstTexture, BlendMode blendMode,
               bool blendFormulaHasCoverage);
 
@@ -72,10 +71,6 @@ class ProgramInfo {
 
   size_t numFragmentProcessors() const {
     return fragmentProcessors.size();
-  }
-
-  const GeometryProcessor* getGeometryProcessor() const {
-    return geometryProcessor;
   }
 
   /// The draw's render target: the engine-level writers (RTAdjust) read its size and origin.
@@ -99,15 +94,11 @@ class ProgramInfo {
 
   Swizzle getOutputSwizzle() const;
 
-  /// Snapshots the draw's geometry into the layout value (the geometry may be null on a build
-  /// whose draw never reaches a program).
-  void setGeometryLayout(GeometryLayout layout) {
-    geometryLayout = std::move(layout);
+  /// The geometry value every reader addresses: the attribute layout, the physical slots and the
+  /// uniform values, built by the draw itself.
+  const GeometryLayout& getGeometryLayout() const {
+    return geometryLayout;
   }
-
-  /// The geometry value every reader addresses: the attribute layout and slots came off the
-  /// geometry at prepare; a build that never set one falls back to the live geometry.
-  const GeometryLayout& getGeometryLayout() const;
 
   const std::vector<Attribute>& getVertexAttributes() const {
     return getGeometryLayout().vertexAttributes;
@@ -313,12 +304,11 @@ class ProgramInfo {
 
  private:
   RenderTarget* renderTarget = nullptr;
-  GeometryProcessor* geometryProcessor = nullptr;
   std::vector<FragmentProcessor*> fragmentProcessors = {};
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
   std::optional<DstTextureInfo> dstTexture = std::nullopt;
-  mutable std::optional<GeometryLayout> geometryLayout = std::nullopt;
+  GeometryLayout geometryLayout = {};
   /// The xfer facts derived from the processor once per program: the shader-side blend flag and
   /// the destination it samples. The writers and the matcher read this, not the processor.
   XferFacts xferFacts = {};

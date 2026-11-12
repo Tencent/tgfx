@@ -18,7 +18,6 @@
 
 #include "HairlineLineOp.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/processors/HairlineLineGeometryProcessor.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -47,13 +46,11 @@ HairlineLineOp::HairlineLineOp(BlockAllocator* allocator,
       coverage(coverage) {
 }
 
-PlacementPtr<GeometryProcessor> HairlineLineOp::onMakeGeometryProcessor(
-    RenderTarget* /*renderTarget*/) {
+std::optional<GeometryLayout> HairlineLineOp::onMakeGeometry(RenderTarget* /*renderTarget*/) {
   auto viewMatrix = hairlineProxy->getDrawingMatrix();
   auto realUVMatrix = uvMatrix;
   realUVMatrix.preConcat(viewMatrix);
-  return HairlineLineGeometryProcessor::Make(allocator, color, viewMatrix, realUVMatrix, coverage,
-                                             aaType);
+  return HairlineLineGeometryLayout(color, viewMatrix, realUVMatrix, coverage, aaType);
 }
 
 bool HairlineLineOp::onPrepare() {

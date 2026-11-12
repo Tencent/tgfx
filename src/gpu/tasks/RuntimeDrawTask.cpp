@@ -24,7 +24,6 @@
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
-#include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
 #include "tgfx/gpu/RenderPass.h"
@@ -134,11 +133,10 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     colorProcessor =
         FragmentProcessor::Compose(allocator, std::move(colorProcessor), std::move(xformEffect));
   }
-  auto geometryProcessor = DefaultGeometryProcessor::Make(
-      allocator, {}, renderTarget->width(), renderTarget->height(), AAType::None, {}, {});
+  auto geometryLayout = DefaultGeometryLayout({}, AAType::None, {}, {});
   std::vector fragmentProcessors = {colorProcessor.get()};
   auto programInfo =
-      std::make_unique<ProgramInfo>(renderTarget.get(), geometryProcessor.get(),
+      std::make_unique<ProgramInfo>(renderTarget.get(), geometryLayout,
                                     std::move(fragmentProcessors), 1, std::nullopt, BlendMode::Src);
   auto program = programInfo->getProgram();
   if (program == nullptr) {

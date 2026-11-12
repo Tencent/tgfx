@@ -20,7 +20,6 @@
 #include "core/utils/ColorHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -69,12 +68,6 @@ Quads3DDrawOp::Quads3DDrawOp(BlockAllocator* allocator, QuadsVertexProvider* pro
 std::optional<GeometryLayout> Quads3DDrawOp::onMakeGeometry(RenderTarget* renderTarget) {
   return QuadGeometryLayoutOf(renderTarget->width(), renderTarget->height(), aaType, commonColor,
                               uvMatrix, false);
-}
-
-PlacementPtr<GeometryProcessor> Quads3DDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
-  return QuadPerEdgeAAGeometryProcessor::Make(allocator, renderTarget->width(),
-                                              renderTarget->height(), aaType, commonColor, uvMatrix,
-                                              false);
 }
 
 void Quads3DDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {

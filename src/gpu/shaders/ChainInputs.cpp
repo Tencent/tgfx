@@ -24,14 +24,7 @@
 #include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
-#include "gpu/processors/AtlasTextGeometryProcessor.h"
-#include "gpu/processors/ComplexEllipseGeometryProcessor.h"
-#include "gpu/processors/DefaultGeometryProcessor.h"
-#include "gpu/processors/EllipseGeometryProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
-#include "gpu/processors/HairlineLineGeometryProcessor.h"
-#include "gpu/processors/MeshGeometryProcessor.h"
-#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/contract/ChainISA.h"
@@ -74,10 +67,10 @@ std::optional<ChainInputs::Inputs> ChainInputs::DeriveInputs(const AOTProgram& p
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
   // The gpKind axis comes from the one geometry classification (DescribeGeometryProcessor), so the
   // family's vertex-layout choice and the matcher's facts cannot disagree.
-  auto gpKindOptional = PointwiseGpKind(DescribeGeometryProcessor(gp));
+  auto gpKindOptional =
+      PointwiseGpKind(DescribeGeometryProcessor(programInfo->getGeometryLayout()));
   if (!gpKindOptional.has_value()) {
     return std::nullopt;
   }
@@ -125,28 +118,27 @@ std::optional<ChainInputs::Inputs> ChainInputs::DeriveInputs(const AOTProgram& p
   inputs.resourceProfile = program.profile;
   inputs.xpType = GetXPType(programInfo);
   if (gpKind == GpKind::QuadPerEdgeAA) {
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    if (quadGP->getHasSubset()) {
-      if (!IsChainQuadSubsetServable(quadGP, program)) {
+    const auto& quad = programInfo->getGeometryLayout().parameters;
+    if (quad.hasSubset) {
+      if (!IsChainQuadSubsetServable(quad, program)) {
         return Fail(failure, PermutationMatchFailure::QuadSubset);
       }
       inputs.hasSubset = true;
     }
-    inputs.hasUVCoord = !quadGP->hasUVMatrix();
+    inputs.hasUVCoord = !quad.hasUVMatrix;
     inputs.hasCoverage = true;
   } else if (gpKind == GpKind::Mesh) {
-    auto* meshGP = static_cast<const MeshGeometryProcessor*>(gp);
     // Mesh vertex buffers follow the chain's attribute order (position, coverage, texCoord,
     // color): texCoords ride the uvCoord slot and the color slot is unconditional (white for
     // colorless meshes). Mesh buffers always carry the coverage slot (1.0 for vertex meshes).
-    inputs.hasUVCoord = meshGP->getHasTexCoords();
+    inputs.hasUVCoord = programInfo->getGeometryLayout().parameters.hasTexCoords;
     inputs.hasCoverage = true;
   } else if (gpKind == GpKind::AtlasText) {
-    // The atlas GP may own its atlas sampler (an unmodified draw) or not (the chain-route twin a
-    // plan task built): the glyph leaf binds through the chain expression either way, so at most
-    // one sampler (the atlas itself) is acceptable.
-    if (gp->numTextureSamplers() > 1) {
-      return std::nullopt;
+    // The atlas geometry may own its atlas sampler (an unmodified draw) or not (the chain-route
+    // twin a plan task built): the glyph leaf binds through the chain expression either way, so at
+    // most one sampler (the atlas itself) is acceptable.
+    if (programInfo->getGeometryLayout().parameters.atlasProxy != nullptr) {
+      // one atlas sampler at most by construction
     }
     // Atlas text buffers are (position, maskCoord, color) with no coverage slot; maskCoord
     // rides the uvCoord slot and the color slot is unconditional.

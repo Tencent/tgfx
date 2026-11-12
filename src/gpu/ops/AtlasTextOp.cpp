@@ -21,7 +21,6 @@
 #include "core/utils/ColorHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -61,8 +60,9 @@ AtlasTextOp::AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provide
   }
 }
 
-PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarget*) {
-  return AtlasTextGeometryProcessor::Make(allocator, textureProxy, aaType, commonColor, sampling);
+std::optional<GeometryLayout> AtlasTextOp::onMakeGeometry(RenderTarget* /*renderTarget*/) {
+  const bool alphaOnly = textureProxy != nullptr && textureProxy->isAlphaOnly();
+  return AtlasTextGeometryLayout(textureProxy, aaType, commonColor, alphaOnly, sampling);
 }
 
 std::optional<AOTAtlasGlyphSource> AtlasTextOp::recordTimeAtlasSource() const {

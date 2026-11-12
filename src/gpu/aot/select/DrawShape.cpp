@@ -40,9 +40,13 @@ void AddReadSwizzle(const std::shared_ptr<Texture>& texture, uint32_t* required)
 // the YUV kernels read the plane channels they need (.r / .rg), which the read swizzle preserves.
 uint32_t RequiredTextureReads(const ProgramInfo* programInfo) {
   uint32_t required = 0;
-  auto gp = programInfo->getGeometryProcessor();
-  for (size_t i = 0; gp != nullptr && i < gp->numTextureSamplers(); ++i) {
-    AddReadSwizzle(gp->textureAt(i), &required);
+  // The geometry's own texture (the glyph atlas) is the only geometry sampler.
+  const auto& atlasProxy = programInfo->getGeometryLayout().parameters.atlasProxy;
+  if (atlasProxy != nullptr) {
+    auto atlasView = atlasProxy->getTextureView();
+    if (atlasView != nullptr) {
+      AddReadSwizzle(atlasView->getTexture(), &required);
+    }
   }
   FragmentProcessor::Iter iter(programInfo);
   for (auto fp = iter.next(); fp != nullptr; fp = iter.next()) {
@@ -97,7 +101,7 @@ DrawShape ExtractDrawShape(const ProgramInfo* programInfo) {
   facts.ir = programInfo->getCarriedIR();
   // The geometry and xfer facts are match-time facts: the matching runs after the processors
   // exist, so they are described off the made processors — one description, no record-time copy.
-  facts.geometry = DescribeGeometryProcessor(programInfo->getGeometryProcessor());
+  facts.geometry = DescribeGeometryProcessor(programInfo->getGeometryLayout());
   facts.xfer = ClassifyXferForMatch(programInfo->getXferFacts());
   if (facts.ir != nullptr) {
     facts.hasGradientSource = GraphHasGradientSource(facts.ir->color);

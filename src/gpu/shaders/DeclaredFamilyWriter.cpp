@@ -29,21 +29,9 @@
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/aot/select/FamilyMatchResult.h"
-#include "gpu/processors/AtlasTextGeometryProcessor.h"
-#include "gpu/processors/ComplexEllipseGeometryProcessor.h"
-#include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
-#include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
-#include "gpu/processors/EllipseGeometryProcessor.h"
-#include "gpu/processors/HairlineLineGeometryProcessor.h"
-#include "gpu/processors/HairlineQuadGeometryProcessor.h"
-#include "gpu/processors/MeshGeometryProcessor.h"
-#include "gpu/processors/NonAARRectGeometryProcessor.h"
-#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
-#include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
-#include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/ParamBuffer.h"
@@ -430,12 +418,11 @@ void WriteGlassLocalMask(const ProgramInfo& info, SlotWriter* writer, bool hasMa
 Matrix SourceCoordMatrix(const ProgramInfo& info) {
   FragmentProcessor::CoordTransformIter iter(&info);
   const CoordTransform* coordTransform = iter.next();
+  // Only the kinds whose processors concatenated their uv matrix onto the source coordinate.
   Matrix uvMatrix = Matrix::I();
-  const auto* geometry = info.getGeometryProcessor();
-  if (IsProcessor<DefaultGeometryProcessor>(geometry)) {
-    uvMatrix = static_cast<const DefaultGeometryProcessor*>(geometry)->getUVMatrix();
-  } else if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(geometry)) {
-    uvMatrix = static_cast<const QuadPerEdgeAAGeometryProcessor*>(geometry)->getUVMatrix();
+  const auto& geometry = info.getGeometryLayout().parameters;
+  if (geometry.kind == GeometryKind::Default || geometry.kind == GeometryKind::QuadPerEdgeAA) {
+    uvMatrix = geometry.uvMatrix;
   }
   Matrix combined = {};
   combined.setConcat(coordTransform != nullptr ? coordTransform->getTotalMatrix() : Matrix::I(),
@@ -531,9 +518,9 @@ void WriteLocalMask(const ProgramInfo& info, SlotWriter* writer) {
     const auto* fp = info.getFragmentProcessor(index);
     if (IsProcessor<TextureEffect>(fp)) {
       Matrix uvMatrix = Matrix::I();
-      const auto* geometry = info.getGeometryProcessor();
-      if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(geometry)) {
-        uvMatrix = static_cast<const QuadPerEdgeAAGeometryProcessor*>(geometry)->getUVMatrix();
+      const auto& geometry = info.getGeometryLayout().parameters;
+      if (geometry.kind == GeometryKind::QuadPerEdgeAA) {
+        uvMatrix = geometry.uvMatrix;
       }
       Matrix combined = {};
       combined.setConcat(
@@ -717,12 +704,11 @@ void WriteCoordMatrixAt(const ProgramInfo& info, SlotWriter* writer, int index) 
   // setTransformDataHelper equivalents concatenate the geometry's uv matrix onto the transform
   // (a masked path draw carries its mask offset there); the transform's own matrix alone leaves
   // the sample offset out and the coverage lands in the wrong place.
+  // Only the kinds whose processors concatenated their uv matrix onto the source coordinate.
   Matrix uvMatrix = Matrix::I();
-  const auto* geometry = info.getGeometryProcessor();
-  if (IsProcessor<DefaultGeometryProcessor>(geometry)) {
-    uvMatrix = static_cast<const DefaultGeometryProcessor*>(geometry)->getUVMatrix();
-  } else if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(geometry)) {
-    uvMatrix = static_cast<const QuadPerEdgeAAGeometryProcessor*>(geometry)->getUVMatrix();
+  const auto& geometry = info.getGeometryLayout().parameters;
+  if (geometry.kind == GeometryKind::Default || geometry.kind == GeometryKind::QuadPerEdgeAA) {
+    uvMatrix = geometry.uvMatrix;
   }
   Matrix combined = {};
   combined.setConcat(coordTransform->getTotalMatrix(), uvMatrix);

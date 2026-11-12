@@ -6,8 +6,6 @@
 #include "gpu/AAType.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/processors/HairlineLineGeometryProcessor.h"
-#include "gpu/processors/HairlineQuadGeometryProcessor.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Color.h"

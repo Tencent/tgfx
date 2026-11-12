@@ -28,7 +28,6 @@
 #include "gpu/aot/chain/ChainContext.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/NodeContract.h"
-#include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"

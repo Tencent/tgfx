@@ -22,7 +22,6 @@
 #include "gpu/InstanceProvider.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
-#include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -74,10 +73,9 @@ ShapeInstancedDrawOp::ShapeInstancedDrawOp(BlockAllocator* allocator,
   }
 }
 
-PlacementPtr<GeometryProcessor> ShapeInstancedDrawOp::onMakeGeometryProcessor(
-    RenderTarget* renderTarget) {
+std::optional<GeometryLayout> ShapeInstancedDrawOp::onMakeGeometry(RenderTarget* /*renderTarget*/) {
   if (shapeProxy == nullptr) {
-    return nullptr;
+    return std::nullopt;
   }
   auto realUVMatrix = uvMatrix;
   realUVMatrix.preConcat(shapeProxy->getDrawingMatrix());
@@ -88,25 +86,23 @@ PlacementPtr<GeometryProcessor> ShapeInstancedDrawOp::onMakeGeometryProcessor(
     auto textureProxy = shapeProxy->getTextureProxy();
     if (textureProxy == nullptr || maskBufferProxy == nullptr ||
         maskBufferProxy->getBuffer() == nullptr) {
-      return nullptr;
+      return std::nullopt;
     }
     Matrix maskMatrix = {};
     if (!realUVMatrix.invert(&maskMatrix)) {
-      return nullptr;
+      return std::nullopt;
     }
     static const SamplingArgs args(TileMode::Clamp, TileMode::Clamp,
                                    SamplingOptions(FilterMode::Nearest, MipmapMode::None),
                                    SrcRectConstraint::Fast);
     auto maskFP = TextureEffect::Make(allocator, std::move(textureProxy), args, &maskMatrix, true);
     if (maskFP == nullptr) {
-      return nullptr;
+      return std::nullopt;
     }
     addCoverageFP(std::move(maskFP));
   }
   auto viewMatrix = stateMatrix * realUVMatrix;
-  return ShapeInstancedGeometryProcessor::Make(allocator, renderTarget->width(),
-                                               renderTarget->height(), aa, hasInstanceColors,
-                                               realUVMatrix, viewMatrix);
+  return ShapeInstancedGeometryLayout(aa, hasInstanceColors, viewMatrix, realUVMatrix);
 }
 
 void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {

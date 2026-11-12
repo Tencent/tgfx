@@ -27,19 +27,7 @@
 #include "gpu/aot/ir/Program.h"
 #include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/aot/select/ProgramSelection.h"
-#include "gpu/processors/AtlasTextGeometryProcessor.h"
-#include "gpu/processors/ComplexEllipseGeometryProcessor.h"
-#include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
-#include "gpu/processors/DefaultGeometryProcessor.h"
-#include "gpu/processors/EllipseGeometryProcessor.h"
-#include "gpu/processors/HairlineLineGeometryProcessor.h"
-#include "gpu/processors/HairlineQuadGeometryProcessor.h"
-#include "gpu/processors/MeshGeometryProcessor.h"
-#include "gpu/processors/NonAARRectGeometryProcessor.h"
-#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/RectEffect.h"
-#include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
-#include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/contract/DrawFacts.h"
@@ -242,84 +230,40 @@ std::optional<Coverage> ClassifyCoverageTerms(const ProgramInfo* programInfo) {
   return ClassifyCoverageTerm(*classified);
 }
 
-AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp) {
+AOTGeometryDesc DescribeGeometryProcessor(const GeometryLayout& layout) {
   AOTGeometryDesc desc = {};
-  if (gp == nullptr) {
-    return desc;
+  const auto& p = layout.parameters;
+  desc.kind = p.kind;
+  // Only the fields the matchers read for that kind are filled, the same per-kind table the
+  // processor discriminators carried.
+  switch (p.kind) {
+    case GeometryKind::NonAARRect:
+    case GeometryKind::ComplexNonAARRect:
+    case GeometryKind::Ellipse:
+    case GeometryKind::ComplexEllipse:
+      desc.hasCommonColor = p.hasCommonColor;
+      desc.isStroke = p.isStroke;
+      break;
+    case GeometryKind::Mesh:
+      desc.hasTexCoords = p.hasTexCoords;
+      break;
+    case GeometryKind::RoundStrokeRect:
+      desc.hasUVMatrix = p.hasUVMatrix;
+      desc.hasUVPerspective = p.hasUVPerspective;
+      break;
+    case GeometryKind::ShapeInstanced:
+    case GeometryKind::AtlasText:
+      desc.hasCoverage = p.aaType == AAType::Coverage;
+      break;
+    case GeometryKind::QuadPerEdgeAA:
+      desc.hasCommonColor = p.hasCommonColor;
+      desc.hasUVMatrix = p.hasUVMatrix;
+      desc.hasSubset = p.hasSubset;
+      desc.hasUVPerspective = p.hasUVPerspective;
+      break;
+    default:
+      break;
   }
-  if (IsProcessor<DefaultGeometryProcessor>(gp)) {
-    desc.kind = GeometryKind::Default;
-    return desc;
-  }
-  if (IsProcessor<NonAARRectGeometryProcessor>(gp)) {
-    auto* rrectGP = static_cast<const NonAARRectGeometryProcessor*>(gp);
-    desc.kind = GeometryKind::NonAARRect;
-    desc.hasCommonColor = rrectGP->hasCommonColor();
-    desc.isStroke = rrectGP->isStroke();
-    return desc;
-  }
-  if (IsProcessor<ComplexNonAARRectGeometryProcessor>(gp)) {
-    auto* rrectGP = static_cast<const ComplexNonAARRectGeometryProcessor*>(gp);
-    desc.kind = GeometryKind::ComplexNonAARRect;
-    desc.hasCommonColor = rrectGP->hasCommonColor();
-    desc.isStroke = rrectGP->isStroke();
-    return desc;
-  }
-  if (IsProcessor<EllipseGeometryProcessor>(gp)) {
-    auto* ellipseGP = static_cast<const EllipseGeometryProcessor*>(gp);
-    desc.kind = GeometryKind::Ellipse;
-    desc.hasCommonColor = ellipseGP->hasCommonColor();
-    desc.isStroke = ellipseGP->isStroke();
-    return desc;
-  }
-  if (IsProcessor<ComplexEllipseGeometryProcessor>(gp)) {
-    auto* ellipseGP = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
-    desc.kind = GeometryKind::ComplexEllipse;
-    desc.hasCommonColor = ellipseGP->hasCommonColor();
-    desc.isStroke = ellipseGP->isStroke();
-    return desc;
-  }
-  if (IsProcessor<HairlineLineGeometryProcessor>(gp)) {
-    desc.kind = GeometryKind::HairlineLine;
-    return desc;
-  }
-  if (IsProcessor<HairlineQuadGeometryProcessor>(gp)) {
-    desc.kind = GeometryKind::HairlineQuad;
-    return desc;
-  }
-  if (IsProcessor<MeshGeometryProcessor>(gp)) {
-    desc.kind = GeometryKind::Mesh;
-    desc.hasTexCoords = static_cast<const MeshGeometryProcessor*>(gp)->getHasTexCoords();
-    return desc;
-  }
-  if (IsProcessor<RoundStrokeRectGeometryProcessor>(gp)) {
-    auto* strokeGP = static_cast<const RoundStrokeRectGeometryProcessor*>(gp);
-    desc.kind = GeometryKind::RoundStrokeRect;
-    desc.hasUVMatrix = strokeGP->hasUVMatrixTransform();
-    desc.hasUVPerspective = strokeGP->isUVPerspective();
-    return desc;
-  }
-  if (IsProcessor<ShapeInstancedGeometryProcessor>(gp)) {
-    desc.kind = GeometryKind::ShapeInstanced;
-    desc.hasCoverage =
-        static_cast<const ShapeInstancedGeometryProcessor*>(gp)->getAAType() == AAType::Coverage;
-    return desc;
-  }
-  if (IsProcessor<AtlasTextGeometryProcessor>(gp)) {
-    desc.kind = GeometryKind::AtlasText;
-    desc.hasCoverage =
-        static_cast<const AtlasTextGeometryProcessor*>(gp)->getAAType() == AAType::Coverage;
-    return desc;
-  }
-  if (!IsProcessor<QuadPerEdgeAAGeometryProcessor>(gp)) {
-    return desc;
-  }
-  auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-  desc.kind = GeometryKind::QuadPerEdgeAA;
-  desc.hasCommonColor = quadGP->hasCommonColor();
-  desc.hasUVMatrix = quadGP->hasUVMatrix();
-  desc.hasSubset = quadGP->getHasSubset();
-  desc.hasUVPerspective = quadGP->getHasUVPerspective();
   return desc;
 }
 
@@ -369,9 +313,8 @@ bool TiledFillModeSupported(int mode) {
 // sampled leaf (the tiled and device-space leaf forms clamp differently) with every other leaf and
 // tiling recipe non-strict. A projective subset stays on the runtime route, as for
 // QuadTextureFillShader: the precompiled vertex stage transforms the subset corners affinely.
-bool IsChainQuadSubsetServable(const QuadPerEdgeAAGeometryProcessor* quadGP,
-                               const AOTProgram& program) {
-  if (program.samplerChildCount == 0 || quadGP->getHasUVPerspective()) {
+bool IsChainQuadSubsetServable(const AOTGeometryParameters& quad, const AOTProgram& program) {
+  if (program.samplerChildCount == 0 || quad.hasUVPerspective) {
     return false;
   }
   for (const auto& tiled : program.tiledLeaves) {

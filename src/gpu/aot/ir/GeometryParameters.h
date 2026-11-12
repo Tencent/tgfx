@@ -20,6 +20,7 @@
 
 #include <memory>
 #include "gpu/AAType.h"
+#include "gpu/SamplerState.h"
 #include "gpu/shaders/contract/GeometryKind.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
@@ -45,6 +46,11 @@ struct AOTGeometryParameters {
   /// The sampling transform of the geometries that carry one inline (quad-per-edge-AA). Module
   /// coordinate matrices stay with their modules (TiledTexture, Texture).
   Matrix uvMatrix = Matrix::I();
+  /// Whether the draw carries an inline sampling transform at all (the attribute layout and the
+  /// matchers distinguish absent from identity).
+  bool hasUVMatrix = false;
+  /// Whether the inline transform has a perspective row (part of the program key).
+  bool hasUVPerspective = false;
   AAType aaType = AAType::None;
   /// The hairline families' constant coverage factor.
   float coverage = 1.f;
@@ -53,8 +59,16 @@ struct AOTGeometryParameters {
   bool isAlphaOnly = false;
   /// The mesh's per-vertex color flag (its HasCommonColor is the complement).
   bool hasColors = false;
+  /// The mesh's texture-coordinate flag.
+  bool hasTexCoords = false;
+  /// The atlas's AA coverage attribute flag (AAType::Coverage).
+  bool hasCoverage = false;
+  /// The quad geometry's subset attribute flag.
+  bool hasSubset = false;
   /// The atlas the glyph attributes index into.
   std::shared_ptr<TextureProxy> atlasProxy = nullptr;
+  /// The atlas sampler state (the glyph draws' sampling options).
+  SamplerState atlasSampler = {};
 };
 
 }  // namespace tgfx

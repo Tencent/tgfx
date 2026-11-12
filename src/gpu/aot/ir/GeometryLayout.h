@@ -25,8 +25,6 @@
 
 namespace tgfx {
 
-class GeometryProcessor;
-
 /// The geometry facts a draw carries: the vertex/instance attribute layout (with the physical
 /// slots precompiled shaders number their inputs by) and the uniform values the writers upload.
 /// The single value every geometry reader addresses, so the concrete geometry-processor type stays
@@ -43,22 +41,37 @@ struct GeometryLayout {
 /// The diagnostic name of a geometry kind (the signature's `GP=` field).
 const char* GeometryKindName(GeometryKind kind);
 
-/// Snapshots the geometry of the given processor. The one place the concrete geometry types are
-/// discriminated; returns a default layout for a null processor.
-GeometryLayout GeometryLayoutOf(const GeometryProcessor* geometryProcessor);
+/// The geometry layouts, built from the draw's own facts: each factory reproduces the processor's
+/// declared slots (filtered by the same conditions, the physical slots keeping the declared
+/// numbering) and its uniform values. These are the onMakeGeometry results; the double-track form
+/// asserts them against GeometryLayoutOf while the processors remain.
+GeometryLayout DefaultGeometryLayout(PMColor color, AAType aaType, const Matrix& viewMatrix,
+                                     const Matrix& uvMatrix);
+GeometryLayout RoundStrokeRectGeometryLayout(AAType aaType, const std::optional<PMColor>& color,
+                                             const std::optional<Matrix>& uvMatrix);
+GeometryLayout NonAARRectGeometryLayout(bool stroke, const std::optional<PMColor>& commonColor);
+GeometryLayout ComplexNonAARRectGeometryLayout(bool stroke,
+                                               const std::optional<PMColor>& commonColor);
+GeometryLayout EllipseGeometryLayout(bool stroke, const std::optional<PMColor>& commonColor);
+GeometryLayout ComplexEllipseGeometryLayout(bool stroke, const std::optional<PMColor>& commonColor);
+GeometryLayout HairlineLineGeometryLayout(PMColor color, const Matrix& viewMatrix,
+                                          const std::optional<Matrix>& uvMatrix, float coverage,
+                                          AAType aaType);
+GeometryLayout HairlineQuadGeometryLayout(PMColor color, const Matrix& viewMatrix,
+                                          const std::optional<Matrix>& uvMatrix, float coverage,
+                                          AAType aaType);
+GeometryLayout MeshGeometryLayout(bool hasTexCoords, bool hasColors, bool hasCoverage,
+                                  PMColor color, const Matrix& viewMatrix);
+GeometryLayout ShapeInstancedGeometryLayout(AAType aaType, bool hasColors, const Matrix& viewMatrix,
+                                            const Matrix& uvMatrix);
+GeometryLayout AtlasTextGeometryLayout(std::shared_ptr<TextureProxy> atlasProxy, AAType aaType,
+                                       const std::optional<PMColor>& commonColor, bool alphaOnly,
+                                       const SamplingOptions& sampling);
 
-/// The uniform-value half alone, for callers that only need the writers' facts.
-AOTGeometryParameters GeometryParametersOf(const GeometryProcessor* geometryProcessor);
-
-/// The quad-per-edge-AA geometry's layout, built from the draw's own facts: the five declared
-/// slots (position, coverage, uv coordinate, colour, subset) filter down to the live ones, and the
-/// physical slots keep the declared numbering. The double-track form of onMakeGeometry: the same
-/// value GeometryLayoutOf derives from the processor.
+/// The quad-per-edge-AA geometry's layout (kept under its own name: the five declared slots
+/// filter down to the live ones).
 GeometryLayout QuadGeometryLayoutOf(int width, int height, AAType aaType,
                                     const std::optional<PMColor>& commonColor,
                                     const std::optional<Matrix>& uvMatrix, bool hasSubset);
-
-/// Field-by-field equality, for the double-track assertion while the geometry processors remain.
-bool SameGeometryLayout(const GeometryLayout& a, const GeometryLayout& b);
 
 }  // namespace tgfx

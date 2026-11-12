@@ -17,111 +17,28 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/ir/GeometryLayout.h"
-#include "gpu/processors/AtlasTextGeometryProcessor.h"
-#include "gpu/processors/ComplexEllipseGeometryProcessor.h"
-#include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
-#include "gpu/processors/DefaultGeometryProcessor.h"
-#include "gpu/processors/EllipseGeometryProcessor.h"
-#include "gpu/processors/HairlineLineGeometryProcessor.h"
-#include "gpu/processors/HairlineQuadGeometryProcessor.h"
-#include "gpu/processors/MeshGeometryProcessor.h"
-#include "gpu/processors/NonAARRectGeometryProcessor.h"
-#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
-#include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
-#include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 
 namespace tgfx {
 
-AOTGeometryParameters GeometryParametersOf(const GeometryProcessor* geometry) {
-  AOTGeometryParameters params = {};
-  if (geometry == nullptr) {
-    return params;
+namespace {
+
+/// Appends one declared slot; an empty attribute keeps its slot numbering but no entry (the
+/// setVertexAttributes rule the processors follow).
+void AppendSlot(GeometryLayout* layout, const Attribute& attribute, uint32_t slot) {
+  if (attribute.empty()) {
+    return;
   }
-  if (IsProcessor<DefaultGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const DefaultGeometryProcessor*>(geometry);
-    params.kind = GeometryKind::Default;
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = true;
-    params.viewMatrix = gp->getViewMatrix();
-    params.uvMatrix = gp->getUVMatrix();
-    params.aaType = gp->getAAType();
-  } else if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const QuadPerEdgeAAGeometryProcessor*>(geometry);
-    params.kind = GeometryKind::QuadPerEdgeAA;
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = gp->hasCommonColor();
-    params.uvMatrix = gp->getUVMatrix();
-    params.aaType = gp->getAAType();
-  } else if (IsProcessor<NonAARRectGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const NonAARRectGeometryProcessor*>(geometry);
-    params.kind = GeometryKind::NonAARRect;
-    const auto color = gp->getCommonColor();
-    params.commonColor = color.value_or(PMColor());
-    params.hasCommonColor = color.has_value();
-    params.isStroke = gp->isStroke();
-  } else if (IsProcessor<ComplexNonAARRectGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const ComplexNonAARRectGeometryProcessor*>(geometry);
-    params.kind = GeometryKind::ComplexNonAARRect;
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = gp->hasCommonColor();
-    params.isStroke = gp->isStroke();
-  } else if (IsProcessor<EllipseGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const EllipseGeometryProcessor*>(geometry);
-    params.kind = GeometryKind::Ellipse;
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = gp->hasCommonColor();
-    params.isStroke = gp->isStroke();
-  } else if (IsProcessor<ComplexEllipseGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const ComplexEllipseGeometryProcessor*>(geometry);
-    params.kind = GeometryKind::ComplexEllipse;
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = gp->hasCommonColor();
-    params.isStroke = gp->isStroke();
-  } else if (IsProcessor<HairlineLineGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const HairlineLineGeometryProcessor*>(geometry);
-    params.kind = GeometryKind::HairlineLine;
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = true;
-    params.viewMatrix = gp->getViewMatrix();
-    params.coverage = gp->getCoverage();
-    params.aaType = gp->getAAType();
-  } else if (IsProcessor<HairlineQuadGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const HairlineQuadGeometryProcessor*>(geometry);
-    params.kind = GeometryKind::HairlineQuad;
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = true;
-    params.viewMatrix = gp->getViewMatrix();
-    params.coverage = gp->getCoverage();
-    params.aaType = gp->getAAType();
-  } else if (IsProcessor<MeshGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const MeshGeometryProcessor*>(geometry);
-    params.kind = GeometryKind::Mesh;
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = !gp->getHasColors();
-    params.viewMatrix = gp->getViewMatrix();
-    params.hasColors = gp->getHasColors();
-  } else if (IsProcessor<RoundStrokeRectGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const RoundStrokeRectGeometryProcessor*>(geometry);
-    params.kind = GeometryKind::RoundStrokeRect;
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = gp->hasCommonColor();
-    params.aaType = gp->getAAType();
-  } else if (IsProcessor<ShapeInstancedGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const ShapeInstancedGeometryProcessor*>(geometry);
-    params.kind = GeometryKind::ShapeInstanced;
-    params.viewMatrix = gp->getViewMatrix();
-    params.uvMatrix = gp->getUVMatrix();
-  } else if (IsProcessor<AtlasTextGeometryProcessor>(geometry)) {
-    const auto* gp = static_cast<const AtlasTextGeometryProcessor*>(geometry);
-    params.kind = GeometryKind::AtlasText;
-    params.commonColor = gp->getCommonColor();
-    params.hasCommonColor = gp->hasCommonColor();
-    params.isAlphaOnly = gp->isAlphaOnly();
-    params.atlasProxy = gp->getTextureProxy();
-    params.aaType = gp->getAAType();
-  }
-  return params;
+  layout->vertexAttributes.push_back(attribute);
+  layout->physicalSlots.push_back(slot);
 }
+
+void AppendInstanceSlot(GeometryLayout* layout, const Attribute& attribute) {
+  if (!attribute.empty()) {
+    layout->instanceAttributes.push_back(attribute);
+  }
+}
+
+}  // namespace
 
 const char* GeometryKindName(GeometryKind kind) {
   switch (kind) {
@@ -155,21 +72,28 @@ const char* GeometryKindName(GeometryKind kind) {
   return "Other";
 }
 
-GeometryLayout GeometryLayoutOf(const GeometryProcessor* geometry) {
+GeometryLayout DefaultGeometryLayout(PMColor color, AAType aaType, const Matrix& viewMatrix,
+                                     const Matrix& uvMatrix) {
   GeometryLayout layout = {};
-  if (geometry == nullptr) {
-    return layout;
-  }
-  layout.parameters = GeometryParametersOf(geometry);
-  layout.vertexAttributes = geometry->vertexAttributes();
-  layout.instanceAttributes = geometry->instanceAttributes();
-  layout.physicalSlots = geometry->vertexAttributeLocations();
+  layout.parameters.kind = GeometryKind::Default;
+  layout.parameters.commonColor = color;
+  layout.parameters.hasCommonColor = true;
+  layout.parameters.viewMatrix = viewMatrix;
+  layout.parameters.uvMatrix = uvMatrix;
+  layout.parameters.hasUVMatrix = uvMatrix != Matrix::I();
+  layout.parameters.hasUVPerspective = uvMatrix.hasPerspective();
+  layout.parameters.aaType = aaType;
+  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2}, 0);
+  AppendSlot(&layout, Attribute{"inCoverage", VertexFormat::Float}, 1);
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 2);
   return layout;
 }
 
 GeometryLayout QuadGeometryLayoutOf(int width, int height, AAType aaType,
                                     const std::optional<PMColor>& commonColor,
                                     const std::optional<Matrix>& uvMatrix, bool hasSubset) {
+  (void)width;
+  (void)height;
   GeometryLayout layout = {};
   layout.parameters.kind = GeometryKind::QuadPerEdgeAA;
   // The processor's own default (an opaque white), so the facts match the derived layout
@@ -177,46 +101,196 @@ GeometryLayout QuadGeometryLayoutOf(int width, int height, AAType aaType,
   layout.parameters.commonColor = commonColor.value_or(PMColor());
   layout.parameters.hasCommonColor = commonColor.has_value();
   layout.parameters.uvMatrix = uvMatrix.value_or(Matrix::I());
+  layout.parameters.hasUVMatrix = uvMatrix.has_value();
+  layout.parameters.hasUVPerspective =
+      uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
   layout.parameters.aaType = aaType;
-  (void)width;
-  (void)height;
-  // The same five declared slots the processor sets, filtered by the same conditions; the
-  // filtered-away attribute keeps its declared slot, exactly as setVertexAttributes does.
-  const Attribute declared[5] = {
-      {"aPosition", VertexFormat::Float2},
-      {"inCoverage", VertexFormat::Float},
-      uvMatrix.has_value() ? Attribute{} : Attribute{"uvCoord", VertexFormat::Float2},
-      {"inColor", VertexFormat::UByte4Normalized},
-      hasSubset ? Attribute{"texSubset", VertexFormat::Float4} : Attribute{}};
-  for (uint32_t slot = 0; slot < 5; ++slot) {
-    if (declared[slot].empty()) {
-      continue;
-    }
-    layout.vertexAttributes.push_back(declared[slot]);
-    layout.physicalSlots.push_back(slot);
-  }
+  layout.parameters.hasSubset = hasSubset;
+  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2}, 0);
+  AppendSlot(&layout, Attribute{"inCoverage", VertexFormat::Float}, 1);
+  AppendSlot(&layout,
+             uvMatrix.has_value() ? Attribute{} : Attribute{"uvCoord", VertexFormat::Float2}, 2);
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 3);
+  AppendSlot(&layout, hasSubset ? Attribute{"texSubset", VertexFormat::Float4} : Attribute{}, 4);
   return layout;
 }
 
-bool SameGeometryLayout(const GeometryLayout& a, const GeometryLayout& b) {
-  if (a.physicalSlots != b.physicalSlots ||
-      a.vertexAttributes.size() != b.vertexAttributes.size() ||
-      a.instanceAttributes.size() != b.instanceAttributes.size()) {
-    return false;
-  }
-  for (size_t index = 0; index < a.vertexAttributes.size(); ++index) {
-    if (a.vertexAttributes[index].name() != b.vertexAttributes[index].name() ||
-        a.vertexAttributes[index].format() != b.vertexAttributes[index].format()) {
-      return false;
-    }
-  }
-  const auto& pa = a.parameters;
-  const auto& pb = b.parameters;
-  return pa.kind == pb.kind && pa.hasCommonColor == pb.hasCommonColor &&
-         pa.commonColor == pb.commonColor && pa.viewMatrix == pb.viewMatrix &&
-         pa.uvMatrix == pb.uvMatrix && pa.aaType == pb.aaType && pa.coverage == pb.coverage &&
-         pa.isStroke == pb.isStroke && pa.isAlphaOnly == pb.isAlphaOnly &&
-         pa.hasColors == pb.hasColors && pa.atlasProxy == pb.atlasProxy;
+GeometryLayout RoundStrokeRectGeometryLayout(AAType aaType,
+                                             const std::optional<PMColor>& commonColor,
+                                             const std::optional<Matrix>& uvMatrix) {
+  GeometryLayout layout = {};
+  layout.parameters.kind = GeometryKind::RoundStrokeRect;
+  layout.parameters.commonColor = commonColor.value_or(PMColor());
+  layout.parameters.hasCommonColor = commonColor.has_value();
+  layout.parameters.uvMatrix = uvMatrix.value_or(Matrix::I());
+  layout.parameters.hasUVMatrix = uvMatrix.has_value();
+  layout.parameters.hasUVPerspective =
+      uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
+  layout.parameters.aaType = aaType;
+  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2}, 0);
+  AppendSlot(&layout, Attribute{"inCoverage", VertexFormat::Float}, 1);
+  AppendSlot(&layout, Attribute{"inEllipseOffset", VertexFormat::Float2}, 2);
+  AppendSlot(&layout, Attribute{"inEllipseRadii", VertexFormat::Float2}, 3);
+  AppendSlot(&layout,
+             uvMatrix.has_value() ? Attribute{} : Attribute{"inUVCoord", VertexFormat::Float2}, 4);
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 5);
+  return layout;
+}
+
+GeometryLayout NonAARRectGeometryLayout(bool stroke, const std::optional<PMColor>& commonColor) {
+  GeometryLayout layout = {};
+  layout.parameters.kind = GeometryKind::NonAARRect;
+  layout.parameters.commonColor = commonColor.value_or(PMColor());
+  layout.parameters.hasCommonColor = commonColor.has_value();
+  layout.parameters.isStroke = stroke;
+  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2}, 0);
+  AppendSlot(&layout, Attribute{"inLocalCoord", VertexFormat::Float2}, 1);
+  AppendSlot(&layout, Attribute{"inRadii", VertexFormat::Float2}, 2);
+  AppendSlot(&layout, Attribute{"inRectBounds", VertexFormat::Float4}, 3);
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 4);
+  AppendSlot(&layout, stroke ? Attribute{"inStrokeWidth", VertexFormat::Float2} : Attribute{}, 5);
+  return layout;
+}
+
+GeometryLayout ComplexNonAARRectGeometryLayout(bool stroke,
+                                               const std::optional<PMColor>& commonColor) {
+  GeometryLayout layout = {};
+  layout.parameters.kind = GeometryKind::ComplexNonAARRect;
+  layout.parameters.commonColor = commonColor.value_or(PMColor());
+  layout.parameters.hasCommonColor = commonColor.has_value();
+  layout.parameters.isStroke = stroke;
+  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2}, 0);
+  AppendSlot(&layout, Attribute{"inLocalCoord", VertexFormat::Float2}, 1);
+  AppendSlot(&layout, Attribute{"inXRadii", VertexFormat::Float4}, 2);
+  AppendSlot(&layout, Attribute{"inYRadii", VertexFormat::Float4}, 3);
+  AppendSlot(&layout, Attribute{"inRectBounds", VertexFormat::Float4}, 4);
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 5);
+  AppendSlot(&layout, stroke ? Attribute{"inStrokeWidth", VertexFormat::Float2} : Attribute{}, 6);
+  return layout;
+}
+
+GeometryLayout EllipseGeometryLayout(bool stroke, const std::optional<PMColor>& commonColor) {
+  GeometryLayout layout = {};
+  layout.parameters.kind = GeometryKind::Ellipse;
+  layout.parameters.commonColor = commonColor.value_or(PMColor());
+  layout.parameters.hasCommonColor = commonColor.has_value();
+  layout.parameters.isStroke = stroke;
+  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2}, 0);
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 1);
+  AppendSlot(&layout, Attribute{"inEllipseOffset", VertexFormat::Float2}, 2);
+  AppendSlot(&layout, Attribute{"inEllipseRadii", VertexFormat::Float4}, 3);
+  return layout;
+}
+
+GeometryLayout ComplexEllipseGeometryLayout(bool stroke,
+                                            const std::optional<PMColor>& commonColor) {
+  GeometryLayout layout = {};
+  layout.parameters.kind = GeometryKind::ComplexEllipse;
+  layout.parameters.commonColor = commonColor.value_or(PMColor());
+  layout.parameters.hasCommonColor = commonColor.has_value();
+  layout.parameters.isStroke = stroke;
+  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2}, 0);
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 1);
+  AppendSlot(&layout, Attribute{"inEllipseOffset", VertexFormat::Float2}, 2);
+  AppendSlot(&layout, Attribute{"inEllipseRadii", VertexFormat::Float4}, 3);
+  AppendSlot(&layout, Attribute{"inEdgeDist", VertexFormat::Float2}, 4);
+  AppendSlot(&layout, stroke ? Attribute{"inStrokeWidth", VertexFormat::Float2} : Attribute{}, 5);
+  return layout;
+}
+
+GeometryLayout HairlineLineGeometryLayout(PMColor color, const Matrix& viewMatrix,
+                                          const std::optional<Matrix>& uvMatrix, float coverage,
+                                          AAType aaType) {
+  GeometryLayout layout = {};
+  layout.parameters.kind = GeometryKind::HairlineLine;
+  layout.parameters.commonColor = color;
+  layout.parameters.hasCommonColor = true;
+  layout.parameters.viewMatrix = viewMatrix;
+  layout.parameters.uvMatrix = uvMatrix.value_or(Matrix::I());
+  layout.parameters.hasUVMatrix = uvMatrix.has_value();
+  layout.parameters.hasUVPerspective =
+      uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
+  layout.parameters.coverage = coverage;
+  layout.parameters.aaType = aaType;
+  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2}, 0);
+  AppendSlot(&layout, Attribute{"aEdgeDistance", VertexFormat::Float}, 1);
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 2);
+  return layout;
+}
+
+GeometryLayout HairlineQuadGeometryLayout(PMColor color, const Matrix& viewMatrix,
+                                          const std::optional<Matrix>& uvMatrix, float coverage,
+                                          AAType aaType) {
+  GeometryLayout layout = {};
+  layout.parameters.kind = GeometryKind::HairlineQuad;
+  layout.parameters.commonColor = color;
+  layout.parameters.hasCommonColor = true;
+  layout.parameters.viewMatrix = viewMatrix;
+  layout.parameters.uvMatrix = uvMatrix.value_or(Matrix::I());
+  layout.parameters.hasUVMatrix = uvMatrix.has_value();
+  layout.parameters.hasUVPerspective =
+      uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
+  layout.parameters.coverage = coverage;
+  layout.parameters.aaType = aaType;
+  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2}, 0);
+  AppendSlot(&layout, Attribute{"hairQuadEdge", VertexFormat::Float4}, 1);
+  return layout;
+}
+
+GeometryLayout MeshGeometryLayout(bool hasTexCoords, bool hasColors, bool hasCoverage,
+                                  PMColor color, const Matrix& viewMatrix) {
+  GeometryLayout layout = {};
+  layout.parameters.kind = GeometryKind::Mesh;
+  layout.parameters.commonColor = color;
+  layout.parameters.hasCommonColor = !hasColors;
+  layout.parameters.hasColors = hasColors;
+  layout.parameters.viewMatrix = viewMatrix;
+  layout.parameters.hasTexCoords = hasTexCoords;
+  layout.parameters.hasCoverage = hasCoverage || hasTexCoords || hasColors;
+  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2}, 0);
+  AppendSlot(&layout, Attribute{"aCoverage", VertexFormat::Float}, 1);
+  AppendSlot(&layout, hasTexCoords ? Attribute{"aTexCoord", VertexFormat::Float2} : Attribute{}, 2);
+  AppendSlot(&layout, Attribute{"aColor", VertexFormat::UByte4Normalized}, 3);
+  return layout;
+}
+
+GeometryLayout ShapeInstancedGeometryLayout(AAType aaType, bool hasColors, const Matrix& viewMatrix,
+                                            const Matrix& uvMatrix) {
+  GeometryLayout layout = {};
+  layout.parameters.kind = GeometryKind::ShapeInstanced;
+  layout.parameters.viewMatrix = viewMatrix;
+  layout.parameters.uvMatrix = uvMatrix;
+  layout.parameters.hasUVMatrix = uvMatrix != Matrix::I();
+  layout.parameters.hasUVPerspective = uvMatrix.hasPerspective();
+  layout.parameters.aaType = aaType;
+  layout.parameters.hasColors = hasColors;
+  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2}, 0);
+  AppendSlot(&layout, Attribute{"inCoverage", VertexFormat::Float}, 1);
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 2);
+  AppendInstanceSlot(&layout, Attribute{"aOffset", VertexFormat::Float2});
+  AppendInstanceSlot(&layout, Attribute{"aColor", VertexFormat::UByte4Normalized});
+  return layout;
+}
+
+GeometryLayout AtlasTextGeometryLayout(std::shared_ptr<TextureProxy> atlasProxy, AAType aaType,
+                                       const std::optional<PMColor>& commonColor, bool alphaOnly,
+                                       const SamplingOptions& sampling) {
+  GeometryLayout layout = {};
+  layout.parameters.kind = GeometryKind::AtlasText;
+  layout.parameters.commonColor = commonColor.value_or(PMColor());
+  layout.parameters.hasCommonColor = commonColor.has_value();
+  layout.parameters.atlasProxy = std::move(atlasProxy);
+  layout.parameters.isAlphaOnly = alphaOnly;
+  layout.parameters.aaType = aaType;
+  layout.parameters.hasCoverage = aaType == AAType::Coverage;
+  layout.parameters.atlasSampler = SamplerState(sampling);
+  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2}, 0);
+  AppendSlot(
+      &layout,
+      aaType == AAType::Coverage ? Attribute{"inCoverage", VertexFormat::Float} : Attribute{}, 1);
+  AppendSlot(&layout, Attribute{"maskCoord", VertexFormat::Float2}, 2);
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 3);
+  return layout;
 }
 
 }  // namespace tgfx

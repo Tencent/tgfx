@@ -22,7 +22,6 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
-#include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -53,9 +52,9 @@ ShapeDrawOp::ShapeDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUShapeProx
   }
 }
 
-PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+std::optional<GeometryLayout> ShapeDrawOp::onMakeGeometry(RenderTarget* /*renderTarget*/) {
   if (shapeProxy == nullptr) {
-    return nullptr;
+    return std::nullopt;
   }
   auto viewMatrix = shapeProxy->getDrawingMatrix();
   auto realUVMatrix = uvMatrix;
@@ -71,23 +70,22 @@ PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarge
     // draw here is pixel-identical and avoids a useless program.
     if (textureProxy == nullptr || textureProxy->getTextureView() == nullptr ||
         maskBufferProxy == nullptr || maskBufferProxy->getBuffer() == nullptr) {
-      return nullptr;
+      return std::nullopt;
     }
     Matrix maskMatrix = {};
     if (!realUVMatrix.invert(&maskMatrix)) {
-      return nullptr;
+      return std::nullopt;
     }
     static const SamplingArgs args(TileMode::Clamp, TileMode::Clamp,
                                    SamplingOptions(FilterMode::Nearest, MipmapMode::None),
                                    SrcRectConstraint::Fast);
     auto maskFP = TextureEffect::Make(allocator, std::move(textureProxy), args, &maskMatrix, true);
     if (maskFP == nullptr) {
-      return nullptr;
+      return std::nullopt;
     }
     addCoverageFP(std::move(maskFP));
   }
-  return DefaultGeometryProcessor::Make(allocator, color, renderTarget->width(),
-                                        renderTarget->height(), aa, viewMatrix, realUVMatrix);
+  return DefaultGeometryLayout(color, aa, viewMatrix, realUVMatrix);
 }
 
 void ShapeDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {

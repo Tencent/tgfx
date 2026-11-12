@@ -26,7 +26,6 @@
 #include "MultisampleTestEffect.h"
 #include "StencilMaskRenderPass.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/resources/DepthStencilTextureView.h"
 #include "tgfx/core/Bitmap.h"
@@ -822,12 +821,9 @@ TGFX_TEST(GPURenderTest, ProgramInfoStencilAccessors) {
   ASSERT_TRUE(proxy != nullptr);
   auto renderTarget = proxy->getRenderTarget();
   ASSERT_TRUE(renderTarget != nullptr);
-  auto* allocator = context->drawingAllocator();
-  auto geometryProcessor =
-      DefaultGeometryProcessor::Make(allocator, {}, 1, 1, AAType::None, {}, {});
-  ASSERT_TRUE(geometryProcessor != nullptr);
+  auto geometryLayout = DefaultGeometryLayout({}, AAType::None, {}, {});
   std::vector<FragmentProcessor*> fragmentProcessors = {};
-  ProgramInfo info(renderTarget.get(), geometryProcessor.get(), std::move(fragmentProcessors),
+  ProgramInfo info(renderTarget.get(), geometryLayout, std::move(fragmentProcessors),
                    /*numColorProcessors=*/0, /*dstTexture=*/std::nullopt, BlendMode::SrcOver);
 
   // Defaults: no-op stencil, all colour channels writable.
@@ -866,16 +862,14 @@ TGFX_TEST(GPURenderTest, ProgramInfoStencilCacheKey) {
   ASSERT_TRUE(proxy != nullptr);
   auto renderTarget = proxy->getRenderTarget();
   ASSERT_TRUE(renderTarget != nullptr);
-  auto* allocator = context->drawingAllocator();
 
   // Each variant builds its own GeometryProcessor with the same parameters; the GP's key
   // contribution is content-addressed, so the three GPs hash identically and only the stencil
   // and colour-write-mask overlay should differentiate the cache lookups below.
-  auto gpA = DefaultGeometryProcessor::Make(allocator, {}, 1, 1, AAType::None, {}, {});
-  auto gpA2 = DefaultGeometryProcessor::Make(allocator, {}, 1, 1, AAType::None, {}, {});
-  auto gpB = DefaultGeometryProcessor::Make(allocator, {}, 1, 1, AAType::None, {}, {});
-  auto gpC = DefaultGeometryProcessor::Make(allocator, {}, 1, 1, AAType::None, {}, {});
-  ASSERT_TRUE(gpA && gpA2 && gpB && gpC);
+  auto gpA = DefaultGeometryLayout({}, AAType::None, {}, {});
+  auto gpA2 = DefaultGeometryLayout({}, AAType::None, {}, {});
+  auto gpB = DefaultGeometryLayout({}, AAType::None, {}, {});
+  auto gpC = DefaultGeometryLayout({}, AAType::None, {}, {});
 
   DepthStencilDescriptor stencilDS = {};
   stencilDS.format = PixelFormat::DEPTH24_STENCIL8;
@@ -884,18 +878,18 @@ TGFX_TEST(GPURenderTest, ProgramInfoStencilCacheKey) {
   stencilDS.stencilBack = stencilDS.stencilFront;
 
   // Variant A: defaults.
-  ProgramInfo infoA(renderTarget.get(), gpA.get(), {}, 0, std::nullopt, BlendMode::SrcOver);
+  ProgramInfo infoA(renderTarget.get(), gpA, {}, 0, std::nullopt, BlendMode::SrcOver);
   auto programA = infoA.getProgram();
   ASSERT_TRUE(programA != nullptr);
 
   // Variant A again: equivalent inputs must hit the same cached program.
-  ProgramInfo infoA2(renderTarget.get(), gpA2.get(), {}, 0, std::nullopt, BlendMode::SrcOver);
+  ProgramInfo infoA2(renderTarget.get(), gpA2, {}, 0, std::nullopt, BlendMode::SrcOver);
   auto programA2 = infoA2.getProgram();
   EXPECT_EQ(programA2.get(), programA.get())
       << "identical ProgramInfo inputs should reuse the cached Program";
 
   // Variant B: differ only in colour write mask.
-  ProgramInfo infoB(renderTarget.get(), gpB.get(), {}, 0, std::nullopt, BlendMode::SrcOver);
+  ProgramInfo infoB(renderTarget.get(), gpB, {}, 0, std::nullopt, BlendMode::SrcOver);
   infoB.setColorWriteMask(0);
   auto programB = infoB.getProgram();
   ASSERT_TRUE(programB != nullptr);
@@ -903,7 +897,7 @@ TGFX_TEST(GPURenderTest, ProgramInfoStencilCacheKey) {
       << "differing colorWriteMask must not collapse onto the same cached Program";
 
   // Variant C: differ only in stencil configuration.
-  ProgramInfo infoC(renderTarget.get(), gpC.get(), {}, 0, std::nullopt, BlendMode::SrcOver);
+  ProgramInfo infoC(renderTarget.get(), gpC, {}, 0, std::nullopt, BlendMode::SrcOver);
   infoC.setDepthStencil(stencilDS);
   auto programC = infoC.getProgram();
   ASSERT_TRUE(programC != nullptr);

@@ -24,6 +24,7 @@
 #include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramWriter.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/select/PrecompiledProgramCreator.h"
 #include "gpu/resources/RenderTarget.h"
@@ -39,21 +40,21 @@ static void EncodeStencilFace(BytesKey& key, const StencilDescriptor& face) {
   key.write(static_cast<uint32_t>(face.passOp));
 }
 
-ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
+ProgramInfo::ProgramInfo(RenderTarget* renderTarget, const GeometryLayout& geometryLayout,
                          std::vector<FragmentProcessor*> fragmentProcessors,
                          size_t numColorProcessors, const std::optional<DstTextureInfo>& dstTexture,
                          BlendMode blendMode)
-    : renderTarget(renderTarget), geometryProcessor(geometryProcessor),
-      fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
-      dstTexture(dstTexture), blendMode(blendMode) {
+    : renderTarget(renderTarget), fragmentProcessors(std::move(fragmentProcessors)),
+      numColorProcessors(numColorProcessors), dstTexture(dstTexture),
+      geometryLayout(geometryLayout), blendMode(blendMode) {
   hasCoverageForBlend = numColorProcessors < this->fragmentProcessors.size();
   updateXferFacts();
 }
 
-ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
+ProgramInfo::ProgramInfo(RenderTarget* renderTarget, const GeometryLayout& geometryLayout,
                          const std::optional<DstTextureInfo>& dstTexture, BlendMode blendMode,
                          bool blendFormulaHasCoverage)
-    : renderTarget(renderTarget), geometryProcessor(geometryProcessor), dstTexture(dstTexture),
+    : renderTarget(renderTarget), dstTexture(dstTexture), geometryLayout(geometryLayout),
       blendMode(blendMode), hasCoverageForBlend(blendFormulaHasCoverage) {
   updateXferFacts();
 }
@@ -66,13 +67,6 @@ void ProgramInfo::updateXferFacts() {
     xferFacts.shaderBlend = true;
     xferFacts.dstTexture = *dstTexture;
   }
-}
-
-const GeometryLayout& ProgramInfo::getGeometryLayout() const {
-  if (!geometryLayout.has_value()) {
-    geometryLayout = GeometryLayoutOf(geometryProcessor);
-  }
-  return *geometryLayout;
 }
 
 Swizzle ProgramInfo::getOutputSwizzle() const {
@@ -123,7 +117,21 @@ const BytesKey& ProgramInfo::programKey() const {
 BytesKey ProgramInfo::buildProgramKey() const {
   BytesKey key = {};
   auto context = renderTarget->getContext();
-  geometryProcessor->computeProcessorKey(context, &key);
+  (void)context;
+  // The geometry's key contribution (see the precompiled-side key): kind, perspective and the
+  // live attribute formats.
+  key.write(static_cast<uint32_t>(geometryLayout.parameters.kind));
+  key.write(static_cast<uint32_t>(geometryLayout.parameters.hasUVPerspective ? 1u : 0u));
+  for (const auto& attribute : geometryLayout.vertexAttributes) {
+    if (!attribute.empty()) {
+      key.write(static_cast<uint32_t>(attribute.format()));
+    }
+  }
+  for (const auto& attribute : geometryLayout.instanceAttributes) {
+    if (!attribute.empty()) {
+      key.write(static_cast<uint32_t>(attribute.format()));
+    }
+  }
   for (const auto& processor : fragmentProcessors) {
     processor->computeProcessorKey(context, &key);
   }
@@ -295,9 +303,13 @@ bool ProgramInfo::samplersAre2D() const {
 
 std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
   std::vector<SamplerInfo> samplers = {};
-  for (size_t i = 0; i < geometryProcessor->numTextureSamplers(); i++) {
-    SamplerInfo sampler = {geometryProcessor->textureAt(i), geometryProcessor->samplerStateAt(i)};
-    samplers.push_back(sampler);
+  // The geometry's own texture (the glyph atlas); its sampler state is the default one.
+  if (geometryLayout.parameters.atlasProxy != nullptr) {
+    auto atlasView = geometryLayout.parameters.atlasProxy->getTextureView();
+    if (atlasView != nullptr) {
+      SamplerInfo sampler = {atlasView->getTexture(), geometryLayout.parameters.atlasSampler};
+      samplers.push_back(sampler);
+    }
   }
   FragmentProcessor::Iter iter(this);
   const FragmentProcessor* fp = iter.next();

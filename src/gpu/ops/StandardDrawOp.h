@@ -29,7 +29,7 @@ struct DrawIR;
  * subclass issues one draw call" pattern. execute() is final: it first gives the subclass a
  * chance to veto the whole execution via onPrepare() when runtime inputs turn out to be
  * unusable, then builds the op's ProgramInfo from the geometry processor supplied by
- * onMakeGeometryProcessor() and the color/coverage fragment processors accumulated on DrawOp,
+ * onMakeGeometry() and the color/coverage fragment processors accumulated on DrawOp,
  * gives subclasses a chance to tweak the resulting ProgramInfo via onConfigureProgramInfo(), then
  * binds the pipeline (together with uniforms, samplers and
  * scissor) before delegating the actual draw call to onDraw().
@@ -114,9 +114,11 @@ class StandardDrawOp : public DrawOp {
   }
 
   /**
-   * Builds the geometry processor that drives this op's pipeline. Called once per execute().
+   * Builds the geometry layout that drives this op's pipeline: the attribute slots and the
+   * uniform values. Called once per execute(); a null return drops the draw (the old null
+   * geometry processor).
    */
-  virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
+  virtual std::optional<GeometryLayout> onMakeGeometry(RenderTarget* renderTarget) = 0;
 
   /**
    * Hook invoked right before the ProgramInfo is materialised, giving the op a chance to
@@ -124,15 +126,6 @@ class StandardDrawOp : public DrawOp {
    * mask. The default does nothing; only ops that need non-default pipeline state override it.
    */
   virtual void onConfigureProgramInfo(ProgramInfo& /*programInfo*/) {
-  }
-
-  /**
-   * Returns the geometry layout the draw carries. The double-track entry: an op that builds the
-   * layout from its own facts lets prepare drop the geometry-processor pass-through; returning
-   * nullopt (the default) keeps the derivation from the constructed processor.
-   */
-  virtual std::optional<GeometryLayout> onMakeGeometry(RenderTarget* /*renderTarget*/) {
-    return std::nullopt;
   }
 
   /**
@@ -151,9 +144,8 @@ class StandardDrawOp : public DrawOp {
   /// draw, so only the draw's own last lookup logs and counts the drop.
   static bool failLookup(RenderTarget* renderTarget, bool isFinalLookup, const char* reason);
 
-  PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
-  bool geometryProcessorInitialized = false;
-  std::optional<GeometryLayout> geometryLayoutOverride = std::nullopt;
+  std::optional<GeometryLayout> geometryLayout = std::nullopt;
+  bool geometryInitialized = false;
   std::unique_ptr<ProgramInfo> preparedProgramInfo = nullptr;
   std::shared_ptr<Program> preparedProgram = nullptr;
   RenderTarget* preparedRenderTarget = nullptr;

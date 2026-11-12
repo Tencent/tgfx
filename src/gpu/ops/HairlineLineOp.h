@@ -39,7 +39,7 @@ class HairlineLineOp final : public StandardDrawOp {
                                            AAType aaType);
 
  protected:
-  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
+  std::optional<GeometryLayout> onMakeGeometry(RenderTarget* renderTarget) override;
 
   bool onPrepare() override;
 

@@ -25,7 +25,7 @@ class ProgramInfo;
 
 /// Builds a human-readable effect signature describing the geometry processor, color/coverage
 /// fragment processors, and xfer processor of a pipeline, e.g.
-/// "GP=DefaultGeometryProcessor;ColorFP=[];CoverageFP=[TextureEffect];XP=EmptyXferProcessor".
+/// "GP=Default;ColorFP=[];CoverageFP=[TextureEffect];XP=fixed".
 /// Used by the AOT hit/miss reporter and the runtime shader dump diagnostics.
 std::string BuildEffectSignature(const ProgramInfo* programInfo);
 

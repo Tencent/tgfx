@@ -21,8 +21,6 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
-#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
-#include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -86,20 +84,10 @@ RectDrawOp::RectDrawOp(BlockAllocator* allocator, RectsVertexProvider* provider)
 
 std::optional<GeometryLayout> RectDrawOp::onMakeGeometry(RenderTarget* renderTarget) {
   if (lineJoin == LineJoin::Round) {
-    // The round-stroke geometry keeps the derived path until its own step.
-    return std::nullopt;
+    return RoundStrokeRectGeometryLayout(aaType, commonColor, uvMatrix);
   }
   return QuadGeometryLayoutOf(renderTarget->width(), renderTarget->height(), aaType, commonColor,
                               uvMatrix, hasSubset);
-}
-
-PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
-  if (lineJoin == LineJoin::Round) {
-    return RoundStrokeRectGeometryProcessor::Make(allocator, aaType, commonColor, uvMatrix);
-  }
-  return QuadPerEdgeAAGeometryProcessor::Make(allocator, renderTarget->width(),
-                                              renderTarget->height(), aaType, commonColor, uvMatrix,
-                                              hasSubset);
 }
 
 static uint16_t GetNumIndicesPerQuad(AAType aaType, const std::optional<LineJoin>& lineJoin) {
