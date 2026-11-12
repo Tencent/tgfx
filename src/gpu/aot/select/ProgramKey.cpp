@@ -51,9 +51,9 @@ BytesKey MakeProgramKey(Context* context, const ProgramInfo& info, uint32_t vari
   // key below, and a null proxy means the backend's framebuffer fetch (the third state the old
   // processor's class ID used to encode).
   const auto& xfer = info.getXferFacts();
-  key.write(static_cast<uint32_t>(xfer.shaderBlend ? 1u : 0u));
-  if (xfer.shaderBlend) {
-    const auto& dstProxy = xfer.dstTexture.textureProxy;
+  key.write(static_cast<uint32_t>(xfer.shaderBlend() ? 1u : 0u));
+  if (xfer.shaderBlend()) {
+    const auto& dstProxy = xfer.dstTexture->textureProxy;
     auto dstView = dstProxy != nullptr ? dstProxy->getTextureView() : nullptr;
     if (dstView != nullptr) {
       TextureView::ComputeTextureKey(dstView->getTexture(), &key);

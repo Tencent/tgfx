@@ -342,8 +342,9 @@ TGFX_TEST(AOTCoverageGateTest, AllProcessorsAreClaimed) {
   // derivation snapshots them into XferFacts, and every reader addresses that value instead.
   auto programInfoSource = ReadTextFile(ProjectPath::Absolute("src/gpu/ProgramInfo.cpp"));
   ASSERT_FALSE(programInfoSource.empty());
-  auto xferClassifier =
-      ExtractFunctionBody(programInfoSource, "void ProgramInfo::updateXferFacts() {");
+  auto xferClassifier = ExtractFunctionBody(
+      programInfoSource,
+      "void ProgramInfo::updateXferFacts(const std::optional<DstTextureInfo>& dstTexture) {");
   ASSERT_FALSE(geometryClassifier.empty());
   ASSERT_FALSE(xferClassifier.empty());
   auto violations = EvaluateProcessorClaims(scanned, ProcessorClaims,

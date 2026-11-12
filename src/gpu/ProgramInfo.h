@@ -307,7 +307,6 @@ class ProgramInfo {
   std::vector<FragmentProcessor*> fragmentProcessors = {};
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
-  std::optional<DstTextureInfo> dstTexture = std::nullopt;
   GeometryLayout geometryLayout = {};
   /// The xfer facts derived from the processor once per program: the shader-side blend flag and
   /// the destination it samples. The writers and the matcher read this, not the processor.
@@ -321,7 +320,7 @@ class ProgramInfo {
   uint32_t colorWriteMask = ColorWriteMask::All;
 
   /// Derives the xfer facts from the processor once, at construction.
-  void updateXferFacts();
+  void updateXferFacts(const std::optional<DstTextureInfo>& dstTexture);
 
   BytesKey buildProgramKey() const;
 

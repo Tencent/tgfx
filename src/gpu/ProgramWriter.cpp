@@ -359,7 +359,7 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
   // than the draw supplies (e.g. an absent device mask on a runtime-guarded kernel), the holes sit
   // before the dst, so hold the dst aside and pad with the shared dummy texture first; the guarded
   // shader path never samples the padded slots.
-  const auto& xferDstProxy = info.getXferFacts().dstTexture.textureProxy;
+  const auto& xferDstProxy = info.getXferFacts().dstProxy();
   auto xferDstView = xferDstProxy != nullptr ? xferDstProxy->getTextureView() : nullptr;
   bool holdDst = expected > samplers.size() && !samplers.empty() && xferDstView != nullptr;
   size_t sequentialCount = holdDst ? samplers.size() - 1 : samplers.size();
@@ -460,8 +460,8 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
   ParamWriter paramWriter(fragmentUniformData);
   const auto& xfer = info.getXferFacts();
   const auto* chainIR = info.getCarriedIR();
-  if (chainIR != nullptr && xfer.shaderBlend) {
-    BindPorterDuffXfer(static_cast<int>(chainIR->blendMode), xfer.dstTexture, &paramWriter);
+  if (chainIR != nullptr && xfer.shaderBlend()) {
+    BindPorterDuffXfer(static_cast<int>(chainIR->blendMode), *xfer.dstTexture, &paramWriter);
   }
 }
 
@@ -493,7 +493,7 @@ void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program
     renderPass->setTexture(textureBinding++, textureView->getTexture(), sampler);
   }
   // The dst texture always binds last.
-  const auto& dstProxy = info.getXferFacts().dstTexture.textureProxy;
+  const auto& dstProxy = info.getXferFacts().dstProxy();
   auto dstTextureView = dstProxy != nullptr ? dstProxy->getTextureView() : nullptr;
   if (dstTextureView != nullptr) {
     auto state = SamplerState();

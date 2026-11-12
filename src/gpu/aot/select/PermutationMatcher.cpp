@@ -65,10 +65,10 @@ int GetXPType(const ProgramInfo* programInfo) {
 }
 
 XferKind ClassifyXferForMatch(const XferFacts& xfer) {
-  if (!xfer.shaderBlend) {
+  if (!xfer.shaderBlend()) {
     return XferKind::None;
   }
-  const auto& proxy = xfer.dstTexture.textureProxy;
+  const auto& proxy = xfer.dstTexture->textureProxy;
   auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
   return view != nullptr ? XferKind::DstTexture : XferKind::FrameBufferFetch;
 }

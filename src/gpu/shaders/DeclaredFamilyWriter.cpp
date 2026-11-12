@@ -860,13 +860,13 @@ void WriteXfer(const ProgramInfo& info, SlotWriter* writer) {
   const auto& xfer = info.getXferFacts();
   // Only a shader-side formula carries a blend mode and a dst texture; the passthrough
   // (the HAS_XP == 0 variants) declares neither field.
-  if (!xfer.shaderBlend) {
+  if (!xfer.shaderBlend()) {
     return;
   }
   // The dst-dialect fields are `when HAS_XP != 0`: absent when the draw's xfer is the
   // passthrough, which the flag above already excludes.
   writer->setIfPresent(XPBlendMode, static_cast<int32_t>(info.getBlendMode()));
-  const auto& dstInfo = xfer.dstTexture;
+  const auto& dstInfo = *xfer.dstTexture;
   if (dstInfo.textureProxy == nullptr) {
     return;
   }

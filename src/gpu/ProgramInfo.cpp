@@ -45,28 +45,23 @@ ProgramInfo::ProgramInfo(RenderTarget* renderTarget, const GeometryLayout& geome
                          size_t numColorProcessors, const std::optional<DstTextureInfo>& dstTexture,
                          BlendMode blendMode)
     : renderTarget(renderTarget), fragmentProcessors(std::move(fragmentProcessors)),
-      numColorProcessors(numColorProcessors), dstTexture(dstTexture),
-      geometryLayout(geometryLayout), blendMode(blendMode) {
+      numColorProcessors(numColorProcessors), geometryLayout(geometryLayout), blendMode(blendMode) {
   hasCoverageForBlend = numColorProcessors < this->fragmentProcessors.size();
-  updateXferFacts();
+  updateXferFacts(dstTexture);
 }
 
 ProgramInfo::ProgramInfo(RenderTarget* renderTarget, const GeometryLayout& geometryLayout,
                          const std::optional<DstTextureInfo>& dstTexture, BlendMode blendMode,
                          bool blendFormulaHasCoverage)
-    : renderTarget(renderTarget), dstTexture(dstTexture), geometryLayout(geometryLayout),
-      blendMode(blendMode), hasCoverageForBlend(blendFormulaHasCoverage) {
-  updateXferFacts();
+    : renderTarget(renderTarget), geometryLayout(geometryLayout), blendMode(blendMode),
+      hasCoverageForBlend(blendFormulaHasCoverage) {
+  updateXferFacts(dstTexture);
 }
 
-void ProgramInfo::updateXferFacts() {
+void ProgramInfo::updateXferFacts(const std::optional<DstTextureInfo>& dstTexture) {
   // An absent value leaves the output to the fixed-function blend; a present one runs the formula
   // in the shader, its empty proxy selecting the backend's framebuffer fetch.
-  xferFacts = {};
-  if (dstTexture.has_value()) {
-    xferFacts.shaderBlend = true;
-    xferFacts.dstTexture = *dstTexture;
-  }
+  xferFacts.dstTexture = dstTexture;
 }
 
 Swizzle ProgramInfo::getOutputSwizzle() const {
@@ -81,7 +76,7 @@ PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
   PipelineColorAttachment colorAttachment = {};
   colorAttachment.format = renderTarget->format();
   colorAttachment.colorWriteMask = colorWriteMask;
-  if (xferFacts.shaderBlend || blendMode == BlendMode::Src) {
+  if (xferFacts.shaderBlend() || blendMode == BlendMode::Src) {
     return colorAttachment;
   }
   BlendFormula blendFormula = {};
@@ -144,9 +139,9 @@ BytesKey ProgramInfo::buildProgramKey() const {
   // The output formula's contribution, the same encoding the precompiled-side key writes: the
   // shader-stage flag and the sampled destination's identity (a null proxy is the framebuffer
   // fetch; blendMode rides the pipeline state key below).
-  key.write(static_cast<uint32_t>(xferFacts.shaderBlend ? 1u : 0u));
-  if (xferFacts.shaderBlend) {
-    const auto& dstProxy = xferFacts.dstTexture.textureProxy;
+  key.write(static_cast<uint32_t>(xferFacts.shaderBlend() ? 1u : 0u));
+  if (xferFacts.shaderBlend()) {
+    const auto& dstProxy = xferFacts.dstTexture->textureProxy;
     auto dstView = dstProxy != nullptr ? dstProxy->getTextureView() : nullptr;
     if (dstView != nullptr) {
       TextureView::ComputeTextureKey(dstView->getTexture(), &key);
@@ -320,9 +315,10 @@ std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
     }
     fp = iter.next();
   }
-  const auto& dstProxy = xferFacts.dstTexture.textureProxy;
+  const auto& dstProxy = xferFacts.dstTexture.has_value() ? xferFacts.dstTexture->textureProxy
+                                                          : DstTextureInfo{}.textureProxy;
   auto dstView =
-      xferFacts.shaderBlend && dstProxy != nullptr ? dstProxy->getTextureView() : nullptr;
+      xferFacts.shaderBlend() && dstProxy != nullptr ? dstProxy->getTextureView() : nullptr;
   if (dstView != nullptr) {
     SamplerInfo sampler = {dstView->getTexture(), {}};
     samplers.push_back(sampler);
