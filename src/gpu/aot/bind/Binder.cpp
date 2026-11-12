@@ -60,12 +60,15 @@ struct ChainIndices {
   uint8_t chainData = ChainElement("ChainData");
   uint8_t clipCoverageRegister = ChainElement("ClipCoverageRegister");
   uint8_t coverageRootIndex = ChainElement("CoverageRootIndex");
+  uint8_t deviceLeafCoordMatrix = ChainElement("DeviceLeafCoordMatrix");
   uint8_t deviceLeafMask = ChainElement("DeviceLeafMask");
   uint8_t gradientColorizerKind = ChainElement("GradientColorizerKind");
   uint8_t gradientIntervalCount = ChainElement("GradientIntervalCount");
   uint8_t gradientLayoutType = ChainElement("GradientLayoutType");
   uint8_t gradientLUTLeaf = ChainElement("GradientLUTLeaf");
   uint8_t hasMaskTexture = ChainElement("HasMaskTexture");
+  uint8_t leafReadSwizzles = ChainElement("LeafReadSwizzles");
+  uint8_t noiseModeOctaves = ChainElement("NoiseModeOctaves");
   uint8_t rootIndex = ChainElement("RootIndex");
   uint8_t slotCount = ChainElement("SlotCount");
   uint8_t slotPacked = ChainElement("SlotPacked");
@@ -410,9 +413,9 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
         deviceCoordMatrix[0], deviceCoordMatrix[1], deviceCoordMatrix[2],
         deviceCoordMatrix[3], deviceCoordMatrix[4], deviceCoordMatrix[5],
         deviceCoordMatrix[6], deviceCoordMatrix[7], deviceCoordMatrix[8]};
-    fragmentUniformData->setArrayElementOptional(ChainParams::DeviceLeafCoordMatrix.name,
-                                                 static_cast<size_t>(deviceLeaf.leafIndex),
-                                                 Mat3ToStd140ColumnMajor(values));
+    chainWriter->setArrayElementIfPresent(ChainField.deviceLeafCoordMatrix,
+                                          static_cast<size_t>(deviceLeaf.leafIndex),
+                                          Mat3ToStd140ColumnMajor(values));
   }
   bool hasLeaf = false;
   for (const auto& binding : program.bindings) {
@@ -429,7 +432,7 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
         }
       }
     }
-    fragmentUniformData->setData(ChainParams::LeafReadSwizzles.name, readSwizzles);
+    chainWriter->setIfPresent(ChainField.leafReadSwizzles, readSwizzles);
   }
   // Each selector names the leaf that reads the matching recipe set; the kernel never reads a set
   // whose selector is -1, so an absent recipe needs no upload.
@@ -505,7 +508,7 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
       UploadSlotData(chainWriter, ChainField.chainData, index, data, ChainISA::PackPerlinNoise);
       int modeOctaves[] = {noise.noiseType, noise.numOctaves, noise.stitchTiles ? 1 : 0,
                            program.noiseSamplerBase};
-      fragmentUniformData->setDataOptional(ChainParams::NoiseModeOctaves.name, modeOctaves);
+      chainWriter->setIfPresent(ChainField.noiseModeOctaves, modeOctaves);
       break;
     }
   }
