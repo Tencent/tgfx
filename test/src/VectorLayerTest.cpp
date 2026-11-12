@@ -5670,4 +5670,64 @@ TGFX_TEST(VectorLayerTest, TextClearTextBlob) {
   EXPECT_EQ(textSpan->textBlob(), nullptr);
 }
 
+class CollectingVectorDrawSink : public VectorDrawSink {
+ public:
+  void drawShape(const VectorDrawOp& op) override {
+    shapes.push_back(op);
+  }
+
+  void drawGlyphRun(const VectorDrawOp& op) override {
+    glyphRuns.push_back(op);
+  }
+
+  void drawOwnGeometry(const VectorDrawOp& op) override {
+    ownGeometries.push_back(op);
+  }
+
+  std::vector<VectorDrawOp> shapes = {};
+  std::vector<VectorDrawOp> glyphRuns = {};
+  std::vector<VectorDrawOp> ownGeometries = {};
+};
+
+/**
+ * Test VectorLayer::prepareDraws: the shared painter traversal must expose the same prepared draws
+ * the renderer consumes, including own geometries that no painter captured.
+ */
+TGFX_TEST(VectorLayerTest, PrepareDraws) {
+  auto filledLayer = VectorLayer::Make();
+  filledLayer->setContents({MakeRoundedRectangle(), MakeFillStyle(Color::White())});
+  CollectingVectorDrawSink filledSink = {};
+  ASSERT_TRUE(filledLayer->prepareDraws(&filledSink));
+  ASSERT_EQ(filledSink.shapes.size(), 1u);
+  EXPECT_EQ(filledSink.glyphRuns.size(), 0u);
+  EXPECT_EQ(filledSink.ownGeometries.size(), 0u);
+  EXPECT_TRUE(filledSink.shapes[0].shape != nullptr);
+  ASSERT_EQ(filledSink.shapes[0].paints.size(), 1u);
+  EXPECT_EQ(filledSink.shapes[0].paints[0].color, Color::White());
+
+  auto ownLayer = VectorLayer::Make();
+  ownLayer->setContents({MakeRoundedRectangle()});
+  CollectingVectorDrawSink ownSink = {};
+  ASSERT_TRUE(ownLayer->prepareDraws(&ownSink));
+  EXPECT_EQ(ownSink.shapes.size(), 0u);
+  ASSERT_EQ(ownSink.ownGeometries.size(), 1u);
+  EXPECT_TRUE(ownSink.ownGeometries[0].shape != nullptr);
+
+  auto typeface = GetTestTypeface();
+  if (typeface == nullptr) {
+    return;
+  }
+  auto textLayer = VectorLayer::Make();
+  Font font(typeface, 36.0f);
+  auto textSpan = Text::Make(TextBlob::MakeFrom("Hello", font));
+  textSpan->setPosition({20, 40});
+  textLayer->setContents({textSpan, MakeFillStyle(Color::Black())});
+  CollectingVectorDrawSink textSink = {};
+  ASSERT_TRUE(textLayer->prepareDraws(&textSink));
+  ASSERT_EQ(textSink.glyphRuns.size(), 1u);
+  EXPECT_TRUE(textSink.glyphRuns[0].textBlob != nullptr);
+  ASSERT_EQ(textSink.glyphRuns[0].paints.size(), 1u);
+  EXPECT_EQ(textSink.glyphRuns[0].matrix, Matrix::MakeTrans(20, 40));
+}
+
 }  // namespace tgfx

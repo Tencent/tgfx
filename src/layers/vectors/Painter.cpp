@@ -22,6 +22,35 @@
 
 namespace tgfx {
 
+class RecorderPainterSink : public PainterSink {
+ public:
+  explicit RecorderPainterSink(LayerRecorder* recorder) : _recorder(recorder) {
+  }
+
+  void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint,
+                const Matrix& matrix) override {
+    _recorder->setMatrix(matrix);
+    _recorder->addShape(std::move(shape), &paint);
+    _recorder->resetMatrix();
+  }
+
+  void addGlyphRun(std::shared_ptr<TextBlob> textBlob, std::shared_ptr<Shape> shape,
+                   std::vector<LayerPaint> paints, const Matrix& matrix) override {
+    _recorder->setMatrix(matrix);
+    for (const auto& paint : paints) {
+      if (shape != nullptr) {
+        _recorder->addShape(shape, &paint);
+      } else if (textBlob != nullptr) {
+        _recorder->addTextBlob(textBlob, &paint);
+      }
+    }
+    _recorder->resetMatrix();
+  }
+
+ private:
+  LayerRecorder* _recorder = nullptr;
+};
+
 void Painter::captureGeometries(VectorContext* context) {
   geometries.reserve(context->geometries.size());
   innerMatrices.reserve(context->geometries.size());
@@ -32,6 +61,11 @@ void Painter::captureGeometries(VectorContext* context) {
 }
 
 void Painter::draw(LayerRecorder* recorder) {
+  RecorderPainterSink sink(recorder);
+  draw(&sink);
+}
+
+void Painter::draw(PainterSink* sink) {
   for (size_t i = 0; i < geometries.size(); i++) {
     auto* geometry = geometries[i];
     const auto& innerMatrix = innerMatrices[i];
@@ -46,15 +80,8 @@ void Painter::draw(LayerRecorder* recorder) {
         auto runMatrix = run.matrix;
         runMatrix.postConcat(innerMatrix);
         runMatrix.postConcat(outerMatrix);
-        recorder->setMatrix(runMatrix);
-        for (const auto& paint : emit.paints) {
-          if (emit.shape != nullptr) {
-            recorder->addShape(emit.shape, &paint);
-          } else if (emit.textBlob != nullptr) {
-            recorder->addTextBlob(emit.textBlob, &paint);
-          }
-        }
-        recorder->resetMatrix();
+        sink->addGlyphRun(std::move(emit.textBlob), std::move(emit.shape), std::move(emit.paints),
+                          runMatrix);
       }
       continue;
     }
@@ -74,9 +101,7 @@ void Painter::draw(LayerRecorder* recorder) {
     if (shape == nullptr) {
       continue;
     }
-    recorder->setMatrix(outerMatrix);
-    recorder->addShape(std::move(shape), &paint);
-    recorder->resetMatrix();
+    sink->addShape(std::move(shape), paint, outerMatrix);
   }
 }
 

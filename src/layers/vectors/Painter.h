@@ -32,6 +32,22 @@ class LayerRecorder;
 class VectorContext;
 
 /**
+ * Receives the final prepared draw operations of a Painter traversal. Implementations decide how
+ * the operations are recorded; the traversal, matrix composition, and preparation hooks stay
+ * shared between normal rendering and export consumers.
+ */
+class PainterSink {
+ public:
+  virtual ~PainterSink() = default;
+
+  virtual void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint,
+                        const Matrix& matrix) = 0;
+
+  virtual void addGlyphRun(std::shared_ptr<TextBlob> textBlob, std::shared_ptr<Shape> shape,
+                           std::vector<LayerPaint> paints, const Matrix& matrix) = 0;
+};
+
+/**
  * Describes the fill/stroke style of a drawing operation.
  */
 struct PainterStyle {
@@ -79,6 +95,12 @@ class Painter {
    * them through the recorder under the proper CTM.
    */
   void draw(LayerRecorder* recorder);
+
+  /**
+   * Performs the same traversal as draw(LayerRecorder*), forwarding the prepared operations to
+   * the sink instead of recording them as layer content.
+   */
+  void draw(PainterSink* sink);
 
   /**
    * Creates a copy of this painter.

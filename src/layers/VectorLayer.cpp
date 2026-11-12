@@ -107,6 +107,76 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
   }
 }
 
+class LayerVectorDrawSink : public PainterSink {
+ public:
+  explicit LayerVectorDrawSink(VectorDrawSink* sink) : _sink(sink) {
+  }
+
+  void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint,
+                const Matrix& matrix) override {
+    VectorDrawOp op = {};
+    op.shape = std::move(shape);
+    op.paints.push_back(paint);
+    op.matrix = matrix;
+    _sink->drawShape(op);
+  }
+
+  void addGlyphRun(std::shared_ptr<TextBlob> textBlob, std::shared_ptr<Shape> shape,
+                   std::vector<LayerPaint> paints, const Matrix& matrix) override {
+    VectorDrawOp op = {};
+    op.shape = std::move(shape);
+    op.textBlob = std::move(textBlob);
+    op.paints = std::move(paints);
+    op.matrix = matrix;
+    _sink->drawGlyphRun(op);
+  }
+
+ private:
+  VectorDrawSink* _sink = nullptr;
+};
+
+bool VectorLayer::prepareDraws(VectorDrawSink* sink) const {
+  if (sink == nullptr) {
+    return false;
+  }
+  if (_contents.empty()) {
+    return true;
+  }
+  VectorContext context = {};
+  for (const auto& element : _contents) {
+    DEBUG_ASSERT(element != nullptr);
+    if (element->enabled()) {
+      element->apply(&context);
+    }
+  }
+  LayerVectorDrawSink painterSink(sink);
+  for (const auto& painter : context.painters) {
+    DEBUG_ASSERT(painter != nullptr);
+    painter->draw(&painterSink);
+  }
+  std::unordered_set<const Geometry*> capturedGeometries = {};
+  capturedGeometries.reserve(context.geometries.size());
+  for (const auto& painter : context.painters) {
+    DEBUG_ASSERT(painter != nullptr);
+    capturedGeometries.insert(painter->geometries.begin(), painter->geometries.end());
+  }
+  for (const auto& geometry : context.geometries) {
+    DEBUG_ASSERT(geometry != nullptr);
+    if (capturedGeometries.count(geometry.get()) != 0) {
+      continue;
+    }
+    auto shape = geometry->getShape();
+    if (shape == nullptr) {
+      continue;
+    }
+    VectorDrawOp op = {};
+    op.shape = std::move(shape);
+    op.matrix = geometry->matrix;
+    sink->drawOwnGeometry(op);
+  }
+  return true;
+}
+
 std::optional<StyledShape> VectorLayer::onGetContentShape() {
   if (_contents.empty()) {
     return std::nullopt;

@@ -22,6 +22,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/VectorDraw.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
@@ -59,6 +60,13 @@ class VectorLayer : public Layer {
    * or a VectorGroup containing multiple elements.
    */
   void setContents(std::vector<std::shared_ptr<VectorElement>> value);
+
+  /**
+   * Applies every enabled element and forwards the surviving painter draws and own geometries to
+   * the sink. The result is the same preparation the renderer consumes, exposed without converting
+   * the draws to layer content. Returns false when the sink is null.
+   */
+  bool prepareDraws(VectorDrawSink* sink) const;
 
  protected:
   VectorLayer() = default;
