@@ -584,14 +584,12 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
   if (!vertBlob->uniforms.empty()) {
     vertexUniformData = std::unique_ptr<UniformData>(new UniformData(vertBlob->uniforms));
-    vertexUniformData->buildParamLayout();
     BindingEntry vertexBinding = {VertexUniformBlockName, VERTEX_UBO_BINDING_POINT,
                                   ShaderVisibility::Vertex};
     descriptor.layout.uniformBlocks.push_back(vertexBinding);
   }
   if (!fragBlob->uniforms.empty()) {
     fragmentUniformData = std::unique_ptr<UniformData>(new UniformData(fragBlob->uniforms));
-    fragmentUniformData->buildParamLayout();
     BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT,
                                     ShaderVisibility::Fragment};
     descriptor.layout.uniformBlocks.push_back(fragmentBinding);

@@ -24,7 +24,6 @@
 #include <vector>
 #include "core/DiagnosticCodes.h"
 #include "gpu/aot/AOTResourceProfile.h"
-#include "gpu/aot/bind/AOTParamRegistry.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/PrecompiledShader.h"

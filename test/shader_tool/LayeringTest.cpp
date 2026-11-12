@@ -123,7 +123,7 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
       "gpu/shaders/contract/SpecContract.h", "gpu/Uniform.h", "gpu/shaders/BundleCodec.h",
       "gpu/shaders/KernelContract.h",
       // declaration layer
-      "gpu/aot/bind/AOTParamRegistry.h", "gpu/shaders/PrecompiledShader.h",
+      "gpu/shaders/PrecompiledShader.h",
       // the module-declaration layer (families, layouts, domains)
       "gpu/shaders/Module.h", "gpu/shaders/Family.h", "gpu/shaders/Families.h",
       "gpu/shaders/FamilyDomains.h", "gpu/shaders/Layout.h",

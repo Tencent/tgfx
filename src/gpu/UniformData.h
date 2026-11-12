@@ -24,7 +24,6 @@
 #include <utility>
 #include <vector>
 #include "gpu/Uniform.h"
-#include "gpu/aot/bind/AOTParamLayout.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorSpace.h"
@@ -146,25 +145,6 @@ class UniformData {
   }
 
   /**
-   * Resolves this data's parameter layout (see AOTParamLayout) from its reflected fields. Built
-   * once, for precompiled programs only; runtime-generated programs keep no layout and their
-   * writes stay name-addressed.
-   */
-  void buildParamLayout();
-
-  /**
-   * The offset-addressed write: the parameter's slot (resolved once per program) and the
-   * instance index address the bytes directly — no name composition, no hash lookup. Returns
-   * false when this data has no layout, the key is unknown, the parameter is undeclared here,
-   * the instance is out of range, or the value's size disagrees; the caller then keeps the
-   * name-addressed path, which stays authoritative.
-   */
-  bool writeParamKey(const void* key, size_t instance, const void* data, size_t size) const;
-
-  /// The Matrix form of writeParamKey, matching setDataOptional's 12-float aligned layout.
-  bool writeParamKey(const void* key, size_t instance, const Matrix& matrix) const;
-
-  /**
    * Sets an external memory buffer for writing uniform data.
    * On platforms with UBO support, the buffer points to memory mapped from a GPU UBO object.
    * On platforms without UBO support, the buffer points to CPU memory.
@@ -229,7 +209,6 @@ class UniformData {
   size_t cursor = 0;
   /// The one memcpy every write funnels into, so the debug write-range tracking sees them all.
   void writeBytes(size_t offset, const void* data, size_t size) const;
-  std::unique_ptr<AOTParamLayout> _paramLayout = {};
 
   explicit UniformData(std::vector<Uniform> uniforms);
 
@@ -256,12 +235,8 @@ class UniformData {
 
   friend class ProgramInfo;
   friend class ProgramWriter;
-  friend class AOTParamLayout;
   friend class PrecompiledProgramWriter;
   friend class ChainProgramWriter;
   friend class PrecompiledProgramCreator;
-  // The shell-free chain binder drives the same structural-suffix addressing the processor-tree
-  // walk maintained; only the per-binding walk needs the direct access.
-  friend void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformData);
 };
 }  // namespace tgfx
