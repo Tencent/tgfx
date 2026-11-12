@@ -58,6 +58,13 @@ class Text : public VectorElement {
   void setTextBlob(std::shared_ptr<TextBlob> textBlob, std::vector<Point> anchors = {});
 
   /**
+   * Removes the text blob and anchors while keeping this Text object and its position. Use this
+   * when a reshape legitimately produces no glyphs (empty text or every glyph dropped); passing a
+   * null blob to setTextBlob leaves the current blob unchanged and would keep stale glyphs.
+   */
+  void clearTextBlob();
+
+  /**
    * Returns the position of the text blob.
    */
   Point position() const {

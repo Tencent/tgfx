@@ -5610,4 +5610,64 @@ TGFX_TEST(VectorLayerTest, TextSetTextBlob) {
   EXPECT_TRUE(Baseline::Compare(surface, "VectorLayerTest/TextSetTextBlob"));
 }
 
+/**
+ * Test Text::clearTextBlob: a reshape that legitimately produces no glyphs must remove the drawn
+ * content while keeping the Text object and its position valid for the parent VectorLayer. The
+ * rendered pixels are checked directly because a new baseline is not required for the empty state.
+ */
+static int CountNonWhitePixels(Surface* surface, int width, int height) {
+  std::vector<uint32_t> pixels(static_cast<size_t>(width) * height);
+  auto info = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  if (!surface->readPixels(info, pixels.data())) {
+    return -1;
+  }
+  int count = 0;
+  for (auto pixel : pixels) {
+    if ((pixel & 0x00FFFFFF) != 0x00FFFFFF) {
+      count++;
+    }
+  }
+  return count;
+}
+
+TGFX_TEST(VectorLayerTest, TextClearTextBlob) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int Width = 291;
+  constexpr int Height = 120;
+  auto surface = Surface::Make(context, Width, Height);
+  ASSERT_TRUE(surface != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto vectorLayer = VectorLayer::Make();
+
+  auto typeface = GetTestTypeface();
+  if (typeface == nullptr) {
+    return;
+  }
+  Font font(typeface, 36.0f);
+
+  auto blob = TextBlob::MakeFrom("Hello", font);
+  auto textSpan = Text::Make(blob);
+  textSpan->setPosition({50, 80});
+  auto fill = MakeFillStyle(Color::Black());
+  vectorLayer->setContents({textSpan, fill});
+  displayList->root()->addChild(vectorLayer);
+
+  displayList->render(surface.get());
+  EXPECT_GT(CountNonWhitePixels(surface.get(), Width, Height), 0);
+
+  textSpan->clearTextBlob();
+  ASSERT_EQ(textSpan->textBlob(), nullptr);
+  EXPECT_TRUE(textSpan->anchors().empty());
+  EXPECT_EQ(textSpan->position(), Point(50, 80));
+
+  displayList->render(surface.get());
+  EXPECT_EQ(CountNonWhitePixels(surface.get(), Width, Height), 0);
+
+  textSpan->clearTextBlob();
+  EXPECT_EQ(textSpan->textBlob(), nullptr);
+}
+
 }  // namespace tgfx
