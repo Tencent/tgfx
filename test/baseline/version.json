@@ -27,7 +27,7 @@
         "ScaledInnerShadowWithBackgroundBlur": "351c4df9",
         "SharedStyleOutput": "accb0e38",
         "SharedStyleOutput3D": "200dffffa",
-        "SimpleBackgroundBlur_tiled": "351c4df9",
+        "SimpleBackgroundBlur_tiled": "24bafb376",
         "backgroundLayerBlur": "29f9281d"
     },
     "CanvasTest": {
@@ -210,6 +210,7 @@
         "scaled_imageCodec_box_filter": "bf48e614",
         "scaled_mipmap": "1b8d95f2",
         "scaled_scale_up": "1b8d95f2",
+        "subset_crop_downscale": "a5eaa6cd8",
         "tile_mode_normal": "c5cfce4d",
         "tile_mode_rgbaaa": "bf48e614",
         "tile_mode_subset": "c5cfce4d"
@@ -314,6 +315,7 @@
         "GlassStyleSplayCompare": "f8b2f40c",
         "GlassStyleWithDropShadow": "f8b2f40c",
         "GlassStyleZoom": "f8b2f40c",
+        "GroupBlurTiledZoom": "a9672fcd3",
         "HasContentChanged_Offset": "bedeb932",
         "HasContentChanged_Org": "bedeb932",
         "HasContentChanged_Zoom": "bedeb932",

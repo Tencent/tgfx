@@ -6779,6 +6779,73 @@ TGFX_TEST(LayerTest, NestedOffscreenTiledZoom) {
                                  "LayerTest/NestedOffscreenTiledZoom");
 }
 
+// Centers the given content point on the surface at the requested zoom, so every frame renders the
+// same region while the zoomed tiles are refined.
+static void CenterTiledContent(DisplayList* displayList, const Surface& surface,
+                               const Point& contentCenter, float zoom) {
+  auto halfWidth = static_cast<float>(surface.width()) * 0.5f;
+  auto halfHeight = static_cast<float>(surface.height()) * 0.5f;
+  displayList->setZoomScale(zoom);
+  displayList->setContentOffset(halfWidth - contentCenter.x * zoom,
+                                halfHeight - contentCenter.y * zoom);
+}
+
+/**
+ * A red rectangle wrapped in a group whose Gaussian blur is zoomed far beyond the tile
+ * resolution. The blurred group is pasted back with a draw rect larger than its offscreen
+ * picture, so the picture has to be sampled through a downscaled crop of the image. A wrong crop
+ * matrix turns the continuous blur into repeating tile-sized gradient blocks.
+ */
+TGFX_TEST(LayerTest, GroupBlurTiledZoom) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 2048, 1024);
+  ASSERT_NE(surface, nullptr);
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.setTileUpdateMode(TileUpdateMode::Smooth);
+  displayList.setTileSize(256);
+  displayList.setMaxTilesRefinedPerFrame(1);
+  displayList.setSubtreeCacheMaxSize(0);
+  displayList.setBackgroundColor(Color::White());
+
+  const Point groupPosition = {2664.0f, -676.0f};
+  const Point rectangleCenter = {20.0f, 10.0f};
+  auto group = Layer::Make();
+  group->setPosition(groupPosition);
+  group->setBlendMode(BlendMode::SrcOver);
+  group->setPassThroughBackground(false);
+  group->setFilters({BlurFilter::Make(3, 3, TileMode::Decal)});
+  auto rectangle = Rectangle::Make();
+  rectangle->setSize({40, 20});
+  rectangle->setPosition(rectangleCenter);
+  auto fill = FillStyle::Make(SolidColor::Make(Color::Red()));
+  auto rectangleLayer = VectorLayer::Make();
+  rectangleLayer->setContents({rectangle, fill});
+  rectangleLayer->setBlendMode(BlendMode::SrcOver);
+  rectangleLayer->setPassThroughBackground(false);
+  group->addChild(rectangleLayer);
+  displayList.root()->addChild(group);
+
+  const Point contentCenter = {groupPosition.x + rectangleCenter.x,
+                               groupPosition.y + rectangleCenter.y};
+  // Warm up at zoom 1 so that the zoomed frames rebuild every visible tile from a stale cache
+  // instead of drawing the content in one continuous pass.
+  CenterTiledContent(&displayList, *surface, contentCenter, 1.0f);
+  displayList.render(surface.get());
+  CenterTiledContent(&displayList, *surface, contentCenter, 36.505f);
+  // Refine one tile per frame until every tile is rasterized at the target zoom; a fixed frame
+  // count would leave the last tiles at the stale zoom and make the image depend on scheduling.
+  int frames = 0;
+  do {
+    displayList.render(surface.get());
+    ++frames;
+  } while (displayList.hasContentChanged() && frames < 200);
+  ASSERT_FALSE(displayList.hasContentChanged()) << "tile refinement did not settle";
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GroupBlurTiledZoom"));
+}
+
 TGFX_TEST(LayerTest, GlassStyleWithDropShadow) {
   ContextScope scope;
   auto context = scope.getContext();
