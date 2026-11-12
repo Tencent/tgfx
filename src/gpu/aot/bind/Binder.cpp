@@ -29,13 +29,7 @@
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/ParamBuffer.h"
 #include "gpu/shaders/contract/ChainOps.h"
-#include "gpu/shaders/modules/AnalyticClipModule.h"
-#include "gpu/shaders/modules/BlendParams.h"
 #include "gpu/shaders/modules/Chain.h"
-#include "gpu/shaders/modules/ChainParams.h"
-#include "gpu/shaders/modules/DeviceMaskModule.h"
-#include "gpu/shaders/modules/TextureSourceModule.h"
-#include "gpu/shaders/modules/TiledSourceModule.h"
 #include "gpu/shaders/modules/Xfer.h"
 #include "gpu/shaders/modules/YUVChainTail.h"
 
@@ -383,19 +377,14 @@ void BindYUVProgram(const AOTProgram& program, SlotWriter* yuvWriter) {
   }
 }
 
-void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
-                      SlotWriter* chainWriter) {
+void BindChainProgram(const AOTProgram& program, SlotWriter* chainWriter) {
   const auto& slots = program.slots;
   const auto slotCount = slots.size();
-  if (vertexUniformData != nullptr) {
-    // Absent in variants without a uvCoord attribute (the field is compiled out there). The mask
-    // belongs to the geometry module, not to Chain, so it stays name-addressed for now.
-    vertexUniformData->setDataOptional(ChainParams::CoordSourceMask.name,
-                                       static_cast<int>(program.coordSourceMask));
-  }
   if (chainWriter == nullptr) {
     return;
   }
+  // The coord-source mask is the geometry module's field (ChainRectUVGeometry / ChainAtlasGeometry)
+  // and its upload belongs to the geometry writer.
   // The mask sampler slot is always bound in four-leaf variants; this flag selects the
   // runtime application. Absent in leaf-free variants (compile-time mask there).
   chainWriter->setIfPresent(ChainField.hasMaskTexture, program.hasMaskTexture ? 1 : 0);

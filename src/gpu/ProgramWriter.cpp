@@ -147,178 +147,220 @@ void ProgramWriter::writeEngineDefaults(const ProgramInfo&, UniformData*) const 
 
 namespace {
 
-/// The geometry's coordinate transforms, the setTransformDataHelper equivalent: the uv matrix
-/// concatenated onto each transform's own matrix, written by ordinal name. The quad geometry's
-/// legacy hook additionally writes the first transform's bare matrix as texSubsetMatrix when the
-/// draw carries a subset and no uv coordinate (the subset bounds' own mapping).
-void WriteGeometryCoordTransforms(const Matrix& uvMatrix, bool writeSubsetMatrix,
-                                  UniformData* vertexUniformData,
-                                  FragmentProcessor::CoordTransformIter* transformIter) {
+// The Chain modules' element indices: every geometry takes its constants from its own declaration
+// (a mistyped name is the link error Module.h's ElementNameNotFound promises). The six coordinate
+// matrices are consecutive elements of the Chain module; the per-element `when` gates bound how
+// many a profile declares.
+constexpr uint8_t ChainCoordTransformBase = UniformElementIndexOf(Chain, "CoordTransformMatrix_0");
+constexpr uint8_t ChainCoordTransformCount = 6;
+
+struct ChainCoordTransformWrite {
+  bool hasFirst = false;
+  Matrix firstTotal = {};
+};
+
+/// Writes the geometry's coordinate transforms through the Chain module's element indices: the uv
+/// matrix concatenated onto each transform's own matrix, in graph order. Returns the first
+/// transform's own matrix, which the plain rect geometry also exposes as its subset matrix.
+ChainCoordTransformWrite WriteChainCoordTransforms(
+    SlotWriter* chainWriter, const Matrix& uvMatrix,
+    FragmentProcessor::CoordTransformIter* transformIter) {
+  ChainCoordTransformWrite result = {};
   int index = 0;
   while (const CoordTransform* coordTransform = transformIter->next()) {
-    Matrix combined = {};
-    combined.setConcat(coordTransform->getTotalMatrix(), uvMatrix);
-    vertexUniformData->setData("CoordTransformMatrix_" + std::to_string(index), combined);
-    if (writeSubsetMatrix && index == 0) {
-      vertexUniformData->setData("texSubsetMatrix", coordTransform->getTotalMatrix());
+    if (index == 0) {
+      result.hasFirst = true;
+      result.firstTotal = coordTransform->getTotalMatrix();
+    }
+    if (index < ChainCoordTransformCount) {
+      Matrix combined = {};
+      combined.setConcat(coordTransform->getTotalMatrix(), uvMatrix);
+      chainWriter->setIfPresent(static_cast<uint8_t>(ChainCoordTransformBase + index), combined);
     }
     ++index;
   }
+  return result;
 }
 
-}  // namespace
-
-/// Writes the geometry's uniform values by name: the one geometry upload the JIT and chain
-/// writers take, the successor of the processors' setData. The fields and their guards are the
-/// processors' own (each guard keeps the runtime-compiled layouts working, where a field may be
-/// absent).
-void WriteGeometryUniformsByName(const GeometryLayout& layout, UniformData* vertexUniformData,
-                                 UniformData* fragmentUniformData,
-                                 FragmentProcessor::CoordTransformIter* transformIter) {
-  if (vertexUniformData == nullptr) {
-    return;
-  }
-  const auto& p = layout.parameters;
+/// The plain quad layout (geometry 0): the uv matrix rides the per-quad attribute, so the vertex
+/// stage keeps only its own projection. The default, quad-per-edge-AA and mesh processors share
+/// this module; their writes differ in the matrix source and the common-color flag's meaning.
+void WriteChainRectGeometry(SlotWriter* writer, SlotWriter* chainWriter,
+                            const AOTGeometryParameters& p,
+                            FragmentProcessor::CoordTransformIter* transformIter) {
+  constexpr uint8_t Matrix = UniformElementIndexOf(ChainRectGeometry, "Matrix");
+  constexpr uint8_t TexSubsetMatrix = UniformElementIndexOf(ChainRectGeometry, "texSubsetMatrix");
+  constexpr uint8_t Color = UniformElementIndexOf(ChainRectGeometry, "Color");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(ChainRectGeometry, "HasCommonColor");
   switch (p.kind) {
     case GeometryKind::Default: {
-      WriteGeometryCoordTransforms(p.uvMatrix, false, vertexUniformData, transformIter);
-      if (fragmentUniformData != nullptr) {
-        fragmentUniformData->setDataOptional("Color", p.commonColor);
-        if (fragmentUniformData->hasField("HasCommonColor")) {
-          fragmentUniformData->setData("HasCommonColor", 1);
-        }
-      }
-      vertexUniformData->setData("Matrix", p.viewMatrix);
+      WriteChainCoordTransforms(chainWriter, p.uvMatrix, transformIter);
+      writer->set(Color, p.commonColor);
+      writer->set(HasCommonColor, 1);
+      writer->set(Matrix, p.viewMatrix);
       break;
     }
     case GeometryKind::QuadPerEdgeAA: {
-      WriteGeometryCoordTransforms(p.uvMatrix, p.hasSubset && p.hasUVMatrix, vertexUniformData,
-                                   transformIter);
-      if (vertexUniformData->hasField("Matrix")) {
-        vertexUniformData->setData("Matrix", Matrix::I());
+      auto write = WriteChainCoordTransforms(chainWriter, p.uvMatrix, transformIter);
+      writer->set(Matrix, Matrix::I());
+      writer->set(HasCommonColor, p.hasCommonColor ? 1 : 0);
+      if (p.hasCommonColor) {
+        writer->set(Color, p.commonColor);
       }
-      if (fragmentUniformData != nullptr) {
-        if (fragmentUniformData->hasField("HasCommonColor")) {
-          fragmentUniformData->setData("HasCommonColor", p.hasCommonColor ? 1 : 0);
-        }
-        if (p.hasCommonColor && fragmentUniformData->hasField("Color")) {
-          fragmentUniformData->setData("Color", p.commonColor);
-        }
+      if (p.hasSubset && p.hasUVMatrix && write.hasFirst) {
+        writer->setIfPresent(TexSubsetMatrix, write.firstTotal);
       }
-      break;
-    }
-    case GeometryKind::RoundStrokeRect: {
-      WriteGeometryCoordTransforms(p.uvMatrix, false, vertexUniformData, transformIter);
-      if (fragmentUniformData != nullptr) {
-        if (p.hasCommonColor) {
-          fragmentUniformData->setDataOptional("Color", p.commonColor);
-        }
-        if (fragmentUniformData->hasField("HasCommonColor")) {
-          fragmentUniformData->setData("HasCommonColor", p.hasCommonColor ? 1 : 0);
-        }
-        if (fragmentUniformData->hasField("AAEnabled")) {
-          fragmentUniformData->setData("AAEnabled", p.aaType == AAType::Coverage ? 1 : 0);
-        }
-      }
-      break;
-    }
-    case GeometryKind::NonAARRect:
-    case GeometryKind::ComplexNonAARRect:
-    case GeometryKind::Ellipse:
-    case GeometryKind::ComplexEllipse: {
-      WriteGeometryCoordTransforms(Matrix::I(), false, vertexUniformData, transformIter);
-      if (fragmentUniformData != nullptr) {
-        if (p.hasCommonColor) {
-          fragmentUniformData->setDataOptional("Color", p.commonColor);
-        }
-        if (fragmentUniformData->hasField("HasCommonColor")) {
-          fragmentUniformData->setData("HasCommonColor", p.hasCommonColor ? 1 : 0);
-        }
-        // The stroke form is a runtime uniform on every rounded-rect layout: the coverage formulas
-        // read it instead of a per-form kernel.
-        fragmentUniformData->setData("StrokeEnabled", p.isStroke ? 1 : 0);
-        if (p.kind == GeometryKind::ComplexEllipse) {
-          fragmentUniformData->setDataOptional("HasDeviceMask", 0);
-        }
-      }
-      break;
-    }
-    case GeometryKind::HairlineLine: {
-      if (p.hasUVMatrix) {
-        WriteGeometryCoordTransforms(p.uvMatrix, false, vertexUniformData, transformIter);
-      }
-      if (fragmentUniformData != nullptr && fragmentUniformData->hasField("HasCommonColor")) {
-        fragmentUniformData->setData("HasCommonColor", 1);
-      }
-      if (fragmentUniformData != nullptr) {
-        fragmentUniformData->setData("Color", p.commonColor);
-        fragmentUniformData->setData("Coverage", p.coverage);
-        fragmentUniformData->setData("AAEnabled", p.aaType == AAType::Coverage ? 1 : 0);
-      }
-      vertexUniformData->setData("Matrix", p.viewMatrix);
-      break;
-    }
-    case GeometryKind::HairlineQuad: {
-      if (p.hasUVMatrix) {
-        WriteGeometryCoordTransforms(p.uvMatrix, false, vertexUniformData, transformIter);
-      }
-      if (fragmentUniformData != nullptr) {
-        // The chain layout declares the common-color flag; the dedicated family does not.
-        if (fragmentUniformData->hasField("HasCommonColor")) {
-          fragmentUniformData->setData("HasCommonColor", 1);
-        }
-        fragmentUniformData->setData("Color", p.commonColor);
-        fragmentUniformData->setData("Coverage", p.coverage);
-        fragmentUniformData->setData("AAEnabled", p.aaType == AAType::Coverage ? 1 : 0);
-      }
-      vertexUniformData->setData("Matrix", p.viewMatrix);
       break;
     }
     case GeometryKind::Mesh: {
-      vertexUniformData->setData("Matrix", p.viewMatrix);
-      WriteGeometryCoordTransforms(Matrix::I(), false, vertexUniformData, transformIter);
-      if (fragmentUniformData != nullptr) {
-        fragmentUniformData->setDataOptional("Color", p.commonColor);
-        fragmentUniformData->setDataOptional("HasCommonColor", p.hasColors ? 0 : 1);
-      }
-      break;
-    }
-    case GeometryKind::ShapeInstanced: {
-      vertexUniformData->setData("UVMatrix", p.uvMatrix);
-      vertexUniformData->setData("ViewMatrix", p.viewMatrix);
-      WriteGeometryCoordTransforms(Matrix::I(), false, vertexUniformData, transformIter);
-      break;
-    }
-    case GeometryKind::AtlasText: {
-      if (p.atlasProxy != nullptr) {
-        auto atlasView = p.atlasProxy->getTextureView();
-        if (atlasView != nullptr) {
-          auto atlasSizeInv = atlasView->getTextureCoord(1.f, 1.f);
-          vertexUniformData->setDataOptional("atlasSizeInv", atlasSizeInv);
-        }
-      }
-      if (vertexUniformData->hasField("Matrix")) {
-        vertexUniformData->setData("Matrix", Matrix::I());
-      }
-      WriteGeometryCoordTransforms(Matrix::I(), false, vertexUniformData, transformIter);
-      if (fragmentUniformData != nullptr) {
-        if (p.hasCommonColor) {
-          fragmentUniformData->setDataOptional("Color", p.commonColor);
-        }
-        if (fragmentUniformData->hasField("HasCommonColor")) {
-          fragmentUniformData->setData("HasCommonColor", p.hasCommonColor ? 1 : 0);
-        }
-        if (fragmentUniformData->hasField("AlphaOnly")) {
-          fragmentUniformData->setData("AlphaOnly", p.isAlphaOnly ? 1 : 0);
-        }
-        fragmentUniformData->setDataOptional("HasDeviceMask", 0);
-      }
+      writer->set(Matrix, p.viewMatrix);
+      WriteChainCoordTransforms(chainWriter, Matrix::I(), transformIter);
+      writer->set(Color, p.commonColor);
+      writer->set(HasCommonColor, p.hasColors ? 0 : 1);
       break;
     }
     default:
       break;
   }
 }
+
+/// The uv-attribute quad layout (geometry 1): every leaf reads either the attribute or the local
+/// coordinate, selected per leaf by the runtime coord-source mask.
+void WriteChainRectUVGeometry(SlotWriter* writer, SlotWriter* chainWriter,
+                              const AOTGeometryParameters& p, uint32_t coordSourceMask,
+                              FragmentProcessor::CoordTransformIter* transformIter) {
+  constexpr uint8_t Matrix = UniformElementIndexOf(ChainRectUVGeometry, "Matrix");
+  constexpr uint8_t CoordSourceMask = UniformElementIndexOf(ChainRectUVGeometry, "CoordSourceMask");
+  constexpr uint8_t Color = UniformElementIndexOf(ChainRectUVGeometry, "Color");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(ChainRectUVGeometry, "HasCommonColor");
+  writer->set(CoordSourceMask, static_cast<int>(coordSourceMask));
+  switch (p.kind) {
+    case GeometryKind::Default: {
+      WriteChainCoordTransforms(chainWriter, p.uvMatrix, transformIter);
+      writer->set(Color, p.commonColor);
+      writer->set(HasCommonColor, 1);
+      writer->set(Matrix, p.viewMatrix);
+      break;
+    }
+    case GeometryKind::Mesh: {
+      writer->set(Matrix, p.viewMatrix);
+      WriteChainCoordTransforms(chainWriter, Matrix::I(), transformIter);
+      writer->set(Color, p.commonColor);
+      writer->set(HasCommonColor, p.hasColors ? 0 : 1);
+      break;
+    }
+    default: {
+      WriteChainCoordTransforms(chainWriter, p.uvMatrix, transformIter);
+      writer->set(Matrix, Matrix::I());
+      writer->set(HasCommonColor, p.hasCommonColor ? 1 : 0);
+      if (p.hasCommonColor) {
+        writer->set(Color, p.commonColor);
+      }
+      break;
+    }
+  }
+}
+
+/// The glyph atlas layout (geometry 2): the mask coordinate rides the uv slot, no coverage
+/// attribute, and the vertex stage keeps identity plus the coord-source mask.
+void WriteChainAtlasGeometry(SlotWriter* writer, SlotWriter* chainWriter,
+                             const AOTGeometryParameters& p, uint32_t coordSourceMask,
+                             FragmentProcessor::CoordTransformIter* transformIter) {
+  constexpr uint8_t Matrix = UniformElementIndexOf(ChainAtlasGeometry, "Matrix");
+  constexpr uint8_t CoordSourceMask = UniformElementIndexOf(ChainAtlasGeometry, "CoordSourceMask");
+  constexpr uint8_t Color = UniformElementIndexOf(ChainAtlasGeometry, "Color");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(ChainAtlasGeometry, "HasCommonColor");
+  writer->set(Matrix, Matrix::I());
+  writer->set(CoordSourceMask, static_cast<int>(coordSourceMask));
+  WriteChainCoordTransforms(chainWriter, Matrix::I(), transformIter);
+  if (p.hasCommonColor) {
+    writer->set(Color, p.commonColor);
+  }
+  writer->set(HasCommonColor, p.hasCommonColor ? 1 : 0);
+}
+
+/// The per-pixel coverage rounded geometries (the ellipse, the complex ellipse and the two non-AA
+/// rounded rects): the paint and the runtime stroke switch are all they carry.
+template <const Module& G>
+void WriteChainStrokeGeometry(SlotWriter* writer, SlotWriter* chainWriter,
+                              const AOTGeometryParameters& p,
+                              FragmentProcessor::CoordTransformIter* transformIter) {
+  constexpr uint8_t Color = UniformElementIndexOf(G, "Color");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(G, "HasCommonColor");
+  constexpr uint8_t StrokeEnabled = UniformElementIndexOf(G, "StrokeEnabled");
+  WriteChainCoordTransforms(chainWriter, Matrix::I(), transformIter);
+  if (p.hasCommonColor) {
+    writer->set(Color, p.commonColor);
+  }
+  writer->set(HasCommonColor, p.hasCommonColor ? 1 : 0);
+  writer->set(StrokeEnabled, p.isStroke ? 1 : 0);
+}
+
+/// The per-pixel edge-AA hairline line and quad: a constant coverage factor plus the AA switch,
+/// with the vertex stage projecting through the view matrix.
+template <const Module& G>
+void WriteChainHairlineGeometry(SlotWriter* writer, SlotWriter* chainWriter,
+                                const AOTGeometryParameters& p,
+                                FragmentProcessor::CoordTransformIter* transformIter) {
+  constexpr uint8_t Matrix = UniformElementIndexOf(G, "Matrix");
+  constexpr uint8_t Color = UniformElementIndexOf(G, "Color");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(G, "HasCommonColor");
+  constexpr uint8_t Coverage = UniformElementIndexOf(G, "Coverage");
+  constexpr uint8_t AAEnabled = UniformElementIndexOf(G, "AAEnabled");
+  if (p.hasUVMatrix) {
+    WriteChainCoordTransforms(chainWriter, p.uvMatrix, transformIter);
+  }
+  writer->set(HasCommonColor, 1);
+  writer->set(Color, p.commonColor);
+  writer->set(Coverage, p.coverage);
+  writer->set(AAEnabled, p.aaType == AAType::Coverage ? 1 : 0);
+  writer->set(Matrix, p.viewMatrix);
+}
+
+/// The chain family's whole geometry upload: the geometry index selects the module whose
+/// declaration the values are written into, and the processor kind selects the values (the same
+/// rect module serves the default, quad-per-edge-AA and mesh processors).
+void WriteChainGeometryUniforms(SlotWriter* geometryWriter, SlotWriter* chainWriter,
+                                const AOTGeometryParameters& p, uint8_t geometryIndex,
+                                uint32_t coordSourceMask,
+                                FragmentProcessor::CoordTransformIter* transformIter) {
+  switch (geometryIndex) {
+    case 0:
+      WriteChainRectGeometry(geometryWriter, chainWriter, p, transformIter);
+      break;
+    case 1:
+      WriteChainRectUVGeometry(geometryWriter, chainWriter, p, coordSourceMask, transformIter);
+      break;
+    case 2:
+      WriteChainAtlasGeometry(geometryWriter, chainWriter, p, coordSourceMask, transformIter);
+      break;
+    case 3:
+      WriteChainStrokeGeometry<ChainEllipseGeometry>(geometryWriter, chainWriter, p, transformIter);
+      break;
+    case 4:
+      WriteChainHairlineGeometry<ChainHairlineGeometry>(geometryWriter, chainWriter, p,
+                                                        transformIter);
+      break;
+    case 5:
+      WriteChainStrokeGeometry<ChainComplexGeometry>(geometryWriter, chainWriter, p, transformIter);
+      break;
+    case 6:
+      WriteChainStrokeGeometry<ChainRRectGeometry>(geometryWriter, chainWriter, p, transformIter);
+      break;
+    case 7:
+      WriteChainStrokeGeometry<ChainComplexRRectGeometry>(geometryWriter, chainWriter, p,
+                                                          transformIter);
+      break;
+    case 8:
+      WriteChainHairlineGeometry<ChainHairlineQuadGeometry>(geometryWriter, chainWriter, p,
+                                                            transformIter);
+      break;
+    default:
+      break;
+  }
+}
+
+}  // namespace
 
 void ChainProgramWriter::writeEngineDefaults(const ProgramInfo& info,
                                              UniformData* fragmentUniformData) const {
@@ -432,8 +474,14 @@ void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
   // processor tree orders them differently, so the GP must not consume the tree's iteration.
   auto transforms = BuildChainCoordTransforms(*program);
   FragmentProcessor::CoordTransformIter coordTransformIter(&transforms);
-  WriteGeometryUniformsByName(info.getGeometryLayout(), vertexUniformData, fragmentUniformData,
-                              &coordTransformIter);
+  // The geometry upload is addressed through the variant's own modules: the geometry the variant
+  // was compiled for owns the geometry fields, and Chain owns the coordinate transforms.
+  const auto modules = ModulesOf(Families()[variant.family], variant);
+  ParamBuffer buffer(vertexUniformData, fragmentUniformData);
+  SlotWriter chainWriter(layout, Chain, chainSlot, &buffer);
+  SlotWriter geometryWriter(layout, *modules.list[geometrySlot], geometrySlot, &buffer);
+  WriteChainGeometryUniforms(&geometryWriter, &chainWriter, info.getGeometryLayout().parameters,
+                             variant.geometry, program->coordSourceMask, &coordTransformIter);
 }
 
 void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
@@ -452,7 +500,7 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
   // The shell-free value write: the draw's whole uniform content comes from the compiled program —
   // the root block plus every binding's per-child records — so no processor tree is walked. The
   // xfer processor still writes through its own bind until the xfer contract lands.
-  BindChainProgram(*program, vertexUniformData, &chainWriter);
+  BindChainProgram(*program, &chainWriter);
   BindChainBindings(*program, &chainWriter);
   SlotWriter xferWriter(layout, Xfer, xferSlot, &buffer);
   const auto& xfer = info.getXferFacts();

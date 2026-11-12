@@ -135,6 +135,8 @@ class ChainProgramWriter final : public PrecompiledProgramWriter {
   Layout layout;
   uint8_t chainSlot = 0;
   uint8_t xferSlot = 0;
+  /// The geometry module's slot: Frame(0), the variant's one geometry(1), Chain(2), Xfer(3).
+  uint8_t geometrySlot = 1;
 };
 
 }  // namespace tgfx

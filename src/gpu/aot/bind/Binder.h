@@ -49,15 +49,14 @@ void BindRRectCoverageSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t 
                            const AOTChainSlot& slot);
 
 /**
- * Writes one compiled chain program's uniforms: the vertex-side coord-source mask and every
- * fragment field the kernel reads — the slot records, the coverage arrays, the tiled recipes, the
- * gradient, noise and color-space parameter blocks. This is the shell-free upload path: it reads
- * the program and its binding table only, never a FragmentProcessor. Every fragment write goes
- * through `chainWriter`, which resolves element indices to the variant's derived field offsets;
- * only the geometry-owned coord-source mask keeps its name-addressed vertex write.
+ * Writes one compiled chain program's fragment uniforms: the slot records, the coverage arrays,
+ * the tiled recipes and the gradient, noise and color-space parameter blocks. This is the
+ * shell-free upload path: it reads the program and its binding table only, never a
+ * FragmentProcessor. Every write goes through `chainWriter`, which resolves element indices to the
+ * variant's derived field offsets; the vertex-side geometry fields (the coord-source mask and the
+ * coordinate transforms) belong to the geometry writer.
  */
-void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
-                      SlotWriter* chainWriter);
+void BindChainProgram(const AOTProgram& program, SlotWriter* chainWriter);
 
 /**
  * Writes the YUV family's compiled tail program (ResolveYUVProgram): SlotCount plus the
