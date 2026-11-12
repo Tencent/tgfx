@@ -50,8 +50,8 @@ PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& a
     return nullptr;
   }
   auto extraMatrix = Matrix::MakeTrans(-drawRect.left, -drawRect.top);
-  extraMatrix.preScale(drawRect.width() / static_cast<float>(textureProxy->width()),
-                       drawRect.height() / static_cast<float>(textureProxy->height()));
+  extraMatrix.postScale(static_cast<float>(textureProxy->width()) / drawRect.width(),
+                        static_cast<float>(textureProxy->height()) / drawRect.height());
 
   auto fpMatrix = extraMatrix;
   if (uvMatrix) {
