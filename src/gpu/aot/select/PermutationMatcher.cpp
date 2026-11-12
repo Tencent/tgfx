@@ -153,6 +153,19 @@ const AOTTextureParameters* BareTextureCoverageLeaf(const AOTCoverageTerm& term)
   return std::get_if<AOTTextureParameters>(&node->parameters);
 }
 
+const AOTTextureParameters* FirstColorTextureLeaf(const DrawIR* ir) {
+  if (ir == nullptr) {
+    return nullptr;
+  }
+  for (uint32_t index = 0; index < ir->color.nodeCount(); ++index) {
+    auto* node = ir->color.nodeAt(AOTNodeID(index));
+    if (node != nullptr && node->kind == AOTEffectKind::TextureSource) {
+      return std::get_if<AOTTextureParameters>(&node->parameters);
+    }
+  }
+  return nullptr;
+}
+
 // The local-mask texture leaf of the draw's Subtree coverage term: the same SrcIn ShaderMaskFilter
 // fingerprint ClassifyCoverageTerm recognizes. The leaf carries the mask transform's perspective
 // fact, so a family that needs an affine mask reads it off the IR.

@@ -22,6 +22,13 @@
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
+class TextureView;
+
+/// The total transform of a raw coordinate matrix: the matrix followed by the instantiated view's
+/// texture-coordinate normalization and its bottom-left origin flip. Shared by the tree-side
+/// CoordTransform and the declared writers, which read the raw matrix off an IR leaf.
+Matrix TotalCoordMatrix(const Matrix& matrix, const TextureView* textureView);
+
 struct CoordTransform {
   CoordTransform() = default;
 

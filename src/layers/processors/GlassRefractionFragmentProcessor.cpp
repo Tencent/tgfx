@@ -86,6 +86,8 @@ bool GlassRefractionFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNo
   parameters.glassFrost = params.frost;
   parameters.glassShapeType = static_cast<int>(params.shapeType);
   parameters.glassSourceProxy = sourceProxy;
+  // The raw background transform; the writer derives the total at bind time from the source view.
+  parameters.glassBackgroundMatrix = coordTransform.matrix;
   auto child = childProcessor(0);
   auto& shape = parameters.glassShape;
   if (IsProcessor<GlassSDFGeometryFragmentProcessor>(child)) {

@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include "gpu/CoordTransform.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/Swizzle.h"
@@ -29,10 +30,8 @@
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/aot/select/FamilyMatchResult.h"
-#include "gpu/processors/DeviceSpaceTextureEffect.h"
-#include "gpu/processors/RRectEffect.h"
-#include "gpu/processors/RectEffect.h"
-#include "gpu/processors/TextureEffect.h"
+#include "gpu/aot/select/ShaderMatchHelpers.h"
+#include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/ParamBuffer.h"
 #include "gpu/shaders/contract/DrawFacts.h"
@@ -125,13 +124,10 @@ void WriteQuadGeometry(const AOTGeometryParameters& params, SlotWriter* writer) 
   writer->set(Color, params.commonColor);
 }
 
-template <const Module& module>
-void WriteCoordMatrix(const ProgramInfo& info, SlotWriter* writer);
-
-/// The transform at the given position in the FP tree's coordinate-transform sequence; a negative
-/// index selects the last one.
-template <const Module& module>
-void WriteCoordMatrixAt(const ProgramInfo& info, SlotWriter* writer, int index);
+/// The declared families' coordinate source: the leaf's raw matrix through the shared total
+/// transform (normalization and origin flip resolved from the instantiated view), with the
+/// geometry's uv matrix pre-concatenated for the kinds whose processors did so.
+Matrix SourceCoordMatrix(const AOTTextureParameters& leaf, const GeometryLayout& geometry);
 
 template <const Module& module>
 void WriteTextureLeafParams(const AOTTextureParameters& leaf, SlotWriter* writer);
@@ -155,7 +151,12 @@ void WriteMeshGeometry(const ProgramInfo& info, const AOTGeometryParameters& par
   writer->set(Matrix, params.viewMatrix);
   writer->set(Color, params.commonColor);
   writer->set(HasCommonColor, static_cast<int32_t>(params.hasCommonColor ? 1 : 0));
-  WriteCoordMatrix<MeshGeometry>(info, writer);
+  // The mesh's color source is the sole texture leaf of the color graph, the transform the legacy
+  // walk reported first; a processor-free mesh has no transform to write.
+  if (const auto* leaf = FirstColorTextureLeaf(info.getCarriedIR())) {
+    constexpr uint8_t CoordMatrix = UniformElementIndexOf(MeshGeometry, "CoordMatrix");
+    writer->set(CoordMatrix, SourceCoordMatrix(*leaf, info.getGeometryLayout()));
+  }
 }
 
 // ShapeInstancedGeometry: the local-coordinate recovery, the view transform and the sampling
@@ -169,7 +170,13 @@ void WriteShapeInstancedGeometry(const ProgramInfo& info, const AOTGeometryParam
   constexpr uint8_t ViewMatrix = UniformElementIndexOf(ShapeInstancedGeometry, "ViewMatrix");
   writer->set(UVMatrix, params.uvMatrix);
   writer->set(ViewMatrix, params.viewMatrix);
-  WriteCoordMatrixAt<ShapeInstancedGeometry>(info, writer, -1);
+  // The sampling transform is the coverage texture leaf's, the last transform the legacy walk
+  // reported; the instanced fill family carries no processor and leaves it unwritten.
+  const auto* match = info.getFamilyMatch();
+  if (match != nullptr && match->maskLeaf != nullptr) {
+    constexpr uint8_t CoordMatrix = UniformElementIndexOf(ShapeInstancedGeometry, "CoordMatrix");
+    writer->set(CoordMatrix, SourceCoordMatrix(*match->maskLeaf, info.getGeometryLayout()));
+  }
 }
 
 // CoverageTexture: the leaf's subset rect and read gates, the same values BindTextureSourceLeaf
@@ -207,7 +214,11 @@ void WriteBlurSourceGeometry(const ProgramInfo& info, const AOTGeometryParameter
                              SlotWriter* writer) {
   constexpr uint8_t ViewMatrix = UniformElementIndexOf(BlurSourceGeometry, "Matrix");
   writer->set(ViewMatrix, params.viewMatrix);
-  WriteCoordMatrix<BlurSourceGeometry>(info, writer);
+  const auto* match = info.getFamilyMatch();
+  if (match != nullptr && match->blurChild != nullptr) {
+    constexpr uint8_t CoordMatrix = UniformElementIndexOf(BlurSourceGeometry, "CoordMatrix");
+    writer->set(CoordMatrix, SourceCoordMatrix(*match->blurChild, info.getGeometryLayout()));
+  }
 }
 
 /// The child's sampling fields the blur-style bodies share: the tiled recipe or the plain subset
@@ -331,7 +342,17 @@ void WriteGlassRefraction(const AOTOpaqueKernelParameters& params, const Program
   constexpr uint8_t EdgeSpan = UniformElementIndexOf(GlassRefraction, "EdgeSpan");
   constexpr uint8_t EdgeMaskUV = UniformElementIndexOf(GlassRefraction, "EdgeMaskUV");
   constexpr uint8_t EdgeMaskOn = UniformElementIndexOf(GlassRefraction, "EdgeMaskOn");
-  WriteCoordMatrixAt<GlassRefraction>(info, writer, 0);
+  constexpr uint8_t CoordMatrix = UniformElementIndexOf(GlassRefraction, "CoordMatrix");
+  // The background transform: the record-time raw matrix through the shared total (the source
+  // view supplies the normalization), with the geometry's uv matrix as the legacy walk did.
+  const auto backgroundView =
+      params.glassSourceProxy != nullptr ? params.glassSourceProxy->getTextureView() : nullptr;
+  Matrix background = TotalCoordMatrix(params.glassBackgroundMatrix, backgroundView.get());
+  const auto& geometry = info.getGeometryLayout().parameters;
+  if (geometry.kind == GeometryKind::Default || geometry.kind == GeometryKind::QuadPerEdgeAA) {
+    background.setConcat(background, geometry.uvMatrix);
+  }
+  writer->set(CoordMatrix, background);
   if (params.glassSourceProxy == nullptr) {
     LOGE("WriteGlassRefraction: the IR node carries no background source proxy");
     return;
@@ -407,28 +428,36 @@ void WriteGlassRefraction(const AOTOpaqueKernelParameters& params, const Program
   }
 }
 
-// GlassLocalMask: the runtime gate (the legacy kernel's HasLocalMask branch) plus the mask's own
-// coordinate transform — the second one in the tree, the same matrix the standard helper uploads.
-void WriteGlassLocalMask(const ProgramInfo& info, SlotWriter* writer, bool hasMask) {
+// GlassLocalMask: the runtime gate (the legacy kernel's HasLocalMask branch) plus the mask leaf's
+// own coordinate transform — the second transform the legacy walk reported.
+void WriteGlassLocalMask(const ProgramInfo& info, SlotWriter* writer,
+                         const AOTTextureParameters* maskLeaf) {
   constexpr uint8_t HasMask = UniformElementIndexOf(GlassLocalMask, "HasMask");
-  writer->set(HasMask, static_cast<int32_t>(hasMask ? 1 : 0));
-  WriteCoordMatrixAt<GlassLocalMask>(info, writer, 1);
+  writer->set(HasMask, static_cast<int32_t>(maskLeaf != nullptr ? 1 : 0));
+  if (maskLeaf != nullptr) {
+    constexpr uint8_t CoordMatrix = UniformElementIndexOf(GlassLocalMask, "CoordMatrix");
+    writer->set(CoordMatrix, SourceCoordMatrix(*maskLeaf, info.getGeometryLayout()));
+  }
 }
 
-// The source coordinate matrix every texture leaf shares: the FP tree's first coord transform
-// with the geometry's uv matrix pre-concatenated (setTransformDataHelper's composition).
-Matrix SourceCoordMatrix(const ProgramInfo& info) {
-  FragmentProcessor::CoordTransformIter iter(&info);
-  const CoordTransform* coordTransform = iter.next();
+// The leaf's total transform: the raw matrix followed by the instantiated view's normalization
+// and origin flip (the tree-side CoordTransform::getTotalMatrix(), without the geometry uv).
+Matrix TotalLeafMatrix(const AOTTextureParameters& leaf) {
+  auto view = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
+  return TotalCoordMatrix(leaf.uvMatrix, view.get());
+}
+
+// The source coordinate matrix every texture leaf shares: the leaf's total transform with the
+// geometry's uv matrix pre-concatenated (setTransformDataHelper's composition).
+Matrix SourceCoordMatrix(const AOTTextureParameters& leaf, const GeometryLayout& layout) {
   // Only the kinds whose processors concatenated their uv matrix onto the source coordinate.
   Matrix uvMatrix = Matrix::I();
-  const auto& geometry = info.getGeometryLayout().parameters;
+  const auto& geometry = layout.parameters;
   if (geometry.kind == GeometryKind::Default || geometry.kind == GeometryKind::QuadPerEdgeAA) {
     uvMatrix = geometry.uvMatrix;
   }
   Matrix combined = {};
-  combined.setConcat(coordTransform != nullptr ? coordTransform->getTotalMatrix() : Matrix::I(),
-                     uvMatrix);
+  combined.setConcat(TotalLeafMatrix(leaf), uvMatrix);
   return combined;
 }
 
@@ -500,36 +529,20 @@ void WriteQuadTextureGeometry(const AOTGeometryParameters& params, SlotWriter* w
 void WriteTexture(const ProgramInfo& info, const AOTTextureParameters& leaf, SlotWriter* writer) {
   constexpr uint8_t CoordMatrix = UniformElementIndexOf(TextureModule, "CoordMatrix");
   constexpr uint8_t SubsetMatrix = UniformElementIndexOf(TextureModule, "SubsetMatrix");
-  // The subset bounds go through the leaf's bare coord transform (the old kernel's
+  // The subset bounds go through the leaf's bare total transform (the old kernel's
   // texSubsetMatrix), while the source coordinate takes the transform with the geometry's uv
   // matrix pre-concatenated — the two differ exactly when the geometry carries a uv matrix.
-  FragmentProcessor::CoordTransformIter iter(&info);
-  const CoordTransform* coordTransform = iter.next();
-  const Matrix subsetMatrix =
-      coordTransform != nullptr ? coordTransform->getTotalMatrix() : Matrix::I();
-  writer->set(CoordMatrix, SourceCoordMatrix(info));
-  writer->set(SubsetMatrix, subsetMatrix);
+  writer->set(CoordMatrix, SourceCoordMatrix(leaf, info.getGeometryLayout()));
+  writer->set(SubsetMatrix, TotalLeafMatrix(leaf));
   WriteTextureLeafParams<TextureModule>(leaf, writer);
 }
 
-// LocalMask: the coverage mask's own coordinate transform, from the coverage TextureEffect.
+// LocalMask: the coverage mask leaf's own coordinate transform, off the IR's Subtree term.
 void WriteLocalMask(const ProgramInfo& info, SlotWriter* writer) {
   constexpr uint8_t CoordMatrix = UniformElementIndexOf(LocalMask, "CoordMatrix");
-  for (size_t index = info.numColorFragmentProcessors(); index < info.numFragmentProcessors();
-       ++index) {
-    const auto* fp = info.getFragmentProcessor(index);
-    if (IsProcessor<TextureEffect>(fp)) {
-      Matrix uvMatrix = Matrix::I();
-      const auto& geometry = info.getGeometryLayout().parameters;
-      if (geometry.kind == GeometryKind::QuadPerEdgeAA) {
-        uvMatrix = geometry.uvMatrix;
-      }
-      Matrix combined = {};
-      combined.setConcat(
-          static_cast<const TextureEffect*>(fp)->getCoordTransform().getTotalMatrix(), uvMatrix);
-      writer->set(CoordMatrix, combined);
-      return;
-    }
+  const auto* leaf = LocalMaskCoverageLeaf(info.getCarriedIR());
+  if (leaf != nullptr) {
+    writer->set(CoordMatrix, SourceCoordMatrix(*leaf, info.getGeometryLayout()));
   }
 }
 
@@ -538,21 +551,14 @@ void WriteLocalMask(const ProgramInfo& info, SlotWriter* writer) {
 void WriteDeviceMaskRuntime(const ProgramInfo& info, SlotWriter* writer) {
   constexpr uint8_t HasDeviceMask = UniformElementIndexOf(DeviceMaskRuntime, "HasDeviceMask");
   constexpr uint8_t CoordMatrix = UniformElementIndexOf(DeviceMaskRuntime, "CoordMatrix");
-  const DeviceSpaceTextureEffect* mask = nullptr;
-  for (size_t index = info.numColorFragmentProcessors(); index < info.numFragmentProcessors();
-       ++index) {
-    const auto* fp = info.getFragmentProcessor(index);
-    if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
-      mask = static_cast<const DeviceSpaceTextureEffect*>(fp);
-    }
-  }
-  writer->set(HasDeviceMask, static_cast<int32_t>(mask != nullptr ? 1 : 0));
-  if (mask == nullptr) {
+  const auto* maskLeaf = DeviceMaskCoverageLeaf(info.getCarriedIR());
+  writer->set(HasDeviceMask, static_cast<int32_t>(maskLeaf != nullptr ? 1 : 0));
+  if (maskLeaf == nullptr) {
     return;
   }
-  auto deviceCoordMatrix = mask->getUVMatrix();
-  const auto& proxy = mask->getTextureProxy();
-  auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
+  auto deviceCoordMatrix = maskLeaf->uvMatrix;
+  auto view =
+      maskLeaf->textureProxy != nullptr ? maskLeaf->textureProxy->getTextureView() : nullptr;
   if (view == nullptr || view->getTexture() == nullptr) {
     return;
   }
@@ -567,7 +573,7 @@ void WriteYUVTexture(const ProgramInfo& info, const AOTTextureParameters& leaf,
   constexpr uint8_t CoordMatrix = UniformElementIndexOf(YUVTexture, "CoordMatrix");
   constexpr uint8_t LimitedRange = UniformElementIndexOf(YUVTexture, "LimitedRange");
   constexpr uint8_t ColorConversion = UniformElementIndexOf(YUVTexture, "ColorConversion");
-  writer->set(CoordMatrix, SourceCoordMatrix(info));
+  writer->set(CoordMatrix, SourceCoordMatrix(leaf, info.getGeometryLayout()));
   WriteTextureLeafParams<YUVTexture>(leaf, writer);
   auto view = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
   if (view == nullptr || !view->isYUV()) {
@@ -594,20 +600,13 @@ void WriteQuadColorGeometry(const AOTGeometryParameters& params, SlotWriter* wri
 // uploads (the effect's uv matrix scaled by the texture view's normalized coord).
 void WriteDeviceMask(const ProgramInfo& info, SlotWriter* writer) {
   constexpr uint8_t CoordMatrix = UniformElementIndexOf(DeviceMask, "CoordMatrix");
-  const DeviceSpaceTextureEffect* mask = nullptr;
-  for (size_t index = info.numColorFragmentProcessors();
-       index < info.numFragmentProcessors() && mask == nullptr; ++index) {
-    const auto* fp = info.getFragmentProcessor(index);
-    if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
-      mask = static_cast<const DeviceSpaceTextureEffect*>(fp);
-    }
-  }
-  if (mask == nullptr) {
+  const auto* maskLeaf = DeviceMaskCoverageLeaf(info.getCarriedIR());
+  if (maskLeaf == nullptr) {
     return;
   }
-  auto deviceCoordMatrix = mask->getUVMatrix();
-  const auto& proxy = mask->getTextureProxy();
-  auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
+  auto deviceCoordMatrix = maskLeaf->uvMatrix;
+  auto view =
+      maskLeaf->textureProxy != nullptr ? maskLeaf->textureProxy->getTextureView() : nullptr;
   if (view == nullptr || view->getTexture() == nullptr) {
     return;
   }
@@ -682,52 +681,6 @@ void WriteRRectGeometry(const AOTGeometryParameters& params, SlotWriter* writer)
   writer->set(StrokeEnabled, static_cast<int32_t>(params.isStroke ? 1 : 0));
 }
 
-/// The texture-space coordinate transform: the FP tree's coord transform at the given position
-/// (local to normalized texture space), the same matrix setTransformDataHelper uploads for the
-/// legacy families. A negative index selects the last transform, which is where the coverage
-/// terms sit — the color graph's transforms come first. The IR's uvMatrix keeps the raw user
-/// matrix, which does not carry the texture's normalization.
-template <const Module& module>
-void WriteCoordMatrixAt(const ProgramInfo& info, SlotWriter* writer, int index) {
-  constexpr uint8_t CoordMatrix = UniformElementIndexOf(module, "CoordMatrix");
-  FragmentProcessor::CoordTransformIter iter(&info);
-  const CoordTransform* coordTransform = nullptr;
-  int position = 0;
-  while (const CoordTransform* candidate = iter.next()) {
-    if (index < 0) {
-      coordTransform = candidate;
-    } else {
-      if (position == index) {
-        coordTransform = candidate;
-        break;
-      }
-      ++position;
-    }
-  }
-  if (coordTransform == nullptr) {
-    return;
-  }
-  // setTransformDataHelper equivalents concatenate the geometry's uv matrix onto the transform
-  // (a masked path draw carries its mask offset there); the transform's own matrix alone leaves
-  // the sample offset out and the coverage lands in the wrong place.
-  // Only the kinds whose processors concatenated their uv matrix onto the source coordinate.
-  Matrix uvMatrix = Matrix::I();
-  const auto& geometry = info.getGeometryLayout().parameters;
-  if (geometry.kind == GeometryKind::Default || geometry.kind == GeometryKind::QuadPerEdgeAA) {
-    uvMatrix = geometry.uvMatrix;
-  }
-  Matrix combined = {};
-  combined.setConcat(coordTransform->getTotalMatrix(), uvMatrix);
-  writer->set(CoordMatrix, combined);
-}
-
-// The first transform's matrix: every family whose color source is the sole sampler reads it
-// through this form.
-template <const Module& module>
-void WriteCoordMatrix(const ProgramInfo& info, SlotWriter* writer) {
-  WriteCoordMatrixAt<module>(info, writer, 0);
-}
-
 // TiledTexture: the single-tap or full nine-mode recipe, field for field the same values
 // BindTiledSourceLeaf uploads for the legacy families.
 void WriteTiledTexture(const ProgramInfo& info, const AOTTextureParameters& leaf,
@@ -743,7 +696,8 @@ void WriteTiledTexture(const ProgramInfo& info, const AOTTextureParameters& leaf
   // field exists iff FULL != 0, absent from the single-tap variants. Same value
   // GLSLTiledTextureEffect uploads.
   constexpr uint8_t ReadSwizzle = UniformElementIndexOf(TiledTexture, "ReadSwizzle");
-  WriteCoordMatrix<TiledTexture>(info, writer);
+  constexpr uint8_t CoordMatrix = UniformElementIndexOf(TiledTexture, "CoordMatrix");
+  writer->set(CoordMatrix, SourceCoordMatrix(leaf, info.getGeometryLayout()));
   if (!leaf.tiledRecipe.has_value()) {
     return;
   }
@@ -774,7 +728,12 @@ void WriteTiledTexture(const ProgramInfo& info, const AOTTextureParameters& leaf
 // MaskTexture: the rasterized shape mask's coordinate transform. The texture itself is bound by
 // the sampler path; the shader samples it and folds the red channel into the coverage.
 void WriteMaskTexture(const ProgramInfo& info, SlotWriter* writer) {
-  WriteCoordMatrix<MaskTexture>(info, writer);
+  const auto* match = info.getFamilyMatch();
+  if (match == nullptr || match->maskLeaf == nullptr) {
+    return;
+  }
+  constexpr uint8_t CoordMatrix = UniformElementIndexOf(MaskTexture, "CoordMatrix");
+  writer->set(CoordMatrix, SourceCoordMatrix(*match->maskLeaf, info.getGeometryLayout()));
 }
 
 // AnalyticClip: the runtime clip contract.
@@ -1066,7 +1025,7 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
         WriteGlassRefraction(*match->glassKernel, info, &writer);
       }
     } else if (module == &GlassLocalMask) {
-      WriteGlassLocalMask(info, &writer, match->maskLeaf != nullptr);
+      WriteGlassLocalMask(info, &writer, match->maskLeaf);
     } else if (module == &GradientModule) {
       if (match->gradient != nullptr) {
         WriteGradient(*match->gradient, &writer);

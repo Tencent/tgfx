@@ -20,11 +20,10 @@
 #include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
-Matrix CoordTransform::getTotalMatrix() const {
-  if (textureProxy == nullptr || textureProxy->getTextureView() == nullptr) {
+Matrix TotalCoordMatrix(const Matrix& matrix, const TextureView* textureView) {
+  if (textureView == nullptr) {
     return matrix;
   }
-  auto textureView = textureProxy->getTextureView();
   auto combined = matrix;
   // normalize
   auto scale = textureView->getTextureCoord(1, 1);
@@ -35,5 +34,10 @@ Matrix CoordTransform::getTotalMatrix() const {
     combined.postTranslate(translate.x, translate.y);
   }
   return combined;
+}
+
+Matrix CoordTransform::getTotalMatrix() const {
+  auto textureView = textureProxy != nullptr ? textureProxy->getTextureView() : nullptr;
+  return TotalCoordMatrix(matrix, textureView.get());
 }
 }  // namespace tgfx

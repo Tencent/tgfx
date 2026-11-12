@@ -102,6 +102,10 @@ std::optional<Coverage> ClassifyCoverageTerm(const AOTCoverageTerm& term);
 /// over the geometry-coverage unit, so the graph is exactly the unit plus the texture source.
 const AOTTextureParameters* BareTextureCoverageLeaf(const AOTCoverageTerm& term);
 
+/// The first texture source of the color graph, in graph order: the transform the legacy walk
+/// reported first (a single-leaf family's sole sampler).
+const AOTTextureParameters* FirstColorTextureLeaf(const DrawIR* ir);
+
 /// Classifies the coverage stage of a ProgramInfo carrying at most one coverage FP: the
 /// no-coverage case is a count, the rest reads the carried IR's terms (the atlas glyph term is
 /// skipped — the geometry processor's own coverage, never a coverage FP).

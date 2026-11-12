@@ -307,6 +307,10 @@ struct AOTOpaqueKernelParameters {
   // GlassRefraction: the kernel's own background-coordinate transform is projective — the
   // precompiled vertex kernels emit the affine form only.
   bool hasPerspective = false;
+  // GlassRefraction: the background sample's raw coordinate transform. The texture normalization
+  // is bind-time (it needs the instantiated view), so the writer derives the total from the
+  // source proxy — the same value the tree walk's getTotalMatrix() reported.
+  Matrix glassBackgroundMatrix = {};
   // GaussianBlur1D's upload values only: the packed half-kernel table, its
   // radius, and the step's length and direction — record-time facts. The step vector itself is
   // bind-time (it maps through the child's coordinate transform, whose normalization needs the
