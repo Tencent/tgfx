@@ -81,6 +81,8 @@ class RectDrawOp : public StandardDrawOp {
  protected:
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
+  std::optional<GeometryLayout> onMakeGeometry(RenderTarget* renderTarget) override;
+
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
   std::optional<PMColor> uniformGeometryColor() const override {

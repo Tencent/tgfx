@@ -124,8 +124,11 @@ void StandardDrawOp::configureProgramInfo(ProgramInfo* info, PixelFormat depthSt
     info->setDepthStencil(depthStencil);
   }
   // Snapshot the geometry into the layout value every reader addresses; a draw that never
-  // reaches a program keeps the live geometry via ProgramInfo's fallback.
-  info->setGeometryLayout(GeometryLayoutOf(geometryProcessor.get()));
+  // reaches a program keeps the live geometry via ProgramInfo's fallback. An op that built its
+  // own layout wins (the geometry-processor path is the double-track fallback).
+  info->setGeometryLayout(geometryLayoutOverride.has_value()
+                              ? *geometryLayoutOverride
+                              : GeometryLayoutOf(geometryProcessor.get()));
   onConfigureProgramInfo(*info);
 }
 
@@ -148,6 +151,15 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
   if (!geometryProcessorInitialized) {
     geometryProcessorInitialized = true;
     geometryProcessor = onMakeGeometryProcessor(renderTarget);
+    geometryLayoutOverride = onMakeGeometry(renderTarget);
+#ifdef DEBUG
+    if (geometryLayoutOverride.has_value()) {
+      // The double-track check: the op's own layout must equal the one derived from the processor
+      // it built, or the deletion of the processor would change the geometry facts.
+      DEBUG_ASSERT(
+          SameGeometryLayout(*geometryLayoutOverride, GeometryLayoutOf(geometryProcessor.get())));
+    }
+#endif
   }
   if (geometryProcessor == nullptr) {
     return false;

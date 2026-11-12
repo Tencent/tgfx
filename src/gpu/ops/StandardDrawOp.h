@@ -127,6 +127,15 @@ class StandardDrawOp : public DrawOp {
   }
 
   /**
+   * Returns the geometry layout the draw carries. The double-track entry: an op that builds the
+   * layout from its own facts lets prepare drop the geometry-processor pass-through; returning
+   * nullopt (the default) keeps the derivation from the constructed processor.
+   */
+  virtual std::optional<GeometryLayout> onMakeGeometry(RenderTarget* /*renderTarget*/) {
+    return std::nullopt;
+  }
+
+  /**
    * Issues draw calls for this op. Invoked after the standard pipeline has been bound to the
    * render pass together with its uniforms, samplers and scissor rectangle. Subclasses only
    * need to bind buffers and call renderPass->draw()/drawIndexed().
@@ -144,6 +153,7 @@ class StandardDrawOp : public DrawOp {
 
   PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
   bool geometryProcessorInitialized = false;
+  std::optional<GeometryLayout> geometryLayoutOverride = std::nullopt;
   std::unique_ptr<ProgramInfo> preparedProgramInfo = nullptr;
   std::shared_ptr<Program> preparedProgram = nullptr;
   RenderTarget* preparedRenderTarget = nullptr;

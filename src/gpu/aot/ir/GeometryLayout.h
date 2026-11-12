@@ -50,4 +50,15 @@ GeometryLayout GeometryLayoutOf(const GeometryProcessor* geometryProcessor);
 /// The uniform-value half alone, for callers that only need the writers' facts.
 AOTGeometryParameters GeometryParametersOf(const GeometryProcessor* geometryProcessor);
 
+/// The quad-per-edge-AA geometry's layout, built from the draw's own facts: the five declared
+/// slots (position, coverage, uv coordinate, colour, subset) filter down to the live ones, and the
+/// physical slots keep the declared numbering. The double-track form of onMakeGeometry: the same
+/// value GeometryLayoutOf derives from the processor.
+GeometryLayout QuadGeometryLayoutOf(int width, int height, AAType aaType,
+                                    const std::optional<PMColor>& commonColor,
+                                    const std::optional<Matrix>& uvMatrix, bool hasSubset);
+
+/// Field-by-field equality, for the double-track assertion while the geometry processors remain.
+bool SameGeometryLayout(const GeometryLayout& a, const GeometryLayout& b);
+
 }  // namespace tgfx

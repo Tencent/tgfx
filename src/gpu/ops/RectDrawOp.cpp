@@ -84,6 +84,15 @@ RectDrawOp::RectDrawOp(BlockAllocator* allocator, RectsVertexProvider* provider)
   }
 }
 
+std::optional<GeometryLayout> RectDrawOp::onMakeGeometry(RenderTarget* renderTarget) {
+  if (lineJoin == LineJoin::Round) {
+    // The round-stroke geometry keeps the derived path until its own step.
+    return std::nullopt;
+  }
+  return QuadGeometryLayoutOf(renderTarget->width(), renderTarget->height(), aaType, commonColor,
+                              uvMatrix, hasSubset);
+}
+
 PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
   if (lineJoin == LineJoin::Round) {
     return RoundStrokeRectGeometryProcessor::Make(allocator, aaType, commonColor, uvMatrix);

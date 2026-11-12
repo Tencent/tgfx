@@ -167,4 +167,56 @@ GeometryLayout GeometryLayoutOf(const GeometryProcessor* geometry) {
   return layout;
 }
 
+GeometryLayout QuadGeometryLayoutOf(int width, int height, AAType aaType,
+                                    const std::optional<PMColor>& commonColor,
+                                    const std::optional<Matrix>& uvMatrix, bool hasSubset) {
+  GeometryLayout layout = {};
+  layout.parameters.kind = GeometryKind::QuadPerEdgeAA;
+  // The processor's own default (an opaque white), so the facts match the derived layout
+  // byte for byte even when the draw carries a per-vertex color.
+  layout.parameters.commonColor = commonColor.value_or(PMColor());
+  layout.parameters.hasCommonColor = commonColor.has_value();
+  layout.parameters.uvMatrix = uvMatrix.value_or(Matrix::I());
+  layout.parameters.aaType = aaType;
+  (void)width;
+  (void)height;
+  // The same five declared slots the processor sets, filtered by the same conditions; the
+  // filtered-away attribute keeps its declared slot, exactly as setVertexAttributes does.
+  const Attribute declared[5] = {
+      {"aPosition", VertexFormat::Float2},
+      {"inCoverage", VertexFormat::Float},
+      uvMatrix.has_value() ? Attribute{} : Attribute{"uvCoord", VertexFormat::Float2},
+      {"inColor", VertexFormat::UByte4Normalized},
+      hasSubset ? Attribute{"texSubset", VertexFormat::Float4} : Attribute{}};
+  for (uint32_t slot = 0; slot < 5; ++slot) {
+    if (declared[slot].empty()) {
+      continue;
+    }
+    layout.vertexAttributes.push_back(declared[slot]);
+    layout.physicalSlots.push_back(slot);
+  }
+  return layout;
+}
+
+bool SameGeometryLayout(const GeometryLayout& a, const GeometryLayout& b) {
+  if (a.physicalSlots != b.physicalSlots ||
+      a.vertexAttributes.size() != b.vertexAttributes.size() ||
+      a.instanceAttributes.size() != b.instanceAttributes.size()) {
+    return false;
+  }
+  for (size_t index = 0; index < a.vertexAttributes.size(); ++index) {
+    if (a.vertexAttributes[index].name() != b.vertexAttributes[index].name() ||
+        a.vertexAttributes[index].format() != b.vertexAttributes[index].format()) {
+      return false;
+    }
+  }
+  const auto& pa = a.parameters;
+  const auto& pb = b.parameters;
+  return pa.kind == pb.kind && pa.hasCommonColor == pb.hasCommonColor &&
+         pa.commonColor == pb.commonColor && pa.viewMatrix == pb.viewMatrix &&
+         pa.uvMatrix == pb.uvMatrix && pa.aaType == pb.aaType && pa.coverage == pb.coverage &&
+         pa.isStroke == pb.isStroke && pa.isAlphaOnly == pb.isAlphaOnly &&
+         pa.hasColors == pb.hasColors && pa.atlasProxy == pb.atlasProxy;
+}
+
 }  // namespace tgfx

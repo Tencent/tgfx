@@ -66,6 +66,11 @@ Quads3DDrawOp::Quads3DDrawOp(BlockAllocator* allocator, QuadsVertexProvider* pro
   }
 }
 
+std::optional<GeometryLayout> Quads3DDrawOp::onMakeGeometry(RenderTarget* renderTarget) {
+  return QuadGeometryLayoutOf(renderTarget->width(), renderTarget->height(), aaType, commonColor,
+                              uvMatrix, false);
+}
+
 PlacementPtr<GeometryProcessor> Quads3DDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
   return QuadPerEdgeAAGeometryProcessor::Make(allocator, renderTarget->width(),
                                               renderTarget->height(), aaType, commonColor, uvMatrix,
