@@ -6779,6 +6779,17 @@ TGFX_TEST(LayerTest, NestedOffscreenTiledZoom) {
                                  "LayerTest/NestedOffscreenTiledZoom");
 }
 
+// Centers the given content point on the surface at the requested zoom, so every frame renders the
+// same region while the zoomed tiles are refined.
+static void CenterTiledContent(DisplayList* displayList, const Surface& surface,
+                               const Point& contentCenter, float zoom) {
+  auto halfWidth = static_cast<float>(surface.width()) * 0.5f;
+  auto halfHeight = static_cast<float>(surface.height()) * 0.5f;
+  displayList->setZoomScale(zoom);
+  displayList->setContentOffset(halfWidth - contentCenter.x * zoom,
+                                halfHeight - contentCenter.y * zoom);
+}
+
 /**
  * A red rectangle wrapped in a group whose Gaussian blur is zoomed far beyond the tile
  * resolution. The blurred group is pasted back with a draw rect larger than its offscreen
@@ -6817,19 +6828,13 @@ TGFX_TEST(LayerTest, GroupBlurTiledZoom) {
   group->addChild(rectangleLayer);
   displayList.root()->addChild(group);
 
+  const Point contentCenter = {groupPosition.x + rectangleCenter.x,
+                               groupPosition.y + rectangleCenter.y};
   // Warm up at zoom 1 so that the zoomed frames rebuild every visible tile from a stale cache
   // instead of drawing the content in one continuous pass.
-  auto centerContent = [&](float zoom) {
-    auto centerX = groupPosition.x + rectangleCenter.x;
-    auto centerY = groupPosition.y + rectangleCenter.y;
-    auto halfWidth = static_cast<float>(surface->width()) * 0.5f;
-    auto halfHeight = static_cast<float>(surface->height()) * 0.5f;
-    displayList.setZoomScale(zoom);
-    displayList.setContentOffset(halfWidth - centerX * zoom, halfHeight - centerY * zoom);
-  };
-  centerContent(1.0f);
+  CenterTiledContent(&displayList, *surface, contentCenter, 1.0f);
   displayList.render(surface.get());
-  centerContent(36.505f);
+  CenterTiledContent(&displayList, *surface, contentCenter, 36.505f);
   // Refine one tile per frame until every tile is rasterized at the target zoom; a fixed frame
   // count would leave the last tiles at the stale zoom and make the image depend on scheduling.
   int frames = 0;
