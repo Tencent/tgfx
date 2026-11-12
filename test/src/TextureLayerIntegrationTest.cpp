@@ -361,8 +361,7 @@ TGFX_TEST(TextureLayerIntegrationTest, PublicFilterContract) {
 
   EXPECT_TRUE(TextureFilter::Make(-1.0f, 10.0f, 4.0f) == nullptr);
   EXPECT_TRUE(TextureFilter::Make(10.0f, 10.0f, -1.0f) == nullptr);
-  EXPECT_TRUE(TextureFilter::Make(std::numeric_limits<float>::quiet_NaN(), 10.0f, 4.0f) ==
-              nullptr);
+  EXPECT_TRUE(TextureFilter::Make(std::numeric_limits<float>::quiet_NaN(), 10.0f, 4.0f) == nullptr);
 }
 
 TGFX_TEST(TextureLayerIntegrationTest, LayerTypeCompatibility) {
