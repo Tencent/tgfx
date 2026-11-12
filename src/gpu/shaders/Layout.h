@@ -41,6 +41,10 @@ struct Layout {
     /// The element count: 16 bits because the slot interpreter's data pool reaches exactly 256
     /// (32 slots * 7 words + the 32-word block region); the bundle codec already stores it wide.
     uint16_t arraySize = 1;
+    /// The size of one element inside `size`'s std140 footprint (the stride pads it to 16 bytes:
+    /// an array of Float2 strides 16 while its element is 8 bytes). Array writes validate against
+    /// this, not against the stride.
+    uint16_t elementSize = 0;
     UniformFormat format = UniformFormat::Float;
   };
   /// One specialization field of the variant, in constant-id order (id 0 is the master switch).

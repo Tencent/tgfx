@@ -76,25 +76,6 @@ void BindYUVProgram(const AOTProgram& program, UniformData* fragmentUniformData)
  */
 void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformData);
 
-/**
- * The IR-driven texture write: the leaf's recorded facts (subset, alphaStart, sampling, flags)
- * plus the view its proxy resolves at bind time, value-gated exactly like
- * TextureSourceModule::Bind over the live processor — field for field, because the leaf was
- * lowered from that very processor. This is the fill route's twin of the chain's binding table:
- * a draw's texture uploads read the IR, not the processor tree.
- */
-void BindTextureSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer);
-
-/**
- * The IR-driven binds of the remaining feature modules, each the field-for-field twin of the
- * module Bind it replaces over the live processor: the values come from the IR node the
- * lowering recorded, the instance-time facts from the view the node's proxy resolves. After
- * these, no AOT-route upload reads a FragmentProcessor's state.
- */
-void BindTiledSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer);
-void BindDeviceMaskLeaf(const AOTTextureParameters& mask, ParamWriter* writer);
-void BindRectClipNode(const AOTRectCoverageParameters& params, ParamWriter* writer);
-void BindRRectClipNode(const AOTRRectCoverageParameters& params, ParamWriter* writer);
 ///
 /// Uploads one pointwise operator as chain slot 0: the packed word (operator value and selector
 /// bits) plus the operator's parameter registers -- the same encoding the chain's slots use, so a

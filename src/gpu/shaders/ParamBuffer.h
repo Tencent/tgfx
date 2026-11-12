@@ -50,8 +50,27 @@ class ParamBuffer {
   /// The Matrix form, matching UniformData's 12-float column-major layout for a mat3 field.
   void set(const Layout::Field& field, const Matrix& matrix) const;
 
+  /**
+   * One element of a std140 array field: the stride is the field's whole footprint divided by its
+   * element count (one packing rule derives both), and the write size is validated against the
+   * element size, not the stride. The chain's slot pools (`SlotPacked`, `ChainData`, the tiled
+   * recipes) are addressed this way.
+   */
+  template <typename T>
+  std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
+                       !std::is_same_v<std::decay_t<T>, Matrix>,
+                   void>
+  setArrayElement(const Layout::Field& field, size_t index, const T& value) const {
+    writeArrayElement(field, index, &value, sizeof(value));
+  }
+
+  /// The Matrix form of an array element (the 12-float column-major mat3 layout).
+  void setArrayElement(const Layout::Field& field, size_t index, const Matrix& matrix) const;
+
  private:
   void write(const Layout::Field& field, const void* data, size_t size) const;
+  void writeArrayElement(const Layout::Field& field, size_t index, const void* data,
+                         size_t size) const;
 
   UniformData* vertexData = nullptr;
   UniformData* fragmentData = nullptr;
@@ -103,6 +122,33 @@ class SlotWriter {
       return;
     }
     buffer->set(layout.fields[fieldIndex], value);
+  }
+
+  /// One element of an array field, addressed by the element index in the declaration.
+  template <typename T>
+  void setArrayElement(uint8_t elementIndex, size_t index, const T& value) const {
+    const auto* field = fieldOf(elementIndex);
+    if (field == nullptr) {
+      return;
+    }
+    buffer->setArrayElement(*field, index, value);
+  }
+
+  void setArrayElement(uint8_t elementIndex, size_t index, const Matrix& value) const {
+    const auto* field = fieldOf(elementIndex);
+    if (field == nullptr) {
+      return;
+    }
+    buffer->setArrayElement(*field, index, value);
+  }
+
+  template <typename T>
+  void setArrayElementIfPresent(uint8_t elementIndex, size_t index, const T& value) const {
+    const uint16_t fieldIndex = fieldIndexOf(elementIndex);
+    if (fieldIndex == Layout::NoField) {
+      return;
+    }
+    buffer->setArrayElement(layout.fields[fieldIndex], index, value);
   }
 
   /// Whether the element contributes a uniform field in this variant (a `when` gate the caller

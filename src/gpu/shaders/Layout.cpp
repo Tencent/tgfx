@@ -123,6 +123,7 @@ Layout DeriveLayout(const Family& family, const Variant& variant) {
             field.format = ShaderTypeFormat(element.type);
             field.arraySize = count;
             field.size = static_cast<uint16_t>(ElementTotalSize(element, count));
+            field.elementSize = static_cast<uint16_t>(ShaderTypeSize(element.type));
             size_t alignment = ShaderTypeAlign(element.type);
             if (count > 1 && alignment < 16) {
               alignment = 16;
