@@ -1316,13 +1316,25 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   // sharing that depends on it) intact.
   std::vector<Rect> cullWorldRects = worldRects;
   if (!cullRects.empty()) {
-    cullWorldRects.clear();
-    cullWorldRects.reserve(cullRects.size());
+    std::vector<Rect> narrowed = {};
+    narrowed.reserve(cullRects.size());
     for (const auto& cullRect : cullRects) {
-      auto worldRect = inverse.mapRect(cullRect);
-      worldRect.roundOut();
-      worldRect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
-      cullWorldRects.push_back(worldRect);
+      auto footprint = inverse.mapRect(cullRect);
+      footprint.roundOut();
+      footprint.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
+      // Intersect with each captured rect rather than with their union, so the culled draw never
+      // covers more than the rects this capture would have used without the footprints.
+      for (const auto& worldRect : worldRects) {
+        auto clipped = footprint;
+        if (clipped.intersect(worldRect)) {
+          narrowed.push_back(clipped);
+        }
+      }
+    }
+    // Fall back to the whole captured area when the intersection is unusable: an empty list would
+    // drop the backdrop the styles read, and an oversized one costs more than the culling saves.
+    if (!narrowed.empty() && narrowed.size() <= MAX_CULL_RECTS) {
+      cullWorldRects = std::move(narrowed);
     }
   }
   DrawArgs args(context);
