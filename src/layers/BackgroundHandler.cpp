@@ -575,8 +575,8 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
 
 void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
                              std::shared_ptr<BackgroundSource> bgSource,
-                             BackgroundSnapshotMap* snapshots,
-                             const std::vector<Rect>& renderRects) {
+                             BackgroundSnapshotMap* snapshots, const std::vector<Rect>& renderRects,
+                             const std::vector<Rect>& styleSourceRects) {
   DEBUG_ASSERT(captureRoot != nullptr);
   DEBUG_ASSERT(bgSource != nullptr);
   DEBUG_ASSERT(snapshots != nullptr);
@@ -590,6 +590,7 @@ void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
   DrawArgs captureArgs = baseArgs;
   captureArgs.backgroundHandler = &capturer;
   captureArgs.renderRects = &renderRects;
+  captureArgs.styleSourceRects = &styleSourceRects;
   captureRoot->drawLayer(captureArgs, bgCanvas, 1.0f, BlendMode::SrcOver);
 }
 

@@ -53,6 +53,12 @@ class DrawArgs {
   // rects if blur sampling range needs to be included. nullptr means no culling (full recording).
   const std::vector<Rect>* renderRects = nullptr;
 
+  // World-space rects the layer style sources are recorded against, when they have to differ from
+  // renderRects. A capture pass culls drawing to the area its background styles sample, but the
+  // sources it caches are reused for the whole captured area, so they must cover the latter.
+  // nullptr means the sources follow renderRects.
+  const std::vector<Rect>* styleSourceRects = nullptr;
+
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 
   // The maximum cache size (single edge) for subtree layer caching. Set to 0 to disable
