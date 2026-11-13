@@ -33,8 +33,8 @@ namespace tgfx {
 //            2 = plain four-leaf        5 = gradient four-leaf
 //
 // The masks below are the value sets of each conditional group. The names are bare (bareNames):
-// the module reuses the legacy kernel's interface spellings verbatim, so the runtime's by-name
-// writers (the GP's setData, BindChainProgram, the xfer bind) keep working unchanged.
+// the module reuses the legacy kernel's interface spellings verbatim in the assembled text, while
+// the runtime addresses every field by element index through the derived layout.
 inline constexpr ModuleDim ChainDims[] = {{"PROFILE", 7}};
 
 // The two pool arrays' lengths per PROFILE: the legacy CHAIN_SLOT_CAPACITY was 16 for every plain

@@ -49,8 +49,8 @@ void DrawOp::tryLowerIR() {
   std::optional<DrawIR> lowered = std::nullopt;
   if (type() == Type::AtlasTextOp) {
     // The glyph leaf's atlas facts come from the op itself — the prepare-time geometry processor
-    // only re-derives them. An atlas the chain cannot carry (a color atlas) leaves the IR null:
-    // the plain path serves the draw exactly as before.
+    // only re-derives them. When the op carries no atlas source the IR stays null, and the draw
+    // is left to the routes that accept an IR-less draw (no match rule accepts one otherwise).
     auto atlas = recordTimeAtlasSource();
     if (atlas.has_value()) {
       lowered = LowerDrawWithAtlas(colorList, coverageList, *atlas, blendMode, allocator);

@@ -135,8 +135,8 @@ struct Module {
   /// The module spells its interface names verbatim (no <Module>_ prefix): uniform, attribute
   /// and varying names, and its dim macros, appear exactly as declared. Frame and Xfer are the
   /// singletons whose names the shared contracts spell bare; the declared Chain modules set it
-  /// too, because they reuse the legacy kernel's interface spellings verbatim (so the runtime
-  /// writers that address fields by name keep working unchanged).
+  /// too, because they reuse the legacy kernel's interface spellings verbatim in the assembled
+  /// text. The runtime addresses those fields by element index through the derived layout.
   bool bareNames = false;
   /// Present on the modules that carry an unrolled executor (the chain family); the assembler
   /// emits the site's macro from it.

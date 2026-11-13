@@ -494,8 +494,8 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
         "unwritten kernel uniforms");
     return;
   }
-  // The leaf records and the shape selectors are addressed through the derived layout now; the
-  // rest of the chain block still rides the by-name binder until the remaining arrays migrate.
+  // The whole chain block is addressed through the derived layout: the slot pools, the shape
+  // selectors and the resource blocks all resolve their element's field once per program.
   ParamBuffer buffer(vertexUniformData, fragmentUniformData);
   SlotWriter chainWriter(layout, Chain, chainSlot, &buffer);
   // The shell-free value write: the draw's whole uniform content comes from the compiled program —
