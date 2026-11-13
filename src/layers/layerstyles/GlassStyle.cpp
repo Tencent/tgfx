@@ -50,6 +50,7 @@ struct GlassStyle::BackgroundMapping {
 // Sampling parameters of the refraction and edge-light UDF textures.
 struct GlassStyle::UDFSampling {
   Point pixelToLayerPixel;
+  float gradientSampleRadius = 0.0f;
   Point edgeSpan;
   Point textureOrigin;
   Point edgePixelToLayerPixel;
@@ -61,22 +62,6 @@ static constexpr float MaxBackgroundSize = 2048.0f;
 // Fallback texture size limit used when no GPU context is available at record time. Kept equal to
 // the UDF size cap so recorded intermediate sizes stay allocatable on any playback device.
 static constexpr int DefaultMaxTextureSize = 2048;
-
-// depthRatio below 0.1 scales the refraction magnitude down via smoothstep to avoid
-// abrupt visual transitions at very shallow depth values.
-static float GetDepthScale(float depthRatio) {
-  float depthScale = std::clamp(depthRatio / 0.1f, 0.0f, 1.0f);
-  return depthScale * depthScale * (3.0f - 2.0f * depthScale);
-}
-
-// Max UDF refraction displacement in layer pixels. Shared by GetRefractionOutset
-// (background sampling range) and getUDFRefractionFilter (shader maxDisplacement) to
-// guarantee both use the identical bound.
-static float GetUDFMaxDisplacement(float minHalf, float refractionFactor, float depthRatio) {
-  // 0.999 keeps displacement strictly inside the glass half-size so refraction
-  // sampling never reads past the layer boundary.
-  return 0.999f * minHalf * refractionFactor * depthRatio * GetDepthScale(depthRatio);
-}
 
 // Below this content scale the edge light field is too coarse to reconstruct, so it is switched off
 // instead of rendered from unreliable gradients.
@@ -93,29 +78,23 @@ static float GetEdgeBandLayerPixels(float contentScale) {
   return std::max(1.5f, 1.0f / contentScale);
 }
 
-// SDF shapes cap the refraction displacement at refractionFactor * glassThickness in the shader
-// (glassThickness is capped at the depth parameter); the sampling outset follows the same bound,
-// extended only by the dispersion channel spread.
-static float GetSDFRefractionOutset(float refractionFactor, float glassThickness,
-                                    float dispersion) {
-  return std::max(glassThickness * refractionFactor * (1.0f + dispersion), 1.0f);
+// Both paths use the same physical displacement bound in layer pixels. The UDF applies its
+// proximity shaping before the refraction shader clamps the final displacement to this bound, so
+// the sampling outset always covers the shader result; dispersion extends the channel spread.
+static float GetRefractionOutset(float maxDisplacement, float dispersion) {
+  return std::max(maxDisplacement * (1.0f + dispersion), 1.0f);
 }
 
-// AlphaMask shapes displace by minHalf * refractionFactor * depthRatio in the shader, clamped to
-// maxDisplacement; the outset uses the identical bound.
-static float GetUDFRefractionOutset(float minHalf, float refractionFactor, float depthRatio,
-                                    float dispersion) {
-  return std::max(
-      GetUDFMaxDisplacement(minHalf, refractionFactor, depthRatio) * (1.0f + dispersion), 1.0f);
-}
-
-// Used when the shape type is not known yet (filterBackground runs before shape detection):
-// cover both paths conservatively.
-static float GetRefractionOutset(float width, float height, float refractionFactor,
-                                 float depthRatio, float dispersion, float glassThickness) {
-  auto minHalf = std::min(width, height) * 0.5f;
-  return std::max(GetSDFRefractionOutset(refractionFactor, glassThickness, dispersion),
-                  GetUDFRefractionOutset(minHalf, refractionFactor, depthRatio, dispersion));
+static float GetGradientSampleRadius(float glassThickness, float minHalf,
+                                     const Point& udfPixelToLayerPixel) {
+  // A one-texel floor changes the normalized gradient span whenever UDF density changes with K.
+  // Use a fixed fraction of the shape instead, so uniform scaling only changes the displacement
+  // magnitude and leaves the reconstructed gradient profile scale-invariant. The actual texel size
+  // remains a fallback for resource-limited UDFs whose density cap drops below the short-side floor.
+  static constexpr float MinGradientSpanRatio = 1.0f / 128.0f;
+  auto normalizedSpan =
+      std::max(glassThickness * 0.05f, std::max(minHalf, 0.0f) * MinGradientSpanRatio);
+  return std::max(normalizedSpan, std::max(udfPixelToLayerPixel.x, udfPixelToLayerPixel.y));
 }
 
 struct GlassShapeInfo {
@@ -278,8 +257,7 @@ Rect GlassStyle::filterBackgroundSharp(const Rect& srcRect, float contentScale) 
   // filterBackground() may run before shapeType is determined, so cover both paths.
   auto minHalf = std::min(maxWidth, maxHeight) * 0.5f;
   float refractionOutset =
-      GetRefractionOutset(maxWidth, maxHeight, getRefractionFactor(), getDepthRatio(),
-                          getDispersionFactor(), getGlassThickness(minHalf));
+      GetRefractionOutset(getRefractionMaxDisplacement(minHalf), getDispersionFactor());
   refractionOutset = refractionOutset * contentScale + 1.0f;
   float sigma = std::max(0.5f, (_frost / 100.0f) * MaxFrostSigma) * contentScale;
   refractionOutset += sigma * 2.0f + 1.0f;
@@ -344,8 +322,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     if (_refraction > 0 || _lightIntensity > 0) {
       auto minHalf = std::min(origWidth, origHeight) * 0.5f;
       float fullRefractionOutset =
-          GetRefractionOutset(origWidth, origHeight, getRefractionFactor(), getDepthRatio(),
-                              getDispersionFactor(), getGlassThickness(minHalf));
+          GetRefractionOutset(getRefractionMaxDisplacement(minHalf), getDispersionFactor());
       fullRefractionOutset = std::ceil(fullRefractionOutset * input.contentScale + 1.0f);
       float fullWidth = contentWidth + 2.0f * fullRefractionOutset;
       float fullHeight = contentHeight + 2.0f * fullRefractionOutset;
@@ -375,11 +352,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     if (_refraction > 0 || _lightIntensity > 0) {
       auto minHalf = std::min(origWidth, origHeight) * 0.5f;
       float refractionOutset =
-          shapeInfo.type == GlassShapeType::AlphaMask
-              ? GetUDFRefractionOutset(minHalf, getRefractionFactor(), getDepthRatio(),
-                                       getDispersionFactor())
-              : GetSDFRefractionOutset(getRefractionFactor(), getGlassThickness(minHalf),
-                                       getDispersionFactor());
+          GetRefractionOutset(getRefractionMaxDisplacement(minHalf), getDispersionFactor());
       refractionOutset = std::ceil(refractionOutset * input.contentScale + 1.0f);
       refractInputRect.outset(refractionOutset, refractionOutset);
       // Refraction samples toward the layer interior (UDF gradient points inward), so the
@@ -464,15 +437,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     mapping.contentWidth = contentWidth;
     mapping.contentHeight = contentHeight;
     if (shapeInfo.type == GlassShapeType::AlphaMask) {
-      // Tent blur approximates the UDF. Use original layer bounds (not zoom-affected) for blur
-      // radius calculation.
-      // depth 1-100 maps linearly to blurRadius 5-30. The 30.0 cap limits max UDF blur to avoid
-      // overly wide transitions on large depth values.
-      static constexpr float MAX_BLUR_RADIUS = 30.0f;
-      static constexpr float MIN_BLUR_RADIUS = 5.0f;
-      float blurRadius =
-          std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
       float minHalf = std::min(origBounds.width(), origBounds.height()) * 0.5f;
+      float glassThickness = getGlassThickness(minHalf);
+      // Tent blur approximates the UDF. The radius is in layer pixels and follows the physical
+      // thickness; the density cap below, not an absolute depth cap, keeps the kernel texel-bounded.
+      float blurRadius = glassThickness * 0.3f;
       // Nominal layer-space tent reach, before the texel-count floors below are applied. The
       // density budget uses this value so the cap tracks the physical radius, not the floors.
       float nominalTentRadius = std::min(blurRadius, minHalf);
@@ -496,15 +465,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       if (maxAllowedDim < 1.0f) {
         return;
       }
-      float udfScale = 1.0f;
-      if (fullMaxDim > maxAllowedDim) {
-        udfScale = maxAllowedDim / fullMaxDim;
-      }
       static constexpr float MIN_SHORT_SIDE_TEXELS = 256.0f;
       float fullMinDim = std::min(contentWidth, contentHeight);
-      if (fullMinDim * udfScale < MIN_SHORT_SIDE_TEXELS) {
-        udfScale = MIN_SHORT_SIDE_TEXELS / fullMinDim;
-      }
+      float udfScale =
+          CalculateGlassUDFScale(fullMaxDim, fullMinDim, maxAllowedDim, MIN_SHORT_SIDE_TEXELS);
       // Layer-pixel-to-source-pixel ratio per axis (= contentScale on both axes). Used to convert
       // the layer-space radius into the UDF texel density.
       float layerToSourceX = contentWidth / origBounds.width();
@@ -548,9 +512,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       Point fineRadius = {
           std::min(effectiveBlurRadius * rhoX, static_cast<float>(GlassUDFMaxTentRadius)),
           std::min(effectiveBlurRadius * rhoY, static_cast<float>(GlassUDFMaxTentRadius))};
-      float gradientSampleRadius = getDepthRatio() * 3.0f + 1.0f;
-      float fineHaloX = std::ceil(gradientSampleRadius) + 1.0f;
-      float fineHaloY = std::ceil(gradientSampleRadius) + 1.0f;
+      Point udfPixelToLayerPixel = {udfPixelToLayerPixelX, udfPixelToLayerPixelY};
+      float gradientSampleRadius =
+          GetGradientSampleRadius(glassThickness, minHalf, udfPixelToLayerPixel);
+      float fineHaloX = std::ceil(gradientSampleRadius / udfPixelToLayerPixelX) + 1.0f;
+      float fineHaloY = std::ceil(gradientSampleRadius / udfPixelToLayerPixelY) + 1.0f;
       // Only the visible window of the refraction field is generated, plus the halo the shader
       // samples for its gradient. A window that already spans most of the field is widened to the
       // whole field instead, so the two cases do not differ by a few pixels of allocation.
@@ -671,6 +637,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       }
       UDFSampling udf = {};
       udf.pixelToLayerPixel = {udfPixelToLayerPixelX, udfPixelToLayerPixelY};
+      udf.gradientSampleRadius = gradientSampleRadius;
       udf.edgeSpan = {edgeSpanX, edgeSpanY};
       udf.textureOrigin = udfTextureOrigin;
       udf.edgePixelToLayerPixel = {edgePixelToLayerPixelX, edgePixelToLayerPixelY};
@@ -814,7 +781,7 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
   // The analytical SDF displaces by at most refractionFactor * glassThickness, so the shader clamp
   // is an identity here. Carrying the real bound instead of a sentinel lets the image filter derive
   // its sampling outset from this value alone.
-  params.maxDisplacement = getGlassThickness(minHalf) * getRefractionFactor();
+  params.maxDisplacement = getRefractionMaxDisplacement(minHalf);
 
   GlassSDFGeometryParams sdfParams = {};
   sdfParams.halfW = halfWidth;
@@ -823,7 +790,6 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
   sdfParams.glassThickness = getGlassThickness(minHalf);
   sdfParams.refractionFactor = getRefractionFactor();
   sdfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
-  sdfParams.depthRatio = getDepthRatio();
   sdfParams.lightAngle = _lightAngle;
   sdfParams.enableEdgeLighting = params.lightIntensity > 0.0f;
   sdfParams.edgeBandLayerPixels = GetEdgeBandLayerPixels(contentScale);
@@ -840,14 +806,16 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
   }
   params.shapeType = GlassShapeType::AlphaMask;
   float minHalf = std::min(halfWidth, halfHeight);
-  params.maxDisplacement = GetUDFMaxDisplacement(minHalf, getRefractionFactor(), getDepthRatio());
+  float glassThickness = getGlassThickness(minHalf);
+  params.maxDisplacement = getRefractionMaxDisplacement(minHalf);
 
   GlassUDFGeometryParams udfParams = {};
   udfParams.halfW = halfWidth;
   udfParams.halfH = halfHeight;
+  udfParams.glassThickness = glassThickness;
   udfParams.refractionFactor = getRefractionFactor();
   udfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
-  udfParams.depthRatio = getDepthRatio();
+  udfParams.gradientSampleRadiusLayerPixels = udf.gradientSampleRadius;
   udfParams.lightAngle = _lightAngle;
   udfParams.edgeBandLayerPixels = GetEdgeBandLayerPixels(contentScale);
   udfParams.udfPixelToLayerPixelX = udf.pixelToLayerPixel.x;

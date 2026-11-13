@@ -653,4 +653,26 @@ TGFX_TEST(ImageRenderTest, drawScaleImage) {
   EXPECT_TRUE(Baseline::Compare(surface, "ImageRenderTest/drawScaleBufferImage"));
 }
 
+/**
+ * Draws the visible part of a subset image with a src rect that starts inside the subset bounds
+ * and overflows them, at half scale. The crop is rendered into a texture at the draw scale and
+ * sampled through the crop origin, so this covers the crop uv mapping end to end.
+ */
+TGFX_TEST(ImageRenderTest, SubsetImageCropDownscale) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto source = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(source != nullptr);
+  auto subset = source->makeSubset(Rect::MakeXYWH(4, 4, 120, 120));
+  ASSERT_TRUE(subset != nullptr);
+  auto surface = Surface::Make(context, 96, 96);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  auto srcRect = Rect::MakeXYWH(12, 8, 116, 116);
+  canvas->drawImageRect(subset, srcRect, Rect::MakeXYWH(10, 10, 54, 56));
+  EXPECT_TRUE(Baseline::Compare(surface, "ImageRenderTest/subset_crop_downscale"));
+}
+
 }  // namespace tgfx
