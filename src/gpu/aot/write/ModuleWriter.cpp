@@ -17,10 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/write/ModuleWriter.h"
+#include "gpu/aot/write/modules/ClipWrite.h"
+#include "gpu/aot/write/modules/Effects.h"
 #include "gpu/aot/write/modules/Frame.h"
 #include "gpu/aot/write/modules/Geometry.h"
 #include "gpu/aot/write/modules/Textures.h"
 #include "gpu/aot/write/modules/Xfer.h"
+#include "gpu/aot/write/modules/YuvTail.h"
 #include "gpu/shaders/modules/Frame.h"
 #include "gpu/shaders/modules/Xfer.h"
 
@@ -38,7 +41,16 @@ ModuleWriter WriterOf(const Module& module) {
   if (const auto writer = GeometryWriterOf(module)) {
     return writer;
   }
-  return TextureSourcesWriterOf(module);
+  if (const auto writer = TextureSourcesWriterOf(module)) {
+    return writer;
+  }
+  if (const auto writer = EffectsWriterOf(module)) {
+    return writer;
+  }
+  if (const auto writer = ClipWriterOf(module)) {
+    return writer;
+  }
+  return YuvTailWriterOf(module);
 }
 
 }  // namespace tgfx

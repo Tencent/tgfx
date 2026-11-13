@@ -18,19 +18,30 @@
 
 #include "gpu/aot/write/modules/Geometry.h"
 #include <array>
+#include "gpu/ProgramInfo.h"
+#include "gpu/aot/ir/DrawIR.h"
+#include "gpu/aot/ir/GeometryLayout.h"
+#include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/aot/write/ParamBuffer.h"
+#include "gpu/aot/write/modules/ClipWrite.h"
+#include "gpu/aot/write/modules/LeafWrite.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
 #include "gpu/shaders/modules/AtlasTextGeometry.h"
+#include "gpu/shaders/modules/BlurSourceGeometry.h"
 #include "gpu/shaders/modules/ComplexEllipseGeometry.h"
 #include "gpu/shaders/modules/ComplexRRectGeometry.h"
 #include "gpu/shaders/modules/EllipseGeometry.h"
+#include "gpu/shaders/modules/HairlineLineGeometry.h"
+#include "gpu/shaders/modules/HairlineQuadGeometry.h"
+#include "gpu/shaders/modules/MeshGeometry.h"
 #include "gpu/shaders/modules/QuadColorGeometry.h"
 #include "gpu/shaders/modules/QuadGeometry.h"
 #include "gpu/shaders/modules/QuadTextureGeometry.h"
 #include "gpu/shaders/modules/RRectGeometry.h"
 #include "gpu/shaders/modules/RectGeometry.h"
 #include "gpu/shaders/modules/RoundStrokeRectGeometry.h"
+#include "gpu/shaders/modules/ShapeInstancedGeometry.h"
 
 namespace tgfx {
 
@@ -146,6 +157,64 @@ void WriteAtlasTextGeometryModule(WriteContext& context) {
   context.slot->set(AlphaOnly, static_cast<int32_t>(context.geometry.isAlphaOnly ? 1 : 0));
 }
 
+// MeshGeometry: the view transform, the color pair and the texture coordinate chain.
+void WriteMeshGeometryModule(WriteContext& context) {
+  constexpr uint8_t Matrix = UniformElementIndexOf(MeshGeometry, "Matrix");
+  constexpr uint8_t Color = UniformElementIndexOf(MeshGeometry, "Color");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(MeshGeometry, "HasCommonColor");
+  context.slot->set(Matrix, context.geometry.viewMatrix);
+  context.slot->set(Color, context.geometry.commonColor);
+  context.slot->set(HasCommonColor, static_cast<int32_t>(context.geometry.hasCommonColor ? 1 : 0));
+  // The mesh's color source is the sole texture leaf of the color graph, the transform the legacy
+  // walk reported first; a processor-free mesh has no transform to write.
+  if (const auto* leaf = FirstColorTextureLeaf(context.info.getCarriedIR())) {
+    constexpr uint8_t CoordMatrix = UniformElementIndexOf(MeshGeometry, "CoordMatrix");
+    context.slot->set(CoordMatrix, SourceCoordMatrix(*leaf, context.info.getGeometryLayout()));
+  }
+}
+
+// ShapeInstancedGeometry: the local-coordinate recovery, the view transform and the sampling
+// coordinate. The instance offset and colour ride the vertex attributes; the sampling transform is
+// the coverage texture leaf's, so a processor-free instanced fill leaves it unwritten.
+void WriteShapeInstancedGeometryModule(WriteContext& context) {
+  constexpr uint8_t UVMatrix = UniformElementIndexOf(ShapeInstancedGeometry, "UVMatrix");
+  constexpr uint8_t ViewMatrix = UniformElementIndexOf(ShapeInstancedGeometry, "ViewMatrix");
+  context.slot->set(UVMatrix, context.geometry.uvMatrix);
+  context.slot->set(ViewMatrix, context.geometry.viewMatrix);
+  const auto* maskLeaf = context.sources.maskLeaf;
+  if (maskLeaf != nullptr) {
+    constexpr uint8_t CoordMatrix = UniformElementIndexOf(ShapeInstancedGeometry, "CoordMatrix");
+    context.slot->set(CoordMatrix, SourceCoordMatrix(*maskLeaf, context.info.getGeometryLayout()));
+  }
+}
+
+// BlurSourceGeometry: the view matrix and the blur child leaf's sampling transform.
+void WriteBlurSourceGeometryModule(WriteContext& context) {
+  constexpr uint8_t ViewMatrix = UniformElementIndexOf(BlurSourceGeometry, "Matrix");
+  context.slot->set(ViewMatrix, context.geometry.viewMatrix);
+  const auto* child = context.sources.blurChild;
+  if (child != nullptr) {
+    constexpr uint8_t CoordMatrix = UniformElementIndexOf(BlurSourceGeometry, "CoordMatrix");
+    context.slot->set(CoordMatrix, SourceCoordMatrix(*child, context.info.getGeometryLayout()));
+  }
+}
+
+// HairlineLineGeometry / HairlineQuadGeometry: the view matrix, the colour/coverage/AA triple and
+// the analytic clip the declaration carries in the same block.
+template <const Module& module>
+void WriteHairlineGeometryModule(WriteContext& context) {
+  constexpr uint8_t ViewMatrix = UniformElementIndexOf(module, "Matrix");
+  constexpr uint8_t Color = UniformElementIndexOf(module, "Color");
+  constexpr uint8_t Coverage = UniformElementIndexOf(module, "Coverage");
+  constexpr uint8_t AAEnabled = UniformElementIndexOf(module, "AAEnabled");
+  context.slot->set(ViewMatrix, context.geometry.viewMatrix);
+  context.slot->set(Color, context.geometry.commonColor);
+  context.slot->set(Coverage, context.geometry.coverage);
+  context.slot->set(AAEnabled,
+                    static_cast<int32_t>(context.geometry.aaType == AAType::None ? 0 : 1));
+  WriteClipParams<module>(context.info, context.slot);
+}
+
 ModuleWriter GeometryWriterOf(const Module& module) {
   if (&module == &RectGeometry) {
     return WriteRectGeometryModule;
@@ -176,6 +245,21 @@ ModuleWriter GeometryWriterOf(const Module& module) {
   }
   if (&module == &AtlasTextGeometry) {
     return WriteAtlasTextGeometryModule;
+  }
+  if (&module == &MeshGeometry) {
+    return WriteMeshGeometryModule;
+  }
+  if (&module == &ShapeInstancedGeometry) {
+    return WriteShapeInstancedGeometryModule;
+  }
+  if (&module == &BlurSourceGeometry) {
+    return WriteBlurSourceGeometryModule;
+  }
+  if (&module == &HairlineLineGeometry) {
+    return WriteHairlineGeometryModule<HairlineLineGeometry>;
+  }
+  if (&module == &HairlineQuadGeometry) {
+    return WriteHairlineGeometryModule<HairlineQuadGeometry>;
   }
   return nullptr;
 }
