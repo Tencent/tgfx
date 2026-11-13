@@ -23,16 +23,7 @@
 namespace tgfx {
 
 namespace {
-
-// The source rules: each wraps one check of ContractChecks.h, whose implementation stays where it
-// is — a rule owns when the check runs and what it is named by, not the check itself.
-
-class MacroNamesRule : public SourceRule {
- public:
-  size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
-    return ValidateMacroNames(context.shaderDir, diagnostics);
-  }
-};
+;
 
 class PointwiseDispatchRule : public SourceRule {
  public:
@@ -59,7 +50,6 @@ class ReflectionContractRule : public ArtifactRule {
 
 std::vector<std::unique_ptr<SourceRule>> MakeSourceRules() {
   std::vector<std::unique_ptr<SourceRule>> rules;
-  rules.push_back(std::make_unique<MacroNamesRule>());
   rules.push_back(std::make_unique<PointwiseDispatchRule>());
   rules.push_back(std::make_unique<SpecReaderRule>());
   return rules;

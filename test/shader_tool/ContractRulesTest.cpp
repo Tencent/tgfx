@@ -41,8 +41,10 @@ SourceRuleContext RealSourceContext() {
 
 }  // namespace
 
-TEST(ContractRulesTest, TheSourceRegistryHoldsTheThreeSourceRules) {
-  EXPECT_EQ(MakeSourceRules().size(), 3u);
+TEST(ContractRulesTest, TheSourceRegistryHoldsTheTwoSourceRules) {
+  // The macro-name rule retired with the stored entry files: every family's text is assembled
+  // from its declarations, so there is no per-family source left for it to scan.
+  EXPECT_EQ(MakeSourceRules().size(), 2u);
 }
 
 TEST(ContractRulesTest, TheArtifactRegistryHoldsTheTwoArtifactRules) {

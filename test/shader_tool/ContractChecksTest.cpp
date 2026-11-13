@@ -38,8 +38,6 @@
 namespace tgfx {
 namespace {
 
-const std::string RealShaderDir = std::string(TGFX_SOURCE_DIR) + "/src/gpu/shaders/glsl";
-
 // What a rule reported: the error count it returned, the diagnostics it recorded, and their
 // messages joined into one text so a test can check why as well as how often.
 struct Report {
@@ -71,13 +69,6 @@ Report CheckReflection(const std::vector<VariantData>& variants) {
   auto errors = ValidateReflectionContracts(variants, &diagnostics);
   return Finish(errors, diagnostics);
 }
-
-Report CheckMacroNames(const std::string& shaderDir) {
-  Diagnostics diagnostics;
-  auto errors = ValidateMacroNames(shaderDir, &diagnostics);
-  return Finish(errors, diagnostics);
-}
-
 UniformEntry Field(const std::string& name, UniformFormat format = UniformFormat::Float4,
                    uint16_t arraySize = 1) {
   return UniformEntry{name, static_cast<uint8_t>(format), arraySize};
@@ -94,39 +85,6 @@ VariantData VariantWithFragment(const std::vector<UniformEntry>& uniforms,
   variant.fragmentReflection.uniforms = uniforms;
   variant.fragmentReflection.samplers = samplers;
   return variant;
-}
-
-// A copy of the real shader directory that a test can damage.
-class DamagedShaderDir : public ::testing::Test {
- protected:
-  DamagedShaderDir() : scratch("contract") {
-    std::filesystem::copy(RealShaderDir, scratch.dir(), std::filesystem::copy_options::recursive);
-  }
-
-  std::string Read(const std::string& relativePath) const {
-    std::ifstream file(scratch.dir() + "/" + relativePath);
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
-  }
-
-  // Replaces the first occurrence of from with to in a file of the copy; false if from is absent.
-  bool Edit(const std::string& relativePath, const std::string& from, const std::string& to) {
-    auto text = Read(relativePath);
-    auto position = text.find(from);
-    if (position == std::string::npos) {
-      return false;
-    }
-    text.replace(position, from.size(), to);
-    scratch.write(relativePath, text);
-    return true;
-  }
-
-  void Append(const std::string& relativePath, const std::string& text) {
-    scratch.write(relativePath, Read(relativePath) + text);
-  }
-
-  ScratchDir scratch;
 };
 
 }  // namespace
@@ -233,27 +191,4 @@ TEST(ReflectionContractTest, TheVertexStageIsCheckedToo) {
   EXPECT_EQ(report.errors, 1u) << report.log;
   EXPECT_TRUE(report.mentions("duplicate name 'Matrix'")) << report.log;
 }
-
-// ---- the macro-name rule --------------------------------------------------------------------
-
-TEST(MacroNamesTest, TheRealSourcesPass) {
-  auto report = CheckMacroNames(RealShaderDir);
-  EXPECT_EQ(report.errors, 0u) << report.log;
-}
-
-TEST(MacroNamesTest, AnUnknownMacroIsReported) {
-  const ScratchDir dir("macro_names_unknown");
-  dir.write("kernels/bad.frag", "#ifdef NOT_A_REAL_MACRO\n#endif\n");
-  auto report = CheckMacroNames(dir.dir());
-  EXPECT_TRUE(report.mentions("conditions on 'NOT_A_REAL_MACRO'")) << report.log;
-}
-
-TEST(MacroNamesTest, AFamilyDimensionAndASourceDefinePass) {
-  const ScratchDir dir("macro_names_known");
-  dir.write("kernels/good.frag",
-            "#define LOCAL_FLAG 1\n#ifdef LOCAL_FLAG\n#endif\n#if defined(PROFILE)\n#endif\n");
-  auto report = CheckMacroNames(dir.dir());
-  EXPECT_EQ(report.errors, 0u) << report.log;
-}
-
 }  // namespace tgfx

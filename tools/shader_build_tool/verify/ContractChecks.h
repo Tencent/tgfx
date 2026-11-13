@@ -30,8 +30,6 @@ namespace tgfx {
 // cli renders the records — so a test asserts the code and the subject fields instead of
 // capturing stderr.
 
-size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics);
-
 /// Checks the shared pointwise dispatch (operator/pointwise_color_dispatch.inc) against the op
 /// list: every operator needs an `op == OP_<NAME>` branch or a `tgfx_pointwise_exempt <Name>:
 /// <reason>` entry, every branch must name a listed operator, and an exemption must state its

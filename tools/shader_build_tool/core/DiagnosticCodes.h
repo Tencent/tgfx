@@ -93,7 +93,6 @@ inline constexpr const char* VerifyNotApplicable = "verify.unverifiable";
 /// A preprocessor condition references an identifier that is neither a family permutation
 /// dimension, a define in the shader sources, nor a whitelisted builtin: a typo would evaluate
 /// silently to zero.
-inline constexpr const char* VerifyMacroUnknown = "verify.macro.unknown";
 
 /// The shared pointwise dispatch (operator/pointwise_color_dispatch.inc) does not match the op
 /// list: an operator lacks a branch or a reasoned exemption, or a branch names no listed
@@ -114,21 +113,10 @@ inline constexpr const char* OutputDuplicateKey = "output.duplicate-key";
 /// must be referenced by at least one site (an unreferenced one is dead, or a site that still
 /// reports through something else).
 inline constexpr const char* AllCodes[] = {
-    SourcesUnreadable,
-    CompileGlsl,
-    CompileCacheDisabled,
-    ReflectUnknownType,
-    EmitFailed,
-    EmitFormLeak,
-    SpecReader,
-    SpecLayoutDrift,
-    VerifyReflection,
-    VerifyBindingLayout,
-    VerifyNotApplicable,
-    VerifyMacroUnknown,
-    VerifyPointwiseDispatch,
-    OutputWrite,
-    OutputDuplicateKey,
+    SourcesUnreadable, CompileGlsl,         CompileCacheDisabled, ReflectUnknownType,
+    EmitFailed,        EmitFormLeak,        SpecReader,           SpecLayoutDrift,
+    VerifyReflection,  VerifyBindingLayout, VerifyNotApplicable,  VerifyPointwiseDispatch,
+    OutputWrite,       OutputDuplicateKey,
 };
 
 }  // namespace DiagnosticCode
