@@ -145,8 +145,6 @@ using PermutationDimension = std::variant<PermutationBool, PermutationEnum, Perm
  *   Dims struct ──declares──▶ typed handles (one per dimension: name + declared range)
  *        │
  *        └── domain() lists the handles in the bundle's dimension order
- *                                       │
- *   Compose ──set(handle, value)──▶ ComposedDims ──finish()──▶ position-ordered values
  *
  * The handle replaces the index enum that previously mirrored the domain list: an enum position
  * could silently drift from the domain order (a transposed write produced a wrong but plausible
@@ -194,14 +192,7 @@ class PermutationEnumDim {
   const char* defineName;
   std::vector<const char*> valueNames;
 };
-
-/**
- * Dimension values a matcher rule produces for both stages, before domain encoding.
- */
-struct RuleComposedValues {
-  std::vector<int> vertValues;
-  std::vector<int> fragValues;
-};
+;
 
 /**
  * Represents the full permutation space formed by a list of dimensions. Provides encoding and
@@ -270,93 +261,6 @@ class PermutationDomain {
 
  private:
   std::vector<PermutationDimension> dimensions;
-};
-
-/**
- * Write side of one stage's dimension values. set() resolves the handle's position in the
- * domain by name — the call order is irrelevant and a transposition against the domain order is
- * impossible — and range-checks the value against the dimension's declared range. finish()
- * returns the position-ordered value vector the encoder consumes, and fails when a declared
- * dimension was never assigned (the old resize-then-index writes silently zero-filled a
- * forgotten dimension). get() reads a value back by handle for validation passes between
- * Compose's stages. The domain is moved in, so a temporary (Dims::domain()) is safe to pass.
- */
-template <typename Dims>
-class ComposedDims {
- public:
-  explicit ComposedDims(PermutationDomain domain) : domain(std::move(domain)) {
-    values.resize(this->domain.dimensionCount(), 0);
-    assigned.resize(this->domain.dimensionCount(), 0);
-  }
-
-  ComposedDims& set(const PermutationBoolDim<Dims>& dim, int value) {
-    setAt(dim.defineName, value);
-    return *this;
-  }
-
-  ComposedDims& set(const PermutationIntDim<Dims>& dim, int value) {
-    setAt(dim.defineName, value);
-    return *this;
-  }
-
-  ComposedDims& set(const PermutationEnumDim<Dims>& dim, int value) {
-    setAt(dim.defineName, value);
-    return *this;
-  }
-
-  int get(const PermutationBoolDim<Dims>& dim) const {
-    return getAt(dim.defineName);
-  }
-
-  int get(const PermutationIntDim<Dims>& dim) const {
-    return getAt(dim.defineName);
-  }
-
-  int get(const PermutationEnumDim<Dims>& dim) const {
-    return getAt(dim.defineName);
-  }
-
-  /**
-   * The position-ordered value vector encode() consumes; fails when a declared dimension was
-   * never assigned.
-   */
-  std::vector<int> finish() const {
-    for (size_t i = 0; i < assigned.size(); i++) {
-      assert(assigned[i] != 0 && "finish() with a declared dimension never assigned");
-    }
-    return values;
-  }
-
-  const PermutationDomain& permutationDomain() const {
-    return domain;
-  }
-
- private:
-  size_t positionOf(const char* defineName) const {
-    auto position = domain.indexOf(defineName);
-    assert(position < domain.dimensionCount() &&
-           "unknown dimension handle: the name is not in "
-           "the domain the builder was built from");
-    return position;
-  }
-
-  void setAt(const char* defineName, int value) {
-    auto position = positionOf(defineName);
-    assert(value >= 0 && value < domain.valueCountOf(position) &&
-           "dimension value outside the declared range");
-    values[position] = value;
-    assigned[position] = 1;
-  }
-
-  int getAt(const char* defineName) const {
-    auto position = positionOf(defineName);
-    assert(assigned[position] != 0 && "reading a dimension that was never assigned");
-    return values[position];
-  }
-
-  PermutationDomain domain;
-  std::vector<int> values;
-  std::vector<uint8_t> assigned;
 };
 
 /**

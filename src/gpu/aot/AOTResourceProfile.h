@@ -68,7 +68,7 @@ inline constexpr AOTResourceCapacity TiledGraphResourceCapacity = {16, 3, 0, 1};
 
 // The capacity defines the compiled stages receive live in the tool (core/CapacityDefines.h):
 // they are read from the declaration the assembler sizes the arrays from, and the contract header
-// below cannot include the declaration layer. The planner's budgets stay here; ChainInputs.cpp
+// below cannot include the declaration layer. The planner's budgets stay here; Chain.h
 // pins them to the declared counts with static_asserts.
 
 inline const AOTResourceCapacity* GetAOTResourceCapacity(AOTResourceProfile profile) {

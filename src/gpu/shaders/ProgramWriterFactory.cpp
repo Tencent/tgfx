@@ -19,7 +19,6 @@
 #include "gpu/shaders/ProgramWriterFactory.h"
 #include "core/utils/Log.h"
 #include "gpu/ProgramWriter.h"
-#include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
 
 namespace tgfx {

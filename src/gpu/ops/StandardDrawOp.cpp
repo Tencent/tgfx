@@ -31,7 +31,6 @@
 #include "gpu/processors/Processor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
-#include "gpu/shaders/ChainInputs.h"
 
 namespace tgfx {
 

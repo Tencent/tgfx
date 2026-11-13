@@ -55,4 +55,10 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const ProgramInfo* info,
 /// asking the interpreter to serve the draw).
 std::optional<FamilyMatchResult> MatchChainProgram(const ProgramInfo* info);
 
+/// The variant a compiled chain program resolves to: the draw's geometry facts plus the program's
+/// expression shape, or nullopt when the shape has no declared counterpart. The caller already
+/// holds the program, so this is the entry for routes and tests that run before any cache lookup;
+/// MatchChainProgram is the program-resolving wrapper.
+std::optional<Variant> MatchChainVariant(const AOTProgram& program, const ProgramInfo* info);
+
 }  // namespace tgfx

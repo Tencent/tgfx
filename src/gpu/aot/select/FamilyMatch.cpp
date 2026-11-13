@@ -27,7 +27,6 @@
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/resources/YUVTextureView.h"
-#include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/KernelContract.h"
@@ -999,6 +998,19 @@ std::optional<FamilyMatchResult> MatchChainProgram(const ProgramInfo* info) {
     return std::nullopt;
   }
   return result;
+}
+
+std::optional<Variant> MatchChainVariant(const AOTProgram& program, const ProgramInfo* info) {
+  if (info == nullptr) {
+    return std::nullopt;
+  }
+  ChainLegacyCell cell = {};
+  if (!DeriveChainCell(program, info, &cell)) {
+    return std::nullopt;
+  }
+  return EncodeVariant(
+      ChainIndex, ChainGeometryOfCell(cell),
+      {static_cast<uint8_t>(cell.subset), ChainProfileOfCell(cell), static_cast<uint8_t>(cell.xp)});
 }
 
 namespace {

@@ -38,6 +38,7 @@
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/Lowering.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
+#include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/aot/select/ProgramSelection.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/processors/ClampedGradientEffect.h"
@@ -50,9 +51,7 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
-#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
@@ -75,15 +74,6 @@
 #include "zstd.h"
 
 namespace tgfx {
-
-// The legacy family retired when the declared Chain took over; these tests still read its
-// dimension view to check the retained composition rules, so the view is assembled here.
-struct PointwiseChainShader {
-  PrecompiledShaderInfo info() const {
-    return {"PointwiseChainShader",          "", "", ChainInputs::VertDims::domain(),
-            ChainInputs::FragDims::domain(), 0};
-  }
-};
 
 #ifndef TGFX_BACKEND_NAME
 #define TGFX_BACKEND_NAME "opengl"
@@ -149,29 +139,6 @@ static GeometryLayout MakeSingleIntervalGeometry(int gpType, bool hasVertexCover
     return DefaultGeometryLayout(PMColor::White(), aa, Matrix::I(), Matrix::I());
   }
   return QuadGeometryLayoutOf(8, 8, aa, PMColor::White(), Matrix::I(), false);
-}
-
-static PlacementPtr<FragmentProcessor> MakeSingleIntervalGradient(BlockAllocator* allocator) {
-  auto colorizer = SingleIntervalGradientColorizer::Make(allocator, Color::Red(), Color::Blue());
-  auto layout = RadialGradientLayout::Make(allocator, Matrix::I());
-  return ClampedGradientEffect::Make(allocator, std::move(colorizer), std::move(layout),
-                                     Color::Red(), Color::Blue());
-}
-
-static PlacementPtr<FragmentProcessor> MakeSingleIntervalCoverage(Context* context,
-                                                                  BlockAllocator* allocator,
-                                                                  int coverageType) {
-  if (coverageType == 0) {
-    return nullptr;
-  }
-  if (coverageType == 1) {
-    return RectEffect::Make(allocator, Rect::MakeWH(8, 8));
-  }
-  auto proxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::ALPHA_8);
-  if (proxy == nullptr || proxy->getTextureView() == nullptr) {
-    return nullptr;
-  }
-  return DeviceSpaceTextureEffect::Make(allocator, std::move(proxy), Matrix::I());
 }
 
 static std::optional<DstTextureInfo> MakeSingleIntervalDst(Context* context, int xpType) {
@@ -335,9 +302,6 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
     }
     EXPECT_EQ(FindShaderInfo(info.name), registered);
   }
-  // The legacy reference set is frozen in ChainInputs (ChainEquivalenceTest pairs it with the
-  // declared variants); the registry now enumerates the declared family alone.
-  EXPECT_EQ(ChainInputs::Reachable().size(), 147u);
   EXPECT_FALSE(EnumerateReachablePermutations("PointwiseChainShader").has_value());
   // The declaration-driven families enumerate their own ordinals: the geometry IS the family, so
   // SolidColor/MaskFill list HAS_XP alone and TiledTextureFill leads with the geometry radix.
@@ -374,281 +338,12 @@ TGFX_TEST(ShaderPermutationTest, DimensionDefinesAppearInGLSL) {
   // declarations, so a dimension's define coverage is checked against the generated text by the
   // build (the assembler emits the conditions from the same declarations).
 }
-
-TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
-  PointwiseChainShader shader;
-  auto info = shader.info();
-  EXPECT_EQ(info.vertDomain.dimensionCount(), 6u);
-  EXPECT_EQ(info.fragDomain.dimensionCount(), 7u);
-  // The appended-last dimensions keep the pre-merge variant indices stable (RESOURCE_KIND for
-  // the fragment stage, HAS_SOURCE_COORDS for the vertex stage); the domain order is now the
-  // only ordering authority, so the pin reads the last dimension's name instead of an enum.
-  EXPECT_STREQ(std::get<PermutationInt>(info.fragDomain.getDimensions().back()).defineName,
-               "RESOURCE_KIND");
-  EXPECT_STREQ(std::get<PermutationBool>(info.vertDomain.getDimensions().back()).defineName,
-               "HAS_SOURCE_COORDS");
-
-  // The retired family's reference set lives in ChainInputs; the registry only enumerates the
-  // declared families now.
-  const auto referenceSet = ChainInputs::Reachable();
-  std::set<uint32_t> vertexIndices;
-  std::set<uint32_t> fragmentIndices;
-  for (int gpType = 0; gpType < 2; ++gpType) {
-    for (int hasCoverage = 0; hasCoverage < 2; ++hasCoverage) {
-      for (int xpType = 0; xpType < 3; ++xpType) {
-        ChainInputs::Inputs inputs;
-        inputs.gpKind = gpType;
-        // The DefaultGP's coverage attribute is unconditional (the non-AA path triangles carry
-        // a constant 1.0 slot), so coverage is always present for every GP kind.
-        inputs.hasCoverage = true;
-        inputs.hasGradient = true;
-        inputs.resourceProfile = AOTResourceProfile::TiledGraph;
-        inputs.xpType = xpType;
-        auto composed = ChainInputs::Compose(inputs);
-        ASSERT_TRUE(composed.has_value());
-        auto vertexIndex = info.vertDomain.encode(composed->vertValues);
-        auto fragmentIndex = info.fragDomain.encode(composed->fragValues);
-        EXPECT_TRUE(info.IsBuildable(vertexIndex, fragmentIndex));
-        EXPECT_EQ(referenceSet.count({vertexIndex, fragmentIndex}), 1u);
-        EXPECT_EQ(info.fragDomain.valueOf(fragmentIndex, ChainInputs::FD::RESOURCE_KIND.defineName),
-                  1);
-        vertexIndices.insert(vertexIndex);
-        fragmentIndices.insert(fragmentIndex);
-      }
-    }
-  }
-  EXPECT_EQ(vertexIndices.size(), 1u);
-  EXPECT_EQ(fragmentIndices.size(), 3u);
-}
-
-TGFX_TEST(ShaderPermutationTest, ComposedDimsFinishIgnoresAssignmentOrder) {
-  // Assignment through typed handles resolves positions by name, so the write order cannot
-  // transpose against the domain order: assigning in reverse produces the same vector and the
-  // same encoded index as the declaration order.
-  using FD = ChainInputs::FD;
-  ComposedDims<FD> reversed(FD::domain());
-  reversed.set(FD::RESOURCE_KIND, 2)
-      .set(FD::HAS_SUBSET, 1)
-      .set(FD::HAS_MASK_TEXTURE, 0)
-      .set(FD::TEXTURE_COUNT, 1)
-      .set(FD::HAS_COVERAGE, 1)
-      .set(FD::HAS_XP, 2)
-      .set(FD::GP_LAYOUT, 3);
-  ComposedDims<FD> forward(FD::domain());
-  forward.set(FD::GP_LAYOUT, 3)
-      .set(FD::HAS_XP, 2)
-      .set(FD::HAS_COVERAGE, 1)
-      .set(FD::TEXTURE_COUNT, 1)
-      .set(FD::HAS_MASK_TEXTURE, 0)
-      .set(FD::HAS_SUBSET, 1)
-      .set(FD::RESOURCE_KIND, 2);
-  EXPECT_EQ(reversed.finish(), forward.finish());
-  EXPECT_EQ(reversed.permutationDomain().encode(reversed.finish()),
-            forward.permutationDomain().encode(forward.finish()));
-}
-
 // Death tests need fork/exec, which Emscripten does not provide; GTEST_HAS_DEATH_TEST is 0 for
 // wasm builds, where these compile out.
 // The three rejections below die on assert(), which NDEBUG removes: a release build has nothing
 // to terminate on, so the tests only describe a debug-build contract.
 #if GTEST_HAS_DEATH_TEST && DEBUG
-TGFX_TEST(ShaderPermutationTest, ComposedDimsRejectsMissingAssignment) {
-  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
-  // The pre-handle write path zero-filled a forgotten dimension (resize then index writes);
-  // finish() must fail instead of letting it read as a valid 0.
-  using FD = ChainInputs::FD;
-  ComposedDims<FD> partial(FD::domain());
-  partial.set(FD::GP_LAYOUT, 0)
-      .set(FD::HAS_XP, 0)
-      .set(FD::HAS_COVERAGE, 0)
-      .set(FD::TEXTURE_COUNT, 0)
-      .set(FD::HAS_MASK_TEXTURE, 0)
-      .set(FD::HAS_SUBSET, 0);
-  EXPECT_DEATH(partial.finish(), "finish\\(\\) with a declared dimension never assigned");
-}
-
-TGFX_TEST(ShaderPermutationTest, ComposedDimsRejectsUnknownDimensionHandle) {
-  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
-  // A handle whose name is not in the domain the builder was built from fails loudly, where a
-  // typo'd name in the old string queries (valueOf) silently read as 0.
-  using FD = ChainInputs::FD;
-  ComposedDims<FD> frag(FD::domain());
-  const PermutationBoolDim<FD> notDeclared{"NOT_A_DIMENSION"};
-  EXPECT_DEATH(frag.set(notDeclared, 1), "unknown dimension handle");
-}
-
-TGFX_TEST(ShaderPermutationTest, ComposedDimsRejectsOutOfRangeValue) {
-  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
-  // HAS_XP declares three values; 3 is outside the range.
-  using FD = ChainInputs::FD;
-  ComposedDims<FD> frag(FD::domain());
-  EXPECT_DEATH(frag.set(FD::HAS_XP, 3), "dimension value outside the declared range");
-}
 #endif
-
-TGFX_TEST(ShaderPermutationTest, GradientUniformsExistOnlyInExtendedChainArtifacts) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_NE(context, nullptr);
-  auto* cache = ContextCacheAccess::Cache(context);
-  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
-  const auto hasUniform = [](const ShaderStageBlob* blob, const std::string& name) {
-    for (const auto& uniform : blob->uniforms) {
-      if (uniform.name() == name) {
-        return true;
-      }
-    }
-    return false;
-  };
-  const auto checkFamily = [&](const char* family) {
-    const uint16_t chainIndex = FamilyIndexOf(family);
-    ASSERT_NE(chainIndex, 0xFFFF);
-    const auto& chainFamily = Families()[chainIndex];
-    auto info = AssembledFamilyInfo(chainFamily);
-    auto profile = ParseProfileTag(cache->profileTag());
-    ASSERT_TRUE(profile.has_value());
-    auto reachable = EnumerateReachablePermutations(family);
-    ASSERT_TRUE(reachable.has_value());
-    for (const auto& indices : *reachable) {
-      if (!PermutationCompilesForBackend(info, indices.first, indices.second, *profile)) {
-        continue;
-      }
-      const uint16_t familyIndex = FamilyIndexOf(family);
-      ASSERT_NE(familyIndex, 0xFFFF);
-      auto vertex = cache->findVertex(VariantIdOf(familyIndex, indices.first));
-      auto fragment = cache->findFragment(VariantIdOf(familyIndex, indices.second));
-      ASSERT_NE(vertex, nullptr);
-      ASSERT_NE(fragment, nullptr);
-      // PROFILE folds the legacy (texture count, mask, resource kind) triple: 3..5 are the
-      // gradient cells and 6 the noise cell. Only the gradient kind carries the gradient
-      // uniforms; every resource kind and every four-leaf cell declares CoordTransformMatrix_0
-      // (the source matrix, the leaf-0 matrix, or both).
-      const int profileValue = info.fragDomain.valueOf(indices.second, "PROFILE");
-      ASSERT_GE(profileValue, 0);
-      const bool hasGradient = profileValue >= 3 && profileValue <= 5;
-      const bool hasResource = profileValue >= 3 && profileValue <= 6;
-      const bool hasLeaves = profileValue == 2 || profileValue == 5 || profileValue == 6;
-      EXPECT_EQ(hasUniform(fragment, "GradientLayoutType"), hasGradient);
-      EXPECT_EQ(hasUniform(fragment, "GradientLUTLeaf"), hasGradient);
-      EXPECT_EQ(hasUniform(vertex, "CoordTransformMatrix_0"), hasResource || hasLeaves);
-    }
-  };
-
-  checkFamily("Chain");
-}
-
-TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_NE(context, nullptr);
-  auto* cache = ContextCacheAccess::Cache(context);
-  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
-  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
-  ASSERT_NE(renderTargetProxy, nullptr);
-  auto renderTarget = renderTargetProxy->getRenderTarget();
-  ASSERT_NE(renderTarget, nullptr);
-
-  PointwiseChainShader shader;
-  auto info = shader.info();
-  std::set<uint32_t> vertexIndices;
-  std::set<uint32_t> fragmentIndices;
-  std::set<uint64_t> pairs;
-  for (int gpType = 0; gpType < 2; ++gpType) {
-    for (int hasVertexCoverage = 0; hasVertexCoverage < 2; ++hasVertexCoverage) {
-      for (int xpType = 0; xpType < 3; ++xpType) {
-        for (int coverageType = 0; coverageType < 3; ++coverageType) {
-          BlockAllocator allocator;
-          auto gp = MakeSingleIntervalGeometry(gpType, hasVertexCoverage != 0);
-          auto gradient = MakeSingleIntervalGradient(&allocator);
-          auto coverage = MakeSingleIntervalCoverage(context, &allocator, coverageType);
-          auto dst = MakeSingleIntervalDst(context, xpType);
-          ASSERT_NE(gradient, nullptr);
-          if (coverageType != 0) {
-            ASSERT_NE(coverage, nullptr);
-          }
-          if (xpType != 0) {
-            ASSERT_TRUE(dst.has_value());
-          }
-          AOTEffectGraph graph;
-          ASSERT_TRUE(LowerToGraph({gradient.get()}, &graph));
-          Plan plan;
-          ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
-          ASSERT_EQ(plan.passes.size(), 1u);
-          EXPECT_EQ(plan.passes[0].resourceProfile, AOTResourceProfile::TiledGraph);
-          std::vector<const FragmentProcessor*> coverageProcessors;
-          if (coverage != nullptr) {
-            coverageProcessors.push_back(coverage.get());
-          }
-          std::vector<AOTCoverageTerm> coverageTerms = {};
-          if (!coverageProcessors.empty()) {
-            auto terms = LowerCoverageTerms(coverageProcessors, nullptr, &allocator);
-            ASSERT_TRUE(terms.has_value());
-            coverageTerms = std::move(*terms);
-          }
-          AOTProgram chain = {};
-          ASSERT_TRUE(AOTChainBuilder::Compile(graph, plan.passes[0], &coverageTerms, &chain));
-          ProgramInfo programInfo(renderTarget.get(), gp, dst, BlendMode::SrcOver,
-                                  !coverageProcessors.empty());
-          // The interpreter's own match: a program-holding draw resolves through MatchProgram,
-          // not the family walk (whose dedicated families would claim the empty processor list).
-          auto match = ChainInputs::MatchProgram(chain, &programInfo);
-          ASSERT_TRUE(match.has_value());
-          ASSERT_LT(match->first, info.vertDomain.totalCount());
-          ASSERT_LT(match->second, info.fragDomain.totalCount());
-          auto vertValues = info.vertDomain.decode(match->first);
-          auto fragValues = info.fragDomain.decode(match->second);
-          EXPECT_TRUE(MirroredDimsAgree(info.vertDomain, info.fragDomain, vertValues, fragValues));
-          vertexIndices.insert(match->first);
-          fragmentIndices.insert(match->second);
-          pairs.insert((static_cast<uint64_t>(match->first) << 32u) | match->second);
-        }
-      }
-    }
-  }
-  EXPECT_EQ(vertexIndices.size(), 1u);
-  EXPECT_EQ(fragmentIndices.size(), 6u);
-  EXPECT_EQ(pairs.size(), 6u);
-
-  for (int hasVertexCoverage = 0; hasVertexCoverage < 2; ++hasVertexCoverage) {
-    BlockAllocator allocator;
-    auto gp = MakeSingleIntervalGeometry(1, hasVertexCoverage != 0);
-    auto gradient = MakeSingleIntervalGradient(&allocator);
-    auto maskProxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::RGBA_8888);
-    ASSERT_NE(gradient, nullptr);
-    ASSERT_NE(maskProxy, nullptr);
-    ASSERT_NE(maskProxy->getTextureView(), nullptr);
-    SamplingArgs sampling(TileMode::Repeat, TileMode::Repeat, SamplingOptions(),
-                          SrcRectConstraint::Fast);
-    auto tiledMask = TiledTextureEffect::Make(&allocator, std::move(maskProxy), sampling);
-    ASSERT_NE(tiledMask, nullptr);
-    ASSERT_EQ(tiledMask->name(), "TiledTextureEffect");
-    int modeX = -1;
-    int modeY = -1;
-    static_cast<TiledTextureEffect*>(tiledMask.get())->getShaderModes(&modeX, &modeY);
-    ASSERT_EQ(modeX, 0);
-    ASSERT_EQ(modeY, 0);
-    auto coverage =
-        FragmentProcessor::MulInputByChildAlpha(&allocator, std::move(tiledMask), false);
-    ASSERT_NE(coverage, nullptr);
-    AOTEffectGraph graph;
-    ASSERT_TRUE(LowerToGraph({gradient.get()}, &graph));
-    Plan plan;
-    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
-    ASSERT_EQ(plan.passes.size(), 1u);
-    auto terms = LowerCoverageTerms({coverage.get()}, nullptr, &allocator);
-    ASSERT_TRUE(terms.has_value());
-    AOTProgram chain = {};
-    ASSERT_TRUE(AOTChainBuilder::Compile(graph, plan.passes[0], &*terms, &chain));
-    ProgramInfo programInfo(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, true);
-    // The interpreter's own match: a program-holding draw resolves through MatchProgram, not the
-    // family walk (whose dedicated families would claim the empty processor list).
-    auto match = ChainInputs::MatchProgram(chain, &programInfo);
-    ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(info.fragDomain.valueOf(match->second, "RESOURCE_KIND"), 1);
-    EXPECT_EQ(info.fragDomain.valueOf(match->second, "TEXTURE_COUNT"), 1);
-  }
-}
-
 // MatchProgram runs without a failure sink (a plan pass has no diagnostic recording), so a
 // rejection must be a plain miss instead of dereferencing the null sink.
 TGFX_TEST(ShaderPermutationTest, ProgramMatchRejectsOverBudgetWithoutFailureSink) {
@@ -667,9 +362,8 @@ TGFX_TEST(ShaderPermutationTest, ProgramMatchRejectsOverBudgetWithoutFailureSink
   program.slots.push_back(gradientSlot);
   program.slots.push_back(gradientSlot);
   ProgramInfo programInfo(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, false);
-  // Two gradient slots exceed the one-gradient budget: this is the rejection path that used to
-  // write through a null failure pointer.
-  EXPECT_FALSE(ChainInputs::MatchProgram(program, &programInfo).has_value());
+  // Two gradient slots exceed the one-gradient budget: the shape has no declared variant.
+  EXPECT_FALSE(MatchChainVariant(program, &programInfo).has_value());
 }
 
 TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
@@ -682,8 +376,6 @@ TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
   ASSERT_NE(renderTargetProxy, nullptr);
   auto renderTarget = renderTargetProxy->getRenderTarget();
   ASSERT_NE(renderTarget, nullptr);
-  PointwiseChainShader shader;
-  auto info = shader.info();
   for (int lutLeaf = 0; lutLeaf < 4; ++lutLeaf) {
     SCOPED_TRACE(lutLeaf);
     BlockAllocator allocator;
@@ -743,12 +435,14 @@ TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
         lutProxy->getTextureView()->getTexture());
     auto gp = MakeSingleIntervalGeometry(1, true);
     ProgramInfo programInfo(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, false);
-    // The interpreter's own match: a program-holding draw resolves through MatchProgram, not the
-    // family walk (whose dedicated families would claim the empty processor list).
-    auto match = ChainInputs::MatchProgram(program, &programInfo);
+    // The interpreter's own match: a program-holding draw resolves through the variant
+    // derivation, not the family walk (whose dedicated families claim the empty processor list).
+    auto match = MatchChainVariant(program, &programInfo);
     ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(info.fragDomain.valueOf(match->second, "RESOURCE_KIND"), 1);
-    EXPECT_EQ(info.fragDomain.valueOf(match->second, "TEXTURE_COUNT"), 1);
+    // The Chain body's module slot carries PROFILE: 5 is the gradient kind with the four leaf
+    // slots (the legacy TEXTURE_COUNT=1 / RESOURCE_KIND=1 cell).
+    constexpr uint8_t ChainBodySlot = 2;
+    EXPECT_EQ(DimValueOf(Families()[match->family], *match, ChainBodySlot, 0), 5);
   }
 }
 

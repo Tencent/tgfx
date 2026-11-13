@@ -23,7 +23,6 @@
 #include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/aot/spec/SpecResolver.h"
-#include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
 
 namespace tgfx {
@@ -58,7 +57,9 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
       // matcher), so one walk answers both; a second explicit interpreter attempt would run the
       // same predicate on the same shape.
       match = MatchAssembledFamily(&info, shape);
-    } else if (allowInterpreter && (!alphaOnly || ChainInputs::ServesAlphaOnly)) {
+    } else if (allowInterpreter) {
+      // The chain serves alpha-only targets too: its kernels apply the render-target write swizzle
+      // themselves, so no target-type gate applies here.
       match = MatchChainProgram(&info);
     }
     if (!match && alphaOnly) {

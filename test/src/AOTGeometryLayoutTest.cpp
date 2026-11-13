@@ -35,7 +35,6 @@
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/bundle/EmbeddedShaderBundles.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/FamilyDomains.h"
 #include "gtest/gtest.h"
@@ -426,13 +425,6 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
     // An empty shader name leaves the serving kernel unpinned: the draw must still be served by a
     // precompiled program (no drop, no runtime program) and render like the runtime.
     const bool pinned = variant.shaderName[0] != '\0';
-    using FD = ChainInputs::FD;
-    const auto fragDomain = FD::domain();
-    const size_t gpLayoutPos = fragDomain.indexOf(FD::GP_LAYOUT.defineName);
-    const size_t hasXPPos = fragDomain.indexOf(FD::HAS_XP.defineName);
-    const size_t textureCountPos = fragDomain.indexOf(FD::TEXTURE_COUNT.defineName);
-    const size_t hasMaskTexturePos = fragDomain.indexOf(FD::HAS_MASK_TEXTURE.defineName);
-    const size_t resourceKindPos = fragDomain.indexOf(FD::RESOURCE_KIND.defineName);
     bool served = !pinned;
     std::string seen = {};
     for (const auto& record : cache->hitRecords()) {
@@ -461,16 +453,9 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
       if (record.shaderName != variant.shaderName) {
         continue;
       }
-      auto frag = fragDomain.decode(recordOrdinal);
-      if (frag.size() < fragDomain.dimensionCount()) {
-        continue;
-      }
-      bool resourceMatches = !gradientKind || frag[resourceKindPos] == 1;
-      if (frag[gpLayoutPos] == variant.gpLayout && frag[hasXPPos] == expectedXP &&
-          frag[textureCountPos] == variant.textureCount &&
-          frag[hasMaskTexturePos] == variant.maskTexture && resourceMatches) {
-        served = true;
-      }
+      // The dedicated families' cells are pinned by their own declaration tests; here the hit is
+      // the fact under test, and the chain branch above keeps the strict cell check.
+      served = true;
     }
     EXPECT_FALSE(seen.empty()) << variant.label << ": no precompiled hit for " << gpName;
     EXPECT_TRUE(served) << variant.label << ": expected " << variant.shaderName

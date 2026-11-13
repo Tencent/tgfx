@@ -28,8 +28,8 @@
 #include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/aot/select/ProgramSelection.h"
 #include "gpu/processors/RectEffect.h"
-#include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
+#include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/contract/DrawFacts.h"
 #include "tgfx/core/BytesKey.h"
 

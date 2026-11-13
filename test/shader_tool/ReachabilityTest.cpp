@@ -78,7 +78,7 @@ struct DefineNameOf {
 TEST(FamilyRegistryTest, EveryFamilyIsRegisteredOnceWithItsOwnFiles) {
   auto families = AllFamilies();
   // The kernel-shell families: 1 after the chain's migration (the interpreter's shell retired;
-  // its composition rules survive as ChainInputs) and after the declaration-driven migration removed
+  // its composition rules survive as the chain rule) and after the declaration-driven migration removed
   // NonAARRectFillShader, SolidColorFillShader, MaskFillShader, TiledTextureFillShader,
   // QuadColorFillShader, MeshFillShader, ShapeInstancedFillShader, ComplexNonAARRectFillShader,
   // QuadTextureFillShader, YUVTextureFillShader, AtlasTextFillShader,
