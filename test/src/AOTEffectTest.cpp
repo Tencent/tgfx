@@ -1639,6 +1639,31 @@ TGFX_TEST(AOTEffectTest, ConstColorLowersToConstColorNode) {
   EXPECT_FLOAT_EQ(parameters->color[3], 0.75f);
 }
 
+TGFX_TEST(AOTEffectTest, ResolversKeepTheirOwnMemo) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
+  ASSERT_NE(renderTargetProxy, nullptr);
+  BlockAllocator allocator;
+  auto texture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+  ASSERT_NE(texture, nullptr);
+  auto ir = LowerDraw({texture.get()}, {}, BlendMode::SrcOver, &allocator);
+  ASSERT_TRUE(ir.has_value());
+  ProgramInfo info(renderTargetProxy->getRenderTarget().get(),
+                   DefaultGeometryLayout(PMColor::Red(), AAType::None, Matrix::I(), Matrix::I()),
+                   std::nullopt, BlendMode::SrcOver, false);
+  info.setCarriedIR(&*ir);
+
+  const AOTProgram* chain = AOTChainBuilder::ResolveChainProgram(&info);
+  ASSERT_NE(chain, nullptr);
+  // The YUV resolver answers with its own tail or with nothing: a Chain program is not a YUV tail,
+  // and one shared memo slot let the YUV family's budget probe accept draws it cannot serve.
+  EXPECT_EQ(AOTChainBuilder::ResolveYUVProgram(&info), nullptr);
+  // The other resolver's answer leaves the chain memo intact.
+  EXPECT_EQ(AOTChainBuilder::ResolveChainProgram(&info), chain);
+}
+
 TGFX_TEST(AOTEffectTest, XfermodeDstLowersToBinaryBlend) {
   ContextScope scope;
   auto context = scope.getContext();

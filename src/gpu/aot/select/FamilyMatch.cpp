@@ -129,10 +129,10 @@ bool MatchMaskFill(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMa
 
 /// The TiledTextureFill family's rule, carried over from the former TiledTextureFillShader: a
 /// position-only rect or quad whose sole color processor is the IR's tiled texture leaf (no
-/// operators above it). The legacy QuadTextureFillShader still wins the Plain-leaf Quad draws it
-/// accepts (the legacy dedicated table runs first); this family serves the DefaultGP form and the
-/// Quad draws with a Tiled leaf. FULL and PRESENT are pinned to 1, so the flattened dim order
-/// stays [FULL=1, PRESENT=1, HAS_XP] and the ordinal is geometry + 2 * HAS_XP.
+/// operators above it). It serves the DefaultGP form and the Quad draws whose leaf is Tiled; a
+/// Plain-leaf Quad belongs to QuadTexture, whose rule is disjoint from this one. FULL and PRESENT
+/// are pinned to 1, so the flattened dim order stays [FULL=1, PRESENT=1, HAS_XP] and the ordinal is
+/// geometry + 2 * HAS_XP.
 bool MatchTiledTextureFill(const ProgramInfo* /*info*/, const DrawShape& shape,
                            FamilyMatchResult* result) {
   if (!shape.positionOnlyRect()) {
@@ -629,10 +629,10 @@ bool MatchQuadTexture(const ProgramInfo* /*info*/, const DrawShape& shape,
 }
 
 /// The YUVTexture family's rule, the simplified former YUVTextureFillShader: the QuadPerEdgeAA
-/// geometry with exactly one bare YUV leaf (no operators above it, no coverage processors) and any
-/// xfer. Color-graded YUV draws stay on the legacy kernel until the flatten fallback lands. The
-/// flattened dims are [UV_COORD, SUBSET=0, FORMAT, HAS_XP], so the ordinal is
-/// UV_COORD + 4*FORMAT + 8*HAS_XP.
+/// geometry with exactly one multi-plane leaf, at most the bounded operator tail above it and no
+/// coverage processors, and any xfer. The tail itself is served by the YUVChainTail module, whose
+/// declared slot capacity the acceptance below enforces. The flattened dims are
+/// [UV_COORD, SUBSET=0, FORMAT, HAS_XP], so the ordinal is UV_COORD + 4*FORMAT + 8*HAS_XP.
 bool MatchYUVTexture(const ProgramInfo* info, const DrawShape& shape, FamilyMatchResult* result) {
   // The acceptance is the legacy kernel's, verbatim: the QuadPerEdgeAA quad without a subset,
   // the color graph is the multi-plane source with at most the tail's operators above it, and the

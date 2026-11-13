@@ -165,13 +165,13 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
 
   // Plan-pass serving: the pass IR is the whole expression, so the AOT route resolves the draw
   // from the program it compiles onto — no processor travels through the info. A fill pass carries
-  // the IR on itself; the terminal pass hands it in from the plan.
+  // the IR on itself; the terminal pass hands it in from the plan. Only a Chain program marks an IR
+  // as a prepared expression: a pass build compiles that form, and a chain draw's own match does
+  // too, while the YUV tail is a different family's memo and must not route here.
   const DrawIR* resolvedPassIR = passIR;
   if (resolvedPassIR == nullptr) {
     auto* lowered = loweredIR();
-    if (lowered != nullptr && lowered->program.has_value()) {
-      // A plan pass carries its compiled program from the pass build; a draw's own IR compiles on
-      // its first match and then carries the program the same way.
+    if (lowered != nullptr && lowered->carriedChainProgram() != nullptr) {
       resolvedPassIR = lowered;
     }
   }
@@ -184,7 +184,7 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
     // form the key — everything resolves before any cache lookup. The pass info carries no
     // processors: the program is the whole expression, and the blend formula's coverage bit is
     // false (the kernel folds coverage itself).
-    if (!resolvedPassIR->program.has_value()) {
+    if (resolvedPassIR->carriedChainProgram() == nullptr) {
       // A pass IR is compiled when the plan builds it; a missing program means the admission
       // promise was broken, so the draw is dropped instead of compiled on the spot.
       return failLookup(renderTarget, isFinalLookup, "the pass carries no compiled program");

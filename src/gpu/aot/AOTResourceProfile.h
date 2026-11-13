@@ -26,10 +26,11 @@
 
 namespace tgfx {
 
-// The pointwise kernel comes in three resource shapes, one per shader variant family:
-//   Chain      -> PointwiseChainShader
-//   NoiseGraph -> PointwiseChainShader, RESOURCE_KIND 2 (one noise source)
-//   TiledGraph -> PointwiseChainShader, RESOURCE_KIND 1 (one gradient, three tiled recipes)
+// The chain interpreter comes in three resource shapes, one per value of the Chain module's
+// RESOURCE dimension:
+//   Chain      -> the plain slot pool
+//   NoiseGraph -> the pool plus one noise source (32 slots)
+//   TiledGraph -> the pool plus one LUT gradient and three tiled recipes
 // Automatic means "not decided yet": the planner picks the smallest shape that fits.
 enum class AOTResourceProfile : uint32_t {
   Automatic,

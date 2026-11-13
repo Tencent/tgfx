@@ -294,12 +294,13 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
       // the whole task here, keeping the draw on the plain route instead of failing at flush time.
       passIR.coverage = *terminalCoverage;
     }
-    // The pass program is built here, once, and travels on the IR: prepare never compiles.
+    // The pass program is built here, once, and travels on the IR's chain slot: prepare never
+    // compiles.
     AOTProgram passProgram = {};
     if (!AOTChainBuilder::CompileSegment(passIR, &passProgram)) {
       return false;
     }
-    passIR.program = std::move(passProgram);
+    passIR.chainProgram = std::move(passProgram);
     auto ownedIR = allocator->make<DrawIR>(std::move(passIR));
     if (ownedIR == nullptr) {
       return false;
@@ -339,7 +340,7 @@ static bool BuildPassIRs(Context* context, uint32_t renderFlags, const AOTEffect
       passIR.coverage = *terminalCoverage;
     }
     if (!AOTChainBuilder::Compile(graph, plan.passes[0], terminalCoverage,
-                                  &passIR.program.emplace())) {
+                                  &passIR.chainProgram.emplace())) {
       return false;
     }
     renderPlan->terminalIR = allocator->make<DrawIR>(std::move(passIR));

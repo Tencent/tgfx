@@ -440,20 +440,21 @@ static bool CompileChainProgramForInfo(const ProgramInfo* programInfo, AOTProgra
 
 // The memoization both consumers share: the program lives on the draw's IR, the first caller that
 // needs it compiles it, and every later caller — the matcher's second prepare, the writer on a
-// program-cache hit — reads it back. One entry, one compile per draw.
+// program-cache hit — reads it back. One entry per form, one compile per draw: the chain memo never
+// answers the YUV resolver's question and vice versa (the two accept different graphs).
 const AOTProgram* AOTChainBuilder::ResolveChainProgram(const ProgramInfo* programInfo) {
   auto* carried = programInfo != nullptr ? programInfo->getCarriedIR() : nullptr;
   if (carried == nullptr) {
     return nullptr;
   }
-  if (!carried->program.has_value()) {
+  if (!carried->chainProgram.has_value()) {
     AOTProgram program = {};
     if (!CompileChainProgramForInfo(programInfo, &program)) {
       return nullptr;
     }
-    carried->program = std::move(program);
+    carried->chainProgram = std::move(program);
   }
-  return &*carried->program;
+  return &*carried->chainProgram;
 }
 
 const AOTProgram* AOTChainBuilder::ResolveYUVProgram(const ProgramInfo* programInfo) {
@@ -461,7 +462,7 @@ const AOTProgram* AOTChainBuilder::ResolveYUVProgram(const ProgramInfo* programI
   if (carried == nullptr) {
     return nullptr;
   }
-  if (!carried->program.has_value()) {
+  if (!carried->yuvProgram.has_value()) {
     auto context = programInfo->getContext();
     if (context == nullptr || context->drawingManager() == nullptr) {
       return nullptr;
@@ -470,9 +471,9 @@ const AOTProgram* AOTChainBuilder::ResolveYUVProgram(const ProgramInfo* programI
     if (!CompileYUVProgramForInfo(programInfo, &program)) {
       return nullptr;
     }
-    carried->program = std::move(program);
+    carried->yuvProgram = std::move(program);
   }
-  return &*carried->program;
+  return &*carried->yuvProgram;
 }
 
 }  // namespace tgfx

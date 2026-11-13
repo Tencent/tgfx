@@ -76,12 +76,10 @@ inline constexpr FamilyModule SolidColorBody[] = {&AnalyticClip};
 inline constexpr FamilyModule MaskFillBody[] = {&MaskTexture};
 
 /// The TiledTextureFill family (the former TiledTextureFillShader): a rect or quad filled with a
-/// nine-mode tiled texture. The legacy QuadTextureFillShader still wins the Plain-leaf Quad draws
-/// it accepts (the legacy dedicated table runs first); the declared family serves the DefaultGP
-/// form and the Quad draws with a Tiled leaf, which the legacy family never accepted. FULL is
-/// pinned to 1 (the full nine-mode recipe), PRESENT to 1 (the texture is the family's color
-/// source). Slot layout: Frame(0), geometry(1), TiledTexture(2: FULL pinned, PRESENT pinned),
-/// Xfer(3).
+/// nine-mode tiled texture. It serves the DefaultGP form and the Quad draws whose leaf is Tiled; a
+/// Plain-leaf Quad belongs to QuadTexture, whose rule is disjoint from this one. FULL is pinned to 1
+/// (the full nine-mode recipe), PRESENT to 1 (the texture is the family's color source). Slot
+/// layout: Frame(0), geometry(1), TiledTexture(2: FULL pinned, PRESENT pinned), Xfer(3).
 inline constexpr const Module* RectQuadGeometries[] = {&RectGeometry, &QuadGeometry};
 
 inline constexpr int8_t TiledTextureFillPins[] = {1, 1};
@@ -123,8 +121,9 @@ inline constexpr const Module* ShapeInstancedGeometries[] = {&ShapeInstancedGeom
 /// Slot layout: Frame(0), ShapeInstancedGeometry(1), Xfer(2).
 bool ShapeInstancedVariantAllowed(const Variant& variant, const Family& family);
 
-/// The family table, in match priority order. The declaration-driven families are checked before
-/// the legacy kernel table; among themselves the dedicated rules are disjoint.
+/// The family table. The curated rows are pairwise disjoint, so the walk's order among them carries
+/// no priority; the rows marked fallback (Chain) are consulted only after every curated row rejected
+/// the draw.
 /// The ComplexRRect family (the former ComplexNonAARRectFillShader): a per-corner-radius rounded
 /// rect with no fragment processor. STROKE selects the stroke form (it carries the stroke width
 /// attribute and varying). Slot layout: Frame(0), ComplexRRectGeometry(1: STROKE), Xfer(2).
@@ -211,7 +210,7 @@ inline constexpr FamilyModule AtlasTextBody[] = {&DeviceMaskRuntime, &AnalyticCl
 /// keeps the same VERTEX_COLOR = 0 hole ShapeInstanced uses), with the optional single-interval
 /// gradient over the instance color and the analytic clip. The geometry's coord matrix is the
 /// coverage texture's transform — the coverage terms trail the color graph, so it is the last one.
-/// The legacy kernel served the no-xfer case only, so HAS_XP stays pinned to XP_NONE. Slot layout:
+/// The family serves the no-xfer case only, so HAS_XP stays pinned to XP_NONE. Slot layout:
 /// Frame(0), ShapeInstancedGeometry(1), Gradient(2: PRESENT), CoverageTexture(3), AnalyticClip(4),
 /// Xfer(5: HAS_XP).
 inline constexpr const Module* ShapeInstancedTextureCoverageGeometries[] = {

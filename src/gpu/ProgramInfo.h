@@ -101,10 +101,6 @@ class ProgramInfo {
   int getSampleCount() const;
 
   /**
-   * Returns the index of the processor in the ProgramInfo. Returns -1 if the processor is not in
-   * the ProgramInfo.
-   */
-  /**
    * Resolves the program for this info from the caches. Precompiled artifacts are the only
    * program source: a miss drops the draw, with no runtime fallback. The first call also runs the
    * draw's single selection and keeps its data sources on this info (see getFamilyMatch), so the

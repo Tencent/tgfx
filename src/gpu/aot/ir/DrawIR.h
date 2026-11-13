@@ -98,14 +98,29 @@ struct DrawIR {
   size_t colorFPCount = 0;
   size_t coverageFPCount = 0;
   /**
-   * The draw's compiled program — the chain interpreter's or the YUV tail's, whichever resolves
-   * this IR. A plan pass carries it from the pass build (admission already compiled the same
-   * expression); a plain draw fills it on its first match, so a repeated prepare of the same op
-   * reads it back instead of recompiling. Mutable only for that write-once memo: the matcher holds
-   * a const ProgramInfo, and an idempotent cache is not draw semantics. Two distinct draws never
-   * share an IR, so cross-draw repeats are the program-signature cache's problem, not this one.
+   * The compiled Chain interpreter program of this expression. A plan pass carries it from the pass
+   * build (admission already compiled the same expression); a plain draw fills it on its first
+   * match, so a repeated prepare of the same op reads it back instead of recompiling. Mutable only
+   * for that write-once memo: the matcher holds a const ProgramInfo, and an idempotent cache is not
+   * draw semantics. Two distinct draws never share an IR, so cross-draw repeats are the program
+   * cache's problem, not this one.
    */
-  mutable std::optional<AOTProgram> program = std::nullopt;
+  mutable std::optional<AOTProgram> chainProgram = std::nullopt;
+
+  /**
+   * The YUV family's compiled color-grade tail. It occupies its own slot rather than sharing
+   * chainProgram because the two resolvers accept different graphs: a memo written by one must
+   * never answer the other's resolution, or the YUV matcher's budget probe and the chain's serving
+   * decision would read each other's program.
+   */
+  mutable std::optional<AOTProgram> yuvProgram = std::nullopt;
+
+  /// The compiled Chain program this IR carries, or null when it carries none. Only the Chain form
+  /// counts as a prepared expression: a plan pass build and a chain draw's own match are the two
+  /// producers, and the YUV tail never answers for them.
+  const AOTProgram* carriedChainProgram() const {
+    return chainProgram.has_value() ? &*chainProgram : nullptr;
+  }
 };
 
 /**
