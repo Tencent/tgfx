@@ -27,7 +27,6 @@
 #include "gpu/aot/ir/Program.h"
 #include "gpu/aot/ir/XferFacts.h"
 #include "gpu/aot/plan/DrawPlan.h"
-#include "gpu/aot/select/SelectionScope.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
@@ -115,19 +114,6 @@ class ProgramInfo {
   /// The draw's resolved plan, or null when no selection ran (a draw that did not match).
   const DrawPlan* getPlan() const {
     return plan.has_value() ? &*plan : nullptr;
-  }
-
-  /**
-   * Narrows the program lookup to the scope this info serves. The default (AnyFamily) is a draw's
-   * own expression; a plan pass sets ChainOnly because its expression is already compiled into the
-   * carried IR and only the interpreter carries it.
-   */
-  void setSelectionScope(SelectionScope scope) {
-    selectionScope = scope;
-  }
-
-  SelectionScope getSelectionScope() const {
-    return selectionScope;
   }
 
   /**
@@ -336,7 +322,6 @@ class ProgramInfo {
 
   // The scope getProgram() resolves in: a draw's own expression by default, the compiled chain
   // for a plan pass.
-  SelectionScope selectionScope = SelectionScope::AnyFamily;
 
   friend class ProgramWriter;
   friend class PrecompiledProgramWriter;

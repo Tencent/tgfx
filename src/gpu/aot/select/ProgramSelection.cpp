@@ -20,6 +20,7 @@
 #include "gpu/ContextInternal.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/aot/spec/SpecResolver.h"
@@ -28,7 +29,6 @@
 namespace tgfx {
 
 std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInfo& info,
-                                              SelectionScope scope,
                                               PermutationMatchFailure* failure) {
   // The route-independent gates first, so a draw they refuse reports its reason before any family
   // walk runs; the texture-read check needs the matched family and runs after the walk.
@@ -38,9 +38,11 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
   }
   auto matchFailure = PermutationMatchFailure::None;
   std::optional<FamilyMatchResult> match = std::nullopt;
-  if (scope == SelectionScope::ChainOnly) {
-    // A plan pass carries its expression pre-compiled, so the interpreter is the only family that
-    // can serve it; MatchChainProgram resolves the compiled program off the carried IR.
+  const auto* carried = info.getCarriedIR();
+  if (carried != nullptr && carried->carriedChainProgram() != nullptr) {
+    // The expression is already compiled: a plan pass built it, or the draw's own earlier match
+    // did. The interpreter is then the only family that can serve it — walking the rules would
+    // re-derive a variant the compiled program has already fixed.
     match = MatchChainProgram(&info);
   } else {
     // Alpha-only (AAAA) targets: only the kernels that apply the write swizzle at output may

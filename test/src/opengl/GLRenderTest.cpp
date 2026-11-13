@@ -586,8 +586,7 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     ProgramInfo programInfo(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, false);
     programInfo.setCarriedIR(&*ir);
     EXPECT_TRUE(programInfo.glProfileMatchesCache());
-    EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo, SelectionScope::AnyFamily)
-                    .has_value());
+    EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo).has_value());
   }
 
   {
@@ -603,8 +602,7 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo, SelectionScope::AnyFamily)
-                    .has_value());
+    EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo).has_value());
   }
 
   {
@@ -632,8 +630,7 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     EXPECT_FALSE(programInfo.samplersAre2D());
     // A rectangle sampler has no precompiled variant and is rejected by the matcher gate (it
     // would otherwise bind to a plain sampler2D).
-    EXPECT_FALSE(SelectProgram(programInfo.getContext(), programInfo, SelectionScope::AnyFamily)
-                     .has_value());
+    EXPECT_FALSE(SelectProgram(programInfo.getContext(), programInfo).has_value());
   }
 
   {
@@ -654,8 +651,7 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     ProgramInfo programInfo(renderTarget.get(), gp, dst, BlendMode::SrcOver, false);
     programInfo.setCarriedIR(&*ir);
     // SrcOver needs no dst readback, so the chain kernel serves this draw.
-    EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo, SelectionScope::AnyFamily)
-                    .has_value());
+    EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo).has_value());
   }
 }
 

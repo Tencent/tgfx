@@ -476,7 +476,7 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskServesBothCoveragePolaritie
     auto lowered = LowerDraw({color.get()}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(lowered.has_value());
     programInfo.setCarriedIR(&*lowered);
-    auto match = SelectProgram(context, programInfo, SelectionScope::AnyFamily);
+    auto match = SelectProgram(context, programInfo);
     // Both polarities are servable: an inverted local mask lowers to an SrcOut xfer node the IR
     // expresses, so the walk claims the draw through the chain family (the xfer operator rides
     // the pointwise table) instead of the dedicated local-mask kernel. The pre-IR matcher
@@ -1568,7 +1568,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    auto match = SelectProgram(context, programInfo, SelectionScope::AnyFamily);
+    auto match = SelectProgram(context, programInfo);
     ASSERT_TRUE(match.has_value());
     EXPECT_EQ(Families()[match->variant.family].name, "ShapeInstancedTextureCoverage");
     // The bare coverage form is GRADIENT=0, and the family's allowed rule keeps VERTEX_COLOR and
@@ -1589,7 +1589,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    auto match = SelectProgram(context, programInfo, SelectionScope::AnyFamily);
+    auto match = SelectProgram(context, programInfo);
     ASSERT_TRUE(match.has_value());
     EXPECT_EQ(Families()[match->variant.family].name, "ShapeInstancedTextureCoverage");
     EXPECT_EQ(match->variant.ordinal, 0u);
@@ -1605,7 +1605,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    EXPECT_FALSE(SelectProgram(context, programInfo, SelectionScope::AnyFamily).has_value());
+    EXPECT_FALSE(SelectProgram(context, programInfo).has_value());
   }
 
   {
@@ -1620,7 +1620,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto ir = LowerDraw({color.get()}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    EXPECT_FALSE(SelectProgram(context, programInfo, SelectionScope::AnyFamily).has_value());
+    EXPECT_FALSE(SelectProgram(context, programInfo).has_value());
   }
 
   {
@@ -1633,7 +1633,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    EXPECT_FALSE(SelectProgram(context, programInfo, SelectionScope::AnyFamily).has_value());
+    EXPECT_FALSE(SelectProgram(context, programInfo).has_value());
   }
 
   {
@@ -1648,7 +1648,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    EXPECT_FALSE(SelectProgram(context, programInfo, SelectionScope::AnyFamily).has_value());
+    EXPECT_FALSE(SelectProgram(context, programInfo).has_value());
   }
 
   // A rounded clip next to the coverage texture: the clip rides the runtime clip contract uniforms,
@@ -1677,7 +1677,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
     auto failure = PermutationMatchFailure::CoverageShape;
-    auto match = SelectProgram(context, programInfo, SelectionScope::AnyFamily, &failure);
+    auto match = SelectProgram(context, programInfo, &failure);
     ASSERT_TRUE(match.has_value()) << "clipFirst=" << clipFirst;
     EXPECT_EQ(failure, PermutationMatchFailure::None);
     EXPECT_EQ(Families()[match->variant.family].name, "ShapeInstancedTextureCoverage");
@@ -1701,8 +1701,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_TRUE(twoMaskIR.has_value());
     programInfo.setCarriedIR(&*twoMaskIR);
     auto failure = PermutationMatchFailure::None;
-    EXPECT_FALSE(
-        SelectProgram(context, programInfo, SelectionScope::AnyFamily, &failure).has_value());
+    EXPECT_FALSE(SelectProgram(context, programInfo, &failure).has_value());
     // The rejection itself is the contract. The reason is a diagnostic classification that
     // collapses to NoMatchingRule for the fallback report, so asserting one specific sub-reason
     // would freeze an internal detail of the family's predicate shape.
@@ -1734,12 +1733,12 @@ TGFX_TEST(ShaderPermutationTest, ComplexEllipseTextureCoverageIsServedByChain) {
   ProgramInfo rejected(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, false);
   rejected.setCarriedIR(&*ir);
   auto failure = PermutationMatchFailure::None;
-  auto served = SelectProgram(context, rejected, SelectionScope::AnyFamily, &failure);
+  auto served = SelectProgram(context, rejected, &failure);
   ASSERT_TRUE(served.has_value());
   EXPECT_STREQ(Families()[served->variant.family].name, "Chain");
 
   ProgramInfo accepted(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, false);
-  auto match = SelectProgram(context, accepted, SelectionScope::AnyFamily, &failure);
+  auto match = SelectProgram(context, accepted, &failure);
   ASSERT_TRUE(match.has_value());
   EXPECT_EQ(Families()[match->variant.family].name, "ComplexEllipse");
   EXPECT_EQ(failure, PermutationMatchFailure::None);
@@ -1798,7 +1797,7 @@ static void ExpectDirectAARectMatch(ProgramInfo* programInfo,
   auto lowered = LowerDraw(color, coverage, BlendMode::SrcOver, &allocator);
   ASSERT_TRUE(lowered.has_value());
   programInfo->setCarriedIR(&*lowered);
-  auto match = SelectProgram(programInfo->getContext(), *programInfo, SelectionScope::AnyFamily);
+  auto match = SelectProgram(programInfo->getContext(), *programInfo);
   ASSERT_TRUE(match.has_value());
   EXPECT_EQ(Families()[match->variant.family].name, shaderName);
 }
@@ -1932,7 +1931,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectComposedCoverageIsServedByChain) {
                           BlendMode::SrcOver, false);
   programInfo.setCarriedIR(&*ir);
   auto failure = PermutationMatchFailure::None;
-  auto served = SelectProgram(context, programInfo, SelectionScope::AnyFamily, &failure);
+  auto served = SelectProgram(context, programInfo, &failure);
   ASSERT_TRUE(served.has_value());
   EXPECT_STREQ(Families()[served->variant.family].name, "Chain");
 }

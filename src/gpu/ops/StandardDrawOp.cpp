@@ -26,7 +26,6 @@
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/chain/AOTShapeRules.h"
 #include "gpu/aot/ir/DrawIR.h"
-#include "gpu/aot/select/SelectionScope.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/processors/TextureEffect.h"
@@ -163,85 +162,64 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
   preparedProgramInfo = nullptr;
   preparedRenderTarget = nullptr;
 
-  // Plan-pass serving: the pass IR is the whole expression, so the AOT route resolves the draw
-  // from the program it compiles onto — no processor travels through the info. A fill pass carries
-  // the IR on itself; the terminal pass hands it in from the plan. Only a Chain program marks an IR
-  // as a prepared expression: a pass build compiles that form, and a chain draw's own match does
-  // too, while the YUV tail is a different family's memo and must not route here.
-  const DrawIR* resolvedPassIR = passIR;
-  if (resolvedPassIR == nullptr) {
-    auto* lowered = loweredIR();
-    if (lowered != nullptr && lowered->carriedChainProgram() != nullptr) {
-      resolvedPassIR = lowered;
-    }
-  }
-  if (resolvedPassIR != nullptr) {
+  // One path for both kinds of expression: a plan pass hands its IR in (its program was compiled
+  // when the plan was built, so the interpreter is its only family), and a draw carries its own
+  // record-time IR. Everything after this point — the info, the plan, the key, the program — is
+  // the same work either way.
+  const bool isPass = passIR != nullptr;
+  const DrawIR* carried = passIR;
+  if (isPass) {
     auto context = renderTarget->getContext();
     if (context == nullptr || context->drawingManager() == nullptr) {
       return false;
     }
-    // The pass IR carries its program from the pass build, whose variant plus the pipeline state
-    // form the key — everything resolves before any cache lookup. The pass info carries no
-    // processors: the program is the whole expression, and the blend formula's coverage bit is
-    // false (the kernel folds coverage itself).
-    if (resolvedPassIR->carriedChainProgram() == nullptr) {
-      // A pass IR is compiled when the plan builds it; a missing program means the admission
-      // promise was broken, so the draw is dropped instead of compiled on the spot.
+    // A plan pass carries its program from the pass build; a missing one means the admission
+    // promise was broken, so the draw is dropped instead of compiled on the spot.
+    if (carried->carriedChainProgram() == nullptr) {
       return failLookup(renderTarget, isFinalLookup, "the pass carries no compiled program");
     }
-    auto passInfo =
-        std::make_unique<ProgramInfo>(renderTarget, *geometryLayout, dstTexture, blendMode, false);
-    configureProgramInfo(passInfo.get(), depthStencilFormat);
-    // The pass's expression is already compiled into its carried IR, so only the interpreter can
-    // serve it; the scope is the one difference from a draw's own lookup, and the one entry
-    // resolves both. The resolution (and the specialization capture it runs) consults the
-    // carried IR through the writer's canWrite, so the IR must ride the pass info first.
-    passInfo->setSelectionScope(SelectionScope::ChainOnly);
-    passInfo->setCarriedIR(resolvedPassIR);
-    auto program = passInfo->getProgram();
-    if (program == nullptr) {
-      // The pass's shape has no variant, or the bundle lacks it: nothing can serve this draw.
-      return failLookup(renderTarget, isFinalLookup, "the pass program has no serving variant");
+  } else {
+    // The draw's record-time IR is the whole expression every later stage reads. A coverage
+    // processor attached only at prepare (a rasterized shape's mask, added by onMakeGeometry) is
+    // appended to the IR's terms instead of dropping the IR — the color graph cannot change after
+    // record time, so a color-count mismatch is the only case the IR does not describe. A draw
+    // that never lowered has no expression any rule accepts, so it is dropped here.
+    carried = loweredIR();
+    if (carried == nullptr || carried->colorFPCount != colors.size() || !appendGrownCoverage()) {
+      return failLookup(renderTarget, isFinalLookup, "the draw carries no expression");
     }
-    preparedProgramInfo = std::move(passInfo);
-    preparedProgram = std::move(program);
-    preparedRenderTarget = renderTarget;
-    return true;
   }
-  // The draw's record-time IR is the whole expression every later stage reads. A coverage
-  // processor attached only at prepare (a rasterized shape's mask, added by onMakeGeometry) is
-  // appended to the IR's terms instead of dropping the IR — the color graph cannot change after
-  // record time, so a color-count mismatch is the only case the IR does not describe. A draw
-  // that never lowered has no expression any rule accepts, so it is dropped here.
-  auto* carried = loweredIR();
-  if (carried == nullptr || carried->colorFPCount != colors.size() || !appendGrownCoverage()) {
-    return failLookup(renderTarget, isFinalLookup, "the draw carries no expression");
-  }
+  // The pass info carries no processors: its program is the whole expression, and the blend
+  // formula's coverage bit is false (the kernel folds coverage itself).
   preparedProgramInfo = std::make_unique<ProgramInfo>(renderTarget, *geometryLayout, dstTexture,
-                                                      blendMode, !coverages.empty());
+                                                      blendMode, !isPass && !coverages.empty());
   configureProgramInfo(preparedProgramInfo.get(), depthStencilFormat);
   preparedProgramInfo->setCarriedIR(carried);
-  // Diagnostics only: the effect signature stays processor-based until the processors themselves
-  // go away, and it is built only when the cache records diagnostics, so a production draw pays
-  // nothing. Nothing that selects, keys or writes the program reads it.
-  auto* cache = ContextCacheAccess::Cache(renderTarget->getContext());
-  if (cache != nullptr && cache->diagnosticRecordingEnabled()) {
-    std::vector<const FragmentProcessor*> colorList = {};
-    std::vector<const FragmentProcessor*> coverageList = {};
-    colorList.reserve(colors.size());
-    coverageList.reserve(coverages.size());
-    for (const auto& color : colors) {
-      colorList.push_back(color.get());
+  if (!isPass) {
+    // Diagnostics only: the effect signature stays processor-based until the processors
+    // themselves go away, and it is built only when the cache records diagnostics, so a
+    // production draw pays nothing. Nothing that selects, keys or writes reads it.
+    auto* cache = ContextCacheAccess::Cache(renderTarget->getContext());
+    if (cache != nullptr && cache->diagnosticRecordingEnabled()) {
+      std::vector<const FragmentProcessor*> colorList = {};
+      std::vector<const FragmentProcessor*> coverageList = {};
+      colorList.reserve(colors.size());
+      coverageList.reserve(coverages.size());
+      for (const auto& color : colors) {
+        colorList.push_back(color.get());
+      }
+      for (const auto& coverage : coverages) {
+        coverageList.push_back(coverage.get());
+      }
+      preparedProgramInfo->setEffectSignature(BuildEffectSignature(
+          *geometryLayout, colorList, coverageList, preparedProgramInfo->getXferFacts()));
     }
-    for (const auto& coverage : coverages) {
-      coverageList.push_back(coverage.get());
-    }
-    preparedProgramInfo->setEffectSignature(BuildEffectSignature(
-        *geometryLayout, colorList, coverageList, preparedProgramInfo->getXferFacts()));
   }
   preparedProgram = preparedProgramInfo->getProgram();
   if (preparedProgram == nullptr) {
-    return failLookup(renderTarget, isFinalLookup, "No program for the draw");
+    return failLookup(
+        renderTarget, isFinalLookup,
+        isPass ? "the pass program has no serving variant" : "No program for the draw");
   }
   preparedRenderTarget = renderTarget;
   return true;

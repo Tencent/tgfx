@@ -21,7 +21,6 @@
 #include <optional>
 #include "gpu/aot/AOTFailure.h"
 #include "gpu/aot/select/FamilyMatchResult.h"
-#include "gpu/aot/select/SelectionScope.h"
 #include "gpu/aot/spec/SpecValues.h"
 #include "gpu/shaders/Family.h"
 
@@ -43,14 +42,14 @@ struct ProgramSelection {
 };
 
 /**
- * The one selection entry both routes call: the route-independent admission gates, the family
- * walk (or the interpreter alone, for a plan pass), the buildability and per-family admission
- * checks, and the specialization capture. failure is written only when the result is null; a
- * plain no-match defaults to NoMatchingRule unless a gate named a finer reason, and a success
- * reports None.
+ * The one selection entry every route calls: the route-independent admission gates, the family
+ * walk, the buildability and per-family admission checks, and the specialization capture. An IR
+ * that already carries a compiled Chain program (a plan pass, or a draw whose own match compiled
+ * one) is served by the interpreter alone — the walk would re-derive a variant the expression has
+ * already fixed. failure is written only when the result is null; a plain no-match defaults to
+ * NoMatchingRule unless a gate named a finer reason, and a success reports None.
  */
 std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInfo& info,
-                                              SelectionScope scope,
                                               PermutationMatchFailure* failure = nullptr);
 
 }  // namespace tgfx
