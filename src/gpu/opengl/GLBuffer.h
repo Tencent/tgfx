@@ -52,7 +52,10 @@ class GLBuffer : public GPUBuffer, public GLResource {
 
   void unmap() override;
 
-  void insertReadbackFence();
+  /**
+   * Inserts a fence that is signaled once the GPU has finished writing to this readback buffer.
+   */
+  virtual void insertReadbackFence();
 
  protected:
   std::shared_ptr<GLInterface> _interface = nullptr;

@@ -37,6 +37,8 @@ class WebGLBuffer : public GLBuffer {
 
   void unmap() override;
 
+  void insertReadbackFence() override;
+
  private:
   size_t subDataOffset = 0;
   size_t subDataSize = 0;
