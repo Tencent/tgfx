@@ -36,6 +36,7 @@ void WebGPUCaps::initInfo(WGPUDevice) {
 }
 
 void WebGPUCaps::initFeatureSet(WGPUDevice) {
+  gpuFeatures.stencilAttachmentSupported = true;
   gpuFeatures.semaphore = false;
   gpuFeatures.clampToBorder = false;
   gpuFeatures.textureBarrier = false;

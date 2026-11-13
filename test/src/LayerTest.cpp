@@ -36,6 +36,7 @@
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/TextContent.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
+#include "tgfx/core/ImageProvider.h"
 #include "tgfx/core/Mesh.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Shape.h"
@@ -267,6 +268,109 @@ TGFX_TEST(LayerTest, imageLayer) {
   imageLayer->setMatrix(Matrix::MakeScale(5.0f));
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/imageLayer"));
+}
+
+namespace {
+/**
+ * Creates a solid color image from raw RGBA bytes, where rgba is laid out as R, G, B, A.
+ */
+std::shared_ptr<Image> MakeSolidColorImage(int width, int height, uint32_t rgba) {
+  auto info = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  std::vector<uint32_t> pixels(static_cast<size_t>(width) * static_cast<size_t>(height), rgba);
+  auto data = Data::MakeWithCopy(pixels.data(), pixels.size() * sizeof(uint32_t));
+  return Image::MakeFrom(info, std::move(data));
+}
+
+class TestImageProvider : public ImageProvider {
+ public:
+  TestImageProvider(int width, int height, std::shared_ptr<Image> low, std::shared_ptr<Image> high)
+      : _width(width), _height(height), _low(std::move(low)), _high(std::move(high)) {
+  }
+
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
+  std::shared_ptr<Image> getImage(float scale) const override {
+    lastScale = scale;
+    ++callCount;
+    return scale >= 2.0f ? _high : _low;
+  }
+
+  mutable int callCount = 0;
+  mutable float lastScale = 0.0f;
+
+ private:
+  int _width = 0;
+  int _height = 0;
+  std::shared_ptr<Image> _low = nullptr;
+  std::shared_ptr<Image> _high = nullptr;
+};
+}  // namespace
+
+TGFX_TEST(LayerTest, imageLayerProvider) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  // Opaque red at logical size and opaque green at twice the pixel density.
+  auto lowImage = MakeSolidColorImage(10, 10, 0xFF0000FF);
+  auto highImage = MakeSolidColorImage(20, 20, 0xFF00FF00);
+  ASSERT_TRUE(lowImage != nullptr);
+  ASSERT_TRUE(highImage != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto imageLayer = ImageLayer::Make();
+  displayList->root()->addChild(imageLayer);
+  auto provider = std::make_shared<TestImageProvider>(10, 10, lowImage, highImage);
+  auto providerImage = Image::MakeFrom(provider);
+  ASSERT_TRUE(providerImage != nullptr);
+  imageLayer->setImage(providerImage);
+  EXPECT_FLOAT_EQ(imageLayer->getBounds().width(), 10.0f);
+  EXPECT_FLOAT_EQ(imageLayer->getBounds().height(), 10.0f);
+
+  imageLayer->setMatrix(Matrix::MakeScale(2.0f));
+  auto surface = Surface::Make(context, 20, 20);
+  ASSERT_TRUE(surface != nullptr);
+  displayList->render(surface.get());
+  EXPECT_GT(provider->callCount, 0);
+  EXPECT_NEAR(provider->lastScale, 2.0f, 0.01f);
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  uint32_t pixel = 0;
+  ASSERT_TRUE(surface->readPixels(info, &pixel, 10, 10));
+  EXPECT_EQ(pixel, 0xFF00FF00u);
+
+  auto secondList = std::make_unique<DisplayList>();
+  auto secondLayer = ImageLayer::Make();
+  secondList->root()->addChild(secondLayer);
+  auto secondProvider = std::make_shared<TestImageProvider>(10, 10, lowImage, highImage);
+  secondLayer->setImage(Image::MakeFrom(secondProvider));
+  auto secondSurface = Surface::Make(context, 10, 10);
+  ASSERT_TRUE(secondSurface != nullptr);
+  secondList->render(secondSurface.get());
+  EXPECT_GT(secondProvider->callCount, 0);
+  EXPECT_NEAR(secondProvider->lastScale, 1.0f, 0.01f);
+  ASSERT_TRUE(secondSurface->readPixels(info, &pixel, 5, 5));
+  EXPECT_EQ(pixel, 0xFF0000FFu);
+
+  // The same image switches to the variant of the new draw scale instead of keeping the first one.
+  auto switchingProvider = std::make_shared<TestImageProvider>(10, 10, lowImage, highImage);
+  auto switchingLayer = ImageLayer::Make();
+  auto switchingList = std::make_unique<DisplayList>();
+  switchingList->root()->addChild(switchingLayer);
+  switchingLayer->setImage(Image::MakeFrom(switchingProvider));
+  auto switchingSurface = Surface::Make(context, 20, 20);
+  ASSERT_TRUE(switchingSurface != nullptr);
+  switchingList->render(switchingSurface.get());
+  ASSERT_TRUE(switchingSurface->readPixels(info, &pixel, 5, 5));
+  EXPECT_EQ(pixel, 0xFF0000FFu);
+  switchingLayer->setMatrix(Matrix::MakeScale(2.0f));
+  switchingList->render(switchingSurface.get());
+  ASSERT_TRUE(switchingSurface->readPixels(info, &pixel, 10, 10));
+  EXPECT_EQ(pixel, 0xFF00FF00u);
 }
 
 TGFX_TEST_PRIVATE(LayerTest, Layer_getTotalMatrix) {
@@ -6673,6 +6777,73 @@ TGFX_TEST(LayerTest, NestedOffscreenTiledZoom) {
   // all tiles in the viewport are rasterized at the target zoom.
   RenderNestedOffscreenTiledZoom(displayList.get(), surface, 12.29f,
                                  "LayerTest/NestedOffscreenTiledZoom");
+}
+
+// Centers the given content point on the surface at the requested zoom, so every frame renders the
+// same region while the zoomed tiles are refined.
+static void CenterTiledContent(DisplayList* displayList, const Surface& surface,
+                               const Point& contentCenter, float zoom) {
+  auto halfWidth = static_cast<float>(surface.width()) * 0.5f;
+  auto halfHeight = static_cast<float>(surface.height()) * 0.5f;
+  displayList->setZoomScale(zoom);
+  displayList->setContentOffset(halfWidth - contentCenter.x * zoom,
+                                halfHeight - contentCenter.y * zoom);
+}
+
+/**
+ * A red rectangle wrapped in a group whose Gaussian blur is zoomed far beyond the tile
+ * resolution. The blurred group is pasted back with a draw rect larger than its offscreen
+ * picture, so the picture has to be sampled through a downscaled crop of the image. A wrong crop
+ * matrix turns the continuous blur into repeating tile-sized gradient blocks.
+ */
+TGFX_TEST(LayerTest, GroupBlurTiledZoom) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 2048, 1024);
+  ASSERT_NE(surface, nullptr);
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.setTileUpdateMode(TileUpdateMode::Smooth);
+  displayList.setTileSize(256);
+  displayList.setMaxTilesRefinedPerFrame(1);
+  displayList.setSubtreeCacheMaxSize(0);
+  displayList.setBackgroundColor(Color::White());
+
+  const Point groupPosition = {2664.0f, -676.0f};
+  const Point rectangleCenter = {20.0f, 10.0f};
+  auto group = Layer::Make();
+  group->setPosition(groupPosition);
+  group->setBlendMode(BlendMode::SrcOver);
+  group->setPassThroughBackground(false);
+  group->setFilters({BlurFilter::Make(3, 3, TileMode::Decal)});
+  auto rectangle = Rectangle::Make();
+  rectangle->setSize({40, 20});
+  rectangle->setPosition(rectangleCenter);
+  auto fill = FillStyle::Make(SolidColor::Make(Color::Red()));
+  auto rectangleLayer = VectorLayer::Make();
+  rectangleLayer->setContents({rectangle, fill});
+  rectangleLayer->setBlendMode(BlendMode::SrcOver);
+  rectangleLayer->setPassThroughBackground(false);
+  group->addChild(rectangleLayer);
+  displayList.root()->addChild(group);
+
+  const Point contentCenter = {groupPosition.x + rectangleCenter.x,
+                               groupPosition.y + rectangleCenter.y};
+  // Warm up at zoom 1 so that the zoomed frames rebuild every visible tile from a stale cache
+  // instead of drawing the content in one continuous pass.
+  CenterTiledContent(&displayList, *surface, contentCenter, 1.0f);
+  displayList.render(surface.get());
+  CenterTiledContent(&displayList, *surface, contentCenter, 36.505f);
+  // Refine one tile per frame until every tile is rasterized at the target zoom; a fixed frame
+  // count would leave the last tiles at the stale zoom and make the image depend on scheduling.
+  int frames = 0;
+  do {
+    displayList.render(surface.get());
+    ++frames;
+  } while (displayList.hasContentChanged() && frames < 200);
+  ASSERT_FALSE(displayList.hasContentChanged()) << "tile refinement did not settle";
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GroupBlurTiledZoom"));
 }
 
 TGFX_TEST(LayerTest, GlassStyleWithDropShadow) {

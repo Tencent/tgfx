@@ -20,6 +20,7 @@
 #include <string>
 #include "base/TestEnvironment.h"
 #include "gtest/gtest.h"
+#include "utils/Baseline.h"
 
 static bool initialized = false;
 
@@ -50,7 +51,9 @@ extern "C" {
 EMSCRIPTEN_KEEPALIVE
 int RunAllTests() {
   initTests();
-  return RUN_ALL_TESTS();
+  auto result = RUN_ALL_TESTS();
+  tgfx::Baseline::ReportMissingCache();
+  return result;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -65,7 +68,9 @@ int RunTest(const char* filter) {
   } else if (excludeFilter[0] != '\0') {
     testing::GTEST_FLAG(filter) = excludeFilter;
   }
-  return RUN_ALL_TESTS();
+  auto result = RUN_ALL_TESTS();
+  tgfx::Baseline::ReportMissingCache();
+  return result;
 }
 
 }

@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlassUDF.h"
+#include <algorithm>
+#include <cmath>
 #include "gpu/DrawingManager.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -24,6 +26,22 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+
+float CalculateGlassUDFScale(float maxDimension, float minDimension, float maxAllowedDimension,
+                             float minShortSideTexels) {
+  if (!(maxDimension > 0.0f) || !(minDimension > 0.0f) || !(maxAllowedDimension > 0.0f) ||
+      !(minShortSideTexels >= 0.0f) || !std::isfinite(maxDimension) ||
+      !std::isfinite(minDimension) || !std::isfinite(maxAllowedDimension) ||
+      !std::isfinite(minShortSideTexels)) {
+    return 0.0f;
+  }
+  auto maxScale = maxAllowedDimension / maxDimension;
+  auto scale = std::min(1.0f, maxScale);
+  if (minDimension * scale < minShortSideTexels) {
+    scale = std::min(maxScale, minShortSideTexels / minDimension);
+  }
+  return scale;
+}
 
 bool GlassUDFRequest::isValid() const {
   if (source == nullptr || coreWidth <= 0 || coreHeight <= 0 || textureRect.isEmpty()) {
