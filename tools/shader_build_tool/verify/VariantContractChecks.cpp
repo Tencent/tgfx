@@ -78,23 +78,9 @@ static bool IsDeclaredTextureName(const std::string& name) {
 size_t ValidateReflectionContracts(const std::vector<VariantData>& variants,
                                    Diagnostics* diagnostics) {
   size_t errors = 0;
-  const auto maxEntries = BundleFormat::Reflection::MaxListEntries;
-  const auto maxNameLength = BundleFormat::Reflection::MaxNameLength;
   for (const auto& variant : variants) {
     const StageReflectionData* stages[] = {&variant.vertexReflection, &variant.fragmentReflection};
     for (const auto* reflection : stages) {
-      // The bundle writer serializes name lengths and per-stage entry counts as uint8
-      // (BundleWriter's WriteU8 sites): values over the format's byte would wrap silently (a
-      // 256-byte name is written with length 0), so reject them here at build time instead.
-      if (reflection->uniforms.size() > maxEntries || reflection->samplers.size() > maxEntries) {
-        Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection, variant.shaderName,
-               variant.profileTag, -1, -1,
-               "reflection exceeds the " + std::to_string(maxEntries) +
-                   "-entry serialization limit (uniforms=" +
-                   std::to_string(reflection->uniforms.size()) +
-                   ", samplers=" + std::to_string(reflection->samplers.size()) + ")");
-        ++errors;
-      }
       std::map<std::string, int> seenNames;
       for (const auto* list : {&reflection->uniforms, &reflection->samplers}) {
         bool isSamplerList = list == &reflection->samplers;
@@ -103,14 +89,6 @@ size_t ValidateReflectionContracts(const std::vector<VariantData>& variants,
             Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection,
                    variant.shaderName, variant.profileTag, -1, -1,
                    "reflection carries an embedded NUL in a name");
-            ++errors;
-            continue;
-          }
-          if (entry.name.size() > maxNameLength) {
-            Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection,
-                   variant.shaderName, variant.profileTag, -1, -1,
-                   "entry '" + entry.name + "' exceeds the " + std::to_string(maxNameLength) +
-                       "-byte name serialization limit");
             ++errors;
             continue;
           }

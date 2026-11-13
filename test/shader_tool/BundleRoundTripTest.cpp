@@ -48,15 +48,7 @@ std::vector<uint8_t> Blob(const std::string& text) {
   return std::vector<uint8_t>(text.begin(), text.end());
 }
 
-UniformEntry MakeUniform(const std::string& name, UniformFormat format, uint16_t arraySize = 1) {
-  return UniformEntry{name, static_cast<uint8_t>(format), arraySize};
-}
-
-VertexInputEntry MakeVertexInput(const std::string& name, UniformFormat format, uint8_t location) {
-  return VertexInputEntry{name, static_cast<uint8_t>(format), location};
-}
-
-// A variant with every kind of reflection entry the v5 format carries.
+// A variant with both stages, coded so a mixed-up pool shows up as a content mismatch.
 VariantData FullVariant(const std::string& shader, uint32_t vertIndex, uint32_t fragIndex,
                         const std::string& profileTag, const std::string& vertexCode,
                         const std::string& fragmentCode) {
@@ -69,17 +61,6 @@ VariantData FullVariant(const std::string& shader, uint32_t vertIndex, uint32_t 
   variant.profileTag = profileTag;
   variant.vertexBlob = Blob(vertexCode);
   variant.fragmentBlob = Blob(fragmentCode);
-  variant.vertexReflection.uniforms = {MakeUniform("uMatrix", UniformFormat::Float3x3),
-                                       MakeUniform("uOffset", UniformFormat::Float2)};
-  // A gap between locations is legal and a real shape-instanced kernel has one.
-  variant.vertexReflection.vertexInputs = {MakeVertexInput("aPosition", UniformFormat::Float2, 0),
-                                           MakeVertexInput("aCoverage", UniformFormat::Float, 2)};
-  variant.fragmentReflection.uniforms = {MakeUniform("uColor", UniformFormat::Float4),
-                                         MakeUniform("uStops", UniformFormat::Float4, 8),
-                                         MakeUniform("uMode", UniformFormat::Int)};
-  variant.fragmentReflection.samplers = {
-      MakeUniform("TextureSampler_0", UniformFormat::Texture2DSampler),
-      MakeUniform("TextureSampler_1", UniformFormat::TextureExternalSampler)};
   return variant;
 }
 
@@ -91,33 +72,9 @@ struct LoadedBundle {
   }
 };
 
-void ExpectSameUniforms(const std::vector<UniformEntry>& expected,
-                        const std::vector<Uniform>& actual) {
-  ASSERT_EQ(expected.size(), actual.size());
-  for (size_t i = 0; i < expected.size(); ++i) {
-    EXPECT_EQ(expected[i].name, actual[i].name()) << i;
-    EXPECT_EQ(expected[i].format, static_cast<uint8_t>(actual[i].format())) << expected[i].name;
-    EXPECT_EQ(expected[i].arraySize, actual[i].arraySize()) << expected[i].name;
-  }
-}
-
-void ExpectStageRoundTrips(const std::vector<uint8_t>& code, const StageReflectionData& reflection,
-                           const ShaderStageBlob* blob, bool vertex) {
+void ExpectStageRoundTrips(const std::vector<uint8_t>& code, const ShaderStageBlob* blob) {
   ASSERT_NE(blob, nullptr);
   EXPECT_EQ(blob->data, code);
-  ExpectSameUniforms(reflection.uniforms, blob->uniforms);
-  ExpectSameUniforms(reflection.samplers, blob->samplers);
-  ASSERT_EQ(reflection.vertexInputs.size(), blob->vertexInputs.size());
-  for (size_t i = 0; i < reflection.vertexInputs.size(); ++i) {
-    EXPECT_EQ(reflection.vertexInputs[i].name, blob->vertexInputs[i].name);
-    EXPECT_EQ(reflection.vertexInputs[i].format,
-              static_cast<uint8_t>(blob->vertexInputs[i].format));
-    EXPECT_EQ(reflection.vertexInputs[i].location, blob->vertexInputs[i].location);
-  }
-  // Only the vertex stage declares vertex inputs.
-  if (!vertex) {
-    EXPECT_TRUE(blob->vertexInputs.empty());
-  }
 }
 
 class BundleRoundTripTest : public ::testing::TestWithParam<bool> {};
@@ -166,10 +123,8 @@ TEST_P(BundleRoundTripTest, EveryFieldSurvivesTheLoader) {
   EXPECT_EQ(bundle.cache.bundleToolchainABI(), ExpectedToolchainABI);
 
   for (const auto& variant : variants) {
-    ExpectStageRoundTrips(variant.vertexBlob, variant.vertexReflection,
-                          bundle.cache.findVertex(variant.variantId), true);
-    ExpectStageRoundTrips(variant.fragmentBlob, variant.fragmentReflection,
-                          bundle.cache.findFragment(variant.variantId), false);
+    ExpectStageRoundTrips(variant.vertexBlob, bundle.cache.findVertex(variant.variantId));
+    ExpectStageRoundTrips(variant.fragmentBlob, bundle.cache.findFragment(variant.variantId));
   }
   std::remove(path.c_str());
 }

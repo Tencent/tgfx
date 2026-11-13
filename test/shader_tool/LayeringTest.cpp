@@ -120,8 +120,7 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
       // contract layer
       "gpu/aot/AOTResourceProfile.h", "gpu/shaders/contract/ShaderBundleContract.h",
       "gpu/shaders/contract/ChainISA.h", "gpu/shaders/contract/ChainOps.h",
-      "gpu/shaders/contract/SpecContract.h", "gpu/Uniform.h", "gpu/shaders/BundleCodec.h",
-      "gpu/shaders/KernelContract.h",
+      "gpu/shaders/contract/SpecContract.h", "gpu/Uniform.h", "gpu/shaders/KernelContract.h",
       // declaration layer
       "gpu/shaders/PrecompiledShader.h",
       // the module-declaration layer (families, layouts, domains)
@@ -138,7 +137,7 @@ const std::vector<std::string>& ContractHeaders() {
       "gpu/aot/AOTResourceProfile.h",        "gpu/shaders/contract/ShaderBundleContract.h",
       "gpu/shaders/contract/ChainISA.h",     "gpu/shaders/contract/ChainOps.h",
       "gpu/shaders/contract/SpecContract.h", "gpu/Uniform.h",
-      "gpu/shaders/BundleCodec.h",           "gpu/shaders/KernelContract.h",
+      "gpu/shaders/KernelContract.h",
   };
   return headers;
 }

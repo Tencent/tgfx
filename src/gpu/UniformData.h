@@ -9,141 +9,27 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <unordered_map>
-#include <utility>
-#include <vector>
-#include "gpu/Uniform.h"
-#include "gpu/shaders/contract/ShaderBundleContract.h"
-#include "tgfx/core/Color.h"
-#include "tgfx/core/ColorSpace.h"
-#include "tgfx/core/Matrix.h"
+#include <cstddef>
+#include <cstdint>
 
 namespace tgfx {
 
-struct AOTProgram;
-
 /**
- * An object representing the collection of uniform data in CPU side.
+ * One stage's uniform block: a byte range the writers fill through the layout-derived offsets and
+ * the upload hands to the GPU. The precompiled route addresses every field by the derived
+ * layout's offset, so a block is a size and a writable buffer — there is no name table here.
  */
 class UniformData {
  public:
-  /**
-   *
-   * Copies value into the uniform data. The data must have the same size as the uniform specified
-   * by name.
-   */
-  template <typename T>
-  std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
-                       !std::is_same_v<std::decay_t<T>, Matrix> &&
-                       !std::is_same_v<std::decay_t<T>, ColorMatrix33>,
-                   void>
-  setData(const std::string& name, const T& value) const {
-    onSetData(name, &value, sizeof(value));
-  }
-
-  /**
-   * Like setData(), but for a uniform that may legitimately be absent from this program. Precompiled
-   * shaders can declare uniforms (e.g. a Kernel's tile-mode) that the runtime-generated shader does
-   * not, because the runtime path expresses the same behaviour through generated code instead. When
-   * the field is absent this silently does nothing rather than logging an error, so a required-field
-   * typo is still caught while an intentionally-optional uniform is tolerated.
-   */
-  template <typename T>
-  std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
-                       !std::is_same_v<std::decay_t<T>, Matrix> &&
-                       !std::is_same_v<std::decay_t<T>, ColorMatrix33>,
-                   void>
-  setDataOptional(const std::string& name, const T& value) const {
-    onSetData(name, &value, sizeof(value), true);
-  }
-
-  /**
-   * Convenience method for copying a Matrix to a 3x3 matrix in column-major order.
-   */
-  template <typename T>
-  std::enable_if_t<std::is_same_v<std::decay_t<T>, Matrix>, void> setData(const std::string& name,
-                                                                          const T& matrix) const {
-    float values[9] = {};
-    matrix.get9(values);
-
-    // clang-format off
-    const float data[] = {
-      values[0], values[3], values[6], 0,
-      values[1], values[4], values[7], 0,
-      values[2], values[5], values[8], 0,
-    };
-    // clang-format on
-    onSetData(name, data, sizeof(data));
-  }
-
-  /**
-   * Like setData(), but tolerates the matrix uniform being absent from this program (see
-   * setDataOptional() for when absence is legitimate).
-   */
-  template <typename T>
-  std::enable_if_t<std::is_same_v<std::decay_t<T>, Matrix>, void> setDataOptional(
-      const std::string& name, const T& matrix) const {
-    float values[9] = {};
-    matrix.get9(values);
-    const float data[] = {
-        values[0], values[3], values[6], 0,         values[1], values[4],
-        values[7], 0,         values[2], values[5], values[8], 0,
-    };
-    onSetData(name, data, sizeof(data), true);
-  }
-
-  template <typename T>
-  std::enable_if_t<std::is_same_v<std::decay_t<T>, ColorMatrix33>, void> setData(
-      const std::string& name, const T& matrix) const {
-
-    // clang-format off
-      const float data[] = {
-        matrix.values[0][0], matrix.values[1][0], matrix.values[2][0], 0,
-        matrix.values[0][1], matrix.values[1][1], matrix.values[2][1], 0,
-        matrix.values[0][2], matrix.values[1][2], matrix.values[2][2], 0,
-      };
-    // clang-format on
-    onSetData(name, data, sizeof(data));
-  }
-
-  /**
-   * Copies value into one element of an array uniform. A scalar uniform is accepted as a
-   * single-element target (only index 0 is in range), so callers can use one call form for both
-   * scalar fields and array elements. The value size must match one element.
-   */
-  template <typename T>
-  std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
-                       !std::is_same_v<std::decay_t<T>, Matrix> &&
-                       !std::is_same_v<std::decay_t<T>, ColorMatrix33>,
-                   void>
-  setArrayElement(const std::string& name, size_t index, const T& value) const {
-    onSetArrayElement(name, index, &value, sizeof(value), false);
-  }
-
-  /**
-   * Like setArrayElement(), but tolerates the array uniform being absent from this program (see
-   * setDataOptional() for when absence is legitimate).
-   */
-  template <typename T>
-  std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
-                       !std::is_same_v<std::decay_t<T>, Matrix> &&
-                       !std::is_same_v<std::decay_t<T>, ColorMatrix33>,
-                   void>
-  setArrayElementOptional(const std::string& name, size_t index, const T& value) const {
-    onSetArrayElement(name, index, &value, sizeof(value), true);
-  }
-
   /**
    * Sets an external memory buffer for writing uniform data.
    * On platforms with UBO support, the buffer points to memory mapped from a GPU UBO object.
@@ -164,83 +50,15 @@ class UniformData {
     return bufferSize;
   }
 
-  /**
-   * Returns the list of uniforms in this data.
-   */
-  const std::vector<Uniform>& uniforms() const {
-    return _uniforms;
-  }
-
-  /**
-   * Returns true if a uniform field with the given name exists in this data.
-   */
-  bool hasField(const std::string& name) const;
-
-  /**
-   * Reads one 32-bit word of a uniform field back from the current buffer, addressing the field
-   * by name and the word by its index within it (a scalar holds one word, an ivec4 array four
-   * words per element). The specialization capture reads what the writers wrote, so the values a
-   * specialized shader folds and the values the upload writes are one and the same bytes.
-   * Returns false when the field is absent, the index is out of range, or no buffer is set.
-   */
-  bool readInt32(const std::string& name, size_t wordIndex, int32_t* value) const;
-
  private:
-  /// A block of the given byte size with no named fields: the precompiled route addresses every
-  /// field through its derived layout's offsets, so the block needs only its size and a buffer.
-  explicit UniformData(size_t bufferSize);
-
-  struct Field {
-    std::string name = "";
-    UniformFormat format = UniformFormat::Float;
-    size_t offset = 0;
-    size_t size = 0;
-    size_t align = 0;
-    uint32_t arraySize = 1;
-    size_t elementStride = 0;
-    size_t elementSize = 0;
-  };
-
-  struct Entry {
-    size_t size;
-    size_t align;
-  };
+  /// A block of the given byte size: the precompiled route addresses every field through its
+  /// derived layout's offsets, so the block needs only its size and a buffer.
+  explicit UniformData(size_t size);
 
   uint8_t* _buffer = nullptr;
   size_t bufferSize = 0;
-  std::vector<Uniform> _uniforms = {};
-  std::unordered_map<std::string, Field> fieldMap = {};
-  size_t cursor = 0;
-  /// The one memcpy every write funnels into, so the debug write-range tracking sees them all.
-  void writeBytes(size_t offset, const void* data, size_t size) const;
 
-  explicit UniformData(std::vector<Uniform> uniforms);
-
-  void onSetData(const std::string& name, const void* data, size_t size,
-                 bool optional = false) const;
-
-  void onSetArrayElement(const std::string& name, size_t index, const void* data, size_t size,
-                         bool optional) const;
-
-  const Field* findField(const std::string& key) const;
-
-  size_t alignCursor(size_t alignment) const;
-
-  static Entry EntryOf(UniformFormat format);
-
-  /**
-   * Dump UniformData's memory layout information is printed to the console for debugging.
-   */
-#if DEBUG
-  static const char* ToUniformFormatName(UniformFormat format);
-
-  void dump() const;
-#endif
-
-  friend class ProgramInfo;
-  friend class ProgramWriter;
-  friend class PrecompiledProgramWriter;
-  friend class ChainProgramWriter;
   friend class PrecompiledProgramCreator;
 };
+
 }  // namespace tgfx

@@ -25,16 +25,9 @@
 
 namespace tgfx {
 
-/// Serializes stage reflection into the bundle's on-disk reflection format:
-/// [uniformCount:u8][samplerCount:u8][vertexInputCount:u8][reserved:u8] followed by the uniform
-/// entries, then the sampler entries, each [nameLen:u8][name:bytes][format:u8][arraySize:u16],
-/// then (format v5) the vertex input entries, each [nameLen:u8][name:bytes][format:u8]
-/// [location:u8]. The count byte keeps v4 byte-prefix compatibility: a v4 reader sees 0 vertex
-/// inputs. Exposed so audit reporting can reproduce the exact byte-level reflection identity the
-/// bundle stores.
-std::vector<uint8_t> SerializeStageReflection(const StageReflectionData& reflection);
-
-/// Writes the shader bundle file with separate vertex and fragment pools.
+/// Writes the shader bundle file with separate vertex and fragment pools. Each entry is the
+/// variant id and its compiled bytes; the interface is not stored, because the runtime derives it
+/// from the declaration table the compile step has already checked the reflection against.
 /// When compress is true, the data pool is zstd-compressed (compressionType=2 in header).
 /// Failures are reported to diagnostics (output.write-failed, or output.duplicate-key when two
 /// variants collide on one stage key with different content).

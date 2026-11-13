@@ -2,34 +2,31 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
 #include <cstdint>
-#include <string>
 
 namespace tgfx {
 /**
  * Uniform variable formats.
  *
- * The numeric values are part of the precompiled bundle format: shader_build_tool stores a
- * UniformFormat as one byte in every reflection entry and the runtime loader reads it back. The
- * values are therefore written out and pinned below. Never reorder or renumber an entry, and
- * append new formats at the end; any change to an existing value or to the meaning of a stored
- * format must bump ExpectedToolchainABI in ShaderBundleContract.h.
+ * One value per shader type the declaration layer can express (see ShaderType in
+ * gpu/shaders/Module.h): the derived layout stores it per field and the pipeline descriptor
+ * compares it against the geometry's vertex attribute formats.
  */
 enum class UniformFormat {
   Float = 0,                    // 32-bit floating point scalar.
@@ -54,64 +51,6 @@ static_assert(static_cast<int>(UniformFormat::Float) == 0 &&
                   static_cast<int>(UniformFormat::Int4) == 10 &&
                   static_cast<int>(UniformFormat::Texture2DSampler) == 11 &&
                   static_cast<int>(UniformFormat::Texture2DRectSampler) == 13,
-              "UniformFormat values are stored in the bundle format; see the comment above.");
+              "the format values are pinned; append new formats instead of renumbering");
 
-/**
- * Represents a uniform variable in a GPU program.
- */
-class Uniform {
- public:
-  /**
-   * Default constructor for Uniform.
-   */
-  Uniform() = default;
-
-  /**
-   * Creates a uniform variable with the specified name, type, and element count. An array uniform
-   * is created when arraySize is greater than 1. Array uniforms must use a format whose element
-   * size is 16 bytes (e.g. Float4), because the std140 layout aligns every array element to 16
-   * bytes.
-   */
-  Uniform(std::string name, UniformFormat format, uint32_t arraySize = 1)
-      : _name(std::move(name)), _format(format), _arraySize(arraySize) {
-  }
-
-  /**
-   * Returns true if the uniform variable is empty.
-   */
-  bool empty() const {
-    return _name.empty();
-  }
-
-  /**
-   * The name of the uniform variable.
-   */
-  const std::string& name() const {
-    return _name;
-  }
-
-  /**
-   * The format of the uniform variable.
-   */
-  UniformFormat format() const {
-    return _format;
-  }
-
-  /**
-   * The number of elements in the uniform array. Returns 1 for scalar uniforms.
-   */
-  uint32_t arraySize() const {
-    return _arraySize;
-  }
-
-  /**
-   * Returns the total size of the uniform variable in bytes.
-   */
-  size_t size() const;
-
- private:
-  std::string _name = {};
-  UniformFormat _format = UniformFormat::Float;
-  uint32_t _arraySize = 1;
-};
 }  // namespace tgfx

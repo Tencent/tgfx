@@ -844,7 +844,6 @@ if (TGFX_EMBED_SHADER_BUNDLES)
   endif ()
   if (NOT CMAKE_CROSSCOMPILING)
     file(GLOB_RECURSE TGFX_SHADER_DECL_FILES CONFIGURE_DEPENDS
-            src/gpu/shaders/BundleCodec.*
             src/gpu/shaders/Family.cpp
             src/gpu/shaders/FamilyDomains.cpp
             src/gpu/shaders/Layout.cpp

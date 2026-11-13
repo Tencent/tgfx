@@ -25,7 +25,6 @@
 #include <sstream>
 #include <utility>
 #include "core/DiagnosticCodes.h"
-#include "gpu/shaders/BundleCodec.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "output/OutputFile.h"
 #include "zstd.h"
@@ -75,41 +74,10 @@ static void WriteU64LE(std::ostream& out, uint64_t val) {
   out.write(reinterpret_cast<char*>(buf), 8);
 }
 
-// The tool's StageReflectionData mapped onto the codec's neutral entries: the grammar itself
-// lives in BundleCodec, shared with the runtime's parser.
-static void MapEntries(const std::vector<UniformEntry>& entries,
-                       std::vector<BundleReflectionEntry>* out) {
-  out->reserve(entries.size());
-  for (const auto& entry : entries) {
-    out->push_back(BundleReflectionEntry{entry.name, entry.format, entry.arraySize});
-  }
-}
-
-static void MapSpecEntries(const std::vector<SpecEntry>& entries,
-                           std::vector<BundleSpecEntry>* out) {
-  out->reserve(entries.size());
-  for (const auto& entry : entries) {
-    out->push_back(BundleSpecEntry{entry.name, entry.format, entry.arraySize, entry.firstId});
-  }
-}
-
-std::vector<uint8_t> SerializeStageReflection(const StageReflectionData& reflection) {
-  BundleReflection staged = {};
-  MapEntries(reflection.uniforms, &staged.uniforms);
-  MapEntries(reflection.samplers, &staged.samplers);
-  MapSpecEntries(reflection.specEntries, &staged.specEntries);
-  staged.vertexInputs.reserve(reflection.vertexInputs.size());
-  for (const auto& entry : reflection.vertexInputs) {
-    staged.vertexInputs.push_back(BundleVertexInput{entry.name, entry.format, entry.location});
-  }
-  return SerializeBundleReflection(staged);
-}
-
 struct PoolEntry {
   uint32_t variantId = 0;
   uint32_t dataOffset = 0;
   uint32_t dataSize = 0;
-  uint32_t reflOffset = 0;
 };
 
 // The header and pool entry layout is defined in gpu/ShaderBundleContract.h, shared with the verifier and
@@ -136,20 +104,17 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   }
 
   // One entry per variant and pool, keyed by the id the compile step stamped. The bundle carries
-  // no shader name, and this writer needs no knowledge of the declaration table.
+  // no shader name and no interface description — the runtime derives that from the declaration
+  // table — so an entry is the id and the compiled bytes.
   std::vector<uint8_t> dataPool;
-  std::vector<uint8_t> reflPool;
   std::vector<PoolEntry> vertPool;
   std::vector<PoolEntry> fragPool;
   std::set<uint32_t> seenIds;
 
-  auto addBlob = [&](const std::vector<uint8_t>& blob, const std::vector<uint8_t>& reflection,
-                     PoolEntry* entry) {
+  auto addBlob = [&](const std::vector<uint8_t>& blob, PoolEntry* entry) {
     entry->dataOffset = static_cast<uint32_t>(dataPool.size());
     entry->dataSize = static_cast<uint32_t>(blob.size());
     dataPool.insert(dataPool.end(), blob.begin(), blob.end());
-    entry->reflOffset = static_cast<uint32_t>(reflPool.size());
-    reflPool.insert(reflPool.end(), reflection.begin(), reflection.end());
   };
 
   for (const auto& v : variants) {
@@ -164,11 +129,11 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     }
     PoolEntry vert;
     vert.variantId = v.variantId;
-    addBlob(v.vertexBlob, SerializeStageReflection(v.vertexReflection), &vert);
+    addBlob(v.vertexBlob, &vert);
     vertPool.push_back(vert);
     PoolEntry frag;
     frag.variantId = v.variantId;
-    addBlob(v.fragmentBlob, SerializeStageReflection(v.fragmentReflection), &frag);
+    addBlob(v.fragmentBlob, &frag);
     fragPool.push_back(frag);
   }
 
@@ -209,29 +174,23 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     // If compression didn't reduce size, fall back to uncompressed.
   }
 
-  // Recompute reflectionOffset based on actual data written.
-  uint32_t actualReflectionOffset =
-      reflPool.empty() ? 0 : static_cast<uint32_t>(dataOffset + dataToWriteSize);
-
-  // Identity hash: covers the serialized pool entries, the uncompressed data and reflection
-  // pools, the profile tag, and the counts. The runtime loader recomputes this over the same
-  // fields and rejects a bundle whose hash does not match, closing the gap where a same-name
-  // bundle with changed shader content or reflection layout would otherwise load fine.
+  // Identity hash: covers the pool entries, the uncompressed data pool, the profile tag and the
+  // counts. The runtime loader recomputes this over the same fields and rejects a bundle whose
+  // hash does not match, closing the gap where a same-content-length bundle would load fine.
   char tagBuf[32] = {};
   std::strncpy(tagBuf, profileTag.c_str(), sizeof(tagBuf) - 1);
   uint64_t identityHash = BundleIdentityHashInit();
   identityHash = BundleIdentityHashHeader(identityHash, BundleFormat::CurrentVersion, vertPoolCount,
                                           fragPoolCount, reinterpret_cast<const uint8_t*>(tagBuf));
   for (const auto& entry : vertPool) {
-    identityHash = BundleIdentityHashEntry(identityHash, entry.variantId, entry.dataOffset,
-                                           entry.dataSize, entry.reflOffset);
+    identityHash =
+        BundleIdentityHashEntry(identityHash, entry.variantId, entry.dataOffset, entry.dataSize);
   }
   for (const auto& entry : fragPool) {
-    identityHash = BundleIdentityHashEntry(identityHash, entry.variantId, entry.dataOffset,
-                                           entry.dataSize, entry.reflOffset);
+    identityHash =
+        BundleIdentityHashEntry(identityHash, entry.variantId, entry.dataOffset, entry.dataSize);
   }
   identityHash = BundleIdentityHashBytes(identityHash, dataPool.data(), dataPool.size());
-  identityHash = BundleIdentityHashBytes(identityHash, reflPool.data(), reflPool.size());
 
   // Header, in the order of BundleFormat::Offset.
   WriteU32LE(file, BundleFormat::Magic);
@@ -245,7 +204,6 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   WriteU32LE(file, fragPoolOffset);
   WriteU32LE(file, dataOffset);
   WriteU32LE(file, dataSize);  // uncompressed
-  WriteU32LE(file, actualReflectionOffset);
   static_assert(sizeof(tagBuf) == BundleFormat::ProfileTagSize, "the tag buffer is the tag field");
   file.write(tagBuf, sizeof(tagBuf));
   WriteU16LE(file, payloadKind);
@@ -262,7 +220,6 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     WriteU32LE(file, entry.variantId);
     WriteU32LE(file, entry.dataOffset);
     WriteU32LE(file, entry.dataSize);
-    WriteU32LE(file, entry.reflOffset);
   }
 
   // Frag pool entries
@@ -270,18 +227,11 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     WriteU32LE(file, entry.variantId);
     WriteU32LE(file, entry.dataOffset);
     WriteU32LE(file, entry.dataSize);
-    WriteU32LE(file, entry.reflOffset);
   }
 
   // Data pool (possibly compressed)
   file.write(reinterpret_cast<const char*>(dataToWrite),
              static_cast<std::streamsize>(dataToWriteSize));
-
-  // Reflection pool
-  if (!reflPool.empty()) {
-    file.write(reinterpret_cast<const char*>(reflPool.data()),
-               static_cast<std::streamsize>(reflPool.size()));
-  }
 
   // A failed write (disk full, permission) must not report success: the caller would treat the
   // truncated or missing file as a valid bundle.

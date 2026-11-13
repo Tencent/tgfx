@@ -18,6 +18,7 @@
 
 #include "gpu/aot/spec/SpecResolver.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/chain/AOTChainSpec.h"
 #include "gpu/aot/spec/SpecInjector.h"
@@ -63,28 +64,28 @@ ShaderCodeFormat SpecFormatForBackend(Backend backend, uint16_t payloadFormat) {
   }
 }
 
-SpecValues SpecResolver::Resolve(SpecSource* source, Backend backend, const ProgramInfo& info,
-                                 const Variant& variant) {
-  if (source == nullptr || !source->specializationEnabled() || !source->isLoaded()) {
+SpecValues SpecResolver::Resolve(PrecompiledShaderCache* cache, Backend backend,
+                                 const ProgramInfo& info, const Variant& variant) {
+  if (cache == nullptr || !cache->specializationEnabled() || !cache->isLoaded()) {
     return {};
   }
   // A format without an injector cannot consume the values, so capturing for it would only cost
   // the draw a scratch write. The gate is the registry, not a backend list.
-  if (FindSpecInjector(SpecFormatForBackend(backend, source->payloadFormat())) == nullptr) {
+  if (FindSpecInjector(SpecFormatForBackend(backend, cache->payloadFormat())) == nullptr) {
     return {};
   }
   // The values come straight off the compiled program (the same fields the runtime binder
-  // uploads); the bundle's spec table supplies the order and the array lengths.
-  const auto* fields = source->findFragmentSpecFields(variant.id());
-  if (fields == nullptr) {
+  // uploads); the declaration supplies the order and the array lengths.
+  const auto fields = DeriveSpecFieldInfos(variant);
+  if (fields.empty()) {
     return {};
   }
   const auto* program = AOTChainBuilder::ResolveChainProgram(&info);
   if (program == nullptr) {
     return {};
   }
-  auto values = ResolveChainSpec(*program, *fields);
-  source->recordSpecCapture(values);
+  auto values = ResolveChainSpec(*program, fields);
+  cache->recordSpecCapture(values);
   return values;
 }
 

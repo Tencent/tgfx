@@ -43,7 +43,7 @@ void ParamBuffer::write(const Layout::Field& field, const void* data, size_t siz
 void ParamBuffer::set(const Layout::Field& field, const Matrix& matrix) const {
   float values[9] = {};
   matrix.get9(values);
-  // The same column-major 12-float layout UniformData::setData writes for a mat3 field.
+  // The same column-major 12-float layout the assembled mat3 declaration expects.
   const float data[] = {
       values[0], values[3], values[6], 0,         values[1], values[4],
       values[7], 0,         values[2], values[5], values[8], 0,

@@ -19,7 +19,6 @@
 #pragma once
 
 #include <cstdint>
-#include "gpu/aot/spec/SpecSource.h"
 #include "gpu/aot/spec/SpecValues.h"
 #include "gpu/shaders/Family.h"
 #include "tgfx/gpu/GPU.h"
@@ -27,6 +26,7 @@
 
 namespace tgfx {
 
+class PrecompiledShaderCache;
 class ProgramInfo;
 
 /// The variant's specialization table, derived from its declaration: the same order, names and id
@@ -42,14 +42,14 @@ class SpecResolver {
  public:
   /**
    * Resolves the specialization values of one draw.
-   * @param source    The artifact store the draw's reflected layouts come from.
+   * @param cache     The artifact store that owns the enable switch and the capture accounting.
    * @param backend   The backend whose injector decides whether the values are consumable.
    * @param info      The draw's processor tree and pipeline state.
-   * @param variant   The matched variant; its id selects the bundle's spec table.
+   * @param variant   The matched variant; its declaration derives the spec table.
    * @return          The values in spec-table order (the master switch first), or an empty set
    *                  when the draw serves the generic form.
    */
-  static SpecValues Resolve(SpecSource* source, Backend backend, const ProgramInfo& info,
+  static SpecValues Resolve(PrecompiledShaderCache* cache, Backend backend, const ProgramInfo& info,
                             const Variant& variant);
 };
 

@@ -25,14 +25,9 @@
 
 namespace tgfx {
 
-// The bundle reader: byte-level parsing of one bundle's pools, with the semantic rules the format
-// leaves to the runtime (which formats may be uniforms or samplers, which array sizes are legal).
-// It is a separate translation unit from the cache because it holds no state: the cache decides
-// what to parse and what to share, this decides what the bytes mean.
-
-/// Parses one stage's reflection block into `blob`, consuming from `remainingBytes`.
-bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStageBlob* blob,
-                          size_t* remainingBytes);
+// The bundle reader: byte-level parsing of one bundle's pools. It is a separate translation unit
+// from the cache because it holds no state: the cache decides what to parse and what to share,
+// this decides what the bytes mean.
 
 /// Checks a pool's entries against the data pool's bounds and the payload budget, without loading.
 bool CheckPoolPayloadBudget(const uint8_t* fileData, size_t poolOffset, uint32_t poolCount,
@@ -40,8 +35,8 @@ bool CheckPoolPayloadBudget(const uint8_t* fileData, size_t poolOffset, uint32_t
 
 /// Loads one pool's stages into `entries`.
 bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset, uint32_t poolCount,
-              size_t dataPoolStart, size_t dataPoolEnd, size_t reflectionPoolStart,
-              std::unordered_map<uint32_t, ShaderStageBlob>& entries, size_t* remainingBytes);
+              size_t dataPoolStart, size_t dataPoolEnd,
+              std::unordered_map<uint32_t, ShaderStageBlob>& entries);
 
 /// Feeds a pool's entry hashes into the bundle identity hash, in the on-disk field order the
 /// writer feeds (see BundleIdentityHashEntry).

@@ -133,27 +133,6 @@ TEST(ReflectionContractTest, ANameWithAnEmbeddedNulIsReported) {
   EXPECT_TRUE(report.mentions("embedded NUL")) << report.log;
 }
 
-TEST(ReflectionContractTest, ANameOverTheSerializationLimitIsReported) {
-  auto report = CheckReflection({VariantWithFragment({Field(std::string(256, 'n'))})});
-  EXPECT_EQ(report.errors, 1u) << report.log;
-  EXPECT_TRUE(report.mentions("exceeds the 255-byte name serialization limit")) << report.log;
-}
-
-TEST(ReflectionContractTest, ANameAtTheSerializationLimitPasses) {
-  auto report = CheckReflection({VariantWithFragment({Field(std::string(255, 'n'))})});
-  EXPECT_EQ(report.errors, 0u) << report.log;
-}
-
-TEST(ReflectionContractTest, MoreThanTwoHundredFiftyFiveEntriesAreReported) {
-  std::vector<UniformEntry> uniforms;
-  for (int i = 0; i < 256; ++i) {
-    uniforms.push_back(Field("u" + std::to_string(i)));
-  }
-  auto report = CheckReflection({VariantWithFragment(uniforms)});
-  EXPECT_GE(report.errors, 1u);
-  EXPECT_TRUE(report.mentions("255-entry serialization limit")) << report.log;
-}
-
 TEST(ReflectionContractTest, AGenericSamplerWithAGapIsReported) {
   // The gap index must not be a declared module's texture name: those are legal by construction
   // (the Chain module declares TextureSampler_0..3), so the synthetic gap uses a free index.

@@ -29,9 +29,9 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/AOTDiagnostics.h"
+#include "gpu/aot/bundle/BundleCodec.h"
 #include "gpu/aot/bundle/BundleReader.h"
 #include "gpu/aot/select/ShaderProfileResolver.h"
-#include "gpu/shaders/BundleCodec.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/Context.h"
 #include "zstd.h"
@@ -360,7 +360,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   if (header.toolchainABI != ExpectedToolchainABI) {
     LOGE(
         "PrecompiledShaderCache: Bundle toolchain ABI 0x%08x does not match the runtime's "
-        "0x%08x; the reflection/uniform contracts are incompatible",
+        "0x%08x; the interface and uniform contracts are incompatible",
         header.toolchainABI, ExpectedToolchainABI);
     return false;
   }
@@ -370,7 +370,6 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   uint32_t fragPoolOffset = header.fragPoolOffset;
   uint32_t dataOffset = header.dataOffset;
   uint32_t dataSize = header.dataSize;
-  uint32_t reflectionOffset = header.reflectionOffset;
   const std::string& profileTag = header.profileTag;
   // The parsed fields the rest of this loader and the cached ParsedBundle carry forward.
   const uint16_t formatVersion = header.formatVersion;
@@ -446,23 +445,15 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     return false;
   }
 
-  size_t reflectionPoolStart = reflectionOffset;
-
   if (compressionType == BundleFormat::Compression::Zstd) {
-    // Only the data pool region is compressed. Compute compressed size from file layout.
-    size_t compressedEnd = reflectionOffset > 0 ? static_cast<size_t>(reflectionOffset) : size;
-    if (dataPoolStart > size || compressedEnd > size || compressedEnd < dataPoolStart) {
+    // The data pool is the compressed region and the last section of the file; the pools before it
+    // stay raw, so the decompressed view is [header | pools | data] with the same offsets.
+    if (dataPoolStart > size) {
       LOGE("PrecompiledShaderCache: Compressed data region out of bounds");
       return false;
     }
-    size_t compressedSize = compressedEnd - dataPoolStart;
-    size_t reflectionSize = reflectionOffset > 0 ? size - compressedEnd : 0;
-    if (reflectionSize > MAX_BUNDLE_BYTES - dataPoolEnd) {
-      LOGE("PrecompiledShaderCache: Reassembled bundle exceeds parser limits");
-      return false;
-    }
-    // Decompress into a reassembled buffer: [header+pools | decompressed data | reflection]
-    decompressed.resize(dataPoolEnd + reflectionSize);
+    size_t compressedSize = size - dataPoolStart;
+    decompressed.resize(dataPoolEnd);
     std::memcpy(decompressed.data(), ptr, dataPoolStart);
     size_t destLen = ZSTD_decompress(decompressed.data() + dataPoolStart, dataSize,
                                      ptr + dataPoolStart, compressedSize);
@@ -471,25 +462,17 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
       LOGE("PrecompiledShaderCache: data pool decompression failed (type=%u)", compressionType);
       return false;
     }
-    // Copy reflection section after the decompressed data.
-    if (reflectionSize > 0) {
-      std::memcpy(decompressed.data() + dataPoolEnd, ptr + compressedEnd, reflectionSize);
-      reflectionPoolStart = dataPoolEnd;
-    } else {
-      reflectionPoolStart = 0;
-    }
     loadPtr = decompressed.data();
     loadSize = decompressed.size();
-  } else if (dataPoolEnd > size || (reflectionOffset != 0 &&
-                                    (dataPoolEnd > reflectionOffset || reflectionOffset > size))) {
-    LOGE("PrecompiledShaderCache: Data or reflection section out of bounds");
+  } else if (dataPoolEnd > size) {
+    LOGE("PrecompiledShaderCache: Data section out of bounds");
     return false;
   }
 
   // Content identity: recompute the writer's identity hash over the loaded view (pool entries,
-  // uncompressed data pool, reflection pool, tag, counts) and reject mismatches. The hash is
-  // mandatory — bundles written before the identity contract existed are refused with every
-  // other bundle older than CurrentVersion.
+  // uncompressed data pool, tag, counts) and reject mismatches. The hash is mandatory — bundles
+  // written before the identity contract existed are refused with every other bundle older than
+  // CurrentVersion.
   if (sourceHash == 0) {
     LOGE(
         "PrecompiledShaderCache: Bundle carries no identity hash; refusing an unverifiable bundle");
@@ -502,10 +485,6 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     computed = HashPoolEntries(computed, loadPtr + vertPoolOffset, vertPoolCount);
     computed = HashPoolEntries(computed, loadPtr + fragPoolOffset, fragPoolCount);
     computed = BundleIdentityHashBytes(computed, loadPtr + dataPoolStart, dataSize);
-    if (reflectionPoolStart != 0 && loadSize > reflectionPoolStart) {
-      computed = BundleIdentityHashBytes(computed, loadPtr + reflectionPoolStart,
-                                         loadSize - reflectionPoolStart);
-    }
     if (computed != sourceHash) {
       LOGE(
           "PrecompiledShaderCache: Bundle identity hash mismatch (expected 0x%016llx, computed "
@@ -538,11 +517,11 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   std::unordered_map<HashKey, ShaderStageBlob> newVertEntries;
   std::unordered_map<HashKey, ShaderStageBlob> newFragEntries;
   if (!LoadPool(loadPtr, loadSize, vertPoolOffset, vertPoolCount, dataPoolStart, dataPoolEnd,
-                reflectionPoolStart, newVertEntries, &remainingPayloadBytes)) {
+                newVertEntries)) {
     return false;
   }
   if (!LoadPool(loadPtr, loadSize, fragPoolOffset, fragPoolCount, dataPoolStart, dataPoolEnd,
-                reflectionPoolStart, newFragEntries, &remainingPayloadBytes)) {
+                newFragEntries)) {
     return false;
   }
 
@@ -640,12 +619,6 @@ const ShaderStageBlob* PrecompiledShaderCache::findFragment(uint32_t variantId) 
     return nullptr;
   }
   return &it->second;
-}
-
-const std::vector<SpecFieldInfo>* PrecompiledShaderCache::findFragmentSpecFields(
-    uint32_t variantId) const {
-  auto* blob = findFragment(variantId);
-  return blob == nullptr || blob->specFields.empty() ? nullptr : &blob->specFields;
 }
 
 }  // namespace tgfx

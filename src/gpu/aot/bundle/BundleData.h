@@ -22,8 +22,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "gpu/Uniform.h"
-#include "gpu/aot/spec/SpecSource.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
@@ -33,23 +31,10 @@ namespace tgfx {
 // type would force the reader to be a member function of the cache again, which is what made the
 // loader one 1000-line file.
 
-/// One vertex-stage input recorded in the bundle: the attribute slot layout the stage declares. The
-/// runtime binds attributes by location, so a mismatch with what the geometry processor emits is a
-/// layout contract violation the loader can detect.
-struct VertexInput {
-  std::string name;
-  UniformFormat format = UniformFormat::Float;
-  uint32_t location = 0;
-};
-
-/// One stage's artifact and its reflection: the compiled payload plus everything the runtime needs
-/// to bind it (uniforms, samplers, vertex inputs, and the freezable spec fields).
+/// One stage's artifact: the compiled payload and nothing else. The interface the shader was
+/// generated against is the declaration table's (DeriveLayout), so the bundle stores no reflection.
 struct ShaderStageBlob {
   std::vector<uint8_t> data;
-  std::vector<Uniform> uniforms;
-  std::vector<Uniform> samplers;
-  std::vector<VertexInput> vertexInputs;
-  std::vector<SpecFieldInfo> specFields;
 };
 
 /// The immutable parse of one bundle. loadBundle() shares one instance per (identity hash, byte

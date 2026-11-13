@@ -37,7 +37,7 @@
 #include "gpu/aot/AOTFailure.h"
 #include "gpu/aot/bundle/BundleData.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
-#include "gpu/aot/spec/SpecSource.h"
+#include "gpu/aot/spec/SpecValues.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Backend.h"
 
@@ -152,7 +152,7 @@ struct AOTDrawStats {
 /// Runtime cache that loads precompiled shader bundles and provides O(1) lookup by ShaderKey hash.
 /// Each Context holds one instance. The bundle stores vertex and fragment shaders in separate
 /// pools, enabling M+N storage instead of M*N.
-class PrecompiledShaderCache : public SpecSource {
+class PrecompiledShaderCache {
  public:
   /// The cache is owned by its Context and keeps a back pointer for bundle-generation
   /// bookkeeping: every load or unload bumps the generation and invalidates cached programs.
@@ -197,12 +197,12 @@ class PrecompiledShaderCache : public SpecSource {
 
   /// What the loaded bundle's code blobs hold, one of BundleFormat::Payload. Reports the text form
   /// before any bundle is loaded.
-  uint16_t payloadFormat() const override {
+  uint16_t payloadFormat() const {
     return _bundle == nullptr ? BundleFormat::Payload::Text : _bundle->payloadFormat;
   }
 
   /// Returns true if at least one bundle has been loaded.
-  bool isLoaded() const override {
+  bool isLoaded() const {
     return _bundle != nullptr && (!_bundle->vertEntries.empty() || !_bundle->fragEntries.empty());
   }
 
@@ -223,7 +223,7 @@ class PrecompiledShaderCache : public SpecSource {
 
   /// Returns the profile tag from the loaded bundle header (e.g. "vulkan"; see
   /// ShaderBundleContract.h).
-  const std::string& profileTag() const override {
+  const std::string& profileTag() const {
     static const std::string empty;
     return _bundle == nullptr ? empty : _bundle->profileTag;
   }
@@ -418,7 +418,7 @@ class PrecompiledShaderCache : public SpecSource {
   /// uniform values before creating its program. On by default, and the resolver's format gate
   /// keeps it to the backends whose stored form can consume the values (GLSL text rewrite, Metal
   /// function constants); TGFX_AOT_SPECIALIZE=0 turns it off for a whole run.
-  bool specializationEnabled() const override {
+  bool specializationEnabled() const {
     return _specializationEnabled;
   }
 
@@ -436,20 +436,10 @@ class PrecompiledShaderCache : public SpecSource {
   };
 
   /// Records one resolved specialization. An empty value set is the generic form and is ignored.
-  void recordSpecCapture(const SpecValues& values) override;
+  void recordSpecCapture(const SpecValues& values);
 
   /// Returns a snapshot of the specialization accounting since the last resetStats().
   SpecStats specStats() const;
-
-  /// The specialization capture's per-variant scratch: uniform data backed by CPU buffers, so
-  /// the capture runs the very writers the upload runs without touching any GPU object. One
-  /// scratch per fragment stage key, rebuilt whenever the bundle changes.
-  /// Returns the capture scratch of one (vertex, fragment) stage pair, creating it from the two
-  /// stages' reflected uniforms on first use. Returns nullptr when either stage has no blob.
-
-  /// SpecSource: the two stages' reflected layouts and the fragment stage's spec table, as the
-  /// capture needs them. A missing stage yields null rather than an empty view.
-  const std::vector<SpecFieldInfo>* findFragmentSpecFields(uint32_t variantId) const override;
 
   using HashKey = uint32_t;
 

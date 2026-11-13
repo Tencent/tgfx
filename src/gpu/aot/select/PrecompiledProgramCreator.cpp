@@ -237,82 +237,6 @@ static bool DeclaredInputAcceptsAttribute(PrecompiledShaderCache* cache,
   return false;
 }
 
-#if DEBUG
-// The migration's one cross-check: every interface number the runtime now takes from the derived
-// layout must equal what the artifact's reflection recorded. A disagreement means the declaration
-// and the compiled text have drifted, and the upload would address fields the artifact does not
-// declare. Debug-only; the release path reads the layout alone.
-void AssertLayoutMatchesReflection(const Layout& layout, const ShaderStageBlob& vertBlob,
-                                   const ShaderStageBlob& fragBlob, const Variant& variant,
-                                   const char* shaderName) {
-  auto report = [shaderName, &variant](const char* what, size_t index) {
-    LOGE(
-        "PrecompiledProgramCreator: %s[variant=%u] the derived layout disagrees with the "
-        "artifact's reflection at %s[%zu]; the declaration and the compiled text have drifted",
-        shaderName, variant.id(), what, index);
-    DEBUG_ASSERT(false);
-  };
-  for (uint8_t block = 0; block < 2; ++block) {
-    const auto& reflected = block == 0 ? vertBlob.uniforms : fragBlob.uniforms;
-    size_t count = 0;
-    for (size_t index = 0; index < layout.fields.size(); ++index) {
-      const auto& field = layout.fields[index];
-      if (field.block != block) {
-        continue;
-      }
-      if (count >= reflected.size() || reflected[count].name() != layout.fieldNames[index] ||
-          reflected[count].format() != field.format ||
-          reflected[count].arraySize() != static_cast<uint32_t>(field.arraySize)) {
-        report("uniforms", index);
-        return;
-      }
-      ++count;
-    }
-    if (count != reflected.size()) {
-      report("uniform count", count);
-      return;
-    }
-  }
-  if (layout.textures.size() != fragBlob.samplers.size()) {
-    report("sampler count", layout.textures.size());
-    return;
-  }
-  for (size_t index = 0; index < layout.textures.size(); ++index) {
-    if (layout.textures[index].name != fragBlob.samplers[index].name()) {
-      report("samplers", index);
-      return;
-    }
-  }
-  if (layout.attributes.size() != vertBlob.vertexInputs.size()) {
-    report("vertex input count", layout.attributes.size());
-    return;
-  }
-  for (size_t index = 0; index < layout.attributes.size(); ++index) {
-    const auto& attribute = layout.attributes[index];
-    const auto& input = vertBlob.vertexInputs[index];
-    if (attribute.name != input.name || attribute.format != input.format ||
-        attribute.location != input.location) {
-      report("vertex inputs", index);
-      return;
-    }
-  }
-  const auto specFields = DeriveSpecFieldInfos(variant);
-  if (specFields.size() != fragBlob.specFields.size()) {
-    report("spec field count", specFields.size());
-    return;
-  }
-  for (size_t index = 0; index < specFields.size(); ++index) {
-    const auto& derived = specFields[index];
-    const auto& reflected = fragBlob.specFields[index];
-    if (derived.name != reflected.name || derived.arraySize != reflected.arraySize ||
-        derived.firstId != reflected.firstId) {
-      report("spec fields", index);
-      return;
-    }
-  }
-}
-#endif
-
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
                                                                   ProgramInfo* programInfo) {
   auto cache = ContextCacheAccess::Cache(context);
@@ -448,10 +372,6 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
   // compiled bytes. The layout is the single numbering source the assembled text was generated
   // from and the writers upload through, so nothing here reads the bundle's reflection.
   const Layout layout = DeriveLayout(variant);
-#if DEBUG
-  AssertLayoutMatchesReflection(layout, *vertBlob, *fragBlob, variant, shaderName);
-#endif
-
   auto format = SpecFormatForBackend(context->backend(), cache->payloadFormat());
   const bool binaryPayload = IsBinaryFormat(format);
 

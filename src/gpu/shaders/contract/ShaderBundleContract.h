@@ -326,13 +326,16 @@ inline std::vector<std::string> BindingContractDefines() {
 //
 // File layout, all integers little endian:
 //
-//   [ header : HeaderSize ][ vertex pool ][ fragment pool ][ data pool ][ reflection pool ]
+//   [ header : HeaderSize ][ vertex pool ][ fragment pool ][ data pool ]
 //
 //   header          the fields at the Offset values below.
 //   vertex pool     vertPoolCount entries of PoolEntrySize bytes, sorted by stage key.
 //   fragment pool   fragPoolCount entries of PoolEntrySize bytes, sorted by stage key.
 //   data pool       the shader code blobs, compressed as a whole when compressionType is not None.
-//   reflection pool the serialized reflection of every stage (see SerializeStageReflection).
+//
+// The bundle stores the compiled bytes and nothing else: every interface number the runtime needs
+// is derived from the declaration table (DeriveLayout), and the build fails when the compiled
+// text's reflection disagrees with it.
 //
 // Changing any value below is a format change: bump CurrentVersion, and bump
 // ExpectedToolchainABI so every published bundle is rebuilt.
@@ -343,16 +346,16 @@ inline constexpr uint32_t Magic = 0x54475346u;
 
 /// The only version the writer produces and the runtime loader reads. Older versions carried no
 /// array sizes (v3), no vertex input reflection (v4), no payload format field (v5), no spec table
-/// (v6) or hash-keyed pool entries (v7); they are refused instead of read through compatibility
-/// branches the loader no longer has. v8 keys the entries by the declaration table's variant id
-/// instead of a name hash, so the bundle no longer carries shader names at all.
-inline constexpr uint16_t CurrentVersion = 8;
+/// (v6), hash-keyed pool entries (v7) or a reflection pool (v8); they are refused instead of read
+/// through compatibility branches the loader no longer has. v9 drops the reflection pool: the
+/// entry is variantId + dataOffset + dataSize and the header loses its reflection offset.
+inline constexpr uint16_t CurrentVersion = 9;
 
 /// The size of the fixed header.
-inline constexpr uint32_t HeaderSize = 84;
+inline constexpr uint32_t HeaderSize = 80;
 
-/// The size of one pool entry: variantId(4) + dataOffset(4) + dataSize(4) + reflectionOffset(4).
-inline constexpr uint32_t PoolEntrySize = 16;
+/// The size of one pool entry: variantId(4) + dataOffset(4) + dataSize(4).
+inline constexpr uint32_t PoolEntrySize = 12;
 
 /// How the data pool is stored. Stored in the header as a 16 bit value.
 namespace Compression {
@@ -364,20 +367,19 @@ inline constexpr uint16_t Max = Zstd;
 
 /// The byte offsets of the header fields.
 namespace Offset {
-inline constexpr uint32_t Magic = 0;              // u32
-inline constexpr uint32_t FormatVersion = 4;      // u16
-inline constexpr uint32_t CompressionType = 6;    // u16
-inline constexpr uint32_t IdentityHash = 8;       // u64, see the identity hash below
-inline constexpr uint32_t ToolchainABI = 16;      // u32, see ExpectedToolchainABI
-inline constexpr uint32_t VertPoolCount = 20;     // u32
-inline constexpr uint32_t FragPoolCount = 24;     // u32
-inline constexpr uint32_t VertPoolOffset = 28;    // u32
-inline constexpr uint32_t FragPoolOffset = 32;    // u32
-inline constexpr uint32_t DataOffset = 36;        // u32
-inline constexpr uint32_t DataSize = 40;          // u32, uncompressed size of the data pool
-inline constexpr uint32_t ReflectionOffset = 44;  // u32, 0 when the bundle has no reflection
-inline constexpr uint32_t ProfileTag = 48;        // ProfileTagSize bytes, zero padded
-inline constexpr uint32_t PayloadFormat = 80;     // u16, see Payload
+inline constexpr uint32_t Magic = 0;            // u32
+inline constexpr uint32_t FormatVersion = 4;    // u16
+inline constexpr uint32_t CompressionType = 6;  // u16
+inline constexpr uint32_t IdentityHash = 8;     // u64, see the identity hash below
+inline constexpr uint32_t ToolchainABI = 16;    // u32, see ExpectedToolchainABI
+inline constexpr uint32_t VertPoolCount = 20;   // u32
+inline constexpr uint32_t FragPoolCount = 24;   // u32
+inline constexpr uint32_t VertPoolOffset = 28;  // u32
+inline constexpr uint32_t FragPoolOffset = 32;  // u32
+inline constexpr uint32_t DataOffset = 36;      // u32
+inline constexpr uint32_t DataSize = 40;        // u32, uncompressed size of the data pool
+inline constexpr uint32_t ProfileTag = 44;      // ProfileTagSize bytes, zero padded
+inline constexpr uint32_t PayloadFormat = 76;   // u16, see Payload
 }  // namespace Offset
 
 // What the data pool holds for this profile. A profile's payload is uniform across its stages and
@@ -395,21 +397,11 @@ inline constexpr uint16_t Max = Binary;
 /// The size of the profile tag field, including the zero padding.
 inline constexpr uint32_t ProfileTagSize = 32;
 
-/// Limits of the reflection pool. A stage's reflection serializes its list counts and every name
-/// length as one byte (see SerializeStageReflection), so these are format facts, not policy: the
-/// writer, the loader and shader_build_tool's contract check all read them from here. A change
-/// to a wider field must move them with the format version.
-namespace Reflection {
-inline constexpr uint32_t MaxListEntries = 255;  // uniforms or samplers per stage
-inline constexpr uint32_t MaxNameLength = 255;   // bytes of one uniform/sampler/input name
-}  // namespace Reflection
-
 /// The byte offsets of the fields inside one pool entry.
 namespace EntryOffset {
-inline constexpr uint32_t VariantId = 0;          // u32, see VariantIdOf
-inline constexpr uint32_t DataOffset = 4;         // u32, relative to the data pool
-inline constexpr uint32_t DataSize = 8;           // u32
-inline constexpr uint32_t ReflectionOffset = 12;  // u32, relative to the reflection pool
+inline constexpr uint32_t VariantId = 0;   // u32, see VariantIdOf
+inline constexpr uint32_t DataOffset = 4;  // u32, relative to the data pool
+inline constexpr uint32_t DataSize = 8;    // u32
 }  // namespace EntryOffset
 
 static_assert(Offset::PayloadFormat == Offset::ProfileTag + ProfileTagSize,
@@ -417,7 +409,7 @@ static_assert(Offset::PayloadFormat == Offset::ProfileTag + ProfileTagSize,
 // PayloadFormat is a u16 followed by a u16 of reserved space, keeping the header 4-byte aligned.
 static_assert(Offset::PayloadFormat + 2 * sizeof(uint16_t) == HeaderSize,
               "the header fields must tile the header exactly");
-static_assert(EntryOffset::ReflectionOffset + sizeof(uint32_t) == PoolEntrySize,
+static_assert(EntryOffset::DataSize + sizeof(uint32_t) == PoolEntrySize,
               "the entry fields must tile the pool entry exactly");
 
 }  // namespace BundleFormat
@@ -452,12 +444,11 @@ inline bool ProfileAllowsPayload(ShaderProfile profile, uint16_t payloadFormat) 
 // Bundle identity: the content hash and the toolchain ABI.
 //
 // A bundle's identity hash is a 64-bit FNV-1a over the serialized pool entries, the uncompressed
-// data pool, the reflection pool, the profile tag, and the counts. Any shader-content or
-// reflection-layout change produces a different hash even when shader names and permutation
-// indices stay the same, which is exactly the compatibility gap a format version cannot express.
-// Both sides must feed the exact same field sequence; the helpers below are the single source of
-// truth for that sequence. The mapping from a runtime Backend to a shader profile needs runtime
-// types and lives in ShaderProfileResolver.h.
+// data pool, the profile tag, and the counts. Any shader-content change produces a different hash
+// even when permutation indices stay the same, which is exactly the compatibility gap a format
+// version cannot express. Both sides must feed the exact same field sequence; the helpers below
+// are the single source of truth for that sequence. The mapping from a runtime Backend to a shader
+// profile needs runtime types and lives in ShaderProfileResolver.h.
 
 /**
  * The toolchain ABI version every bundle records (header offset 16). This is the compatibility
@@ -474,7 +465,7 @@ inline bool ProfileAllowsPayload(ShaderProfile profile, uint16_t payloadFormat) 
  * still refuses bundles whose recorded ABI is not this value, which guards hand-carried or
  * cached bundle files.
  */
-inline constexpr uint32_t ExpectedToolchainABI = 0x00010021u;
+inline constexpr uint32_t ExpectedToolchainABI = 0x00010022u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"
@@ -508,10 +499,10 @@ inline uint64_t BundleIdentityHashHeader(uint64_t state, uint16_t formatVersion,
   return BundleIdentityHashBytes(state, profileTag32, 32);
 }
 
-// Pool entries are fed in the on-disk field order: variantId(4) + dataOffset(4) + dataSize(4) +
-// reflOffset(4), all little-endian.
+// Pool entries are fed in the on-disk field order: variantId(4) + dataOffset(4) + dataSize(4), all
+// little-endian.
 inline uint64_t BundleIdentityHashEntry(uint64_t state, uint32_t variantId, uint32_t dataOffset,
-                                        uint32_t dataSize, uint32_t reflOffset) {
+                                        uint32_t dataSize) {
   auto feedU32 = [&state](uint32_t value) {
     uint8_t le[4] = {static_cast<uint8_t>(value), static_cast<uint8_t>(value >> 8),
                      static_cast<uint8_t>(value >> 16), static_cast<uint8_t>(value >> 24)};
@@ -520,7 +511,6 @@ inline uint64_t BundleIdentityHashEntry(uint64_t state, uint32_t variantId, uint
   feedU32(variantId);
   feedU32(dataOffset);
   feedU32(dataSize);
-  feedU32(reflOffset);
   return state;
 }
 
