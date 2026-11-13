@@ -1964,4 +1964,90 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullStaysInsideTheDirtyTile) {
   })
 }
 
+// A chain of nested styles adds no footprint beyond the outermost one: without the early stop every
+// level would push its own rect and push the list over the budget.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, NestedStyleChainAddsOneFootprint) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto surface = Surface::Make(context, 300, 300);
+    ASSERT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(RenderMode::Tiled);
+
+    auto root = ShapeLayer::Make();
+    Path path;
+    path.addRect(Rect::MakeWH(140, 140));
+    root->setPath(path);
+    root->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 40)));
+    root->setMatrix(Matrix::MakeTrans(70, 70));
+    root->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
+
+    auto current = root;
+    for (int i = 0; i < 8; ++i) {
+      auto child = ShapeLayer::Make();
+      child->setPath(path);
+      child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 30)));
+      child->setMatrix(Matrix::MakeTrans(6, 6));
+      child->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
+      current->addChild(child);
+      current = child;
+    }
+    displayList->root()->addChild(root);
+
+    displayList->render(surface.get());
+    auto footprints = displayList->collectBackgroundFootprints(Rect::MakeWH(300.0f, 300.0f));
+    ASSERT_EQ(footprints.size(), 1u);
+    auto expected = root->renderBounds;
+    expected.outset(root->maxBackgroundOutset, root->maxBackgroundOutset);
+    EXPECT_EQ(footprints[0], expected);
+  })
+}
+
+// More styles than the per-layer cull loop can afford must still cull: the rects are merged instead
+// of dropping the cull altogether.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, ManyStylesStillCullTheCapture) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto surface = Surface::Make(context, 400, 400);
+    ASSERT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(RenderMode::Tiled);
+
+    for (int i = 0; i < 40; ++i) {
+      auto layer = ShapeLayer::Make();
+      Path path;
+      path.addRect(Rect::MakeWH(8, 8));
+      layer->setPath(path);
+      layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 30)));
+      layer->setMatrix(Matrix::MakeTrans(40.0f + static_cast<float>(i % 8) * 9.0f,
+                                         40.0f + static_cast<float>(i / 8) * 9.0f));
+      layer->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+      displayList->root()->addChild(layer);
+    }
+
+    displayList->render(surface.get());
+    auto captureRect = Rect::MakeWH(400.0f, 400.0f);
+    auto footprints = displayList->collectBackgroundFootprints(captureRect);
+    // Well above MAX_CULL_RECTS, so the merge is what keeps the cull alive.
+    ASSERT_GT(footprints.size(), 32u);
+
+    auto snapshots = displayList->captureBackgrounds(surface.get(), {captureRect}, footprints);
+    ASSERT_TRUE(snapshots != nullptr);
+    ASSERT_FALSE(snapshots->cullRects.empty());
+  // The per-layer cull loop only affords MAX_CULL_RECTS rects, so the merge has to get under it
+  // instead of dropping the cull.
+  EXPECT_LE(snapshots->cullRects.size(), 32u);
+    auto cullArea = 0.0f;
+    for (const auto& rect : snapshots->cullRects) {
+      cullArea += rect.width() * rect.height();
+    }
+    EXPECT_LT(cullArea, captureRect.width() * captureRect.height() * 0.5f);
+    context->flushAndSubmit();
+  })
+}
+
 }  // namespace tgfx
