@@ -1659,10 +1659,9 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullRectsStayInsideTheFootprints){T
   for (const auto& rect : snapshots->cullRects) {
     EXPECT_TRUE(captureWithOutset.contains(rect));
   }
-  // The cull follows the footprint plus the blur reach, not the captured area.
-  auto expected = footprints[0];
-  expected.outset(rootOutset, rootOutset);
-  EXPECT_EQ(snapshots->cullRects[0], expected);
+  // The cull is the footprint itself: its blur reach is already folded in, and widening it again
+  // would draw layers no style can read.
+  EXPECT_EQ(snapshots->cullRects[0], footprints[0]);
   EXPECT_LT(snapshots->cullRects[0].width() * snapshots->cullRects[0].height(),
             captureRect.width() * captureRect.height());
 

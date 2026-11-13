@@ -480,13 +480,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       }
       auto footprints = collectBackgroundFootprints(inverse.mapRect(capturedRect));
       if (!footprints.empty()) {
-        cullRects.reserve(footprints.size());
-        for (const auto& footprint : footprints) {
-          auto rect = viewMatrix.mapRect(footprint);
-          rect.roundOut();
-          cullRects.push_back(rect);
-        }
-        normalizeCullRects(&cullRects);
+        normalizeCullRects(&footprints);
+        cullRects = std::move(footprints);
       }
     }
     snapshotMap = captureBackgrounds(surface, captureRects, cullRects);
@@ -1375,15 +1370,9 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   std::vector<Rect> cullWorldRects = worldRects;
   bool culled = false;
   if (!cullRects.empty()) {
-    std::vector<Rect> footprints = {};
-    footprints.reserve(cullRects.size());
-    for (const auto& cullRect : cullRects) {
-      auto footprint = inverse.mapRect(cullRect);
-      footprint.roundOut();
-      footprint.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
-      footprints.push_back(footprint);
-    }
-    auto narrowed = narrowCullRects(footprints, worldRects);
+    // The footprints already include the blur reach of every background style the layer owns, so
+    // they are used as they are: widening them again would draw layers no style can read.
+    auto narrowed = narrowCullRects(cullRects, worldRects);
     // An empty list means no style samples inside this capture, in which case the whole area is
     // kept rather than replaying the tree for nothing.
     if (!narrowed.empty()) {
