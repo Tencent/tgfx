@@ -28,11 +28,6 @@
 
 namespace tgfx {
 
-static std::shared_ptr<Shader> MakeNoiseShader(float size, float scale, float seed) {
-  auto freq = 1.0f / (size * scale);
-  return Shader::MakeFractalNoise(freq, freq, 3, seed);
-}
-
 static std::shared_ptr<ColorFilter> MakeColorFillFilter(const Color& color, float alpha) {
   Color fillColor = {color.red, color.green, color.blue, alpha};
   return ColorFilter::Blend(fillColor, BlendMode::SrcIn);

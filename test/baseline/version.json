@@ -27,7 +27,7 @@
         "ScaledInnerShadowWithBackgroundBlur": "351c4df9",
         "SharedStyleOutput": "accb0e38",
         "SharedStyleOutput3D": "200dffffa",
-        "SimpleBackgroundBlur_tiled": "351c4df9",
+        "SimpleBackgroundBlur_tiled": "24bafb376",
         "backgroundLayerBlur": "29f9281d"
     },
     "CanvasTest": {
@@ -210,6 +210,7 @@
         "scaled_imageCodec_box_filter": "bf48e614",
         "scaled_mipmap": "1b8d95f2",
         "scaled_scale_up": "1b8d95f2",
+        "subset_crop_downscale": "a5eaa6cd8",
         "tile_mode_normal": "c5cfce4d",
         "tile_mode_rgbaaa": "bf48e614",
         "tile_mode_subset": "c5cfce4d"
@@ -232,11 +233,11 @@
         "TileClear_PartialTileWithNewLayer": "bf48e614"
     },
     "LayerFilterTest": {
-        "AnchorStability": "22739e1e",
-        "BasicMonoDuoMulti": "c4e55267",
-        "BlendMode": "c4e55267",
-        "ChainedMonoNoise": "c4e55267",
-        "DensitySweep": "c4e55267",
+        "AnchorStability": "570d433bb",
+        "BasicMonoDuoMulti": "570d433bb",
+        "BlendMode": "570d433bb",
+        "ChainedMonoNoise": "570d433bb",
+        "DensitySweep": "570d433bb",
         "DropShadowDirtyRect": "2ce762fb",
         "DropShadowStyle": "bf48e614",
         "DropShadowStyle-stroke": "e7704264",
@@ -250,7 +251,7 @@
         "ScaledRectWithInnerShadow": "2ce762fb",
         "ShapeLayerContourWithDropShadow": "351c4df9",
         "ShapeLayerNoStyleWithDropShadow": "351c4df9",
-        "WithBlurAndShadow": "351c4df9",
+        "WithBlurAndShadow": "570d433bb",
         "dropShadow": "351c4df9",
         "filterClip": "bf48e614",
         "filterTest": "351c4df9",
@@ -314,6 +315,7 @@
         "GlassStyleSplayCompare": "f8b2f40c",
         "GlassStyleWithDropShadow": "f8b2f40c",
         "GlassStyleZoom": "f8b2f40c",
+        "GroupBlurTiledZoom": "a9672fcd3",
         "HasContentChanged_Offset": "bedeb932",
         "HasContentChanged_Org": "bedeb932",
         "HasContentChanged_Zoom": "bedeb932",
@@ -357,7 +359,7 @@
         "TemporaryOffscreenImage_image1": "351c4df9",
         "TemporaryOffscreenImage_image2": "0598172b",
         "TemporaryOffscreenImage_pic": "0598172b",
-        "TextDuoNoiseTransforms": "40d85838c",
+        "TextDuoNoiseTransforms": "570d433bb",
         "ZoomAndOffset": "6b4e5ce0",
         "draw_shape": "68e5a3499",
         "draw_solid": "b4a1231",
@@ -373,12 +375,12 @@
         "rasterize_path_texture": "c475bfb"
     },
     "PDFExportTest": {
-        "DuoNoiseImage": "2c4681a2",
-        "NoiseEffects": "351c4df9",
-        "ShapeNoiseStyle": "d30e4026",
-        "TextInnerShadow": "351c4df9",
-        "TextLayerStyleAlignment": "351c4df9",
-        "TextMultiNoiseTransforms": "2c4681a2"
+        "DuoNoiseImage": "570d433bb",
+        "NoiseEffects": "570d433bb",
+        "ShapeNoiseStyle": "570d433bb",
+        "TextInnerShadow": "570d433bb",
+        "TextLayerStyleAlignment": "570d433bb",
+        "TextMultiNoiseTransforms": "570d433bb"
     },
     "PDFTest": {
         "AssignColorSpace": "351c4df9",
@@ -413,17 +415,17 @@
         "LayerLinearGradient": "bf721f63",
         "LayerRadialGradient": "bf721f63",
         "LinearGradientWhiteAlpha": "bf721f63",
-        "NoiseEffects": "351c4df9",
+        "NoiseEffects": "570d433bb",
         "NonRegularBlendMode": "bf721f63",
         "PendingRasterFlushOnPoll": "3b1fa4fa",
         "PendingRasterPlaceholder": "3b1fa4fa",
         "PictureMask": "f85f35d5",
-        "ShapeNoiseStyle": "d30e4026",
+        "ShapeNoiseStyle": "570d433bb",
         "SimpleText": "984e8f18",
         "SrcBlendOverlap": "bf721f63",
-        "TextInnerShadow": "351c4df9",
-        "TextLayerStyleAlignment": "351c4df9",
-        "TextMultiNoiseTransforms": "2c4681a2"
+        "TextInnerShadow": "570d433bb",
+        "TextLayerStyleAlignment": "570d433bb",
+        "TextMultiNoiseTransforms": "570d433bb"
     },
     "PathShapeTest": {
         "AdaptiveDashEffect": "0448e0fe",
