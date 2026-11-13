@@ -80,12 +80,8 @@ class DeclaredFamilyProgramWriter final : public ProgramWriter {
   DeclaredFamilyProgramWriter(const ProgramInfo& info, Variant variant);
 
  protected:
-  void writeEngineDefaults(const ProgramInfo& info,
-                           UniformData* fragmentUniformData) const override;
-  void writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
-                              UniformData* fragmentUniformData) const override;
-  void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                       UniformData* fragmentUniformData) const override;
+  void writeUniforms(const ProgramInfo& info, UniformData* vertexUniformData,
+                     UniformData* fragmentUniformData) const override;
   bool writeSamplers(const ProgramInfo& info, Program* program,
                      RenderPass* renderPass) const override;
 
@@ -99,12 +95,9 @@ DeclaredFamilyProgramWriter::DeclaredFamilyProgramWriter([[maybe_unused]] const 
     : variant(std::move(variant)), layout(DeriveLayout(variant)) {
 }
 
-void DeclaredFamilyProgramWriter::writeEngineDefaults(const ProgramInfo&, UniformData*) const {
-}
-
-void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
-                                                         UniformData* vertexUniformData,
-                                                         UniformData* fragmentUniformData) const {
+void DeclaredFamilyProgramWriter::writeUniforms(const ProgramInfo& info,
+                                                UniformData* vertexUniformData,
+                                                UniformData* fragmentUniformData) const {
   // The draw's selection ran once, before the program was created from this variant, and its data
   // sources (the texture leaves, the kernels) rode the info to here: the upload never re-matches.
   const auto* match = info.getSources();
@@ -143,11 +136,6 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       writeModule(context);
     }
   }
-}
-
-void DeclaredFamilyProgramWriter::writeProcessors(const ProgramInfo&, UniformData*,
-                                                  UniformData*) const {
-  // Every value write happens in writeGeometryProcessor's module walk.
 }
 
 bool DeclaredFamilyProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,

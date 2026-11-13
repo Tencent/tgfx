@@ -95,20 +95,13 @@ class ProgramWriter {
                           UniformData* fragmentUniformData) const;
 
  protected:
-  /** Writes the engine-level default uniforms only this route's shaders declare. */
-  virtual void writeEngineDefaults(const ProgramInfo& info, UniformData* fragmentUniformData) const;
-
   /**
-   * Writes the geometry processor's uniforms. A concrete writer either declares them from the
-   * variant's layout (the declared families) or feeds the compiled program's leaf-ordered
-   * transforms (the chain writer); there is no processor-tree default left.
+   * Writes every per-draw uniform value. A concrete writer either declares them from the variant's
+   * layout (the declared families walk their modules) or feeds the compiled program's records (the
+   * chain writer); there is no processor-tree default and no separate engine-default step left.
    */
-  virtual void writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
-                                      UniformData* fragmentUniformData) const = 0;
-
-  /** Writes the fragment and xfer processors' per-instance uniforms. */
-  virtual void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                               UniformData* fragmentUniformData) const = 0;
+  virtual void writeUniforms(const ProgramInfo& info, UniformData* vertexUniformData,
+                             UniformData* fragmentUniformData) const = 0;
 
   /**
    * Binds the draw's textures onto the program's sampler slots. Returns false when the draw's
@@ -134,12 +127,8 @@ class ChainProgramWriter final : public ProgramWriter {
   bool canWrite(const ProgramInfo& info) const override;
 
  protected:
-  void writeEngineDefaults(const ProgramInfo& info,
-                           UniformData* fragmentUniformData) const override;
-  void writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
-                              UniformData* fragmentUniformData) const override;
-  void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                       UniformData* fragmentUniformData) const override;
+  void writeUniforms(const ProgramInfo& info, UniformData* vertexUniformData,
+                     UniformData* fragmentUniformData) const override;
   bool writeSamplers(const ProgramInfo& info, Program* program,
                      RenderPass* renderPass) const override;
 

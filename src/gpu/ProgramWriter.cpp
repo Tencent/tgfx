@@ -112,17 +112,10 @@ bool ProgramWriter::canWrite(const ProgramInfo&) const {
 
 void ProgramWriter::writeUniformValues(const ProgramInfo& info, UniformData* vertexUniformData,
                                        UniformData* fragmentUniformData) const {
-  // The Frame module's RTAdjust is written by each route's geometry pass, addressed through its
-  // own derived layout: every writer here is a precompiled one, so no route needs a by-name
-  // fallback for it.
-  writeEngineDefaults(info, fragmentUniformData);
-
-  writeGeometryProcessor(info, vertexUniformData, fragmentUniformData);
-
-  writeProcessors(info, vertexUniformData, fragmentUniformData);
-}
-
-void ProgramWriter::writeEngineDefaults(const ProgramInfo&, UniformData*) const {
+  // One uniform entry per route: every writer here is a precompiled one, so the values come from
+  // the variant's layout or the compiled program — there is no by-name fallback and no separate
+  // engine-default step left.
+  writeUniforms(info, vertexUniformData, fragmentUniformData);
 }
 
 namespace {
@@ -342,22 +335,6 @@ void WriteChainGeometryUniforms(SlotWriter* geometryWriter, SlotWriter* chainWri
 
 }  // namespace
 
-void ChainProgramWriter::writeEngineDefaults(const ProgramInfo& info,
-                                             UniformData* fragmentUniformData) const {
-  if (fragmentUniformData == nullptr) {
-    return;
-  }
-  // Precompiled fill kernels apply the render-target write swizzle at output via this uniform;
-  // only the alpha-only (AAAA) case is non-identity, RGBA targets leave it 0 (a no-op). The Xfer
-  // module declares the field in every variant, so the write goes straight through the derived
-  // layout. The former HasClip / HasDeviceMask defaults no longer apply: no Chain-family module
-  // declares either field, so both writes were silent no-ops on this route.
-  ParamBuffer buffer(nullptr, fragmentUniformData);
-  SlotWriter xferWriter(layout, Xfer, xferSlot, &buffer);
-  constexpr uint8_t OutputAlphaSwizzle = UniformElementIndexOf(Xfer, "OutputAlphaSwizzle");
-  xferWriter.set(OutputAlphaSwizzle, info.getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0);
-}
-
 // The interpreter program the draw's match compiled. The match carries it on its result (the
 // Chain family compiles to derive its variant), so the writers read the one decision instead of
 // resolving — and potentially re-memoizing — the same program again.
@@ -387,14 +364,21 @@ bool ChainProgramWriter::canWrite(const ProgramInfo& info) const {
   return ChainProgramOf(info) != nullptr;
 }
 
-void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
-                                                UniformData* vertexUniformData,
-                                                UniformData* fragmentUniformData) const {
+void ChainProgramWriter::writeUniforms(const ProgramInfo& info, UniformData* vertexUniformData,
+                                       UniformData* fragmentUniformData) const {
+  ParamBuffer buffer(vertexUniformData, fragmentUniformData);
+  // The engine default first: the render-target write swizzle, declared by the Xfer module in every
+  // variant. Only the alpha-only (AAAA) case is non-identity; RGBA targets leave it 0 (a no-op).
+  if (fragmentUniformData != nullptr) {
+    SlotWriter xferWriter(layout, Xfer, xferSlot, &buffer);
+    constexpr uint8_t OutputAlphaSwizzle = UniformElementIndexOf(Xfer, "OutputAlphaSwizzle");
+    xferWriter.set(OutputAlphaSwizzle, info.getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0);
+  }
   const auto* program = ChainProgramOf(info);
   if (program == nullptr) {
     LOGE(
-        "ChainProgramWriter::writeGeometryProcessor() no compiled chain program; the draw renders "
-        "without its coordinate transforms");
+        "ChainProgramWriter::writeUniforms() no compiled chain program; the draw renders with "
+        "unwritten uniforms");
     return;
   }
   // The program's binding table describes the artifact's transforms in leaf order; the info's own
@@ -404,9 +388,6 @@ void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
   // The geometry upload is addressed through the variant's own modules: the geometry the variant
   // was compiled for owns the geometry fields, and Chain owns the coordinate transforms.
   const auto modules = ModulesOf(Families()[variant.family], variant);
-  ParamBuffer buffer(vertexUniformData, fragmentUniformData);
-  // Frame (slot 0): the render-target adjust, the same element-addressed write as every other
-  // Chain-family field.
   constexpr uint8_t FrameSlot = 0;
   constexpr uint8_t RTAdjust = UniformElementIndexOf(Frame, "RTAdjust");
   SlotWriter frameWriter(layout, Frame, FrameSlot, &buffer);
@@ -415,30 +396,16 @@ void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
   SlotWriter geometryWriter(layout, *modules.list[geometrySlot], geometrySlot, &buffer);
   WriteChainGeometryUniforms(&geometryWriter, &chainWriter, info.getGeometryLayout().parameters,
                              variant.geometry, program->coordSourceMask, &coordTransformIter);
-}
-
-void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                                         UniformData* fragmentUniformData) const {
-  const auto* program = ChainProgramOf(info);
-  if (program == nullptr) {
-    LOGE(
-        "ChainProgramWriter::writeProcessors() no compiled chain program; the draw renders with "
-        "unwritten kernel uniforms");
-    return;
-  }
   // The whole chain block is addressed through the derived layout: the slot pools, the shape
-  // selectors and the resource blocks all resolve their element's field once per program.
-  ParamBuffer buffer(vertexUniformData, fragmentUniformData);
-  SlotWriter chainWriter(layout, Chain, chainSlot, &buffer);
-  // The shell-free value write: the draw's whole uniform content comes from the compiled program —
-  // the root block plus every binding's per-child records — so no processor tree is walked. The
-  // xfer processor still writes through its own bind until the xfer contract lands.
+  // selectors and the resource blocks all resolve their element's field once per program. The
+  // draw's whole uniform content comes from the compiled program — the root block plus every
+  // binding's per-child records — so no processor tree is walked.
   BindChainProgram(*program, &chainWriter);
   BindChainBindings(*program, &chainWriter);
-  SlotWriter xferWriter(layout, Xfer, xferSlot, &buffer);
   const auto& xfer = info.getXferFacts();
   const auto* chainIR = info.getCarriedIR();
   if (chainIR != nullptr && xfer.shaderBlend()) {
+    SlotWriter xferWriter(layout, Xfer, xferSlot, &buffer);
     BindPorterDuffXfer(static_cast<int>(chainIR->blendMode), *xfer.dstTexture, &xferWriter);
   }
 }
