@@ -32,6 +32,7 @@
 #include "gpu/aot/select/DrawFacts.h"
 #include "gpu/aot/select/FamilyMatchResult.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
+#include "gpu/aot/write/ModuleWriter.h"
 #include "gpu/aot/write/ParamBuffer.h"
 #include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/Families.h"
@@ -72,11 +73,6 @@ namespace tgfx {
 namespace {
 
 // Frame (slot 0): the render-target adjust vector.
-void WriteFrame(const ProgramInfo& info, SlotWriter* writer) {
-  constexpr uint8_t RTAdjust = UniformElementIndexOf(Frame, "RTAdjust");
-  writer->set(RTAdjust, GetRTAdjustArray(info.getRenderTarget()));
-}
-
 // RectGeometry (the DefaultGP geometry): the view transform and the paint color uniform. The
 // per-vertex coverage rides the varying and needs no write.
 void WriteRectGeometry(const AOTGeometryParameters& params, SlotWriter* writer) {
@@ -783,44 +779,6 @@ void WriteClipParams(const ProgramInfo& info, SlotWriter* writer) {
 
 // Xfer: the blend mode, the dst-texture coord mapping for the dst dialect, and the render-target
 // write swizzle — the same values BindPorterDuffXfer uploads for the legacy families.
-void WriteXfer(const ProgramInfo& info, SlotWriter* writer) {
-  constexpr uint8_t XPBlendMode = UniformElementIndexOf(Xfer, "XPBlendMode");
-  constexpr uint8_t DstTextureUpperLeft = UniformElementIndexOf(Xfer, "DstTextureUpperLeft");
-  constexpr uint8_t DstTextureCoordScale = UniformElementIndexOf(Xfer, "DstTextureCoordScale");
-  constexpr uint8_t OutputAlphaSwizzle = UniformElementIndexOf(Xfer, "OutputAlphaSwizzle");
-  // The write swizzle is unconditional (the HAS_XP == 0 path composes too).
-  writer->set(OutputAlphaSwizzle,
-              static_cast<int32_t>(info.getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0));
-  const auto& xfer = info.getXferFacts();
-  // Only a shader-side formula carries a blend mode and a dst texture; the passthrough
-  // (the HAS_XP == 0 variants) declares neither field.
-  if (!xfer.shaderBlend()) {
-    return;
-  }
-  // The dst-dialect fields are `when HAS_XP != 0`: absent when the draw's xfer is the
-  // passthrough, which the flag above already excludes.
-  writer->setIfPresent(XPBlendMode, static_cast<int32_t>(info.getBlendMode()));
-  const auto& dstInfo = *xfer.dstTexture;
-  if (dstInfo.textureProxy == nullptr) {
-    return;
-  }
-  auto dstView = dstInfo.textureProxy->getTextureView();
-  if (dstView == nullptr || dstView->getTexture() == nullptr) {
-    return;
-  }
-  const std::array<float, 2> upperLeft = {dstInfo.offset.x, dstInfo.offset.y};
-  writer->setIfPresent(DstTextureUpperLeft, upperLeft);
-  int width = dstView->width();
-  int height = dstView->height();
-  if (dstView->getTexture()->type() == TextureType::Rectangle) {
-    width = 1;
-    height = 1;
-  }
-  const std::array<float, 2> scales = {1.f / static_cast<float>(width),
-                                       1.f / static_cast<float>(height)};
-  writer->setIfPresent(DstTextureCoordScale, scales);
-}
-
 }  // namespace
 
 /// The declaration-driven families' writer. The variant is fixed at construction: the layout is
@@ -892,9 +850,13 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       continue;
     }
     SlotWriter writer(layout, *module, slot, &buffer);
-    if (module == &FrameModule()) {
-      WriteFrame(info, &writer);
-    } else if (module == &RectGeometry) {
+    // The migrated modules write through their own file; the rest still share the switch below.
+    if (const auto writeModule = WriterOf(*module)) {
+      WriteContext context = {info, *match, geometryParams, &writer};
+      writeModule(context);
+      continue;
+    }
+    if (module == &RectGeometry) {
       WriteRectGeometry(geometryParams, &writer);
     } else if (module == &BlurSourceGeometry) {
       WriteBlurSourceGeometry(info, geometryParams, &writer);
@@ -975,8 +937,6 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       WriteMaskTexture(info, &writer);
     } else if (module == &AnalyticClip) {
       WriteAnalyticClip(info, &writer);
-    } else if (module == &XferModule()) {
-      WriteXfer(info, &writer);
     }
   }
 }
