@@ -141,7 +141,7 @@ void WriteShapeInstancedGeometry(const ProgramInfo& info, const AOTGeometryParam
   writer->set(ViewMatrix, params.viewMatrix);
   // The sampling transform is the coverage texture leaf's, the last transform the legacy walk
   // reported; the instanced fill family carries no processor and leaves it unwritten.
-  const auto* match = info.getFamilyMatch();
+  const auto* match = info.getSources();
   if (match != nullptr && match->maskLeaf != nullptr) {
     constexpr uint8_t CoordMatrix = UniformElementIndexOf(ShapeInstancedGeometry, "CoordMatrix");
     writer->set(CoordMatrix, SourceCoordMatrix(*match->maskLeaf, info.getGeometryLayout()));
@@ -183,7 +183,7 @@ void WriteBlurSourceGeometry(const ProgramInfo& info, const AOTGeometryParameter
                              SlotWriter* writer) {
   constexpr uint8_t ViewMatrix = UniformElementIndexOf(BlurSourceGeometry, "Matrix");
   writer->set(ViewMatrix, params.viewMatrix);
-  const auto* match = info.getFamilyMatch();
+  const auto* match = info.getSources();
   if (match != nullptr && match->blurChild != nullptr) {
     constexpr uint8_t CoordMatrix = UniformElementIndexOf(BlurSourceGeometry, "CoordMatrix");
     writer->set(CoordMatrix, SourceCoordMatrix(*match->blurChild, info.getGeometryLayout()));
@@ -697,7 +697,7 @@ void WriteTiledTexture(const ProgramInfo& info, const AOTTextureParameters& leaf
 // MaskTexture: the rasterized shape mask's coordinate transform. The texture itself is bound by
 // the sampler path; the shader samples it and folds the red channel into the coverage.
 void WriteMaskTexture(const ProgramInfo& info, SlotWriter* writer) {
-  const auto* match = info.getFamilyMatch();
+  const auto* match = info.getSources();
   if (match == nullptr || match->maskLeaf == nullptr) {
     return;
   }
@@ -864,7 +864,7 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
                                                          UniformData* fragmentUniformData) const {
   // The draw's selection ran once, before the program was created from this variant, and its data
   // sources (the texture leaves, the kernels) rode the info to here: the upload never re-matches.
-  const auto* match = info.getFamilyMatch();
+  const auto* match = info.getSources();
   if (match == nullptr) {
     LOGE(
         "DeclaredFamilyProgramWriter: the draw carries no selection for the %s family; uniforms "

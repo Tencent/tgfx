@@ -26,7 +26,7 @@
 #include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/aot/ir/Program.h"
 #include "gpu/aot/ir/XferFacts.h"
-#include "gpu/aot/select/FamilyMatchResult.h"
+#include "gpu/aot/plan/DrawPlan.h"
 #include "gpu/aot/select/SelectionScope.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/resources/RenderTarget.h"
@@ -99,17 +99,22 @@ class ProgramInfo {
   /**
    * Resolves the program for this info from the caches. Precompiled artifacts are the only
    * program source: a miss drops the draw, with no runtime fallback. The first call also runs the
-   * draw's single selection and keeps its data sources on this info (see getFamilyMatch), so the
-   * upload never re-matches.
+   * draw's single selection and keeps the resulting plan on this info (see getPlan), so the upload
+   * never re-matches.
    */
   std::shared_ptr<Program> getProgram();
 
   /**
-   * Records the selection's data sources on this info. The selection layer is the only caller:
-   * it runs once per draw, right before the program is created from the selected variant.
+   * Records the draw's resolved plan on this info. The selection layer is the only caller: it runs
+   * once per draw, right before the program is created from the selected variant.
    */
-  void setFamilyMatch(const FamilyMatchResult& match) {
-    familyMatch = match;
+  void setPlan(const DrawPlan& value) {
+    plan = value;
+  }
+
+  /// The draw's resolved plan, or null when no selection ran (a draw that did not match).
+  const DrawPlan* getPlan() const {
+    return plan.has_value() ? &*plan : nullptr;
   }
 
   /**
@@ -126,12 +131,11 @@ class ProgramInfo {
   }
 
   /**
-   * The data sources the draw's selection named (the texture/gradient/kernel leaves the declared
-   * families' writers read), or null when no selection ran — a chain program, a draw that did not
-   * match, or an info whose program was never resolved.
+   * The plan's data sources (the texture/gradient/kernel leaves the declared families' writers
+   * read), or null when no selection ran.
    */
-  const FamilyMatchResult* getFamilyMatch() const {
-    return familyMatch.has_value() ? &*familyMatch : nullptr;
+  const FamilyMatchResult* getSources() const {
+    return plan.has_value() ? &plan->sources : nullptr;
   }
 
   /**
@@ -326,9 +330,9 @@ class ProgramInfo {
   // The diagnostics-only signature (see setEffectSignature).
   mutable std::string effectSignature = {};
 
-  // The draw's single selection result, filled by getProgram()'s first call. An input to the
-  // upload, never recomputed; null when no selection ran.
-  std::optional<FamilyMatchResult> familyMatch = std::nullopt;
+  // The draw's single selection result (see getPlan), filled by getProgram()'s first call. An
+  // input to the upload, never recomputed; null when no selection ran.
+  std::optional<DrawPlan> plan = std::nullopt;
 
   // The scope getProgram() resolves in: a draw's own expression by default, the compiled chain
   // for a plan pass.

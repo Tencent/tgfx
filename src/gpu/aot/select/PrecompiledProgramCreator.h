@@ -31,8 +31,8 @@ class ProgramWriter;
 
 /// Attempts to create a Program from a precompiled shader bundle. Returns nullptr if the
 /// PrecompiledShaderCache is empty, the ProgramInfo does not match any known permutation, or
-/// the bundle does not contain the required variant. A successful match stays on the info (see
-/// ProgramInfo::setFamilyMatch), so the upload reads the data sources instead of re-matching.
+/// the bundle does not contain the required variant. A successful match lands on the info as a
+/// DrawPlan (see ProgramInfo::setPlan), so the upload reads its sources instead of re-matching.
 class PrecompiledProgramCreator {
  public:
   static std::shared_ptr<Program> CreateProgram(Context* context, ProgramInfo* programInfo);

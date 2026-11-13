@@ -34,6 +34,7 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
+#include "gpu/aot/plan/DrawPlan.h"
 #include "gpu/aot/select/ProgramKey.h"
 #include "gpu/aot/select/ProgramSelection.h"
 #include "gpu/aot/spec/SpecInjector.h"
@@ -302,21 +303,26 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
-  // The selection's data sources stay on the info before the cache lookup: the upload reads them
-  // instead of re-running the family rule, whether the program comes from the cache or is created
-  // below.
-  programInfo->setFamilyMatch(selection->sources);
+  // The whole decision stays on the info before the cache lookup: the key reads it, and the upload
+  // reads its sources instead of re-running the family rule, whether the program comes from the
+  // cache or is created below.
+  DrawPlan plan = {};
+  plan.variant = selection->variant;
+  plan.sources = selection->sources;
+  plan.spec = selection->spec;
+  plan.outputSwizzle = programInfo->getOutputSwizzle();
+  programInfo->setPlan(plan);
   // The selection names the program: its variant selects the blob pair and its specialization
   // values tell two chain shapes of one variant apart (a rect clip's anti-alias flag, for one, is
   // not in the processor tree), so the generic form and every specialized form of one variant
   // are distinct programs under distinct keys.
-  const BytesKey key =
-      MakeProgramKey(context, *programInfo, selection->variant.id(), selection->spec);
+  const auto& resolved = *programInfo->getPlan();
+  const BytesKey key = MakeProgramKey(context, *programInfo, resolved.variant.id(), resolved.spec);
   if (auto cached = context->globalCache()->findProgram(key)) {
     return cached;
   }
-  auto program = CreateProgramForVariant(context, programInfo, selection->variant,
-                                         selection->spec.empty() ? nullptr : &selection->spec);
+  auto program = CreateProgramForVariant(context, programInfo, resolved.variant,
+                                         resolved.spec.empty() ? nullptr : &resolved.spec);
   if (program != nullptr) {
     // A specialization that failed to build still returns the generic form (see the fallback in
     // CreateProgramForVariant); caching it under this key keeps the failing compile from being
