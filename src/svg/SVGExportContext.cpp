@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SVGExportContext.h"
+#include <algorithm>
 #include <utility>
 #include "ElementWriter.h"
 #include "SVGUtils.h"
@@ -419,6 +420,31 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
         resources.filter = "url(#" + filterIDs[0] + ")";
       }
     }
+    auto hasUnsupportedFilter =
+        filter && (filterIDs.empty() ||
+                   std::any_of(filterIDs.begin(), filterIDs.end(),
+                               [](const std::string& filterID) { return filterID.empty(); }));
+    if (hasUnsupportedFilter) {
+      auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace,
+                                                _assignColorSpace, _pendingImages);
+      if (modifyImage == nullptr) {
+        applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
+        exportPendingImage(_pendingImages->back().token, image->width(), image->height(), matrix,
+                           brush);
+        return;
+      }
+      auto pendingCount = _pendingImages->size();
+      Bitmap bitmap = ImageExportToBitmap(context, modifyImage, _pendingImages);
+      if (!bitmap.isEmpty()) {
+        applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
+        exportPixmap(Pixmap(bitmap), matrix, brush);
+      } else if (_pendingImages->size() > pendingCount) {
+        applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
+        exportPendingImage(_pendingImages->back().token, image->width(), image->height(), matrix,
+                           brush);
+      }
+      return;
+    }
     auto clipPath = clip.getClipPath();
     bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
     // Close any active clip group from prior draws BEFORE emitting our own <clipPath> resource
@@ -805,9 +831,39 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
   std::vector<std::string> filterIDs;
   auto bound = matrix.mapRect(picture->getBounds());
   if (imageFilter) {
-    ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
-                       _assignColorSpace);
-    filterIDs = defs.addImageFilterChain(imageFilter, bound, customWriter, context, _pendingImages);
+    {
+      ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
+                         _assignColorSpace);
+      filterIDs =
+          defs.addImageFilterChain(imageFilter, bound, customWriter, context, _pendingImages);
+    }
+    auto unsupported = filterIDs.empty() ||
+                       std::any_of(filterIDs.begin(), filterIDs.end(),
+                                   [](const std::string& filterID) { return filterID.empty(); });
+    if (unsupported) {
+      auto pictureBounds = picture->getBounds();
+      if (!pictureBounds.isEmpty()) {
+        auto imageMatrix = Matrix::MakeTrans(-pictureBounds.left, -pictureBounds.top);
+        auto image = Image::MakeFrom(picture, FloatCeilToInt(pictureBounds.width()),
+                                     FloatCeilToInt(pictureBounds.height()), &imageMatrix,
+                                     _targetColorSpace);
+        if (image != nullptr) {
+          Point filterOffset = {};
+          auto filtered = image->makeWithFilter(imageFilter, &filterOffset);
+          if (filtered != nullptr) {
+            auto drawMatrix = matrix;
+            drawMatrix.preTranslate(pictureBounds.left + filterOffset.x,
+                                    pictureBounds.top + filterOffset.y);
+            auto brushMatrix = Matrix::MakeTrans(-pictureBounds.left - filterOffset.x,
+                                                 -pictureBounds.top - filterOffset.y);
+            drawImage(std::move(filtered), {}, drawMatrix, clip, brush.makeWithMatrix(brushMatrix));
+            return;
+          }
+        }
+      }
+      LOGE("SVGExportContext: failed to rasterize unsupported image filter.");
+      return;
+    }
   }
   auto clipPath = clip.getClipPath();
   bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);

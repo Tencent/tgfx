@@ -690,6 +690,10 @@
         "textEmojiOverlayBlendModes": "bf48e614",
         "text_shape": "bf48e614"
     },
+    "TextureLayerIntegrationTest": {
+        "ClipComposition": "fa93f0807",
+        "EffectComposition": "fa93f0807"
+    },
     "TypefaceTest": {
         "CustomImageTypeface": "5a810d0b",
         "CustomPathTypeface": "5a810d0b"

@@ -17,15 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <string>
 #include "base/TGFXTest.h"
+#include "core/filters/TextureImageFilter.h"
 #include "gtest/gtest.h"
 #include "svg/ElementWriter.h"
 #include "svg/SVGExportContext.h"
+#include "svg/SVGUtils.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
@@ -42,6 +46,7 @@
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/filters/TextureFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
@@ -64,6 +69,21 @@ bool CompareSVG(const std::shared_ptr<MemoryWriteStream>& stream, const std::str
     SaveFile(data, key + ".svg");
   }
   return result;
+}
+
+std::shared_ptr<Image> DecodeEmbeddedPNG(const std::string& svg) {
+  static constexpr auto prefix = "data:image/png;base64,";
+  auto start = svg.find(prefix);
+  if (start == std::string::npos) {
+    return nullptr;
+  }
+  start += std::strlen(prefix);
+  auto end = svg.find('"', start);
+  if (end == std::string::npos) {
+    return nullptr;
+  }
+  auto data = Base64Decode(svg.substr(start, end - start));
+  return data != nullptr ? Image::MakeFromEncoded(std::move(data)) : nullptr;
 }
 }  // namespace
 
@@ -1362,6 +1382,82 @@ TGFX_TEST(SVGExportTest, BlurFilterWithRotation) {
   displayList->root()->draw(exporter->getCanvas());
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BlurFilterWithRotation"));
+}
+
+TGFX_TEST(SVGExportTest, TextureFilterRasterFallback) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(240, 240));
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = ShapeLayer::Make();
+  Path path = {};
+  path.addOval(Rect::MakeXYWH(50, 50, 140, 100));
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
+  layer->setFilters({TextureFilter::Make(16.0f, 16.0f, 8.0f, 3491, false)});
+  displayList->root()->addChild(layer);
+  auto canvas = exporter->getCanvas();
+  canvas->clipRect(Rect::MakeXYWH(30, 30, 180, 180));
+  displayList->root()->draw(canvas);
+  exporter->close();
+
+  auto svg = SVGStream->readString();
+  EXPECT_FALSE(svg.empty());
+  auto imageOffset = svg.find("<image");
+  auto defsEndOffset = svg.find("</defs>");
+  EXPECT_NE(imageOffset, std::string::npos);
+  EXPECT_NE(defsEndOffset, std::string::npos);
+  if (imageOffset != std::string::npos && defsEndOffset != std::string::npos) {
+    EXPECT_LT(defsEndOffset, imageOffset);
+  }
+  EXPECT_NE(svg.find("<clipPath"), std::string::npos);
+  auto image = DecodeEmbeddedPNG(svg);
+  ASSERT_TRUE(image != nullptr);
+  EXPECT_GT(image->width(), 140);
+  EXPECT_GT(image->height(), 100);
+}
+
+TGFX_TEST(SVGExportTest, TextureFilterDrawLayerFallback) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  PictureRecorder recorder;
+  auto* recordingCanvas = recorder.beginRecording();
+  Paint bluePaint = {};
+  bluePaint.setColor(Color::Blue());
+  recordingCanvas->drawRect(Rect::MakeXYWH(10, 10, 90, 70), bluePaint);
+  Paint redPaint = {};
+  redPaint.setColor(Color::Red());
+  recordingCanvas->drawRect(Rect::MakeXYWH(90, 50, 80, 70), redPaint);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  auto params = MakeTextureGrainParams(16.0f, 12.0f, 8.0f, Point::Make(90.0f, 65.0f), 3491);
+  Paint paint = {};
+  paint.setImageFilter(std::make_shared<TextureImageFilter>(params));
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(180, 130));
+  exporter->getCanvas()->drawPicture(picture, nullptr, &paint);
+  exporter->close();
+
+  auto svg = SVGStream->readString();
+  EXPECT_FALSE(svg.empty());
+  auto imageOffset = svg.find("<image");
+  auto defsEndOffset = svg.find("</defs>");
+  EXPECT_NE(imageOffset, std::string::npos);
+  EXPECT_NE(defsEndOffset, std::string::npos);
+  if (imageOffset != std::string::npos && defsEndOffset != std::string::npos) {
+    EXPECT_LT(defsEndOffset, imageOffset);
+  }
+  auto image = DecodeEmbeddedPNG(svg);
+  ASSERT_TRUE(image != nullptr);
+  EXPECT_GT(image->width(), 160);
+  EXPECT_GT(image->height(), 110);
 }
 
 TGFX_TEST(SVGExportTest, FilterImageWithBlendMode) {

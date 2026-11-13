@@ -185,7 +185,7 @@ class ElementWriter {
                                  const std::string& inputResult = "",
                                  bool preserveSoftAlpha = false);
   void addColorImageFilter(const ColorImageFilter* filter, const std::string& inputResult = "");
-  void addBlendImageFilter(const BlendImageFilter* filter, const std::string& inputResult,
+  bool addBlendImageFilter(const BlendImageFilter* filter, const std::string& inputResult,
                            const Rect* filterBounds, Context* context,
                            std::vector<PendingImage>* pendings = nullptr);
 

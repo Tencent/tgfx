@@ -33,6 +33,12 @@ void LayerProperty::invalidateTransform() {
   }
 }
 
+void LayerProperty::invalidateSubtree() {
+  for (const auto& owner : owners) {
+    owner->invalidateSubtree();
+  }
+}
+
 void LayerProperty::attachToLayer(Layer* layer) {
   owners.push_back(layer);
 }
