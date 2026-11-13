@@ -20,7 +20,10 @@
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/processors/ConicGradientLayout.h"
+#include "gpu/processors/DiamondGradientLayout.h"
 #include "gpu/processors/DualIntervalGradientColorizer.h"
+#include "gpu/processors/LinearGradientLayout.h"
+#include "gpu/processors/RadialGradientLayout.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureGradientColorizer.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
@@ -59,17 +62,18 @@ bool ClampedGradientEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
     return false;
   }
   AOTGradientParameters parameters = {};
-  const auto& layoutName = layoutFP->name();
-  if (layoutName == "LinearGradientLayout") {
+  // Typed dispatch, not name() comparison: a rename then fails to compile instead of silently
+  // taking the fallback branch, and the cast below is checked by the same ClassID.
+  if (IsProcessor<LinearGradientLayout>(layoutFP)) {
     parameters.layoutType = 0;
-  } else if (layoutName == "RadialGradientLayout") {
+  } else if (IsProcessor<RadialGradientLayout>(layoutFP)) {
     parameters.layoutType = 1;
-  } else if (layoutName == "ConicGradientLayout") {
+  } else if (IsProcessor<ConicGradientLayout>(layoutFP)) {
     parameters.layoutType = 2;
     auto* conic = static_cast<const ConicGradientLayout*>(layoutFP);
     parameters.bias = conic->getBias();
     parameters.scale = conic->getScale();
-  } else if (layoutName == "DiamondGradientLayout") {
+  } else if (IsProcessor<DiamondGradientLayout>(layoutFP)) {
     parameters.layoutType = 3;
   } else {
     return false;

@@ -30,9 +30,10 @@ class LinearGradientLayout : public FragmentProcessor {
     return "LinearGradientLayout";
   }
 
- protected:
+  // Public so the typed dispatch (IsProcessor<T>) works outside the class, matching Conic.
   DEFINE_PROCESSOR_CLASS_ID
 
+ protected:
   explicit LinearGradientLayout(Matrix matrix);
 
   CoordTransform coordTransform;
