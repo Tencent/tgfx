@@ -24,11 +24,6 @@ ConicGradientLayout::ConicGradientLayout(Matrix matrix, float bias, float scale)
   addCoordTransform(&coordTransform);
 }
 
-void ConicGradientLayout::onComputeProcessorKey(BytesKey* bytesKey) const {
-  const uint32_t flags = coordTransform.matrix.hasPerspective() ? 1 : 0;
-  bytesKey->write(flags);
-}
-
 PlacementPtr<ConicGradientLayout> ConicGradientLayout::Make(BlockAllocator* allocator,
                                                             Matrix matrix, float bias,
                                                             float scale) {

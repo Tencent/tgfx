@@ -24,11 +24,6 @@ RadialGradientLayout::RadialGradientLayout(Matrix matrix)
   addCoordTransform(&coordTransform);
 }
 
-void RadialGradientLayout::onComputeProcessorKey(BytesKey* bytesKey) const {
-  const uint32_t flags = coordTransform.matrix.hasPerspective() ? 1 : 0;
-  bytesKey->write(flags);
-}
-
 PlacementPtr<RadialGradientLayout> RadialGradientLayout::Make(BlockAllocator* allocator,
                                                               Matrix matrix) {
   return allocator->make<RadialGradientLayout>(matrix);

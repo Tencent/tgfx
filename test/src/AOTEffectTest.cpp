@@ -499,11 +499,6 @@ TGFX_TEST(AOTEffectTest, ChannelPermutationClassification) {
   auto scale = ColorMatrixFragmentProcessor::Make(&allocator, scaleRed);
   ASSERT_NE(scale, nullptr);
   EXPECT_FALSE(scale->isChannelPermutation());
-  BytesKey permutationKey = {};
-  BytesKey generalKey = {};
-  permutation->computeProcessorKey(context, &permutationKey);
-  scale->computeProcessorKey(context, &generalKey);
-  EXPECT_FALSE(permutationKey == generalKey);
 
   std::array<float, 20> duplicateRed = IdentityColorMatrix;
   duplicateRed[5] = 1.0f;
@@ -541,8 +536,6 @@ TGFX_TEST(AOTEffectTest, TiledHardwareSamplingSnapshotMatchesLowering) {
   auto resolved = tiled->resolveSampling();
   ASSERT_NE(resolved, nullptr);
   EXPECT_EQ(tiled->resolveSampling(), resolved);
-  BytesKey keyBeforeLowering = {};
-  processor->computeProcessorKey(context, &keyBeforeLowering);
   EXPECT_EQ(resolved->shaderModeX, TiledTextureEffect::ShaderMode::None);
   EXPECT_EQ(resolved->shaderModeY, TiledTextureEffect::ShaderMode::None);
   EXPECT_EQ(resolved->hardwareSampler.tileModeX, TileMode::Repeat);
@@ -556,9 +549,6 @@ TGFX_TEST(AOTEffectTest, TiledHardwareSamplingSnapshotMatchesLowering) {
   ASSERT_NE(parameters, nullptr);
   ExpectResolvedSamplingMatchesLowering(*resolved, *parameters);
   EXPECT_EQ(tiled->resolveSampling(), resolved);
-  BytesKey keyAfterLowering = {};
-  processor->computeProcessorKey(context, &keyAfterLowering);
-  EXPECT_TRUE(keyAfterLowering == keyBeforeLowering);
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
@@ -1906,12 +1896,6 @@ TGFX_TEST(AOTEffectTest, TextureParametersRebuildIsLossless) {
 
   auto rebuilt = RebuildTextureFromAOTParameters(&allocator, *parameters);
   ASSERT_NE(rebuilt, nullptr);
-
-  BytesKey originalKey = {};
-  BytesKey rebuiltKey = {};
-  original->computeProcessorKey(context, &originalKey);
-  rebuilt->computeProcessorKey(context, &rebuiltKey);
-  EXPECT_TRUE(originalKey == rebuiltKey);
 }
 
 static PlacementPtr<FragmentProcessor> MakePerlinProcessor(Context* context) {

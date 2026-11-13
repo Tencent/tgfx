@@ -158,8 +158,8 @@ BytesKey MakeProgramKey(Context* context, const ProgramInfo& info, uint32_t vari
   key.write(static_cast<uint32_t>(spec.values.size()));
   spec.writeKey(&key);
   (void)context;
-  // The geometry's key contribution, the same facts Processor::computeProcessorKey wrote: the
-  // kind (the class ID's replacement), the perspective flag, and every live attribute's format.
+  // The geometry's key contribution: the kind (the class ID's replacement), the perspective flag,
+  // and every live attribute's format.
   const auto& geometryLayout = info.getGeometryLayout();
   key.write(static_cast<uint32_t>(geometryLayout.parameters.kind));
   key.write(static_cast<uint32_t>(geometryLayout.parameters.hasUVPerspective ? 1u : 0u));

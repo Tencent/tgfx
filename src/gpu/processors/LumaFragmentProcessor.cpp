@@ -21,10 +21,6 @@
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/shaders/modules/PointwiseOpModule.h"
 namespace tgfx {
-void LumaFragmentProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
-  bytesKey->write(classID());
-}
-
 bool LumaFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                        AOTNodeID* output) const {
   if (builder == nullptr || output == nullptr) {

@@ -109,8 +109,6 @@ class GlassSDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
     return params;
   }
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
  protected:
   GlassSDFGeometryFragmentProcessor(GlassShapeType shapeType, const GlassSDFGeometryParams& params);
 
@@ -153,8 +151,6 @@ class GlassUDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
   const std::shared_ptr<TextureProxy>& getEdgeMaskProxy() const {
     return edgeMaskProxy;
   }
-
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   void appendSamplers(std::vector<AOTSamplerRef>* samplers) const override;
 

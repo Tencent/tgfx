@@ -63,10 +63,6 @@ void GaussianBlur1DFragmentProcessor::computeKernel(float sigma) {
   }
 }
 
-void GaussianBlur1DFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
-  key->write(maxSigma);
-}
-
 bool GaussianBlur1DFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                                  AOTNodeID* output) const {
   // The blur's math cannot ride the pointwise chain, so it lowers as an opaque-kernel barrier:

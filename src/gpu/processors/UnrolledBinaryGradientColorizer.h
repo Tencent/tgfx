@@ -63,8 +63,6 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
     *outThresholds9_13 = thresholds9_13;
   }
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
  protected:
   UnrolledBinaryGradientColorizer(int intervalCount, Color* scales, Color* biases,
                                   Rect thresholds1_7, Rect thresholds9_13)

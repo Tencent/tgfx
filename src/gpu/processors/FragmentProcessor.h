@@ -126,8 +126,6 @@ class FragmentProcessor : public Processor {
     return onSamplerStateAt(i);
   }
 
-  void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
-
   virtual bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const;
 
   /**
@@ -228,9 +226,6 @@ class FragmentProcessor : public Processor {
   }
 
  private:
-  virtual void onComputeProcessorKey(BytesKey*) const {
-  }
-
   virtual size_t onCountTextureSamplers() const {
     return 0;
   }

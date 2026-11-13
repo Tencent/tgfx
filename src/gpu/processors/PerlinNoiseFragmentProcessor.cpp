@@ -40,20 +40,6 @@ PerlinNoiseFragmentProcessor::PerlinNoiseFragmentProcessor(
   addCoordTransform(&coordTransform);
 }
 
-void PerlinNoiseFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  uint32_t key = static_cast<uint32_t>(numOctaves);
-  key = key << 3;
-  if (noiseType == PerlinNoiseType::FractalNoise) {
-    key |= 0x1;
-  } else {
-    key |= 0x2;
-  }
-  if (stitchTiles) {
-    key |= 0x4;
-  }
-  bytesKey->write(key);
-}
-
 std::shared_ptr<Texture> PerlinNoiseFragmentProcessor::onTextureAt(size_t index) const {
   if (index == 0) {
     return permutationsView->getTexture();

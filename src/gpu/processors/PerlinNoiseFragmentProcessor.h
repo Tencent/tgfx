@@ -78,8 +78,6 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
     return paintingData.get();
   }
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
   size_t onCountTextureSamplers() const override {
     return 2;
   }

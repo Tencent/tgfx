@@ -32,11 +32,6 @@ PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(
   return allocator->make<ColorSpaceXformEffect>(std::move(colorXform));
 }
 
-void ColorSpaceXformEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  uint32_t key = ColorSpaceXformSteps::XFormKey(colorSpaceXformSteps.get());
-  bytesKey->write(key);
-}
-
 bool ColorSpaceXformEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                        AOTNodeID* output) const {
   if (builder == nullptr || output == nullptr) {

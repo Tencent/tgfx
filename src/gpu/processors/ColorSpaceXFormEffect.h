@@ -45,7 +45,6 @@ class ColorSpaceXformEffect : public FragmentProcessor {
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  private:
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
   std::shared_ptr<ColorSpaceXformSteps> colorSpaceXformSteps;
 };
 }  // namespace tgfx

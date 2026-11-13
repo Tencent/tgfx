@@ -20,10 +20,6 @@
 #include "gpu/aot/ir/EffectGraph.h"
 
 namespace tgfx {
-void ConstColorProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(inputMode));
-}
-
 bool ConstColorProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                      AOTNodeID* output) const {
   if (builder == nullptr || output == nullptr) {

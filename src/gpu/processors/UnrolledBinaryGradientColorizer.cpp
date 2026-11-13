@@ -20,10 +20,6 @@
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
-void UnrolledBinaryGradientColorizer::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(intervalCount));
-}
-
 static constexpr int MaxIntervals = 8;
 
 PlacementPtr<UnrolledBinaryGradientColorizer> UnrolledBinaryGradientColorizer::Make(

@@ -72,8 +72,6 @@ class RectEffect : public FragmentProcessor {
         _deviceToLocal(deviceToLocal), _needTransform(!deviceToLocal.isIdentity()) {
   }
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
   bool needTransform() const {
     return _needTransform;
   }

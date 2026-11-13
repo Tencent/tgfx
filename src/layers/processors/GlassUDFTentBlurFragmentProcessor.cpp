@@ -62,12 +62,6 @@ GlassUDFTentBlurFragmentProcessor::GlassUDFTentBlurFragmentProcessor(
   }
 }
 
-void GlassUDFTentBlurFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
-  key->write(maxRadius);
-  key->write(static_cast<uint32_t>(inputIsPacked));
-  key->write(static_cast<uint32_t>(field));
-}
-
 bool GlassUDFTentBlurFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                                    AOTNodeID* output) const {
   // Same contract as the gaussian blur's opaque node: the active source child lowers into the

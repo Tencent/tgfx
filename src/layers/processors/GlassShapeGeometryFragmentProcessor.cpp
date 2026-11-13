@@ -27,20 +27,11 @@ GlassSDFGeometryFragmentProcessor::GlassSDFGeometryFragmentProcessor(
     : GlassShapeGeometryFragmentProcessor(ClassID()), shapeType(shapeType), params(params) {
 }
 
-void GlassSDFGeometryFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(shapeType));
-  bytesKey->write(static_cast<uint32_t>(params.enableEdgeLighting));
-}
-
 GlassUDFGeometryFragmentProcessor::GlassUDFGeometryFragmentProcessor(
     std::shared_ptr<TextureProxy> mask, std::shared_ptr<TextureProxy> edgeMask,
     const GlassUDFGeometryParams& params, bool enableEdgeLighting)
     : GlassShapeGeometryFragmentProcessor(ClassID()), maskProxy(std::move(mask)),
       edgeMaskProxy(std::move(edgeMask)), params(params), enableEdgeLighting(enableEdgeLighting) {
-}
-
-void GlassUDFGeometryFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(enableEdgeLighting));
 }
 
 void GlassUDFGeometryFragmentProcessor::appendSamplers(std::vector<AOTSamplerRef>* samplers) const {

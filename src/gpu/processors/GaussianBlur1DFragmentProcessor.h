@@ -61,8 +61,6 @@ class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
   GaussianBlur1DFragmentProcessor(PlacementPtr<FragmentProcessor> processor, float sigma,
                                   GaussianBlurDirection direction, float stepLength, int maxSigma);
 
-  void onComputeProcessorKey(BytesKey* key) const override;
-
   // The direction in which the blur is applied.
   GaussianBlurDirection direction = GaussianBlurDirection::Horizontal;
   // The pixel offset between adjacent samples.

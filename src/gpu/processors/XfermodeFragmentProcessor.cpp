@@ -65,10 +65,6 @@ XfermodeFragmentProcessor::XfermodeFragmentProcessor(PlacementPtr<FragmentProces
   }
 }
 
-void XfermodeFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(mode) | (static_cast<uint32_t>(child) << 16));
-}
-
 bool XfermodeFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                            AOTNodeID* output) const {
   if (builder == nullptr || output == nullptr) {

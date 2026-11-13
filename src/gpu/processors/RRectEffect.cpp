@@ -29,10 +29,6 @@ namespace tgfx {
 // adds only a bounded amount of work that does not grow with the input, so keeping antiAlias a
 // runtime uniform and sharing one program across AA and non-AA draws is a better trade-off than
 // doubling the program count.
-void RRectEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(_needTransform ? 1 : 0));
-}
-
 bool RRectEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const {
   // Every rrect form (device or local space, AA or hard edge) resolves through runtime uniforms,
   // so the lowering accepts them all; perspective and degenerate matrices were rejected at

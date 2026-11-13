@@ -34,8 +34,6 @@ class LumaFragmentProcessor : public FragmentProcessor {
     return "LumaFragmentProcessor";
   }
 
-  void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
-
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
   /** The luminance coefficients the processor was built with. */

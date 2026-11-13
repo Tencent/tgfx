@@ -95,8 +95,6 @@ class TiledTextureEffect : public FragmentProcessor {
                      SrcRectConstraint constraint, const Matrix& uvMatrix,
                      const std::optional<Rect>& subset);
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
   void appendSamplers(std::vector<AOTSamplerRef>* samplers) const override;
 
   size_t onCountTextureSamplers() const override;

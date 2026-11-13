@@ -29,10 +29,6 @@ namespace tgfx {
 // adds only a bounded amount of work that does not grow with the input, so keeping antiAlias a
 // runtime uniform and sharing one program across AA and non-AA draws is a better trade-off than
 // doubling the program count.
-void RectEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(_needTransform ? 1 : 0));
-}
-
 bool RectEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const {
   if (builder == nullptr || output == nullptr) {
     return false;

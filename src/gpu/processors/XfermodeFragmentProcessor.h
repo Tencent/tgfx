@@ -53,8 +53,6 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
 
   std::string name() const override;
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:

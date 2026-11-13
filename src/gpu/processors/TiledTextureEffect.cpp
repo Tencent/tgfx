@@ -317,19 +317,6 @@ bool TiledTextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
   return builder->addTextureSource(input, parameters, output);
 }
 
-void TiledTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  auto sampling = resolveSampling();
-  if (sampling == nullptr) {
-    return;
-  }
-  bytesKey->write(sampling->alphaOnly);
-  auto flags = static_cast<uint32_t>(sampling->shaderModeX);
-  flags |= static_cast<uint32_t>(sampling->shaderModeY) << 4;
-  flags |= sampling->strict ? static_cast<uint32_t>(1) << 8 : 0;
-  flags |= sampling->hasPerspective ? static_cast<uint32_t>(1) << 9 : 0;
-  bytesKey->write(flags);
-}
-
 void TiledTextureEffect::appendSamplers(std::vector<AOTSamplerRef>* samplers) const {
   samplers->push_back({textureProxy, samplerState, false, false});
 }

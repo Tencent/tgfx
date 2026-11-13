@@ -83,21 +83,6 @@ PlacementPtr<FragmentProcessor> FragmentProcessor::Compose(BlockAllocator* alloc
   return ComposeFragmentProcessor::Make(allocator, std::move(first), std::move(second));
 }
 
-void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey) const {
-  bytesKey->write(classID());
-  onComputeProcessorKey(bytesKey);
-  auto textureSamplerCount = onCountTextureSamplers();
-  for (size_t i = 0; i < textureSamplerCount; ++i) {
-    auto texture = textureAt(i);
-    if (texture != nullptr) {
-      TextureView::ComputeTextureKey(texture, bytesKey);
-    }
-  }
-  for (const auto& childProcessor : childProcessors) {
-    childProcessor->computeProcessorKey(context, bytesKey);
-  }
-}
-
 bool FragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID, AOTNodeID*) const {
   if (builder != nullptr) {
     builder->recordMissingLowering(this);

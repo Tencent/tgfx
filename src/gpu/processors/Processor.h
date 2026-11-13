@@ -20,7 +20,6 @@
 
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/UniqueID.h"
-#include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -45,8 +44,6 @@ class Processor {
   uint32_t classID() const {
     return _classID;
   }
-
-  virtual void computeProcessorKey(Context* context, BytesKey* bytesKey) const = 0;
 
  private:
   uint32_t _classID = 0;

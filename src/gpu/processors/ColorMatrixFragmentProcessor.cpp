@@ -44,10 +44,6 @@ bool ColorMatrixFragmentProcessor::isChannelPermutation() const {
          matrix[19] == 0.0f;
 }
 
-void ColorMatrixFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(isChannelPermutation()));
-}
-
 bool ColorMatrixFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                               AOTNodeID* output) const {
   if (builder == nullptr || output == nullptr) {

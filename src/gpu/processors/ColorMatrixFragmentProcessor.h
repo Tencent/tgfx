@@ -42,8 +42,6 @@ class ColorMatrixFragmentProcessor : public FragmentProcessor {
       : FragmentProcessor(ClassID()), matrix(matrix) {
   }
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
   std::array<float, 20> matrix;
 };
 }  // namespace tgfx

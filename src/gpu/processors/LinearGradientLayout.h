@@ -35,8 +35,6 @@ class LinearGradientLayout : public FragmentProcessor {
 
   explicit LinearGradientLayout(Matrix matrix);
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
   CoordTransform coordTransform;
 };
 }  // namespace tgfx
