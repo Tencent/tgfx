@@ -1227,40 +1227,43 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
 }
 
+// Adds the world rect each visible background style samples. Returns false when the subtree cannot
+// bound what its styles sample, so the caller keeps the whole tile instead.
+bool DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds,
+                                              std::vector<Rect>* footprints) {
+  if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
+      !Rect::Intersects(bounds, layer->renderBounds)) {
+    return true;
+  }
+  // A layer that keeps its own 3D context is composited through the BSP, and a non-affine 3D matrix
+  // leaves the 2D renderBounds without a usable extent for the sampled area. Either way bail out
+  // and let the caller keep the whole tile.
+  const bool nonAffine3D = !layer->matrix3D().isIdentity() && layer->matrix().isIdentity();
+  if (layer->canPreserve3D() || nonAffine3D) {
+    return false;
+  }
+  for (const auto& style : layer->_layerStyles) {
+    if (style == nullptr || (style->extraSourceType() &
+                             static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
+      continue;
+    }
+    // The style samples the backdrop under its own bounds plus the blur reach.
+    auto footprint = layer->renderBounds;
+    footprint.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
+    footprints->push_back(footprint);
+    break;
+  }
+  for (const auto& child : layer->_children) {
+    if (!collectBackgroundFootprints(child.get(), bounds, footprints)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds) const {
   std::vector<Rect> footprints = {};
-  bool safe = true;
-  auto collect = [](const Layer* layer, const Rect& bounds, bool& safe, std::vector<Rect>& out,
-                    const auto& self) -> void {
-    if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
-        !Rect::Intersects(bounds, layer->renderBounds)) {
-      return;
-    }
-    // A layer that keeps its own 3D context is composited through the BSP, and a non-affine 3D
-    // matrix leaves the 2D renderBounds without a usable extent for the sampled area. Either way
-    // bail out and let the caller keep the whole tile.
-    const bool nonAffine3D = !layer->matrix3D().isIdentity() && layer->matrix().isIdentity();
-    if (layer->canPreserve3D() || nonAffine3D) {
-      safe = false;
-      return;
-    }
-    for (const auto& style : layer->_layerStyles) {
-      if (style == nullptr || (style->extraSourceType() &
-                               static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
-        continue;
-      }
-      // The style samples the backdrop under its own bounds plus the blur reach.
-      auto footprint = layer->renderBounds;
-      footprint.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
-      out.push_back(footprint);
-      break;
-    }
-    for (const auto& child : layer->_children) {
-      self(child.get(), bounds, safe, out, self);
-    }
-  };
-  collect(_root.get(), worldBounds, safe, footprints, collect);
-  if (!safe) {
+  if (!collectBackgroundFootprints(_root.get(), worldBounds, &footprints)) {
     return {};
   }
   return footprints;
@@ -1355,8 +1358,8 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   if (_backgroundColor != Color::Transparent()) {
     bgSource->getCanvas()->drawColor(_backgroundColor, BlendMode::SrcOver);
   }
-  BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get(),
-                          cullWorldRects, worldRects);
+  BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get(), cullWorldRects,
+                          worldRects);
   return snapshotMap;
 }
 
