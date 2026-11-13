@@ -274,8 +274,8 @@ bool ProgramInfo::glProfileMatchesCache() const {
 }
 
 bool ProgramInfo::samplersAre2D() const {
-  // The same texture set getSamplers() would build, walked without building it: the gate runs
-  // before a program exists (twice per draw), so it must not allocate a vector.
+  // The texture set the binders fill, walked from the IR without building a list: the gate runs
+  // before a program exists (twice per draw), so it must not allocate.
   auto isTwoD = [](const std::shared_ptr<Texture>& texture) {
     // Only TwoD is supported by the precompiled samplers (see the gate in MatchPermutationImpl for
     // where rectangle and External (OES) textures come from). A slot without a texture counts as
@@ -320,65 +320,4 @@ bool ProgramInfo::samplersAre2D() const {
   return true;
 }
 
-std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
-  std::vector<SamplerInfo> samplers = {};
-  // The geometry's own texture (the glyph atlas); its sampler state is the default one.
-  if (geometryLayout.parameters.atlasProxy != nullptr) {
-    auto atlasView = geometryLayout.parameters.atlasProxy->getTextureView();
-    if (atlasView != nullptr) {
-      SamplerInfo sampler = {atlasView->getTexture(), geometryLayout.parameters.atlasSampler};
-      samplers.push_back(sampler);
-    }
-  }
-  // The expression's samplers, recorded at lowering in the tree walk's order. A view that has not
-  // been instantiated yet contributes nothing unless the processor declared a view-independent
-  // count; a YUV view expands to its planes here, exactly as the processor enumeration did.
-  if (carriedIR != nullptr) {
-    for (const auto& ref : carriedIR->samplers) {
-      auto view = ref.textureProxy != nullptr ? ref.textureProxy->getTextureView() : nullptr;
-      if (view == nullptr) {
-        if (ref.countsWithoutView) {
-          samplers.push_back({nullptr, ref.state});
-        }
-        continue;
-      }
-      if (view->isYUV()) {
-        auto* yuvView = static_cast<const YUVTextureView*>(view.get());
-        for (size_t index = 0; index < yuvView->textureCount(); ++index) {
-          samplers.push_back({yuvView->getTextureAt(index), ref.state});
-        }
-      } else {
-        samplers.push_back({view->getTexture(), ref.state});
-      }
-    }
-  }
-  const auto& dstProxy = xferFacts.dstTexture.has_value() ? xferFacts.dstTexture->textureProxy
-                                                          : DstTextureInfo{}.textureProxy;
-  auto dstView =
-      xferFacts.shaderBlend() && dstProxy != nullptr ? dstProxy->getTextureView() : nullptr;
-  if (dstView != nullptr) {
-    SamplerInfo sampler = {dstView->getTexture(), {}};
-    samplers.push_back(sampler);
-  }
-  return samplers;
-}
-
-size_t ProgramInfo::suppliedColorSamplerCount() const {
-  if (carriedIR == nullptr) {
-    return 0;
-  }
-  size_t count = 0;
-  for (const auto& ref : carriedIR->samplers) {
-    if (ref.coverageSide) {
-      continue;
-    }
-    auto view = ref.textureProxy != nullptr ? ref.textureProxy->getTextureView() : nullptr;
-    if (view == nullptr) {
-      count += ref.countsWithoutView ? 1 : 0;
-      continue;
-    }
-    count += view->isYUV() ? static_cast<const YUVTextureView*>(view.get())->textureCount() : 1;
-  }
-  return count;
-}
 }  // namespace tgfx

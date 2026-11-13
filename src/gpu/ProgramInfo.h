@@ -326,11 +326,5 @@ class ProgramInfo {
   friend class ProgramWriter;
   friend class PrecompiledProgramWriter;
   friend class ChainProgramWriter;
-
-  std::vector<SamplerInfo> getSamplers() const;
-
-  /// The number of color-side samplers the draw supplies (the geometry atlas included): the
-  /// position an absent device mask leaves a hole at. Read off the IR's sampler record.
-  size_t suppliedColorSamplerCount() const;
 };
 }  // namespace tgfx

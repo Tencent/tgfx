@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include "gpu/CoordTransform.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/Swizzle.h"
@@ -34,6 +35,7 @@
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/aot/write/ModuleWriter.h"
 #include "gpu/aot/write/ParamBuffer.h"
+#include "gpu/aot/write/TextureList.h"
 #include "gpu/aot/write/modules/LeafWrite.h"
 #include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/Families.h"
@@ -86,6 +88,8 @@ class DeclaredFamilyProgramWriter final : public PrecompiledProgramWriter {
                               UniformData* fragmentUniformData) const override;
   void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
                        UniformData* fragmentUniformData) const override;
+  bool writeSamplers(const ProgramInfo& info, Program* program,
+                     RenderPass* renderPass) const override;
 
  private:
   Variant variant;
@@ -150,6 +154,56 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
 void DeclaredFamilyProgramWriter::writeProcessors(const ProgramInfo&, UniformData*,
                                                   UniformData*) const {
   // Every value write happens in writeGeometryProcessor's module walk.
+}
+
+bool DeclaredFamilyProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
+                                                RenderPass* renderPass) const {
+  const auto* sources = info.getSources();
+  if (sources == nullptr) {
+    LOGE("DeclaredFamilyProgramWriter: the draw carries no selection; nothing binds");
+    return false;
+  }
+  // The declaration is the ordering authority: every module fills the slots it declares, and a
+  // slot it declares but the draw does not supply keeps its position as a placeholder.
+  TextureList textures(layout);
+  const auto& geometryParams = info.getGeometryLayout().parameters;
+  WriteContext writeContext = {info, *sources, geometryParams, nullptr, &layout, &textures};
+  const Family& family = Families()[variant.family];
+  const auto modules = ModulesOf(family, variant);
+  for (uint8_t slot = 0; slot < modules.count; ++slot) {
+    const Module* module = modules.list[slot];
+    if (module == nullptr || !ModulePresent(family, variant, slot)) {
+      continue;
+    }
+    if (!BindModuleTextures(writeContext, *module)) {
+      return false;
+    }
+  }
+  if (!textures.complete() || textures.size() != program->expectedTextureCount()) {
+    LOGE(
+        "DeclaredFamilyProgramWriter: the draw fills %zu of the %zu declared slots (the program "
+        "declares %u); the declaration and the draw's sources disagree",
+        textures.size(), layout.textures.size(), program->expectedTextureCount());
+    return false;
+  }
+  auto* drawContext = info.getRenderTarget()->getContext();
+  auto gpu = drawContext->gpu();
+  auto* cache = drawContext->globalCache();
+  const auto& bindings = textures.bindings();
+  for (size_t binding = 0; binding < bindings.size(); ++binding) {
+    const auto& bound = bindings[binding];
+    if (bound.texture == nullptr) {
+      renderPass->setTexture(static_cast<unsigned>(binding), cache->getOrCreateDummyTexture(),
+                             cache->getOrCreateDummySampler());
+      continue;
+    }
+    const auto& state = bound.state;
+    SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
+                                 state.minFilterMode, state.magFilterMode, state.mipmapMode);
+    renderPass->setTexture(static_cast<unsigned>(binding), bound.texture,
+                           gpu->createSampler(descriptor));
+  }
+  return true;
 }
 
 std::unique_ptr<ProgramWriter> MakeDeclaredFamilyProgramWriter(const ProgramInfo& info,

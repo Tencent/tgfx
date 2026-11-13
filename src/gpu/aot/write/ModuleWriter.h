@@ -23,7 +23,9 @@
 
 namespace tgfx {
 
+struct Layout;
 class ProgramInfo;
+class TextureList;
 struct Module;
 class SlotWriter;
 
@@ -38,11 +40,19 @@ struct WriteContext {
   const FamilyMatchResult& sources;
   const AOTGeometryParameters& geometry;
   SlotWriter* slot = nullptr;
+  /// The variant's layout: the declaration the walk addresses (null in the texture pass, which
+  /// only reads the layout through the list it fills).
+  const Layout* layout = nullptr;
+  /// The bindings this pass fills; null during the uniform pass.
+  TextureList* textures = nullptr;
 };
 
-/// One module's write. Batch by batch, the modules move out of DeclaredFamilyWriter's shared
-/// switch into these per-module functions.
+/// One module's write. Every module lives in its own file under write/modules/.
 using ModuleWriter = void (*)(WriteContext& context);
+
+/// Fills the module's declared texture slots, in element order. A declared slot this draw does not
+/// supply becomes a placeholder (never a shift), and a module that declares none is a no-op.
+bool BindModuleTextures(WriteContext& context, const Module& module);
 
 /**
  * The migrated writer for a module, or null while the module still lives in the shared switch.

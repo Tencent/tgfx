@@ -22,6 +22,8 @@
 #include "gpu/UniformData.h"
 #include "gpu/shaders/Family.h"
 #include "gpu/shaders/Layout.h"
+#include "tgfx/core/TileMode.h"
+#include "tgfx/gpu/Sampler.h"
 
 namespace tgfx {
 
@@ -34,6 +36,21 @@ class RenderTarget;
 /// The declared routes address it through their derived layouts, so both the chain and the
 /// declaration-driven writers take the value from here rather than each carrying a copy.
 std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget);
+
+/// The sampler address mode a tile mode maps onto. Shared by the sampler passes.
+inline AddressMode ToAddressMode(TileMode tileMode) {
+  switch (tileMode) {
+    case TileMode::Clamp:
+      return AddressMode::ClampToEdge;
+    case TileMode::Repeat:
+      return AddressMode::Repeat;
+    case TileMode::Mirror:
+      return AddressMode::MirrorRepeat;
+    case TileMode::Decal:
+      return AddressMode::ClampToBorder;
+  }
+  return AddressMode::ClampToEdge;
+}
 
 /**
  * Writes one program's per-draw uniform values and texture bindings. A Program owns its writer;
@@ -113,8 +130,10 @@ class PrecompiledProgramWriter : public ProgramWriter {
   bool canWrite(const ProgramInfo& info) const override;
 
  protected:
+  /// The declared families implement this from their module declarations; the chain writer binds
+  /// its compiled program's binding table. There is no shared default left.
   bool writeSamplers(const ProgramInfo& info, Program* program,
-                     RenderPass* renderPass) const override;
+                     RenderPass* renderPass) const override = 0;
 };
 
 /**

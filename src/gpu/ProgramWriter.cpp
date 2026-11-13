@@ -77,20 +77,6 @@ std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
   return result;
 }
 
-static AddressMode ToAddressMode(TileMode tileMode) {
-  switch (tileMode) {
-    case TileMode::Clamp:
-      return AddressMode::ClampToEdge;
-    case TileMode::Repeat:
-      return AddressMode::Repeat;
-    case TileMode::Mirror:
-      return AddressMode::MirrorRepeat;
-    case TileMode::Decal:
-      return AddressMode::ClampToBorder;
-  }
-  return AddressMode::ClampToEdge;
-}
-
 bool ProgramWriter::write(const ProgramInfo& info, RenderPass* renderPass, Program* program) const {
   if (!canWrite(info)) {
     // The route's compiled program is unavailable: submitting would draw with unwritten (or
@@ -370,63 +356,6 @@ void ChainProgramWriter::writeEngineDefaults(const ProgramInfo& info,
   SlotWriter xferWriter(layout, Xfer, xferSlot, &buffer);
   constexpr uint8_t OutputAlphaSwizzle = UniformElementIndexOf(Xfer, "OutputAlphaSwizzle");
   xferWriter.set(OutputAlphaSwizzle, info.getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0);
-}
-
-bool PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
-                                             RenderPass* renderPass) const {
-  auto samplers = info.getSamplers();
-  auto expected = program->expectedTextureCount();
-  // The dst texture always binds last in the artifact. When the artifact declares more samplers
-  // than the draw supplies (an absent device mask on a runtime-guarded kernel, the edge-lit-off
-  // UDF's edge-mask slot), the holes sit before the dst, so hold the dst aside and pad with the
-  // shared dummy texture first; the guarded shader path never samples the padded slots.
-  const auto& xferDstProxy = info.getXferFacts().dstProxy();
-  auto xferDstView = xferDstProxy != nullptr ? xferDstProxy->getTextureView() : nullptr;
-  bool holdDst = expected > samplers.size() && !samplers.empty() && xferDstView != nullptr;
-  size_t sequentialCount = holdDst ? samplers.size() - 1 : samplers.size();
-  // The device-mask slot in precompiled kernels sits immediately after the color-side textures
-  // (geometry-processor textures plus the color fragment-processor subtrees); the dummy for an
-  // absent device mask must occupy that slot, pushing local-mask textures right.
-  size_t colorSamplerCount = info.getGeometryLayout().parameters.atlasProxy != nullptr ? 1 : 0;
-  colorSamplerCount += info.suppliedColorSamplerCount();
-  unsigned textureBinding = 0;
-  auto gpu = info.renderTarget->getContext()->gpu();
-  auto* cache = info.renderTarget->getContext()->globalCache();
-  bool padHole = expected > samplers.size();
-  for (size_t i = 0; i < sequentialCount; ++i) {
-    if (padHole && textureBinding == colorSamplerCount) {
-      renderPass->setTexture(textureBinding++, cache->getOrCreateDummyTexture(),
-                             cache->getOrCreateDummySampler());
-    }
-    auto& [texture, state] = samplers[i];
-    if (texture == nullptr) {
-      // A slot the recording declared but whose source has not instantiated yet: occupy it with
-      // the dummy so the slots after it keep their positions.
-      renderPass->setTexture(textureBinding++, cache->getOrCreateDummyTexture(),
-                             cache->getOrCreateDummySampler());
-      continue;
-    }
-    SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
-                                 state.minFilterMode, state.magFilterMode, state.mipmapMode);
-    auto sampler = gpu->createSampler(descriptor);
-    renderPass->setTexture(textureBinding++, texture, sampler);
-  }
-  if (textureBinding < expected - (holdDst ? 1u : 0u)) {
-    auto dummyTexture = cache->getOrCreateDummyTexture();
-    auto dummySampler = cache->getOrCreateDummySampler();
-    unsigned stop = expected - (holdDst ? 1u : 0u);
-    while (textureBinding < stop) {
-      renderPass->setTexture(textureBinding++, dummyTexture, dummySampler);
-    }
-  }
-  if (holdDst) {
-    auto& [texture, state] = samplers.back();
-    SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
-                                 state.minFilterMode, state.magFilterMode, state.mipmapMode);
-    auto sampler = gpu->createSampler(descriptor);
-    renderPass->setTexture(textureBinding, texture, sampler);
-  }
-  return true;
 }
 
 bool PrecompiledProgramWriter::canWrite(const ProgramInfo&) const {
