@@ -20,7 +20,9 @@
 #include <array>
 #include <cstdlib>
 #include "core/utils/Log.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/YUVFormat.h"
+#include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
@@ -28,6 +30,7 @@
 #include "gpu/shaders/ChainInputs.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/FamilyDomains.h"
+#include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/contract/DrawFacts.h"
 
 namespace tgfx {
@@ -707,6 +710,179 @@ bool MatchAtlasText(const ProgramInfo* /*info*/, const DrawShape& shape,
   return EncodeMatch(AtlasTextIndex, 0, {hasCoverage, hasXp}, &result->variant);
 }
 
+/// Derives the legacy cell a compiled chain program resolves to. Every gate below is an
+/// acceptance rule of the retired legacy composition, carried over verbatim: the draw's geometry
+/// classification and the program's expression shape either place it in the declared dims or make
+/// it fall to another family, so the chain never compiles a kernel it cannot feed.
+bool DeriveChainCell(const AOTProgram& program, const ProgramInfo* info, ChainLegacyCell* cell) {
+  // The gpKind axis comes from the one geometry classification (DescribeGeometryProcessor), so the
+  // family's vertex-layout choice and the matcher's facts cannot disagree.
+  auto gpKind = PointwiseGpKind(DescribeGeometryProcessor(info->getGeometryLayout()));
+  if (!gpKind.has_value()) {
+    return false;
+  }
+  // Sampler-only padding makes every non-empty chain present exactly four sampler children.
+  if (program.samplerChildCount != 0 && program.samplerChildCount != 4) {
+    return false;
+  }
+  // Color-space transforms and gradients each share one chain-wide parameter block.
+  int colorSpaceXformCount = 0;
+  int gradientCount = 0;
+  for (const auto& slot : program.slots) {
+    if (slot.op == AOTChainOp::ColorSpaceXform) {
+      ++colorSpaceXformCount;
+    } else if (slot.op == AOTChainOp::Gradient) {
+      ++gradientCount;
+    }
+  }
+  if (colorSpaceXformCount > 1 || gradientCount > 1) {
+    return false;
+  }
+  for (const auto& binding : program.bindings) {
+    // Every leaf binding is a plain sampled texture: the planner refuses multi-plane, swizzled and
+    // non-TileMode sources before a leaf reaches the program. A deferred (task-local) proxy has no
+    // view yet and always binds one sampler once it is instantiated (a lazy proxy is internally
+    // rendered, hence never multi-plane YUV), so only a view that resolves multi-plane is refused.
+    // A leaf subset is a runtime uniform (the kernel always clamps, full bounds when absent), an
+    // alpha-only leaf splats .r through its slot selector bit, and an RGBAAA leaf reads its alpha
+    // area through the per-leaf AlphaStart / HasRgbaaa uniforms, so none needs a variant.
+    // Perspective transforms are served: leaf coordinates carry w and divide per-pixel.
+    if (binding.kind != AOTBinding::Kind::Leaf || binding.textureProxy == nullptr) {
+      continue;
+    }
+    auto textureView = binding.textureProxy->getTextureView();
+    if (textureView != nullptr && textureView->isYUV()) {
+      return false;
+    }
+  }
+  const int textureCount = program.samplerChildCount == 0 ? 0 : 1;
+  const bool hasMask = program.hasMaskTexture;
+  const bool hasNoise = program.noiseSamplerBase >= 0;
+  const bool hasGradient = gradientCount != 0;
+  const auto& geometry = info->getGeometryLayout().parameters;
+  int hasCoverage = 0;
+  int hasUVCoord = 0;
+  bool hasSubset = false;
+  switch (*gpKind) {
+    case GpKind::QuadPerEdgeAA:
+      hasCoverage = 1;
+      hasUVCoord = geometry.hasUVMatrix ? 0 : 1;
+      if (geometry.hasSubset) {
+        if (!IsChainQuadSubsetServable(geometry, program)) {
+          return false;
+        }
+        hasSubset = true;
+      }
+      break;
+    case GpKind::Mesh:
+      // Mesh vertex buffers follow the chain's attribute order (position, coverage, texCoord,
+      // color): texCoords ride the uvCoord slot and the color slot is unconditional (white for
+      // colorless meshes). Mesh buffers always carry the coverage slot (1.0 for vertex meshes).
+      hasCoverage = 1;
+      hasUVCoord = geometry.hasTexCoords ? 1 : 0;
+      break;
+    case GpKind::AtlasText:
+      // Atlas text buffers are (position, maskCoord, color) with no coverage slot; maskCoord
+      // rides the uvCoord slot and the color slot is unconditional.
+      hasUVCoord = 1;
+      break;
+    case GpKind::Ellipse:
+    case GpKind::HairlineLine:
+    case GpKind::ComplexEllipse:
+    case GpKind::NonAARRect:
+    case GpKind::ComplexRRect:
+    case GpKind::HairlineQuad:
+      // Per-pixel edge coverage laid out ahead of the chain: no coverage or uvCoord attribute.
+      break;
+    case GpKind::Default:
+      // The DefaultGP's coverage attribute is unconditional (the non-AA path triangles carry a
+      // constant 1.0 slot), so it always reports coverage.
+      hasCoverage = 1;
+      break;
+    default:
+      return false;
+  }
+  int resource = 0;
+  if (program.profile == AOTResourceProfile::NoiseGraph) {
+    resource = 2;
+    if (!hasNoise || hasGradient || *gpKind != GpKind::QuadPerEdgeAA || hasCoverage == 0 ||
+        hasUVCoord != 0 || textureCount != 1) {
+      return false;
+    }
+  } else if (program.profile == AOTResourceProfile::TiledGraph) {
+    resource = 1;
+    if (hasNoise) {
+      return false;
+    }
+  } else if (hasNoise || hasGradient ||
+             (program.profile != AOTResourceProfile::Automatic &&
+              program.profile != AOTResourceProfile::Chain)) {
+    return false;
+  }
+  // The extended resource kinds carry no per-quad subset branch.
+  if (resource != 0 && hasSubset) {
+    return false;
+  }
+  int gpLayout = 0;
+  switch (*gpKind) {
+    case GpKind::Default:
+      if (hasUVCoord != 0) {
+        return false;
+      }
+      break;
+    case GpKind::QuadPerEdgeAA:
+    case GpKind::Mesh:
+      break;
+    case GpKind::AtlasText:
+      // The atlas route exists to sample the atlas coverage leaf: the decomposer always attaches
+      // it, so a leaf-free atlas chain is structurally producible but semantically vacuous.
+      if (textureCount == 0) {
+        return false;
+      }
+      break;
+    case GpKind::Ellipse:
+      gpLayout = 1;
+      break;
+    case GpKind::HairlineLine:
+      gpLayout = 2;
+      break;
+    case GpKind::ComplexEllipse:
+      gpLayout = 3;
+      break;
+    case GpKind::NonAARRect:
+      gpLayout = 5;
+      break;
+    case GpKind::ComplexRRect:
+      gpLayout = 7;
+      break;
+    case GpKind::HairlineQuad:
+      gpLayout = 9;
+      break;
+    default:
+      return false;
+  }
+  // Four-leaf variants apply the mask through a runtime uniform, so the compile-time mask
+  // dimension exists only for leaf-free chains, and those stay on layouts without quad attributes.
+  const int mask = textureCount == 0 && hasMask ? 1 : 0;
+  if (mask != 0 && (gpLayout == 1 || hasUVCoord != 0)) {
+    return false;
+  }
+  // The per-quad subset is a QuadPerEdgeAAGP attribute that clamps a texture leaf, so it exists
+  // only on the quad profile with the four-leaf slots.
+  if (hasSubset && (*gpKind != GpKind::QuadPerEdgeAA || textureCount != 1)) {
+    return false;
+  }
+  cell->gpLayout = gpLayout;
+  cell->coverage = hasCoverage;
+  cell->uvCoord = hasUVCoord;
+  cell->textureCount = textureCount;
+  cell->mask = mask;
+  cell->resource = resource;
+  cell->subset = hasSubset ? 1 : 0;
+  cell->xp = GetXPType(info);
+  return true;
+}
+
 /// The chain family's rule: the legacy interpreter's Accept restated over the declared dims. The
 /// acceptance is the carried IR's compilability (the chain builder's slot budget and op support),
 /// not a shape predicate, so the rule compiles the draw's program exactly where the legacy Accept
@@ -722,12 +898,14 @@ bool MatchChain(const ProgramInfo* info, const DrawShape& /*shape*/, FamilyMatch
   if (program == nullptr) {
     return false;
   }
-  auto variant = ChainInputs::MatchVariant(*program, info);
-  if (!variant.has_value()) {
+  ChainLegacyCell cell = {};
+  if (!DeriveChainCell(*program, info, &cell)) {
     return false;
   }
-  result->variant = *variant;
-  return true;
+  return EncodeMatch(
+      ChainIndex, ChainGeometryOfCell(cell),
+      {static_cast<uint8_t>(cell.subset), ChainProfileOfCell(cell), static_cast<uint8_t>(cell.xp)},
+      &result->variant);
 }
 
 }  // namespace

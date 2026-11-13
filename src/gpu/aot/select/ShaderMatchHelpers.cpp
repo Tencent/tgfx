@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <skcms.h>
 #include "ShaderMatchHelpers.h"
+#include <skcms.h>
 #include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/ContextInternal.h"
 #include "gpu/ProgramInfo.h"
