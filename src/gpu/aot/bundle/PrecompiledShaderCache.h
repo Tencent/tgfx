@@ -21,6 +21,7 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <deque>
 #include <limits>
 #include <map>
 #include <memory>
@@ -242,9 +243,14 @@ class PrecompiledShaderCache {
 
   /// Records a program key the precompiled route refused, with the reason: later draws carrying
   /// the same key are refused without walking the permutation rules again. Cleared whenever the
-  /// bundle changes, because a new bundle may serve a key the old one refused.
+  /// bundle changes, because a new bundle may serve a key the old one refused. The table is
+  /// bounded: a miss is a shortcut, so evicting the oldest entry only costs one repeated walk.
   bool findProgramMiss(const BytesKey& key, PrecompiledFallbackReason* reason) const;
   void recordProgramMiss(const BytesKey& key, PrecompiledFallbackReason reason);
+
+  /// Whether any miss is recorded. An empty table cannot answer a lookup, which lets the caller
+  /// skip the attempt key's whole-expression hash.
+  bool hasProgramMisses() const;
 
   /// Counts a miss served from the negative cache: the cheap counters move, but the per-draw
   /// fallback record (which formats strings) is not built again.
@@ -481,6 +487,10 @@ class PrecompiledShaderCache {
   std::shared_ptr<const ParsedBundle> _bundle = nullptr;
   mutable std::mutex _programMissMutex;
   std::unordered_map<BytesKey, PrecompiledFallbackReason, BytesKeyHasher> _programMisses;
+  /// Insertion order of the miss table, so overflow evicts the oldest entry instead of growing.
+  std::deque<BytesKey> _programMissOrder;
+  /// The most misses kept; a larger set only means a repeated rule walk, never a wrong answer.
+  static constexpr size_t MaxProgramMisses = 1024;
   // Simultaneously-live materialized-texture accounting (peakTemporaryBytes): materialization
   // edges created during a flush cycle (blend-child flattens, offscreen plan targets) add their
   // bytes to this running total; flush() settles it into peakTemporaryBytes and resets. The

@@ -262,14 +262,17 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   }
   cache->recordAOTStage(PrecompiledAOTStage::CacheAvailable);
 
-  const auto& programKey = programInfo->programKey();
-  PrecompiledFallbackReason cachedReason = PrecompiledFallbackReason::Unspecified;
-  if (cache->findProgramMiss(programKey, &cachedReason)) {
-    // The first draw with this key walked the rules and was refused; every later draw carrying the
-    // same key gets the same answer, so skip the walk (and the record formatting that goes with
-    // it). The cache drops the entry whenever the bundle changes.
-    cache->recordCachedMiss(cachedReason);
-    return nullptr;
+  // The negative cache answers repeated misses. An empty table cannot answer anything, so the
+  // whole-expression attempt key is only hashed when there is something to look it up in.
+  if (cache->hasProgramMisses()) {
+    PrecompiledFallbackReason cachedReason = PrecompiledFallbackReason::Unspecified;
+    if (cache->findProgramMiss(programInfo->programKey(), &cachedReason)) {
+      // The first draw with this key walked the rules and was refused; every later draw carrying
+      // the same key gets the same answer, so skip the walk (and the record formatting that goes
+      // with it). The cache drops the entry whenever the bundle changes.
+      cache->recordCachedMiss(cachedReason);
+      return nullptr;
+    }
   }
 
   PermutationMatchFailure matchFailure = PermutationMatchFailure::None;
@@ -297,7 +300,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     if (reason != PrecompiledFallbackReason::DeferredTexture) {
       // A deferred texture may be instantiated later, which can make the same key serviceable:
       // only the definitive refusals enter the negative cache.
-      cache->recordProgramMiss(programKey, reason);
+      cache->recordProgramMiss(programInfo->programKey(), reason);
     }
     return nullptr;
   }

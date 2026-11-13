@@ -504,6 +504,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
       // previous generation must not keep refusing a key the newly loaded bundle can serve.
       std::lock_guard<std::mutex> lock(_programMissMutex);
       _programMisses.clear();
+      _programMissOrder.clear();
     }
     _generation.fetch_add(1, std::memory_order_relaxed);
     if (_context != nullptr) {
@@ -536,6 +537,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   {
     std::lock_guard<std::mutex> lock(_programMissMutex);
     _programMisses.clear();
+    _programMissOrder.clear();
   }
   _generation.fetch_add(1, std::memory_order_relaxed);
   if (_context != nullptr) {
@@ -582,10 +584,23 @@ bool PrecompiledShaderCache::findProgramMiss(const BytesKey& key,
   return true;
 }
 
+bool PrecompiledShaderCache::hasProgramMisses() const {
+  std::lock_guard<std::mutex> lock(_programMissMutex);
+  return !_programMisses.empty();
+}
+
 void PrecompiledShaderCache::recordProgramMiss(const BytesKey& key,
                                                PrecompiledFallbackReason reason) {
   std::lock_guard<std::mutex> lock(_programMissMutex);
+  if (_programMisses.find(key) != _programMisses.end()) {
+    return;
+  }
+  if (_programMisses.size() >= MaxProgramMisses && !_programMissOrder.empty()) {
+    _programMisses.erase(_programMissOrder.front());
+    _programMissOrder.pop_front();
+  }
   _programMisses.emplace(key, reason);
+  _programMissOrder.push_back(key);
 }
 
 void PrecompiledShaderCache::recordCachedMiss(PrecompiledFallbackReason reason) {
