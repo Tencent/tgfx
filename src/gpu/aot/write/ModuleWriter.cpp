@@ -19,6 +19,7 @@
 #include "gpu/aot/write/ModuleWriter.h"
 #include "gpu/aot/write/modules/Frame.h"
 #include "gpu/aot/write/modules/Geometry.h"
+#include "gpu/aot/write/modules/Textures.h"
 #include "gpu/aot/write/modules/Xfer.h"
 #include "gpu/shaders/modules/Frame.h"
 #include "gpu/shaders/modules/Xfer.h"
@@ -32,8 +33,12 @@ ModuleWriter WriterOf(const Module& module) {
   if (&module == &XferModule()) {
     return WriteXferModule;
   }
-  // The geometry modules share one file: they are one kind of thing, not independent features.
-  return GeometryWriterOf(module);
+  // The geometry and texture-source modules each share one file: they are kinds of things, not
+  // independent features.
+  if (const auto writer = GeometryWriterOf(module)) {
+    return writer;
+  }
+  return TextureSourcesWriterOf(module);
 }
 
 }  // namespace tgfx

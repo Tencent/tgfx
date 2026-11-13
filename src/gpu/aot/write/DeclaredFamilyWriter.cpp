@@ -34,46 +34,24 @@
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/aot/write/ModuleWriter.h"
 #include "gpu/aot/write/ParamBuffer.h"
+#include "gpu/aot/write/modules/LeafWrite.h"
 #include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/modules/AnalyticClip.h"
 #include "gpu/shaders/modules/BlurSourceGeometry.h"
-#include "gpu/shaders/modules/CoverageTexture.h"
-#include "gpu/shaders/modules/DeviceMask.h"
-#include "gpu/shaders/modules/DeviceMaskRuntime.h"
 #include "gpu/shaders/modules/GaussianBlur.h"
-#include "gpu/shaders/modules/GlassLocalMask.h"
 #include "gpu/shaders/modules/GlassRefraction.h"
 #include "gpu/shaders/modules/GlassUDFTentBlur.h"
 #include "gpu/shaders/modules/Gradient.h"
 #include "gpu/shaders/modules/HairlineLineGeometry.h"
 #include "gpu/shaders/modules/HairlineQuadGeometry.h"
-#include "gpu/shaders/modules/LocalMask.h"
-#include "gpu/shaders/modules/MaskTexture.h"
 #include "gpu/shaders/modules/MeshGeometry.h"
 #include "gpu/shaders/modules/ShapeInstancedGeometry.h"
-#include "gpu/shaders/modules/Texture.h"
-#include "gpu/shaders/modules/TiledTexture.h"
-#include "gpu/shaders/modules/YUVTexture.h"
 
 namespace tgfx {
 
 namespace {
 
-// Frame (slot 0): the render-target adjust vector.
-// RectGeometry (the DefaultGP geometry): the view transform and the paint color uniform. The
-// per-vertex coverage rides the varying and needs no write.
-// QuadGeometry (the QuadPerEdgeAA geometry): the paint color uniform; the position is already in
-// device space, so there is no view transform.
-/// The declared families' coordinate source: the leaf's raw matrix through the shared total
-/// transform (normalization and origin flip resolved from the instantiated view), with the
-/// geometry's uv matrix pre-concatenated for the kinds whose processors did so.
-Matrix SourceCoordMatrix(const AOTTextureParameters& leaf, const GeometryLayout& geometry);
-
-template <const Module& module>
-void WriteTextureLeafParams(const AOTTextureParameters& leaf, SlotWriter* writer);
-
-// ComplexRRectGeometry: the color pair. The corner data and the SDF run entirely on the varyings.
 // MeshGeometry: the view transform, the color pair and the texture coordinate chain.
 void WriteMeshGeometry(const ProgramInfo& info, const AOTGeometryParameters& params,
                        SlotWriter* writer) {
@@ -109,12 +87,6 @@ void WriteShapeInstancedGeometry(const ProgramInfo& info, const AOTGeometryParam
     constexpr uint8_t CoordMatrix = UniformElementIndexOf(ShapeInstancedGeometry, "CoordMatrix");
     writer->set(CoordMatrix, SourceCoordMatrix(*match->maskLeaf, info.getGeometryLayout()));
   }
-}
-
-// CoverageTexture: the leaf's subset rect and read gates, the same values BindTextureSourceLeaf
-// uploads. The sample coordinate rides the geometry's own transform.
-void WriteCoverageTexture(const AOTTextureParameters& leaf, SlotWriter* writer) {
-  WriteTextureLeafParams<CoverageTexture>(leaf, writer);
 }
 
 // Gradient: the clamped single-interval gradient's whole record — the endpoints, the boundary
@@ -360,163 +332,6 @@ void WriteGlassRefraction(const AOTOpaqueKernelParameters& params, const Program
   }
 }
 
-// GlassLocalMask: the runtime gate (the legacy kernel's HasLocalMask branch) plus the mask leaf's
-// own coordinate transform — the second transform the legacy walk reported.
-void WriteGlassLocalMask(const ProgramInfo& info, SlotWriter* writer,
-                         const AOTTextureParameters* maskLeaf) {
-  constexpr uint8_t HasMask = UniformElementIndexOf(GlassLocalMask, "HasMask");
-  writer->set(HasMask, static_cast<int32_t>(maskLeaf != nullptr ? 1 : 0));
-  if (maskLeaf != nullptr) {
-    constexpr uint8_t CoordMatrix = UniformElementIndexOf(GlassLocalMask, "CoordMatrix");
-    writer->set(CoordMatrix, SourceCoordMatrix(*maskLeaf, info.getGeometryLayout()));
-  }
-}
-
-// The leaf's total transform: the raw matrix followed by the instantiated view's normalization
-// and origin flip (the tree-side CoordTransform::getTotalMatrix(), without the geometry uv).
-Matrix TotalLeafMatrix(const AOTTextureParameters& leaf) {
-  auto view = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
-  return TotalCoordMatrix(leaf.uvMatrix, view.get());
-}
-
-// The source coordinate matrix every texture leaf shares: the leaf's total transform with the
-// geometry's uv matrix pre-concatenated (setTransformDataHelper's composition).
-Matrix SourceCoordMatrix(const AOTTextureParameters& leaf, const GeometryLayout& layout) {
-  // Only the kinds whose processors concatenated their uv matrix onto the source coordinate.
-  Matrix uvMatrix = Matrix::I();
-  const auto& geometry = layout.parameters;
-  if (geometry.kind == GeometryKind::Default || geometry.kind == GeometryKind::QuadPerEdgeAA) {
-    uvMatrix = geometry.uvMatrix;
-  }
-  Matrix combined = {};
-  combined.setConcat(TotalLeafMatrix(leaf), uvMatrix);
-  return combined;
-}
-
-// The leaf's subset rect and read gates, the same values BindTextureSourceLeaf uploads. The
-// texture-carrying modules declare different subsets of these fields, so the shared body
-// templates on the module and writes exactly the fields it declares (a compile-time fact).
-template <const Module& module>
-void WriteTextureLeafParams(const AOTTextureParameters& leaf, SlotWriter* writer) {
-  constexpr uint8_t Subset = UniformElementIndexOf(module, "Subset");
-  auto view = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
-  if (view == nullptr || view->getTexture() == nullptr) {
-    return;
-  }
-  float rect[4] = {};
-  LeafSubsetRectForSampler(leaf.textureProxy, view.get(), leaf.subset, leaf.samplerState, rect);
-  writer->set(Subset, std::array<float, 4>{rect[0], rect[1], rect[2], rect[3]});
-  if constexpr (HasElement(module, "SubsetClampOn")) {
-    constexpr uint8_t SubsetClampOn = UniformElementIndexOf(module, "SubsetClampOn");
-    writer->set(SubsetClampOn,
-                static_cast<int32_t>(
-                    LeafSubsetClampOn(leaf.textureProxy, view.get(), leaf.subset) ? 1 : 0));
-  }
-  if constexpr (HasElement(module, "AlphaStart")) {
-    constexpr uint8_t AlphaStart = UniformElementIndexOf(module, "AlphaStart");
-    if (leaf.hasRGBAAA) {
-      auto coord = view->getTextureCoord(leaf.alphaStart.x, leaf.alphaStart.y);
-      writer->set(AlphaStart, std::array<float, 2>{coord.x, coord.y});
-    }
-  }
-  if constexpr (HasElement(module, "AlphaOnly")) {
-    constexpr uint8_t AlphaOnly = UniformElementIndexOf(module, "AlphaOnly");
-    writer->set(AlphaOnly, static_cast<int32_t>(leaf.isAlphaOnly ? 1 : 0));
-  }
-  if constexpr (HasElement(module, "HasRgbaaa")) {
-    constexpr uint8_t HasRgbaaa = UniformElementIndexOf(module, "HasRgbaaa");
-    writer->set(HasRgbaaa, static_cast<int32_t>(leaf.hasRGBAAA ? 1 : 0));
-  }
-}
-
-// AtlasTextGeometry: the atlas size scale, the color pair and the AlphaOnly switch. The atlas
-// sample supplies the coverage itself, so the geometry needs no transform.
-// QuadTextureGeometry: the paint color the texture source multiplies by.
-// Texture: the plain leaf source. Both matrices carry the source coordinate transform — the
-// subset bounds go through the same transform whether the geometry supplies uv coordinates or
-// the position (the old kernel's two uniforms held the same value).
-void WriteTexture(const ProgramInfo& info, const AOTTextureParameters& leaf, SlotWriter* writer) {
-  constexpr uint8_t CoordMatrix = UniformElementIndexOf(TextureModule, "CoordMatrix");
-  constexpr uint8_t SubsetMatrix = UniformElementIndexOf(TextureModule, "SubsetMatrix");
-  // The subset bounds go through the leaf's bare total transform (the old kernel's
-  // texSubsetMatrix), while the source coordinate takes the transform with the geometry's uv
-  // matrix pre-concatenated — the two differ exactly when the geometry carries a uv matrix.
-  writer->set(CoordMatrix, SourceCoordMatrix(leaf, info.getGeometryLayout()));
-  writer->set(SubsetMatrix, TotalLeafMatrix(leaf));
-  WriteTextureLeafParams<TextureModule>(leaf, writer);
-}
-
-// LocalMask: the coverage mask leaf's own coordinate transform, off the IR's Subtree term.
-void WriteLocalMask(const ProgramInfo& info, SlotWriter* writer) {
-  constexpr uint8_t CoordMatrix = UniformElementIndexOf(LocalMask, "CoordMatrix");
-  const auto* leaf = LocalMaskCoverageLeaf(info.getCarriedIR());
-  if (leaf != nullptr) {
-    writer->set(CoordMatrix, SourceCoordMatrix(*leaf, info.getGeometryLayout()));
-  }
-}
-
-// DeviceMaskRuntime: the runtime gate plus the same device-space transform WriteDeviceMask
-// computes; a draw without a device mask keeps the branch off.
-void WriteDeviceMaskRuntime(const ProgramInfo& info, SlotWriter* writer) {
-  constexpr uint8_t HasDeviceMask = UniformElementIndexOf(DeviceMaskRuntime, "HasDeviceMask");
-  constexpr uint8_t CoordMatrix = UniformElementIndexOf(DeviceMaskRuntime, "CoordMatrix");
-  const auto* maskLeaf = DeviceMaskCoverageLeaf(info.getCarriedIR());
-  writer->set(HasDeviceMask, static_cast<int32_t>(maskLeaf != nullptr ? 1 : 0));
-  if (maskLeaf == nullptr) {
-    return;
-  }
-  auto deviceCoordMatrix = maskLeaf->uvMatrix;
-  auto view =
-      maskLeaf->textureProxy != nullptr ? maskLeaf->textureProxy->getTextureView() : nullptr;
-  if (view == nullptr || view->getTexture() == nullptr) {
-    return;
-  }
-  const auto scale = view->getTextureCoord(1, 1);
-  deviceCoordMatrix.postScale(scale.x, scale.y);
-  writer->set(CoordMatrix, deviceCoordMatrix);
-}
-
-// YUVTexture: the source transform, the full-bounds subset and the conversion pair off the view.
-void WriteYUVTexture(const ProgramInfo& info, const AOTTextureParameters& leaf,
-                     SlotWriter* writer) {
-  constexpr uint8_t CoordMatrix = UniformElementIndexOf(YUVTexture, "CoordMatrix");
-  constexpr uint8_t LimitedRange = UniformElementIndexOf(YUVTexture, "LimitedRange");
-  constexpr uint8_t ColorConversion = UniformElementIndexOf(YUVTexture, "ColorConversion");
-  writer->set(CoordMatrix, SourceCoordMatrix(leaf, info.getGeometryLayout()));
-  WriteTextureLeafParams<YUVTexture>(leaf, writer);
-  auto view = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
-  if (view == nullptr || !view->isYUV()) {
-    return;
-  }
-  auto* yuvView = static_cast<const YUVTextureView*>(view.get());
-  writer->set(LimitedRange,
-              static_cast<int32_t>(IsLimitedYUVColorRange(yuvView->yuvColorSpace()) ? 1 : 0));
-  if (auto conversion = YUVColorConversionMatrix(yuvView->yuvColorSpace())) {
-    writer->set(ColorConversion, *conversion);
-  }
-}
-
-// QuadColorGeometry (the QuadPerEdgeAA geometry with the per-vertex color): the exact paint color
-// and its flag. The per-vertex color rides the varying.
-// DeviceMask: the mask's destination-to-sample transform, the same value BindDeviceMaskLeaf
-// uploads (the effect's uv matrix scaled by the texture view's normalized coord).
-void WriteDeviceMask(const ProgramInfo& info, SlotWriter* writer) {
-  constexpr uint8_t CoordMatrix = UniformElementIndexOf(DeviceMask, "CoordMatrix");
-  const auto* maskLeaf = DeviceMaskCoverageLeaf(info.getCarriedIR());
-  if (maskLeaf == nullptr) {
-    return;
-  }
-  auto deviceCoordMatrix = maskLeaf->uvMatrix;
-  auto view =
-      maskLeaf->textureProxy != nullptr ? maskLeaf->textureProxy->getTextureView() : nullptr;
-  if (view == nullptr || view->getTexture() == nullptr) {
-    return;
-  }
-  const auto scale = view->getTextureCoord(1, 1);
-  deviceCoordMatrix.postScale(scale.x, scale.y);
-  writer->set(CoordMatrix, deviceCoordMatrix);
-}
-
 template <const Module& module>
 void WriteClipParams(const ProgramInfo& info, SlotWriter* writer);
 
@@ -524,9 +339,6 @@ void WriteAnalyticClip(const ProgramInfo& info, SlotWriter* writer) {
   WriteClipParams<AnalyticClip>(info, writer);
 }
 
-// EllipseGeometry: the color pair and the stroke selector; the ellipse data rides the varyings.
-// ComplexEllipseGeometry: the color pair and the stroke form; the ellipse data rides the varyings.
-// RoundStrokeRectGeometry: the color pair, the AA flag and the analytic clip.
 // HairlineLineGeometry / HairlineQuadGeometry: the view matrix, the color/coverage/AA triple and
 // the analytic clip the old declaration carried in the same block.
 template <const Module& module>
@@ -541,63 +353,6 @@ void WriteHairlineGeometry(const ProgramInfo& info, const AOTGeometryParameters&
   writer->set(Coverage, params.coverage);
   writer->set(AAEnabled, static_cast<int32_t>(params.aaType == AAType::None ? 0 : 1));
   WriteClipParams<module>(info, writer);
-}
-
-// RRectGeometry (the non-AA rounded rect): the exact common color and its flag. The 8-bit
-// quantized varying needs no write; the values come from the geometry processor.
-// TiledTexture: the single-tap or full nine-mode recipe, field for field the same values
-// BindTiledSourceLeaf uploads for the legacy families.
-void WriteTiledTexture(const ProgramInfo& info, const AOTTextureParameters& leaf,
-                       SlotWriter* writer) {
-  constexpr uint8_t ShaderModeX = UniformElementIndexOf(TiledTexture, "ShaderModeX");
-  constexpr uint8_t ShaderModeY = UniformElementIndexOf(TiledTexture, "ShaderModeY");
-  constexpr uint8_t Subset = UniformElementIndexOf(TiledTexture, "Subset");
-  constexpr uint8_t Clamp = UniformElementIndexOf(TiledTexture, "Clamp");
-  constexpr uint8_t Dimension = UniformElementIndexOf(TiledTexture, "Dimension");
-  constexpr uint8_t AlphaOnly = UniformElementIndexOf(TiledTexture, "AlphaOnly");
-  constexpr uint8_t Strict = UniformElementIndexOf(TiledTexture, "Strict");
-  // The runtime texture read swizzle (GRAY_8/RG_88) is only read by the full nine-mode path; its
-  // field exists iff FULL != 0, absent from the single-tap variants. Same value
-  // GLSLTiledTextureEffect uploads.
-  constexpr uint8_t ReadSwizzle = UniformElementIndexOf(TiledTexture, "ReadSwizzle");
-  constexpr uint8_t CoordMatrix = UniformElementIndexOf(TiledTexture, "CoordMatrix");
-  writer->set(CoordMatrix, SourceCoordMatrix(leaf, info.getGeometryLayout()));
-  if (!leaf.tiledRecipe.has_value()) {
-    return;
-  }
-  const auto& sampling = *leaf.tiledRecipe;
-  writer->set(ShaderModeX, static_cast<int32_t>(sampling.shaderModeX));
-  writer->set(ShaderModeY, static_cast<int32_t>(sampling.shaderModeY));
-  const float subset[4] = {sampling.shaderSubset.left, sampling.shaderSubset.top,
-                           sampling.shaderSubset.right, sampling.shaderSubset.bottom};
-  writer->set(Subset, subset);
-  const float clampRect[4] = {sampling.shaderClamp.left, sampling.shaderClamp.top,
-                              sampling.shaderClamp.right, sampling.shaderClamp.bottom};
-  writer->set(Clamp, clampRect);
-  if (sampling.usesShaderDimensions) {
-    const float dimensions[2] = {sampling.shaderDimensions.x, sampling.shaderDimensions.y};
-    writer->set(Dimension, dimensions);
-  }
-  writer->set(AlphaOnly, static_cast<int32_t>(sampling.alphaOnly ? 1 : 0));
-  writer->set(Strict, static_cast<int32_t>(sampling.strict ? 1 : 0));
-  if (writer->present(ReadSwizzle)) {
-    auto view = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
-    if (view != nullptr && view->getTexture() != nullptr) {
-      writer->set(ReadSwizzle,
-                  static_cast<int32_t>(AOTReadSwizzleMode(view->getTexture()->format())));
-    }
-  }
-}
-
-// MaskTexture: the rasterized shape mask's coordinate transform. The texture itself is bound by
-// the sampler path; the shader samples it and folds the red channel into the coverage.
-void WriteMaskTexture(const ProgramInfo& info, SlotWriter* writer) {
-  const auto* match = info.getSources();
-  if (match == nullptr || match->maskLeaf == nullptr) {
-    return;
-  }
-  constexpr uint8_t CoordMatrix = UniformElementIndexOf(MaskTexture, "CoordMatrix");
-  writer->set(CoordMatrix, SourceCoordMatrix(*match->maskLeaf, info.getGeometryLayout()));
 }
 
 // AnalyticClip: the runtime clip contract.
@@ -765,14 +520,6 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       WriteMeshGeometry(info, geometryParams, &writer);
     } else if (module == &ShapeInstancedGeometry) {
       WriteShapeInstancedGeometry(info, geometryParams, &writer);
-    } else if (module == &TextureModule) {
-      if (match->tiledLeaf != nullptr) {
-        WriteTexture(info, *match->tiledLeaf, &writer);
-      }
-    } else if (module == &CoverageTexture) {
-      if (match->maskLeaf != nullptr) {
-        WriteCoverageTexture(*match->maskLeaf, &writer);
-      }
     } else if (module == &GaussianBlur) {
       if (match->blurKernel != nullptr) {
         WriteGaussianBlur(*match->blurKernel, match->blurChild, &writer);
@@ -785,19 +532,9 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       if (match->glassKernel != nullptr) {
         WriteGlassRefraction(*match->glassKernel, info, &writer);
       }
-    } else if (module == &GlassLocalMask) {
-      WriteGlassLocalMask(info, &writer, match->maskLeaf);
     } else if (module == &GradientModule) {
       if (match->gradient != nullptr) {
         WriteGradient(*match->gradient, &writer);
-      }
-    } else if (module == &LocalMask) {
-      WriteLocalMask(info, &writer);
-    } else if (module == &DeviceMaskRuntime) {
-      WriteDeviceMaskRuntime(info, &writer);
-    } else if (module == &YUVTexture) {
-      if (match->tiledLeaf != nullptr) {
-        WriteYUVTexture(info, *match->tiledLeaf, &writer);
       }
     } else if (module == &YUVChainTail) {
       // The analytic clip fields live in this module (bare names, the legacy spelling); the tail's
@@ -806,14 +543,6 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       if (const auto* program = AOTChainBuilder::ResolveYUVProgram(&info)) {
         BindYUVProgram(*program, &writer);
       }
-    } else if (module == &TiledTexture) {
-      if (match->tiledLeaf != nullptr) {
-        WriteTiledTexture(info, *match->tiledLeaf, &writer);
-      }
-    } else if (module == &DeviceMask) {
-      WriteDeviceMask(info, &writer);
-    } else if (module == &MaskTexture) {
-      WriteMaskTexture(info, &writer);
     } else if (module == &AnalyticClip) {
       WriteAnalyticClip(info, &writer);
     }
