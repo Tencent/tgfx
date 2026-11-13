@@ -1227,6 +1227,24 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
 }
 
+// Intersects each footprint with each captured rect instead of with their union, so the narrowed
+// cull never covers more than the capture would have drawn without the footprints. Footprints that
+// overlap no captured rect are dropped.
+std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprints,
+                                               const std::vector<Rect>& captureRects) {
+  std::vector<Rect> narrowed = {};
+  narrowed.reserve(footprints.size());
+  for (const auto& footprint : footprints) {
+    for (const auto& captureRect : captureRects) {
+      auto clipped = footprint;
+      if (clipped.intersect(captureRect)) {
+        narrowed.push_back(clipped);
+      }
+    }
+  }
+  return narrowed;
+}
+
 // Adds the world rect each visible background style samples. Returns false when the subtree cannot
 // bound what its styles sample, so the caller keeps the whole tile instead.
 bool DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds,
@@ -1316,21 +1334,15 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   // sharing that depends on it) intact.
   std::vector<Rect> cullWorldRects = worldRects;
   if (!cullRects.empty()) {
-    std::vector<Rect> narrowed = {};
-    narrowed.reserve(cullRects.size());
+    std::vector<Rect> footprints = {};
+    footprints.reserve(cullRects.size());
     for (const auto& cullRect : cullRects) {
       auto footprint = inverse.mapRect(cullRect);
       footprint.roundOut();
       footprint.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
-      // Intersect with each captured rect rather than with their union, so the culled draw never
-      // covers more than the rects this capture would have used without the footprints.
-      for (const auto& worldRect : worldRects) {
-        auto clipped = footprint;
-        if (clipped.intersect(worldRect)) {
-          narrowed.push_back(clipped);
-        }
-      }
+      footprints.push_back(footprint);
     }
+    auto narrowed = narrowCullRects(footprints, worldRects);
     // Fall back to the whole captured area when the intersection is unusable: an empty list would
     // drop the backdrop the styles read, and an oversized one costs more than the culling saves.
     if (!narrowed.empty() && narrowed.size() <= MAX_CULL_RECTS) {

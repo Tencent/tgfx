@@ -411,6 +411,9 @@ class DisplayList {
   static bool collectBackgroundFootprints(const Layer* layer, const Rect& bounds,
                                           std::vector<Rect>* footprints);
 
+  static std::vector<Rect> narrowCullRects(const std::vector<Rect>& footprints,
+                                           const std::vector<Rect>& captureRects);
+
   std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(
       Surface* surface, const std::vector<Rect>& renderRects,
       const std::vector<Rect>& cullRects = {}) const;

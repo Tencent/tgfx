@@ -1596,4 +1596,30 @@ TGFX_TEST(BackgroundBlurTest, CaptureCullKeepsStyleSourceComplete) {
   EXPECT_EQ(different, 0u);
 }
 
+// The capture may only draw what it covers itself, so every footprint is clipped against each
+// captured rect rather than against their union: a footprint stretched over the gap between two
+// tiles must not pull in the layers under that gap.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, NarrowCullRectsToTheCaptureArea) {
+  TGFX_PRIVATE_ACCESS({
+    std::vector<Rect> footprints = {Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f)};
+    std::vector<Rect> captureRects = {Rect::MakeXYWH(-20.0f, -20.0f, 40.0f, 40.0f),
+                                      Rect::MakeXYWH(80.0f, 80.0f, 60.0f, 60.0f)};
+    auto narrowed = DisplayList::narrowCullRects(footprints, captureRects);
+    ASSERT_EQ(narrowed.size(), 2u);
+    EXPECT_EQ(narrowed[0], Rect::MakeXYWH(0.0f, 0.0f, 20.0f, 20.0f));
+    EXPECT_EQ(narrowed[1], Rect::MakeXYWH(80.0f, 80.0f, 20.0f, 20.0f));
+    // The union of the captured rects would be (20, 20) to (80, 80), which the footprint itself
+    // covers, so the gap between the two tiles must not survive as a cull rect.
+    for (const auto& rect : narrowed) {
+      EXPECT_TRUE(captureRects[0].contains(rect) || captureRects[1].contains(rect));
+    }
+
+    // A footprint outside every captured rect is dropped, which leaves the caller on its fallback
+    // instead of widening the cull back to the union.
+    auto outside =
+        DisplayList::narrowCullRects({Rect::MakeXYWH(200.0f, 200.0f, 10.0f, 10.0f)}, captureRects);
+    EXPECT_TRUE(outside.empty());
+  })
+}
+
 }  // namespace tgfx
