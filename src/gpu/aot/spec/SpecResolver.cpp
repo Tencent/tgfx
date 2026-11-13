@@ -65,7 +65,7 @@ ShaderCodeFormat SpecFormatForBackend(Backend backend, uint16_t payloadFormat) {
 }
 
 SpecValues SpecResolver::Resolve(PrecompiledShaderCache* cache, Backend backend,
-                                 const ProgramInfo& info, const Variant& variant) {
+                                 const Variant& variant, const AOTProgram* chain) {
   if (cache == nullptr || !cache->specializationEnabled() || !cache->isLoaded()) {
     return {};
   }
@@ -80,11 +80,10 @@ SpecValues SpecResolver::Resolve(PrecompiledShaderCache* cache, Backend backend,
   if (fields.empty()) {
     return {};
   }
-  const auto* program = AOTChainBuilder::ResolveChainProgram(&info);
-  if (program == nullptr) {
+  if (chain == nullptr) {
     return {};
   }
-  auto values = ResolveChainSpec(*program, fields);
+  auto values = ResolveChainSpec(*chain, fields);
   cache->recordSpecCapture(values);
   return values;
 }

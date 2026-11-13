@@ -90,7 +90,7 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
   // built for one shape must never answer the other.
   const SpecValues spec =
       SpecResolver::Resolve(context != nullptr ? ContextCacheAccess::Cache(context) : nullptr,
-                            info.backend(), info, match->variant);
+                            info.backend(), match->variant, match->chain);
   if (failure != nullptr) {
     *failure = PermutationMatchFailure::None;
   }

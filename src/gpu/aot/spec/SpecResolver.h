@@ -28,6 +28,7 @@ namespace tgfx {
 
 class PrecompiledShaderCache;
 class ProgramInfo;
+struct AOTProgram;
 
 /// The variant's specialization table, derived from its declaration: the same order, names and id
 /// assignment the assembler declares them with, so the injector addresses the constants without
@@ -44,13 +45,14 @@ class SpecResolver {
    * Resolves the specialization values of one draw.
    * @param cache     The artifact store that owns the enable switch and the capture accounting.
    * @param backend   The backend whose injector decides whether the values are consumable.
-   * @param info      The draw's processor tree and pipeline state.
    * @param variant   The matched variant; its declaration derives the spec table.
+   * @param chain     The interpreter program the match compiled (null for the declared families):
+   *                  the values are read out of it.
    * @return          The values in spec-table order (the master switch first), or an empty set
    *                  when the draw serves the generic form.
    */
-  static SpecValues Resolve(PrecompiledShaderCache* cache, Backend backend, const ProgramInfo& info,
-                            const Variant& variant);
+  static SpecValues Resolve(PrecompiledShaderCache* cache, Backend backend, const Variant& variant,
+                            const AOTProgram* chain);
 };
 
 /// The code format a backend's payload arrives in. The backend picks the dialect and the bundle

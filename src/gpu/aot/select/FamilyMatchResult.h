@@ -23,6 +23,7 @@
 namespace tgfx {
 
 class ProgramInfo;
+struct AOTProgram;
 struct AOTTextureParameters;
 struct AOTGradientParameters;
 struct AOTOpaqueKernelParameters;
@@ -40,6 +41,10 @@ struct FamilyMatchResult {
   const AOTOpaqueKernelParameters* blurKernel = nullptr;
   const AOTTextureParameters* blurChild = nullptr;
   const AOTOpaqueKernelParameters* glassKernel = nullptr;
+  /// The interpreter's compiled program: the Chain family compiles the draw's expression to
+  /// derive its variant, so the result carries what it compiled instead of every later reader
+  /// resolving (and re-memoizing) the same program.
+  const AOTProgram* chain = nullptr;
 };
 
 }  // namespace tgfx

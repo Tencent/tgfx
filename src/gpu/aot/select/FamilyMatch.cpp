@@ -901,6 +901,7 @@ bool MatchChain(const ProgramInfo* info, const DrawShape& /*shape*/, FamilyMatch
   if (!DeriveChainCell(*program, info, &cell)) {
     return false;
   }
+  result->chain = program;
   return EncodeMatch(
       ChainIndex, ChainGeometryOfCell(cell),
       {static_cast<uint8_t>(cell.subset), ChainProfileOfCell(cell), static_cast<uint8_t>(cell.xp)},

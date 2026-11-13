@@ -433,10 +433,13 @@ bool PrecompiledProgramWriter::canWrite(const ProgramInfo&) const {
   return true;
 }
 
-// The compiled chain program this draw resolves to comes from the one memoized entry
-// (AOTChainBuilder::ResolveChainProgram): a plan pass carries it on its IR, the first match or
-// write compiles it there, and every later caller reads it back — the transform, uniform and
-// sampler writes share one description, and a repeated prepare never recompiles.
+// The interpreter program the draw's match compiled. The match carries it on its result (the
+// Chain family compiles to derive its variant), so the writers read the one decision instead of
+// resolving — and potentially re-memoizing — the same program again.
+static const AOTProgram* ChainProgramOf(const ProgramInfo& info) {
+  const auto* sources = info.getSources();
+  return sources != nullptr ? sources->chain : nullptr;
+}
 
 ChainProgramWriter::ChainProgramWriter(Variant variant)
     : variant(std::move(variant)), layout(DeriveLayout(this->variant)) {
@@ -456,13 +459,13 @@ ChainProgramWriter::ChainProgramWriter(Variant variant)
 bool ChainProgramWriter::canWrite(const ProgramInfo& info) const {
   // The chain kernel's whole uniform content, transforms and sampler order come from the compiled
   // program; without it there is nothing correct to upload.
-  return AOTChainBuilder::ResolveChainProgram(&info) != nullptr;
+  return ChainProgramOf(info) != nullptr;
 }
 
 void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
                                                 UniformData* vertexUniformData,
                                                 UniformData* fragmentUniformData) const {
-  const auto* program = AOTChainBuilder::ResolveChainProgram(&info);
+  const auto* program = ChainProgramOf(info);
   if (program == nullptr) {
     LOGE(
         "ChainProgramWriter::writeGeometryProcessor() no compiled chain program; the draw renders "
@@ -491,7 +494,7 @@ void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
 
 void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
                                          UniformData* fragmentUniformData) const {
-  const auto* program = AOTChainBuilder::ResolveChainProgram(&info);
+  const auto* program = ChainProgramOf(info);
   if (program == nullptr) {
     LOGE(
         "ChainProgramWriter::writeProcessors() no compiled chain program; the draw renders with "
@@ -517,7 +520,7 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
 
 bool ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
                                        RenderPass* renderPass) const {
-  const auto* chainProgram = AOTChainBuilder::ResolveChainProgram(&info);
+  const auto* chainProgram = ChainProgramOf(info);
   if (chainProgram == nullptr) {
     LOGE("ChainProgramWriter::writeSamplers() no compiled chain program; skipping the bindings");
     return false;
