@@ -21,9 +21,31 @@
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/chain/AOTChainSpec.h"
 #include "gpu/aot/spec/SpecInjector.h"
+#include "gpu/shaders/Families.h"
+#include "gpu/shaders/Layout.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
+
+std::vector<SpecFieldInfo> DeriveSpecFieldInfos(const Variant& variant) {
+  const Family& family = Families()[variant.family];
+  const auto modules = ModulesOf(family, variant);
+  std::vector<SpecFieldInfo> infos = {};
+  for (const auto& spec : DeriveSpecFields(family, variant)) {
+    const Module* module = modules.list[spec.slot];
+    if (module == nullptr || spec.element >= module->elementCount) {
+      return {};
+    }
+    const Element& element = module->elements[spec.element];
+    SpecFieldInfo info = {};
+    info.name = ElementNameOf(module, element);
+    info.format = ShaderTypeFormat(element.type);
+    info.arraySize = ElementCountOf(element, DimOffsetOf(family, variant, spec.slot), variant);
+    info.firstId = spec.firstId;
+    infos.push_back(std::move(info));
+  }
+  return infos;
+}
 
 ShaderCodeFormat SpecFormatForBackend(Backend backend, uint16_t payloadFormat) {
   const bool binary = payloadFormat == BundleFormat::Payload::Binary;

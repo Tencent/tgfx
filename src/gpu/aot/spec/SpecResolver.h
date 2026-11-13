@@ -29,6 +29,11 @@ namespace tgfx {
 
 class ProgramInfo;
 
+/// The variant's specialization table, derived from its declaration: the same order, names and id
+/// assignment the assembler declares them with, so the injector addresses the constants without
+/// reading the bundle's table.
+std::vector<SpecFieldInfo> DeriveSpecFieldInfos(const Variant& variant);
+
 /// The one entry point for "can this draw specialize, and with which values". Both routes (the
 /// plain processor-tree route and the pass-IR route) call it, so the enable switch, the format
 /// gate and the capture live in one place: the two routes cannot drift into one specializing

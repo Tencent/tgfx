@@ -186,6 +186,10 @@ class UniformData {
   bool readInt32(const std::string& name, size_t wordIndex, int32_t* value) const;
 
  private:
+  /// A block of the given byte size with no named fields: the precompiled route addresses every
+  /// field through its derived layout's offsets, so the block needs only its size and a buffer.
+  explicit UniformData(size_t bufferSize);
+
   struct Field {
     std::string name = "";
     UniformFormat format = UniformFormat::Float;
