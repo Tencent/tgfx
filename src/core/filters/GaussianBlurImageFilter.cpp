@@ -47,8 +47,9 @@ float GaussianBlurImageFilter::MaxSigma() {
   return MAX_BLUR_SIGMA;
 }
 
-// The single pass evaluates (2 * ceil(2 * sigma) + 1)^2 samples per pixel. Up to this long edge
-// that stays far below the cost of the render pass it saves.
+// The single pass evaluates (2 * ceil(2 * sigma) + 1)^2 samples per pixel. Together with MAX_SIGMA
+// this cap keeps a pixel at 81 samples and a 64x64 target at about 330k samples, the budget within
+// which the extra sampling stays below the cost of the render target and the pass it replaces.
 static constexpr int SINGLE_PASS_MAX_EDGE = 64;
 
 GaussianBlurImageFilter::GaussianBlurImageFilter(float blurrinessX, float blurrinessY,
@@ -71,6 +72,9 @@ static void Blur1D(PlacementPtr<FragmentProcessor> source,
 
 std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args) const {
+  // The single pass and the folded crop read the source through whole-pixel offsets, so a clip that
+  // reaches past the source's blur range would make the two paths disagree along the columns.
+  DEBUG_ASSERT(filterBounds(Rect::MakeWH(source->width(), source->height())).contains(clipBounds));
   Rect srcSampleBounds = clipBounds;
   // The pixels involved in the convolution operation may be outside the clipping area.
   srcSampleBounds = filterBounds(srcSampleBounds);
@@ -131,10 +135,9 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
                               (clipBounds.top - srcSampleBounds.top) * blurDstScaleY);
   const bool isIdentityEnd = !isBlurDstScaled && finalUVMatrix.isIdentity();
   const bool needExtraTransform = !isIdentityEnd;
-  // Without any rescale the copy is a translation, which the vertical pass applies while it reads
-  // the horizontal result. Every output pixel then reads the same samples of that result as the
-  // copy would, so only the samples the copy drops are no longer computed. The target sizes
-  // differ in that case by the sampling margin, which is what the copy removes.
+  // When the final UV matrix is a pure translation, the vertical pass applies that offset while it
+  // reads the horizontal result and writes the requested bounds directly, so the separate copy is
+  // unnecessary. The blur passes before it may still have rescaled the source.
   const bool foldCrop = blur2D && needExtraTransform && finalUVMatrix.isTranslate();
   // A small kernel is cheaper to evaluate in full than to split into passes. The single pass reads
   // the source directly, so it only matches the separable blur where both read the same pixels:
