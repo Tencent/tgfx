@@ -41,6 +41,14 @@ class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
     return "GaussianBlur1DFragmentProcessor";
   }
 
+  /**
+   * Writes the normalized half-kernel of a gaussian with the given sigma into weights and returns
+   * its radius, ceil(2 * sigma) clamped to maxRadius. weights must hold maxRadius + 1 entries:
+   * weights[0] is the center weight and weights[i] the shared weight of offsets +i and -i. A sigma
+   * of zero yields a single center weight of 1.
+   */
+  static int ComputeHalfKernel(float sigma, float* weights, int maxRadius);
+
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
