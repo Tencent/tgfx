@@ -20,7 +20,6 @@
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
-#include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/resources/ResourceKey.h"
@@ -52,6 +51,15 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
   return std::make_shared<MatrixShape>(std::move(shape), matrixShape->matrix);
 }
 
+PathFillType StrokeShape::fillType() const {
+  // A non-hairline stroke replaces the outline with its own winding boundary, so the inner rule no
+  // longer describes the result. A hairline stroke draws the outline itself and keeps its rule.
+  if (IsHairlineStroke(stroke)) {
+    return shape->fillType();
+  }
+  return PathFillType::Winding;
+}
+
 Rect StrokeShape::onGetBounds() const {
   auto bounds = shape->onGetBounds();
   ApplyStrokeToBounds(stroke, &bounds, Matrix::I(), true);
@@ -62,7 +70,7 @@ Path StrokeShape::onGetPath(float resolutionScale) const {
   if (FloatNearlyZero(resolutionScale)) {
     return {};
   }
-  auto path = ShapeUtils::GetContourPath(shape, resolutionScale);
+  auto path = shape->onGetPath(resolutionScale);
   if (IsHairlineStroke(stroke)) {
     Stroke hairlineStroke = stroke;
     // When zoomed in by a matrix shape, reduce the stroke width ahead of time

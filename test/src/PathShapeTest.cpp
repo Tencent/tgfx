@@ -25,6 +25,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
@@ -392,7 +393,9 @@ TGFX_TEST(PathShapeTest, inverseFillType) {
   shape = Shape::ApplyMatrix(firstShape, Matrix::MakeScale(2.0f));
   EXPECT_TRUE(shape->isInverseFillType());
   shape = Shape::ApplyStroke(firstShape, &stroke);
-  EXPECT_TRUE(shape->isInverseFillType());
+  // A non-hairline stroke builds its own winding boundary, so the inverse rule of the input does
+  // not carry over.
+  EXPECT_FALSE(shape->isInverseFillType());
 }
 
 TGFX_TEST_PRIVATE(PathShapeTest, MergeShapeFillType) {
@@ -615,9 +618,9 @@ TGFX_TEST(PathShapeTest, MergedUnionWithOverlappingBoundsIsResolved) {
 
 static void ExpectRuleMatchesOutline(const std::shared_ptr<Shape>& shape, const char* name) {
   // Only MergeShape and AppendShape can drift: every other shape answers fillType() from the very
-  // path it hands out. These two derive the rule without building the path, so the rule they report
-  // and the rule their outline carries are two separate computations that have to agree - the
-  // renderer reads the outline with the reported rule.
+  // path it hands out. These two derive their rule from the operands, so the rule they report and
+  // the rule their outline carries are two separate computations that have to agree - the renderer
+  // reads the outline with the reported rule.
   EXPECT_EQ(shape->getPath().getFillType(), shape->fillType()) << name;
 }
 
@@ -1408,6 +1411,35 @@ TGFX_TEST(PathShapeTest, AppendKeepsAnEmptyInverseShapeFillingThePlane) {
   // The rectangle is the hole; everything outside it is still filled.
   EXPECT_TRUE(path.contains(1000.0f, 1000.0f));
   EXPECT_FALSE(path.contains(50.0f, 50.0f));
+}
+
+TGFX_TEST(PathShapeTest, StrokeShapeReportsWindingRule) {
+  Path path = {};
+  path.addRect(Rect::MakeLTRB(0, 0, 100, 100));
+  path.setFillType(PathFillType::EvenOdd);
+  auto shape = Shape::MakeFrom(path);
+  ASSERT_TRUE(shape != nullptr);
+
+  Stroke stroke(10.0f);
+  auto stroked = Shape::ApplyStroke(shape, &stroke);
+  ASSERT_TRUE(stroked != nullptr);
+  EXPECT_EQ(stroked->fillType(), PathFillType::Winding);
+
+  Stroke hairline(0.0f);
+  auto hairlined = Shape::ApplyStroke(shape, &hairline);
+  ASSERT_TRUE(hairlined != nullptr);
+  EXPECT_EQ(hairlined->fillType(), PathFillType::EvenOdd);
+}
+
+TGFX_TEST(PathShapeTest, DashEffectKeepsInputFillRule) {
+  Path path = {};
+  path.addRect(Rect::MakeLTRB(0, 0, 100, 100));
+  path.setFillType(PathFillType::EvenOdd);
+  float intervals[] = {10.0f, 5.0f};
+  auto effect = PathEffect::MakeDash(intervals, 2, 0.0f);
+  ASSERT_TRUE(effect != nullptr);
+  ASSERT_TRUE(effect->filterPath(&path));
+  EXPECT_EQ(path.getFillType(), PathFillType::EvenOdd);
 }
 
 }  // namespace tgfx

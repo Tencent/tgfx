@@ -45,6 +45,5 @@ class ReverseShape : public UniqueKeyShape {
   std::shared_ptr<Shape> shape = nullptr;
 
   friend class Shape;
-  friend class ShapeUtils;
 };
 }  // namespace tgfx

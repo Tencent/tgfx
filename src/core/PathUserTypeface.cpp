@@ -20,7 +20,6 @@
 #include "UserScalerContext.h"
 #include "core/PathRasterizer.h"
 #include "core/utils/FauxBoldScale.h"
-#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Shape.h"
@@ -33,35 +32,6 @@ static Matrix GetTransform(bool fauxItalic, float textScale) {
   }
   return matrix;
 }
-
-namespace {
-
-// Faux bold is the union of an outline and the result of stroking it. The two do not agree on a
-// fill rule -- the outline keeps whatever rule it was built with, a stroke produces a winding one --
-// so the combination has to be resolved by filled area. Concatenating them instead would let
-// whichever came first decide the rule, and the region where the outline overlaps its own stroke
-// would then be read by the wrong one, cancelling it out.
-bool ApplyFauxBold(Path* path, float boldSize) {
-  if (path == nullptr) {
-    return false;
-  }
-  if (path->isEmpty()) {
-    return true;
-  }
-  Path strokePath = *path;
-  Stroke stroke(boldSize);
-  if (!stroke.applyToPath(&strokePath)) {
-    return false;
-  }
-  auto merged = Path::Merge({*path, strokePath});
-  if (!merged.has_value()) {
-    return false;
-  }
-  *path = std::move(*merged);
-  return true;
-}
-
-}  // namespace
 
 class PathUserScalerContext final : public UserScalerContext {
  public:
@@ -104,9 +74,11 @@ class PathUserScalerContext final : public UserScalerContext {
     if (!path->isEmpty()) {
       auto transform = GetTransform(fauxItalic, textScale);
       path->transform(transform);
-      if (fauxBold && !ApplyFauxBold(path, fauxBoldSize)) {
-        LOGE("PathUserScalerContext: failed to merge the faux-bold stroke with the outline.");
-        return false;
+      if (fauxBold) {
+        auto strokePath = *path;
+        Stroke stroke(fauxBoldSize);
+        stroke.applyToPath(&strokePath);
+        path->addPath(strokePath, PathOp::Union);
       }
     }
     return true;
@@ -150,14 +122,9 @@ class PathUserScalerContext final : public UserScalerContext {
     matrix.postTranslate(-bounds.x(), -bounds.y());
     auto shape = Shape::MakeFrom(pathProvider);
     if (fauxBold) {
-      // Bold the outline in the design coordinates the provider hands out, then rasterize that
-      // instead of building a shape per step: combining a glyph with the stroke of itself is a
-      // question about filled area, which is what Path::Merge() resolves.
-      auto glyphPath = pathProvider->getPath();
-      if (!ApplyFauxBold(&glyphPath, fauxBoldSize / textScale)) {
-        return false;
-      }
-      shape = Shape::MakeFrom(glyphPath);
+      auto boldStroke = std::make_unique<Stroke>(fauxBoldSize / textScale);
+      shape = Shape::ApplyStroke(shape, boldStroke.get());
+      shape = Shape::Merge(Shape::MakeFrom(pathProvider), std::move(shape));
     }
     // The stroke parameter is already scaled by matrix.maxScale in the caller (GetScaledStroke).
     // Since ApplyStroke runs before the upcoming Matrix::MakeScale(textScale) transform, we must
@@ -186,7 +153,8 @@ class PathUserScalerContext final : public UserScalerContext {
     if (rasterizer == nullptr) {
       return false;
     }
-    return rasterizer->readPixels(dstInfo, dstPixels);
+    rasterizer->readPixels(dstInfo, dstPixels);
+    return true;
   }
 
  private:

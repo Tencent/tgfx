@@ -29,6 +29,7 @@
 #include <include/pathops/SkPathOps.h>
 #include "core/PathRef.h"
 #include "core/utils/AtomicCache.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
@@ -885,21 +886,14 @@ bool Path::toWinding() {
     return true;
   }
   auto& path = PathRef::WriteAccess(*this);
-  // AsWinding() decides each contour's direction from the nesting depth it sits at, reversing the
-  // ones that disagree with the contour containing them. An outermost contour keeps the direction
-  // it already has, so two of them that overlap while running opposite ways still cancel and leave
-  // the overlap empty -- forcing every outermost contour to one shared direction, which no fill
-  // rule asks for, would fill it in. It copies the curves it was given rather than rebuilding them,
-  // so the geometry survives unchanged. It does not detect self-crossings or contours that cross
-  // each other, so those still come back with the filled area changed; see Path::toWinding().
-  //
-  // The other pathkit entry for this conversion is deliberately not used. SkOpBuilder - add() once
-  // and resolve(), which runs Simplify followed by FixWinding - decides the directions the same
-  // way, but Simplify rebuilds the contours and quantises their coordinates, so a counter a
-  // fraction of a unit wide closes up: PathTest.ToWindingKeepsThinCurveCounter fails under it while
-  // passing here. Only reversing contours is what keeps that geometry.
+  // AsWinding() normalizes the outermost contours to clockwise and orients the counters against
+  // them, which is what makes the result safe to append. It copies the curves rather than rebuilding
+  // them, so a counter a fraction of a unit wide keeps its geometry; the SkOpBuilder path instead
+  // runs Simplify, which quantises coordinates and closes such a band up. Contours that cross each
+  // other or themselves still change the filled area, as the contract in Path.h states.
   SkPath result;
   if (!AsWinding(path, &result)) {
+    LOGE("Path::toWinding() failed to normalize the outline; keeping the even-odd fill rule.");
     return false;
   }
   result.setFillType(fillType == PathFillType::InverseEvenOdd ? SkPathFillType::kInverseWinding

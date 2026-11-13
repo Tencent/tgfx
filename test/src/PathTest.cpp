@@ -747,31 +747,27 @@ TGFX_TEST(PathTest, ToWindingKeepsOrientationFarFromOrigin) {
 
 TGFX_TEST(PathTest, ToWindingLeavesCrossingContoursAlone) {
   // Contours that share area are neither nested nor disjoint. Real glyphs do this: two strokes of
-  // one character overlap where they meet. Neither is flipped, so both stay outermost and keep the
-  // direction they were drawn with. That is still not enough to keep the even-odd area when they
-  // run the same way: even-odd reads an even crossing count in the intersection and leaves it
-  // empty, while two winding numbers of the same sign add up to a non-zero one and fill it. No
-  // choice of directions can change that, so it is asserted here as the known deviation from the
-  // contract in the header, which holds for outlines whose contours do not cross. Keeping the
-  // even-odd area of these takes a boolean operation - addPath() runs one and orients the result.
+  // one character overlap where they meet. Both stay outermost and are normalized to clockwise, so
+  // their winding numbers add up in the intersection and fill it, matching the union of the two.
+  // The header contract excludes crossing contours because the even-odd area is not preserved;
+  // callers that need that area must run a boolean operation before converting.
   Path path = {};
   path.addRect(Rect::MakeLTRB(0.0f, 0.0f, 600.0f, 600.0f));
   path.addRect(Rect::MakeLTRB(400.0f, 400.0f, 1000.0f, 1000.0f));
   path.setFillType(PathFillType::EvenOdd);
-  ASSERT_FALSE(path.contains(500.0f, 500.0f)) << "input no longer shows the deviation";
+  ASSERT_FALSE(path.contains(500.0f, 500.0f)) << "input no longer shows the case";
   ASSERT_TRUE(path.toWinding());
   EXPECT_EQ(path.getFillType(), PathFillType::Winding);
   EXPECT_TRUE(path.contains(100.0f, 100.0f)) << "first contour lost";
   EXPECT_TRUE(path.contains(900.0f, 900.0f)) << "second contour lost";
-  EXPECT_TRUE(path.contains(500.0f, 500.0f)) << "documented deviation: the intersection fills in";
+  EXPECT_TRUE(path.contains(500.0f, 500.0f)) << "intersection should match the union";
 }
 
-TGFX_TEST(PathTest, ToWindingKeepsAreaOfOppositeOverlappingContours) {
-  // The other way round the area can be kept. Two outermost contours that overlap in opposite
-  // directions leave their intersection empty under even-odd, and under winding as well, because
-  // the two winding numbers cancel there. That only holds while each keeps the direction it was
-  // drawn with: forcing every outermost contour to one shared direction - which neither rule asks
-  // for, winding only wanting a non-zero sum - makes them agree and fills the intersection in.
+TGFX_TEST(PathTest, ToWindingNormalizesOppositeOverlappingContours) {
+  // Two outermost contours that overlap while running opposite ways leave their intersection empty
+  // under even-odd. Normalizing every outermost contour to clockwise makes them agree, so the
+  // intersection fills in exactly as the union does. That agreement is what lets callers append
+  // normalized glyph paths instead of merging the areas with a boolean operation.
   Path path = {};
   path.addRect(Rect::MakeLTRB(0.0f, 0.0f, 600.0f, 600.0f));
   path.addRect(Rect::MakeLTRB(400.0f, 400.0f, 1000.0f, 1000.0f), true);
@@ -779,7 +775,7 @@ TGFX_TEST(PathTest, ToWindingKeepsAreaOfOppositeOverlappingContours) {
   ASSERT_FALSE(path.contains(500.0f, 500.0f)) << "input no longer shows the case";
   ASSERT_TRUE(path.toWinding());
   EXPECT_EQ(path.getFillType(), PathFillType::Winding);
-  EXPECT_FALSE(path.contains(500.0f, 500.0f)) << "intersection filled in";
+  EXPECT_TRUE(path.contains(500.0f, 500.0f)) << "intersection should match the union";
   EXPECT_TRUE(path.contains(100.0f, 100.0f)) << "first contour lost";
   EXPECT_TRUE(path.contains(900.0f, 900.0f)) << "second contour lost";
 }

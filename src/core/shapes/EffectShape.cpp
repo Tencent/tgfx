@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EffectShape.h"
-#include "core/utils/Log.h"
-#include "core/utils/ShapeUtils.h"
 
 namespace tgfx {
 std::shared_ptr<Shape> Shape::ApplyEffect(std::shared_ptr<Shape> shape,
@@ -39,20 +37,9 @@ Rect EffectShape::onGetBounds() const {
 }
 
 Path EffectShape::onGetPath(float resolutionScale) const {
-  std::vector<Path> paths = {};
-  if (!ShapeUtils::GetPathSources(shape, resolutionScale, &paths)) {
-    return {};
-  }
-  ShapeUtils::ApplyEffectToSources(*effect, &paths);
-  if (paths.size() == 1) {
-    return paths.front();
-  }
-  auto merged = Path::Merge(paths);
-  if (!merged.has_value()) {
-    LOGE("EffectShape: failed to merge path sources!");
-    return {};
-  }
-  return std::move(*merged);
+  auto path = shape->onGetPath(resolutionScale);
+  effect->filterPath(&path);
+  return path;
 }
 
 }  // namespace tgfx

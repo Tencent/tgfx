@@ -59,20 +59,6 @@ std::shared_ptr<PathEffect> PathEffect::MakeDash(const float* intervals, int cou
   return std::shared_ptr<PathEffect>(new SkPathEffectWrapper(std::move(effect)));
 }
 
-bool PathEffect::filterPaths(std::vector<Path>* paths) const {
-  if (paths == nullptr) {
-    return false;
-  }
-  auto result = *paths;
-  for (auto& path : result) {
-    if (!filterPath(&path)) {
-      return false;
-    }
-  }
-  *paths = std::move(result);
-  return true;
-}
-
 std::shared_ptr<PathEffect> PathEffect::MakeCorner(float radius) {
   auto effect = SkCornerPathEffect::Make(radius);
   if (effect == nullptr) {
