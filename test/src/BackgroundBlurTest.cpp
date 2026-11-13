@@ -1402,58 +1402,56 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleShareCompactGate){TGFX_PRIVATE_ACCESS
  * decision so every pass draws the style directly instead of retrying the oversized rasterization,
  * which is what keeps the style on screen.
  */
-TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleOutputOversizeFallsBack) {
-  TGFX_PRIVATE_ACCESS({
-    ContextScope scope;
-    auto context = scope.getContext();
-    EXPECT_TRUE(context != nullptr);
-    constexpr int TargetWidth = 2048;
-    constexpr int TargetHeight = 256;
-    auto surface = Surface::Make(context, TargetWidth, TargetHeight);
-    DisplayList displayList;
-    displayList.setBackgroundColor(Color::White());
-    displayList.setZoomScale(512.0f);
+TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleOutputOversizeFallsBack){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  constexpr int TargetWidth = 2048;
+  constexpr int TargetHeight = 256;
+  auto surface = Surface::Make(context, TargetWidth, TargetHeight);
+  DisplayList displayList;
+  displayList.setBackgroundColor(Color::White());
+  displayList.setZoomScale(512.0f);
 
-    const float inverseZoom = 1.0f / 512.0f;
-    auto back = SolidLayer::Make();
-    back->setColor(Color::FromRGBA(70, 130, 190, 255));
-    back->setWidth(2048 * inverseZoom);
-    back->setHeight(256 * inverseZoom);
-    displayList.root()->addChild(back);
+  const float inverseZoom = 1.0f / 512.0f;
+  auto back = SolidLayer::Make();
+  back->setColor(Color::FromRGBA(70, 130, 190, 255));
+  back->setWidth(2048 * inverseZoom);
+  back->setHeight(256 * inverseZoom);
+  displayList.root()->addChild(back);
 
-    // Content 20000 device pixels wide: the cached output cannot fit in one texture.
-    auto styledLayer = SolidLayer::Make();
-    styledLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
-    styledLayer->setWidth(20000 * inverseZoom);
-    styledLayer->setHeight(256 * inverseZoom);
-    styledLayer->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
-    displayList.root()->addChild(styledLayer);
+  // Content 20000 device pixels wide: the cached output cannot fit in one texture.
+  auto styledLayer = SolidLayer::Make();
+  styledLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
+  styledLayer->setWidth(20000 * inverseZoom);
+  styledLayer->setHeight(256 * inverseZoom);
+  styledLayer->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
+  displayList.root()->addChild(styledLayer);
 
-    // One frame first: captureBackgrounds needs the tree's background outset, which is computed
-    // while rendering.
-    displayList.render(surface.get());
+  // One frame first: captureBackgrounds needs the tree's background outset, which is computed
+  // while rendering.
+  displayList.render(surface.get());
 
-    // Two rects covering the target in halves turn multi-pass rendering on while staying compact,
-    // which is what the shared style output requires.
-    const auto halfWidth = static_cast<float>(TargetWidth) * 0.5f;
-    const auto height = static_cast<float>(TargetHeight);
-    auto snapshots = displayList.captureBackgrounds(
-        surface.get(),
-        {Rect::MakeWH(halfWidth, height), Rect::MakeXYWH(halfWidth, 0.f, halfWidth, height)});
-    ASSERT_TRUE(snapshots != nullptr);
-    displayList.drawRootLayer(surface.get(), Rect::MakeWH(static_cast<float>(TargetWidth), height),
-                              displayList.getViewMatrix(), true, snapshots.get());
+  // Two rects covering the target in halves turn multi-pass rendering on while staying compact,
+  // which is what the shared style output requires.
+  const auto halfWidth = static_cast<float>(TargetWidth) * 0.5f;
+  const auto height = static_cast<float>(TargetHeight);
+  auto snapshots = displayList.captureBackgrounds(
+      surface.get(),
+      {Rect::MakeWH(halfWidth, height), Rect::MakeXYWH(halfWidth, 0.f, halfWidth, height)});
+  ASSERT_TRUE(snapshots != nullptr);
+  displayList.drawRootLayer(surface.get(), Rect::MakeWH(static_cast<float>(TargetWidth), height),
+                            displayList.getViewMatrix(), true, snapshots.get());
 
-    // Submitting flushes the render tasks this frame queued, so they do not leak into the next test
-    // through the shared drawing buffer.
-    context->flushAndSubmit();
+  // Submitting flushes the render tasks this frame queued, so they do not leak into the next test
+  // through the shared drawing buffer.
+  context->flushAndSubmit();
 
-    // The decision is remembered as a null entry, which is what sends the later passes down the
-    // direct path.
-    ASSERT_EQ(snapshots->styleOutputs.size(), 1u);
-    EXPECT_TRUE(snapshots->styleOutputs.begin()->second.image == nullptr);
-  })
-}
+  // The decision is remembered as a null entry, which is what sends the later passes down the
+  // direct path.
+  ASSERT_EQ(snapshots->styleOutputs.size(), 1u);
+  EXPECT_TRUE(snapshots->styleOutputs.begin()->second.image == nullptr);
+})}
 
 // The capture pass draws only the layers a background style samples, so the footprints it culls
 // against have to cover every style's blur reach and nothing else.
@@ -1926,84 +1924,80 @@ TGFX_TEST(BackgroundBlurTest, CullWithGlassStyleMatchesDirectRendering) {
 
 // A blur layer that covers far more than the dirty tile cannot widen the cull beyond the tile it is
 // captured for, otherwise the whole frame's content would be replayed.
-TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullStaysInsideTheDirtyTile) {
-  TGFX_PRIVATE_ACCESS({
-    ContextScope scope;
-    auto context = scope.getContext();
-    ASSERT_TRUE(context != nullptr);
-    auto surface = Surface::Make(context, 512, 512);
-    ASSERT_TRUE(surface != nullptr);
-    auto displayList = std::make_unique<DisplayList>();
-    displayList->setRenderMode(RenderMode::Tiled);
+TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullStaysInsideTheDirtyTile){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 512, 512);
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
 
-    auto blurred = ShapeLayer::Make();
-    Path path;
-    path.addRect(Rect::MakeWH(600, 600));
-    blurred->setPath(path);
-    blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 60)));
-    blurred->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
-    displayList->root()->addChild(blurred);
+  auto blurred = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(600, 600));
+  blurred->setPath(path);
+  blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 60)));
+  blurred->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
+  displayList->root()->addChild(blurred);
 
-    displayList->render(surface.get());
-    auto rootOutset = displayList->root()->maxBackgroundOutset;
-    ASSERT_GT(rootOutset, 0.0f);
+  displayList->render(surface.get());
+  auto rootOutset = displayList->root()->maxBackgroundOutset;
+  ASSERT_GT(rootOutset, 0.0f);
 
-    auto tileRect = Rect::MakeXYWH(128.0f, 128.0f, 128.0f, 128.0f);
-    auto footprints = displayList->collectBackgroundFootprints(tileRect);
-    ASSERT_EQ(footprints.size(), 1u);
-    auto snapshots = displayList->captureBackgrounds(surface.get(), {tileRect}, footprints);
-    ASSERT_TRUE(snapshots != nullptr);
-    ASSERT_EQ(snapshots->cullRects.size(), 1u);
+  auto tileRect = Rect::MakeXYWH(128.0f, 128.0f, 128.0f, 128.0f);
+  auto footprints = displayList->collectBackgroundFootprints(tileRect);
+  ASSERT_EQ(footprints.size(), 1u);
+  auto snapshots = displayList->captureBackgrounds(surface.get(), {tileRect}, footprints);
+  ASSERT_TRUE(snapshots != nullptr);
+  ASSERT_EQ(snapshots->cullRects.size(), 1u);
 
-    // The footprint covers the whole document, so the tile bounds the cull instead.
-    auto tileWithOutset = tileRect;
-    tileWithOutset.outset(rootOutset, rootOutset);
-    EXPECT_EQ(snapshots->cullRects[0], tileWithOutset);
-    EXPECT_LT(snapshots->cullRects[0].width(), footprints[0].width());
-    context->flushAndSubmit();
-  })
-}
+  // The footprint covers the whole document, so the tile bounds the cull instead.
+  auto tileWithOutset = tileRect;
+  tileWithOutset.outset(rootOutset, rootOutset);
+  EXPECT_EQ(snapshots->cullRects[0], tileWithOutset);
+  EXPECT_LT(snapshots->cullRects[0].width(), footprints[0].width());
+  context->flushAndSubmit();
+})}
 
 // A chain of nested styles adds no footprint beyond the outermost one: without the early stop every
 // level would push its own rect and push the list over the budget.
-TGFX_TEST_PRIVATE(BackgroundBlurTest, NestedStyleChainAddsOneFootprint) {
-  TGFX_PRIVATE_ACCESS({
-    ContextScope scope;
-    auto context = scope.getContext();
-    ASSERT_TRUE(context != nullptr);
-    auto surface = Surface::Make(context, 300, 300);
-    ASSERT_TRUE(surface != nullptr);
-    auto displayList = std::make_unique<DisplayList>();
-    displayList->setRenderMode(RenderMode::Tiled);
+TGFX_TEST_PRIVATE(BackgroundBlurTest, NestedStyleChainAddsOneFootprint){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
 
-    auto root = ShapeLayer::Make();
-    Path path;
-    path.addRect(Rect::MakeWH(140, 140));
-    root->setPath(path);
-    root->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 40)));
-    root->setMatrix(Matrix::MakeTrans(70, 70));
-    root->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
+  auto root = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(140, 140));
+  root->setPath(path);
+  root->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 40)));
+  root->setMatrix(Matrix::MakeTrans(70, 70));
+  root->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
 
-    auto current = root;
-    for (int i = 0; i < 8; ++i) {
-      auto child = ShapeLayer::Make();
-      child->setPath(path);
-      child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 30)));
-      child->setMatrix(Matrix::MakeTrans(6, 6));
-      child->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
-      current->addChild(child);
-      current = child;
-    }
-    displayList->root()->addChild(root);
+  auto current = root;
+  for (int i = 0; i < 8; ++i) {
+    auto child = ShapeLayer::Make();
+    child->setPath(path);
+    child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 30)));
+    child->setMatrix(Matrix::MakeTrans(6, 6));
+    child->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
+    current->addChild(child);
+    current = child;
+  }
+  displayList->root()->addChild(root);
 
-    displayList->render(surface.get());
-    auto footprints = displayList->collectBackgroundFootprints(Rect::MakeWH(300.0f, 300.0f));
-    ASSERT_EQ(footprints.size(), 1u);
-    auto expected = root->renderBounds;
-    expected.outset(root->maxBackgroundOutset, root->maxBackgroundOutset);
-    EXPECT_EQ(footprints[0], expected);
-  })
-}
+  displayList->render(surface.get());
+  auto footprints = displayList->collectBackgroundFootprints(Rect::MakeWH(300.0f, 300.0f));
+  ASSERT_EQ(footprints.size(), 1u);
+  auto expected = root->renderBounds;
+  expected.outset(root->maxBackgroundOutset, root->maxBackgroundOutset);
+  EXPECT_EQ(footprints[0], expected);
+})}
 
 // More styles than the per-layer cull loop can afford must still cull: the rects are merged instead
 // of dropping the cull altogether.
@@ -2038,9 +2032,9 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, ManyStylesStillCullTheCapture) {
     auto snapshots = displayList->captureBackgrounds(surface.get(), {captureRect}, footprints);
     ASSERT_TRUE(snapshots != nullptr);
     ASSERT_FALSE(snapshots->cullRects.empty());
-  // The per-layer cull loop only affords MAX_CULL_RECTS rects, so the merge has to get under it
-  // instead of dropping the cull.
-  EXPECT_LE(snapshots->cullRects.size(), 32u);
+    // The per-layer cull loop only affords MAX_CULL_RECTS rects, so the merge has to get under it
+    // instead of dropping the cull.
+    EXPECT_LE(snapshots->cullRects.size(), 32u);
     auto cullArea = 0.0f;
     for (const auto& rect : snapshots->cullRects) {
       cullArea += rect.width() * rect.height();
