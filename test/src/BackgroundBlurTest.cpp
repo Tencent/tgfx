@@ -1454,73 +1454,75 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleOutputOversizeFallsBack){TGFX_PRIVATE
 
 // The capture pass draws only the layers a background style samples, so the footprints it culls
 // against have to cover every style's blur reach and nothing else.
-TGFX_TEST_PRIVATE(BackgroundBlurTest, CullFootprintsCoverTheSampledArea){TGFX_PRIVATE_ACCESS({
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 240, 240);
-  ASSERT_TRUE(surface != nullptr);
-  auto displayList = std::make_unique<DisplayList>();
-  displayList->setRenderMode(RenderMode::Tiled);
+TGFX_TEST_PRIVATE(BackgroundBlurTest, CullFootprintsCoverTheSampledArea) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto surface = Surface::Make(context, 240, 240);
+    ASSERT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(RenderMode::Tiled);
 
-  auto blurred = ShapeLayer::Make();
-  blurred->setMatrix(Matrix::MakeTrans(30, 40));
-  Path rect;
-  rect.addRect(Rect::MakeWH(40, 32));
-  blurred->setPath(rect);
-  blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 128)));
-  blurred->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
-  displayList->root()->addChild(blurred);
+    auto blurred = ShapeLayer::Make();
+    blurred->setMatrix(Matrix::MakeTrans(30, 40));
+    Path rect;
+    rect.addRect(Rect::MakeWH(40, 32));
+    blurred->setPath(rect);
+    blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 128)));
+    blurred->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
+    displayList->root()->addChild(blurred);
 
-  // A sibling without a background style contributes no footprint of its own.
-  auto plain = ShapeLayer::Make();
-  plain->setMatrix(Matrix::MakeTrans(120, 40));
-  plain->setPath(rect);
-  plain->setFillStyle(ShapeStyle::Make(Color::Red()));
-  displayList->root()->addChild(plain);
+    // A sibling without a background style contributes no footprint of its own.
+    auto plain = ShapeLayer::Make();
+    plain->setMatrix(Matrix::MakeTrans(120, 40));
+    plain->setPath(rect);
+    plain->setFillStyle(ShapeStyle::Make(Color::Red()));
+    displayList->root()->addChild(plain);
 
-  // renderBounds and the background outsets are computed while rendering.
-  displayList->render(surface.get());
+    // renderBounds and the background outsets are computed while rendering.
+    displayList->render(surface.get());
 
-  auto footprints = displayList->collectBackgroundFootprints(Rect::MakeWH(240, 240));
-  ASSERT_EQ(footprints.size(), 1u);
-  auto expected = blurred->renderBounds;
-  expected.outset(blurred->maxBackgroundOutset, blurred->maxBackgroundOutset);
-  EXPECT_EQ(footprints[0], expected);
+    auto footprints = displayList->collectBackgroundFootprints(Rect::MakeWH(240, 240));
+    ASSERT_EQ(footprints.size(), 1u);
+    auto expected = blurred->renderBounds;
+    expected.outset(blurred->maxBackgroundOutset, blurred->maxBackgroundOutset);
+    EXPECT_EQ(footprints[0], expected);
 
-  // A perspective transform leaves the 2D bounds unable to delimit the sampled area, so the walk
-  // gives up and the caller keeps whole tiles.
-  auto perspective = ShapeLayer::Make();
-  auto matrix3D = Matrix3D::I();
-  matrix3D.setRowColumn(3, 2, -1.0f / 400.0f);
-  perspective->setPath(rect);
-  perspective->setFillStyle(ShapeStyle::Make(Color::Blue()));
-  perspective->setMatrix3D(matrix3D);
-  perspective->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
-  displayList->root()->addChild(perspective);
-  displayList->render(surface.get());
+    // A perspective transform leaves the 2D bounds unable to delimit the sampled area, so the walk
+    // gives up and the caller keeps whole tiles.
+    auto perspective = ShapeLayer::Make();
+    auto matrix3D = Matrix3D::I();
+    matrix3D.setRowColumn(3, 2, -1.0f / 400.0f);
+    perspective->setPath(rect);
+    perspective->setFillStyle(ShapeStyle::Make(Color::Blue()));
+    perspective->setMatrix3D(matrix3D);
+    perspective->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+    displayList->root()->addChild(perspective);
+    displayList->render(surface.get());
 
-  EXPECT_TRUE(displayList->collectBackgroundFootprints(Rect::MakeWH(240, 240)).empty());
+    EXPECT_TRUE(displayList->collectBackgroundFootprints(Rect::MakeWH(240, 240)).empty());
 
-  // A layer that keeps its own 3D context composites through the BSP, so its bounds do not delimit
-  // what the style samples either.
-  auto list3D = std::make_unique<DisplayList>();
-  list3D->setRenderMode(RenderMode::Tiled);
-  auto group = Layer::Make();
-  group->setPreserve3D(true);
-  auto blurred3D = ShapeLayer::Make();
-  blurred3D->setPath(rect);
-  blurred3D->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 128)));
-  blurred3D->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
-  group->addChild(blurred3D);
-  list3D->root()->addChild(group);
-  list3D->render(surface.get());
+    // A layer that keeps its own 3D context composites through the BSP, so its bounds do not delimit
+    // what the style samples either.
+    auto list3D = std::make_unique<DisplayList>();
+    list3D->setRenderMode(RenderMode::Tiled);
+    auto group = Layer::Make();
+    group->setPreserve3D(true);
+    auto blurred3D = ShapeLayer::Make();
+    blurred3D->setPath(rect);
+    blurred3D->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 128)));
+    blurred3D->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+    group->addChild(blurred3D);
+    list3D->root()->addChild(group);
+    list3D->render(surface.get());
 
-  EXPECT_TRUE(list3D->collectBackgroundFootprints(Rect::MakeWH(240, 240)).empty());
+    EXPECT_TRUE(list3D->collectBackgroundFootprints(Rect::MakeWH(240, 240)).empty());
 
-  // Submitting flushes the render tasks these frames queued, so they do not leak into the next test
-  // through the shared drawing buffer.
-  context->flushAndSubmit();
-})}
+    // Submitting flushes the render tasks these frames queued, so they do not leak into the next test
+    // through the shared drawing buffer.
+    context->flushAndSubmit();
+  })
+}
 
 }  // namespace tgfx
