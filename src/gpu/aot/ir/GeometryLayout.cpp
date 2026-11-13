@@ -22,14 +22,14 @@ namespace tgfx {
 
 namespace {
 
-/// Appends one declared slot; an empty attribute keeps its slot numbering but no entry (the
-/// setVertexAttributes rule the processors follow).
-void AppendSlot(GeometryLayout* layout, const Attribute& attribute, uint32_t slot) {
+/// Appends one declared attribute; an empty attribute contributes no entry (the
+/// setVertexAttributes rule the processors follow). The list is the geometry's attribute order —
+/// the program's shader locations come from the declaration, so no slot numbering is kept here.
+void AppendSlot(GeometryLayout* layout, const Attribute& attribute) {
   if (attribute.empty()) {
     return;
   }
   layout->vertexAttributes.push_back(attribute);
-  layout->physicalSlots.push_back(slot);
 }
 
 void AppendInstanceSlot(GeometryLayout* layout, const Attribute& attribute) {
@@ -83,9 +83,9 @@ GeometryLayout DefaultGeometryLayout(PMColor color, AAType aaType, const Matrix&
   layout.parameters.hasUVMatrix = uvMatrix != Matrix::I();
   layout.parameters.hasUVPerspective = uvMatrix.hasPerspective();
   layout.parameters.aaType = aaType;
-  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2}, 0);
-  AppendSlot(&layout, Attribute{"inCoverage", VertexFormat::Float}, 1);
-  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 2);
+  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inCoverage", VertexFormat::Float});
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized});
   return layout;
 }
 
@@ -106,12 +106,12 @@ GeometryLayout QuadGeometryLayoutOf(int width, int height, AAType aaType,
       uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
   layout.parameters.aaType = aaType;
   layout.parameters.hasSubset = hasSubset;
-  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2}, 0);
-  AppendSlot(&layout, Attribute{"inCoverage", VertexFormat::Float}, 1);
+  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inCoverage", VertexFormat::Float});
   AppendSlot(&layout,
-             uvMatrix.has_value() ? Attribute{} : Attribute{"uvCoord", VertexFormat::Float2}, 2);
-  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 3);
-  AppendSlot(&layout, hasSubset ? Attribute{"texSubset", VertexFormat::Float4} : Attribute{}, 4);
+             uvMatrix.has_value() ? Attribute{} : Attribute{"uvCoord", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized});
+  AppendSlot(&layout, hasSubset ? Attribute{"texSubset", VertexFormat::Float4} : Attribute{});
   return layout;
 }
 
@@ -127,13 +127,13 @@ GeometryLayout RoundStrokeRectGeometryLayout(AAType aaType,
   layout.parameters.hasUVPerspective =
       uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
   layout.parameters.aaType = aaType;
-  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2}, 0);
-  AppendSlot(&layout, Attribute{"inCoverage", VertexFormat::Float}, 1);
-  AppendSlot(&layout, Attribute{"inEllipseOffset", VertexFormat::Float2}, 2);
-  AppendSlot(&layout, Attribute{"inEllipseRadii", VertexFormat::Float2}, 3);
+  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inCoverage", VertexFormat::Float});
+  AppendSlot(&layout, Attribute{"inEllipseOffset", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inEllipseRadii", VertexFormat::Float2});
   AppendSlot(&layout,
-             uvMatrix.has_value() ? Attribute{} : Attribute{"inUVCoord", VertexFormat::Float2}, 4);
-  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 5);
+             uvMatrix.has_value() ? Attribute{} : Attribute{"inUVCoord", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized});
   return layout;
 }
 
@@ -143,14 +143,14 @@ GeometryLayout NonAARRectGeometryLayout(bool stroke, const std::optional<PMColor
   layout.parameters.commonColor = commonColor.value_or(PMColor());
   layout.parameters.hasCommonColor = commonColor.has_value();
   layout.parameters.isStroke = stroke;
-  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2}, 0);
-  AppendSlot(&layout, Attribute{"inLocalCoord", VertexFormat::Float2}, 1);
-  AppendSlot(&layout, Attribute{"inRadii", VertexFormat::Float2}, 2);
-  AppendSlot(&layout, Attribute{"inRectBounds", VertexFormat::Float4}, 3);
-  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 4);
+  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inLocalCoord", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inRadii", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inRectBounds", VertexFormat::Float4});
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized});
   // The stroke width slot is unconditional (a fill batch writes zeros), matching the module's
   // always-declared attribute and the provider's constant stride.
-  AppendSlot(&layout, Attribute{"inStrokeWidth", VertexFormat::Float2}, 5);
+  AppendSlot(&layout, Attribute{"inStrokeWidth", VertexFormat::Float2});
   return layout;
 }
 
@@ -161,13 +161,13 @@ GeometryLayout ComplexNonAARRectGeometryLayout(bool stroke,
   layout.parameters.commonColor = commonColor.value_or(PMColor());
   layout.parameters.hasCommonColor = commonColor.has_value();
   layout.parameters.isStroke = stroke;
-  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2}, 0);
-  AppendSlot(&layout, Attribute{"inLocalCoord", VertexFormat::Float2}, 1);
-  AppendSlot(&layout, Attribute{"inXRadii", VertexFormat::Float4}, 2);
-  AppendSlot(&layout, Attribute{"inYRadii", VertexFormat::Float4}, 3);
-  AppendSlot(&layout, Attribute{"inRectBounds", VertexFormat::Float4}, 4);
-  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 5);
-  AppendSlot(&layout, Attribute{"inStrokeWidth", VertexFormat::Float2}, 6);
+  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inLocalCoord", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inXRadii", VertexFormat::Float4});
+  AppendSlot(&layout, Attribute{"inYRadii", VertexFormat::Float4});
+  AppendSlot(&layout, Attribute{"inRectBounds", VertexFormat::Float4});
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized});
+  AppendSlot(&layout, Attribute{"inStrokeWidth", VertexFormat::Float2});
   return layout;
 }
 
@@ -177,10 +177,10 @@ GeometryLayout EllipseGeometryLayout(bool stroke, const std::optional<PMColor>& 
   layout.parameters.commonColor = commonColor.value_or(PMColor());
   layout.parameters.hasCommonColor = commonColor.has_value();
   layout.parameters.isStroke = stroke;
-  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2}, 0);
-  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 1);
-  AppendSlot(&layout, Attribute{"inEllipseOffset", VertexFormat::Float2}, 2);
-  AppendSlot(&layout, Attribute{"inEllipseRadii", VertexFormat::Float4}, 3);
+  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized});
+  AppendSlot(&layout, Attribute{"inEllipseOffset", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inEllipseRadii", VertexFormat::Float4});
   return layout;
 }
 
@@ -191,14 +191,14 @@ GeometryLayout ComplexEllipseGeometryLayout(bool stroke,
   layout.parameters.commonColor = commonColor.value_or(PMColor());
   layout.parameters.hasCommonColor = commonColor.has_value();
   layout.parameters.isStroke = stroke;
-  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2}, 0);
-  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 1);
-  AppendSlot(&layout, Attribute{"inEllipseOffset", VertexFormat::Float2}, 2);
-  AppendSlot(&layout, Attribute{"inEllipseRadii", VertexFormat::Float4}, 3);
-  AppendSlot(&layout, Attribute{"inEdgeDist", VertexFormat::Float2}, 4);
+  AppendSlot(&layout, Attribute{"inPosition", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized});
+  AppendSlot(&layout, Attribute{"inEllipseOffset", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inEllipseRadii", VertexFormat::Float4});
+  AppendSlot(&layout, Attribute{"inEdgeDist", VertexFormat::Float2});
   // The stroke width slot is unconditional (a fill batch writes zeros), matching the module's
   // always-declared attribute and the provider's constant stride.
-  AppendSlot(&layout, Attribute{"inStrokeWidth", VertexFormat::Float2}, 5);
+  AppendSlot(&layout, Attribute{"inStrokeWidth", VertexFormat::Float2});
   return layout;
 }
 
@@ -216,9 +216,9 @@ GeometryLayout HairlineLineGeometryLayout(PMColor color, const Matrix& viewMatri
       uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
   layout.parameters.coverage = coverage;
   layout.parameters.aaType = aaType;
-  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2}, 0);
-  AppendSlot(&layout, Attribute{"aEdgeDistance", VertexFormat::Float}, 1);
-  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 2);
+  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"aEdgeDistance", VertexFormat::Float});
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized});
   return layout;
 }
 
@@ -236,8 +236,8 @@ GeometryLayout HairlineQuadGeometryLayout(PMColor color, const Matrix& viewMatri
       uvMatrix.has_value() && (uvMatrix->getType() & Matrix::PerspectiveMask) != 0;
   layout.parameters.coverage = coverage;
   layout.parameters.aaType = aaType;
-  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2}, 0);
-  AppendSlot(&layout, Attribute{"hairQuadEdge", VertexFormat::Float4}, 1);
+  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"hairQuadEdge", VertexFormat::Float4});
   return layout;
 }
 
@@ -251,10 +251,10 @@ GeometryLayout MeshGeometryLayout(bool hasTexCoords, bool hasColors, bool hasCov
   layout.parameters.viewMatrix = viewMatrix;
   layout.parameters.hasTexCoords = hasTexCoords;
   layout.parameters.hasCoverage = hasCoverage || hasTexCoords || hasColors;
-  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2}, 0);
-  AppendSlot(&layout, Attribute{"aCoverage", VertexFormat::Float}, 1);
-  AppendSlot(&layout, hasTexCoords ? Attribute{"aTexCoord", VertexFormat::Float2} : Attribute{}, 2);
-  AppendSlot(&layout, Attribute{"aColor", VertexFormat::UByte4Normalized}, 3);
+  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"aCoverage", VertexFormat::Float});
+  AppendSlot(&layout, hasTexCoords ? Attribute{"aTexCoord", VertexFormat::Float2} : Attribute{});
+  AppendSlot(&layout, Attribute{"aColor", VertexFormat::UByte4Normalized});
   return layout;
 }
 
@@ -268,9 +268,9 @@ GeometryLayout ShapeInstancedGeometryLayout(AAType aaType, bool hasColors, const
   layout.parameters.hasUVPerspective = uvMatrix.hasPerspective();
   layout.parameters.aaType = aaType;
   layout.parameters.hasColors = hasColors;
-  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2}, 0);
-  AppendSlot(&layout, Attribute{"inCoverage", VertexFormat::Float}, 1);
-  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 2);
+  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inCoverage", VertexFormat::Float});
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized});
   AppendInstanceSlot(&layout, Attribute{"aOffset", VertexFormat::Float2});
   AppendInstanceSlot(&layout, Attribute{"aColor", VertexFormat::UByte4Normalized});
   return layout;
@@ -288,12 +288,11 @@ GeometryLayout AtlasTextGeometryLayout(std::shared_ptr<TextureProxy> atlasProxy,
   layout.parameters.aaType = aaType;
   layout.parameters.hasCoverage = aaType == AAType::Coverage;
   layout.parameters.atlasSampler = SamplerState(sampling);
-  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2}, 0);
-  AppendSlot(
-      &layout,
-      aaType == AAType::Coverage ? Attribute{"inCoverage", VertexFormat::Float} : Attribute{}, 1);
-  AppendSlot(&layout, Attribute{"maskCoord", VertexFormat::Float2}, 2);
-  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized}, 3);
+  AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2});
+  AppendSlot(&layout, aaType == AAType::Coverage ? Attribute{"inCoverage", VertexFormat::Float}
+                                                 : Attribute{});
+  AppendSlot(&layout, Attribute{"maskCoord", VertexFormat::Float2});
+  AppendSlot(&layout, Attribute{"inColor", VertexFormat::UByte4Normalized});
   return layout;
 }
 

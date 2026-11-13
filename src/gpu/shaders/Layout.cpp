@@ -94,6 +94,7 @@ Layout DeriveLayout(const Family& family, const Variant& variant) {
           attribute.name = ElementNameOf(module, element);
           attribute.format = ShaderTypeFormat(element.type);
           attribute.location = attributeOrdinal;
+          attribute.instance = element.kind == Element::Kind::InstanceAttribute;
           layout.attributes.push_back(attribute);
         }
         attributeOrdinal++;

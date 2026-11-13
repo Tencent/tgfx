@@ -59,6 +59,9 @@ struct Layout {
     std::string name;
     UniformFormat format = UniformFormat::Float;
     uint8_t location = 0;
+    /// The attribute advances per instance rather than per vertex. Both kinds share one location
+    /// ordinal, so the two buffer layouts take their locations from this one list.
+    bool instance = false;
   };
   struct Varying {
     std::string name;

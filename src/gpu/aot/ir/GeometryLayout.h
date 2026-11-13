@@ -33,9 +33,6 @@ struct GeometryLayout {
   AOTGeometryParameters parameters = {};
   std::vector<Attribute> vertexAttributes = {};
   std::vector<Attribute> instanceAttributes = {};
-  /// The physical vertex slot of each entry in vertexAttributes (a filtered-away attribute keeps
-  /// its declared slot, so an attribute after an unused one does not shift).
-  std::vector<uint32_t> physicalSlots = {};
 };
 
 /// The diagnostic name of a geometry kind (the signature's `GP=` field).

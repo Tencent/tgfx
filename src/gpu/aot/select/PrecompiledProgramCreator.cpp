@@ -184,70 +184,56 @@ static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failur
   return PrecompiledFallbackReason::Unspecified;
 }
 
-// True when the reflected vertex input at the given location (if the shader reads that slot)
-// carries a format the runtime attribute can serve: half-precision and normalized byte
-// attributes read as their float forms in the precompiled GLSL, everything else must match
-// exactly. A slot with no reflected input (an attribute parked on a spare location) passes.
-static bool VertexInputFormatMatches(const std::vector<VertexInput>& inputs, uint32_t location,
-                                     VertexFormat runtimeFormat, const char* shaderName,
-                                     uint32_t variantId, PrecompiledShaderCache* cache,
-                                     const ProgramInfo* programInfo, const Variant* variant) {
-  const VertexInput* input = nullptr;
-  for (const auto& candidate : inputs) {
-    if (candidate.location == location) {
-      input = &candidate;
-      break;
-    }
-  }
-  if (input == nullptr) {
-    return true;
-  }
-  UniformFormat reflected = input->format;
-  bool agrees = false;
-  switch (runtimeFormat) {
+// Whether a runtime vertex format feeds a shader input the declaration types as `declared`.
+// Half-precision and normalized byte attributes are read as their float forms by the precompiled
+// text, so those feed the matching float input; anything else must agree exactly.
+static bool VertexFormatFeedsInput(VertexFormat runtime, UniformFormat declared) {
+  switch (runtime) {
     case VertexFormat::Float:
     case VertexFormat::Half:
     case VertexFormat::UByteNormalized:
-      agrees = reflected == UniformFormat::Float;
-      break;
+      return declared == UniformFormat::Float;
     case VertexFormat::Float2:
     case VertexFormat::Half2:
     case VertexFormat::UByte2Normalized:
-      agrees = reflected == UniformFormat::Float2;
-      break;
+      return declared == UniformFormat::Float2;
     case VertexFormat::Float3:
     case VertexFormat::Half3:
     case VertexFormat::UByte3Normalized:
-      agrees = reflected == UniformFormat::Float3;
-      break;
+      return declared == UniformFormat::Float3;
     case VertexFormat::Float4:
     case VertexFormat::Half4:
     case VertexFormat::UByte4Normalized:
-      agrees = reflected == UniformFormat::Float4;
-      break;
+      return declared == UniformFormat::Float4;
     case VertexFormat::Int:
-      agrees = reflected == UniformFormat::Int;
-      break;
+      return declared == UniformFormat::Int;
     case VertexFormat::Int2:
-      agrees = reflected == UniformFormat::Int2;
-      break;
+      return declared == UniformFormat::Int2;
     case VertexFormat::Int3:
-      agrees = reflected == UniformFormat::Int3;
-      break;
+      return declared == UniformFormat::Int3;
     case VertexFormat::Int4:
-      agrees = reflected == UniformFormat::Int4;
-      break;
+      return declared == UniformFormat::Int4;
   }
-  if (agrees) {
+  return false;
+}
+
+// The one vertex-interface check: the geometry's attribute must feed the declaration's input of
+// the same position. A disagreement means the module's element list and the geometry's attribute
+// list have drifted, so the draw is refunded rather than bound wrongly.
+static bool DeclaredInputAcceptsAttribute(PrecompiledShaderCache* cache,
+                                          const ProgramInfo* programInfo, const Variant& variant,
+                                          const char* shaderName, const Attribute& runtime,
+                                          const Layout::Attribute& declared, const char* side) {
+  if (VertexFormatFeedsInput(runtime.format(), declared.format)) {
     return true;
   }
   cache->recordFailure(PrecompiledFallbackReason::VertexLayoutMismatch,
-                       MakeFallbackRecord(cache, programInfo, variant));
+                       MakeFallbackRecord(cache, programInfo, &variant));
   LOGE(
-      "PrecompiledProgramCreator: vertex format mismatch for %s[variant=%u]: location %u "
-      "reflects format %d but the runtime attribute provides %d",
-      shaderName, variantId, location, static_cast<int>(reflected),
-      static_cast<int>(runtimeFormat));
+      "PrecompiledProgramCreator: vertex interface mismatch for %s[variant=%u]: %s attribute %s "
+      "arrives as format %d, the declaration reads it as %d",
+      shaderName, variant.id(), side, runtime.name().c_str(), static_cast<int>(runtime.format()),
+      static_cast<int>(declared.format));
   return false;
 }
 
@@ -545,116 +531,61 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
   cache->recordAOTStage(PrecompiledAOTStage::FragmentModuleCreated);
 
   RenderPipelineDescriptor descriptor = {};
-  VertexBufferLayout vertexLayout(programInfo->getVertexAttributes());
-  auto& instanceAttributes = programInfo->getInstanceAttributes();
-  // The AOT vertex stage declares its inputs at the template's physical slots, which keep holes
-  // where a conditional attribute is compiled out of the variant (e.g. inUVCoord under
-  // HAS_UV_MATRIX=1), while the GP's attribute list filters those slots away. Two numbering
-  // conventions coexist: a template that declares one input per surviving attribute numbers them
-  // densely, while one that always declares a slot for a filtered-away attribute numbers by the
-  // physical slot. A one-to-one interface therefore pairs in order, and only a shader that reads a
-  // strict subset of the attribute list is matched by physical slot. Instance inputs take the slots
-  // after the vertex ones.
-  const auto& attributeLocations = programInfo->getVertexAttributeLocations();
-  uint32_t instanceBase = 0;
-  for (auto location : attributeLocations) {
-    instanceBase = std::max(instanceBase, location + 1);
-  }
-  if (!vertBlob->vertexInputs.empty()) {
-    auto& inputs = vertBlob->vertexInputs;
-    // Instance inputs occupy the slots after the vertex ones; everything below divides the shader's
-    // declared inputs along that boundary.
-    std::vector<const VertexInput*> vertexInputs = {};
-    for (const auto& input : inputs) {
-      if (input.location < instanceBase) {
-        vertexInputs.push_back(&input);
-        continue;
-      }
-      if (input.location >= instanceBase + instanceAttributes.size()) {
-        cache->recordFailure(PrecompiledFallbackReason::VertexLayoutMismatch,
-                             MakeFallbackRecord(cache, programInfo, &variant));
-        LOGE(
-            "PrecompiledProgramCreator: vertex interface mismatch for %s[variant=%u]: declared "
-            "input at location %u, the geometry processor provides no such attribute",
-            shaderName, variantId, input.location);
-        return nullptr;
-      }
+  // The vertex interface comes from the declaration: each element's location is the one the
+  // assembled text declares, and the element kind splits the two buffer layouts. A geometry may
+  // carry attributes the program does not read (a per-vertex color a kernel takes from a uniform,
+  // a slot its variant filters out); those keep their buffer entry and park on spare locations
+  // past the declared range — that is what a rendered pipeline needs, not a guess about which
+  // numbering convention a template used.
+  const auto& geometryAttributes = programInfo->getVertexAttributes();
+  const auto& instanceAttributes = programInfo->getInstanceAttributes();
+  std::vector<const Layout::Attribute*> declaredVertex = {};
+  std::vector<const Layout::Attribute*> declaredInstance = {};
+  uint32_t spareLocation = 0;
+  for (const auto& attribute : layout.attributes) {
+    spareLocation = std::max(spareLocation, static_cast<uint32_t>(attribute.location) + 1);
+    if (attribute.instance) {
+      declaredInstance.push_back(&attribute);
+    } else {
+      declaredVertex.push_back(&attribute);
     }
-    if (vertexInputs.size() > vertexLayout.attributes.size()) {
-      cache->recordFailure(PrecompiledFallbackReason::VertexLayoutMismatch,
-                           MakeFallbackRecord(cache, programInfo, &variant));
-      LOGE(
-          "PrecompiledProgramCreator: vertex interface mismatch for %s[variant=%u]: %zu "
-          "reflected vertex inputs vs %zu runtime attributes",
-          shaderName, variantId, vertexInputs.size(), vertexLayout.attributes.size());
+  }
+  if (declaredVertex.size() > geometryAttributes.size() ||
+      declaredInstance.size() > instanceAttributes.size()) {
+    cache->recordFailure(PrecompiledFallbackReason::VertexLayoutMismatch,
+                         MakeFallbackRecord(cache, programInfo, &variant));
+    LOGE(
+        "PrecompiledProgramCreator: vertex interface mismatch for %s[variant=%u]: the declaration "
+        "reads %zu vertex and %zu instance attributes, the geometry provides %zu and %zu",
+        shaderName, variantId, declaredVertex.size(), declaredInstance.size(),
+        geometryAttributes.size(), instanceAttributes.size());
+    return nullptr;
+  }
+  VertexBufferLayout vertexLayout(geometryAttributes);
+  for (size_t index = 0; index < geometryAttributes.size(); ++index) {
+    const bool declared = index < declaredVertex.size();
+    if (declared && !DeclaredInputAcceptsAttribute(cache, programInfo, variant, shaderName,
+                                                   geometryAttributes[index],
+                                                   *declaredVertex[index], "vertex")) {
       return nullptr;
     }
-    if (vertexInputs.size() == vertexLayout.attributes.size()) {
-      for (const auto* input : vertexInputs) {
-        vertexLayout.shaderLocations.push_back(input->location);
-      }
-    } else {
-      // The kernel reads a subset: the attributes are shared across kernels, and a kernel that
-      // takes its color from a uniform simply does not declare the color slot. Bind each attribute
-      // to its physical slot where the shader declares it, and park the unread attributes on spare
-      // locations past the declared range. A subset whose locations follow the dense convention
-      // cannot be mapped this way, so it stays an interface error rather than binding wrongly.
-      // The parked slots start after the instance slots: a shader that declares no vertex coverage
-      // (ShapeInstancedTextureCoverage) would otherwise park the unread vertex attributes on the
-      // very locations its instance attributes use.
-      uint32_t spareLocation = instanceBase + static_cast<uint32_t>(instanceAttributes.size());
-      for (auto location : attributeLocations) {
-        bool read = std::any_of(
-            vertexInputs.begin(), vertexInputs.end(),
-            [location](const VertexInput* input) { return input->location == location; });
-        vertexLayout.shaderLocations.push_back(read ? location : spareLocation++);
-      }
-      for (const auto* input : vertexInputs) {
-        if (std::find(attributeLocations.begin(), attributeLocations.end(), input->location) ==
-            attributeLocations.end()) {
-          cache->recordFailure(PrecompiledFallbackReason::VertexLayoutMismatch,
-                               MakeFallbackRecord(cache, programInfo, &variant));
-          LOGE(
-              "PrecompiledProgramCreator: vertex interface mismatch for %s[variant=%u]: the "
-              "shader reads a subset of the attributes but declares input at location %u, which "
-              "the geometry processor does not provide",
-              shaderName, variantId, input->location);
-          return nullptr;
-        }
-      }
-    }
+    vertexLayout.shaderLocations.push_back(declared ? declaredVertex[index]->location
+                                                    : spareLocation++);
   }
   descriptor.vertex.bufferLayouts = {vertexLayout};
-  uint32_t instanceAttributeBase = instanceBase;
   if (!instanceAttributes.empty()) {
     VertexBufferLayout instanceLayout(instanceAttributes, VertexStepMode::Instance);
     for (size_t index = 0; index < instanceAttributes.size(); ++index) {
-      instanceLayout.shaderLocations.push_back(instanceBase + static_cast<uint32_t>(index));
+      const bool declared = index < declaredInstance.size();
+      if (declared && !DeclaredInputAcceptsAttribute(cache, programInfo, variant, shaderName,
+                                                     instanceAttributes[index],
+                                                     *declaredInstance[index], "instance")) {
+        return nullptr;
+      }
+      instanceLayout.shaderLocations.push_back(declared ? declaredInstance[index]->location
+                                                        : spareLocation++);
     }
     descriptor.vertex.bufferLayouts.push_back(instanceLayout);
-  }
-  // The location check above says the shader reads the attribute slots the GP provides; the
-  // format check says it reads them with the layout the GP binds. Half-precision and normalized
-  // byte attributes are read as their float forms by the precompiled GLSL, so those map onto the
-  // float formats before the comparison; anything else must match exactly.
-  {
-    bool formatMismatch = false;
-    for (size_t slot = 0; !formatMismatch && slot < vertexLayout.attributes.size() &&
-                          slot < vertexLayout.shaderLocations.size();
-         ++slot) {
-      formatMismatch =
-          !VertexInputFormatMatches(vertBlob->vertexInputs, vertexLayout.shaderLocations[slot],
-                                    vertexLayout.attributes[slot].format(), shaderName, variantId,
-                                    cache, programInfo, &variant);
-    }
-    for (size_t index = 0; !formatMismatch && index < instanceAttributes.size(); ++index) {
-      formatMismatch = !VertexInputFormatMatches(
-          vertBlob->vertexInputs, instanceAttributeBase + static_cast<uint32_t>(index),
-          instanceAttributes[index].format(), shaderName, variantId, cache, programInfo, &variant);
-    }
-    if (formatMismatch) {
-      return nullptr;
-    }
   }
   // Precompiled GLSL declares attributes with layout(location=N) matching the flattened order of
   // the runtime attribute list. Names in the template differ from the GeometryProcessor's runtime

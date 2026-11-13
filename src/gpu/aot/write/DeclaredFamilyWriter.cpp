@@ -71,19 +71,6 @@ namespace tgfx {
 
 namespace {
 
-#if DEBUG
-/// Whether the geometry's slot list declares the location (the pairing check's per-attribute
-/// probe; a plain loop in place of the std::any_of lambda the coding rules exclude).
-bool SlotIsDeclared(const std::vector<uint32_t>& slots, uint32_t location) {
-  for (uint32_t slot : slots) {
-    if (slot == location) {
-      return true;
-    }
-  }
-  return false;
-}
-#endif
-
 // Frame (slot 0): the render-target adjust vector.
 void WriteFrame(const ProgramInfo& info, SlotWriter* writer) {
   constexpr uint8_t RTAdjust = UniformElementIndexOf(Frame, "RTAdjust");
@@ -863,55 +850,6 @@ class DeclaredFamilyProgramWriter final : public PrecompiledProgramWriter {
 DeclaredFamilyProgramWriter::DeclaredFamilyProgramWriter([[maybe_unused]] const ProgramInfo& info,
                                                          Variant variant)
     : variant(std::move(variant)), layout(DeriveLayout(variant)) {
-#if DEBUG
-  // The pairing contract, spelled the way the program creator applies it: a shader that declares
-  // one input per geometry attribute pairs in order (the count must match), and one that reads a
-  // strict subset pairs by physical slot (every declared location must be a slot the geometry
-  // actually provides). A violation here means the module's element order disagrees with the
-  // geometry's declared attribute order, which would otherwise surface only as pixel damage.
-  // Checked once per program, not once per draw.
-  {
-    const auto& geometryAttributes = info.getVertexAttributes();
-    const auto& geometrySlots = info.getVertexAttributeLocations();
-    // Instance inputs occupy the slots after the vertex ones (the creator's own split), so the
-    // pairing checks below see the vertex inputs alone.
-    uint32_t instanceBase = 0;
-    for (auto slot : geometrySlots) {
-      instanceBase = std::max(instanceBase, slot + 1);
-    }
-    size_t vertexInputCount = 0;
-    for (const auto& attribute : layout.attributes) {
-      if (attribute.location < instanceBase) {
-        ++vertexInputCount;
-      }
-    }
-    if (vertexInputCount > geometryAttributes.size()) {
-      LOGE(
-          "DeclaredFamilyProgramWriter: %s declares %zu vertex inputs but the geometry provides "
-          "%zu attributes — the module's element list is out of sync with the geometry",
-          Families()[variant.family].name, vertexInputCount, geometryAttributes.size());
-      DEBUG_ASSERT(false);
-    }
-    // Only a strict subset pairs by physical slot (the creator parks the unread attributes); a
-    // one-to-one interface pairs in order, where the declared locations are internal numbering.
-    if (vertexInputCount < geometryAttributes.size()) {
-      for (const auto& attribute : layout.attributes) {
-        if (attribute.location >= instanceBase) {
-          continue;
-        }
-        const bool onSlot = SlotIsDeclared(geometrySlots, attribute.location);
-        if (!onSlot) {
-          LOGE(
-              "DeclaredFamilyProgramWriter: attribute %s wants location %u, which the geometry "
-              "does not declare — the module's element order disagrees with the geometry's "
-              "attribute order",
-              attribute.name.c_str(), attribute.location);
-          DEBUG_ASSERT(false);
-        }
-      }
-    }
-  }
-#endif
 }
 
 bool DeclaredFamilyProgramWriter::canWrite(const ProgramInfo&) const {

@@ -92,10 +92,6 @@ class ProgramInfo {
     return getGeometryLayout().instanceAttributes;
   }
 
-  const std::vector<uint32_t>& getVertexAttributeLocations() const {
-    return getGeometryLayout().physicalSlots;
-  }
-
   PipelineColorAttachment getPipelineColorAttachment() const;
 
   int getSampleCount() const;
