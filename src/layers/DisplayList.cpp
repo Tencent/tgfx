@@ -479,15 +479,14 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
         capturedRect.join(rect);
       }
       auto footprints = collectBackgroundFootprints(inverse.mapRect(capturedRect));
-      // The capture keeps the tile rects when there are more footprints than the per-layer cull
-      // loop can afford.
-      if (!footprints.empty() && footprints.size() <= MAX_CULL_RECTS) {
+      if (!footprints.empty()) {
         cullRects.reserve(footprints.size());
         for (const auto& footprint : footprints) {
           auto rect = viewMatrix.mapRect(footprint);
           rect.roundOut();
           cullRects.push_back(rect);
         }
+        normalizeCullRects(&cullRects);
       }
     }
     snapshotMap = captureBackgrounds(surface, captureRects, cullRects);
@@ -1227,6 +1226,40 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
 }
 
+// Joins the rects that overlap or touch, so many styles sitting next to each other do not multiply
+// the per-layer cull loop. When even that leaves more than MAX_CULL_RECTS a single bounding rect is
+// used: a coarser cull still draws less than the whole tile, so it never falls back to unculled.
+void DisplayList::normalizeCullRects(std::vector<Rect>* rects) {
+  bool merged = true;
+  while (merged) {
+    merged = false;
+    for (size_t i = 0; i < rects->size() && !merged; ++i) {
+      for (size_t j = i + 1; j < rects->size(); ++j) {
+        auto& current = (*rects)[i];
+        const auto& other = (*rects)[j];
+        auto joined = current;
+        joined.join(other);
+        // Only merge when the join adds no area of its own, which covers both overlap and a shared
+        // edge but leaves a real gap alone.
+        auto joinedArea = joined.width() * joined.height();
+        if (joinedArea <= current.width() * current.height() + other.width() * other.height()) {
+          current = joined;
+          rects->erase(rects->begin() + static_cast<long>(j));
+          merged = true;
+          break;
+        }
+      }
+    }
+  }
+  if (rects->size() > MAX_CULL_RECTS) {
+    auto unionRect = Rect::MakeEmpty();
+    for (const auto& rect : *rects) {
+      unionRect.join(rect);
+    }
+    rects->assign(1, unionRect);
+  }
+}
+
 // Intersects each footprint with each captured rect instead of with their union, so the narrowed
 // cull never covers more than the capture would have drawn without the footprints. Footprints that
 // overlap no captured rect are dropped.
@@ -1248,7 +1281,7 @@ std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprin
 // Adds the world rect each visible background style samples. Returns false when the subtree cannot
 // bound what its styles sample, so the caller keeps the whole tile instead.
 bool DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds,
-                                              std::vector<Rect>* footprints) {
+                                              std::vector<Rect>* footprints, bool collect) {
   if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
       !Rect::Intersects(bounds, layer->renderBounds)) {
     return true;
@@ -1260,19 +1293,26 @@ bool DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bo
   if (layer->canPreserve3D() || nonAffine3D) {
     return false;
   }
-  for (const auto& style : layer->_layerStyles) {
-    if (style == nullptr || (style->extraSourceType() &
-                             static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
-      continue;
+  bool pushed = false;
+  if (collect) {
+    for (const auto& style : layer->_layerStyles) {
+      if (style == nullptr || (style->extraSourceType() &
+                               static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
+        continue;
+      }
+      // The style samples the backdrop under its own bounds plus the blur reach, and a child's own
+      // footprint stays inside it: renderBounds folds the children in and the outset propagates up.
+      auto footprint = layer->renderBounds;
+      footprint.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
+      footprints->push_back(footprint);
+      pushed = true;
+      break;
     }
-    // The style samples the backdrop under its own bounds plus the blur reach.
-    auto footprint = layer->renderBounds;
-    footprint.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
-    footprints->push_back(footprint);
-    break;
   }
+  // The descendants of a layer that pushed its own footprint are covered by it, so only the safety
+  // checks below still have to walk them.
   for (const auto& child : layer->_children) {
-    if (!collectBackgroundFootprints(child.get(), bounds, footprints)) {
+    if (!collectBackgroundFootprints(child.get(), bounds, footprints, collect && !pushed)) {
       return false;
     }
   }
@@ -1281,7 +1321,7 @@ bool DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bo
 
 std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds) const {
   std::vector<Rect> footprints = {};
-  if (!collectBackgroundFootprints(_root.get(), worldBounds, &footprints)) {
+  if (!collectBackgroundFootprints(_root.get(), worldBounds, &footprints, true)) {
     return {};
   }
   return footprints;
@@ -1344,9 +1384,10 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
       footprints.push_back(footprint);
     }
     auto narrowed = narrowCullRects(footprints, worldRects);
-    // Fall back to the whole captured area when the intersection is unusable: an empty list would
-    // drop the backdrop the styles read, and an oversized one costs more than the culling saves.
-    if (!narrowed.empty() && narrowed.size() <= MAX_CULL_RECTS) {
+    // An empty list means no style samples inside this capture, in which case the whole area is
+    // kept rather than replaying the tree for nothing.
+    if (!narrowed.empty()) {
+      normalizeCullRects(&narrowed);
       cullWorldRects = std::move(narrowed);
       culled = true;
     }
