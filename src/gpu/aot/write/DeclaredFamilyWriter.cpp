@@ -75,11 +75,9 @@ namespace {
 /// index in its module's declaration (a compile-time constant) through the layout's elementField
 /// table — no name is composed at draw time. The per-draw work is one match rule (the program's
 /// own family, for the data-source leaves) plus the module walk.
-class DeclaredFamilyProgramWriter final : public PrecompiledProgramWriter {
+class DeclaredFamilyProgramWriter final : public ProgramWriter {
  public:
   DeclaredFamilyProgramWriter(const ProgramInfo& info, Variant variant);
-
-  bool canWrite(const ProgramInfo& info) const override;
 
  protected:
   void writeEngineDefaults(const ProgramInfo& info,
@@ -99,10 +97,6 @@ class DeclaredFamilyProgramWriter final : public PrecompiledProgramWriter {
 DeclaredFamilyProgramWriter::DeclaredFamilyProgramWriter([[maybe_unused]] const ProgramInfo& info,
                                                          Variant variant)
     : variant(std::move(variant)), layout(DeriveLayout(variant)) {
-}
-
-bool DeclaredFamilyProgramWriter::canWrite(const ProgramInfo&) const {
-  return true;
 }
 
 void DeclaredFamilyProgramWriter::writeEngineDefaults(const ProgramInfo&, UniformData*) const {

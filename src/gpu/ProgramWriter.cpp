@@ -358,10 +358,6 @@ void ChainProgramWriter::writeEngineDefaults(const ProgramInfo& info,
   xferWriter.set(OutputAlphaSwizzle, info.getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0);
 }
 
-bool PrecompiledProgramWriter::canWrite(const ProgramInfo&) const {
-  return true;
-}
-
 // The interpreter program the draw's match compiled. The match carries it on its result (the
 // Chain family compiles to derive its variant), so the writers read the one decision instead of
 // resolving — and potentially re-memoizing — the same program again.

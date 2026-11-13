@@ -120,29 +120,12 @@ class ProgramWriter {
 };
 
 /**
- * The precompiled route's base: the artifact's engine defaults and sampler slots. It is not a
- * writer on its own — every family either declares its own processor write (the declared families,
- * deriving the layout from the variant) or compiles the draw's whole expression (Chain), so no
- * concrete writer leaves writeProcessors unimplemented.
- */
-class PrecompiledProgramWriter : public ProgramWriter {
- public:
-  bool canWrite(const ProgramInfo& info) const override;
-
- protected:
-  /// The declared families implement this from their module declarations; the chain writer binds
-  /// its compiled program's binding table. There is no shared default left.
-  bool writeSamplers(const ProgramInfo& info, Program* program,
-                     RenderPass* renderPass) const override = 0;
-};
-
-/**
  * The fused chain kernel's writer: the draw's whole uniform content, its vertex transforms and its
  * sampler bindings all come from the compiled chain program the info carries (uniforms through the
  * aot binder, transforms from the binding table, samplers in binding order) — no processor tree is
  * walked. It stays a ProgramWriter until P7 folds the whole writer hierarchy away.
  */
-class ChainProgramWriter final : public PrecompiledProgramWriter {
+class ChainProgramWriter final : public ProgramWriter {
  public:
   /// The writer addresses the chain's uniform block by the variant's derived layout: the slot
   /// index of the Chain module and the element indices of its fields are fixed per program.
