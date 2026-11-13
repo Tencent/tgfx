@@ -478,10 +478,10 @@ TGFX_TEST(TextureLayerIntegrationTest, RenderModesAndCacheInvalidation) {
     }
     auto filter = TextureFilter::Make(initialSizeX, 16.0f, 6.0f, 3491, false);
     auto layer = SolidLayer::Make();
-    layer->setWidth(170.0f);
-    layer->setHeight(110.0f);
+    layer->setWidth(120.0f);
+    layer->setHeight(80.0f);
     layer->setColor(Color::FromRGBA(40, 120, 210));
-    layer->setMatrix(Matrix::MakeTrans(75.0f, 105.0f));
+    layer->setMatrix(Matrix::MakeTrans(60.0f, 70.0f));
     layer->setFilters({filter});
     displayList.root()->addChild(layer);
     displayList.render(surface.get());
@@ -499,12 +499,13 @@ TGFX_TEST(TextureLayerIntegrationTest, RenderModesAndCacheInvalidation) {
   EXPECT_LE(CompareScenes(direct, partial).mean, 0.1);
   EXPECT_LE(CompareScenes(direct, tiled).mean, 0.1);
 
-  auto fresh = render(RenderMode::Direct, 24.0f, false);
   const RenderMode modes[] = {RenderMode::Direct, RenderMode::Partial, RenderMode::Tiled};
   const RenderedScene* initials[] = {&direct, &partial, &tiled};
   for (size_t index = 0; index < 3; ++index) {
+    SCOPED_TRACE(index);
     auto mutated = render(modes[index], 16.0f, true);
     EXPECT_GT(CompareScenes(*initials[index], mutated).mean, 0.01);
+    auto fresh = render(modes[index], 24.0f, false);
     auto difference = CompareScenes(mutated, fresh);
     EXPECT_LE(difference.mean, 0.1);
     EXPECT_LE(difference.max, 8);
