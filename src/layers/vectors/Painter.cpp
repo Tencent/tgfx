@@ -27,15 +27,16 @@ class RecorderPainterSink : public PainterSink {
   explicit RecorderPainterSink(LayerRecorder* recorder) : _recorder(recorder) {
   }
 
-  void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint,
-                const Matrix& matrix) override {
+  void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint, const Matrix& matrix,
+                const Geometry* /*source*/, std::shared_ptr<ColorSource> /*colorSource*/) override {
     _recorder->setMatrix(matrix);
     _recorder->addShape(std::move(shape), &paint);
     _recorder->resetMatrix();
   }
 
   void addGlyphRun(std::shared_ptr<TextBlob> textBlob, std::shared_ptr<Shape> shape,
-                   std::vector<LayerPaint> paints, const Matrix& matrix) override {
+                   std::vector<LayerPaint> paints, const Matrix& matrix, const Geometry* /*source*/,
+                   std::shared_ptr<ColorSource> /*colorSource*/) override {
     _recorder->setMatrix(matrix);
     for (const auto& paint : paints) {
       if (shape != nullptr) {
@@ -81,7 +82,7 @@ void Painter::draw(PainterSink* sink) {
         runMatrix.postConcat(innerMatrix);
         runMatrix.postConcat(outerMatrix);
         sink->addGlyphRun(std::move(emit.textBlob), std::move(emit.shape), std::move(emit.paints),
-                          runMatrix);
+                          runMatrix, geometry, colorSource);
       }
       continue;
     }
@@ -101,7 +102,7 @@ void Painter::draw(PainterSink* sink) {
     if (shape == nullptr) {
       continue;
     }
-    sink->addShape(std::move(shape), paint, outerMatrix);
+    sink->addShape(std::move(shape), paint, outerMatrix, geometry, colorSource);
   }
 }
 

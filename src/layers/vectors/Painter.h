@@ -40,11 +40,12 @@ class PainterSink {
  public:
   virtual ~PainterSink() = default;
 
-  virtual void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint,
-                        const Matrix& matrix) = 0;
+  virtual void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint, const Matrix& matrix,
+                        const Geometry* source, std::shared_ptr<ColorSource> colorSource) = 0;
 
   virtual void addGlyphRun(std::shared_ptr<TextBlob> textBlob, std::shared_ptr<Shape> shape,
-                           std::vector<LayerPaint> paints, const Matrix& matrix) = 0;
+                           std::vector<LayerPaint> paints, const Matrix& matrix,
+                           const Geometry* source, std::shared_ptr<ColorSource> colorSource) = 0;
 };
 
 /**

@@ -24,6 +24,7 @@
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/layers/LayerPaint.h"
+#include "tgfx/layers/vectors/ColorSource.h"
 
 namespace tgfx {
 
@@ -52,6 +53,18 @@ struct VectorDrawOp {
    * The transform from the prepared geometry space to the layer space.
    */
   Matrix matrix = Matrix::I();
+
+  /**
+   * Opaque identity of the captured geometry that produced this op. It stays stable for the
+   * lifetime of the draw call and lets a caller correlate the op with the element it built.
+   */
+  const void* geometry = nullptr;
+
+  /**
+   * The authored color source of the painter. Exporters use it to rebuild a seriable paint
+   * (gradient or image pattern) because the prepared shader itself is opaque.
+   */
+  std::shared_ptr<ColorSource> colorSource = nullptr;
 };
 
 /**

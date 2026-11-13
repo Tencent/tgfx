@@ -5702,6 +5702,8 @@ TGFX_TEST(VectorLayerTest, PrepareDraws) {
   EXPECT_EQ(filledSink.glyphRuns.size(), 0u);
   EXPECT_EQ(filledSink.ownGeometries.size(), 0u);
   EXPECT_TRUE(filledSink.shapes[0].shape != nullptr);
+  EXPECT_TRUE(filledSink.shapes[0].geometry != nullptr);
+  EXPECT_TRUE(filledSink.shapes[0].colorSource != nullptr);
   ASSERT_EQ(filledSink.shapes[0].paints.size(), 1u);
   EXPECT_EQ(filledSink.shapes[0].paints[0].color, Color::White());
 
@@ -5728,6 +5730,7 @@ TGFX_TEST(VectorLayerTest, PrepareDraws) {
   EXPECT_TRUE(textSink.glyphRuns[0].textBlob != nullptr);
   ASSERT_EQ(textSink.glyphRuns[0].paints.size(), 1u);
   EXPECT_EQ(textSink.glyphRuns[0].matrix, Matrix::MakeTrans(20, 40));
+  EXPECT_TRUE(textSink.glyphRuns[0].colorSource != nullptr);
 }
 
 }  // namespace tgfx
