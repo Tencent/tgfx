@@ -117,8 +117,7 @@ bool ProgramWriter::write(const ProgramInfo& info, RenderPass* renderPass, Progr
 
   info.bindUniformBufferAndUnloadToGPU(program, std::move(uniformBuffer), renderPass, vertexOffset,
                                        fragmentOffset);
-  writeSamplers(info, program, renderPass);
-  return true;
+  return writeSamplers(info, program, renderPass);
 }
 
 bool ProgramWriter::canWrite(const ProgramInfo&) const {
@@ -373,14 +372,14 @@ void ChainProgramWriter::writeEngineDefaults(const ProgramInfo& info,
   xferWriter.set(OutputAlphaSwizzle, info.getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0);
 }
 
-void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
+bool PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
                                              RenderPass* renderPass) const {
   auto samplers = info.getSamplers();
   auto expected = program->expectedTextureCount();
   // The dst texture always binds last in the artifact. When the artifact declares more samplers
-  // than the draw supplies (e.g. an absent device mask on a runtime-guarded kernel), the holes sit
-  // before the dst, so hold the dst aside and pad with the shared dummy texture first; the guarded
-  // shader path never samples the padded slots.
+  // than the draw supplies (an absent device mask on a runtime-guarded kernel, the edge-lit-off
+  // UDF's edge-mask slot), the holes sit before the dst, so hold the dst aside and pad with the
+  // shared dummy texture first; the guarded shader path never samples the padded slots.
   const auto& xferDstProxy = info.getXferFacts().dstProxy();
   auto xferDstView = xferDstProxy != nullptr ? xferDstProxy->getTextureView() : nullptr;
   bool holdDst = expected > samplers.size() && !samplers.empty() && xferDstView != nullptr;
@@ -393,9 +392,6 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
   unsigned textureBinding = 0;
   auto gpu = info.renderTarget->getContext()->gpu();
   auto* cache = info.renderTarget->getContext()->globalCache();
-  // A precompiled kernel can leave a hole right after the supplied color samplers — an absent
-  // device mask, or the edge-lit-off UDF's always-declared edge-mask slot in the declared
-  // GlassRefraction families — so an expected/supplied gap means the dummy must be inserted there.
   bool padHole = expected > samplers.size();
   for (size_t i = 0; i < sequentialCount; ++i) {
     if (padHole && textureBinding == colorSamplerCount) {
@@ -403,6 +399,13 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
                              cache->getOrCreateDummySampler());
     }
     auto& [texture, state] = samplers[i];
+    if (texture == nullptr) {
+      // A slot the recording declared but whose source has not instantiated yet: occupy it with
+      // the dummy so the slots after it keep their positions.
+      renderPass->setTexture(textureBinding++, cache->getOrCreateDummyTexture(),
+                             cache->getOrCreateDummySampler());
+      continue;
+    }
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                  state.minFilterMode, state.magFilterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
@@ -423,6 +426,7 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
     auto sampler = gpu->createSampler(descriptor);
     renderPass->setTexture(textureBinding, texture, sampler);
   }
+  return true;
 }
 
 bool PrecompiledProgramWriter::canWrite(const ProgramInfo&) const {
@@ -511,15 +515,14 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
   }
 }
 
-void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
+bool ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
                                        RenderPass* renderPass) const {
-  // `program` is read by DEBUG_ASSERT only, which Release builds compile out.
-  (void)program;
   const auto* chainProgram = AOTChainBuilder::ResolveChainProgram(&info);
   if (chainProgram == nullptr) {
     LOGE("ChainProgramWriter::writeSamplers() no compiled chain program; skipping the bindings");
-    return;
+    return false;
   }
+  auto* cache = info.renderTarget->getContext()->globalCache();
   auto gpu = info.renderTarget->getContext()->gpu();
   unsigned textureBinding = 0;
   // The artifact's sampler order is the program's binding order: the DAG leaves (padded to the
@@ -529,14 +532,18 @@ void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program
     auto textureView =
         binding.textureProxy != nullptr ? binding.textureProxy->getTextureView() : nullptr;
     if (textureView == nullptr || textureView->getTexture() == nullptr) {
-      LOGE("ChainProgramWriter::writeSamplers() a bound texture is not instantiated");
-      return;
+      // The binding occupies its slot whether or not the upload has landed: dropping the draw
+      // here would lose content the shader guards against, and leaving the slot unbound would
+      // shift every binding after it. The dummy keeps the position.
+      renderPass->setTexture(textureBinding++, cache->getOrCreateDummyTexture(),
+                             cache->getOrCreateDummySampler());
+      continue;
     }
     SamplerState state(binding.args.tileModeX, binding.args.tileModeY, binding.args.sampling);
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                  state.minFilterMode, state.magFilterMode, state.mipmapMode);
-    auto sampler = gpu->createSampler(descriptor);
-    renderPass->setTexture(textureBinding++, textureView->getTexture(), sampler);
+    renderPass->setTexture(textureBinding++, textureView->getTexture(),
+                           gpu->createSampler(descriptor));
   }
   // The dst texture always binds last.
   const auto& dstProxy = info.getXferFacts().dstProxy();
@@ -545,14 +552,15 @@ void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program
     auto state = SamplerState();
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                  state.minFilterMode, state.magFilterMode, state.mipmapMode);
-    auto sampler = gpu->createSampler(descriptor);
-    renderPass->setTexture(textureBinding++, dstTextureView->getTexture(), sampler);
+    renderPass->setTexture(textureBinding++, dstTextureView->getTexture(),
+                           gpu->createSampler(descriptor));
   }
   if (textureBinding != program->expectedTextureCount()) {
     LOGE("ChainProgramWriter::writeSamplers(): bound %u textures but the program declares %zu",
          textureBinding, program->expectedTextureCount());
-    DEBUG_ASSERT(false);
+    return false;
   }
+  return true;
 }
 
 }  // namespace tgfx

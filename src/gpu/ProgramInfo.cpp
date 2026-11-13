@@ -274,13 +274,46 @@ bool ProgramInfo::glProfileMatchesCache() const {
 }
 
 bool ProgramInfo::samplersAre2D() const {
-  for (const auto& sampler : getSamplers()) {
-    if (sampler.texture == nullptr) {
+  // The same texture set getSamplers() would build, walked without building it: the gate runs
+  // before a program exists (twice per draw), so it must not allocate a vector.
+  auto isTwoD = [](const std::shared_ptr<Texture>& texture) {
+    // Only TwoD is supported by the precompiled samplers (see the gate in MatchPermutationImpl for
+    // where rectangle and External (OES) textures come from). A slot without a texture counts as
+    // "not 2D": the draw would bind a dummy there.
+    return texture != nullptr && texture->type() == TextureType::TwoD;
+  };
+  if (geometryLayout.parameters.atlasProxy != nullptr) {
+    auto atlasView = geometryLayout.parameters.atlasProxy->getTextureView();
+    if (atlasView != nullptr && !isTwoD(atlasView->getTexture())) {
       return false;
     }
-    // Only TwoD is supported by the precompiled samplers (see the gate in MatchPermutationImpl
-    // for where rectangle and External (OES) textures come from).
-    if (sampler.texture->type() != TextureType::TwoD) {
+  }
+  if (carriedIR != nullptr) {
+    for (const auto& ref : carriedIR->samplers) {
+      auto view = ref.textureProxy != nullptr ? ref.textureProxy->getTextureView() : nullptr;
+      if (view == nullptr) {
+        if (ref.countsWithoutView) {
+          return false;
+        }
+        continue;
+      }
+      if (view->isYUV()) {
+        auto* yuvView = static_cast<const YUVTextureView*>(view.get());
+        for (size_t index = 0; index < yuvView->textureCount(); ++index) {
+          if (!isTwoD(yuvView->getTextureAt(index))) {
+            return false;
+          }
+        }
+        continue;
+      }
+      if (!isTwoD(view->getTexture())) {
+        return false;
+      }
+    }
+  }
+  if (xferFacts.shaderBlend() && xferFacts.dstProxy() != nullptr) {
+    auto dstView = xferFacts.dstProxy()->getTextureView();
+    if (dstView != nullptr && !isTwoD(dstView->getTexture())) {
       return false;
     }
   }

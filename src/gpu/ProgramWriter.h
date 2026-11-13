@@ -93,8 +93,12 @@ class ProgramWriter {
   virtual void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
                                UniformData* fragmentUniformData) const = 0;
 
-  /** Binds the draw's textures onto the program's sampler slots. */
-  virtual void writeSamplers(const ProgramInfo& info, Program* program,
+  /**
+   * Binds the draw's textures onto the program's sampler slots. Returns false when the draw's
+   * sources do not fill exactly the slots the program declares: a missing slot is an interface
+   * error, never a shift of the slots that follow it.
+   */
+  virtual bool writeSamplers(const ProgramInfo& info, Program* program,
                              RenderPass* renderPass) const = 0;
 };
 
@@ -109,7 +113,7 @@ class PrecompiledProgramWriter : public ProgramWriter {
   bool canWrite(const ProgramInfo& info) const override;
 
  protected:
-  void writeSamplers(const ProgramInfo& info, Program* program,
+  bool writeSamplers(const ProgramInfo& info, Program* program,
                      RenderPass* renderPass) const override;
 };
 
@@ -134,7 +138,7 @@ class ChainProgramWriter final : public PrecompiledProgramWriter {
                               UniformData* fragmentUniformData) const override;
   void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
                        UniformData* fragmentUniformData) const override;
-  void writeSamplers(const ProgramInfo& info, Program* program,
+  bool writeSamplers(const ProgramInfo& info, Program* program,
                      RenderPass* renderPass) const override;
 
  private:
