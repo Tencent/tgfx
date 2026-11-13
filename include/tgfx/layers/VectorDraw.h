@@ -67,6 +67,12 @@ struct VectorDrawOp {
   const void* sourceTag = nullptr;
 
   /**
+   * Opaque identity of the style element that produced the painter for this op, or null when the
+   * style did not attach one. Exporters use it to recover the authored fill or stroke node.
+   */
+  const void* painterTag = nullptr;
+
+  /**
    * The authored color source of the painter. Exporters use it to rebuild a seriable paint
    * (gradient or image pattern) because the prepared shader itself is opaque.
    */

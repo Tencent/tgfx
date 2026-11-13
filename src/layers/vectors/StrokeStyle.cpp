@@ -244,6 +244,7 @@ void StrokeStyle::apply(VectorContext* context) {
   auto painter = std::make_unique<StrokePainter>();
   painter->shader = std::move(shader);
   painter->colorSource = _colorSource;
+  painter->sourceTag = sourceTag();
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
   painter->placement = _placement;

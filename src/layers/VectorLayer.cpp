@@ -113,20 +113,22 @@ class LayerVectorDrawSink : public PainterSink {
   }
 
   void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint, const Matrix& matrix,
-                const Geometry* source, std::shared_ptr<ColorSource> colorSource) override {
+                const Geometry* source, std::shared_ptr<ColorSource> colorSource,
+                const void* painterTag) override {
     VectorDrawOp op = {};
     op.shape = std::move(shape);
     op.paints.push_back(paint);
     op.matrix = matrix;
     op.geometry = source;
     op.sourceTag = source->sourceTag;
+    op.painterTag = painterTag;
     op.colorSource = std::move(colorSource);
     _sink->drawShape(op);
   }
 
   void addGlyphRun(std::shared_ptr<TextBlob> textBlob, std::shared_ptr<Shape> shape,
                    std::vector<LayerPaint> paints, const Matrix& matrix, const Geometry* source,
-                   std::shared_ptr<ColorSource> colorSource) override {
+                   std::shared_ptr<ColorSource> colorSource, const void* painterTag) override {
     VectorDrawOp op = {};
     op.shape = std::move(shape);
     op.textBlob = std::move(textBlob);
@@ -134,6 +136,7 @@ class LayerVectorDrawSink : public PainterSink {
     op.matrix = matrix;
     op.geometry = source;
     op.sourceTag = source->sourceTag;
+    op.painterTag = painterTag;
     op.colorSource = std::move(colorSource);
     _sink->drawGlyphRun(op);
   }

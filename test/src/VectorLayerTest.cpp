@@ -5696,7 +5696,9 @@ class CollectingVectorDrawSink : public VectorDrawSink {
 TGFX_TEST(VectorLayerTest, PrepareDraws) {
   auto filledLayer = VectorLayer::Make();
   auto filledRectangle = MakeRoundedRectangle();
-  filledLayer->setContents({filledRectangle, MakeFillStyle(Color::White())});
+  auto filledStyle = MakeFillStyle(Color::White());
+  filledStyle->setSourceTag(filledStyle.get());
+  filledLayer->setContents({filledRectangle, filledStyle});
   CollectingVectorDrawSink filledSink = {};
   ASSERT_TRUE(filledLayer->prepareDraws(&filledSink));
   ASSERT_EQ(filledSink.shapes.size(), 1u);
@@ -5706,6 +5708,7 @@ TGFX_TEST(VectorLayerTest, PrepareDraws) {
   EXPECT_TRUE(filledSink.shapes[0].geometry != nullptr);
   EXPECT_TRUE(filledSink.shapes[0].colorSource != nullptr);
   EXPECT_EQ(filledSink.shapes[0].sourceTag, nullptr);
+  EXPECT_EQ(filledSink.shapes[0].painterTag, filledStyle.get());
   ASSERT_EQ(filledSink.shapes[0].paints.size(), 1u);
   EXPECT_EQ(filledSink.shapes[0].paints[0].color, Color::White());
 

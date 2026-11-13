@@ -41,11 +41,13 @@ class PainterSink {
   virtual ~PainterSink() = default;
 
   virtual void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint, const Matrix& matrix,
-                        const Geometry* source, std::shared_ptr<ColorSource> colorSource) = 0;
+                        const Geometry* source, std::shared_ptr<ColorSource> colorSource,
+                        const void* painterTag) = 0;
 
   virtual void addGlyphRun(std::shared_ptr<TextBlob> textBlob, std::shared_ptr<Shape> shape,
                            std::vector<LayerPaint> paints, const Matrix& matrix,
-                           const Geometry* source, std::shared_ptr<ColorSource> colorSource) = 0;
+                           const Geometry* source, std::shared_ptr<ColorSource> colorSource,
+                           const void* painterTag) = 0;
 };
 
 /**
@@ -115,6 +117,10 @@ class Painter {
 
   std::shared_ptr<Shader> shader = nullptr;
   std::shared_ptr<ColorSource> colorSource = nullptr;
+  /**
+   * Opaque identity of the style element that created this painter. tgfx never dereferences it.
+   */
+  const void* sourceTag = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   float alpha = 1.0f;
   LayerPlacement placement = LayerPlacement::Background;
