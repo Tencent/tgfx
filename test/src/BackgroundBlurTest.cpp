@@ -1525,4 +1525,75 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CullFootprintsCoverTheSampledArea) {
   })
 }
 
+static std::vector<uint8_t> ReadSurfacePixels(Surface* surface) {
+  auto info = ImageInfo::Make(surface->width(), surface->height(), ColorType::RGBA_8888,
+                              AlphaType::Premultiplied);
+  std::vector<uint8_t> pixels(static_cast<size_t>(surface->width() * surface->height() * 4));
+  EXPECT_TRUE(surface->readPixels(info, pixels.data()));
+  return pixels;
+}
+
+// The capture culls its draw calls to the footprints of the background styles, but the layer style
+// sources it caches are reused for the whole tile: a child outside the footprint must still reach
+// the shadow of the styled parent.
+TGFX_TEST(BackgroundBlurTest, CaptureCullKeepsStyleSourceComplete) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int SurfaceSize = 240;
+
+  auto makeChild = [](float x, float y) {
+    auto child = ShapeLayer::Make();
+    Path path;
+    path.addRect(Rect::MakeXYWH(0, 0, 40, 40));
+    child->setPath(path);
+    child->setFillStyle(ShapeStyle::Make(Color::Red()));
+    child->setMatrix(Matrix::MakeTrans(x, y));
+    return child;
+  };
+
+  auto render = [&](RenderMode mode) {
+    auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
+    EXPECT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(mode);
+
+    auto parent = Layer::Make();
+    parent->setLayerStyles({DropShadowStyle::Make(0, 20, 0, 0, Color::Black())});
+    parent->addChild(makeChild(10, 10));
+    parent->addChild(makeChild(150, 10));
+    displayList->root()->addChild(parent);
+
+    // Only covers the first child, so the capture footprint stays small.
+    auto blur = ShapeLayer::Make();
+    Path blurPath;
+    blurPath.addRect(Rect::MakeXYWH(0, 0, 60, 60));
+    blur->setPath(blurPath);
+    blur->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 40)));
+    blur->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+    displayList->root()->addChild(blur);
+
+    displayList->render(surface.get());
+    return ReadSurfacePixels(surface.get());
+  };
+
+  auto direct = render(RenderMode::Direct);
+  auto tiled = render(RenderMode::Tiled);
+  ASSERT_FALSE(direct.empty());
+  ASSERT_EQ(direct.size(), tiled.size());
+
+  // The shadow under the far child, below its bottom edge and inside the shadow offset.
+  const auto shadowOffset = static_cast<size_t>(((10 + 40 + 10) * SurfaceSize + 170) * 4);
+  EXPECT_EQ(direct[shadowOffset + 3], 255);
+  EXPECT_EQ(tiled[shadowOffset + 3], 255);
+  size_t different = 0;
+  for (size_t i = 0; i < direct.size(); i += 4) {
+    if (tiled[i] != direct[i] || tiled[i + 1] != direct[i + 1] || tiled[i + 2] != direct[i + 2] ||
+        tiled[i + 3] != direct[i + 3]) {
+      ++different;
+    }
+  }
+  EXPECT_EQ(different, 0u);
+}
+
 }  // namespace tgfx

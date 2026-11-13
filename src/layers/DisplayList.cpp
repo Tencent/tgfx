@@ -1356,7 +1356,7 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     bgSource->getCanvas()->drawColor(_backgroundColor, BlendMode::SrcOver);
   }
   BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get(),
-                          cullWorldRects);
+                          cullWorldRects, worldRects);
   return snapshotMap;
 }
 

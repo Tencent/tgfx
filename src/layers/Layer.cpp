@@ -954,7 +954,8 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       // rooted, or this layer's local bounds when orphan.
       Layer* captureRoot = _root ? _root : this;
       Rect captureRect = _root ? renderRect : clippedBounds;
-      BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), &snapshotMap, {captureRect});
+      BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), &snapshotMap, {captureRect},
+                              {captureRect});
       snapshotsPtr = &snapshotMap;
     }
   }
@@ -1852,6 +1853,11 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   drawArgs.render3DContext = nullptr;
   // Layer style source content is an intermediate artifact — skip background capture / consume.
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
+  // The cached sources are reused outside the rects that limit the capture's own draw calls, so a
+  // capture pass records them against the whole area it captured.
+  if (args.styleSourceRects != nullptr) {
+    drawArgs.renderRects = args.styleSourceRects;
+  }
 
   // Record the geometry once for both buckets: neither the recording nor the shape depends on
   // drawArgs.excludeEffects, so both buckets would otherwise record the same raster. Keep it that
