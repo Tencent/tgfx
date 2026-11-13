@@ -80,7 +80,7 @@ void Text::apply(VectorContext* context) {
   if (_textBlob == nullptr) {
     return;
   }
-  context->addTextBlob(_textBlob, _position, _anchors);
+  context->addTextBlob(_textBlob, _position, _anchors, sourceTag());
 }
 
 }  // namespace tgfx

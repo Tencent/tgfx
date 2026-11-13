@@ -61,6 +61,12 @@ struct VectorDrawOp {
   const void* geometry = nullptr;
 
   /**
+   * Opaque identity of the vector element that produced the captured geometry, or null when the
+   * element did not attach one. Exporters use it to recover the authored node behind this draw.
+   */
+  const void* sourceTag = nullptr;
+
+  /**
    * The authored color source of the painter. Exporters use it to rebuild a seriable paint
    * (gradient or image pattern) because the prepared shader itself is opaque.
    */

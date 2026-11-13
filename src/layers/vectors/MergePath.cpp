@@ -71,7 +71,7 @@ void MergePath::apply(VectorContext* context) {
   context->painters.clear();
 
   if (mergedShape) {
-    context->addShape(std::move(mergedShape));
+    context->addShape(std::move(mergedShape), sourceTag());
   }
 }
 

@@ -127,6 +127,12 @@ class Geometry {
    */
   std::vector<Glyph> glyphs = {};
 
+  /**
+   * Opaque identity of the element that produced this geometry. It stays owned by the caller and
+   * is never dereferenced by tgfx.
+   */
+  const void* sourceTag = nullptr;
+
  private:
   friend class VectorContext;
 

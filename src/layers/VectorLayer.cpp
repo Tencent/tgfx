@@ -119,6 +119,7 @@ class LayerVectorDrawSink : public PainterSink {
     op.paints.push_back(paint);
     op.matrix = matrix;
     op.geometry = source;
+    op.sourceTag = source->sourceTag;
     op.colorSource = std::move(colorSource);
     _sink->drawShape(op);
   }
@@ -132,6 +133,7 @@ class LayerVectorDrawSink : public PainterSink {
     op.paints = std::move(paints);
     op.matrix = matrix;
     op.geometry = source;
+    op.sourceTag = source->sourceTag;
     op.colorSource = std::move(colorSource);
     _sink->drawGlyphRun(op);
   }

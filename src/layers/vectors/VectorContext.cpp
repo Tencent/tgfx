@@ -20,27 +20,30 @@
 
 namespace tgfx {
 
-void VectorContext::addShape(std::shared_ptr<Shape> shape) {
+void VectorContext::addShape(std::shared_ptr<Shape> shape, const void* sourceTag) {
   if (shape == nullptr) {
     return;
   }
   auto geometry = std::make_unique<Geometry>();
   geometry->shape = std::move(shape);
+  geometry->sourceTag = sourceTag;
   geometries.push_back(std::move(geometry));
 }
 
-void VectorContext::addShape(std::shared_ptr<Shape> shape, const Point& position) {
+void VectorContext::addShape(std::shared_ptr<Shape> shape, const Point& position,
+                             const void* sourceTag) {
   if (shape == nullptr) {
     return;
   }
   auto geometry = std::make_unique<Geometry>();
   geometry->shape = std::move(shape);
   geometry->matrix = Matrix::MakeTrans(position.x, position.y);
+  geometry->sourceTag = sourceTag;
   geometries.push_back(std::move(geometry));
 }
 
 void VectorContext::addTextBlob(std::shared_ptr<TextBlob> blob, const Point& position,
-                                const std::vector<Point>& textAnchors) {
+                                const std::vector<Point>& textAnchors, const void* sourceTag) {
   if (blob == nullptr) {
     return;
   }
@@ -48,6 +51,7 @@ void VectorContext::addTextBlob(std::shared_ptr<TextBlob> blob, const Point& pos
   geometry->textBlob = std::move(blob);
   geometry->matrix = Matrix::MakeTrans(position.x, position.y);
   geometry->textAnchors = textAnchors;
+  geometry->sourceTag = sourceTag;
   geometries.push_back(std::move(geometry));
 }
 

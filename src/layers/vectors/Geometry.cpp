@@ -42,6 +42,7 @@ std::unique_ptr<Geometry> Geometry::clone() const {
   cloned->textBlob = textBlob;
   cloned->glyphs = glyphs;
   cloned->textAnchors = textAnchors;
+  cloned->sourceTag = sourceTag;
   return cloned;
 }
 

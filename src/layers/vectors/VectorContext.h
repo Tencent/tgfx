@@ -33,19 +33,22 @@ class VectorContext {
  public:
   /**
    * Adds a shape geometry to the list.
+   * @param shape The shape to add.
+   * @param sourceTag Opaque identity of the producing element; stored on the geometry.
    */
-  void addShape(std::shared_ptr<Shape> shape);
+  void addShape(std::shared_ptr<Shape> shape, const void* sourceTag = nullptr);
 
   /**
    * Adds a shape geometry with the given position to the list.
    */
-  void addShape(std::shared_ptr<Shape> shape, const Point& position);
+  void addShape(std::shared_ptr<Shape> shape, const Point& position,
+                const void* sourceTag = nullptr);
 
   /**
    * Adds a text geometry with the given position and optional text anchors to the list.
    */
   void addTextBlob(std::shared_ptr<TextBlob> blob, const Point& position,
-                   const std::vector<Point>& textAnchors = {});
+                   const std::vector<Point>& textAnchors = {}, const void* sourceTag = nullptr);
 
   /**
    * Converts all geometries to shape mode and returns the geometry list.
