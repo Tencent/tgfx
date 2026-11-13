@@ -21,8 +21,10 @@
 #include "gpu/OpsCompositor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
+#include "gpu/processors/SmoothRRectEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gtest/gtest.h"
+#include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
@@ -132,6 +134,57 @@ TGFX_TEST_PRIVATE(ClipTest, RRectEffect) {
       {
         auto fp = RRectEffect::Make(&allocator, RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12),
                                     Matrix::MakeScale(0, 1), true);
+        EXPECT_EQ(fp, nullptr);
+      })
+}
+
+TGFX_TEST_PRIVATE(ClipTest, SmoothRRectEffect) {
+  TGFX_PRIVATE_ACCESS(
+      BlockAllocator allocator;
+      BytesKey transformKey = {};
+
+      // Case 1: Circular, elliptical and sharp corners at full smoothness under a non-uniform scale
+      // followed by a rotation produce the transform variant.
+      {
+        const std::array<Point, 4> radii = {{{10, 10}, {0, 0}, {15, 10}, {10, 15}}};
+        const auto rRect = RRect::MakeRectRadii(Rect::MakeWH(100, 80), radii, 1.0f);
+        EXPECT_FLOAT_EQ(rRect.smoothness(), 1.0f);
+        auto matrix = Matrix::MakeScale(2, 1);
+        matrix.postRotate(30);
+        auto fp = SmoothRRectEffect::Make(&allocator, rRect, matrix, true);
+        ASSERT_NE(fp, nullptr);
+        EXPECT_TRUE(fp->needTransform());
+        fp->onComputeProcessorKey(&transformKey);
+      }
+
+      // Case 2: The same corners at a small smoothness without a matrix produce the identity
+      // variant, whose processor key differs from the transform variant's.
+      {
+        const std::array<Point, 4> radii = {{{10, 10}, {0, 0}, {15, 10}, {10, 15}}};
+        const auto rRect = RRect::MakeRectRadii(Rect::MakeWH(100, 80), radii, 0.1f);
+        auto fp = SmoothRRectEffect::Make(&allocator, rRect, Matrix::I(), true);
+        ASSERT_NE(fp, nullptr);
+        EXPECT_FALSE(fp->needTransform());
+        BytesKey identityKey = {};
+        fp->onComputeProcessorKey(&identityKey);
+        EXPECT_FALSE(identityKey == transformKey);
+      }
+
+      // Case 3: With AA, an elliptical corner that is too elongated returns nullptr.
+      {
+        const std::array<Point, 4> radii = {{{20, 20}, {0, 0}, {10, 50}, {20, 30}}};
+        const auto rRect = RRect::MakeRectRadii(Rect::MakeWH(200, 200), radii, 1.0f);
+        EXPECT_FLOAT_EQ(rRect.smoothness(), 1.0f);
+        auto fp = SmoothRRectEffect::Make(&allocator, rRect, Matrix::I(), true);
+        EXPECT_EQ(fp, nullptr);
+      }
+
+      // Case 4: A diagonal corner pair whose smoothed extents overlap returns nullptr.
+      {
+        const std::array<Point, 4> radii = {{{30, 30}, {0, 0}, {30, 20}, {20, 15}}};
+        const auto rRect = RRect::MakeRectRadii(Rect::MakeWH(100, 100), radii, 1.0f);
+        EXPECT_FLOAT_EQ(rRect.smoothness(), 1.0f);
+        auto fp = SmoothRRectEffect::Make(&allocator, rRect, Matrix::I(), true);
         EXPECT_EQ(fp, nullptr);
       })
 }
@@ -881,192 +934,291 @@ TGFX_TEST(ClipTest, Overview) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
-
-  constexpr int kCell = 200;
-  constexpr int kCols = 6;
-  constexpr int kRows = 3;
-  constexpr int kWidth = kCell * kCols;
-  constexpr int kHeight = kCell * kRows;
-  auto surface = Surface::Make(context, kWidth, kHeight);
+  constexpr int cellSize = 200;
+  constexpr int columns = 5;
+  constexpr int rows = 4;
+  auto surface = Surface::Make(context, cellSize * columns, cellSize * rows);
   auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
-
-  const Color tints[8] = {{0.95f, 0.92f, 0.88f, 1.0f}, {0.88f, 0.92f, 0.95f, 1.0f},
-                          {0.95f, 0.92f, 0.95f, 1.0f}, {0.92f, 0.95f, 0.88f, 1.0f},
-                          {0.92f, 0.92f, 0.95f, 1.0f}, {0.95f, 0.95f, 0.88f, 1.0f},
-                          {0.88f, 0.95f, 0.92f, 1.0f}, {0.95f, 0.88f, 0.88f, 1.0f}};
+  const auto cell = Rect::MakeWH(cellSize, cellSize);
   Paint fillPaint = {};
   fillPaint.setColor({0.72f, 0.22f, 0.18f, 1.0f});
 
-  for (int row = 0; row < kRows; ++row) {
-    for (int col = 0; col < kCols; ++col) {
-      canvas->save();
-      canvas->translate(static_cast<float>(col * kCell), static_cast<float>(row * kCell));
-      Paint tintPaint = {};
-      tintPaint.setColor(tints[(row * kCols + col) % 8]);
-      canvas->drawRect(Rect::MakeWH(kCell, kCell), tintPaint);
-
-      const int idx = row * kCols + col;
-      switch (idx) {
-        // ---------- Rect single-element variants ----------
-        case 0: {
-          // Cell 0: Rect under shear, AA. Non-orthogonal axes, RectEffect transform variant.
-          canvas->translate(kCell / 2.f, kCell / 2.f);
-          Matrix shear = Matrix::I();
-          shear.setSkew(0.3f, 0);
-          canvas->concat(shear);
-          canvas->clipRect(Rect::MakeXYWH(-60, -60, 120, 120), true);
-          canvas->resetMatrix();
-          canvas->translate(static_cast<float>(col * kCell), static_cast<float>(row * kCell));
-          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
-          break;
-        }
-        case 1: {
-          // Cell 1: Perspective Rect clip, NonAA. Falls back to mask texture path.
-          canvas->translate(kCell / 2.f, kCell / 2.f);
-          Matrix persp = Matrix::I();
-          persp.setAll(1, 0, 0, 0, 1, 0, 0.002f, 0, 1);
-          canvas->concat(persp);
-          canvas->clipRect(Rect::MakeXYWH(-70, -70, 140, 140), false);
-          canvas->resetMatrix();
-          canvas->translate(static_cast<float>(col * kCell), static_cast<float>(row * kCell));
-          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
-          break;
-        }
-
-        // ---------- RRect single-element variants ----------
-        case 2:
-          // Cell 2: Simple RRect (uniform radii) AA, identity. RRectEffect identity variant.
-          canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(30, 30, 140, 140), 25, 25), true);
-          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
-          break;
-        case 3:
-          // Cell 3: Complex RRect (4 distinct radii), identity, AA. RRectEffect identity variant.
-          canvas->clipRRect(RRect::MakeRectRadii(Rect::MakeXYWH(30, 30, 140, 140),
-                                                 {{{50, 50}, {12, 30}, {8, 8}, {30, 15}}}),
-                            true);
-          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
-          break;
-        case 4:
-          // Cell 4: Rotated Simple RRect, AA. RRectEffect transform variant.
-          canvas->translate(kCell / 2.f, kCell / 2.f);
-          canvas->rotate(20);
-          canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(-70, -55, 140, 110), 20, 20), true);
-          canvas->translate(-kCell / 2.f, -kCell / 2.f);
-          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
-          break;
-        case 5: {
-          // Cell 5: Perspective Simple RRect, AA. Falls back to mask texture path.
-          canvas->translate(kCell / 2.f, kCell / 2.f);
-          Matrix persp = Matrix::I();
-          persp.setAll(1, 0, 0, 0, 1, 0, 0.002f, 0, 1);
-          canvas->concat(persp);
-          canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(-70, -70, 140, 140), 25, 25), true);
-          canvas->resetMatrix();
-          canvas->translate(static_cast<float>(col * kCell), static_cast<float>(row * kCell));
-          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
-          break;
-        }
-
-        // ---------- Path single-element variants ----------
-        case 6:
-          // Cell 6: Pentagon Path NonAA. Visually identical to the AA variant because the FreeType
-          // path rasterizer always produces an 8-bit AA mask and ignores the antiAlias flag (see
-          // FTPathRasterizer::onReadPixels).
-          canvas->translate(kCell / 2.f, kCell / 2.f);
-          canvas->clipPath(MakePath({{0, -75}, {72, -23}, {44, 60}, {-44, 60}, {-72, -23}}), false);
-          canvas->translate(-kCell / 2.f, -kCell / 2.f);
-          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
-          break;
-        case 7: {
-          // Cell 7: Inverse-fill Path. The inset rect is excluded from the clip, leaving an outer
-          // frame where fills remain visible.
-          Path path = {};
-          path.addRect(Rect::MakeXYWH(40, 40, 120, 120));
-          path.toggleInverseFillType();
-          canvas->clipPath(path);
-          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
-          break;
-        }
-
-        // ---------- Multi-element combinations ----------
-        case 8:
-          // Cell 8: Two RRects with offset bounds. The intersection's TR/BL corners equal
-          // neither A's nor B's, so ConservativeIntersect falls back to IsInnerToCorners
-          // and fails because the points lie outside both rounded corners. Both elements
-          // survive and produce two FPs.
-          canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(20, 20, 140, 140), 50, 50), true);
-          canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(60, 60, 140, 140), 50, 50), true);
-          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
-          break;
-        case 9:
-          // Cell 9: 5 RRects overflow. First 4 use analytic FP, 5th falls to mask.
-          for (int i = 0; i < 5; ++i) {
-            canvas->translate(kCell / 2.f, kCell / 2.f);
-            canvas->rotate(static_cast<float>(i) * 10.f + 5.f);
-            canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(-70, -70, 140, 140), 12, 12), true);
-            canvas->resetMatrix();
-            canvas->translate(static_cast<float>(col * kCell), static_cast<float>(row * kCell));
-          }
-          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
-          break;
-        case 10: {
-          // Cell 10: Duplicate non-rect Path clip. Two separately constructed Paths with
-          // identical geometry bypass isSame() elimination, so both survive to the mask path.
-          canvas->translate(kCell / 2.f, kCell / 2.f);
-          auto pathA = MakePath({{0, -75}, {72, -23}, {44, 60}, {-44, 60}, {-72, -23}});
-          auto pathB = MakePath({{0, -75}, {72, -23}, {44, 60}, {-44, 60}, {-72, -23}});
-          canvas->clipPath(pathA);
-          canvas->clipPath(pathB);
-          canvas->translate(-kCell / 2.f, -kCell / 2.f);
-          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
-          break;
-        }
-        case 11: {
-          // Cell 11: Inverse-fill clip whose geometry covers the current clip bounds. Combined
-          // with the cell-range clipRect, the keep-region collapses to empty and the drawRect
-          // is fully suppressed via the fast-path that retires the clip stack to Empty.
-          canvas->clipRect(Rect::MakeWH(kCell, kCell));
-          Path inverseFill = {};
-          inverseFill.addRect(Rect::MakeLTRB(-10, -10, kCell + 10, kCell + 10));
-          inverseFill.toggleInverseFillType();
-          canvas->clipPath(inverseFill);
-          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
-          break;
-        }
-
-        case 12: {
-          // Cell 12: Outer RRect clip combined with an inverse-fill rect clip whose shape sits
-          // inside the RRect. The keep-region is the RRect interior minus the inverse shape,
-          // producing a rounded outer frame with a rectangular cutout in the middle.
-          canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(20, 20, 160, 160), 30, 30));
-          Path inverseHole = {};
-          inverseHole.addRect(Rect::MakeXYWH(60, 60, 80, 80));
-          inverseHole.toggleInverseFillType();
-          canvas->clipPath(inverseHole);
-          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
-          break;
-        }
-
-        // ---------- State degeneracy ----------
-        case 13: {
-          // Cell 13: ClipStack updates its uniqueID when transitioning to the Empty state.
-          // Without that update, the second drawRect can be incorrectly batched
-          // with the first one's (Empty) clip via stale-uniqueID comparison and get fully
-          // suppressed, even though after restore the clip is back to wide-open.
-          canvas->save();
-          Path path = {};
-          path.addRect(Rect::MakeXYWH(500, 500, 50, 50));
-          canvas->clipPath(path);
-          canvas->drawRect(Rect::MakeXYWH(20, 20, 80, 80), fillPaint);
-          canvas->restore();
-          canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), fillPaint);
-          break;
-        }
-      }
-      canvas->restore();
-    }
+  // ---------- Rect single-element variants ----------
+  // Case 1: Rect under shear, AA. Non-orthogonal axes, RectEffect transform variant.
+  {
+    canvas->save();
+    canvas->translate(cellSize / 2, cellSize / 2);
+    Matrix shear = Matrix::I();
+    shear.setSkew(0.3f, 0);
+    canvas->concat(shear);
+    canvas->clipRect(Rect::MakeXYWH(-60, -60, 120, 120), true);
+    canvas->resetMatrix();
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
   }
+
+  // Case 2: Perspective Rect clip, NonAA. Falls back to mask texture path.
+  {
+    canvas->save();
+    canvas->translate(cellSize, 0);
+    canvas->translate(cellSize / 2, cellSize / 2);
+    Matrix persp = Matrix::I();
+    persp.setAll(1, 0, 0, 0, 1, 0, 0.002f, 0, 1);
+    canvas->concat(persp);
+    canvas->clipRect(Rect::MakeXYWH(-70, -70, 140, 140), false);
+    canvas->resetMatrix();
+    canvas->translate(cellSize, 0);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+  }
+
+  // ---------- RRect single-element variants ----------
+  // Case 3: Simple RRect (uniform radii) AA, identity. RRectEffect identity variant.
+  {
+    canvas->save();
+    canvas->translate(2 * cellSize, 0);
+    canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(30, 30, 140, 140), 25, 25), true);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+  }
+
+  // Case 4: Complex RRect (4 distinct radii), identity, AA. RRectEffect identity variant.
+  {
+    canvas->save();
+    canvas->translate(3 * cellSize, 0);
+    canvas->clipRRect(RRect::MakeRectRadii(Rect::MakeXYWH(30, 30, 140, 140),
+                                           {{{50, 50}, {12, 30}, {8, 8}, {30, 15}}}),
+                      true);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+  }
+
+  // Case 5: Rotated Simple RRect, AA. RRectEffect transform variant.
+  {
+    canvas->save();
+    canvas->translate(4 * cellSize, 0);
+    canvas->translate(cellSize / 2, cellSize / 2);
+    canvas->rotate(20);
+    canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(-70, -55, 140, 110), 20, 20), true);
+    canvas->translate(-cellSize / 2, -cellSize / 2);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+  }
+
+  // Case 6: Perspective Simple RRect, AA. Falls back to mask texture path.
+  {
+    canvas->save();
+    canvas->translate(0, cellSize);
+    canvas->translate(cellSize / 2, cellSize / 2);
+    Matrix persp = Matrix::I();
+    persp.setAll(1, 0, 0, 0, 1, 0, 0.002f, 0, 1);
+    canvas->concat(persp);
+    canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(-70, -70, 140, 140), 25, 25), true);
+    canvas->resetMatrix();
+    canvas->translate(0, cellSize);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+  }
+
+  // ---------- Path single-element variants ----------
+  // Case 7: Pentagon Path NonAA. Visually identical to the AA variant because the FreeType path
+  // rasterizer always produces an 8-bit AA mask and ignores the antiAlias flag (see
+  // FTPathRasterizer::onReadPixels).
+  {
+    canvas->save();
+    canvas->translate(cellSize, cellSize);
+    canvas->translate(cellSize / 2, cellSize / 2);
+    canvas->clipPath(MakePath({{0, -75}, {72, -23}, {44, 60}, {-44, 60}, {-72, -23}}), false);
+    canvas->translate(-cellSize / 2, -cellSize / 2);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+  }
+
+  // Case 8: Inverse-fill Path. The inset rect is excluded from the clip, leaving an outer frame
+  // where fills remain visible.
+  {
+    canvas->save();
+    canvas->translate(2 * cellSize, cellSize);
+    Path path = {};
+    path.addRect(Rect::MakeXYWH(40, 40, 120, 120));
+    path.toggleInverseFillType();
+    canvas->clipPath(path);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+  }
+
+  // ---------- Multi-element combinations ----------
+  // Case 9: Two RRects with offset bounds. The intersection's TR/BL corners equal neither A's nor
+  // B's, so ConservativeIntersect falls back to IsInnerToCorners and fails because the points lie
+  // outside both rounded corners. Both elements survive and produce two FPs.
+  {
+    canvas->save();
+    canvas->translate(3 * cellSize, cellSize);
+    canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(20, 20, 140, 140), 50, 50), true);
+    canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(60, 60, 140, 140), 50, 50), true);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+  }
+
+  // Case 10: 5 RRects overflow. First 4 use analytic FP, 5th falls to mask.
+  {
+    canvas->save();
+    canvas->translate(4 * cellSize, cellSize);
+    for (int i = 0; i < 5; ++i) {
+      canvas->translate(cellSize / 2, cellSize / 2);
+      canvas->rotate(static_cast<float>(i) * 10.f + 5.f);
+      canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(-70, -70, 140, 140), 12, 12), true);
+      canvas->resetMatrix();
+      canvas->translate(4 * cellSize, cellSize);
+    }
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+  }
+
+  // Case 11: Duplicate non-rect Path clip. Two separately constructed Paths with identical
+  // geometry bypass isSame() elimination, so both survive to the mask path.
+  {
+    canvas->save();
+    canvas->translate(0, 2 * cellSize);
+    canvas->translate(cellSize / 2, cellSize / 2);
+    auto pathA = MakePath({{0, -75}, {72, -23}, {44, 60}, {-44, 60}, {-72, -23}});
+    auto pathB = MakePath({{0, -75}, {72, -23}, {44, 60}, {-44, 60}, {-72, -23}});
+    canvas->clipPath(pathA);
+    canvas->clipPath(pathB);
+    canvas->translate(-cellSize / 2, -cellSize / 2);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+  }
+
+  // Case 12: Inverse-fill clip whose geometry covers the current clip bounds. Combined with the
+  // cell-range clipRect, the keep-region collapses to empty and the drawRect is fully suppressed
+  // via the fast-path that retires the clip stack to Empty.
+  {
+    canvas->save();
+    canvas->translate(cellSize, 2 * cellSize);
+    canvas->clipRect(cell);
+    Path inverseFill = {};
+    inverseFill.addRect(Rect::MakeLTRB(-10, -10, cellSize + 10, cellSize + 10));
+    inverseFill.toggleInverseFillType();
+    canvas->clipPath(inverseFill);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+  }
+
+  // Case 13: Outer RRect clip combined with an inverse-fill rect clip whose shape sits inside the
+  // RRect. The keep-region is the RRect interior minus the inverse shape, producing a rounded
+  // outer frame with a rectangular cutout in the middle.
+  {
+    canvas->save();
+    canvas->translate(2 * cellSize, 2 * cellSize);
+    canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(20, 20, 160, 160), 30, 30));
+    Path inverseHole = {};
+    inverseHole.addRect(Rect::MakeXYWH(60, 60, 80, 80));
+    inverseHole.toggleInverseFillType();
+    canvas->clipPath(inverseHole);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+  }
+
+  // ---------- State degeneracy ----------
+  // Case 14: ClipStack updates its uniqueID when transitioning to the Empty state. Without that
+  // update, the second drawRect can be incorrectly batched with the first one's (Empty) clip via
+  // stale-uniqueID comparison and get fully suppressed, even though after restore the clip is
+  // back to wide-open.
+  {
+    canvas->save();
+    canvas->translate(3 * cellSize, 2 * cellSize);
+    canvas->save();
+    Path path = {};
+    path.addRect(Rect::MakeXYWH(500, 500, 50, 50));
+    canvas->clipPath(path);
+    canvas->drawRect(Rect::MakeXYWH(20, 20, 80, 80), fillPaint);
+    canvas->restore();
+    canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), fillPaint);
+    canvas->restore();
+  }
+
+  // ---------- Smoothed RRect variants ----------
+  Paint smoothPaint = {};
+  smoothPaint.setColor(Color::White());
+  const std::array<Point, 4> smoothRadii = {{{30, 30}, {0, 0}, {35, 20}, {20, 30}}};
+  // Case 15: Smoothed Complex RRect mixing circular, elliptical and sharp corners at full
+  // smoothness, AA, identity. SmoothRRectEffect identity variant.
+  {
+    const auto rect = Rect::MakeXYWH(30, 30, 140, 140);
+    canvas->save();
+    canvas->translate(4 * cellSize, 2 * cellSize);
+    canvas->save();
+    canvas->clipRRect(RRect::MakeRectRadii(rect, smoothRadii), true);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+    canvas->clipRRect(RRect::MakeRectRadii(rect, smoothRadii, 1.0f), true);
+    canvas->drawRect(cell, smoothPaint);
+    canvas->restore();
+  }
+
+  // Case 16: The same corners as case 15 at a small smoothness, AA, identity. SmoothRRectEffect
+  // identity variant.
+  {
+    const auto rect = Rect::MakeXYWH(30, 30, 140, 140);
+    canvas->save();
+    canvas->translate(0, 3 * cellSize);
+    canvas->save();
+    canvas->clipRRect(RRect::MakeRectRadii(rect, smoothRadii), true);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+    canvas->clipRRect(RRect::MakeRectRadii(rect, smoothRadii, 0.1f), true);
+    canvas->drawRect(cell, smoothPaint);
+    canvas->restore();
+  }
+
+  // Case 17: Smoothed Complex RRect mixing circular, elliptical and sharp corners at full
+  // smoothness under a non-uniform scale followed by a rotation, AA. SmoothRRectEffect transform
+  // variant.
+  {
+    const auto rect = Rect::MakeXYWH(-30, -50, 60, 100);
+    const std::array<Point, 4> radii = {{{15, 15}, {0, 0}, {12, 10}, {10, 15}}};
+    canvas->save();
+    canvas->translate(cellSize, 3 * cellSize);
+    canvas->translate(cellSize / 2, cellSize / 2);
+    canvas->rotate(20);
+    canvas->scale(2, 1);
+    canvas->save();
+    canvas->clipRRect(RRect::MakeRectRadii(rect, radii), true);
+    canvas->resetMatrix();
+    canvas->translate(cellSize, 3 * cellSize);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+    canvas->clipRRect(RRect::MakeRectRadii(rect, radii, 1.0f), true);
+    canvas->resetMatrix();
+    canvas->translate(cellSize, 3 * cellSize);
+    canvas->drawRect(cell, smoothPaint);
+    canvas->restore();
+  }
+
+  // Case 18: The same corners as case 15 at full smoothness under perspective, AA. Falls back to
+  // mask texture path.
+  {
+    const auto rect = Rect::MakeXYWH(-70, -70, 140, 140);
+    canvas->save();
+    canvas->translate(2 * cellSize, 3 * cellSize);
+    canvas->translate(cellSize / 2, cellSize / 2);
+    Matrix persp = Matrix::I();
+    persp.setAll(1, 0, 0, 0, 1, 0, 0.002f, 0, 1);
+    canvas->concat(persp);
+    canvas->save();
+    canvas->clipRRect(RRect::MakeRectRadii(rect, smoothRadii), true);
+    canvas->resetMatrix();
+    canvas->translate(2 * cellSize, 3 * cellSize);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+    canvas->clipRRect(RRect::MakeRectRadii(rect, smoothRadii, 1.0f), true);
+    canvas->resetMatrix();
+    canvas->translate(2 * cellSize, 3 * cellSize);
+    canvas->drawRect(cell, smoothPaint);
+    canvas->restore();
+  }
+
   EXPECT_TRUE(Baseline::Compare(surface, "ClipTest/ClipOverview"));
 }
 

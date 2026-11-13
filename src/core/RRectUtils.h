@@ -74,6 +74,18 @@ class RRectUtils {
    *         matrix is not axis-aligned or the transform cannot produce a valid RRect.
    */
   static std::optional<RRect> TryAxisAlignedTransform(const RRect& src, const Matrix& matrix);
+
+  /**
+   * Tests whether either diagonal corner pair overlaps on at least one axis.
+   * Each corner extends (1 + smoothness) * radius along its edges, so the test checks whether the
+   * extents of two diagonal corners sum past the side length on that axis.
+   * @param rRect the rounded rectangle
+   * @return true if either diagonal corner pair overlaps on the x or y axis
+   * @note Only Complex RRects can overlap: the other types have equal radii at all four corners, so
+   *       each diagonal sum equals an adjacent sum, which RRect already keeps within the side
+   *       length.
+   */
+  static bool HasDiagonalCornerAxisOverlap(const RRect& rRect);
 };
 
 }  // namespace tgfx

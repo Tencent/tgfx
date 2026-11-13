@@ -19,6 +19,7 @@
 #include "OpsCompositor.h"
 #include "core/MeshBase.h"
 #include "core/PathRef.h"
+#include "core/RRectUtils.h"
 #include "core/VertexMesh.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -39,6 +40,7 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
+#include "gpu/processors/SmoothRRectEffect.h"
 #include "processors/ColorSpaceXFormEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
 #include "processors/XfermodeFragmentProcessor.h"
@@ -132,6 +134,16 @@ static bool ComplexMismatch(const RRect& newRRect,
   return newRRect.isComplex() != pending.front()->rRect.isComplex();
 }
 
+// Returns true when the new RRect's smoothness (smooth vs plain) disagrees with the RRects already
+// queued. Smoothness values do not split batches because each record stores its own value.
+static bool SmoothnessMismatch(const RRect& newRRect,
+                               const std::vector<PlacementPtr<RRectRecord>>& pending) {
+  if (pending.empty()) {
+    return false;
+  }
+  return (newRRect.smoothness() > 0.0f) != (pending.front()->rRect.smoothness() > 0.0f);
+}
+
 void OpsCompositor::fillRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
                              const Brush& brush, const Stroke* stroke) {
   DEBUG_ASSERT(!rect.isEmpty());
@@ -154,7 +166,8 @@ void OpsCompositor::drawRRect(const RRect& rRect, const Matrix& matrix, const Cl
   // Complex and non-Complex RRects use different GPs and vertex layouts, so they cannot be
   // batched into the same op; flush if the incoming RRect's complexity disagrees with pending.
   if (!canAppend(PendingOpType::RRect, clip, rectBrush) ||
-      ShouldFlushRectOps(pendingStrokes, stroke) || ComplexMismatch(rRect, pendingRRects)) {
+      ShouldFlushRectOps(pendingStrokes, stroke) || ComplexMismatch(rRect, pendingRRects) ||
+      SmoothnessMismatch(rRect, pendingRRects)) {
     flushPendingOps(PendingOpType::RRect, clip, rectBrush);
   }
   auto record = drawingAllocator()->make<RRectRecord>(rRect, matrix, rectBrush.color);
@@ -986,6 +999,8 @@ std::pair<bool, PlacementPtr<FragmentProcessor>> OpsCompositor::tryApplyAnalytic
         const auto& rRect = shape.rRect();
         if (rRect.type() == RRect::Type::Rect) {
           elementFP = RectEffect::Make(drawingAllocator(), rRect.rect(), matrix, aa);
+        } else if (rRect.smoothness() > 0.0f) {
+          elementFP = SmoothRRectEffect::Make(drawingAllocator(), rRect, matrix, aa);
         } else {
           elementFP = RRectEffect::Make(drawingAllocator(), rRect, matrix, aa);
         }

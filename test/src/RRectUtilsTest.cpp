@@ -169,6 +169,25 @@ TGFX_TEST(RRectUtilsTest, InnerBounds) {
     EXPECT_NEAR(inner.right, 100.f - 14.645161f, 1e-3f);
     EXPECT_NEAR(inner.bottom, 80.f - 11.716129f, 1e-3f);
   }
+
+  // Case 6: A smoothed corner occupies (1 + s) * r along each edge, so the strips inset by the
+  // 30px footprint, and the diagonal candidate is unavailable.
+  {
+    const auto rr = RRect::MakeRectXY(Rect::MakeWH(100, 100), 20, 20, 0.5f);
+    EXPECT_EQ(RRectUtils::InnerBounds(rr), Rect::MakeLTRB(0, 30, 100, 70));
+  }
+}
+
+TGFX_TEST(RRectUtilsTest, SmoothnessRejection) {
+  // The analytic corner tests hardcode the ellipse equation, so smoothed rrects are rejected
+  // outright instead of risking a non-conservative answer.
+  const auto smooth = RRect::MakeRectXY(Rect::MakeWH(100, 100), 20, 20, 0.5f);
+  const auto plain = RRect::MakeRectXY(Rect::MakeWH(100, 100), 20, 20);
+  EXPECT_FALSE(RRectUtils::ConservativeIntersect(smooth, plain).has_value());
+  EXPECT_FALSE(RRectUtils::ConservativeIntersect(plain, smooth).has_value());
+  // The center point is deep inside the shape, yet the conservative answer must be false.
+  EXPECT_FALSE(RRectUtils::ContainsPoint(smooth, {50, 50}));
+  EXPECT_FALSE(RRectUtils::ContainsRect(smooth, Rect::MakeXYWH(40, 40, 20, 20)));
 }
 
 TGFX_TEST(RRectUtilsTest, TryAxisAlignedTransform) {
@@ -314,6 +333,16 @@ TGFX_TEST(RRectUtilsTest, TryAxisAlignedTransform) {
     EXPECT_EQ(out->type(), RRect::Type::Rect);
     EXPECT_FLOAT_EQ(out->rect().width(), 200.f);
     EXPECT_FLOAT_EQ(out->rect().height(), 40.f);
+  }
+
+  // Case 14: Smoothness survives axis-aligned transforms; the per-axis constraint scales along
+  // with the radii and edge lengths, so the resolved value carries over unchanged.
+  {
+    auto rRect = RRect::MakeRectXY(Rect::MakeWH(200, 200), 40, 40, 0.5f);
+    auto out = RRectUtils::TryAxisAlignedTransform(rRect, Matrix::MakeScale(0.5f, 0.5f));
+    ASSERT_TRUE(out.has_value());
+    EXPECT_FLOAT_EQ(out->smoothness(), 0.5f);
+    EXPECT_FLOAT_EQ(out->radii()[0].x, 20.f);
   }
 }
 
