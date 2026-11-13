@@ -1236,9 +1236,9 @@ std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBoun
         !Rect::Intersects(bounds, layer->renderBounds)) {
       return;
     }
-    // matrix() reports the identity whenever the layer carries a 3D or projection transform, in
-    // which case the 2D renderBounds no longer delimits what the style samples. Bail out and let
-    // the caller keep the whole tile.
+    // matrix() reports the identity when the 3D matrix is not affine, i.e. it carries a
+    // perspective or projection. The 2D renderBounds then no longer delimits what the style
+    // samples, so bail out and let the caller keep the whole tile.
     if (!layer->matrix3D().isIdentity() && layer->matrix().isIdentity()) {
       safe = false;
       return;
