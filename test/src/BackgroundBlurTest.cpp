@@ -28,6 +28,7 @@
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/GlassStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "utils/TestUtils.h"
 
@@ -1527,6 +1528,30 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CullFootprintsCoverTheSampledArea) {
   })
 }
 
+static size_t CountPixelsDifferentFrom(const std::vector<uint8_t>& pixels, size_t index) {
+  size_t varied = 0;
+  for (size_t i = 0; i + 3 < pixels.size(); i += 4) {
+    if (pixels[i] != pixels[index] || pixels[i + 1] != pixels[index + 1] ||
+        pixels[i + 2] != pixels[index + 2]) {
+      ++varied;
+    }
+  }
+  return varied;
+}
+
+static size_t CountDifferentPixels(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
+  if (a.size() != b.size()) {
+    return a.size() + b.size();
+  }
+  size_t different = 0;
+  for (size_t i = 0; i < a.size(); i += 4) {
+    if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2] || a[i + 3] != b[i + 3]) {
+      ++different;
+    }
+  }
+  return different;
+}
+
 static std::vector<uint8_t> ReadSurfacePixels(Surface* surface) {
   auto info = ImageInfo::Make(surface->width(), surface->height(), ColorType::RGBA_8888,
                               AlphaType::Premultiplied);
@@ -1795,6 +1820,148 @@ TGFX_TEST(BackgroundBlurTest, NestedBlursMatchDirectRendering) {
     }
   }
   EXPECT_EQ(different, 0u);
+}
+
+// A footprint that crosses a tile boundary must not lose the layers on either side of the seam.
+TGFX_TEST(BackgroundBlurTest, CullAcrossTileBoundaryMatchesDirectRendering) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int SurfaceSize = 256;
+  constexpr int TileSize = 128;
+
+  auto render = [&](RenderMode mode) {
+    auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
+    EXPECT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(mode);
+    displayList->setTileSize(TileSize);
+
+    // Content on both sides of the seam at (128, 128).
+    auto back = SolidLayer::Make();
+    back->setColor(Color::FromRGBA(30, 60, 120, 255));
+    back->setWidth(SurfaceSize);
+    back->setHeight(SurfaceSize);
+    displayList->root()->addChild(back);
+
+    for (int i = 0; i < 4; ++i) {
+      auto block = ShapeLayer::Make();
+      Path path;
+      path.addRect(Rect::MakeWH(40, 40));
+      block->setPath(path);
+      block->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 120, 0, 255)));
+      block->setMatrix(Matrix::MakeTrans(100.0f + static_cast<float>(i % 2) * 30.0f,
+                                         100.0f + static_cast<float>(i / 2) * 30.0f));
+      displayList->root()->addChild(block);
+    }
+
+    auto blurred = ShapeLayer::Make();
+    blurred->setMatrix(Matrix::MakeTrans(96, 96));
+    Path blurPath;
+    blurPath.addRect(Rect::MakeWH(64, 64));
+    blurred->setPath(blurPath);
+    blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 60)));
+    blurred->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
+    displayList->root()->addChild(blurred);
+
+    displayList->render(surface.get());
+    return ReadSurfacePixels(surface.get());
+  };
+
+  auto direct = render(RenderMode::Direct);
+  auto tiled = render(RenderMode::Tiled);
+  ASSERT_FALSE(direct.empty());
+  // The scene has to differ from a flat fill, otherwise the comparison proves nothing.
+  EXPECT_GT(CountPixelsDifferentFrom(direct, 0), 1000u);
+  EXPECT_EQ(CountDifferentPixels(direct, tiled), 0u);
+}
+
+// A glass style samples the backdrop through the background handler too, so culling the capture has
+// to keep the same pixels as direct rendering.
+TGFX_TEST(BackgroundBlurTest, CullWithGlassStyleMatchesDirectRendering) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int SurfaceSize = 240;
+
+  auto render = [&](RenderMode mode) {
+    auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
+    EXPECT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(mode);
+
+    auto back = SolidLayer::Make();
+    back->setColor(Color::FromRGBA(20, 90, 180, 255));
+    back->setWidth(SurfaceSize);
+    back->setHeight(SurfaceSize);
+    displayList->root()->addChild(back);
+
+    auto pattern = ShapeLayer::Make();
+    Path path;
+    path.addRect(Rect::MakeWH(60, 60));
+    pattern->setPath(path);
+    pattern->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 200, 0, 255)));
+    pattern->setMatrix(Matrix::MakeTrans(70, 70));
+    displayList->root()->addChild(pattern);
+
+    auto glass = ShapeLayer::Make();
+    glass->setMatrix(Matrix::MakeTrans(50, 50));
+    Path glassPath;
+    glassPath.addRect(Rect::MakeWH(120, 120));
+    glass->setPath(glassPath);
+    glass->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 40)));
+    glass->setLayerStyles({GlassStyle::Make(80.0f, 60.0f, 0.0f, 0.0f, 0.0f, 45.0f, 1.0f)});
+    displayList->root()->addChild(glass);
+
+    displayList->render(surface.get());
+    return ReadSurfacePixels(surface.get());
+  };
+
+  auto direct = render(RenderMode::Direct);
+  auto tiled = render(RenderMode::Tiled);
+  ASSERT_FALSE(direct.empty());
+  EXPECT_GT(CountPixelsDifferentFrom(direct, 0), 1000u);
+  EXPECT_EQ(CountDifferentPixels(direct, tiled), 0u);
+}
+
+// A blur layer that covers far more than the dirty tile cannot widen the cull beyond the tile it is
+// captured for, otherwise the whole frame's content would be replayed.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullStaysInsideTheDirtyTile) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto surface = Surface::Make(context, 512, 512);
+    ASSERT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(RenderMode::Tiled);
+
+    auto blurred = ShapeLayer::Make();
+    Path path;
+    path.addRect(Rect::MakeWH(600, 600));
+    blurred->setPath(path);
+    blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 60)));
+    blurred->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
+    displayList->root()->addChild(blurred);
+
+    displayList->render(surface.get());
+    auto rootOutset = displayList->root()->maxBackgroundOutset;
+    ASSERT_GT(rootOutset, 0.0f);
+
+    auto tileRect = Rect::MakeXYWH(128.0f, 128.0f, 128.0f, 128.0f);
+    auto footprints = displayList->collectBackgroundFootprints(tileRect);
+    ASSERT_EQ(footprints.size(), 1u);
+    auto snapshots = displayList->captureBackgrounds(surface.get(), {tileRect}, footprints);
+    ASSERT_TRUE(snapshots != nullptr);
+    ASSERT_EQ(snapshots->cullRects.size(), 1u);
+
+    // The footprint covers the whole document, so the tile bounds the cull instead.
+    auto tileWithOutset = tileRect;
+    tileWithOutset.outset(rootOutset, rootOutset);
+    EXPECT_EQ(snapshots->cullRects[0], tileWithOutset);
+    EXPECT_LT(snapshots->cullRects[0].width(), footprints[0].width());
+    context->flushAndSubmit();
+  })
 }
 
 }  // namespace tgfx
