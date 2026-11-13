@@ -18,7 +18,7 @@ cd /d "%~dp0"
 ::   --skip-images   Skip writing baseline `_base.webp` images. The cache
 ::                   (md5.json + version.json) is still refreshed, which is
 ::                   all the CI pipeline needs. Local runs omit this to also
-::                   produce baseline-out\ images for visual inspection.
+::                   produce test\out\ images for visual inspection.
 
 :: Parse arguments: separate the backend keyword from the --skip-images flag so callers may
 :: pass them in any order (e.g. `update_baseline.bat --skip-images USE_D3D12`).

@@ -94,8 +94,8 @@ PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& a
   }
   newSamplingArgs.sampleArea = std::nullopt;
   auto fpMatrix = Matrix::MakeTrans(-drawBounds.left, -drawBounds.top);
-  fpMatrix.preScale(static_cast<float>(textureProxy->width()) / drawBounds.width(),
-                    static_cast<float>(textureProxy->height()) / drawBounds.height());
+  fpMatrix.postScale(static_cast<float>(textureProxy->width()) / drawBounds.width(),
+                     static_cast<float>(textureProxy->height()) / drawBounds.height());
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);
   }
