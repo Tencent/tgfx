@@ -51,6 +51,15 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
   return std::make_shared<MatrixShape>(std::move(shape), matrixShape->matrix);
 }
 
+PathFillType StrokeShape::fillType() const {
+  // A non-hairline stroke replaces the outline with its own winding boundary, so the inner rule no
+  // longer describes the result. A hairline stroke draws the outline itself and keeps its rule.
+  if (IsHairlineStroke(stroke)) {
+    return shape->fillType();
+  }
+  return PathFillType::Winding;
+}
+
 Rect StrokeShape::onGetBounds() const {
   auto bounds = shape->onGetBounds();
   ApplyStrokeToBounds(stroke, &bounds, Matrix::I(), true);

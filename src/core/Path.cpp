@@ -29,6 +29,7 @@
 #include <include/pathops/SkPathOps.h>
 #include "core/PathRef.h"
 #include "core/utils/AtomicCache.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
@@ -523,15 +524,50 @@ void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) 
   writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);
 }
 
+bool PathRef::UnionsByConcatenation(PathFillType firstFillType, const Rect& firstBounds,
+                                    PathFillType secondFillType, const Rect& secondBounds) {
+  if (firstFillType != secondFillType) {
+    return false;
+  }
+  // Inverse fills extend outside their bounds, so disjoint bounds do not prove disjoint areas.
+  if (firstFillType == PathFillType::InverseWinding ||
+      firstFillType == PathFillType::InverseEvenOdd) {
+    return false;
+  }
+  return !Rect::Intersects(firstBounds, secondBounds);
+}
+
 bool Path::addPath(const Path& src, PathOp op) {
-  auto& path = writableRef()->path;
-  const auto& newPath = src.pathRef->path;
+  // The bounds are read before the destination is made writable, which drops its cached bounds:
+  // reading them after that would leave the cache holding the bounds from before the merge.
+  return PathRef::AddPath(*this, src, op, getBounds(), src.getBounds());
+}
+
+bool PathRef::AddPath(Path& destination, const Path& source, PathOp op, const Rect& bounds,
+                      const Rect& sourceBounds) {
+  // Testing disjoint bounds avoids paying for a boolean operation twice during mask accumulation.
+  auto unionConcatenates =
+      op == PathOp::Union &&
+      UnionsByConcatenation(destination.getFillType(), bounds, source.getFillType(), sourceBounds);
+  auto& path = WriteAccess(destination);
+  const auto& newPath = ReadAccess(source);
   if (op == PathOp::Append || op == PathOp::Extend) {
-    if (path.isEmpty()) {
+    // An empty inverse path fills the whole plane, so it is not a no-op operand: overwriting it with
+    // the next one would drop the plane. Only a path with neither contours nor an inverse rule is.
+    if (path.isEmpty() && !path.isInverseFillType()) {
       path = newPath;
     } else {
       auto mode = op == PathOp::Extend ? SkPath::kExtend_AddPathMode : SkPath::kAppend_AddPathMode;
       path.addPath(newPath, mode);
+    }
+    return true;
+  }
+  if (unionConcatenates) {
+    // Appending onto an empty path reads the verb array behind its end, so the operand replaces it.
+    if (path.isEmpty()) {
+      path = newPath;
+    } else {
+      path.addPath(newPath, SkPath::kAppend_AddPathMode);
     }
     return true;
   }
@@ -850,21 +886,14 @@ bool Path::toWinding() {
     return true;
   }
   auto& path = PathRef::WriteAccess(*this);
-  // AsWinding() decides each contour's direction from the nesting depth it sits at, reversing the
-  // ones that disagree with the contour containing them. An outermost contour keeps the direction
-  // it already has, so two of them that overlap while running opposite ways still cancel and leave
-  // the overlap empty -- forcing every outermost contour to one shared direction, which no fill
-  // rule asks for, would fill it in. It copies the curves it was given rather than rebuilding them,
-  // so the geometry survives unchanged. It does not detect self-crossings or contours that cross
-  // each other, so those still come back with the filled area changed; see Path::toWinding().
-  //
-  // The other pathkit entry for this conversion is deliberately not used. SkOpBuilder - add() once
-  // and resolve(), which runs Simplify followed by FixWinding - decides the directions the same
-  // way, but Simplify rebuilds the contours and quantises their coordinates, so a counter a
-  // fraction of a unit wide closes up: PathTest.ToWindingKeepsThinCurveCounter fails under it while
-  // passing here. Only reversing contours is what keeps that geometry.
+  // AsWinding() normalizes the outermost contours to clockwise and orients the counters against
+  // them, which is what makes the result safe to append. It copies the curves rather than rebuilding
+  // them, so a counter a fraction of a unit wide keeps its geometry; the SkOpBuilder path instead
+  // runs Simplify, which quantises coordinates and closes such a band up. Contours that cross each
+  // other or themselves still change the filled area, as the contract in Path.h states.
   SkPath result;
   if (!AsWinding(path, &result)) {
+    LOGE("Path::toWinding() failed to normalize the outline; keeping the even-odd fill rule.");
     return false;
   }
   result.setFillType(fillType == PathFillType::InverseEvenOdd ? SkPathFillType::kInverseWinding
