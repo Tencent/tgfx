@@ -1504,6 +1504,22 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CullFootprintsCoverTheSampledArea) {
 
   EXPECT_TRUE(displayList->collectBackgroundFootprints(Rect::MakeWH(240, 240)).empty());
 
+  // A layer that keeps its own 3D context composites through the BSP, so its bounds do not delimit
+  // what the style samples either.
+  auto list3D = std::make_unique<DisplayList>();
+  list3D->setRenderMode(RenderMode::Tiled);
+  auto group = Layer::Make();
+  group->setPreserve3D(true);
+  auto blurred3D = ShapeLayer::Make();
+  blurred3D->setPath(rect);
+  blurred3D->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 128)));
+  blurred3D->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+  group->addChild(blurred3D);
+  list3D->root()->addChild(group);
+  list3D->render(surface.get());
+
+  EXPECT_TRUE(list3D->collectBackgroundFootprints(Rect::MakeWH(240, 240)).empty());
+
   // Submitting flushes the render tasks these frames queued, so they do not leak into the next test
   // through the shared drawing buffer.
   context->flushAndSubmit();
