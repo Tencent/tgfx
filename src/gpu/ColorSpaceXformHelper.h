@@ -20,7 +20,7 @@
 #include <skcms.h>
 #include <cstdint>
 #include "core/ColorSpaceXformSteps.h"
-#include "gpu/shaders/ParamBuffer.h"
+#include "gpu/aot/write/ParamBuffer.h"
 
 namespace tgfx {
 

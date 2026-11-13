@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/shaders/ParamBuffer.h"
+#include "gpu/aot/write/ParamBuffer.h"
 #include <cstring>
 #include "core/utils/Log.h"
 #include "gpu/UniformData.h"

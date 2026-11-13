@@ -19,11 +19,11 @@
 #pragma once
 
 #include <optional>
+#include "gpu/aot/AOTFailure.h"
 #include "gpu/aot/select/FamilyMatchResult.h"
 #include "gpu/aot/select/SelectionScope.h"
 #include "gpu/aot/spec/SpecValues.h"
 #include "gpu/shaders/Family.h"
-#include "gpu/shaders/contract/AOTFailure.h"
 
 namespace tgfx {
 

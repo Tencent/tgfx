@@ -25,12 +25,12 @@
 #include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/ir/DrawIR.h"
+#include "gpu/aot/select/DrawFacts.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/KernelContract.h"
-#include "gpu/shaders/contract/DrawFacts.h"
 
 namespace tgfx {
 

@@ -33,7 +33,7 @@
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/bundle/EmbeddedShaderBundles.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/shaders/contract/ShaderProfileResolver.h"
+#include "gpu/aot/select/ShaderProfileResolver.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/gpu/GPU.h"
 

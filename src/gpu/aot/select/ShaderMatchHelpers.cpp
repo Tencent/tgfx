@@ -25,12 +25,12 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/Program.h"
+#include "gpu/aot/select/DrawFacts.h"
 #include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/aot/select/ProgramSelection.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/ShaderPermutation.h"
-#include "gpu/shaders/contract/DrawFacts.h"
 #include "tgfx/core/BytesKey.h"
 
 namespace tgfx {

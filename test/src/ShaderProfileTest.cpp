@@ -22,11 +22,11 @@
 
 #include <string>
 #include "base/TGFXTest.h"
+#include "gpu/aot/select/ShaderProfileResolver.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
-#include "gpu/shaders/contract/ShaderProfileResolver.h"
 
 namespace tgfx {
 

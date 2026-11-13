@@ -34,10 +34,10 @@
 #include "gpu/ShaderCache.h"
 #include "gpu/Uniform.h"
 #include "gpu/UniformData.h"
+#include "gpu/aot/AOTFailure.h"
 #include "gpu/aot/bundle/BundleData.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/spec/SpecSource.h"
-#include "gpu/shaders/contract/AOTFailure.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Backend.h"
 

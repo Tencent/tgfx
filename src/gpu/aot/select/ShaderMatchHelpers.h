@@ -19,10 +19,10 @@
 #pragma once
 
 #include <optional>
+#include "gpu/aot/AOTFailure.h"
 #include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/aot/ir/XferFacts.h"
-#include "gpu/shaders/contract/AOTFailure.h"
-#include "gpu/shaders/contract/DrawFacts.h"
+#include "gpu/aot/select/DrawFacts.h"
 
 // Shared predicates of the per-family Match functions. Declared here and defined once in
 // ShaderMatchHelpers.cpp (their private helper chains stay internal to that translation unit);

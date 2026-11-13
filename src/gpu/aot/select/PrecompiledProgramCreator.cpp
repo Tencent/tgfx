@@ -38,11 +38,11 @@
 #include "gpu/aot/select/ProgramSelection.h"
 #include "gpu/aot/spec/SpecInjector.h"
 #include "gpu/aot/spec/SpecResolver.h"
+#include "gpu/aot/write/ProgramWriterFactory.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/shaders/Families.h"
-#include "gpu/shaders/ProgramWriterFactory.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/GPU.h"
 

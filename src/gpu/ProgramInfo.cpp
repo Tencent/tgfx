@@ -29,9 +29,9 @@
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/select/PrecompiledProgramCreator.h"
 #include "gpu/aot/select/ProgramKey.h"
+#include "gpu/aot/select/ShaderProfileResolver.h"
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/resources/YUVTextureView.h"
-#include "gpu/shaders/contract/ShaderProfileResolver.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {

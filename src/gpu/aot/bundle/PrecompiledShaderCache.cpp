@@ -30,9 +30,9 @@
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/AOTDiagnostics.h"
 #include "gpu/aot/bundle/BundleReader.h"
+#include "gpu/aot/select/ShaderProfileResolver.h"
 #include "gpu/shaders/BundleCodec.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
-#include "gpu/shaders/contract/ShaderProfileResolver.h"
 #include "tgfx/gpu/Context.h"
 #include "zstd.h"
 

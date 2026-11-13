@@ -271,8 +271,40 @@ TEST(LayeringTest, TheRuntimeOnlyProfileResolverIsNotUsedByTheTool) {
   // ShaderProfileResolver.h depends on the runtime Backend type. The tool uses ShaderBundleContract.h.
   for (const auto& file : FilesIn(ToolDir(), {".cpp", ".h"})) {
     for (const auto& include : IncludesOf(file)) {
-      EXPECT_NE(include.target, "gpu/shaders/contract/ShaderProfileResolver.h") << NameOf(file);
+      EXPECT_NE(include.target, "gpu/aot/select/ShaderProfileResolver.h") << NameOf(file);
     }
+  }
+}
+
+// ---- The declaration layer stays a declaration layer ----------------------------------------
+
+TEST(LayeringTest, DeclarationLayerIncludesOnlyItselfAndTheContractLeaves) {
+  // src/gpu/shaders holds what the tool and the runtime share: the module declarations, the
+  // families and the layout derived from them. It must stay usable without a GPU context, so its
+  // includes are its own tree plus the two contract leaves below. Anything else — a processor, an
+  // IR node, a logger, the uniform writer — belongs to the runtime side of src/gpu/aot.
+  const std::set<std::string> contractLeaves = {"gpu/Uniform.h", "core/utils/USE.h"};
+  std::set<std::string> used;
+  size_t checked = 0;
+  for (const auto& file : FilesIn(SourceDir + "/src/gpu/shaders", {".cpp", ".h"})) {
+    for (const auto& include : IncludesOf(file)) {
+      if (include.system) {
+        continue;
+      }
+      ++checked;
+      used.insert(include.target);
+      const bool declarationInclude = include.target.rfind("gpu/shaders/", 0) == 0;
+      EXPECT_TRUE(declarationInclude || contractLeaves.count(include.target) == 1u)
+          << NameOf(file) << " includes " << include.target
+          << "; the declaration layer may include only gpu/shaders/** and its contract leaves. If "
+             "this file belongs to the declaration layer, add it to contractLeaves in this test as "
+             "a reviewed decision.";
+    }
+  }
+  EXPECT_GT(checked, 0u);
+  // A leaf nobody includes any more is a permission that will be reused later without a review.
+  for (const auto& leaf : contractLeaves) {
+    EXPECT_EQ(used.count(leaf), 1u) << leaf << " is allowed but the layer no longer includes it";
   }
 }
 

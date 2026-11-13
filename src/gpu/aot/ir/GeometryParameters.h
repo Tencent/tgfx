@@ -21,7 +21,7 @@
 #include <memory>
 #include "gpu/AAType.h"
 #include "gpu/SamplerState.h"
-#include "gpu/shaders/contract/GeometryKind.h"
+#include "gpu/aot/ir/GeometryKind.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 

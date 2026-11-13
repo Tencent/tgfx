@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/shaders/ProgramWriterFactory.h"
+#include "gpu/aot/write/ProgramWriterFactory.h"
 #include "core/utils/Log.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/shaders/Families.h"
