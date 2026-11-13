@@ -32,7 +32,6 @@
 namespace tgfx {
 class AOTNodeBuilder;
 class AOTNodeID;
-struct AOTSamplerRef;
 class ParamWriter;
 class ProgramInfo;
 class Image;
@@ -133,8 +132,6 @@ class FragmentProcessor : public Processor {
    * legacy texture-sampler enumeration reported them. Lowering walks the tree once and records
    * the result on the draw IR, so the runtime never enumerates processors to bind samplers.
    */
-  virtual void appendSamplers(std::vector<AOTSamplerRef>* /*samplers*/) const {
-  }
 
   size_t numChildProcessors() const {
     return childProcessors.size();

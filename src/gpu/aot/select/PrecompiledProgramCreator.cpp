@@ -285,9 +285,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
       // the production metrics stay honest. The record rides the IR, not the processor list.
       const auto* ir = programInfo->getCarriedIR();
       if (ir != nullptr) {
-        for (const auto& ref : ir->samplers) {
-          if (ref.textureProxy != nullptr && !ref.countsWithoutView &&
-              ref.textureProxy->getTextureView() == nullptr) {
+        for (const auto& proxy : ir->textures) {
+          if (proxy != nullptr && proxy->getTextureView() == nullptr) {
             reason = PrecompiledFallbackReason::DeferredTexture;
             break;
           }

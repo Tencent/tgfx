@@ -96,10 +96,6 @@ class TextureEffect : public FragmentProcessor {
                 SrcRectConstraint constraint, const Point& alphaStart, const Matrix& uvMatrix,
                 const std::optional<Rect>& subset);
 
-  void appendSamplers(std::vector<AOTSamplerRef>* samplers) const override;
-
-  size_t onCountTextureSamplers() const override;
-
   std::shared_ptr<Texture> onTextureAt(size_t index) const override;
 
   SamplerState onSamplerStateAt(size_t) const override {

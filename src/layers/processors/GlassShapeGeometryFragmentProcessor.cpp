@@ -34,18 +34,6 @@ GlassUDFGeometryFragmentProcessor::GlassUDFGeometryFragmentProcessor(
       edgeMaskProxy(std::move(edgeMask)), params(params), enableEdgeLighting(enableEdgeLighting) {
 }
 
-void GlassUDFGeometryFragmentProcessor::appendSamplers(std::vector<AOTSamplerRef>* samplers) const {
-  const SamplerState state(TileMode::Decal, TileMode::Decal);
-  samplers->push_back({maskProxy, state, false, true});
-  if (enableEdgeLighting) {
-    samplers->push_back({edgeMaskProxy, state, false, true});
-  }
-}
-
-size_t GlassUDFGeometryFragmentProcessor::onCountTextureSamplers() const {
-  return enableEdgeLighting ? 2 : 1;
-}
-
 std::shared_ptr<Texture> GlassUDFGeometryFragmentProcessor::onTextureAt(size_t index) const {
   auto proxy = index == 0 ? maskProxy : edgeMaskProxy;
   if (proxy == nullptr) {

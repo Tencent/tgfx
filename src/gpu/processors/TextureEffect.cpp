@@ -129,21 +129,6 @@ bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNode
   return builder->addTextureSource(input, parameters, output);
 }
 
-void TextureEffect::appendSamplers(std::vector<AOTSamplerRef>* samplers) const {
-  samplers->push_back({textureProxy, samplerState, false, false});
-}
-
-size_t TextureEffect::onCountTextureSamplers() const {
-  auto textureView = getTextureView();
-  if (textureView == nullptr) {
-    return 0;
-  }
-  if (textureView->isYUV()) {
-    return reinterpret_cast<YUVTextureView*>(textureView)->textureCount();
-  }
-  return 1;
-}
-
 std::shared_ptr<Texture> TextureEffect::onTextureAt(size_t index) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {

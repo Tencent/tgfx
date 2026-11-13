@@ -34,10 +34,6 @@ GlassRefractionFragmentProcessor::GlassRefractionFragmentProcessor(
   geometryIndex = registerChildProcessor(std::move(geometry));
 }
 
-void GlassRefractionFragmentProcessor::appendSamplers(std::vector<AOTSamplerRef>* samplers) const {
-  samplers->push_back({sourceProxy, SamplerState(TileMode::Clamp, TileMode::Clamp), false, true});
-}
-
 size_t GlassRefractionFragmentProcessor::onCountTextureSamplers() const {
   return 1;
 }

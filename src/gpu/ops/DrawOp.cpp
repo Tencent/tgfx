@@ -91,9 +91,9 @@ bool DrawOp::appendGrownCoverage() {
     ir->coverage.emplace_back(std::move(term));
   }
   ir->coverageFPCount = coverages.size();
-  // The grown processors' samplers join the IR's record in the same walk order; without them the
-  // bind loses the rasterized mask's texture and the draw samples the wrong slots.
-  AppendCoverageSamplers(grown, ir.get());
+  // The grown mask is now one of the IR's terms, so the draw's texture list is recomputed from the
+  // IR: the same walk that produced it at record time, over the grown coverage.
+  CollectDrawTextures(ir.get());
   return true;
 }
 

@@ -317,15 +317,6 @@ bool TiledTextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
   return builder->addTextureSource(input, parameters, output);
 }
 
-void TiledTextureEffect::appendSamplers(std::vector<AOTSamplerRef>* samplers) const {
-  samplers->push_back({textureProxy, samplerState, false, false});
-}
-
-size_t TiledTextureEffect::onCountTextureSamplers() const {
-  auto textureView = getTextureView();
-  return textureView ? 1 : 0;
-}
-
 std::shared_ptr<Texture> TiledTextureEffect::onTextureAt(size_t) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {

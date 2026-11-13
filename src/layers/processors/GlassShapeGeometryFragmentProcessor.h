@@ -152,10 +152,6 @@ class GlassUDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
     return edgeMaskProxy;
   }
 
-  void appendSamplers(std::vector<AOTSamplerRef>* samplers) const override;
-
-  size_t onCountTextureSamplers() const override;
-
   std::shared_ptr<Texture> onTextureAt(size_t index) const override;
 
   SamplerState onSamplerStateAt(size_t index) const override;

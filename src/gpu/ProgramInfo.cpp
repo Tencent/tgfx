@@ -289,12 +289,10 @@ bool ProgramInfo::samplersAre2D() const {
     }
   }
   if (carriedIR != nullptr) {
-    for (const auto& ref : carriedIR->samplers) {
-      auto view = ref.textureProxy != nullptr ? ref.textureProxy->getTextureView() : nullptr;
+    for (const auto& proxy : carriedIR->textures) {
+      auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
       if (view == nullptr) {
-        if (ref.countsWithoutView) {
-          return false;
-        }
+        // An upload that has not landed binds the dummy, which is a 2D texture.
         continue;
       }
       if (view->isYUV()) {

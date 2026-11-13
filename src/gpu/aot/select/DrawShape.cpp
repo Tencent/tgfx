@@ -50,10 +50,10 @@ uint32_t RequiredTextureReads(const ProgramInfo* programInfo) {
   }
   const auto* ir = programInfo->getCarriedIR();
   if (ir != nullptr) {
-    // The recorded sampler entries are the draw's whole sampler set, in binding order: a view
-    // that is not instantiated yet contributes no texture (the same rule the bind applies).
-    for (const auto& ref : ir->samplers) {
-      auto view = ref.textureProxy != nullptr ? ref.textureProxy->getTextureView() : nullptr;
+    // The recorded textures are the draw's whole sampler set: a view that is not instantiated yet
+    // contributes no texture (the same rule the bind applies).
+    for (const auto& proxy : ir->textures) {
+      auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
       if (view == nullptr || view->isYUV()) {
         continue;
       }
