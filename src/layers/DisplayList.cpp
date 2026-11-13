@@ -1593,10 +1593,11 @@ std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBoun
         !Rect::Intersects(bounds, layer->renderBounds)) {
       return;
     }
-    // matrix() reports the identity whenever the layer carries a 3D or projection transform, in
-    // which case the 2D renderBounds no longer delimits what the style samples. Bail out and let
-    // the caller keep the whole tile.
-    if (!layer->matrix3D().isIdentity() && layer->matrix().isIdentity()) {
+    // A layer that keeps its own 3D context is composited through the BSP, and a non-affine 3D
+    // matrix leaves the 2D renderBounds without a usable extent for the sampled area. Either way
+    // bail out and let the caller keep the whole tile.
+    const bool nonAffine3D = !layer->matrix3D().isIdentity() && layer->matrix().isIdentity();
+    if (layer->canPreserve3D() || nonAffine3D) {
       safe = false;
       return;
     }
