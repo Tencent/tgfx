@@ -112,6 +112,9 @@ struct BackgroundSnapshotMap {
   // they bound the shared style output texture to the on-screen size instead of the layer's full
   // content extent, which under zoom can be orders of magnitude larger.
   std::vector<Rect> visibleRects = {};
+  // World-space rects the capture pass culled its draw calls to. Empty when it replayed the whole
+  // captured area. Exposed so a test can pin how far the culling is allowed to reach.
+  std::vector<Rect> cullRects = {};
   // Device size of this frame's render target. The shared style output is rasterized in device
   // space, so this bounds it — anything outside the target is never visible.
   int renderTargetWidth = 0;

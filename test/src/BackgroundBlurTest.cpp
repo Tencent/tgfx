@@ -1599,26 +1599,75 @@ TGFX_TEST(BackgroundBlurTest, CaptureCullKeepsStyleSourceComplete) {
 // The capture may only draw what it covers itself, so every footprint is clipped against each
 // captured rect rather than against their union: a footprint stretched over the gap between two
 // tiles must not pull in the layers under that gap.
-TGFX_TEST_PRIVATE(BackgroundBlurTest, NarrowCullRectsToTheCaptureArea) {
-  TGFX_PRIVATE_ACCESS({
-    std::vector<Rect> footprints = {Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f)};
-    std::vector<Rect> captureRects = {Rect::MakeXYWH(-20.0f, -20.0f, 40.0f, 40.0f),
-                                      Rect::MakeXYWH(80.0f, 80.0f, 60.0f, 60.0f)};
-    auto narrowed = DisplayList::narrowCullRects(footprints, captureRects);
-    ASSERT_EQ(narrowed.size(), 2u);
-    EXPECT_EQ(narrowed[0], Rect::MakeXYWH(0.0f, 0.0f, 20.0f, 20.0f));
-    EXPECT_EQ(narrowed[1], Rect::MakeXYWH(80.0f, 80.0f, 20.0f, 20.0f));
-    // The union of the captured rects would be (20, 20) to (80, 80), which the footprint itself
-    // covers, so the gap between the two tiles must not survive as a cull rect.
-    for (const auto& rect : narrowed) {
-      EXPECT_TRUE(captureRects[0].contains(rect) || captureRects[1].contains(rect));
-    }
+TGFX_TEST_PRIVATE(BackgroundBlurTest, NarrowCullRectsToTheCaptureArea){TGFX_PRIVATE_ACCESS({
+  std::vector<Rect> footprints = {Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f)};
+  std::vector<Rect> captureRects = {Rect::MakeXYWH(-20.0f, -20.0f, 40.0f, 40.0f),
+                                    Rect::MakeXYWH(80.0f, 80.0f, 60.0f, 60.0f)};
+  auto narrowed = DisplayList::narrowCullRects(footprints, captureRects);
+  ASSERT_EQ(narrowed.size(), 2u);
+  EXPECT_EQ(narrowed[0], Rect::MakeXYWH(0.0f, 0.0f, 20.0f, 20.0f));
+  EXPECT_EQ(narrowed[1], Rect::MakeXYWH(80.0f, 80.0f, 20.0f, 20.0f));
+  // The union of the captured rects would be (20, 20) to (80, 80), which the footprint itself
+  // covers, so the gap between the two tiles must not survive as a cull rect.
+  for (const auto& rect : narrowed) {
+    EXPECT_TRUE(captureRects[0].contains(rect) || captureRects[1].contains(rect));
+  }
 
-    // A footprint outside every captured rect is dropped, which leaves the caller on its fallback
-    // instead of widening the cull back to the union.
-    auto outside =
-        DisplayList::narrowCullRects({Rect::MakeXYWH(200.0f, 200.0f, 10.0f, 10.0f)}, captureRects);
-    EXPECT_TRUE(outside.empty());
+  // A footprint outside every captured rect is dropped, which leaves the caller on its fallback
+  // instead of widening the cull back to the union.
+  auto outside =
+      DisplayList::narrowCullRects({Rect::MakeXYWH(200.0f, 200.0f, 10.0f, 10.0f)}, captureRects);
+  EXPECT_TRUE(outside.empty());
+})}
+
+// The capture only draws what its background styles sample: the cull rects stay inside both the
+// captured area and the footprints, instead of covering the whole capture a large dirty region asks
+// for.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullRectsStayInsideTheFootprints) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto surface = Surface::Make(context, 300, 300);
+    ASSERT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(RenderMode::Tiled);
+
+    auto blurred = ShapeLayer::Make();
+    blurred->setMatrix(Matrix::MakeTrans(10, 10));
+    Path path;
+    path.addRect(Rect::MakeWH(20, 20));
+    blurred->setPath(path);
+    blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 128)));
+    blurred->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
+    displayList->root()->addChild(blurred);
+
+    // renderBounds and the background outsets are computed while rendering.
+    displayList->render(surface.get());
+    auto rootOutset = displayList->root()->maxBackgroundOutset;
+    ASSERT_GT(rootOutset, 0.0f);
+
+    // A 200x200 capture against a 20x20 blurred layer: the cull has to follow the footprint.
+    auto captureRect = Rect::MakeWH(200.0f, 200.0f);
+    auto footprints = displayList->collectBackgroundFootprints(captureRect);
+    ASSERT_EQ(footprints.size(), 1u);
+    auto snapshots = displayList->captureBackgrounds(surface.get(), {captureRect}, footprints);
+    ASSERT_TRUE(snapshots != nullptr);
+    ASSERT_EQ(snapshots->cullRects.size(), 1u);
+
+    auto captureWithOutset = captureRect;
+    captureWithOutset.outset(rootOutset, rootOutset);
+    for (const auto& rect : snapshots->cullRects) {
+      EXPECT_TRUE(captureWithOutset.contains(rect));
+    }
+    // The cull follows the footprint plus the blur reach, not the captured area.
+    auto expected = footprints[0];
+    expected.outset(rootOutset, rootOutset);
+    EXPECT_EQ(snapshots->cullRects[0], expected);
+    EXPECT_LT(snapshots->cullRects[0].width() * snapshots->cullRects[0].height(),
+              captureRect.width() * captureRect.height());
+
+    context->flushAndSubmit();
   })
 }
 

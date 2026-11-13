@@ -1333,6 +1333,7 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   // keeping the captured area unchanged keeps the multi-pass structure (and the style output
   // sharing that depends on it) intact.
   std::vector<Rect> cullWorldRects = worldRects;
+  bool culled = false;
   if (!cullRects.empty()) {
     std::vector<Rect> footprints = {};
     footprints.reserve(cullRects.size());
@@ -1347,6 +1348,7 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     // drop the backdrop the styles read, and an oversized one costs more than the culling saves.
     if (!narrowed.empty() && narrowed.size() <= MAX_CULL_RECTS) {
       cullWorldRects = std::move(narrowed);
+      culled = true;
     }
   }
   DrawArgs args(context);
@@ -1358,6 +1360,11 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     return nullptr;
   }
   auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
+  // Only the narrowed list is recorded: the fallback keeps the whole captured area, which the
+  // caller already knows from renderRects.
+  if (culled) {
+    snapshotMap->cullRects = cullWorldRects;
+  }
   snapshotMap->multiPass = renderRects.size() > 1;
   snapshotMap->visibleRects = std::move(visibleRects);
   snapshotMap->renderTargetWidth = surface->width();
