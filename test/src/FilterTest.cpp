@@ -938,8 +938,9 @@ TGFX_TEST(FilterTest, GaussianBlurSmallSigmaMatchesSeparable) {
   EXPECT_LE(MaxDiffInWindow(single, separable, left, top, right, bottom), 1);
 }
 
-// Letting the vertical pass write the requested bounds directly must match the copy it replaces,
-// down to the last bit: it reads the same samples of the horizontal result.
+// Letting the vertical pass write the requested bounds directly must match the copy it replaces: it
+// reads the same samples of the horizontal result. Software rasterizers resolve that shifted read a
+// fraction of a texel off the center, so the interpolated sample may differ by 1/255.
 TGFX_TEST(FilterTest, GaussianBlurFoldedCropMatchesTheCopy) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -954,7 +955,7 @@ TGFX_TEST(FilterTest, GaussianBlurFoldedCropMatchesTheCopy) {
   ASSERT_FALSE(noCopy.empty());
   ASSERT_FALSE(folded.empty());
   EXPECT_GT(WindowSpread(noCopy, 40 + 10, 40 + 12, 40 + 10 + 60, 40 + 12 + 44), 8);
-  EXPECT_EQ(MaxDiffInWindow(noCopy, folded, 40 + 10, 40 + 12, 40 + 10 + 60, 40 + 12 + 44), 0);
+  EXPECT_LE(MaxDiffInWindow(noCopy, folded, 40 + 10, 40 + 12, 40 + 10 + 60, 40 + 12 + 44), 1);
 }
 
 TGFX_TEST(FilterTest, ReverseFilterBounds) {
