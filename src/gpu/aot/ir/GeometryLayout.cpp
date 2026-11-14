@@ -267,6 +267,7 @@ GeometryLayout ShapeInstancedGeometryLayout(AAType aaType, bool hasColors, const
   layout.parameters.hasUVMatrix = uvMatrix != Matrix::I();
   layout.parameters.hasUVPerspective = uvMatrix.hasPerspective();
   layout.parameters.aaType = aaType;
+  layout.parameters.hasCoverage = aaType == AAType::Coverage;
   layout.parameters.hasColors = hasColors;
   AppendSlot(&layout, Attribute{"aPosition", VertexFormat::Float2});
   AppendSlot(&layout, Attribute{"inCoverage", VertexFormat::Float});

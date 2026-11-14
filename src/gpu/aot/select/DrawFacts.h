@@ -21,6 +21,8 @@
 #include <cstdint>
 #include <optional>
 #include "gpu/aot/ir/GeometryKind.h"
+#include "gpu/aot/ir/GeometryParameters.h"
+#include "gpu/aot/ir/XferFacts.h"
 #include "gpu/shaders/ShaderPermutation.h"
 
 // The draw facts a family's match rule reads. They live in the contract layer because the
@@ -31,40 +33,6 @@ namespace tgfx {
 
 class ProgramInfo;
 struct DrawIR;
-
-/**
- * The geometry facts a draw's matcher rules read, as plain data. Described off the made geometry
- * processor at match time (DescribeGeometryProcessor) — the matching runs at prepare, where the
- * processor itself is the truth, so there is one description and no record-time copy.
- */
-struct AOTGeometryDesc {
-  GeometryKind kind = GeometryKind::Other;
-  // QuadPerEdgeAA only: the vertex stage's layout facts the matchers read.
-  bool hasCommonColor = false;
-  bool hasUVMatrix = false;
-  bool hasSubset = false;
-  bool hasUVPerspective = false;
-  // The rounded-rect kinds only: the stroke form (the processors' isStroke).
-  bool isStroke = false;
-  // Mesh only: whether the vertex attributes carry texture coordinates.
-  bool hasTexCoords = false;
-  // AtlasText only: whether the processor carries the AA coverage attribute (AAType::Coverage).
-  bool hasCoverage = false;
-};
-
-/**
- * The xfer classification the matcher rules read (the XP_* vocabulary's plain-data twin): how
- * the destination color reaches the fragment shader. Classified off the made xfer processor at
- * match time — the dst-texture decision was made when the op was recorded (a dst-texture
- * processor holds its proxy, a framebuffer-fetch one empty info), so the processor's own dst
- * info is exact.
- */
-enum class XferKind : uint8_t {
-  Unsupported = 0,
-  None,
-  DstTexture,
-  FrameBufferFetch,
-};
 
 /// How the draw's sole coverage FP is served. LocalMask is a distinct capability: it needs a
 /// local-space varying and sampler and therefore cannot be encoded in the shared runtime clip
@@ -91,8 +59,11 @@ enum class Coverage {
  */
 struct DrawShape {
   const DrawIR* ir = nullptr;
-  AOTGeometryDesc geometry = {};
-  XferKind xfer = XferKind::Unsupported;
+  /// The draw's geometry parameters, read in place: the matcher facts and the writer's layout are
+  /// the same object, so a geometry flag has one definition instead of a described copy.
+  const AOTGeometryParameters* geometry = nullptr;
+  /// The draw's xfer facts, read in place (see xpType).
+  const XferFacts* xfer = nullptr;
   bool alphaOnlyTarget = false;
   size_t colorFPCount = 0;
   size_t fragmentCount = 0;
@@ -112,25 +83,15 @@ struct DrawShape {
   /// QuadPerEdgeAA whose coordinate comes from aPosition (a common color, a uv matrix, no
   /// per-quad subset).
   bool positionOnlyRect() const {
-    return geometry.kind == GeometryKind::Default ||
-           (geometry.kind == GeometryKind::QuadPerEdgeAA && geometry.hasCommonColor &&
-            geometry.hasUVMatrix && !geometry.hasSubset);
+    return geometry != nullptr &&
+           (geometry->kind == GeometryKind::Default ||
+            (geometry->kind == GeometryKind::QuadPerEdgeAA && geometry->hasCommonColor &&
+             geometry->hasUVMatrix && !geometry->hasSubset));
   }
 
-  /// The XP_* vocabulary value (the fill families' shared HAS_XP axis).
-  int xpType() const {
-    switch (xfer) {
-      case XferKind::None:
-        return XP_NONE;
-      case XferKind::DstTexture:
-        return XP_DST_TEXTURE;
-      case XferKind::FrameBufferFetch:
-        return XP_FRAMEBUFFER_FETCH;
-      case XferKind::Unsupported:
-        break;
-    }
-    return XP_UNSUPPORTED;
-  }
+  /// The XP_* vocabulary value (the fill families' shared HAS_XP axis), read off the draw's xfer
+  /// facts: the one classification, no described copy.
+  int xpType() const;
 };
 
 /// Describes one draw's matcher facts off the made processors and its carried IR. The one

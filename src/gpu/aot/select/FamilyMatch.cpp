@@ -84,7 +84,7 @@ namespace {
 /// geometry or the body, so the ordinal is HAS_XP alone.
 bool MatchSolidColor(const ProgramInfo* /*info*/, const DrawShape& shape,
                      FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::Default) {
+  if (shape.geometry->kind != GeometryKind::Default) {
     return false;
   }
   const bool noProcessorsOrDirectClip =
@@ -102,7 +102,7 @@ bool MatchSolidColor(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// sampler facts come off the IR's sole coverage term, so the acceptance reads the carried IR.
 /// Slot layout: Frame(0), RectGeometry(1), MaskTexture(2), Xfer(3: HAS_XP).
 bool MatchMaskFill(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::Default) {
+  if (shape.geometry->kind != GeometryKind::Default) {
     return false;
   }
   if (shape.colorFPCount != 0 || shape.fragmentCount != 1) {
@@ -154,7 +154,7 @@ bool MatchTiledTextureFill(const ProgramInfo* /*info*/, const DrawShape& shape,
       !TiledFillModeSupported(static_cast<int>(leaf->tiledRecipe->shaderModeY))) {
     return false;
   }
-  const uint8_t geometry = shape.geometry.kind == GeometryKind::Default ? 0 : 1;
+  const uint8_t geometry = shape.geometry->kind == GeometryKind::Default ? 0 : 1;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
   // The pinned dims (FULL and PRESENT at 1) are filled by EncodeVariant from the declaration;
   // hand-rolling them at zero made PRESENT read as "module absent" and skip every tiled uniform
@@ -172,7 +172,7 @@ bool MatchTiledTextureFill(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// DeviceMask(2: PRESENT), AnalyticClip(3), Xfer(4: HAS_XP). The ordinal is PRESENT + 2 * HAS_XP.
 bool MatchQuadColor(const ProgramInfo* /*info*/, const DrawShape& shape,
                     FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::QuadPerEdgeAA) {
+  if (shape.geometry->kind != GeometryKind::QuadPerEdgeAA) {
     return false;
   }
   uint8_t present = 0;
@@ -197,7 +197,7 @@ bool MatchQuadColor(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// rounded rect, at most one fragment (a sole analytic clip riding the runtime contract, or the
 /// single-tap tiled fill), never alpha-only, any xfer.
 bool MatchRRect(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::NonAARRect || shape.alphaOnlyTarget) {
+  if (shape.geometry->kind != GeometryKind::NonAARRect || shape.alphaOnlyTarget) {
     return false;
   }
   if (shape.fragmentCount > 1) {
@@ -224,7 +224,7 @@ bool MatchRRect(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatch
       return false;
     }
     // The textured form never combines with stroke (the family's allowed rule).
-    if (shape.geometry.isStroke) {
+    if (shape.geometry->isStroke) {
       return false;
     }
   }
@@ -262,11 +262,11 @@ const AOTGradientParameters* SoleGradientLeaf(const AOTEffectGraph& graph) {
 /// fragment processor and any xfer. The flattened dims are the geometry's TEX_COORDS then the
 /// Xfer's HAS_XP, so the ordinal is TEX_COORDS + 2 * HAS_XP.
 bool MatchMesh(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::Mesh || shape.fragmentCount != 0 ||
+  if (shape.geometry->kind != GeometryKind::Mesh || shape.fragmentCount != 0 ||
       shape.xpType() < XP_NONE) {
     return false;
   }
-  const uint8_t texCoords = shape.geometry.hasTexCoords ? 1 : 0;
+  const uint8_t texCoords = shape.geometry->hasTexCoords ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
   return EncodeMatch(MeshIndex, 0, {texCoords, hasXp}, &result->variant);
 }
@@ -279,7 +279,7 @@ bool MatchMesh(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchR
 /// set for every blended xfer.
 bool MatchShapeInstanced(const ProgramInfo* /*info*/, const DrawShape& shape,
                          FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::ShapeInstanced || shape.fragmentCount != 0 ||
+  if (shape.geometry->kind != GeometryKind::ShapeInstanced || shape.fragmentCount != 0 ||
       shape.xpType() < XP_NONE) {
     return false;
   }
@@ -296,7 +296,7 @@ bool MatchShapeInstanced(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// GRADIENT, HAS_XP] with the first and last pinned to 0, so the ordinal is 2 * GRADIENT.
 bool MatchShapeInstancedTextureCoverage(const ProgramInfo* /*info*/, const DrawShape& shape,
                                         FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::ShapeInstanced || shape.geometry.hasCoverage ||
+  if (shape.geometry->kind != GeometryKind::ShapeInstanced || shape.geometry->hasCoverage ||
       shape.xpType() != XP_NONE || shape.ir == nullptr) {
     return false;
   }
@@ -351,8 +351,8 @@ bool MatchShapeInstancedTextureCoverage(const ProgramInfo* /*info*/, const DrawS
 /// The GaussianBlur family's rule, carried over from the former GaussianBlur1DShader.
 bool MatchGaussianBlur(const ProgramInfo* /*info*/, const DrawShape& shape,
                        FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::Default &&
-      shape.geometry.kind != GeometryKind::QuadPerEdgeAA) {
+  if (shape.geometry->kind != GeometryKind::Default &&
+      shape.geometry->kind != GeometryKind::QuadPerEdgeAA) {
     return false;
   }
   if (shape.colorFPCount != 1) {
@@ -385,8 +385,8 @@ bool MatchGaussianBlur(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// IR's tent-blur node over one servable texture child; the fixed loop bound caps the radius.
 bool MatchGlassUDFTentBlur(const ProgramInfo* /*info*/, const DrawShape& shape,
                            FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::Default &&
-      shape.geometry.kind != GeometryKind::QuadPerEdgeAA) {
+  if (shape.geometry->kind != GeometryKind::Default &&
+      shape.geometry->kind != GeometryKind::QuadPerEdgeAA) {
     return false;
   }
   if (shape.colorFPCount != 1) {
@@ -426,16 +426,16 @@ bool MatchGlassUDFTentBlur(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// variants per family, the legacy kernel's 36 across the two.
 bool MatchGlassRefraction(const ProgramInfo* /*info*/, const DrawShape& shape, GeometryKind kind,
                           uint16_t family, FamilyMatchResult* result) {
-  if (shape.geometry.kind != kind || shape.alphaOnlyTarget) {
+  if (shape.geometry->kind != kind || shape.alphaOnlyTarget) {
     return false;
   }
   if (kind == GeometryKind::Ellipse) {
-    if (!shape.geometry.hasCommonColor) {
+    if (!shape.geometry->hasCommonColor) {
       return false;
     }
   } else {
-    if (!shape.geometry.hasCommonColor || !shape.geometry.hasUVMatrix || shape.geometry.hasSubset ||
-        shape.geometry.hasUVPerspective) {
+    if (!shape.geometry->hasCommonColor || !shape.geometry->hasUVMatrix ||
+        shape.geometry->hasSubset || shape.geometry->hasUVPerspective) {
       return false;
     }
   }
@@ -488,7 +488,7 @@ bool MatchGlassRefractionQuad(const ProgramInfo* /*info*/, const DrawShape& shap
 /// runtime StrokeEnabled uniform, so the ordinal is HAS_XP alone.
 bool MatchComplexRRect(const ProgramInfo* /*info*/, const DrawShape& shape,
                        FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::ComplexNonAARRect || shape.fragmentCount != 0 ||
+  if (shape.geometry->kind != GeometryKind::ComplexNonAARRect || shape.fragmentCount != 0 ||
       shape.xpType() < XP_NONE) {
     return false;
   }
@@ -502,7 +502,7 @@ bool MatchComplexRRect(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// HAS_XP alone.
 bool MatchHairline(const ProgramInfo* /*info*/, const DrawShape& shape, GeometryKind kind,
                    uint16_t family, FamilyMatchResult* result) {
-  if (shape.geometry.kind != kind) {
+  if (shape.geometry->kind != kind) {
     return false;
   }
   const bool directClip = shape.colorFPCount == 0 &&
@@ -534,7 +534,7 @@ bool MatchHairlineQuad(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// with no color processor, a coverage that is anything but a local mask, and any xfer. DeviceMask
 /// carries PRESENT, so the ordinal is PRESENT + 2 * HAS_XP.
 bool MatchEllipse(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::Ellipse || shape.colorFPCount != 0 ||
+  if (shape.geometry->kind != GeometryKind::Ellipse || shape.colorFPCount != 0 ||
       !shape.coverage.has_value() || *shape.coverage == Coverage::LocalMask ||
       shape.xpType() < XP_NONE) {
     return false;
@@ -550,7 +550,7 @@ bool MatchEllipse(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMat
 /// STROKE + 2 * PRESENT + 4 * HAS_XP.
 bool MatchComplexEllipse(const ProgramInfo* /*info*/, const DrawShape& shape,
                          FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::ComplexEllipse || shape.colorFPCount != 0 ||
+  if (shape.geometry->kind != GeometryKind::ComplexEllipse || shape.colorFPCount != 0 ||
       !shape.coverage.has_value() || *shape.coverage == Coverage::LocalMask ||
       shape.xpType() < XP_NONE) {
     return false;
@@ -566,7 +566,7 @@ bool MatchComplexEllipse(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// is UV_MATRIX + 2 * HAS_XP.
 bool MatchRoundStrokeRect(const ProgramInfo* /*info*/, const DrawShape& shape,
                           FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::RoundStrokeRect) {
+  if (shape.geometry->kind != GeometryKind::RoundStrokeRect) {
     return false;
   }
   const bool directClip = shape.colorFPCount == 0 &&
@@ -574,10 +574,10 @@ bool MatchRoundStrokeRect(const ProgramInfo* /*info*/, const DrawShape& shape,
   if (shape.fragmentCount != 0 && !directClip) {
     return false;
   }
-  if (shape.geometry.hasUVPerspective || shape.xpType() < XP_NONE) {
+  if (shape.geometry->hasUVPerspective || shape.xpType() < XP_NONE) {
     return false;
   }
-  const uint8_t uvMatrix = shape.geometry.hasUVMatrix ? 1 : 0;
+  const uint8_t uvMatrix = shape.geometry->hasUVMatrix ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
   return EncodeMatch(RoundStrokeRectIndex, 0, {uvMatrix, hasXp}, &result->variant);
 }
@@ -589,7 +589,7 @@ bool MatchRoundStrokeRect(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// UV_COORD + 2*SUBSET + 4*SUBSET + 8*PRESENT + 16*HAS_XP.
 bool MatchQuadTexture(const ProgramInfo* /*info*/, const DrawShape& shape,
                       FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::QuadPerEdgeAA || shape.colorFPCount != 1 ||
+  if (shape.geometry->kind != GeometryKind::QuadPerEdgeAA || shape.colorFPCount != 1 ||
       shape.xpType() < XP_NONE || shape.ir == nullptr) {
     return false;
   }
@@ -612,11 +612,12 @@ bool MatchQuadTexture(const ProgramInfo* /*info*/, const DrawShape& shape,
       tail.leaf->isYUV || tail.leaf->samplingKind != AOTTextureSamplingKind::Plain) {
     return false;
   }
-  if (shape.geometry.hasSubset && (shape.geometry.hasUVPerspective || tail.leaf->hasPerspective)) {
+  if (shape.geometry->hasSubset &&
+      (shape.geometry->hasUVPerspective || tail.leaf->hasPerspective)) {
     return false;
   }
-  const uint8_t uvCoord = shape.geometry.hasUVMatrix ? 0 : 1;
-  const uint8_t subset = shape.geometry.hasSubset ? 1 : 0;
+  const uint8_t uvCoord = shape.geometry->hasUVMatrix ? 0 : 1;
+  const uint8_t subset = shape.geometry->hasSubset ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
   // The free values in flattened order: [UV_COORD, SUBSET (geometry), SUBSET (texture), PRESENT,
   // HAS_XP] — the geometry's and the texture's SUBSET move together (the allowed rule).
@@ -637,7 +638,7 @@ bool MatchYUVTexture(const ProgramInfo* info, const DrawShape& shape, FamilyMatc
   // The acceptance is the legacy kernel's, verbatim: the QuadPerEdgeAA quad without a subset,
   // the color graph is the multi-plane source with at most the tail's operators above it, and the
   // staleness guard keeps the tree and the graph in agreement.
-  if (shape.geometry.kind != GeometryKind::QuadPerEdgeAA || shape.geometry.hasSubset ||
+  if (shape.geometry->kind != GeometryKind::QuadPerEdgeAA || shape.geometry->hasSubset ||
       shape.colorFPCount < 1 || shape.colorFPCount != shape.fragmentCount ||
       shape.xpType() < XP_NONE || shape.ir == nullptr) {
     return false;
@@ -673,7 +674,7 @@ bool MatchYUVTexture(const ProgramInfo* info, const DrawShape& shape, FamilyMatc
       return false;
     }
   }
-  const uint8_t uvCoord = shape.geometry.hasUVMatrix ? 0 : 1;
+  const uint8_t uvCoord = shape.geometry->hasUVMatrix ? 0 : 1;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
   // The writer's data source: the multi-plane leaf the tail is built over (the same field the
   // chain family carries its leaf in).
@@ -690,7 +691,7 @@ bool MatchYUVTexture(const ProgramInfo* info, const DrawShape& shape, FamilyMatc
 /// flatten in that order, so the ordinal is HAS_COVERAGE + 2 * HAS_XP.
 bool MatchAtlasText(const ProgramInfo* /*info*/, const DrawShape& shape,
                     FamilyMatchResult* result) {
-  if (shape.geometry.kind != GeometryKind::AtlasText || shape.colorFPCount != 0 ||
+  if (shape.geometry->kind != GeometryKind::AtlasText || shape.colorFPCount != 0 ||
       shape.fragmentCount > 1 || shape.xpType() < XP_NONE) {
     return false;
   }
@@ -704,7 +705,7 @@ bool MatchAtlasText(const ProgramInfo* /*info*/, const DrawShape& shape,
       }
     }
   }
-  const uint8_t hasCoverage = shape.geometry.hasCoverage ? 1 : 0;
+  const uint8_t hasCoverage = shape.geometry->hasCoverage ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
   return EncodeMatch(AtlasTextIndex, 0, {hasCoverage, hasXp}, &result->variant);
 }
@@ -716,7 +717,7 @@ bool MatchAtlasText(const ProgramInfo* /*info*/, const DrawShape& shape,
 bool DeriveChainCell(const AOTProgram& program, const ProgramInfo* info, ChainLegacyCell* cell) {
   // The gpKind axis comes from the one geometry classification (DescribeGeometryProcessor), so the
   // family's vertex-layout choice and the matcher's facts cannot disagree.
-  auto gpKind = PointwiseGpKind(DescribeGeometryProcessor(info->getGeometryLayout()));
+  auto gpKind = PointwiseGpKind(GeometryFactsOf(info->getGeometryLayout()));
   if (!gpKind.has_value()) {
     return false;
   }
@@ -878,7 +879,7 @@ bool DeriveChainCell(const AOTProgram& program, const ProgramInfo* info, ChainLe
   cell->mask = mask;
   cell->resource = resource;
   cell->subset = hasSubset ? 1 : 0;
-  cell->xp = GetXPType(info);
+  cell->xp = XpTypeOf(info->getXferFacts());
   return true;
 }
 

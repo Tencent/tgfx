@@ -48,29 +48,13 @@ bool RejectsAlphaOnlyTarget(bool servesAlphaOnly, const ProgramInfo* programInfo
   return !servesAlphaOnly && programInfo->getOutputSwizzle() == Swizzle::AAAA();
 }
 
-// Returns XP_NONE for EmptyXferProcessor, XP_DST_TEXTURE / XP_FRAMEBUFFER_FETCH for the
-// PorterDuff modes, or XP_UNSUPPORTED for XP types no kernel can serve.
-int GetXPType(const ProgramInfo* programInfo) {
-  switch (ClassifyXferForMatch(programInfo->getXferFacts())) {
-    case XferKind::None:
-      return XP_NONE;
-    case XferKind::DstTexture:
-      return XP_DST_TEXTURE;
-    case XferKind::FrameBufferFetch:
-      return XP_FRAMEBUFFER_FETCH;
-    case XferKind::Unsupported:
-      break;
-  }
-  return XP_UNSUPPORTED;
-}
-
-XferKind ClassifyXferForMatch(const XferFacts& xfer) {
+int XpTypeOf(const XferFacts& xfer) {
   if (!xfer.shaderBlend()) {
-    return XferKind::None;
+    return XP_NONE;
   }
   const auto& proxy = xfer.dstTexture->textureProxy;
   auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
-  return view != nullptr ? XferKind::DstTexture : XferKind::FrameBufferFetch;
+  return view != nullptr ? XP_DST_TEXTURE : XP_FRAMEBUFFER_FETCH;
 }
 
 // Determines whether a texture-based coverage child can be served by the local-space mask path
@@ -243,44 +227,13 @@ std::optional<Coverage> ClassifyCoverageTerms(const ProgramInfo* programInfo) {
   return ClassifyCoverageTerm(*classified);
 }
 
-AOTGeometryDesc DescribeGeometryProcessor(const GeometryLayout& layout) {
-  AOTGeometryDesc desc = {};
-  const auto& p = layout.parameters;
-  desc.kind = p.kind;
-  // Only the fields the matchers read for that kind are filled, the same per-kind table the
-  // processor discriminators carried.
-  switch (p.kind) {
-    case GeometryKind::NonAARRect:
-    case GeometryKind::ComplexNonAARRect:
-    case GeometryKind::Ellipse:
-    case GeometryKind::ComplexEllipse:
-      desc.hasCommonColor = p.hasCommonColor;
-      desc.isStroke = p.isStroke;
-      break;
-    case GeometryKind::Mesh:
-      desc.hasTexCoords = p.hasTexCoords;
-      break;
-    case GeometryKind::RoundStrokeRect:
-      desc.hasUVMatrix = p.hasUVMatrix;
-      desc.hasUVPerspective = p.hasUVPerspective;
-      break;
-    case GeometryKind::ShapeInstanced:
-    case GeometryKind::AtlasText:
-      desc.hasCoverage = p.aaType == AAType::Coverage;
-      break;
-    case GeometryKind::QuadPerEdgeAA:
-      desc.hasCommonColor = p.hasCommonColor;
-      desc.hasUVMatrix = p.hasUVMatrix;
-      desc.hasSubset = p.hasSubset;
-      desc.hasUVPerspective = p.hasUVPerspective;
-      break;
-    default:
-      break;
-  }
-  return desc;
+const AOTGeometryParameters& GeometryFactsOf(const GeometryLayout& layout) {
+  // The geometry facts are the layout's own parameters: the matchers, the writers and the program
+  // creator read the same object, so a flag has one definition instead of a described copy.
+  return layout.parameters;
 }
 
-std::optional<int> PointwiseGpKind(const AOTGeometryDesc& geometry) {
+std::optional<int> PointwiseGpKind(const AOTGeometryParameters& geometry) {
   switch (geometry.kind) {
     case GeometryKind::Default:
       return GpKind::Default;

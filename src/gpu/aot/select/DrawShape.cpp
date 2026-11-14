@@ -88,12 +88,21 @@ DrawShape ExtractDrawShape(const ProgramInfo* programInfo) {
   facts.requiredTextureReads = RequiredTextureReads(programInfo);
   facts.coverage = ClassifyCoverageTerms(programInfo);
   facts.ir = ir;
-  // The geometry and xfer facts are match-time facts: the matching runs after the processors
-  // exist, so they are described off the made processors — one description, no record-time copy.
-  facts.geometry = DescribeGeometryProcessor(programInfo->getGeometryLayout());
-  facts.xfer = ClassifyXferForMatch(programInfo->getXferFacts());
+  // The geometry parameters are read in place: the matching runs at prepare, where the layout the
+  // rest of the upload addresses is already the truth.
+  facts.geometry = &programInfo->getGeometryLayout().parameters;
+  facts.xfer = &programInfo->getXferFacts();
   facts.hasGradientSource = ir != nullptr && GraphHasGradientSource(ir->color);
   return facts;
+}
+
+int DrawShape::xpType() const {
+  if (xfer == nullptr || !xfer->shaderBlend()) {
+    return XP_NONE;
+  }
+  const auto& proxy = xfer->dstTexture->textureProxy;
+  auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
+  return view != nullptr ? XP_DST_TEXTURE : XP_FRAMEBUFFER_FETCH;
 }
 
 }  // namespace tgfx

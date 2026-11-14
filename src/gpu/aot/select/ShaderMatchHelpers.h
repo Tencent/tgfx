@@ -41,10 +41,9 @@ struct AOTProgram;
 struct AOTCoverageTerm;
 struct Family;
 
-/// Describes a geometry processor's matcher-relevant facts — the one description of the draw's
-/// geometry the executor-table matching reads, taken off the made processor at match time. The
-/// type dispatch uses IsProcessor, never name() strings, so a rename cannot silently reclassify.
-AOTGeometryDesc DescribeGeometryProcessor(const GeometryLayout& layout);
+/// The draw's geometry facts, read in place: the matcher rules, the writers and the program
+/// creator all address the layout's own parameters, so a geometry flag has one definition.
+const AOTGeometryParameters& GeometryFactsOf(const GeometryLayout& layout);
 
 /// The pointwise chain's gpKind axis: one value per vertex layout its kernels have. The numbers are
 /// permutation values baked into the kernels' GP layouts, so they are ABI — append only.
@@ -64,19 +63,15 @@ inline constexpr int HairlineQuad = 9;
 
 /// Maps the one geometry classification onto the chain's gpKind axis; nullopt when the chain has no
 /// vertex layout for that geometry. The single place the two classifications meet.
-std::optional<int> PointwiseGpKind(const AOTGeometryDesc& geometry);
+std::optional<int> PointwiseGpKind(const AOTGeometryParameters& geometry);
 
-/// The xfer classification the matcher facts read — what GetXPType reports for the draw's info,
-/// taken off its output-formula facts.
-XferKind ClassifyXferForMatch(const XferFacts& xfer);
+/// The XP_* value of a draw's xfer facts: none, dst-texture, or framebuffer fetch.
+int XpTypeOf(const XferFacts& xfer);
 
 /// Whether a color-space transform's steps fit the single-slot fill kernel's precompiled
 /// evaluation (the transfer functions must be of an indexable type when linearize/encode run) —
 /// IsSupportedPointwiseOp's color-space half, over the IR's steps.
 bool SupportedFillKernelSteps(const ColorSpaceXformSteps* steps);
-
-/// 0 = Empty XferProcessor, 1 = PorterDuff DST_TEX, 2 = PorterDuff FBF, -1 = none representable.
-int GetXPType(const ProgramInfo* programInfo);
 
 /// Whether a ShaderMode value is one the tiled fill kernel implements.
 bool TiledFillModeSupported(int mode);
