@@ -67,8 +67,11 @@ struct PrecompiledShaderInfo {
  * verifier (AOTClosureVerifier) must apply it, or the verifier reports holes the runtime can never
  * request.
  */
-bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t vertIndex,
-                                   uint32_t fragIndex, ShaderProfile profile);
+bool PermutationCompilesForBackend(uint16_t familyIndex, uint32_t ordinal, ShaderProfile profile);
+
+/// Whether the variant's destination path is the framebuffer-fetch dialect (the profile filter's
+/// only input). False for an ordinal the family does not enumerate.
+bool VariantUsesFramebufferFetch(uint16_t familyIndex, uint32_t ordinal);
 
 /**
  * The declared family's metadata, addressed by name. Every family lives in the declaration table

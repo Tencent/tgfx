@@ -390,12 +390,13 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         }
       }
       for (auto& emitterEntry : emitters) {
-        if (!PermutationCompilesForBackend(info, variant.ordinal, variant.ordinal,
+        if (!PermutationCompilesForBackend(static_cast<uint16_t>(familyIndex), variant.ordinal,
                                            emitterEntry.first)) {
           continue;
         }
         EmitInput input;
         input.info = &info;
+        input.familyIndex = static_cast<uint16_t>(familyIndex);
         input.vertIndex = variant.ordinal;
         input.fragIndex = variant.ordinal;
         input.vertSource = &vertExpanded;

@@ -59,14 +59,14 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
     if (!ShaderSelected(name, shaderNames)) {
       continue;
     }
-    const auto* info = FindShaderInfo(name);
-    if (info == nullptr) {
+    const uint16_t familyIndex = FamilyIndexOf(name.c_str());
+    if (familyIndex == 0xFFFF) {
       continue;
     }
     // Reproduce the build tool's enumeration: the compile list is the matcher rule's reachable
     // set. Vertices are deduplicated by index because a vertex stage is compiled once per
     // vertIndex.
-    auto reachable = EnumerateReachablePermutations(info->name);
+    auto reachable = EnumerateReachablePermutations(name);
     if (!reachable) {
       continue;
     }
@@ -75,29 +75,24 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
     for (const auto& permutation : *reachable) {
       // Apply the same profile-specific exclusions as the bundle generator (the framebuffer fetch
       // variants); without this the verifier reports holes the runtime can never request.
-      if (profile &&
-          !PermutationCompilesForBackend(*info, permutation.first, permutation.second, *profile)) {
+      if (profile && !PermutationCompilesForBackend(familyIndex, permutation.first, *profile)) {
         continue;
       }
       vertIndices.insert(permutation.first);
       fragIndices.insert(permutation.second);
     }
-    const uint16_t familyIndex = FamilyIndexOf(info->name.c_str());
-    if (familyIndex == 0xFFFF) {
-      continue;
-    }
     for (auto vi : vertIndices) {
       result.expectedCount++;
       if (cache->findVertex(VariantIdOf(familyIndex, vi)) == nullptr) {
         result.missingCount++;
-        result.missing.push_back({info->name, true, vi});
+        result.missing.push_back({name, true, vi});
       }
     }
     for (auto fi : fragIndices) {
       result.expectedCount++;
       if (cache->findFragment(VariantIdOf(familyIndex, fi)) == nullptr) {
         result.missingCount++;
-        result.missing.push_back({info->name, false, fi});
+        result.missing.push_back({name, false, fi});
       }
     }
   }

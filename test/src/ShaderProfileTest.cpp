@@ -96,15 +96,17 @@ TGFX_TEST(ShaderProfileTest, PayloadFormsFollowTheProfileRule) {
 
 TGFX_TEST(ShaderProfileTest, FramebufferFetchVariantsFollowTheProfileRule) {
   // The declared Chain family carries the HAS_XP dim (the legacy YUV shell retired).
-  auto info = AssembledFamilyInfo(Families()[FamilyIndexOf("Chain")]);
-  const auto& fragDomain = info.fragDomain;
+  const auto chainIndex = FamilyIndexOf("Chain");
+  ASSERT_NE(chainIndex, 0xFFFF);
+  const auto& family = Families()[chainIndex];
+  const auto variants = EnumerateVariants(family, chainIndex);
   size_t checked = 0;
-  for (uint32_t fragIndex = 0; fragIndex < fragDomain.totalCount(); ++fragIndex) {
-    bool fetch = fragDomain.valueOf(fragIndex, XP_DEFINE_NAME) == XP_FRAMEBUFFER_FETCH;
+  for (const auto& variant : variants) {
+    const bool fetch = VariantUsesFramebufferFetch(chainIndex, variant.ordinal);
     for (auto profile : AllShaderProfiles) {
-      bool compiles = PermutationCompilesForBackend(info, 0, fragIndex, profile);
+      const bool compiles = PermutationCompilesForBackend(chainIndex, variant.ordinal, profile);
       EXPECT_EQ(compiles, !fetch || ProfileSupportsFramebufferFetch(profile))
-          << ProfileTag(profile) << " frag " << fragIndex;
+          << ProfileTag(profile) << " ordinal " << variant.ordinal;
       checked++;
     }
   }

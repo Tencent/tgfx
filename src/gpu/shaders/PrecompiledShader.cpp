@@ -57,10 +57,16 @@ bool PrecompiledShaderInfo::IsBuildable(uint32_t vertIndex, uint32_t fragIndex) 
   return MirroredDimsAgree(vertDomain, fragDomain, vertValues, fragValues);
 }
 
-bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t vertIndex,
-                                   uint32_t fragIndex, ShaderProfile profile) {
-  USE(vertIndex);
-  if (info.fragDomain.valueOf(fragIndex, XP_DEFINE_NAME) == XP_FRAMEBUFFER_FETCH &&
+bool VariantUsesFramebufferFetch(uint16_t familyIndex, uint32_t ordinal) {
+  const auto variant = DecodeVariant(familyIndex, ordinal);
+  if (!variant.has_value()) {
+    return false;
+  }
+  return XferDimValue(Families()[familyIndex], *variant) == XP_FRAMEBUFFER_FETCH;
+}
+
+bool PermutationCompilesForBackend(uint16_t familyIndex, uint32_t ordinal, ShaderProfile profile) {
+  if (VariantUsesFramebufferFetch(familyIndex, ordinal) &&
       !ProfileSupportsFramebufferFetch(profile)) {
     return false;
   }

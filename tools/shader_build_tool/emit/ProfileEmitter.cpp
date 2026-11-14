@@ -301,8 +301,7 @@ std::optional<EmittedStages> DirectGLSLEmitter::emit(const EmitInput& input, Sta
     // source (input.fragSource) already carries the generated const TGFX_SPEC declarations in
     // their plain text form — GL keeps them verbatim for the runtime injection to rewrite,
     // this backend's counterpart of the Vulkan family's pipeline-constant injection.
-    bool fbfVariant =
-        input.info->fragDomain.valueOf(input.fragIndex, XP_DEFINE_NAME) == XP_FRAMEBUFFER_FETCH;
+    bool fbfVariant = VariantUsesFramebufferFetch(input.familyIndex, input.fragIndex);
     std::string emissionError;
     directVert =
         EmitDirectGLSLES300(PrependDefines(*input.vertSource, *input.vertDefines),

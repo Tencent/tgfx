@@ -505,12 +505,14 @@ static void ExpectBundleEntryCounts(const PrecompiledShaderCache& cache,
   for (const auto& name : names) {
     const auto* info = FindShaderInfo(name);
     ASSERT_NE(info, nullptr) << name;
+    const auto familyIndex = FamilyIndexOf(info->name.c_str());
+    ASSERT_NE(familyIndex, 0xFFFF);
     auto reachable = EnumerateReachablePermutations(info->name);
     ASSERT_TRUE(reachable.has_value()) << info->name;
     std::set<uint32_t> vertexIndices;
     std::set<uint32_t> fragmentIndices;
     for (const auto& permutation : *reachable) {
-      if (!PermutationCompilesForBackend(*info, permutation.first, permutation.second, *profile)) {
+      if (!PermutationCompilesForBackend(familyIndex, permutation.first, *profile)) {
         continue;
       }
       vertexIndices.insert(permutation.first);

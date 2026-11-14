@@ -179,18 +179,20 @@ TEST(ReachabilityTest, EveryDimensionDefineNameIsAnIdentifier) {
 TEST(ReachabilityTest, FramebufferFetchVariantsExistOnlyWhereTheProfileCanServeThem) {
   // The profile rule removes exactly the variants whose destination read is a framebuffer fetch.
   for (const auto& info : AllFamilies()) {
+    const auto familyIndex = FamilyIndexOf(info.name.c_str());
+    ASSERT_NE(familyIndex, 0xFFFF);
     auto reachable = EnumerateReachablePermutations(info.name);
     ASSERT_TRUE(reachable.has_value());
     size_t fetch = 0;
     for (const auto& pair : *reachable) {
-      if (info.fragDomain.valueOf(pair.second, XP_DEFINE_NAME) == XP_FRAMEBUFFER_FETCH) {
+      if (VariantUsesFramebufferFetch(familyIndex, pair.second)) {
         ++fetch;
       }
     }
     for (auto profile : AllShaderProfiles) {
       size_t compiled = 0;
       for (const auto& pair : *reachable) {
-        if (PermutationCompilesForBackend(info, pair.first, pair.second, profile)) {
+        if (PermutationCompilesForBackend(familyIndex, pair.first, profile)) {
           ++compiled;
         }
       }

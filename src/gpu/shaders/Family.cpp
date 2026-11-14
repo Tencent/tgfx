@@ -308,6 +308,12 @@ std::optional<Variant> EncodeVariant(uint16_t familyIndex, uint8_t geometry,
   return variant;
 }
 
+uint8_t XferDimValue(const Family& family, const Variant& variant) {
+  // The implicit Xfer module follows the body: slot moduleCount + 2 (see BuildFamilySeed).
+  const auto slot = static_cast<uint8_t>(family.moduleCount + 2);
+  return variant.values[DimOffsetOf(family, variant, slot)];
+}
+
 std::optional<Variant> DecodeVariant(uint16_t familyIndex, uint32_t ordinal) {
   if (familyIndex >= FamilyCount()) {
     return std::nullopt;

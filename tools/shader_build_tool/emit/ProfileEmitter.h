@@ -58,6 +58,8 @@ struct EmittedStages {
 /// stage (spirv plus its compile outcome).
 struct EmitInput {
   const PrecompiledShaderInfo* info = nullptr;
+  /// The variant's family: the declaration the emits address (dim values, the profile filter).
+  uint16_t familyIndex = 0;
   uint32_t vertIndex = 0;
   uint32_t fragIndex = 0;
   const std::string* vertSource = nullptr;

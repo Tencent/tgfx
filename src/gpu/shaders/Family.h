@@ -176,6 +176,10 @@ struct FamilyFreeDim {
 /// geometry yields an empty list.
 std::vector<FamilyFreeDim> FreeDimsOf(uint16_t familyIndex, uint8_t geometry);
 
+/// The value of the Xfer module's HAS_XP dim (the XP_* vocabulary). The Xfer slot is the variant's
+/// last one, so the lookup is the slot offset rather than a search.
+uint8_t XferDimValue(const Family& family, const Variant& variant);
+
 /// The inverse of EncodeVariant: rebuilds the full variant (pinned values included) from the
 /// family index and the ordinal. Nullopt when the ordinal exceeds the family's variant space or
 /// the allowed filter rejects it.
