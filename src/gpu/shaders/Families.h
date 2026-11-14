@@ -284,6 +284,14 @@ inline bool ChainVariantAllowed(const Variant& variant, const Family& family) {
   // StrokeEnabled uniform, so it is no dimension any more.
   const uint8_t subset = DimValueOf(family, variant, 1, 0);
   const uint8_t profile = DimValueOf(family, variant, 2, 0);
+  // The layout class the chain body branches on (GP_LAYOUT): one value per geometry, the legacy
+  // kernel's own numbering (0 rect, 1 ellipse, 2 hairline, 3 complex-ellipse, 5 non-AA rrect,
+  // 7 complex rrect, 9 hairline quad). A variant pairing a geometry with another class would
+  // assemble a body whose branches disagree with the geometry's interface.
+  static constexpr uint8_t GeometryLayouts[] = {0, 0, 0, 1, 2, 3, 5, 7, 9};
+  if (DimValueOf(family, variant, 2, 1) != GeometryLayouts[variant.geometry]) {
+    return false;
+  }
   switch (variant.geometry) {
     case 0:
       // ChainRectGeometry: every profile is reachable; the per-quad subset exists only on the

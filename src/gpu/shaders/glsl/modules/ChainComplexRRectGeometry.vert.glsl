@@ -3,7 +3,6 @@
 // attribute. The attribute is unconditional and the StrokeEnabled uniform selects the coverage
 // form, so one layout serves fill and stroke.
 
-#define GP_LAYOUT 7
 #define HAS_COVERAGE 0
 #define HAS_UV_COORD 0
 #define HAS_SUBSET 0

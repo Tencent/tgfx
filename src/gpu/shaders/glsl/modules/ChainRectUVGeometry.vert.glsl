@@ -3,7 +3,6 @@
 // and flags CHAIN_UV_COORD_SOURCE so the body's transforms select the leaf source per leaf through
 // CoordSourceMask.
 
-#define GP_LAYOUT 0
 #define HAS_COVERAGE 1
 #define HAS_UV_COORD 1
 #define HAS_SUBSET SUBSET

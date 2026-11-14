@@ -869,10 +869,10 @@ bool MatchChain(const ProgramInfo* info, const DrawShape& /*shape*/, FamilyMatch
     return false;
   }
   result->chain = program;
-  return EncodeMatchValues(
-      ChainIndex, ChainGeometryOfCell(cell),
-      {static_cast<uint8_t>(cell.subset), ChainProfileOfCell(cell), static_cast<uint8_t>(cell.xp)},
-      &result->variant);
+  return EncodeMatchValues(ChainIndex, ChainGeometryOfCell(cell),
+                           {static_cast<uint8_t>(cell.subset), ChainProfileOfCell(cell),
+                            static_cast<uint8_t>(cell.gpLayout), static_cast<uint8_t>(cell.xp)},
+                           &result->variant);
 }
 
 }  // namespace
@@ -976,9 +976,9 @@ std::optional<Variant> MatchChainVariant(const AOTProgram& program, const Progra
   if (!DeriveChainCell(program, info, &cell)) {
     return std::nullopt;
   }
-  return EncodeVariant(
-      ChainIndex, ChainGeometryOfCell(cell),
-      {static_cast<uint8_t>(cell.subset), ChainProfileOfCell(cell), static_cast<uint8_t>(cell.xp)});
+  return EncodeVariant(ChainIndex, ChainGeometryOfCell(cell),
+                       {static_cast<uint8_t>(cell.subset), ChainProfileOfCell(cell),
+                        static_cast<uint8_t>(cell.gpLayout), static_cast<uint8_t>(cell.xp)});
 }
 
 namespace {

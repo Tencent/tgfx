@@ -35,7 +35,7 @@ namespace tgfx {
 // The masks below are the value sets of each conditional group. The names are bare (bareNames):
 // the module reuses the legacy kernel's interface spellings verbatim in the assembled text, while
 // the runtime addresses every field by element index through the derived layout.
-inline constexpr ModuleDim ChainDims[] = {{"PROFILE", 7}};
+inline constexpr ModuleDim ChainDims[] = {{"PROFILE", 7}, {"GP_LAYOUT", 10}};
 
 // The two pool arrays' lengths per PROFILE: the legacy CHAIN_SLOT_CAPACITY was 16 for every plain
 // and gradient variant and 32 for the noise profile; the block region is 32 words, so the data
@@ -181,7 +181,7 @@ inline constexpr Element ChainElements[] = {
 inline constexpr Module Chain = {
     "Chain",
     ChainDims,
-    1,
+    2,
     ChainElements,
     static_cast<uint8_t>(sizeof(ChainElements) / sizeof(ChainElements[0])),
     true,

@@ -3,7 +3,6 @@
 // HAS_SUBSET aliases the declared SUBSET dim. Vertex::localCoord carries the leaf coordinate
 // source the body's transforms read.
 
-#define GP_LAYOUT 0
 #define HAS_COVERAGE 1
 #define HAS_UV_COORD 0
 #define HAS_SUBSET SUBSET

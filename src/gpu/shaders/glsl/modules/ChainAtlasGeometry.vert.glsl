@@ -1,7 +1,6 @@
 // The chain's atlas layout vertex hook: position through the Matrix uniform, the glyph mask
 // coordinate on the UVCoord attribute (CoordSourceMask picks it per leaf at runtime).
 
-#define GP_LAYOUT 0
 #define HAS_COVERAGE 0
 #define HAS_UV_COORD 1
 #define HAS_SUBSET 0
