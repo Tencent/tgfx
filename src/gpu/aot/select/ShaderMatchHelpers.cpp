@@ -30,7 +30,7 @@
 #include "gpu/aot/select/ProgramSelection.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/shaders/Families.h"
-#include "gpu/shaders/ShaderPermutation.h"
+#include "gpu/shaders/Family.h"
 #include "tgfx/core/BytesKey.h"
 
 namespace tgfx {

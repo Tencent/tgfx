@@ -21,6 +21,7 @@
 #include "GLSLDialect.h"
 #include "compile/StageCompiler.h"
 #include "core/DiagnosticCodes.h"
+#include "gpu/shaders/Family.h"
 
 namespace tgfx {
 

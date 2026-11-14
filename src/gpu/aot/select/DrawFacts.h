@@ -23,7 +23,7 @@
 #include "gpu/aot/ir/GeometryKind.h"
 #include "gpu/aot/ir/GeometryParameters.h"
 #include "gpu/aot/ir/XferFacts.h"
-#include "gpu/shaders/ShaderPermutation.h"
+#include "gpu/shaders/Family.h"
 
 // The draw facts a family's match rule reads. They live in the contract layer because the
 // families' declarations are contract-layer too: a fact type must not force the declaration

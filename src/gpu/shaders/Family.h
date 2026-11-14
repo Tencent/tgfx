@@ -26,6 +26,16 @@
 
 namespace tgfx {
 
+/// The destination-color path one variant carries: the value of the Xfer module's HAS_XP dim.
+/// XP_UNSUPPORTED is the matcher's "no kernel serves this form" sentinel and never reaches a
+/// variant; the other three are the declared range.
+inline constexpr const char* XP_DEFINE_NAME = "HAS_XP";
+inline constexpr int XP_UNSUPPORTED = -1;
+inline constexpr int XP_NONE = 0;
+inline constexpr int XP_DST_TEXTURE = 1;
+inline constexpr int XP_FRAMEBUFFER_FETCH = 2;
+inline constexpr int XP_VALUE_COUNT = 3;
+
 inline constexpr size_t MaxDims = 6;
 inline constexpr size_t MaxModules = 8;
 
