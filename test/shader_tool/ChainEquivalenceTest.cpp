@@ -115,27 +115,27 @@ TEST(ChainEquivalenceTest, DeclaredVariantsBijectTheLegacyReachableSet) {
         coverage = 0;
         uvCoord = 1;
         break;
-      case 3:  // ChainEllipseGeometry
+      case 3:  // the ellipse
         gpLayout = 1;
         coverage = 0;
         break;
-      case 4:  // ChainHairlineGeometry
+      case 4:  // the hairline line
         gpLayout = 2;
         coverage = 0;
         break;
-      case 5:  // ChainComplexGeometry
+      case 5:  // the complex ellipse
         gpLayout = 3;
         coverage = 0;
         break;
-      case 6:  // ChainRRectGeometry
+      case 6:  // the non-AA rrect
         gpLayout = 5;
         coverage = 0;
         break;
-      case 7:  // ChainComplexRRectGeometry
+      case 7:  // the complex rrect
         gpLayout = 7;
         coverage = 0;
         break;
-      default:  // ChainHairlineQuadGeometry
+      default:  // the hairline quad
         gpLayout = 9;
         coverage = 0;
         break;

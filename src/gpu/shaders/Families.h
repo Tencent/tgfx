@@ -26,12 +26,6 @@
 #include "gpu/shaders/modules/Chain.h"
 #include "gpu/shaders/modules/ChainAtlasGeometry.h"
 #include "gpu/shaders/modules/ChainColorParams.h"
-#include "gpu/shaders/modules/ChainComplexGeometry.h"
-#include "gpu/shaders/modules/ChainComplexRRectGeometry.h"
-#include "gpu/shaders/modules/ChainEllipseGeometry.h"
-#include "gpu/shaders/modules/ChainHairlineGeometry.h"
-#include "gpu/shaders/modules/ChainHairlineQuadGeometry.h"
-#include "gpu/shaders/modules/ChainRRectGeometry.h"
 #include "gpu/shaders/modules/ChainRectGeometry.h"
 #include "gpu/shaders/modules/ChainRectUVGeometry.h"
 #include "gpu/shaders/modules/ComplexEllipseGeometry.h"
@@ -315,7 +309,7 @@ inline bool ChainVariantAllowed(const Variant& variant, const Family& family) {
       // ChainAtlasGeometry: the atlas route always carries the four leaf slots.
       return subset == 0 && (profile == 2 || profile == 5);
     case 3:
-      // ChainEllipseGeometry: the ellipse layout has no coverage or uvCoord attribute, so the
+      // The ellipse layout has no coverage or uvCoord attribute, so the
       // mask-only profiles and noise are unreachable.
       return subset == 0 && (profile == 0 || profile == 2 || profile == 3 || profile == 5);
     default:
