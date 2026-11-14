@@ -28,7 +28,8 @@ namespace tgfx {
 /// position as the modules' source coordinate (HAS_UV_COORD = 1 exactly when the geometry carries
 /// no uv matrix). HAS_SUBSET adds the per-vertex subset bounds attribute; the body modules own
 /// every transform and sampler.
-inline constexpr ModuleDim QuadTextureGeometryDims[] = {{"HAS_UV_COORD", 2}, {"HAS_SUBSET", 2}};
+inline constexpr ModuleDim QuadTextureGeometryDims[] = {{"HAS_UV_COORD", 2, DimFact::UvCoord},
+                                                        {"HAS_SUBSET", 2, DimFact::Subset}};
 
 inline constexpr Element QuadTextureGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "Position"},

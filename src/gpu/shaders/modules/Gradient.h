@@ -29,7 +29,7 @@ namespace tgfx {
 /// endpoints carry the single-interval colorizer's colors. The input color's alpha modulates the
 /// result, which is how the paint alpha reaches the gradient. Only the clamped single-interval
 /// form is expressible, which is exactly the form the families accept.
-inline constexpr ModuleDim GradientDims[] = {{"PRESENT", 2}};
+inline constexpr ModuleDim GradientDims[] = {{"PRESENT", 2, DimFact::GradientPresent}};
 
 inline constexpr Element GradientElements[] = {
     {Element::Kind::VertexParam, ShaderType::Mat3, "CoordMatrix", 1, 0, 0x02},

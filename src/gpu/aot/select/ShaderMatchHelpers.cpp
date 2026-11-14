@@ -437,4 +437,15 @@ bool AdmitMatchedProgram(const ProgramInfo* programInfo, const DrawShape& shape,
   return true;
 }
 
+const AOTGradientParameters* SoleGradientLeaf(const AOTEffectGraph& graph) {
+  if (graph.nodeCount() != 2 || !graph.root().isValid() || graph.root().index() != 1) {
+    return nullptr;
+  }
+  auto* node = graph.nodeAt(graph.root());
+  if (node == nullptr || node->kind != AOTEffectKind::GradientSource) {
+    return nullptr;
+  }
+  return std::get_if<AOTGradientParameters>(&node->parameters);
+}
+
 }  // namespace tgfx

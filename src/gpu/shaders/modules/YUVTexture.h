@@ -27,7 +27,7 @@ namespace tgfx {
 /// is the YUV-to-RGB conversion of the sampled planes, optionally through the RGBAAA dual-plane
 /// alpha; the bounded pointwise tail the old kernel embedded is stripped — color-graded YUV draws
 /// flatten to RGBA first (see the plan's YUV entry).
-inline constexpr ModuleDim YUVTextureDims[] = {{"FORMAT", 2}};
+inline constexpr ModuleDim YUVTextureDims[] = {{"FORMAT", 2, DimFact::YuvFormat}};
 
 inline constexpr Element YUVTextureElements[] = {
     {Element::Kind::VertexParam, ShaderType::Mat3, "CoordMatrix"},

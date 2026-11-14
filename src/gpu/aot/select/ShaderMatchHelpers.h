@@ -73,6 +73,13 @@ int XpTypeOf(const XferFacts& xfer);
 /// IsSupportedPointwiseOp's color-space half, over the IR's steps.
 bool SupportedFillKernelSteps(const ColorSpaceXformSteps* steps);
 
+/// The graph's sole gradient source when the color expression is root-plus-one-gradient; null
+/// otherwise. The shared predicate behind the Gradient module's PRESENT dim and the family rules
+/// that accept a single clamped gradient.
+class AOTEffectGraph;
+struct AOTGradientParameters;
+const AOTGradientParameters* SoleGradientLeaf(const AOTEffectGraph& graph);
+
 /// Whether a ShaderMode value is one the tiled fill kernel implements.
 bool TiledFillModeSupported(int mode);
 

@@ -28,7 +28,7 @@ namespace tgfx {
 /// vertex coverage. UV_MATRIX mirrors the geometry's own flag: with a uv matrix the buffer carries
 /// no uv coordinate (slot 4 empty) and the local coordinate is recovered from the transform, which
 /// this shader never samples, so the attribute is simply declared away.
-inline constexpr ModuleDim RoundStrokeRectGeometryDims[] = {{"UV_MATRIX", 2}};
+inline constexpr ModuleDim RoundStrokeRectGeometryDims[] = {{"UV_MATRIX", 2, DimFact::UvMatrix}};
 
 inline constexpr Element RoundStrokeRectGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "Position"},

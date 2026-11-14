@@ -28,7 +28,7 @@ namespace tgfx {
 /// per-vertex slot. The element order mirrors the geometry's declared attribute order
 /// (position, coverage, texCoord, color), so a draw without texture coordinates leaves slot 2
 /// empty and the color keeps slot 3.
-inline constexpr ModuleDim MeshGeometryDims[] = {{"TEX_COORDS", 2}};
+inline constexpr ModuleDim MeshGeometryDims[] = {{"TEX_COORDS", 2, DimFact::MeshTexCoords}};
 
 inline constexpr Element MeshGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "Position"},

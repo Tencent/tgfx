@@ -25,7 +25,8 @@ namespace tgfx {
 /// A tiled texture as the color source. FULL selects the 4-tap mipmap-repeat path (pinned to 1 by
 /// TiledTextureFill, to 0 by RRect's single-tap form). PRESENT carries the module: 0 = the module
 /// is absent (a solid fill), 1 = the texture rides the fill.
-inline constexpr ModuleDim TiledTextureDims[] = {{"FULL", 2}, {"PRESENT", 2}};
+inline constexpr ModuleDim TiledTextureDims[] = {{"FULL", 2, DimFact::TiledFull},
+                                                 {"PRESENT", 2, DimFact::TiledPresent}};
 
 inline constexpr Element TiledTextureElements[] = {
     {Element::Kind::VertexParam, ShaderType::Mat3, "CoordMatrix", 1, 1, 0x02},

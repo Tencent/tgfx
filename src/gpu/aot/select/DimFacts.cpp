@@ -17,7 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/select/DimFacts.h"
+#include "gpu/aot/chain/AOTChainBuilder.h"
+#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/select/DrawFacts.h"
+#include "gpu/aot/select/ShaderMatchHelpers.h"
+#include "gpu/proxies/TextureProxy.h"
+#include "gpu/resources/TextureView.h"
+#include "gpu/resources/YUVTextureView.h"
 
 namespace tgfx {
 
@@ -40,18 +46,65 @@ std::optional<uint8_t> DimValueOf(DimFact fact, const DrawShape& shape) {
       return shape.coverage.has_value() && *shape.coverage == Coverage::LocalMask ? 1 : 0;
     case DimFact::AtlasCoverage:
       return shape.geometry != nullptr && shape.geometry->hasCoverage ? 1 : 0;
-    case DimFact::Unspecified:
     case DimFact::GradientPresent:
+      // The color expression is the instance color plus one evaluable clamped gradient: the same
+      // predicate the family's rule uses to accept the draw.
+      return shape.colorFPCount == 1 && shape.ir != nullptr &&
+                     SoleGradientLeaf(shape.ir->color) != nullptr
+                 ? 1
+                 : 0;
     case DimFact::TiledFull:
-    case DimFact::TiledPresent:
+      return std::nullopt;
+    case DimFact::TiledPresent: {
+      if (shape.ir == nullptr) {
+        return 0;
+      }
+      AOTChainBuilder::AOTTextureTailShape tail = {};
+      if (!AOTChainBuilder::CollectTextureTail(shape.ir->color, &tail) || tail.leaf == nullptr) {
+        return 0;
+      }
+      return tail.leaf->samplingKind == AOTTextureSamplingKind::Tiled ? 1 : 0;
+    }
     case DimFact::UvCoord:
+      return shape.geometry != nullptr && shape.geometry->hasUVMatrix ? 0 : 1;
     case DimFact::Subset:
+      return shape.geometry != nullptr && shape.geometry->hasSubset ? 1 : 0;
     case DimFact::UvMatrix:
+      return shape.geometry != nullptr && shape.geometry->hasUVMatrix ? 1 : 0;
     case DimFact::MeshTexCoords:
+      return shape.geometry != nullptr && shape.geometry->hasTexCoords ? 1 : 0;
     case DimFact::VertexColor:
-    case DimFact::YuvFormat:
+      // The families that declare VERTEX_COLOR keep it at 0 (the instanced batch carries its color
+      // per instance), so the declaration annotates that dim Constant0 rather than this fact.
+      return std::nullopt;
+    case DimFact::YuvFormat: {
+      if (shape.ir == nullptr) {
+        return std::nullopt;
+      }
+      AOTChainBuilder::AOTTextureTailShape tail = {};
+      if (!AOTChainBuilder::CollectYUVTail(shape.ir->color, &tail) || tail.leaf == nullptr) {
+        return std::nullopt;
+      }
+      if (tail.leaf->yuvFormat >= 0) {
+        return static_cast<uint8_t>(tail.leaf->yuvFormat);
+      }
+      auto view =
+          tail.leaf->textureProxy != nullptr ? tail.leaf->textureProxy->getTextureView() : nullptr;
+      if (view == nullptr || !view->isYUV()) {
+        return std::nullopt;
+      }
+      const auto* yuvView = static_cast<const YUVTextureView*>(view.get());
+      if (yuvView->yuvFormat() == YUVFormat::I420) {
+        return 0;
+      }
+      if (yuvView->yuvFormat() == YUVFormat::NV12) {
+        return 1;
+      }
+      return std::nullopt;
+    }
     case DimFact::GlassDispersion:
     case DimFact::GlassShape:
+    case DimFact::Unspecified:
       // Not wired yet: the family's rule still supplies these values itself.
       return std::nullopt;
   }

@@ -273,16 +273,6 @@ bool MatchRRect(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatch
 /// The gradient form's color graph: the geometry color lowered as the input, then the single
 /// GradientSource over it. Its parameters carry the layout branch, the boundary colors and the
 /// colorizer endpoints the Gradient module writes.
-const AOTGradientParameters* SoleGradientLeaf(const AOTEffectGraph& graph) {
-  if (graph.nodeCount() != 2 || !graph.root().isValid() || graph.root().index() != 1) {
-    return nullptr;
-  }
-  auto* node = graph.nodeAt(graph.root());
-  if (node == nullptr || node->kind != AOTEffectKind::GradientSource) {
-    return nullptr;
-  }
-  return std::get_if<AOTGradientParameters>(&node->parameters);
-}
 
 /// The Mesh family's rule, carried over from the former MeshFillShader: the mesh geometry with no
 /// fragment processor and any xfer. The flattened dims are the geometry's TEX_COORDS then the
