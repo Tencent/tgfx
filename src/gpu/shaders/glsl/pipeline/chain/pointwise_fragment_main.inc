@@ -131,6 +131,9 @@ highp float gpPixelCoverage = 1.0;
 #define vRadii RRectGeometry_vRadii
 #define vRectBounds RRectGeometry_vRectBounds
 #define vStrokeWidth RRectGeometry_vStrokeWidth
+#elif CHAIN_GEOMETRY == 8
+#define vColor HairlineQuadGeometry_vColor
+#define vHairQuadEdge HairlineQuadGeometry_vHairQuadEdge
 #elif CHAIN_GEOMETRY == 7
 #define vColor ComplexRRectGeometry_vColor
 #define vLocalCoord ComplexRRectGeometry_vLocalCoord

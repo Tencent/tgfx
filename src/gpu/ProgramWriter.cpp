@@ -330,8 +330,8 @@ void WriteChainGeometryUniforms(SlotWriter* geometryWriter, SlotWriter* chainWri
                                                           transformIter);
       break;
     case 8:
-      WriteChainHairlineGeometry<ChainHairlineQuadGeometry>(geometryWriter, chainWriter,
-                                                            colorParams, p, transformIter);
+      WriteChainHairlineGeometry<HairlineQuadGeometry>(geometryWriter, chainWriter, colorParams, p,
+                                                       transformIter);
       break;
     default:
       break;

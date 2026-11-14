@@ -273,7 +273,7 @@ inline constexpr const Module* ChainGeometries[] = {
     // The ellipse reuses the declared geometry: its interface and vertex math are identical, and
     // the chain body addresses the prefixed varyings through the CHAIN_GEOMETRY alias block.
     &EllipseGeometry, &HairlineLineGeometry, &ComplexEllipseGeometry, &RRectGeometry,
-    &ComplexRRectGeometry, &ChainHairlineQuadGeometry};
+    &ComplexRRectGeometry, &HairlineQuadGeometry};
 
 // The chain family's body order is the slot order: Frame(0), geometry(1), Chain(2),
 // ChainColorParams(3, no dims), Xfer(4). Readers that address a module by slot must use these

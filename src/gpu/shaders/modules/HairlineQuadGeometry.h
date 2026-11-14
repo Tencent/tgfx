@@ -28,6 +28,9 @@ inline constexpr Element HairlineQuadGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "Position"},
     {Element::Kind::Attribute, ShaderType::Float4, "InHairQuadEdge"},
     {Element::Kind::Varying, ShaderType::Float4, "HairQuadEdge"},
+    // The chain body's color select references this varying unconditionally; the hairline-quad
+    // never reads it (its writer pins HasCommonColor to 1), so the hook writes zeros.
+    {Element::Kind::Varying, ShaderType::Float4, "Color"},
     {Element::Kind::VertexParam, ShaderType::Mat3, "Matrix"},
     {Element::Kind::Param, ShaderType::Float4, "Color"},
     {Element::Kind::Param, ShaderType::Float, "Coverage"},
@@ -42,6 +45,6 @@ inline constexpr Element HairlineQuadGeometryElements[] = {
 };
 
 inline constexpr Module HairlineQuadGeometry = {
-    "HairlineQuadGeometry", nullptr, 0, HairlineQuadGeometryElements, 14, true, true};
+    "HairlineQuadGeometry", nullptr, 0, HairlineQuadGeometryElements, 15, true, true};
 
 }  // namespace tgfx
