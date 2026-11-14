@@ -103,7 +103,21 @@ std::optional<uint8_t> DimValueOf(DimFact fact, const DrawShape& shape) {
       return std::nullopt;
     }
     case DimFact::GlassDispersion:
-    case DimFact::GlassShape:
+    case DimFact::GlassShape: {
+      if (shape.ir == nullptr) {
+        return std::nullopt;
+      }
+      const auto irShape = ReadOpaqueKernelIRShape(shape.ir, AOTOpaqueKernel::GlassRefraction,
+                                                   /*requiresTextureChild=*/false);
+      if (!irShape || !irShape->kernel->geometryKind.has_value() ||
+          irShape->kernel->hasPerspective) {
+        return std::nullopt;
+      }
+      if (fact == DimFact::GlassDispersion) {
+        return irShape->kernel->dispersionOn ? 1 : 0;
+      }
+      return static_cast<uint8_t>(*irShape->kernel->geometryKind);
+    }
     case DimFact::Unspecified:
       // Not wired yet: the family's rule still supplies these values itself.
       return std::nullopt;

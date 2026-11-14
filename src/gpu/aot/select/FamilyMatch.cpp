@@ -62,41 +62,15 @@ constexpr uint16_t GlassRefractionIndex = FamilyIndexOf("GlassRefraction");
 constexpr uint16_t GlassRefractionQuadIndex = FamilyIndexOf("GlassRefractionQuad");
 constexpr uint16_t ChainIndex = FamilyIndexOf("Chain");
 
-#if DEBUG
-// The migration's cross-check: once every free dim of the pair carries a fact, the declaration
-// composes the variant on its own and must land on exactly the variant the rule spelled out.
-// A disagreement means a dim's fact and the rule's value drifted, and the ordinal (the bundle's
-// key) would differ.
-void AssertFactsAgree(uint16_t family, uint8_t geometry, const DrawShape& shape,
-                      const Variant& expected) {
-  const auto composed = ComposeVariantFromFacts(family, geometry, shape);
-  if (!composed.has_value()) {
-    return;
-  }
-  if (composed->ordinal == expected.ordinal && composed->values == expected.values) {
-    return;
-  }
-  LOGE(
-      "ShaderMatch: %s[geometry=%u] composes to ordinal %u from its declared facts but the rule "
-      "encoded %u; the dim's fact and the rule's value disagree",
-      Families()[family].name, geometry, composed->ordinal, expected.ordinal);
-  DEBUG_ASSERT(false);
-}
-#endif
-
-/// Encodes the matched family's variant: the match rule supplies the geometry choice and the
-/// free dim values in flattened declaration order, and EncodeVariant fills the pinned values and
-/// composes the ordinal by the enumeration's own radix rule. False means the draw stays
-/// unmatched (the value range, the free-value count or the allowed filter rejected it).
-bool EncodeMatch(uint16_t family, uint8_t geometry, const std::vector<uint8_t>& freeValues,
-                 const DrawShape& shape, Variant* variant) {
-  auto encoded = EncodeVariant(family, geometry, freeValues);
+/// Encodes a variant whose dimension values come from something other than the draw's facts: the
+/// interpreter's dims (PROFILE, SUBSET) are read off the compiled program, so the chain rule is the
+/// one caller. Every declared family composes through EncodeMatchFromFacts instead.
+bool EncodeMatchValues(uint16_t family, uint8_t geometry, const std::vector<uint8_t>& values,
+                       Variant* variant) {
+  auto encoded = EncodeVariant(family, geometry, values);
   if (!encoded.has_value()) {
     return false;
   }
-#if DEBUG
-  AssertFactsAgree(family, geometry, shape, *encoded);
-#endif
   *variant = *encoded;
   return true;
 }
@@ -132,8 +106,7 @@ bool MatchSolidColor(const ProgramInfo* /*info*/, const DrawShape& shape,
   if (!noProcessorsOrDirectClip || shape.xpType() < XP_NONE) {
     return false;
   }
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(SolidColorIndex, 0, {hasXp}, shape, &result->variant);
+  return EncodeMatchFromFacts(SolidColorIndex, 0, shape, &result->variant);
 }
 
 /// The MaskFill family's rule, carried over from the former MaskFillShader: the DefaultGP's rect
@@ -158,8 +131,7 @@ bool MatchMaskFill(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMa
   if (shape.xpType() < XP_NONE) {
     return false;
   }
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  if (!EncodeMatch(MaskFillIndex, 0, {hasXp}, shape, &result->variant)) {
+  if (!EncodeMatchFromFacts(MaskFillIndex, 0, shape, &result->variant)) {
     return false;
   }
   result->maskLeaf = mask;
@@ -194,11 +166,10 @@ bool MatchTiledTextureFill(const ProgramInfo* /*info*/, const DrawShape& shape,
     return false;
   }
   const uint8_t geometry = shape.geometry->kind == GeometryKind::Default ? 0 : 1;
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  // The pinned dims (FULL and PRESENT at 1) are filled by EncodeVariant from the declaration;
-  // hand-rolling them at zero made PRESENT read as "module absent" and skip every tiled uniform
-  // (the c8c9c9e6d bug this helper exists to prevent).
-  if (!EncodeMatch(TiledTextureFillIndex, geometry, {hasXp}, shape, &result->variant)) {
+  // The pinned dims (FULL and PRESENT at 1) come from the declaration; hand-rolling them at zero
+  // made PRESENT read as "module absent" and skip every tiled uniform (the c8c9c9e6d bug this
+  // helper exists to prevent).
+  if (!EncodeMatchFromFacts(TiledTextureFillIndex, geometry, shape, &result->variant)) {
     return false;
   }
   result->tiledLeaf = leaf;
@@ -214,22 +185,19 @@ bool MatchQuadColor(const ProgramInfo* /*info*/, const DrawShape& shape,
   if (shape.geometry->kind != GeometryKind::QuadPerEdgeAA) {
     return false;
   }
-  uint8_t present = 0;
   if (shape.fragmentCount != 0) {
     if (shape.colorFPCount != 0 || !shape.coverage.has_value()) {
       return false;
     }
-    if (*shape.coverage == Coverage::DeviceMask) {
-      present = 1;
-    } else if (*shape.coverage != Coverage::AARect && *shape.coverage != Coverage::RRect) {
+    if (*shape.coverage != Coverage::DeviceMask && *shape.coverage != Coverage::AARect &&
+        *shape.coverage != Coverage::RRect) {
       return false;
     }
   }
   if (shape.xpType() < XP_NONE) {
     return false;
   }
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(QuadColorIndex, 0, {present, hasXp}, shape, &result->variant);
+  return EncodeMatchFromFacts(QuadColorIndex, 0, shape, &result->variant);
 }
 
 /// The RRect family's rule, carried over from the former NonAARRectFillShader: the non-AA
@@ -308,8 +276,7 @@ bool MatchShapeInstanced(const ProgramInfo* /*info*/, const DrawShape& shape,
       shape.xpType() < XP_NONE) {
     return false;
   }
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(ShapeInstancedIndex, 0, {0, hasXp}, shape, &result->variant);
+  return EncodeMatchFromFacts(ShapeInstancedIndex, 0, shape, &result->variant);
 }
 
 /// The ShapeInstancedTextureCoverage family's rule, carried over from the former
@@ -394,8 +361,7 @@ bool MatchGaussianBlur(const ProgramInfo* /*info*/, const DrawShape& shape,
   if (irShape->kernel->sigma < 1 || irShape->kernel->sigma > 10) {
     return false;
   }
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  if (!EncodeMatch(GaussianBlurIndex, 0, {hasXp}, shape, &result->variant)) {
+  if (!EncodeMatchFromFacts(GaussianBlurIndex, 0, shape, &result->variant)) {
     return false;
   }
   result->blurKernel = irShape->kernel;
@@ -425,8 +391,7 @@ bool MatchGlassUDFTentBlur(const ProgramInfo* /*info*/, const DrawShape& shape,
   if (!irShape || irShape->kernel->maxRadius > 64) {
     return false;
   }
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  if (!EncodeMatch(GlassUDFTentBlurIndex, 0, {hasXp}, shape, &result->variant)) {
+  if (!EncodeMatchFromFacts(GlassUDFTentBlurIndex, 0, shape, &result->variant)) {
     return false;
   }
   result->blurKernel = irShape->kernel;
@@ -481,10 +446,7 @@ bool MatchGlassRefraction(const ProgramInfo* /*info*/, const DrawShape& shape, G
   if (!irShape || !irShape->kernel->geometryKind.has_value() || irShape->kernel->hasPerspective) {
     return false;
   }
-  const uint8_t dispersion = irShape->kernel->dispersionOn ? 1 : 0;
-  const uint8_t shapeKind = static_cast<uint8_t>(*irShape->kernel->geometryKind);
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  if (!EncodeMatch(family, 0, {dispersion, shapeKind, hasXp}, shape, &result->variant)) {
+  if (!EncodeMatchFromFacts(family, 0, shape, &result->variant)) {
     return false;
   }
   result->glassKernel = irShape->kernel;
@@ -515,8 +477,7 @@ bool MatchComplexRRect(const ProgramInfo* /*info*/, const DrawShape& shape,
       shape.xpType() < XP_NONE) {
     return false;
   }
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(ComplexRRectIndex, 0, {hasXp}, shape, &result->variant);
+  return EncodeMatchFromFacts(ComplexRRectIndex, 0, shape, &result->variant);
 }
 
 /// The hairline families' shared rule, carried over from the former HairlineLineShader and
@@ -536,8 +497,7 @@ bool MatchHairline(const ProgramInfo* /*info*/, const DrawShape& shape, Geometry
   if (shape.xpType() < XP_NONE) {
     return false;
   }
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(family, 0, {hasXp}, shape, &result->variant);
+  return EncodeMatchFromFacts(family, 0, shape, &result->variant);
 }
 
 /// The shared hairline rule's two table entries, one per family row.
@@ -562,9 +522,7 @@ bool MatchEllipse(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMat
       shape.xpType() < XP_NONE) {
     return false;
   }
-  const uint8_t present = *shape.coverage == Coverage::DeviceMask ? 1 : 0;
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(EllipseIndex, 0, {present, hasXp}, shape, &result->variant);
+  return EncodeMatchFromFacts(EllipseIndex, 0, shape, &result->variant);
 }
 
 /// The ComplexEllipse family's rule, carried over from the former ComplexEllipseFillShader: the
@@ -578,9 +536,7 @@ bool MatchComplexEllipse(const ProgramInfo* /*info*/, const DrawShape& shape,
       shape.xpType() < XP_NONE) {
     return false;
   }
-  const uint8_t present = *shape.coverage == Coverage::DeviceMask ? 1 : 0;
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(ComplexEllipseIndex, 0, {present, hasXp}, shape, &result->variant);
+  return EncodeMatchFromFacts(ComplexEllipseIndex, 0, shape, &result->variant);
 }
 
 /// The RoundStrokeRect family's rule, carried over from the former RoundStrokeRectFillShader: the
@@ -717,9 +673,7 @@ bool MatchAtlasText(const ProgramInfo* /*info*/, const DrawShape& shape,
       }
     }
   }
-  const uint8_t hasCoverage = shape.geometry->hasCoverage ? 1 : 0;
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(AtlasTextIndex, 0, {hasCoverage, hasXp}, shape, &result->variant);
+  return EncodeMatchFromFacts(AtlasTextIndex, 0, shape, &result->variant);
 }
 
 /// Derives the legacy cell a compiled chain program resolves to. Every gate below is an
@@ -900,7 +854,7 @@ bool DeriveChainCell(const AOTProgram& program, const ProgramInfo* info, ChainLe
 /// not a shape predicate, so the rule compiles the draw's program exactly where the legacy Accept
 /// did — and derives every dimension from the compiled program rather than guessing from the
 /// shape, which is what kept the old matcher from accepting shapes its writer could not serve.
-bool MatchChain(const ProgramInfo* info, const DrawShape& shape, FamilyMatchResult* result) {
+bool MatchChain(const ProgramInfo* info, const DrawShape& /*shape*/, FamilyMatchResult* result) {
   if (info == nullptr) {
     // The exclusivity test matches shapes without a program; the interpreter's acceptance needs
     // the compiled IR.
@@ -915,10 +869,10 @@ bool MatchChain(const ProgramInfo* info, const DrawShape& shape, FamilyMatchResu
     return false;
   }
   result->chain = program;
-  return EncodeMatch(
+  return EncodeMatchValues(
       ChainIndex, ChainGeometryOfCell(cell),
       {static_cast<uint8_t>(cell.subset), ChainProfileOfCell(cell), static_cast<uint8_t>(cell.xp)},
-      shape, &result->variant);
+      &result->variant);
 }
 
 }  // namespace

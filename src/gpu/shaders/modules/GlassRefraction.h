@@ -32,7 +32,8 @@ namespace tgfx {
 /// move a texture coordinate. The UDF kind always declares its two mask samplers (an edge-lit-off
 /// draw binds the shared dummy texture and clears EdgeMaskOn), so the UDF-only fields and samplers
 /// exist iff SHAPE == 2.
-inline constexpr ModuleDim GlassRefractionDims[] = {{"DISPERSION", 2}, {"SHAPE", 3}};
+inline constexpr ModuleDim GlassRefractionDims[] = {{"DISPERSION", 2, DimFact::GlassDispersion},
+                                                    {"SHAPE", 3, DimFact::GlassShape}};
 
 inline constexpr Element GlassRefractionElements[] = {
     // The background-coordinate transform: the fragment processor's own coord transform, uploaded
