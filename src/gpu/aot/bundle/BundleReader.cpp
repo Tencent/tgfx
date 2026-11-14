@@ -18,7 +18,7 @@
 
 #include "gpu/aot/bundle/BundleReader.h"
 #include "core/utils/Log.h"
-#include "gpu/aot/bundle/BundleCodec.h"
+#include "gpu/aot/bundle/BundleReader.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
@@ -101,6 +101,27 @@ uint64_t HashPoolEntries(uint64_t state, const uint8_t* pool, uint32_t count) {
         ReadBundleU32LE(entry + BundleFormat::EntryOffset::DataSize, 0));
   }
   return state;
+}
+
+bool ParseBundleHeader(const uint8_t* data, size_t size, BundleHeader* header) {
+  if (data == nullptr || header == nullptr || size < BundleFormat::HeaderSize) {
+    return false;
+  }
+  header->magic = ReadBundleU32LE(data, BundleFormat::Offset::Magic);
+  header->formatVersion = ReadBundleU16LE(data, BundleFormat::Offset::FormatVersion);
+  header->compressionType = ReadBundleU16LE(data, BundleFormat::Offset::CompressionType);
+  header->identityHash = ReadBundleU64LE(data, BundleFormat::Offset::IdentityHash);
+  header->toolchainABI = ReadBundleU32LE(data, BundleFormat::Offset::ToolchainABI);
+  header->vertPoolCount = ReadBundleU32LE(data, BundleFormat::Offset::VertPoolCount);
+  header->fragPoolCount = ReadBundleU32LE(data, BundleFormat::Offset::FragPoolCount);
+  header->vertPoolOffset = ReadBundleU32LE(data, BundleFormat::Offset::VertPoolOffset);
+  header->fragPoolOffset = ReadBundleU32LE(data, BundleFormat::Offset::FragPoolOffset);
+  header->dataOffset = ReadBundleU32LE(data, BundleFormat::Offset::DataOffset);
+  header->dataSize = ReadBundleU32LE(data, BundleFormat::Offset::DataSize);
+  const auto* tag = reinterpret_cast<const char*>(data + BundleFormat::Offset::ProfileTag);
+  header->profileTag.assign(tag, strnlen(tag, BundleFormat::ProfileTagSize));
+  header->payloadFormat = ReadBundleU16LE(data, BundleFormat::Offset::PayloadFormat);
+  return true;
 }
 
 }  // namespace tgfx

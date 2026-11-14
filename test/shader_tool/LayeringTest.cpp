@@ -118,25 +118,31 @@ std::string NameOf(const std::string& path) {
 const std::set<std::string>& AllowedRuntimeHeaders() {
   static const std::set<std::string> allowed = {
       // contract layer
-      "gpu/aot/AOTResourceProfile.h", "gpu/shaders/contract/ShaderBundleContract.h",
-      "gpu/shaders/contract/ChainISA.h", "gpu/shaders/contract/ChainOps.h",
-      "gpu/shaders/contract/SpecContract.h", "gpu/Uniform.h", "gpu/shaders/KernelContract.h",
+      "gpu/shaders/contract/ShaderBundleContract.h", "gpu/shaders/contract/ChainISA.h",
+      "gpu/shaders/contract/ChainOps.h", "gpu/shaders/contract/SpecContract.h", "gpu/Uniform.h",
+      "gpu/shaders/KernelContract.h",
       // declaration layer
       "gpu/shaders/PrecompiledShader.h",
       // the module-declaration layer (families, layouts, domains)
       "gpu/shaders/Module.h", "gpu/shaders/Family.h", "gpu/shaders/Families.h",
       "gpu/shaders/FamilyDomains.h", "gpu/shaders/Layout.h",
+      // runtime headers that read the declaration layer
+      "gpu/aot/AOTResourceProfile.h",
       // the fragment-stage declaration language (the emitter walks these tables)
   };
   return allowed;
 }
 
 // The contract headers: constants and pure functions shared by the tool and the runtime.
+// AOTResourceProfile.h is not one of them: it reads the declaration's per-profile capacity table,
+// so it belongs to the runtime headers that consume the declaration layer.
 const std::vector<std::string>& ContractHeaders() {
   static const std::vector<std::string> headers = {
-      "gpu/aot/AOTResourceProfile.h",        "gpu/shaders/contract/ShaderBundleContract.h",
-      "gpu/shaders/contract/ChainISA.h",     "gpu/shaders/contract/ChainOps.h",
-      "gpu/shaders/contract/SpecContract.h", "gpu/Uniform.h",
+      "gpu/shaders/contract/ShaderBundleContract.h",
+      "gpu/shaders/contract/ChainISA.h",
+      "gpu/shaders/contract/ChainOps.h",
+      "gpu/shaders/contract/SpecContract.h",
+      "gpu/Uniform.h",
       "gpu/shaders/KernelContract.h",
   };
   return headers;

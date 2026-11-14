@@ -29,7 +29,6 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/AOTDiagnostics.h"
-#include "gpu/aot/bundle/BundleCodec.h"
 #include "gpu/aot/bundle/BundleReader.h"
 #include "gpu/aot/select/ShaderProfileResolver.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
@@ -322,7 +321,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   }
 
   const uint8_t* ptr = data;
-  // The header grammar is single-sourced in BundleCodec (the tool's verifier and manifest go
+  // The header grammar is single-sourced in BundleReader (the tool's verifier and manifest go
   // through the same parser); the checks below are this loader's policy.
   BundleHeader header = {};
   if (!ParseBundleHeader(ptr, size, &header)) {
