@@ -48,15 +48,6 @@ const std::map<std::string, PrecompiledShaderInfo>& ShaderInfos() {
 
 }  // namespace
 
-bool PrecompiledShaderInfo::IsBuildable(uint32_t vertIndex, uint32_t fragIndex) const {
-  if (vertIndex >= vertDomain.totalCount() || fragIndex >= fragDomain.totalCount()) {
-    return false;
-  }
-  auto vertValues = vertDomain.decode(vertIndex);
-  auto fragValues = fragDomain.decode(fragIndex);
-  return MirroredDimsAgree(vertDomain, fragDomain, vertValues, fragValues);
-}
-
 bool VariantUsesFramebufferFetch(uint16_t familyIndex, uint32_t ordinal) {
   const auto variant = DecodeVariant(familyIndex, ordinal);
   if (!variant.has_value()) {

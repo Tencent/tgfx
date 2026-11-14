@@ -26,90 +26,11 @@
 
 namespace tgfx {
 
-namespace {
-
-void AppendDomainDims(const Module* module, const int8_t* pinned, std::vector<std::string>* owned) {
-  if (module == nullptr) {
-    return;
-  }
-  for (uint8_t dim = 0; dim < module->dimCount; ++dim) {
-    if (pinned != nullptr && pinned[dim] >= 0) {
-      continue;
-    }
-    // A bare-names module (Frame, Xfer, the declared Chain) carries no dim prefix, so the shared
-    // HAS_XP lookup the profile filters use keeps working and the chain's hooks read the legacy
-    // dim macros verbatim.
-    owned->emplace_back(module->bareNames
-                            ? module->dims[dim].name
-                            : std::string(module->name) + "_" + module->dims[dim].name);
-  }
-}
-
-// Builds the domain entries from the finished name list. The names must be complete before any
-// c_str() is taken: growing the vector could reallocate and dangle every earlier pointer the
-// stored dimensions keep.
-void AppendDomainEntries(const Module* module, const int8_t* pinned,
-                         const std::vector<std::string>& owned, size_t* nameIndex,
-                         std::vector<PermutationDimension>* dims) {
-  if (module == nullptr) {
-    return;
-  }
-  for (uint8_t dim = 0; dim < module->dimCount; ++dim) {
-    if (pinned != nullptr && pinned[dim] >= 0) {
-      continue;
-    }
-    dims->emplace_back(PermutationInt(owned[*nameIndex].c_str(), module->dims[dim].count));
-    ++*nameIndex;
-  }
-}
-
-}  // namespace
-
 PrecompiledShaderInfo AssembledFamilyInfo(const Family& family) {
-  // The domain names must outlive the returned info: the registry keeps it for the process
-  // lifetime and the matchers compare names against it. A prefixed dim name exists only as a
-  // concatenation, so the strings are built once per family and kept for the process lifetime
-  // (both callers build them from a single-threaded initialization path).
-  static std::map<const Family*, std::vector<std::string>> ownedNames;
-  std::vector<std::string>& owned = ownedNames[&family];
-  if (owned.empty()) {
-    AppendDomainDims(family.geometries[0], nullptr, &owned);
-    for (uint8_t index = 0; index < family.moduleCount; ++index) {
-      AppendDomainDims(family.modules[index].module, family.modules[index].pinned, &owned);
-    }
-    AppendDomainDims(&XferModule(), nullptr, &owned);
-  }
-  std::vector<PermutationDimension> dims;
-  size_t nameIndex = 0;
-  // The variant ordinal encodes the geometry index as its lowest radix (EnumerateVariants starts
-  // the stride at the geometry count). A family with more than one geometry must model that radix
-  // here too, or valueOf would decode an ordinal against a domain that lacks the geometry term
-  // and report the wrong HAS_XP for the profile filters.
-  if (family.geometryCount > 1) {
-    dims.emplace_back(PermutationInt("GEOMETRY", family.geometryCount));
-  }
-  // The ordinal composes the CHOSEN geometry's dims on the stride after the geometry, so every
-  // geometry must declare the dims positionally identical and the domain carries one copy. A
-  // family whose geometries disagree cannot be flat-decoded; the assert keeps that from slipping
-  // through as a silently wrong valueOf.
-  AppendDomainEntries(family.geometries[0], nullptr, owned, &nameIndex, &dims);
-#if DEBUG
-  for (uint8_t geometry = 1; geometry < family.geometryCount; ++geometry) {
-    const Module& other = *family.geometries[geometry];
-    const Module& first = *family.geometries[0];
-    assert(other.dimCount == first.dimCount);
-    for (uint8_t dim = 0; dim < other.dimCount; ++dim) {
-      assert(other.dims[dim].count == first.dims[dim].count);
-    }
-  }
-#endif
-  for (uint8_t index = 0; index < family.moduleCount; ++index) {
-    AppendDomainEntries(family.modules[index].module, family.modules[index].pinned, owned,
-                        &nameIndex, &dims);
-  }
-  AppendDomainEntries(&XferModule(), nullptr, owned, &nameIndex, &dims);
-  PermutationDomain domain(dims);
-  return PrecompiledShaderInfo{family.name, "", "", domain, domain, family.textureReads};
+  // The declaration is the only variant description left: the info names the family and carries
+  // the capability bits the matcher gates on. There is no domain to assemble, because the variant
+  // space is what EnumerateVariants walks.
+  return PrecompiledShaderInfo{family.name, "", "", family.textureReads};
 }
 
 uint8_t ChainGeometryOfCell(const ChainLegacyCell& cell) {

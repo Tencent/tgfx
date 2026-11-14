@@ -54,7 +54,7 @@ const std::string BrokenVertex = "#version 450\nvoid main() { this is not glsl }
 const PrecompiledShaderInfo* TestFamilyInfo() {
   static const PrecompiledShaderInfo stored = [] {
     if (FamilyCount() == 0) {
-      return PrecompiledShaderInfo{"", "", "", PermutationDomain({}), PermutationDomain({}), 0};
+      return PrecompiledShaderInfo{"", "", "", 0};
     }
     return AssembledFamilyInfo(Families()[0]);
   }();

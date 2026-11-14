@@ -24,7 +24,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
@@ -50,14 +49,8 @@ struct PrecompiledShaderInfo {
   std::string name;
   std::string vertexFile;
   std::string fragmentFile;
-  PermutationDomain vertDomain;
-  PermutationDomain fragDomain;
   /// ShaderTextureRead bits this family implements. Zero (the default) declares none.
   uint32_t textureReads = 0;
-
-  /// Whether the vertex/fragment indices belong to the declared domains and agree on every
-  /// mirrored dimension.
-  bool IsBuildable(uint32_t vertIndex, uint32_t fragIndex) const;
 };
 
 /**

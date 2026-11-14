@@ -54,7 +54,6 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/PrecompiledShader.h"
-#include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
@@ -156,174 +155,6 @@ static std::optional<DstTextureInfo> MakeSingleIntervalDst(Context* context, int
   }
   // A present value with an empty proxy is the framebuffer-fetch state (xpType == 2).
   return dstTextureInfo;
-}
-
-TGFX_TEST(ShaderPermutationTest, DimTypes) {
-  PermutationBool boolDim("HAS_YUV");
-  EXPECT_EQ(PermutationBool::valueCount(), 2);
-  EXPECT_STREQ(boolDim.defineName, "HAS_YUV");
-
-  PermutationEnum enumDim("MODE", {"NONE", "CLAMP", "REPEAT"});
-  EXPECT_EQ(enumDim.valueCount(), 3);
-  EXPECT_STREQ(enumDim.defineName, "MODE");
-  EXPECT_STREQ(enumDim.valueNames[1], "CLAMP");
-
-  PermutationInt intDim("OCTAVES", 5);
-  EXPECT_EQ(intDim.valueCount(), 5);
-  EXPECT_STREQ(intDim.defineName, "OCTAVES");
-}
-
-TGFX_TEST(ShaderPermutationTest, DomainEncodeDecodeAllBool) {
-  // Test 2 dimensions (4 combinations)
-  {
-    auto domain = PermutationDomain::FromBoolNames("A, B");
-    EXPECT_EQ(domain.totalCount(), 4u);
-    EXPECT_EQ(domain.dimensionCount(), 2u);
-    for (uint32_t i = 0; i < domain.totalCount(); i++) {
-      auto values = domain.decode(i);
-      EXPECT_EQ(domain.encode(values), i);
-    }
-  }
-  // Test 4 dimensions (16 combinations)
-  {
-    auto domain = PermutationDomain::FromBoolNames("A, B, C, D");
-    EXPECT_EQ(domain.totalCount(), 16u);
-    for (uint32_t i = 0; i < domain.totalCount(); i++) {
-      auto values = domain.decode(i);
-      EXPECT_EQ(domain.encode(values), i);
-    }
-  }
-  // Test 8 dimensions (256 combinations)
-  {
-    auto domain = PermutationDomain::FromBoolNames("A, B, C, D, E, F, G, H");
-    EXPECT_EQ(domain.totalCount(), 256u);
-    for (uint32_t i = 0; i < domain.totalCount(); i++) {
-      auto values = domain.decode(i);
-      EXPECT_EQ(domain.encode(values), i);
-    }
-  }
-}
-
-TGFX_TEST(ShaderPermutationTest, DomainWithEnumAndInt) {
-  // Domain: enum(3 values) + bool
-  std::vector<PermutationDimension> dims;
-  dims.emplace_back(PermutationEnum("MODE", {"NONE", "CLAMP", "REPEAT"}));
-  dims.emplace_back(PermutationBool("HAS_ALPHA"));
-  PermutationDomain domain(std::move(dims));
-  EXPECT_EQ(domain.totalCount(), 6u);
-
-  // index=0: MODE=0, HAS_ALPHA=0
-  auto v0 = domain.decode(0);
-  EXPECT_EQ(v0[0], 0);
-  EXPECT_EQ(v0[1], 0);
-
-  // index=1: MODE=1, HAS_ALPHA=0
-  auto v1 = domain.decode(1);
-  EXPECT_EQ(v1[0], 1);
-  EXPECT_EQ(v1[1], 0);
-
-  // index=3: MODE=0, HAS_ALPHA=1
-  auto v3 = domain.decode(3);
-  EXPECT_EQ(v3[0], 0);
-  EXPECT_EQ(v3[1], 1);
-
-  // index=5: MODE=2, HAS_ALPHA=1
-  auto v5 = domain.decode(5);
-  EXPECT_EQ(v5[0], 2);
-  EXPECT_EQ(v5[1], 1);
-
-  // Round-trip all
-  for (uint32_t i = 0; i < domain.totalCount(); i++) {
-    EXPECT_EQ(domain.encode(domain.decode(i)), i);
-  }
-}
-
-TGFX_TEST(ShaderPermutationTest, DefineListForZeroValue) {
-  auto domain = PermutationDomain::FromBoolNames("X, Y, Z");
-  auto defines = domain.defineListFor(0);
-  EXPECT_EQ(defines.size(), 3u);
-  EXPECT_EQ(defines[0], "X=0");
-  EXPECT_EQ(defines[1], "Y=0");
-  EXPECT_EQ(defines[2], "Z=0");
-
-  // Also verify a non-zero index
-  // index=5 for 3-bool: decode(5) = {1, 0, 1} (5 = 1*1 + 0*2 + 1*4)
-  auto defines5 = domain.defineListFor(5);
-  EXPECT_EQ(defines5[0], "X=1");
-  EXPECT_EQ(defines5[1], "Y=0");
-  EXPECT_EQ(defines5[2], "Z=1");
-}
-
-TGFX_TEST(ShaderPermutationTest, TypedVertDimsDeclaresTheSameDomain) {
-  // A declared family's domain is built from the module declarations; the RoundStrokeRect family
-  // carries the geometry's UV_MATRIX radix (2) and the Xfer HAS_XP radix (3), and the flattened
-  // ordinal is UV_MATRIX + 2 * HAS_XP.
-  const auto* family = FindShaderInfo("RoundStrokeRect");
-  ASSERT_NE(family, nullptr);
-  const auto& domain = family->vertDomain;
-  EXPECT_EQ(domain.dimensionCount(), 2u);
-  EXPECT_EQ(domain.totalCount(), 6u);
-  EXPECT_EQ(domain.defineListFor(1)[0], "RoundStrokeRectGeometry_UV_MATRIX=1");
-}
-
-TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
-  // Every family is a declaration row now: the retired shells are neither registered nor
-  // enumerable.
-  for (const char* retired :
-       {"TextureFillShader", "TextureColorMatrixShader", "DeviceSpaceTextureShader",
-        "PointwiseDirectShader", "PointwiseChainShader", "YUVTextureFillShader"}) {
-    EXPECT_EQ(FindShaderInfo(retired), nullptr) << retired;
-    EXPECT_FALSE(EnumerateReachablePermutations(retired).has_value()) << retired;
-  }
-  const auto* maskFill = FindShaderInfo("MaskFill");
-  ASSERT_NE(maskFill, nullptr);
-  // The declaration-driven families encode HAS_XP(int3) = 3 permutations; the one domain drives
-  // both stages (the vertex text just never reads the dimension).
-  EXPECT_EQ(maskFill->vertDomain.totalCount(), 3u);
-  EXPECT_EQ(maskFill->vertDomain.dimensionCount(), 1u);
-  EXPECT_EQ(maskFill->fragDomain.totalCount(), 3u);
-  EXPECT_EQ(maskFill->fragDomain.dimensionCount(), 1u);
-}
-
-TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
-  std::set<std::string> names;
-  for (size_t index = 0; index < FamilyCount(); ++index) {
-    const auto info = AssembledFamilyInfo(Families()[index]);
-    SCOPED_TRACE(info.name);
-    EXPECT_TRUE(names.insert(info.name).second);
-    const auto* registered = FindShaderInfo(info.name);
-    ASSERT_NE(registered, nullptr);
-    EXPECT_EQ(registered->textureReads, info.textureReads);
-    auto reachable = EnumerateReachablePermutations(info.name);
-    ASSERT_TRUE(reachable.has_value());
-    ASSERT_FALSE(reachable->empty());
-    for (const auto& indices : *reachable) {
-      EXPECT_TRUE(info.IsBuildable(indices.first, indices.second));
-    }
-    EXPECT_EQ(FindShaderInfo(info.name), registered);
-  }
-  EXPECT_FALSE(EnumerateReachablePermutations("PointwiseChainShader").has_value());
-  // The declaration-driven families enumerate their own ordinals: the geometry IS the family, so
-  // SolidColor/MaskFill list HAS_XP alone and TiledTextureFill leads with the geometry radix.
-  const std::set<std::pair<uint32_t, uint32_t>> solidColorPairs = {{0, 0}, {1, 1}, {2, 2}};
-  EXPECT_EQ(*EnumerateReachablePermutations("SolidColor"), solidColorPairs);
-  EXPECT_EQ(*EnumerateReachablePermutations("MaskFill"), solidColorPairs);
-  const std::set<std::pair<uint32_t, uint32_t>> tiledFillPairs = {{0, 0}, {1, 1}, {2, 2},
-                                                                  {3, 3}, {4, 4}, {5, 5}};
-  EXPECT_EQ(*EnumerateReachablePermutations("TiledTextureFill"), tiledFillPairs);
-  // The ShapeInstancedTextureCoverage family keeps 2 pairs: the gradient radix alone, with the
-  // geometry's VERTEX_COLOR and the Xfer's HAS_XP pinned to 0 by the product rule.
-  const std::set<std::pair<uint32_t, uint32_t>> shapeCoveragePairs = {{0, 0}, {2, 2}};
-  EXPECT_EQ(*EnumerateReachablePermutations("ShapeInstancedTextureCoverage"), shapeCoveragePairs);
-  // The RRect family (the declaration-driven successor of NonAARRectFillShader) keeps 6 pairs: the
-  // [PRESENT, HAS_XP] product. The stroke form is the runtime StrokeEnabled uniform, so it is no
-  // dimension; the match rule still rejects a textured stroke draw at runtime.
-  const auto rrectPairs = EnumerateReachablePermutations("RRect");
-  ASSERT_TRUE(rrectPairs.has_value());
-  EXPECT_EQ(rrectPairs->size(), 6u);
-  EXPECT_EQ(FindShaderInfo("UnknownShader"), nullptr);
-  EXPECT_FALSE(EnumerateReachablePermutations("UnknownShader").has_value());
-  EXPECT_FALSE(EnumerateReachablePermutations("UnknownShader").has_value());
 }
 
 // Reads a GLSL source file with its #include lines recursively expanded (bounded), so a check can
@@ -1535,19 +1366,6 @@ TGFX_TEST(ShaderPermutationTest, MaskFillHitsPrecompiledCache) {
   }
 }
 
-TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
-  // The family is declaration-driven now: it has no factory shell and no source files, and its
-  // domain spans the geometry's HAS_UV_COORD/HAS_SUBSET, Texture's HAS_SUBSET, LocalMask's
-  // PRESENT and Xfer's HAS_XP (2 * 2 * 2 * 2 * 3); the product rule prunes the enumerated bundle
-  // to the 24 real programs.
-  const auto* registered = FindShaderInfo("QuadTexture");
-  ASSERT_NE(registered, nullptr);
-  EXPECT_EQ(registered->vertDomain.totalCount(), 48u);
-  EXPECT_EQ(registered->fragDomain.totalCount(), 48u);
-  EXPECT_TRUE(registered->vertexFile.empty());
-  EXPECT_TRUE(registered->fragmentFile.empty());
-}
-
 TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactContract) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -1746,18 +1564,6 @@ TGFX_TEST(ShaderPermutationTest, ComplexEllipseTextureCoverageIsServedByChain) {
   EXPECT_EQ(failure, PermutationMatchFailure::None);
 }
 
-TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageRegistry) {
-  // The family is declaration-driven now: its domain spans the geometry's VERTEX_COLOR, the
-  // Gradient module's PRESENT and Xfer's HAS_XP (2 * 2 * 3); the product rule prunes the
-  // enumerated bundle to the 2 real programs.
-  const auto* registered = FindShaderInfo("ShapeInstancedTextureCoverage");
-  ASSERT_NE(registered, nullptr);
-  EXPECT_EQ(registered->vertDomain.totalCount(), 12u);
-  EXPECT_EQ(registered->fragDomain.totalCount(), 12u);
-  EXPECT_TRUE(registered->vertexFile.empty());
-  EXPECT_TRUE(registered->fragmentFile.empty());
-}
-
 TGFX_TEST(ShaderPermutationTest, EffectDecomposerTripleFP) {
   auto image = MakeImage("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);
@@ -1887,29 +1693,6 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
   }
 }
 
-TGFX_TEST(ShaderPermutationTest, DirectAARectPreservesPermutationDomains) {
-  struct ExpectedDomain {
-    const char* name;
-    uint32_t vertexCount;
-    uint32_t fragmentCount;
-  };
-  const ExpectedDomain expected[] = {
-      {"QuadColor", 6, 6},    {"QuadTexture", 48, 48}, {"SolidColor", 3, 3},
-      {"HairlineLine", 3, 3}, {"HairlineQuad", 3, 3},
-  };
-  for (const auto& expectedDomain : expected) {
-    // The lookup goes through Find so the declaration-driven families (SolidColor) are covered
-    // alongside the factory families.
-    const auto* registered = FindShaderInfo(expectedDomain.name);
-    EXPECT_NE(registered, nullptr) << expectedDomain.name;
-    if (registered == nullptr) {
-      continue;
-    }
-    EXPECT_EQ(registered->vertDomain.totalCount(), expectedDomain.vertexCount);
-    EXPECT_EQ(registered->fragDomain.totalCount(), expectedDomain.fragmentCount);
-  }
-}
-
 // A Compose(mask, rect) coverage is the chain's documented narrow form (the mask child plus a clip
 // slot), so the interpreter serves it: the shape is no longer a NoMatchingRule miss.
 TGFX_TEST(ShaderPermutationTest, DirectAARectComposedCoverageIsServedByChain) {
@@ -1936,41 +1719,6 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectComposedCoverageIsServedByChain) {
   auto served = SelectProgram(context, programInfo, &failure);
   ASSERT_TRUE(served.has_value());
   EXPECT_STREQ(Families()[served->variant.family].name, "Chain");
-}
-
-// --- MirroredDim: permanent desync guard --------------------------------------------------------
-// A shader whose vertex and fragment stages share a dimension name gates a varying that both stages
-// must declare identically; the framework's MirroredDimsAgree (ShaderPermutation) enforces value
-// equality automatically, replacing the per-shader hand-written guards. For that automatic rule to
-// be sound, a shared-name dimension must have the SAME arity (value count) in both domains --
-// otherwise the two stages disagree on how many varying configurations exist and could emit a
-// mismatched vertex/fragment interface. This test asserts that structural invariant for every
-// registered shader, turning a future "added the dim to one stage / with a different arity" mistake
-// into a build-time failure instead of an invalid runtime pipeline.
-static const char* MirrorDimName(const PermutationDimension& dimension) {
-  return std::visit([](const auto& d) { return d.defineName; }, dimension);
-}
-
-static int MirrorDimArity(const PermutationDimension& dimension) {
-  return std::visit([](const auto& d) { return d.valueCount(); }, dimension);
-}
-
-TGFX_TEST(ShaderPermutationTest, MirroredDimsHaveConsistentArity) {
-  for (size_t index = 0; index < FamilyCount(); ++index) {
-    const auto info = AssembledFamilyInfo(Families()[index]);
-    const auto& vertDims = info.vertDomain.getDimensions();
-    const auto& fragDims = info.fragDomain.getDimensions();
-    for (const auto& fragDim : fragDims) {
-      std::string fragName = MirrorDimName(fragDim);
-      for (const auto& vertDim : vertDims) {
-        if (std::string(MirrorDimName(vertDim)) == fragName) {
-          EXPECT_EQ(MirrorDimArity(vertDim), MirrorDimArity(fragDim))
-              << info.name << " mirror dimension '" << fragName
-              << "' has differing arity between the vertex and fragment domains";
-        }
-      }
-    }
-  }
 }
 
 }  // namespace tgfx
