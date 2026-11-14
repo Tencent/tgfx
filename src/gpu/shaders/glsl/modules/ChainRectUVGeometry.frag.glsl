@@ -1,4 +1,4 @@
-// The rect (uvCoord) layout's interface facts for the fragment stage.
+// The rect (UVCoord) layout's interface facts for the fragment stage.
 
 #define GP_LAYOUT 0
 #define HAS_COVERAGE 1

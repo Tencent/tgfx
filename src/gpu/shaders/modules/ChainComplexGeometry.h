@@ -32,14 +32,14 @@ namespace tgfx {
 inline constexpr ModuleDim ChainComplexGeometryDims[] = {{"SUBSET", 2}};
 
 inline constexpr Element ChainComplexGeometryElements[] = {
-    {Element::Kind::Attribute, ShaderType::Float2, "inPosition"},
-    {Element::Kind::Attribute, ShaderType::Float4, "inColor"},
-    {Element::Kind::Attribute, ShaderType::Float2, "inEllipseOffset"},
-    {Element::Kind::Attribute, ShaderType::Float4, "inEllipseRadii"},
-    {Element::Kind::Attribute, ShaderType::Float2, "inEdgeDist"},
-    {Element::Kind::Attribute, ShaderType::Float2, "inStrokeWidth"},
-    {Element::Kind::Varying, ShaderType::Float2, "vEllipseOffsets"},
-    {Element::Kind::Varying, ShaderType::Float4, "vEllipseRadii"},
+    {Element::Kind::Attribute, ShaderType::Float2, "Position"},
+    {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
+    {Element::Kind::Attribute, ShaderType::Float2, "InEllipseOffset"},
+    {Element::Kind::Attribute, ShaderType::Float4, "InEllipseRadii"},
+    {Element::Kind::Attribute, ShaderType::Float2, "InEdgeDist"},
+    {Element::Kind::Attribute, ShaderType::Float2, "InStrokeWidth"},
+    {Element::Kind::Varying, ShaderType::Float2, "vOffsets"},
+    {Element::Kind::Varying, ShaderType::Float4, "vRadii"},
     {Element::Kind::Varying, ShaderType::Float2, "vEdgeDist"},
     {Element::Kind::Varying, ShaderType::Float2, "vStrokeWidth"},
     {Element::Kind::Varying, ShaderType::Float4, "vColor"},

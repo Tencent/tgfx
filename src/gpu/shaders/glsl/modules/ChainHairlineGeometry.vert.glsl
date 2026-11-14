@@ -8,9 +8,9 @@
 #define HAS_SUBSET 0
 
 void ChainHairlineGeometry_vertex(inout Vertex v) {
-  highp vec2 position = (Matrix * vec3(aPosition, 1.0)).xy;
+  highp vec2 position = (Matrix * vec3(Position, 1.0)).xy;
   v.position = position;
   v.localCoord = position;
-  vEdgeDistance = aEdgeDistance;
-  vColor = inColor;
+  vEdge = InEdge;
+  vColor = InColor;
 }

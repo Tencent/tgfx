@@ -178,14 +178,14 @@ void chainMain() {
   // a coverage subtree's unit input consumes it (the -3 designator), and the tail below folds it
   // into the final coverage exactly once (the subtree already carries it, so the coverage-root
   // path must not multiply it in again).
-  gpPixelCoverage = ellipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, StrokeEnabled);
+  gpPixelCoverage = ellipseEdgeCoverage(vOffsets, vRadii, StrokeEnabled);
 #elif GP_LAYOUT == 2
   // The hairline edge coverage (Coverage * edge alpha), with the same contract as the ellipse.
-  gpPixelCoverage = hairlineLineEdgeCoverage(vEdgeDistance, Coverage, AAEnabled);
+  gpPixelCoverage = hairlineLineEdgeCoverage(vEdge, Coverage, AAEnabled);
 #elif GP_LAYOUT == 3
   // The complex rounded-rect coverage (per-corner radii), same contract as the ellipse;
   // StrokeEnabled selects the fill or the stroke form at runtime.
-  gpPixelCoverage = complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist,
+  gpPixelCoverage = complexEllipseEdgeCoverage(vOffsets, vRadii, vEdgeDist,
                                                vStrokeWidth, StrokeEnabled);
 #elif GP_LAYOUT == 5
   // The non-AA rounded-rect SDF, hard-stepped exactly like the RRect family.

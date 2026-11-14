@@ -33,12 +33,12 @@ namespace tgfx {
 inline constexpr ModuleDim ChainRRectGeometryDims[] = {{"SUBSET", 2}};
 
 inline constexpr Element ChainRRectGeometryElements[] = {
-    {Element::Kind::Attribute, ShaderType::Float2, "inPosition"},
-    {Element::Kind::Attribute, ShaderType::Float2, "inLocalCoord"},
-    {Element::Kind::Attribute, ShaderType::Float2, "inRadii"},
-    {Element::Kind::Attribute, ShaderType::Float4, "inRectBounds"},
-    {Element::Kind::Attribute, ShaderType::Float4, "inColor"},
-    {Element::Kind::Attribute, ShaderType::Float2, "inStrokeWidth"},
+    {Element::Kind::Attribute, ShaderType::Float2, "Position"},
+    {Element::Kind::Attribute, ShaderType::Float2, "LocalCoord"},
+    {Element::Kind::Attribute, ShaderType::Float2, "Radii"},
+    {Element::Kind::Attribute, ShaderType::Float4, "RectBounds"},
+    {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
+    {Element::Kind::Attribute, ShaderType::Float2, "InStrokeWidth"},
     {Element::Kind::Varying, ShaderType::Float2, "vLocalCoord"},
     {Element::Kind::Varying, ShaderType::Float2, "vRadii"},
     {Element::Kind::Varying, ShaderType::Float4, "vRectBounds"},

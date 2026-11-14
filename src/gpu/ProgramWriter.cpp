@@ -162,7 +162,7 @@ void WriteChainRectGeometry(SlotWriter* writer, SlotWriter* chainWriter,
                             const AOTGeometryParameters& p,
                             FragmentProcessor::CoordTransformIter* transformIter) {
   constexpr uint8_t Matrix = UniformElementIndexOf(ChainRectGeometry, "Matrix");
-  constexpr uint8_t TexSubsetMatrix = UniformElementIndexOf(ChainRectGeometry, "texSubsetMatrix");
+  constexpr uint8_t TexSubsetMatrix = UniformElementIndexOf(ChainRectGeometry, "InTexSubsetMatrix");
   constexpr uint8_t Color = UniformElementIndexOf(ChainRectGeometry, "Color");
   constexpr uint8_t HasCommonColor = UniformElementIndexOf(ChainRectGeometry, "HasCommonColor");
   switch (p.kind) {

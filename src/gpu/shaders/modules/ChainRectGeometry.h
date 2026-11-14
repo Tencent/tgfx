@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-// The chain's rect layout without the uvCoord attribute (DefaultGP, QuadPerEdgeAAGP without a
+// The chain's rect layout without the UVCoord attribute (DefaultGP, QuadPerEdgeAAGP without a
 // uvMatrix, Mesh without texCoords). The attribute order is fixed and must pair by order with every
 // serving GP's compacted list while every location stays under that GP's physical-slot ceiling:
 // DefaultGP's ceiling is 3, so the color sits at ordinal 2; the subset attribute follows at 3 and
@@ -35,12 +35,12 @@ namespace tgfx {
 inline constexpr ModuleDim ChainRectGeometryDims[] = {{"SUBSET", 2}};
 
 inline constexpr Element ChainRectGeometryElements[] = {
-    {Element::Kind::Attribute, ShaderType::Float2, "aPosition"},
-    {Element::Kind::Attribute, ShaderType::Float, "inCoverage"},
-    {Element::Kind::Attribute, ShaderType::Float4, "inColor"},
-    {Element::Kind::Attribute, ShaderType::Float4, "texSubset", 1, 0, 0x02},
+    {Element::Kind::Attribute, ShaderType::Float2, "Position"},
+    {Element::Kind::Attribute, ShaderType::Float, "InCoverage"},
+    {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
+    {Element::Kind::Attribute, ShaderType::Float4, "InTexSubset", 1, 0, 0x02},
     {Element::Kind::VertexParam, ShaderType::Mat3, "Matrix"},
-    {Element::Kind::VertexParam, ShaderType::Mat3, "texSubsetMatrix", 1, 0, 0x02},
+    {Element::Kind::VertexParam, ShaderType::Mat3, "InTexSubsetMatrix", 1, 0, 0x02},
     {Element::Kind::Varying, ShaderType::Float, "vCoverage"},
     {Element::Kind::Varying, ShaderType::Float4, "vColor"},
     {Element::Kind::Varying, ShaderType::Float4, "vTexSubset", 1, 0, 0x02},

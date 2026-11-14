@@ -8,9 +8,9 @@
 
 void ChainEllipseGeometry_vertex(inout Vertex v) {
   // EllipseGeometryProcessor vertices are pre-transformed to device space.
-  v.position = inPosition;
-  v.localCoord = inPosition;
-  vEllipseOffsets = inEllipseOffset;
-  vEllipseRadii = inEllipseRadii;
-  vColor = inColor;
+  v.position = Position;
+  v.localCoord = Position;
+  vOffsets = InEllipseOffset;
+  vRadii = InEllipseRadii;
+  vColor = InColor;
 }

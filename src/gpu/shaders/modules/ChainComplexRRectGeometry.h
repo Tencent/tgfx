@@ -32,13 +32,13 @@ namespace tgfx {
 inline constexpr ModuleDim ChainComplexRRectGeometryDims[] = {{"SUBSET", 2}};
 
 inline constexpr Element ChainComplexRRectGeometryElements[] = {
-    {Element::Kind::Attribute, ShaderType::Float2, "inPosition"},
-    {Element::Kind::Attribute, ShaderType::Float2, "inLocalCoord"},
-    {Element::Kind::Attribute, ShaderType::Float4, "inXRadii"},
-    {Element::Kind::Attribute, ShaderType::Float4, "inYRadii"},
-    {Element::Kind::Attribute, ShaderType::Float4, "inRectBounds"},
-    {Element::Kind::Attribute, ShaderType::Float4, "inColor"},
-    {Element::Kind::Attribute, ShaderType::Float2, "inStrokeWidth"},
+    {Element::Kind::Attribute, ShaderType::Float2, "Position"},
+    {Element::Kind::Attribute, ShaderType::Float2, "LocalCoord"},
+    {Element::Kind::Attribute, ShaderType::Float4, "XRadii"},
+    {Element::Kind::Attribute, ShaderType::Float4, "YRadii"},
+    {Element::Kind::Attribute, ShaderType::Float4, "RectBounds"},
+    {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
+    {Element::Kind::Attribute, ShaderType::Float2, "InStrokeWidth"},
     {Element::Kind::Varying, ShaderType::Float2, "vLocalCoord"},
     {Element::Kind::Varying, ShaderType::Float4, "vXRadii"},
     {Element::Kind::Varying, ShaderType::Float4, "vYRadii"},

@@ -31,12 +31,12 @@ namespace tgfx {
 inline constexpr ModuleDim ChainEllipseGeometryDims[] = {{"SUBSET", 2}};
 
 inline constexpr Element ChainEllipseGeometryElements[] = {
-    {Element::Kind::Attribute, ShaderType::Float2, "inPosition"},
-    {Element::Kind::Attribute, ShaderType::Float4, "inColor"},
-    {Element::Kind::Attribute, ShaderType::Float2, "inEllipseOffset"},
-    {Element::Kind::Attribute, ShaderType::Float4, "inEllipseRadii"},
-    {Element::Kind::Varying, ShaderType::Float2, "vEllipseOffsets"},
-    {Element::Kind::Varying, ShaderType::Float4, "vEllipseRadii"},
+    {Element::Kind::Attribute, ShaderType::Float2, "Position"},
+    {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
+    {Element::Kind::Attribute, ShaderType::Float2, "InEllipseOffset"},
+    {Element::Kind::Attribute, ShaderType::Float4, "InEllipseRadii"},
+    {Element::Kind::Varying, ShaderType::Float2, "vOffsets"},
+    {Element::Kind::Varying, ShaderType::Float4, "vRadii"},
     {Element::Kind::Varying, ShaderType::Float4, "vColor"},
     {Element::Kind::Param, ShaderType::Float4, "Color"},
     {Element::Kind::Param, ShaderType::Int, "HasCommonColor"},

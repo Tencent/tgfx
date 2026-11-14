@@ -31,8 +31,8 @@ namespace tgfx {
 inline constexpr ModuleDim ChainHairlineQuadGeometryDims[] = {{"SUBSET", 2}};
 
 inline constexpr Element ChainHairlineQuadGeometryElements[] = {
-    {Element::Kind::Attribute, ShaderType::Float2, "aPosition"},
-    {Element::Kind::Attribute, ShaderType::Float4, "aHairQuadEdge"},
+    {Element::Kind::Attribute, ShaderType::Float2, "Position"},
+    {Element::Kind::Attribute, ShaderType::Float4, "InHairQuadEdge"},
     {Element::Kind::Varying, ShaderType::Float4, "vHairQuadEdge"},
     {Element::Kind::Varying, ShaderType::Float4, "vColor"},
     {Element::Kind::VertexParam, ShaderType::Mat3, "Matrix"},

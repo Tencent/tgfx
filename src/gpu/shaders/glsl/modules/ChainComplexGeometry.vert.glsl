@@ -9,11 +9,11 @@
 
 void ChainComplexGeometry_vertex(inout Vertex v) {
   // ComplexEllipseGeometryProcessor vertices are pre-transformed to device space too.
-  v.position = inPosition;
-  v.localCoord = inPosition;
-  vEllipseOffsets = inEllipseOffset;
-  vEllipseRadii = inEllipseRadii;
-  vEdgeDist = inEdgeDist;
-  vStrokeWidth = inStrokeWidth;
-  vColor = inColor;
+  v.position = Position;
+  v.localCoord = Position;
+  vOffsets = InEllipseOffset;
+  vRadii = InEllipseRadii;
+  vEdgeDist = InEdgeDist;
+  vStrokeWidth = InStrokeWidth;
+  vColor = InColor;
 }

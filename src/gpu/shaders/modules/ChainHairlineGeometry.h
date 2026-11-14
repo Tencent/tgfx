@@ -32,11 +32,11 @@ namespace tgfx {
 inline constexpr ModuleDim ChainHairlineGeometryDims[] = {{"SUBSET", 2}};
 
 inline constexpr Element ChainHairlineGeometryElements[] = {
-    {Element::Kind::Attribute, ShaderType::Float2, "aPosition"},
-    {Element::Kind::Attribute, ShaderType::Float, "aEdgeDistance"},
-    {Element::Kind::Attribute, ShaderType::Float4, "inColor"},
+    {Element::Kind::Attribute, ShaderType::Float2, "Position"},
+    {Element::Kind::Attribute, ShaderType::Float, "InEdge"},
+    {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
     {Element::Kind::VertexParam, ShaderType::Mat3, "Matrix"},
-    {Element::Kind::Varying, ShaderType::Float, "vEdgeDistance"},
+    {Element::Kind::Varying, ShaderType::Float, "vEdge"},
     {Element::Kind::Varying, ShaderType::Float4, "vColor"},
     {Element::Kind::Param, ShaderType::Float4, "Color"},
     {Element::Kind::Param, ShaderType::Int, "HasCommonColor"},

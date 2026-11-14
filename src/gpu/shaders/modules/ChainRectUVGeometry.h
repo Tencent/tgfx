@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-// The chain's rect layout with the uvCoord attribute (QuadPerEdgeAAGP with a uvMatrix, Mesh with
+// The chain's rect layout with the UVCoord attribute (QuadPerEdgeAAGP with a uvMatrix, Mesh with
 // texCoords). Ordinals 0..4 stand under the quad layout's five physical slots; a Mesh draw declares
 // 0..3 and stays under that GP's ceiling of 4. CoordSourceMask selects the leaf coordinate source
 // per leaf at runtime, exactly as the legacy kernel did.
@@ -33,11 +33,11 @@ namespace tgfx {
 inline constexpr ModuleDim ChainRectUVGeometryDims[] = {{"SUBSET", 2}};
 
 inline constexpr Element ChainRectUVGeometryElements[] = {
-    {Element::Kind::Attribute, ShaderType::Float2, "aPosition"},
-    {Element::Kind::Attribute, ShaderType::Float, "inCoverage"},
-    {Element::Kind::Attribute, ShaderType::Float2, "uvCoord"},
-    {Element::Kind::Attribute, ShaderType::Float4, "inColor"},
-    {Element::Kind::Attribute, ShaderType::Float4, "texSubset", 1, 0, 0x02},
+    {Element::Kind::Attribute, ShaderType::Float2, "Position"},
+    {Element::Kind::Attribute, ShaderType::Float, "InCoverage"},
+    {Element::Kind::Attribute, ShaderType::Float2, "UVCoord"},
+    {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
+    {Element::Kind::Attribute, ShaderType::Float4, "InTexSubset", 1, 0, 0x02},
     {Element::Kind::VertexParam, ShaderType::Mat3, "Matrix"},
     {Element::Kind::VertexParam, ShaderType::Int, "CoordSourceMask"},
     {Element::Kind::Varying, ShaderType::Float, "vCoverage"},

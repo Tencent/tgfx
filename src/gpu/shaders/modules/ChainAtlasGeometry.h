@@ -32,9 +32,9 @@ namespace tgfx {
 inline constexpr ModuleDim ChainAtlasGeometryDims[] = {{"SUBSET", 2}};
 
 inline constexpr Element ChainAtlasGeometryElements[] = {
-    {Element::Kind::Attribute, ShaderType::Float2, "aPosition"},
-    {Element::Kind::Attribute, ShaderType::Float2, "uvCoord"},
-    {Element::Kind::Attribute, ShaderType::Float4, "inColor"},
+    {Element::Kind::Attribute, ShaderType::Float2, "Position"},
+    {Element::Kind::Attribute, ShaderType::Float2, "UVCoord"},
+    {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
     {Element::Kind::VertexParam, ShaderType::Mat3, "Matrix"},
     {Element::Kind::VertexParam, ShaderType::Int, "CoordSourceMask"},
     {Element::Kind::Varying, ShaderType::Float4, "vColor"},

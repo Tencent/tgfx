@@ -9,11 +9,11 @@
 #define HAS_SUBSET 0
 
 void ChainRRectGeometry_vertex(inout Vertex v) {
-  v.position = inPosition;
-  v.localCoord = inLocalCoord;
-  vLocalCoord = inLocalCoord;
-  vRadii = inRadii;
-  vRectBounds = inRectBounds;
-  vColor = inColor;
-  vStrokeWidth = inStrokeWidth;
+  v.position = Position;
+  v.localCoord = LocalCoord;
+  vLocalCoord = LocalCoord;
+  vRadii = Radii;
+  vRectBounds = RectBounds;
+  vColor = InColor;
+  vStrokeWidth = InStrokeWidth;
 }

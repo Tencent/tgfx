@@ -9,12 +9,12 @@
 #define HAS_SUBSET 0
 
 void ChainComplexRRectGeometry_vertex(inout Vertex v) {
-  v.position = inPosition;
-  v.localCoord = inLocalCoord;
-  vLocalCoord = inLocalCoord;
-  vXRadii = inXRadii;
-  vYRadii = inYRadii;
-  vRectBounds = inRectBounds;
-  vColor = inColor;
-  vStrokeWidth = inStrokeWidth;
+  v.position = Position;
+  v.localCoord = LocalCoord;
+  vLocalCoord = LocalCoord;
+  vXRadii = XRadii;
+  vYRadii = YRadii;
+  vRectBounds = RectBounds;
+  vColor = InColor;
+  vStrokeWidth = InStrokeWidth;
 }

@@ -9,16 +9,16 @@
 #define HAS_SUBSET SUBSET
 
 void ChainRectGeometry_vertex(inout Vertex v) {
-  highp vec2 position = (Matrix * vec3(aPosition, 1.0)).xy;
+  highp vec2 position = (Matrix * vec3(Position, 1.0)).xy;
   v.position = position;
-  v.localCoord = aPosition;
-  vCoverage = inCoverage;
-  vColor = inColor;
+  v.localCoord = Position;
+  vCoverage = InCoverage;
+  vColor = InColor;
 #if HAS_SUBSET
   // The subset corners in leaf 0's texture space (the legacy vertex text verbatim; the uvless
   // form goes through its own transform, as the quad GP wrote it).
-  highp vec2 subsetLT = (texSubsetMatrix * vec3(texSubset.xy, 1.0)).xy;
-  highp vec2 subsetRB = (texSubsetMatrix * vec3(texSubset.zw, 1.0)).xy;
+  highp vec2 subsetLT = (InTexSubsetMatrix * vec3(InTexSubset.xy, 1.0)).xy;
+  highp vec2 subsetRB = (InTexSubsetMatrix * vec3(InTexSubset.zw, 1.0)).xy;
   vTexSubset = vec4(min(subsetLT, subsetRB), max(subsetLT, subsetRB));
 #endif
 }
