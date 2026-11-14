@@ -334,12 +334,10 @@ static void ExpectBundleEntryCounts(const PrecompiledShaderCache& cache,
     names.insert(Families()[index].name);
   }
   for (const auto& name : names) {
-    const auto* info = FindShaderInfo(name);
-    ASSERT_NE(info, nullptr) << name;
-    const auto familyIndex = FamilyIndexOf(info->name.c_str());
-    ASSERT_NE(familyIndex, 0xFFFF);
-    auto reachable = EnumerateReachablePermutations(info->name);
-    ASSERT_TRUE(reachable.has_value()) << info->name;
+    const auto familyIndex = FamilyIndexOf(name.c_str());
+    ASSERT_NE(familyIndex, 0xFFFF) << name;
+    auto reachable = EnumerateReachablePermutations(name);
+    ASSERT_TRUE(reachable.has_value()) << name;
     std::set<uint32_t> vertexIndices;
     std::set<uint32_t> fragmentIndices;
     for (const auto& permutation : *reachable) {

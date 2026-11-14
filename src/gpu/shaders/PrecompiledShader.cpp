@@ -17,36 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/PrecompiledShader.h"
-#include <cstdlib>
-#include <cstring>
-#include <map>
-#include <utility>
-#include "core/utils/USE.h"
+#include <cstdint>
 #include "gpu/shaders/Families.h"
-#include "gpu/shaders/FamilyDomains.h"
 
 namespace tgfx {
-
-namespace {
-
-/// The name-keyed view the matcher and the reports resolve through. The per-family enumerators
-// that used to live here had no runtime caller once the bundle became variant-id keyed: the tool
-// compiles EnumerateVariants directly, and the reachable-set reference the tests compare against
-// lives with those tests.
-const std::map<std::string, PrecompiledShaderInfo>& ShaderInfos() {
-  static const std::map<std::string, PrecompiledShaderInfo> infos = [] {
-    std::map<std::string, PrecompiledShaderInfo> result;
-    for (size_t index = 0; index < FamilyCount(); ++index) {
-      auto info = AssembledFamilyInfo(Families()[index]);
-      auto name = info.name;
-      result.emplace(std::move(name), std::move(info));
-    }
-    return result;
-  }();
-  return infos;
-}
-
-}  // namespace
 
 bool VariantUsesFramebufferFetch(uint16_t familyIndex, uint32_t ordinal) {
   const auto variant = DecodeVariant(familyIndex, ordinal);
@@ -62,12 +36,6 @@ bool PermutationCompilesForBackend(uint16_t familyIndex, uint32_t ordinal, Shade
     return false;
   }
   return true;
-}
-
-const PrecompiledShaderInfo* FindShaderInfo(const std::string& name) {
-  const auto& infos = ShaderInfos();
-  auto result = infos.find(name);
-  return result == infos.end() ? nullptr : &result->second;
 }
 
 }  // namespace tgfx

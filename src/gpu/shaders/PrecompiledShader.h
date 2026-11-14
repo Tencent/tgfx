@@ -66,11 +66,4 @@ bool PermutationCompilesForBackend(uint16_t familyIndex, uint32_t ordinal, Shade
 /// only input). False for an ordinal the family does not enumerate.
 bool VariantUsesFramebufferFetch(uint16_t familyIndex, uint32_t ordinal);
 
-/**
- * The declared family's metadata, addressed by name. Every family lives in the declaration table
- * (Families.h), so there is no registration step and no dependence on static-initialization order.
- * Returns nullptr when no family carries the name.
- */
-const PrecompiledShaderInfo* FindShaderInfo(const std::string& name);
-
 }  // namespace tgfx

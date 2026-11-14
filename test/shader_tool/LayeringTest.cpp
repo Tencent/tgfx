@@ -288,7 +288,7 @@ TEST(LayeringTest, DeclarationLayerIncludesOnlyItselfAndTheContractLeaves) {
   // families and the layout derived from them. It must stay usable without a GPU context, so its
   // includes are its own tree plus the two contract leaves below. Anything else — a processor, an
   // IR node, a logger, the uniform writer — belongs to the runtime side of src/gpu/aot.
-  const std::set<std::string> contractLeaves = {"gpu/Uniform.h", "core/utils/USE.h"};
+  const std::set<std::string> contractLeaves = {"gpu/Uniform.h"};
   std::set<std::string> used;
   size_t checked = 0;
   for (const auto& file : FilesIn(SourceDir + "/src/gpu/shaders", {".cpp", ".h"})) {
