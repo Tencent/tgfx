@@ -143,6 +143,14 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
   const auto modules = ModulesOf(family, variant);
   AssembledVariant assembled;
 
+  // The interpreter's variant carries its geometry index as a macro: its nine geometries declare
+  // different interfaces, so the shared body text branches on it to address the right module's
+  // varyings. Every other family composes one geometry, which needs no such selector.
+  if (family.fallback) {
+    const std::string geometryDefine = "CHAIN_GEOMETRY=" + std::to_string(variant.geometry);
+    assembled.vertDefines.push_back(geometryDefine);
+    assembled.fragDefines.push_back(geometryDefine);
+  }
   for (uint8_t slot = 0; slot < modules.count; ++slot) {
     const Module* module = modules.list[slot];
     if (module == nullptr) {
