@@ -23,15 +23,18 @@
 #include <string>
 #include <vector>
 #include "gpu/shaders/KernelContract.h"
+#include "gpu/shaders/modules/Chain.h"
 
 namespace tgfx {
 
-// The chain interpreter comes in three resource shapes, one per value of the Chain module's
-// RESOURCE dimension:
-//   Chain      -> the plain slot pool
-//   NoiseGraph -> the pool plus one noise source (32 slots)
-//   TiledGraph -> the pool plus one LUT gradient and three tiled recipes
-// Automatic means "not decided yet": the planner picks the smallest shape that fits.
+// A compiled chain program's capacity class: how large a pool it needs and which of the extended
+// sources (noise, LUT gradient, tiled recipes) it carries. This is not the executor's PROFILE —
+// that one describes which fields the draw's execution needs and is derived per draw
+// (FamilyDomains' ChainProfileOfCell) — so the two are distinct vocabularies on purpose:
+//   Chain      -> a plain profile (0..2): the 16-slot pool
+//   NoiseGraph -> the noise profile (6): the 32-slot pool plus one noise source
+//   TiledGraph -> a gradient profile (3..5): the pool plus one LUT gradient and three recipes
+// Automatic means "not decided yet": the planner picks the smallest class that fits.
 enum class AOTResourceProfile : uint32_t {
   Automatic,
   Chain,
@@ -59,13 +62,22 @@ struct AOTResourceCapacity {
 };
 
 // The sampler bindings a kernel artifact carries before padding.
-inline constexpr size_t MaxChainLeafBindings = 4;
+inline constexpr size_t MaxChainLeafBindings = ChainProfileLeafBindings;
 
-inline constexpr AOTResourceCapacity ChainResourceCapacity = {16, 2, 0, 0};
-inline constexpr AOTResourceCapacity NoiseGraphResourceCapacity = {32, 2, 1, 0};
-// The gradient shape shares the plain chain's 16-slot storage: the libpag corpus's heaviest
-// gradient chain needs 7 slots (p100 over 2,468 constructed chains), so 16 keeps ample headroom.
-inline constexpr AOTResourceCapacity TiledGraphResourceCapacity = {16, 3, 0, 1};
+// The three shapes are points of the declaration's per-PROFILE table (shaders/modules/Chain.h):
+// each number below is that profile's declared array length, so the capacity a shape offers and
+// the variant that will be assembled from the profile cannot disagree. The gradient shape shares
+// the plain chain's 16-slot storage: the libpag corpus's heaviest gradient chain needs 7 slots
+// (p100 over 2,468 constructed chains), so 16 keeps ample headroom.
+inline constexpr AOTResourceCapacity ChainResourceCapacity = {
+    ChainSlotPackedCounts[0], ChainProfileTiledRecipes[0], ChainProfileNoiseSources[0],
+    ChainProfileGradientLeaves[0]};
+inline constexpr AOTResourceCapacity NoiseGraphResourceCapacity = {
+    ChainSlotPackedCounts[6], ChainProfileTiledRecipes[6], ChainProfileNoiseSources[6],
+    ChainProfileGradientLeaves[6]};
+inline constexpr AOTResourceCapacity TiledGraphResourceCapacity = {
+    ChainSlotPackedCounts[3], ChainProfileTiledRecipes[3], ChainProfileNoiseSources[3],
+    ChainProfileGradientLeaves[3]};
 
 // The capacity defines the compiled stages receive live in the tool (core/CapacityDefines.h):
 // they are read from the declaration the assembler sizes the arrays from, and the contract header
@@ -84,6 +96,18 @@ inline const AOTResourceCapacity* GetAOTResourceCapacity(AOTResourceProfile prof
       return nullptr;
   }
 }
+
+// The three shapes are exactly three declared profile points: a shape's capacity must equal the
+// profile it selects, or the planner's budget and the assembled variant disagree.
+static_assert(ChainResourceCapacity.instructions == ChainSlotPackedCounts[0] &&
+                  ChainResourceCapacity.tiledRecipes == ChainProfileTiledRecipes[0],
+              "the plain shape must be the plain profile's declared capacity");
+static_assert(NoiseGraphResourceCapacity.instructions == ChainSlotPackedCounts[6] &&
+                  NoiseGraphResourceCapacity.noiseSources == ChainProfileNoiseSources[6],
+              "the noise shape must be the noise profile's declared capacity");
+static_assert(TiledGraphResourceCapacity.gradients == ChainProfileGradientLeaves[3] &&
+                  TiledGraphResourceCapacity.tiledRecipes == ChainProfileTiledRecipes[3],
+              "the gradient shape must be a gradient profile's declared capacity");
 
 inline bool IsAOTGraphProfile(AOTResourceProfile profile) {
   return profile == AOTResourceProfile::NoiseGraph || profile == AOTResourceProfile::TiledGraph;

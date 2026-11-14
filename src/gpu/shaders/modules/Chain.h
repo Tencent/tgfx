@@ -43,6 +43,17 @@ inline constexpr ModuleDim ChainDims[] = {{"PROFILE", 7}};
 inline constexpr uint16_t ChainSlotPackedCounts[] = {16, 16, 16, 16, 16, 16, 32};
 inline constexpr uint16_t ChainDataCounts[] = {144, 144, 144, 144, 144, 144, 256};
 
+// What each PROFILE's variant declares, in the same order: the instruction pool's length, the
+// tiled recipes the gradient profiles carry, the gradient leaves and the noise source. The
+// capacity classes the runtime planner asks for are points of this table, not separate constants —
+// a number here is the declared array length the assembler sizes the variant with.
+inline constexpr uint8_t ChainProfileTiledRecipes[] = {2, 2, 2, 3, 3, 3, 2};
+inline constexpr uint8_t ChainProfileGradientLeaves[] = {0, 0, 0, 1, 1, 1, 0};
+inline constexpr uint8_t ChainProfileNoiseSources[] = {0, 0, 0, 0, 0, 0, 1};
+/// The four-leaf profiles bind four textures; the others bind fewer, and the extra slots are
+/// padded. The capacity is the maximum, so one number covers every profile.
+inline constexpr uint8_t ChainProfileLeafBindings = 4;
+
 // The PROFILE value sets: leaf slots {2,5,6}, mask-or-leaf {1,2,4,5,6}, gradient {3,4,5},
 // tiled2 {0,1,2,6}, noise {6}, resource source {3,4,5,6}, CTM_0 {2,3,4,5,6},
 // CTM_1..4 {2,5,6}, CTM_5 {5,6}.

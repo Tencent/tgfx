@@ -49,7 +49,9 @@ struct AOTChainLayout {
 // sets, four rrect array elements). ValidateSlots is the only place that enforces them; the
 // planner and the compile both run it on the same instruction array, so the two cannot disagree.
 inline constexpr size_t MaxChainSlots = NoiseGraphResourceCapacity.instructions;
-inline constexpr size_t MaxChainGradientSlots = TiledGraphResourceCapacity.gradients;
+/// A chain pass carries at most one LUT gradient: the gradient profiles declare one leaf and
+/// the encoder rejects a second.
+inline constexpr size_t MaxChainGradientSlots = ChainProfileGradientLeaves[3];
 inline constexpr size_t MaxChainColorSpaceXformSlots = 1;
 
 // The chain-layout pipeline, four stages over one merged node space. PlanChainLayout is the only
