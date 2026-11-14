@@ -274,21 +274,24 @@ void WriteChainStrokeGeometry(SlotWriter* /*writer*/, SlotWriter* chainWriter,
 /// The per-pixel edge-AA hairline line and quad: a constant coverage factor plus the AA switch,
 /// with the vertex stage projecting through the view matrix.
 template <const Module& G>
+template <const Module& G>
 void WriteChainHairlineGeometry(SlotWriter* writer, SlotWriter* chainWriter,
-                                const AOTGeometryParameters& p,
+                                SlotWriter* colorParams, const AOTGeometryParameters& p,
                                 FragmentProcessor::CoordTransformIter* transformIter) {
+  // The view matrix is the only geometry-owned field; the color, coverage and AA switches live in
+  // the chain's own parameter module.
   constexpr uint8_t Matrix = UniformElementIndexOf(G, "Matrix");
-  constexpr uint8_t Color = UniformElementIndexOf(G, "Color");
-  constexpr uint8_t HasCommonColor = UniformElementIndexOf(G, "HasCommonColor");
-  constexpr uint8_t Coverage = UniformElementIndexOf(G, "Coverage");
-  constexpr uint8_t AAEnabled = UniformElementIndexOf(G, "AAEnabled");
+  constexpr uint8_t Color = UniformElementIndexOf(ChainColorParams, "Color");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(ChainColorParams, "HasCommonColor");
+  constexpr uint8_t Coverage = UniformElementIndexOf(ChainColorParams, "Coverage");
+  constexpr uint8_t AAEnabled = UniformElementIndexOf(ChainColorParams, "AAEnabled");
   if (p.hasUVMatrix) {
     WriteChainCoordTransforms(chainWriter, p.uvMatrix, transformIter);
   }
-  writer->set(HasCommonColor, 1);
-  writer->set(Color, p.commonColor);
-  writer->set(Coverage, p.coverage);
-  writer->set(AAEnabled, p.aaType == AAType::Coverage ? 1 : 0);
+  colorParams->set(HasCommonColor, 1);
+  colorParams->set(Color, p.commonColor);
+  colorParams->set(Coverage, p.coverage);
+  colorParams->set(AAEnabled, p.aaType == AAType::Coverage ? 1 : 0);
   writer->set(Matrix, p.viewMatrix);
 }
 
@@ -327,8 +330,8 @@ void WriteChainGeometryUniforms(SlotWriter* geometryWriter, SlotWriter* chainWri
                                                           transformIter);
       break;
     case 8:
-      WriteChainHairlineGeometry<ChainHairlineQuadGeometry>(geometryWriter, chainWriter, p,
-                                                            transformIter);
+      WriteChainHairlineGeometry<ChainHairlineQuadGeometry>(geometryWriter, chainWriter,
+                                                            colorParams, p, transformIter);
       break;
     default:
       break;

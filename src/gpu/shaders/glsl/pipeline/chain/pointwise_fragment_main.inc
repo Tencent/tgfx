@@ -116,6 +116,28 @@ highp float gpPixelCoverage = 1.0;
 #define vColor EllipseGeometry_vColor
 #define vOffsets EllipseGeometry_vOffsets
 #define vRadii EllipseGeometry_vRadii
+#elif CHAIN_GEOMETRY == 4
+#define vColor HairlineLineGeometry_vColor
+#define vEdge HairlineLineGeometry_vEdge
+#elif CHAIN_GEOMETRY == 5
+#define vColor ComplexEllipseGeometry_vColor
+#define vOffsets ComplexEllipseGeometry_vOffsets
+#define vRadii ComplexEllipseGeometry_vRadii
+#define vEdgeDist ComplexEllipseGeometry_vEdgeDist
+#define vStrokeWidth ComplexEllipseGeometry_vStrokeWidth
+#elif CHAIN_GEOMETRY == 6
+#define vColor RRectGeometry_vColor
+#define vLocalCoord RRectGeometry_vLocalCoord
+#define vRadii RRectGeometry_vRadii
+#define vRectBounds RRectGeometry_vRectBounds
+#define vStrokeWidth RRectGeometry_vStrokeWidth
+#elif CHAIN_GEOMETRY == 7
+#define vColor ComplexRRectGeometry_vColor
+#define vLocalCoord ComplexRRectGeometry_vLocalCoord
+#define vXRadii ComplexRRectGeometry_vXRadii
+#define vYRadii ComplexRRectGeometry_vYRadii
+#define vRectBounds ComplexRRectGeometry_vRectBounds
+#define vStrokeWidth ComplexRRectGeometry_vStrokeWidth
 #endif
 
 // Geometry color source: the per-vertex color attribute, or the exact Color uniform for
