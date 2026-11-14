@@ -28,7 +28,7 @@ namespace tgfx {
 /// one or the exact Color uniform. The atlas sample itself replaces the color for a color atlas
 /// and contributes its alpha as the coverage (the former FILL_COVERAGE_ATLAS_TEXT), so the module
 /// owns the atlas sampler, AlphaOnly and the size scale.
-inline constexpr ModuleDim AtlasTextGeometryDims[] = {{"HAS_COVERAGE", 2}};
+inline constexpr ModuleDim AtlasTextGeometryDims[] = {{"HAS_COVERAGE", 2, DimFact::AtlasCoverage}};
 
 inline constexpr Element AtlasTextGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "Position"},

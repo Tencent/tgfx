@@ -29,7 +29,7 @@ namespace tgfx {
 /// (position, coverage, color, offset, instanceColor); VERTEX_COLOR reserves slot 2 for the
 /// geometry's stride-filler color attribute, which this shader never reads, so the instance
 /// attributes keep their physical slots 3 and 4.
-inline constexpr ModuleDim ShapeInstancedGeometryDims[] = {{"VERTEX_COLOR", 2}};
+inline constexpr ModuleDim ShapeInstancedGeometryDims[] = {{"VERTEX_COLOR", 2, DimFact::Constant0}};
 
 inline constexpr Element ShapeInstancedGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "Position"},

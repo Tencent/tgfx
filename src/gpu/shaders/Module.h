@@ -99,11 +99,57 @@ constexpr uint16_t ElementCountOf(const Element& element, uint8_t dimValue) {
   return element.countByValue[dimValue];
 }
 
+/// The draw fact a dimension takes its value from. The declaration names the fact; the match layer
+/// evaluates it against the draw's facts, so a rule never spells a dimension by position.
+enum class DimFact : uint8_t {
+  /// Not annotated yet: the family's rule still supplies this dimension's value, so the
+  /// declaration-driven composition refuses the family instead of guessing.
+  Unspecified = 0,
+  /// Always 0: the dimension exists but this family never varies it.
+  Constant0,
+  /// The variant slot is free but the family always fixes it to 1.
+  Constant1,
+  /// The destination color's path: none, dst texture, framebuffer fetch (Xfer's HAS_XP).
+  XpType,
+  /// The draw carries a device-space mask (DeviceMask's PRESENT).
+  DeviceMaskPresent,
+  /// The draw carries a local-space mask (LocalMask's PRESENT).
+  LocalMaskPresent,
+  /// The draw's color graph is one evaluable gradient source (Gradient's PRESENT).
+  GradientPresent,
+  /// The tiled source needs the full nine-mode recipe (TiledTexture's FULL).
+  TiledFull,
+  /// The draw supplies a tiled source at all (TiledTexture's PRESENT).
+  TiledPresent,
+  /// The quad's coordinate comes from a uv attribute (QuadTextureGeometry's HAS_UV_COORD).
+  UvCoord,
+  /// The source carries a subset rect (QuadTextureGeometry/Texture's HAS_SUBSET).
+  Subset,
+  /// The geometry carries a uv matrix (RoundStrokeRectGeometry's UV_MATRIX).
+  UvMatrix,
+  /// The mesh provides texture coordinates (MeshGeometry's TEX_COORDS).
+  MeshTexCoords,
+  /// The instanced batch carries per-vertex colors (ShapeInstancedGeometry's VERTEX_COLOR).
+  VertexColor,
+  /// The atlas carries the AA coverage attribute (AtlasTextGeometry's HAS_COVERAGE).
+  AtlasCoverage,
+  /// The multi-plane source's chroma layout (YUVTexture's FORMAT).
+  YuvFormat,
+  /// The glass optics' dispersion switch (GlassRefraction's DISPERSION).
+  GlassDispersion,
+  /// The glass shape form (GlassRefraction's SHAPE).
+  GlassShape,
+};
+
 struct ModuleDim {
   /// Emitted as <Module>_<name>; a PRESENT dim with value 0 makes the assembler skip the whole
   /// module (elements and hooks).
   const char* name = "";
   uint8_t count = 0;
+  /// The draw fact this dim takes its value from. A dim left Unspecified is one whose value the
+  /// match rule still spells explicitly; annotating every dim of a family is what lets the
+  /// declaration compose its variant on its own.
+  DimFact source = DimFact::Unspecified;
 };
 
 /// One module's unrolled executor site: the assembler generates the macro <Name>_RUN_UNROLLED_SLOTS

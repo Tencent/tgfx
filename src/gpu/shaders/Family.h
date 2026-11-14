@@ -143,6 +143,29 @@ std::vector<Variant> EnumerateVariants(const Family& family, uint16_t familyInde
 std::optional<Variant> EncodeVariant(uint16_t familyIndex, uint8_t geometry,
                                      const std::vector<uint8_t>& freeValues);
 
+/// One free dimension of a (family, geometry) pair, named the way the declaration names it and
+/// carrying the fact it takes its value from. The list's order is the composition order the ordinal
+/// is built in, so a caller that walks it cannot disagree with EnumerateVariants.
+struct FamilyFreeDim {
+  /// The module that declares the dim: the geometry, a body module, or "Xfer".
+  const char* moduleName = "";
+  /// The dim's module-local name, e.g. "PRESENT" or "HAS_XP".
+  const char* dimName = "";
+  /// The variant slot the dim lives in (1 = the geometry, 2.. = the body, the last = Xfer).
+  uint8_t slot = 0;
+  /// The dim's index inside that module.
+  uint8_t dim = 0;
+  /// The dim's radix.
+  uint8_t iterations = 0;
+  /// The fact the dim reads its value from (Unspecified while the rule still supplies it).
+  DimFact source = DimFact::Unspecified;
+};
+
+/// The free dims of a (family, geometry) pair in composition order; pinned dims are absent, so the
+/// list length is exactly what EncodeVariant's value vector must carry. An out-of-range family or
+/// geometry yields an empty list.
+std::vector<FamilyFreeDim> FreeDimsOf(uint16_t familyIndex, uint8_t geometry);
+
 /// The inverse of EncodeVariant: rebuilds the full variant (pinned values included) from the
 /// family index and the ordinal. Nullopt when the ordinal exceeds the family's variant space or
 /// the allowed filter rejects it.

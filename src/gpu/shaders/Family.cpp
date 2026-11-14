@@ -236,6 +236,44 @@ std::vector<Variant> EnumerateVariants(const Family& family, uint16_t familyInde
   return variants;
 }
 
+std::vector<FamilyFreeDim> FreeDimsOf(uint16_t familyIndex, uint8_t geometry) {
+  std::vector<FamilyFreeDim> dims = {};
+  if (familyIndex >= FamilyCount()) {
+    return dims;
+  }
+  const Family& family = Families()[familyIndex];
+  if (geometry >= family.geometryCount) {
+    return dims;
+  }
+  std::vector<FreeDim> freeDims;
+  BuildFamilySeed(family, familyIndex, geometry, &freeDims);
+  for (const auto& free : freeDims) {
+    // BuildFamilySeed's slot layout: 1 is the geometry, 2.. are the body modules, and
+    // moduleCount + 2 is the implicit Xfer. Naming the dim therefore reads the same declaration
+    // the composition does.
+    const Module* module = nullptr;
+    if (free.slot == 1) {
+      module = family.geometries[geometry];
+    } else if (free.slot >= 2 && free.slot < family.moduleCount + 2) {
+      module = family.modules[free.slot - 2].module;
+    } else {
+      module = &XferModule();
+    }
+    if (module == nullptr || free.dim >= module->dimCount) {
+      continue;
+    }
+    FamilyFreeDim dim = {};
+    dim.moduleName = module->name;
+    dim.dimName = module->dims[free.dim].name;
+    dim.slot = free.slot;
+    dim.dim = free.dim;
+    dim.iterations = free.iterations;
+    dim.source = module->dims[free.dim].source;
+    dims.push_back(dim);
+  }
+  return dims;
+}
+
 std::optional<Variant> EncodeVariant(uint16_t familyIndex, uint8_t geometry,
                                      const std::vector<uint8_t>& freeValues) {
   if (familyIndex >= FamilyCount()) {

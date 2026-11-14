@@ -28,7 +28,7 @@ namespace tgfx {
 /// Frame and Xfer are implicit singletons: their dims, macros and field names carry no module
 /// prefix, so the assembled text spells HAS_XP and DstTextureUpperLeft exactly like the shared
 /// xp contract the rest of the pipeline reads.
-inline constexpr ModuleDim XferDims[] = {{"HAS_XP", 3}};
+inline constexpr ModuleDim XferDims[] = {{"HAS_XP", 3, DimFact::XpType}};
 
 /// The fields exist whenever HAS_XP != 0. The dst-coord pair and the dst sampler are read only by
 /// the HAS_XP == 1 path, but they stay declared under HAS_XP == 2 too (the shader never reads

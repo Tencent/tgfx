@@ -24,7 +24,7 @@ namespace tgfx {
 
 /// A local-space texture-alpha coverage mask (the former FILL_LOCAL_MASK): the mask samples at its
 /// own coordinate transform, its alpha multiplying the running coverage.
-inline constexpr ModuleDim LocalMaskDims[] = {{"PRESENT", 2}};
+inline constexpr ModuleDim LocalMaskDims[] = {{"PRESENT", 2, DimFact::LocalMaskPresent}};
 
 inline constexpr Element LocalMaskElements[] = {
     {Element::Kind::VertexParam, ShaderType::Mat3, "CoordMatrix"},
