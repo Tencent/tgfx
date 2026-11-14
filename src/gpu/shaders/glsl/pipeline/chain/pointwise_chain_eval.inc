@@ -11,6 +11,9 @@
 // ColorSpaceXform parameters are shared chain-wide (ChainCSFlags & friends): the matcher
 // guarantees at most one slot per chain uses them.
 
+#ifndef TGSL_POINTWISE_CHAIN_EVAL_INCLUDED
+#define TGSL_POINTWISE_CHAIN_EVAL_INCLUDED
+
 #pragma tgfx_spec_reader
 
 #include "operator/pointwise_math.inc"
@@ -174,3 +177,6 @@ vec4 evalChainSlot(int slot) {
                              ChainDstTF1, ChainDstTFType)
   return color;
 }
+
+
+#endif  // TGSL_POINTWISE_CHAIN_EVAL_INCLUDED

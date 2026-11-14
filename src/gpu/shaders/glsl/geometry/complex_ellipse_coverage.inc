@@ -4,6 +4,9 @@
 // the inner curve for strokes. Both callers share this file so they stay byte-exact with each
 // other. The strokeEnabled uniform selects the form at runtime, so fill draws skip the inner-curve
 // math without a second variant.
+#ifndef TGSL_COMPLEX_ELLIPSE_COVERAGE_INCLUDED
+#define TGSL_COMPLEX_ELLIPSE_COVERAGE_INCLUDED
+
 float complexEllipseEdgeCoverage(vec2 ellipseOffsets, vec4 ellipseRadii, vec2 edgeDist,
                                  vec2 strokeWidth, int strokeEnabled) {
   highp vec2 offset = ellipseOffsets;
@@ -54,3 +57,6 @@ float complexEllipseEdgeCoverage(vec2 ellipseOffsets, vec4 ellipseRadii, vec2 ed
   }
   return outerAlpha;
 }
+
+
+#endif  // TGSL_COMPLEX_ELLIPSE_COVERAGE_INCLUDED

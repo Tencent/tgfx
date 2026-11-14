@@ -6,6 +6,9 @@
 // half a pixel. analyticRRectCoverage: arc-box dispatch with Sampson-distance corner SDF and the
 // AA / nonAA mix driven by the antiAlias uniform value.
 
+#ifndef TGSL_ANALYTIC_CLIP_MATH_INCLUDED
+#define TGSL_ANALYTIC_CLIP_MATH_INCLUDED
+
 float analyticLocalRectCoverage(vec4 rect, mat3 deviceToLocal) {
   highp vec3 hl = deviceToLocal * vec3(gl_FragCoord.xy, 1.0);
   highp vec2 local = hl.xy / hl.z;
@@ -55,3 +58,6 @@ vec4 aotApplyRRectCoverage(vec4 inputCoverage, vec4 rect, vec4 radiiX, vec4 radi
                            float antiAlias, mat3 deviceToLocal) {
   return inputCoverage * vec4(analyticRRectCoverage(rect, radiiX, radiiY, antiAlias, deviceToLocal));
 }
+
+
+#endif  // TGSL_ANALYTIC_CLIP_MATH_INCLUDED

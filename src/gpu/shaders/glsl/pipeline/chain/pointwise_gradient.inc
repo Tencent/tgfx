@@ -1,5 +1,8 @@
 // Gradient source module (OP_GRADIENT), used by the gradient resource kind (RESOURCE_KIND 1) of
 // the chain interpreter. Pairs with the shared UBO declaration.
+#ifndef TGSL_POINTWISE_GRADIENT_INCLUDED
+#define TGSL_POINTWISE_GRADIENT_INCLUDED
+
 #include "pipeline/chain/pointwise_source_coords.inc"
 #include "source/gradient_layout.inc"
 #include "source/gradient_colorize.inc"
@@ -71,3 +74,6 @@ bool evalGradientSlot(ivec4 Packed, vec4 in0, out vec4 value) {
   value = gradColor * in0.a;
   return true;
 }
+
+
+#endif  // TGSL_POINTWISE_GRADIENT_INCLUDED

@@ -2,6 +2,9 @@
 // GP_LAYOUT==1 path. Evaluates the outer curve (and the inner curve for strokes) from the
 // ellipse varyings. The math is verbatim from the runtime EllipseGeometryProcessor emission;
 // keep it character-identical so the precompiled path stays byte-exact with JIT.
+#ifndef TGSL_ELLIPSE_COVERAGE_INCLUDED
+#define TGSL_ELLIPSE_COVERAGE_INCLUDED
+
 float ellipseEdgeCoverage(vec2 ellipseOffsets, vec4 ellipseRadii, int strokeEnabled) {
   highp vec2 offset = ellipseOffsets;
   if (strokeEnabled != 0) {
@@ -25,3 +28,6 @@ float ellipseEdgeCoverage(vec2 ellipseOffsets, vec4 ellipseRadii, int strokeEnab
   }
   return edgeAlpha;
 }
+
+
+#endif  // TGSL_ELLIPSE_COVERAGE_INCLUDED

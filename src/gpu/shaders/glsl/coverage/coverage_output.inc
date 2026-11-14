@@ -8,6 +8,9 @@
 // The fold order — the initial coverage first, then the device mask, then the clip — is the
 // shared left-fold contract (see compose.inc); this file ends at that shared composition site,
 // so the caller must NOT include xp_output.inc itself.
+#ifndef TGSL_COVERAGE_OUTPUT_INCLUDED
+#define TGSL_COVERAGE_OUTPUT_INCLUDED
+
 #ifndef TGFX_INITIAL_COVERAGE
 #define TGFX_INITIAL_COVERAGE vec4(1.0)
 #endif
@@ -42,3 +45,6 @@
 #define TGFX_COMPOSE_COVERAGE vec4(1.0)
 #include "coverage/compose.inc"
 #endif
+
+
+#endif  // TGSL_COVERAGE_OUTPUT_INCLUDED

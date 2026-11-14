@@ -3,6 +3,9 @@
 // and the one dispatcher the evaluation loop calls. The three resource kinds never coexist in one
 // variant: RESOURCE_KIND is a compile-time dimension.
 
+#ifndef TGSL_POINTWISE_RESOURCE_EVAL_INCLUDED
+#define TGSL_POINTWISE_RESOURCE_EVAL_INCLUDED
+
 #if RESOURCE_KIND == 1
 #if NTEX > 0
 #include "pipeline/chain/pointwise_tiled3.inc"
@@ -31,3 +34,6 @@ bool evalResourceSlot(ivec4 Packed, vec4 in0, int /*dataAt*/, out vec4 value) {
   return false;
 }
 #endif
+
+
+#endif  // TGSL_POINTWISE_RESOURCE_EVAL_INCLUDED

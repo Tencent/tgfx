@@ -3,6 +3,9 @@
 //   2 = rounded rect (LocalRect/RadiiX/RadiiY/AntiAlias/DeviceToLocal);
 //   3 = local-space AA rect (LocalRect/DeviceToLocal).
 // The shared math lives in analytic_clip_math.inc.
+#ifndef TGSL_CLIP_COVERAGE_INCLUDED
+#define TGSL_CLIP_COVERAGE_INCLUDED
+
 #include "coverage/analytic_clip_math.inc"
 
 float clipCoverage() {
@@ -18,3 +21,6 @@ float clipCoverage() {
   highp vec2 dists2 = dists4.xy + dists4.zw - 1.0;
   return HasClip != 0 ? dists2.x * dists2.y : 1.0;
 }
+
+
+#endif  // TGSL_CLIP_COVERAGE_INCLUDED

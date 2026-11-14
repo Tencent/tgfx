@@ -3,6 +3,9 @@
 // the per-vertex coverage inside the ramp band when AA is on, a hard inside step otherwise. A
 // caller may pass a runtime value for aa; ellipseRadii and vertexCoverage are only read when it is
 // set, so a non-AA draw's filler values are inert.
+#ifndef TGSL_ROUND_STROKE_RECT_COVERAGE_INCLUDED
+#define TGSL_ROUND_STROKE_RECT_COVERAGE_INCLUDED
+
 float roundStrokeRectCoverage(vec2 offsets, vec2 ellipseRadii, float vertexCoverage, bool aa) {
   highp vec2 offset = offsets;
   if (!aa) {
@@ -20,3 +23,6 @@ float roundStrokeRectCoverage(vec2 offsets, vec2 ellipseRadii, float vertexCover
   highp float edgeAlpha = clamp(0.5 - test * invlen, 0.0, 1.0);
   return vertexCoverage * edgeAlpha;
 }
+
+
+#endif  // TGSL_ROUND_STROKE_RECT_COVERAGE_INCLUDED

@@ -2,6 +2,9 @@
 // stroke variants. A rounded-rect SDF per pixel, a hard step for the
 // outer edge, and for strokes the inner edge SDF subtracted from it. The strokeEnabled uniform
 // selects the form at runtime, so fill draws skip the inner-edge math without a second variant.
+#ifndef TGSL_RRECT_COVERAGE_INCLUDED
+#define TGSL_RRECT_COVERAGE_INCLUDED
+
 float nonAARRectCoverage(vec2 localCoord, vec4 rectBounds, vec2 radii, vec2 strokeWidth,
                          int strokeEnabled) {
   highp vec2 center = (rectBounds.xy + rectBounds.zw) * 0.5;
@@ -28,3 +31,6 @@ float nonAARRectCoverage(vec2 localCoord, vec4 rectBounds, vec2 radii, vec2 stro
   }
   return outerCoverage * (1.0 - innerCoverage);
 }
+
+
+#endif  // TGSL_RRECT_COVERAGE_INCLUDED

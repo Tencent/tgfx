@@ -40,7 +40,7 @@ inline constexpr Element ChainColorParamsElements[] = {
 };
 
 inline constexpr Module ChainColorParams = {
-    "ChainColorParams",  nullptr, 0, ChainColorParamsElements, 5, false, true,
+    "ChainColorParams",  nullptr, 0, ChainColorParamsElements, 5, false, false,
     /*bareNames=*/false,
 };
 

@@ -6,5 +6,11 @@
 // the geometry coverage belongs to the fragment hook's prologue, the xp and sampling forms to the
 // chain body's; the legacy kernel includes both here in its single include list.
 
+#ifndef TGSL_POINTWISE_INTERFACE_SUPPORT_INCLUDED
+#define TGSL_POINTWISE_INTERFACE_SUPPORT_INCLUDED
+
 #include "pipeline/chain/pointwise_geometry_coverage.inc"
 #include "pipeline/chain/pointwise_xp_support.inc"
+
+
+#endif  // TGSL_POINTWISE_INTERFACE_SUPPORT_INCLUDED

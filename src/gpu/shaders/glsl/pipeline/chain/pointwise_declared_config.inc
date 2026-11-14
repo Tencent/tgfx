@@ -8,6 +8,9 @@
 //   PROFILE  0 = plain leaf-free        3 = gradient leaf-free        6 = noise four-leaf
 //            1 = plain mask             4 = gradient mask
 //            2 = plain four-leaf        5 = gradient four-leaf
+#ifndef TGSL_POINTWISE_DECLARED_CONFIG_INCLUDED
+#define TGSL_POINTWISE_DECLARED_CONFIG_INCLUDED
+
 #if PROFILE == 0 || PROFILE == 3
 #define NTEX 0
 #define HAS_MASK_TEXTURE 0
@@ -40,3 +43,6 @@
 #if RESOURCE_KIND != 0
 #define TGFX_POINTWISE_SOURCE_COORDS 1
 #endif
+
+
+#endif  // TGSL_POINTWISE_DECLARED_CONFIG_INCLUDED

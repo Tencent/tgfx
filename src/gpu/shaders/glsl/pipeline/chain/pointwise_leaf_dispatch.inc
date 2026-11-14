@@ -2,6 +2,9 @@
 // swizzle. This is the text the legacy emitter generated for the chain's InstanceDispatchDecl
 // (emit/StageEmitter.cpp EmitInstanceDispatch); the declared assembly spells it out because its
 // assembler generates no instance dispatches.
+#ifndef TGSL_POINTWISE_LEAF_DISPATCH_INCLUDED
+#define TGSL_POINTWISE_LEAF_DISPATCH_INCLUDED
+
 #if NTEX > 0
 vec4 aotChainRead(int leafIndex, vec2 coord, int readSwizzle) {
   vec4 color;
@@ -17,3 +20,6 @@ vec4 aotChainRead(int leafIndex, vec2 coord, int readSwizzle) {
   return aotReadSwizzle(color, readSwizzle);
 }
 #endif
+
+
+#endif  // TGSL_POINTWISE_LEAF_DISPATCH_INCLUDED

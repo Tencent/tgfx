@@ -14,6 +14,9 @@
 // fill_fragment_main.inc, pointwise_fragment_main.inc and coverage_output.inc, which pre-folds
 // the mask and clip terms for the opaque kernels). This file only fixes the meeting point, once,
 // for every kernel: no pipeline may define the TGFX_XP_* macros itself.
+#ifndef TGSL_COMPOSE_INCLUDED
+#define TGSL_COMPOSE_INCLUDED
+
 #define TGFX_XP_SRC_COLOR (TGFX_COMPOSE_SRC_UNPREMUL * TGFX_COMPOSE_COVERAGE)
 #define TGFX_XP_SRC_UNPREMUL TGFX_COMPOSE_SRC_UNPREMUL
 #define TGFX_XP_COVERAGE TGFX_COMPOSE_COVERAGE
@@ -28,3 +31,6 @@
 #undef TGFX_COMPOSE_DST
 #undef TGFX_COMPOSE_BLENDED
 #endif
+
+
+#endif  // TGSL_COMPOSE_INCLUDED

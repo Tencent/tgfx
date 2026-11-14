@@ -4,6 +4,9 @@
 
 // The number of recipe sets, and the leaf that reads recipe set `recipe` (-1 = unused). Pure
 // selector reads: main() uses them to find the tiled leaves without touching the chainTiled* state.
+#ifndef TGSL_POINTWISE_TILED2_INCLUDED
+#define TGSL_POINTWISE_TILED2_INCLUDED
+
 #define CHAIN_TILED_RECIPES 2
 int chainTiledRecipeLeaf(int recipe) {
   return recipe == 0 ? TiledLeafIndex : TiledLeafIndex2;
@@ -25,3 +28,6 @@ bool chainLoadTiledRecipe(int leafIndex, out bool strict) {
   }
   return false;
 }
+
+
+#endif  // TGSL_POINTWISE_TILED2_INCLUDED

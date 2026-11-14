@@ -3,6 +3,9 @@
 // reads. Every kernel that can apply a ColorSpaceXform operator declares it: the chain
 // interpreter, the YUV tail and the single-operator TexturedEffect kernel. Include inside
 // FragmentUniformBlock.
+#ifndef TGSL_POINTWISE_CS_UNIFORMS_INCLUDED
+#define TGSL_POINTWISE_CS_UNIFORMS_INCLUDED
+
 int ChainCSFlags;
 vec4 ChainSrcTF0;
 vec4 ChainSrcTF1;
@@ -13,3 +16,6 @@ vec4 ChainDstOOTF;
 vec4 ChainDstTF0;
 vec4 ChainDstTF1;
 int ChainDstTFType;
+
+
+#endif  // TGSL_POINTWISE_CS_UNIFORMS_INCLUDED

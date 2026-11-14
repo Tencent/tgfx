@@ -4,6 +4,9 @@
 // assemblies: the legacy kernel (through pointwise_interface_support.inc) and the declared Chain
 // module's fragment hook.
 
+#ifndef TGSL_POINTWISE_GEOMETRY_COVERAGE_INCLUDED
+#define TGSL_POINTWISE_GEOMETRY_COVERAGE_INCLUDED
+
 #if GP_LAYOUT == 1
 #include "geometry/ellipse_coverage.inc"
 #elif GP_LAYOUT == 2
@@ -17,3 +20,6 @@
 #elif GP_LAYOUT == 9
 #include "geometry/hairline_quad_coverage.inc"
 #endif
+
+
+#endif  // TGSL_POINTWISE_GEOMETRY_COVERAGE_INCLUDED

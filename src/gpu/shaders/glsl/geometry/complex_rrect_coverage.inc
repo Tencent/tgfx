@@ -4,6 +4,9 @@
 // coverage, and for strokes the inner arc and inner rect tests are subtracted from it. The
 // strokeEnabled uniform selects the form at runtime, so fill draws skip the inner-edge math without
 // a second variant.
+#ifndef TGSL_COMPLEX_RRECT_COVERAGE_INCLUDED
+#define TGSL_COMPLEX_RRECT_COVERAGE_INCLUDED
+
 float complexRRectCoverage(vec2 localCoord, vec4 rectBounds, vec4 xRadii, vec4 yRadii,
                            vec2 strokeWidth, int strokeEnabled) {
   // Per-corner radii: xR/yR order is [TL, TR, BR, BL]
@@ -44,3 +47,6 @@ float complexRRectCoverage(vec2 localCoord, vec4 rectBounds, vec4 xRadii, vec4 y
   highp float innerCoverage = mix(insideInnerRect, insideInnerEllipse, inAnyCorner);
   return outerCoverage * (1.0 - innerCoverage);
 }
+
+
+#endif  // TGSL_COMPLEX_RRECT_COVERAGE_INCLUDED

@@ -2,6 +2,9 @@
 // and main(). The entry defines chainLoadTiledRecipe() (through its tiling module) and
 // evalResourceSlot() before including this file.
 
+#ifndef TGSL_POINTWISE_FRAGMENT_MAIN_INCLUDED
+#define TGSL_POINTWISE_FRAGMENT_MAIN_INCLUDED
+
 #if NTEX > 0
 // The leaf's sample position before any subset or tiling math. Perspective divide: affine
 // transforms produce z=1.0, making this a no-op (same contract as the QuadTexture family); the
@@ -364,3 +367,6 @@ void chainMain() {
 #include "xp/output_swizzle.inc"
 }
 
+
+
+#endif  // TGSL_POINTWISE_FRAGMENT_MAIN_INCLUDED

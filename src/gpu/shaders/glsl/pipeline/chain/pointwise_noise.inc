@@ -1,6 +1,9 @@
 // Perlin noise source module (OP_PERLIN_NOISE), used by the noise resource kind (RESOURCE_KIND 2)
 // of the chain interpreter. Pairs with the shared UBO declaration. NoiseModeOctaves.w selects
 // which leaf samplers hold the permutation and gradient lookup textures.
+#ifndef TGSL_POINTWISE_NOISE_INCLUDED
+#define TGSL_POINTWISE_NOISE_INCLUDED
+
 #include "pipeline/chain/pointwise_source_coords.inc"
 
 vec4 aotPerlinPermutation(vec2 coord) {
@@ -37,3 +40,6 @@ bool evalNoiseSlot(ivec4 Packed, int dataAt, out vec4 value) {
                          NoiseModeOctaves.y, NoiseModeOctaves.z);
   return true;
 }
+
+
+#endif  // TGSL_POINTWISE_NOISE_INCLUDED

@@ -6,6 +6,9 @@
 // The recipe of the tiled leaf being fetched. chainLeafFetch loads it from the first (Tiled*) or
 // second (Tiled*2) uniform set before calling the helpers, so the coordinate mapping, the seam
 // blend and the border post-pass all read the same leaf's recipe.
+#ifndef TGSL_POINTWISE_TILED_SAMPLING_INCLUDED
+#define TGSL_POINTWISE_TILED_SAMPLING_INCLUDED
+
 int chainTiledModeX;
 int chainTiledModeY;
 highp vec4 chainTiledSubset;
@@ -71,3 +74,6 @@ vec4 tiledSeamBlend(int leafIndex, vec4 texColor, vec2 subsetCoord, vec2 clamped
 #undef Subset
 #undef Clamp
 #undef Dimension
+
+
+#endif  // TGSL_POINTWISE_TILED_SAMPLING_INCLUDED

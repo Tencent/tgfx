@@ -2,6 +2,9 @@
 // coordinate transform of the kernel's gradient or noise source. The vertex stage writes it when
 // built with TGFX_POINTWISE_SOURCE_COORDS (the legacy vertex entry). Included by the source modules,
 // so it is declared once whichever source the kernel carries.
+#ifndef TGSL_POINTWISE_SOURCE_COORDS_INCLUDED
+#define TGSL_POINTWISE_SOURCE_COORDS_INCLUDED
+
 #ifndef TGFX_POINTWISE_SOURCE_COORDS_INC
 #define TGFX_POINTWISE_SOURCE_COORDS_INC
 // Location 7 sits past every layout's leaf coordinates except the ComplexEllipse ones, which
@@ -15,3 +18,6 @@
 layout(location = CHAIN_SOURCE_COORDS_LOC) in vec3 SourceCoords;
 #endif
 #endif
+
+
+#endif  // TGSL_POINTWISE_SOURCE_COORDS_INCLUDED
