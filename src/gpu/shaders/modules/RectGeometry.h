@@ -28,12 +28,17 @@ namespace tgfx {
 inline constexpr Element RectGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "Position"},
     {Element::Kind::Attribute, ShaderType::Float, "Coverage"},
+    // The per-vertex color the chain interpreter reads (its common-color select). The runtime
+    // layout always provides the channel; the declared families that do not read it simply carry
+    // an unused input, which costs nothing.
+    {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
     {Element::Kind::VertexParam, ShaderType::Mat3, "Matrix"},
     {Element::Kind::Varying, ShaderType::Float, "Coverage"},
+    {Element::Kind::Varying, ShaderType::Float4, "Color"},
     {Element::Kind::Param, ShaderType::Float4, "Color"},
 };
 
-inline constexpr Module RectGeometry = {"RectGeometry", nullptr, 0, RectGeometryElements, 5,
+inline constexpr Module RectGeometry = {"RectGeometry", nullptr, 0, RectGeometryElements, 7,
                                         true,           true};
 
 }  // namespace tgfx

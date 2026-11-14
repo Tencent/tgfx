@@ -28,7 +28,11 @@ namespace tgfx {
 inline constexpr Element HairlineLineGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "Position"},
     {Element::Kind::Attribute, ShaderType::Float, "InEdge"},
+    // The per-vertex color the chain interpreter reads; the declared hairline family carries the
+    // input unused (the runtime layout always provides the channel).
+    {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
     {Element::Kind::Varying, ShaderType::Float, "Edge"},
+    {Element::Kind::Varying, ShaderType::Float4, "Color"},
     {Element::Kind::VertexParam, ShaderType::Mat3, "Matrix"},
     {Element::Kind::Param, ShaderType::Float4, "Color"},
     {Element::Kind::Param, ShaderType::Float, "Coverage"},
@@ -43,6 +47,6 @@ inline constexpr Element HairlineLineGeometryElements[] = {
 };
 
 inline constexpr Module HairlineLineGeometry = {
-    "HairlineLineGeometry", nullptr, 0, HairlineLineGeometryElements, 14, true, true};
+    "HairlineLineGeometry", nullptr, 0, HairlineLineGeometryElements, 16, true, true};
 
 }  // namespace tgfx
