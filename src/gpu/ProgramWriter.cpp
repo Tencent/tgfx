@@ -274,7 +274,6 @@ void WriteChainStrokeGeometry(SlotWriter* /*writer*/, SlotWriter* chainWriter,
 /// The per-pixel edge-AA hairline line and quad: a constant coverage factor plus the AA switch,
 /// with the vertex stage projecting through the view matrix.
 template <const Module& G>
-template <const Module& G>
 void WriteChainHairlineGeometry(SlotWriter* writer, SlotWriter* chainWriter,
                                 SlotWriter* colorParams, const AOTGeometryParameters& p,
                                 FragmentProcessor::CoordTransformIter* transformIter) {
@@ -316,8 +315,8 @@ void WriteChainGeometryUniforms(SlotWriter* geometryWriter, SlotWriter* chainWri
       WriteChainStrokeGeometry(geometryWriter, chainWriter, colorParams, p, transformIter);
       break;
     case 4:
-      WriteChainHairlineGeometry<ChainHairlineGeometry>(geometryWriter, chainWriter, p,
-                                                        transformIter);
+      WriteChainHairlineGeometry<HairlineLineGeometry>(geometryWriter, chainWriter, colorParams, p,
+                                                       transformIter);
       break;
     case 5:
       WriteChainStrokeGeometry(geometryWriter, chainWriter, colorParams, p, transformIter);
@@ -326,8 +325,7 @@ void WriteChainGeometryUniforms(SlotWriter* geometryWriter, SlotWriter* chainWri
       WriteChainStrokeGeometry(geometryWriter, chainWriter, colorParams, p, transformIter);
       break;
     case 7:
-      WriteChainStrokeGeometry<ChainComplexRRectGeometry>(geometryWriter, chainWriter, p,
-                                                          transformIter);
+      WriteChainStrokeGeometry(geometryWriter, chainWriter, colorParams, p, transformIter);
       break;
     case 8:
       WriteChainHairlineGeometry<HairlineQuadGeometry>(geometryWriter, chainWriter, colorParams, p,
