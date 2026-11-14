@@ -109,6 +109,15 @@ vec4 chainLeafTex[4];
 // it like the rect layouts' vCoverage varying; 1.0 keeps the define valid for the rect variants.
 highp float gpPixelCoverage = 1.0;
 
+// The declared geometries spell their varyings with the module prefix; the body reads the bare
+// names. One alias block per geometry keeps this text geometry-agnostic: the selectors are the
+// variant's geometry index, and each block answers only for the names its geometry declares.
+#if CHAIN_GEOMETRY == 3
+#define vColor EllipseGeometry_vColor
+#define vOffsets EllipseGeometry_vOffsets
+#define vRadii EllipseGeometry_vRadii
+#endif
+
 // Geometry color source: the per-vertex color attribute, or the exact Color uniform for
 // common-color draws (the broadcast into the unconditional attribute is 8-bit quantized). The
 // selection is a runtime uniform, so a single variant serves both sources.

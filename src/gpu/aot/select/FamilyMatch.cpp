@@ -869,10 +869,15 @@ bool MatchChain(const ProgramInfo* info, const DrawShape& /*shape*/, FamilyMatch
     return false;
   }
   result->chain = program;
-  return EncodeMatchValues(ChainIndex, ChainGeometryOfCell(cell),
-                           {static_cast<uint8_t>(cell.subset), ChainProfileOfCell(cell),
-                            static_cast<uint8_t>(cell.gpLayout), static_cast<uint8_t>(cell.xp)},
-                           &result->variant);
+  const auto geometry = ChainGeometryOfCell(cell);
+  std::vector<uint8_t> values = {};
+  if (Families()[ChainIndex].geometries[geometry]->dimCount != 0) {
+    values.push_back(static_cast<uint8_t>(cell.subset));
+  }
+  values.push_back(ChainProfileOfCell(cell));
+  values.push_back(static_cast<uint8_t>(cell.gpLayout));
+  values.push_back(static_cast<uint8_t>(cell.xp));
+  return EncodeMatchValues(ChainIndex, geometry, values, &result->variant);
 }
 
 }  // namespace
@@ -976,9 +981,15 @@ std::optional<Variant> MatchChainVariant(const AOTProgram& program, const Progra
   if (!DeriveChainCell(program, info, &cell)) {
     return std::nullopt;
   }
-  return EncodeVariant(ChainIndex, ChainGeometryOfCell(cell),
-                       {static_cast<uint8_t>(cell.subset), ChainProfileOfCell(cell),
-                        static_cast<uint8_t>(cell.gpLayout), static_cast<uint8_t>(cell.xp)});
+  const auto geometry = ChainGeometryOfCell(cell);
+  std::vector<uint8_t> values = {};
+  if (Families()[ChainIndex].geometries[geometry]->dimCount != 0) {
+    values.push_back(static_cast<uint8_t>(cell.subset));
+  }
+  values.push_back(ChainProfileOfCell(cell));
+  values.push_back(static_cast<uint8_t>(cell.gpLayout));
+  values.push_back(static_cast<uint8_t>(cell.xp));
+  return EncodeVariant(ChainIndex, geometry, values);
 }
 
 namespace {

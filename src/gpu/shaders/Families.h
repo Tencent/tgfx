@@ -269,9 +269,11 @@ inline constexpr FamilyModule GlassRefractionQuadBody[] = {&GlassRefraction, &Gl
 /// The body owns the fragment output (it runs the XferProcessor's blend pass inside its own
 /// evaluation), so the Xfer module contributes its interface but not its hook.
 inline constexpr const Module* ChainGeometries[] = {
-    &ChainRectGeometry,    &ChainRectUVGeometry,       &ChainAtlasGeometry,
-    &ChainEllipseGeometry, &ChainHairlineGeometry,     &ChainComplexGeometry,
-    &ChainRRectGeometry,   &ChainComplexRRectGeometry, &ChainHairlineQuadGeometry};
+    &ChainRectGeometry, &ChainRectUVGeometry, &ChainAtlasGeometry,
+    // The ellipse reuses the declared geometry: its interface and vertex math are identical, and
+    // the chain body addresses the prefixed varyings through the CHAIN_GEOMETRY alias block.
+    &EllipseGeometry, &ChainHairlineGeometry, &ChainComplexGeometry, &ChainRRectGeometry,
+    &ChainComplexRRectGeometry, &ChainHairlineQuadGeometry};
 
 // The chain family's body order is the slot order: Frame(0), geometry(1), Chain(2),
 // ChainColorParams(3, no dims), Xfer(4). Readers that address a module by slot must use these
@@ -283,10 +285,11 @@ inline constexpr FamilyModule ChainBody[] = {&Chain, &ChainColorParams};
 /// with the legacy permutation set, so this function cannot drift from the old matcher's reachable
 /// set without failing the build.
 inline bool ChainVariantAllowed(const Variant& variant, const Family& family) {
-  // Every geometry declares the same SUBSET dim so the family's ordinals decode against one flat
-  // domain; each geometry pins the dim it does not use to 0 here. The stroke form is the runtime
-  // StrokeEnabled uniform, so it is no dimension any more.
-  const uint8_t subset = DimValueOf(family, variant, 1, 0);
+  // A geometry that declares no dim (a declared module reused as-is) has no SUBSET slot: its
+  // variants carry the body dims first, and the subset is pinned to 0 here. The stroke form is the
+  // runtime StrokeEnabled uniform, so it is no dimension any more.
+  const bool hasSubsetDim = family.geometries[variant.geometry]->dimCount != 0;
+  const uint8_t subset = hasSubsetDim ? DimValueOf(family, variant, 1, 0) : 0;
   const uint8_t profile = DimValueOf(family, variant, 2, 0);
   // The layout class the chain body branches on (GP_LAYOUT): one value per geometry, the legacy
   // kernel's own numbering (0 rect, 1 ellipse, 2 hairline, 3 complex-ellipse, 5 non-AA rrect,
