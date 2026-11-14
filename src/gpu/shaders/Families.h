@@ -25,6 +25,7 @@
 #include "gpu/shaders/modules/BlurSourceGeometry.h"
 #include "gpu/shaders/modules/Chain.h"
 #include "gpu/shaders/modules/ChainAtlasGeometry.h"
+#include "gpu/shaders/modules/ChainColorParams.h"
 #include "gpu/shaders/modules/ChainComplexGeometry.h"
 #include "gpu/shaders/modules/ChainComplexRRectGeometry.h"
 #include "gpu/shaders/modules/ChainEllipseGeometry.h"
@@ -272,7 +273,7 @@ inline constexpr const Module* ChainGeometries[] = {
     &ChainEllipseGeometry, &ChainHairlineGeometry,     &ChainComplexGeometry,
     &ChainRRectGeometry,   &ChainComplexRRectGeometry, &ChainHairlineQuadGeometry};
 
-inline constexpr FamilyModule ChainBody[] = {&Chain};
+inline constexpr FamilyModule ChainBody[] = {&Chain, &ChainColorParams};
 
 /// The reachable-set filter, restated over the new dimensions: the legacy Compose rules in terms
 /// of (geometry class, SUBSET/STROKE, PROFILE). The equivalence test pairs every enumerated variant
@@ -345,7 +346,7 @@ inline constexpr Family FamilyTableStorage[] = {
     {"GlassUDFTentBlur", GlassUDFTentBlurGeometries, 1, GlassUDFTentBlurBody, 3},
     {"GlassRefraction", GlassRefractionGeometries, 1, GlassRefractionBody, 2},
     {"GlassRefractionQuad", GlassRefractionQuadGeometries, 1, GlassRefractionQuadBody, 3},
-    {"Chain", ChainGeometries, 9, ChainBody, 1, ChainVariantAllowed, /*bodyOwnsOutput=*/true,
+    {"Chain", ChainGeometries, 9, ChainBody, 2, ChainVariantAllowed, /*bodyOwnsOutput=*/true,
      /*fallback=*/true, /*textureReads=*/ShaderTextureReadSwizzle},
 };
 

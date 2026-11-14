@@ -47,6 +47,7 @@
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/modules/Chain.h"
+#include "gpu/shaders/modules/ChainColorParams.h"
 #include "gpu/shaders/modules/Frame.h"
 #include "gpu/shaders/modules/Xfer.h"
 #include "tgfx/gpu/Context.h"
@@ -352,6 +353,8 @@ ChainProgramWriter::ChainProgramWriter(Variant variant)
   for (uint8_t slot = 0; slot < modules.count; ++slot) {
     if (modules.list[slot] == &Chain) {
       chainSlot = slot;
+    } else if (modules.list[slot] == &ChainColorParams) {
+      colorParamsSlot = slot;
     } else if (modules.list[slot] == &Xfer) {
       xferSlot = slot;
     }
@@ -394,6 +397,22 @@ void ChainProgramWriter::writeUniforms(const ProgramInfo& info, UniformData* ver
   frameWriter.set(RTAdjust, GetRTAdjustArray(info.getRenderTarget()));
   SlotWriter chainWriter(layout, Chain, chainSlot, &buffer);
   SlotWriter geometryWriter(layout, *modules.list[geometrySlot], geometrySlot, &buffer);
+  // The chain's geometry-facing runtime switches: one write for every variant, from the geometry
+  // parameters the layout already carries, regardless of which geometry module is in the slot.
+  SlotWriter colorParamsWriter(layout, ChainColorParams, colorParamsSlot, &buffer);
+  constexpr uint8_t GeomColor = UniformElementIndexOf(ChainColorParams, "Color");
+  constexpr uint8_t GeomHasCommonColor = UniformElementIndexOf(ChainColorParams, "HasCommonColor");
+  constexpr uint8_t GeomStrokeEnabled = UniformElementIndexOf(ChainColorParams, "StrokeEnabled");
+  constexpr uint8_t GeomAAEnabled = UniformElementIndexOf(ChainColorParams, "AAEnabled");
+  constexpr uint8_t GeomCoverage = UniformElementIndexOf(ChainColorParams, "Coverage");
+  {
+    const auto& p = info.getGeometryLayout().parameters;
+    colorParamsWriter.set(GeomColor, p.commonColor);
+    colorParamsWriter.set(GeomHasCommonColor, static_cast<int32_t>(p.hasCommonColor ? 1 : 0));
+    colorParamsWriter.set(GeomStrokeEnabled, static_cast<int32_t>(p.isStroke ? 1 : 0));
+    colorParamsWriter.set(GeomAAEnabled, static_cast<int32_t>(p.aaType == AAType::None ? 0 : 1));
+    colorParamsWriter.set(GeomCoverage, p.coverage);
+  }
   WriteChainGeometryUniforms(&geometryWriter, &chainWriter, info.getGeometryLayout().parameters,
                              variant.geometry, program->coordSourceMask, &coordTransformIter);
   // The whole chain block is addressed through the derived layout: the slot pools, the shape
