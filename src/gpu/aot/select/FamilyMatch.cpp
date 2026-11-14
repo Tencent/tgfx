@@ -101,6 +101,19 @@ bool EncodeMatch(uint16_t family, uint8_t geometry, const std::vector<uint8_t>& 
   return true;
 }
 
+/// Encodes the matched family's variant from its declaration: the rule names the family and the
+/// geometry, and each free dim reads its value from the draw's facts. False means the pair is not
+/// declaratively composable yet (a dim still Unspecified) or the composed variant is out of range.
+bool EncodeMatchFromFacts(uint16_t family, uint8_t geometry, const DrawShape& shape,
+                          Variant* variant) {
+  auto composed = ComposeVariantFromFacts(family, geometry, shape);
+  if (!composed.has_value()) {
+    return false;
+  }
+  *variant = *composed;
+  return true;
+}
+
 namespace {
 
 /// The SolidColor family's rule, carried over from the former SolidColorFillShader: the
@@ -258,12 +271,10 @@ bool MatchRRect(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatch
     return false;
   }
   // Slot layout: Frame(0), RRectGeometry(1), TiledTexture(2: FULL pinned, PRESENT), AnalyticClip(3),
-  // Xfer(4: HAS_XP). The ordinal encodes [PRESENT, HAS_XP]; the stroke form is the runtime
-  // StrokeEnabled uniform, so it is no dimension.
-  const uint8_t present = tiledLeaf != nullptr ? 1 : 0;
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  // The free values in flattened order: [PRESENT, HAS_XP] (FULL is pinned to 0).
-  if (!EncodeMatch(RRectIndex, 0, {present, hasXp}, shape, &result->variant)) {
+  // Xfer(4: HAS_XP). PRESENT and HAS_XP read their values from the declaration's facts; the stroke
+  // form is the runtime StrokeEnabled uniform, so it is no dimension.
+  result->tiledLeaf = tiledLeaf;
+  if (!EncodeMatchFromFacts(RRectIndex, 0, shape, &result->variant)) {
     return false;
   }
   result->tiledLeaf = tiledLeaf;
@@ -282,9 +293,7 @@ bool MatchMesh(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchR
       shape.xpType() < XP_NONE) {
     return false;
   }
-  const uint8_t texCoords = shape.geometry->hasTexCoords ? 1 : 0;
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(MeshIndex, 0, {texCoords, hasXp}, shape, &result->variant);
+  return EncodeMatchFromFacts(MeshIndex, 0, shape, &result->variant);
 }
 
 /// The ShapeInstanced family's rule, carried over from the former ShapeInstancedFillShader: the
@@ -352,11 +361,9 @@ bool MatchShapeInstancedTextureCoverage(const ProgramInfo* /*info*/, const DrawS
       coverage->textureProxy->getTextureView() == nullptr) {
     return false;
   }
-  const uint8_t gradientValue = gradient != nullptr ? 1 : 0;
-  // The free values in flattened order: [VERTEX_COLOR = 0, GRADIENT, HAS_XP = 0] (the allowed
-  // filter drops both non-zero ends).
-  if (!EncodeMatch(ShapeInstancedTextureCoverageIndex, 0, {0, gradientValue, 0}, shape,
-                   &result->variant)) {
+  // The dims read their values from the declaration: VERTEX_COLOR and HAS_XP are constant 0 for
+  // this family (the allowed filter keeps them at 0), GRADIENT reads the gradient-source fact.
+  if (!EncodeMatchFromFacts(ShapeInstancedTextureCoverageIndex, 0, shape, &result->variant)) {
     return false;
   }
   result->maskLeaf = coverage;
@@ -593,9 +600,7 @@ bool MatchRoundStrokeRect(const ProgramInfo* /*info*/, const DrawShape& shape,
   if (shape.geometry->hasUVPerspective || shape.xpType() < XP_NONE) {
     return false;
   }
-  const uint8_t uvMatrix = shape.geometry->hasUVMatrix ? 1 : 0;
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  return EncodeMatch(RoundStrokeRectIndex, 0, {uvMatrix, hasXp}, shape, &result->variant);
+  return EncodeMatchFromFacts(RoundStrokeRectIndex, 0, shape, &result->variant);
 }
 
 /// The QuadTexture family's rule, carried over from the former QuadTextureFillShader: the
@@ -609,15 +614,14 @@ bool MatchQuadTexture(const ProgramInfo* /*info*/, const DrawShape& shape,
       shape.xpType() < XP_NONE || shape.ir == nullptr) {
     return false;
   }
-  uint8_t present = 0;
   if (shape.fragmentCount != 1) {
+    // Only the coverage forms the family serves may ride the extra term; the local mask is the one
+    // that lifts the device-mask dim (its PRESENT fact reads the coverage classification).
     switch (*shape.coverage) {
       case Coverage::AARect:
       case Coverage::RRect:
       case Coverage::DeviceMask:
-        break;
       case Coverage::LocalMask:
-        present = 1;
         break;
       default:
         return false;
@@ -632,13 +636,10 @@ bool MatchQuadTexture(const ProgramInfo* /*info*/, const DrawShape& shape,
       (shape.geometry->hasUVPerspective || tail.leaf->hasPerspective)) {
     return false;
   }
-  const uint8_t uvCoord = shape.geometry->hasUVMatrix ? 0 : 1;
-  const uint8_t subset = shape.geometry->hasSubset ? 1 : 0;
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  // The free values in flattened order: [UV_COORD, SUBSET (geometry), SUBSET (texture), PRESENT,
-  // HAS_XP] — the geometry's and the texture's SUBSET move together (the allowed rule).
-  if (!EncodeMatch(QuadTextureIndex, 0, {uvCoord, subset, subset, present, hasXp}, shape,
-                   &result->variant)) {
+  // The dims read their values from the declaration: the geometry's and the texture's SUBSET are
+  // two separate declarations that happen to read the same fact (the allowed rule keeps them
+  // equal).
+  if (!EncodeMatchFromFacts(QuadTextureIndex, 0, shape, &result->variant)) {
     return false;
   }
   result->tiledLeaf = tail.leaf;
@@ -690,15 +691,10 @@ bool MatchYUVTexture(const ProgramInfo* info, const DrawShape& shape, FamilyMatc
       return false;
     }
   }
-  const uint8_t uvCoord = shape.geometry->hasUVMatrix ? 0 : 1;
-  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
   // The writer's data source: the multi-plane leaf the tail is built over (the same field the
   // chain family carries its leaf in).
   result->tiledLeaf = tail.leaf;
-  // The free values in flattened order: [UV_COORD, SUBSET = 0, FORMAT, HAS_XP] — SUBSET is free in
-  // the geometry but the allowed filter keeps its 0 half only (the YUV path never carries one).
-  return EncodeMatch(YUVTextureIndex, 0, {uvCoord, 0, static_cast<uint8_t>(format), hasXp}, shape,
-                     &result->variant);
+  return EncodeMatchFromFacts(YUVTextureIndex, 0, shape, &result->variant);
 }
 
 /// The AtlasText family's rule, carried over from the former AtlasTextFillShader: the atlas
