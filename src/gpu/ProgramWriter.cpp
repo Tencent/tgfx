@@ -255,19 +255,20 @@ void WriteChainAtlasGeometry(SlotWriter* writer, SlotWriter* chainWriter,
 
 /// The per-pixel coverage rounded geometries (the ellipse, the complex ellipse and the two non-AA
 /// rounded rects): the paint and the runtime stroke switch are all they carry.
-template <const Module& G>
-void WriteChainStrokeGeometry(SlotWriter* writer, SlotWriter* chainWriter,
-                              const AOTGeometryParameters& p,
+/// The ellipse and rounded-rect classes carry no geometry-specific uniforms beyond the coordinate
+/// transforms: their color switches live in ChainColorParams, one write for every geometry.
+void WriteChainStrokeGeometry(SlotWriter* /*writer*/, SlotWriter* chainWriter,
+                              SlotWriter* colorParams, const AOTGeometryParameters& p,
                               FragmentProcessor::CoordTransformIter* transformIter) {
-  constexpr uint8_t Color = UniformElementIndexOf(G, "Color");
-  constexpr uint8_t HasCommonColor = UniformElementIndexOf(G, "HasCommonColor");
-  constexpr uint8_t StrokeEnabled = UniformElementIndexOf(G, "StrokeEnabled");
+  constexpr uint8_t Color = UniformElementIndexOf(ChainColorParams, "Color");
+  constexpr uint8_t HasCommonColor = UniformElementIndexOf(ChainColorParams, "HasCommonColor");
+  constexpr uint8_t StrokeEnabled = UniformElementIndexOf(ChainColorParams, "StrokeEnabled");
   WriteChainCoordTransforms(chainWriter, Matrix::I(), transformIter);
   if (p.hasCommonColor) {
-    writer->set(Color, p.commonColor);
+    colorParams->set(Color, p.commonColor);
   }
-  writer->set(HasCommonColor, p.hasCommonColor ? 1 : 0);
-  writer->set(StrokeEnabled, p.isStroke ? 1 : 0);
+  colorParams->set(HasCommonColor, p.hasCommonColor ? 1 : 0);
+  colorParams->set(StrokeEnabled, p.isStroke ? 1 : 0);
 }
 
 /// The per-pixel edge-AA hairline line and quad: a constant coverage factor plus the AA switch,
@@ -295,8 +296,8 @@ void WriteChainHairlineGeometry(SlotWriter* writer, SlotWriter* chainWriter,
 /// declaration the values are written into, and the processor kind selects the values (the same
 /// rect module serves the default, quad-per-edge-AA and mesh processors).
 void WriteChainGeometryUniforms(SlotWriter* geometryWriter, SlotWriter* chainWriter,
-                                const AOTGeometryParameters& p, uint8_t geometryIndex,
-                                uint32_t coordSourceMask,
+                                SlotWriter* colorParams, const AOTGeometryParameters& p,
+                                uint8_t geometryIndex, uint32_t coordSourceMask,
                                 FragmentProcessor::CoordTransformIter* transformIter) {
   switch (geometryIndex) {
     case 0:
@@ -309,17 +310,17 @@ void WriteChainGeometryUniforms(SlotWriter* geometryWriter, SlotWriter* chainWri
       WriteChainAtlasGeometry(geometryWriter, chainWriter, p, coordSourceMask, transformIter);
       break;
     case 3:
-      WriteChainStrokeGeometry<ChainEllipseGeometry>(geometryWriter, chainWriter, p, transformIter);
+      WriteChainStrokeGeometry(geometryWriter, chainWriter, colorParams, p, transformIter);
       break;
     case 4:
       WriteChainHairlineGeometry<ChainHairlineGeometry>(geometryWriter, chainWriter, p,
                                                         transformIter);
       break;
     case 5:
-      WriteChainStrokeGeometry<ChainComplexGeometry>(geometryWriter, chainWriter, p, transformIter);
+      WriteChainStrokeGeometry(geometryWriter, chainWriter, colorParams, p, transformIter);
       break;
     case 6:
-      WriteChainStrokeGeometry<ChainRRectGeometry>(geometryWriter, chainWriter, p, transformIter);
+      WriteChainStrokeGeometry(geometryWriter, chainWriter, colorParams, p, transformIter);
       break;
     case 7:
       WriteChainStrokeGeometry<ChainComplexRRectGeometry>(geometryWriter, chainWriter, p,
@@ -413,8 +414,9 @@ void ChainProgramWriter::writeUniforms(const ProgramInfo& info, UniformData* ver
     colorParamsWriter.set(GeomAAEnabled, static_cast<int32_t>(p.aaType == AAType::None ? 0 : 1));
     colorParamsWriter.set(GeomCoverage, p.coverage);
   }
-  WriteChainGeometryUniforms(&geometryWriter, &chainWriter, info.getGeometryLayout().parameters,
-                             variant.geometry, program->coordSourceMask, &coordTransformIter);
+  WriteChainGeometryUniforms(&geometryWriter, &chainWriter, &colorParamsWriter,
+                             info.getGeometryLayout().parameters, variant.geometry,
+                             program->coordSourceMask, &coordTransformIter);
   // The whole chain block is addressed through the derived layout: the slot pools, the shape
   // selectors and the resource blocks all resolve their element's field once per program. The
   // draw's whole uniform content comes from the compiled program — the root block plus every
