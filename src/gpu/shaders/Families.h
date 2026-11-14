@@ -273,6 +273,9 @@ inline constexpr const Module* ChainGeometries[] = {
     &ChainEllipseGeometry, &ChainHairlineGeometry,     &ChainComplexGeometry,
     &ChainRRectGeometry,   &ChainComplexRRectGeometry, &ChainHairlineQuadGeometry};
 
+// The chain family's body order is the slot order: Frame(0), geometry(1), Chain(2),
+// ChainColorParams(3, no dims), Xfer(4). Readers that address a module by slot must use these
+// indices -- the parameter module sits between the interpreter and the implicit Xfer.
 inline constexpr FamilyModule ChainBody[] = {&Chain, &ChainColorParams};
 
 /// The reachable-set filter, restated over the new dimensions: the legacy Compose rules in terms

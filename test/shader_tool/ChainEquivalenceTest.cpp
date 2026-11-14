@@ -101,7 +101,7 @@ TEST(ChainEquivalenceTest, DeclaredVariantsBijectTheLegacyReachableSet) {
   for (const auto& variant : variants) {
     const uint8_t subset = DimValueOf(family, variant, 1, 0);
     const uint8_t profile = DimValueOf(family, variant, 2, 0);
-    const uint8_t xp = DimValueOf(family, variant, 3, 0);
+    const uint8_t xp = DimValueOf(family, variant, 4, 0);
     int gpLayout = 0;
     int coverage = 1;
     int uvCoord = 0;

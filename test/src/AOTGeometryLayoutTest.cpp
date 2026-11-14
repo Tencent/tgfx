@@ -63,7 +63,7 @@ bool DecodeChainCell(const Family& family, const Variant& variant, ChainLegacyCe
   const uint8_t subset = DimValueOf(family, variant, 1, 0);
   const uint8_t profile = DimValueOf(family, variant, 2, 0);
   cell->subset = subset;
-  cell->xp = DimValueOf(family, variant, 3, 0);
+  cell->xp = DimValueOf(family, variant, 4, 0);
   cell->coverage = 1;
   cell->uvCoord = 0;
   switch (variant.geometry) {
