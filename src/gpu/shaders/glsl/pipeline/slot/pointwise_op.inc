@@ -8,7 +8,7 @@
 // no operator FP is composed on top of it, while the same slot record absorbs the composed case.
 //
 // One body serves every consumer: the chain interpreter calls it per slot, the YUV tail's loop
-// calls it with the tail's slot index, and the single-operator TexturedEffect kernel calls it with
+// calls it with the tail's slot index, and the single-operator slot kernel calls it with
 // slot 0. The FragmentUniformBlock must therefore declare the chain slot arrays (a capacity-1
 // include for the single-operator kernel) and the shared ChainCS* block. The OP_* constants come
 // from the shared op table; its guard makes the repeated per-slot inclusion of this file a no-op

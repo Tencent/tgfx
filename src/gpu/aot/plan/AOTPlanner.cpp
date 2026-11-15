@@ -383,15 +383,15 @@ bool AOTPlanner::PlanRequiresTask(const Plan& plan) {
   return plan.passes.size() != 1;
 }
 
-AOTRecordRoute AOTPlanner::RouteRecordPlan(const Plan& plan,
-                                           const std::vector<AOTCoverageTerm>& coverageTerms,
-                                           BlendMode blendMode) {
+bool AOTPlanner::RouteRecordPlan(const Plan& plan,
+                                 const std::vector<AOTCoverageTerm>& coverageTerms,
+                                 BlendMode blendMode) {
   // A single-pass plan never reaches here: the record-time route asks PlanFusedPass instead and
   // serves that pass in place, so every plan this decides on needs a task.
   if (PlanRequiresTask(plan) && TaskCarriesCoverage(plan, coverageTerms, blendMode)) {
-    return AOTRecordRoute::Task;
+    return true;
   }
-  return AOTRecordRoute::Plain;
+  return false;
 }
 
 bool AOTPlanner::Validate(const AOTEffectGraph& graph, const Plan& plan,

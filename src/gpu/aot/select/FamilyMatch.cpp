@@ -853,6 +853,24 @@ bool DeriveChainCell(const AOTProgram& program, const ProgramInfo* info, ChainCe
 /// slot budget and op support), not a shape predicate, so the rule compiles the draw's program and
 /// derives every dimension from the compiled program rather than guessing from the shape, which is
 /// what keeps the matcher from accepting shapes its writer could not serve.
+namespace {
+
+/// The chain cell's declared dimension values, in the family's dimension order. Both entries that
+/// derive a chain variant (the matcher's own and the cache-before-match one) read them from here,
+/// so the order cannot drift between them.
+std::vector<uint8_t> ChainCellValues(const ChainCell& cell, uint8_t geometry) {
+  std::vector<uint8_t> values = {};
+  if (Families()[ChainIndex].geometries[geometry]->dimCount != 0) {
+    values.push_back(static_cast<uint8_t>(cell.subset));
+  }
+  values.push_back(ChainProfileOfCell(cell));
+  values.push_back(static_cast<uint8_t>(cell.gpLayout));
+  values.push_back(static_cast<uint8_t>(cell.xp));
+  return values;
+}
+
+}  // namespace
+
 bool MatchChain(const ProgramInfo* info, const DrawShape& /*shape*/, FamilyMatchResult* result) {
   if (info == nullptr) {
     // The exclusivity test matches shapes without a program; the interpreter's acceptance needs
@@ -869,13 +887,7 @@ bool MatchChain(const ProgramInfo* info, const DrawShape& /*shape*/, FamilyMatch
   }
   result->chain = program;
   const auto geometry = ChainGeometryOfCell(cell);
-  std::vector<uint8_t> values = {};
-  if (Families()[ChainIndex].geometries[geometry]->dimCount != 0) {
-    values.push_back(static_cast<uint8_t>(cell.subset));
-  }
-  values.push_back(ChainProfileOfCell(cell));
-  values.push_back(static_cast<uint8_t>(cell.gpLayout));
-  values.push_back(static_cast<uint8_t>(cell.xp));
+  std::vector<uint8_t> values = ChainCellValues(cell, geometry);
   return EncodeMatchValues(ChainIndex, geometry, values, &result->variant);
 }
 
@@ -981,13 +993,7 @@ std::optional<Variant> MatchChainVariant(const AOTProgram& program, const Progra
     return std::nullopt;
   }
   const auto geometry = ChainGeometryOfCell(cell);
-  std::vector<uint8_t> values = {};
-  if (Families()[ChainIndex].geometries[geometry]->dimCount != 0) {
-    values.push_back(static_cast<uint8_t>(cell.subset));
-  }
-  values.push_back(ChainProfileOfCell(cell));
-  values.push_back(static_cast<uint8_t>(cell.gpLayout));
-  values.push_back(static_cast<uint8_t>(cell.xp));
+  std::vector<uint8_t> values = ChainCellValues(cell, geometry);
   return EncodeVariant(ChainIndex, geometry, values);
 }
 

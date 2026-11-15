@@ -36,7 +36,6 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/ir/DrawIR.h"
-#include "gpu/aot/ir/Lowering.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/aot/select/ProgramSelection.h"

@@ -1,7 +1,7 @@
 // The program-level color-space block: one block per program (at most one ColorSpaceXform
 // operator per chain/tail/operator slot), the fields the shared PM_APPLY_COLOR_SPACE_XFORM math
 // reads. Every kernel that can apply a ColorSpaceXform operator declares it: the chain
-// interpreter, the YUV tail and the single-operator TexturedEffect kernel. Include inside
+// interpreter, the YUV tail and the single-operator slot kernel. Include inside
 // FragmentUniformBlock.
 #ifndef TGSL_POINTWISE_CS_UNIFORMS_INCLUDED
 #define TGSL_POINTWISE_CS_UNIFORMS_INCLUDED

@@ -34,7 +34,6 @@ class RenderTargetProxy;
 
 /// The record-time route one plan takes: run as a plan task, or left to the plain lookup at
 /// prepare (a graph one fused pass can carry never plans at all — it is served in place).
-enum class AOTRecordRoute : uint8_t { Plain, Task };
 
 /**
  * The record-time route's one planner: the decomposition, the routing predicates, the pass
@@ -92,9 +91,8 @@ class AOTPlanner {
    * and Src blend; the coverage gate then admits every task-requiring plan, as the fill route
    * always did.
    */
-  static AOTRecordRoute RouteRecordPlan(const Plan& plan,
-                                        const std::vector<AOTCoverageTerm>& coverageTerms,
-                                        BlendMode blendMode);
+  static bool RouteRecordPlan(const Plan& plan, const std::vector<AOTCoverageTerm>& coverageTerms,
+                              BlendMode blendMode);
 
   /**
    * The plan type's own well-formedness predicate — the same check Build runs first. Either one

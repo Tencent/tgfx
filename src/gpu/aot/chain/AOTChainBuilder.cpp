@@ -423,21 +423,6 @@ bool AOTChainBuilder::ValidateSlots(const std::vector<AOTChainSlot>& slots, size
   return true;
 }
 
-static bool CompileChainProgramForInfo(const ProgramInfo* programInfo, AOTProgram* out) {
-  if (programInfo == nullptr || out == nullptr) {
-    return false;
-  }
-  // The draw's record-time IR is the only input: every draw lowers once at record time, so a
-  // missing IR means the expression is not expressible and no second lowering could fix that.
-  auto* carried = programInfo->getCarriedIR();
-  if (carried == nullptr) {
-    return false;
-  }
-  // The whole expression is the pass: the fused form is derived from the graph itself, so a draw
-  // the record-time route left to this point needs no planning input beyond its IR.
-  return AOTChainBuilder::CompileGraph(carried->color, &carried->coverage, out);
-}
-
 // The memoization both consumers share: the program lives on the draw's IR, the first caller that
 // needs it compiles it, and every later caller — the matcher's second prepare, the writer on a
 // program-cache hit — reads it back. One entry per form, one compile per draw: the chain memo never
@@ -448,8 +433,11 @@ const AOTProgram* AOTChainBuilder::ResolveChainProgram(const ProgramInfo* progra
     return nullptr;
   }
   if (!carried->chainProgram.has_value()) {
+    // The draw's record-time IR is the only input: every draw lowers once at record time, so a
+    // missing IR means the expression is not expressible and no second lowering could fix that.
+    // The whole expression is the pass: the fused form is derived from the graph itself.
     AOTProgram program = {};
-    if (!CompileChainProgramForInfo(programInfo, &program)) {
+    if (!AOTChainBuilder::CompileGraph(carried->color, &carried->coverage, &program)) {
       return nullptr;
     }
     carried->chainProgram = std::move(program);

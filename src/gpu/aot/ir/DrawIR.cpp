@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/ir/DrawIR.h"
-#include "gpu/aot/ir/Lowering.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -287,6 +286,41 @@ std::optional<DrawIR> LowerDrawWithAtlas(
   ownedLeaves.push_back(std::move(atlasLeaf));
   return LowerDrawCore(colorProcessors, coverageProcessors, ownedLeaves.back().get(),
                        std::move(ownedLeaves), blendMode, allocator);
+}
+
+bool LowerToGraph(const std::vector<const FragmentProcessor*>& processors, AOTEffectGraph* graph,
+                  std::string* blockingProcessor) {
+  if (blockingProcessor != nullptr) {
+    blockingProcessor->clear();
+  }
+  if (graph == nullptr || processors.empty()) {
+    return false;
+  }
+  AOTNodeBuilder builder = {};
+  AOTNodeID current = AOTNodeID::Invalid();
+  if (!builder.addGeometryColor(&current)) {
+    return false;
+  }
+  for (auto processor : processors) {
+    if (processor == nullptr) {
+      return false;
+    }
+    AOTNodeID next = AOTNodeID::Invalid();
+    if (!processor->lowerToAOT(&builder, current, &next)) {
+      auto missingLowering = builder.missingLoweringProcessor();
+      if (blockingProcessor != nullptr && missingLowering != nullptr) {
+        *blockingProcessor = missingLowering->name();
+      }
+      return false;
+    }
+    current = next;
+  }
+  AOTEffectGraph result = {};
+  if (!builder.finish(current, &result)) {
+    return false;
+  }
+  *graph = std::move(result);
+  return true;
 }
 
 }  // namespace tgfx

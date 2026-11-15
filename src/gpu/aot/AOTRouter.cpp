@@ -85,7 +85,7 @@ PlacementPtr<RenderTask> AOTRouter::routePlan(const DrawIR* ir, const AOTRouteRe
   }
   const std::vector<AOTCoverageTerm> noCoverage = {};
   const auto& coverage = terminalCoverage != nullptr ? *terminalCoverage : noCoverage;
-  if (AOTPlanner::RouteRecordPlan(*plan, coverage, blend) != AOTRecordRoute::Task) {
+  if (!AOTPlanner::RouteRecordPlan(*plan, coverage, blend)) {
     // Anything else keeps the plain route: the matcher serves it at prepare time.
     return nullptr;
   }

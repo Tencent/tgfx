@@ -2,7 +2,7 @@
 // (TGFX_POINTWISE_OPS in KernelContract.h), reading the operator's block from the chain data
 // pool (the layout lives in contract/ChainOps.h; the readers are generated from it). The chain
 // interpreter (pointwise_chain_eval.inc) and the slot interpreter (pointwise_op.inc, used by
-// TexturedEffect and the YUV tail) both call evalPointwiseColorOp, so the operator-to-parameter
+// the slot kernels and the YUV tail) both call evalPointwiseColorOp, so the operator-to-parameter
 // mapping is written once — a caller only supplies its slot's pool offset.
 //
 // Registered exceptions, dispatched by the call sites because their operands are not per-slot
