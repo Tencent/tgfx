@@ -1,12 +1,11 @@
-// GlassRefraction fragment hook (the former kernels/glass_refraction.frag): displaces the
+// GlassRefraction fragment hook: displaces the
 // background sample along the glass shape's refracted direction, adds the edge-light response and
 // replaces the running color. The coverage is NOT touched here: the geometry module seeds it
 // (the ellipse's analytic edge or the quad's per-vertex coverage) and the local-mask and clip
-// modules multiply onto it. The expressions are verbatim from the legacy kernel, modulo the
-// module-prefixed uniform names; DISPERSION stays a compile-time branch for the same reason the
-// legacy kernel kept it one — keeping both taps in one text lets the compiler hoist the shared
-// `sourceUV + uvOffset` across the branch, which shifts the sampled coordinate by an ULP and
-// flips the occasional texel.
+// modules multiply onto it. The expressions are bit-exact against the interpreter's emission, modulo
+// the module-prefixed uniform names; DISPERSION stays a compile-time branch so both taps live in
+// one text: the compiler then hoists the shared `sourceUV + uvOffset` across the branch, which
+// otherwise shifts the sampled coordinate by an ULP and flips the occasional texel.
 
 // The shared angular edge-light response (mirrors EmitFaceLight): the light-facing edge with
 // coefficient 1 and the back-side rim with 0.6. Shared by the SDF and UDF paths so retuning the

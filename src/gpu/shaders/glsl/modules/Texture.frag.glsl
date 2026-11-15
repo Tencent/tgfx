@@ -1,5 +1,5 @@
-// Texture fragment hook: the plain leaf read (the former FILL_SOURCE_TEXTURE). The expressions
-// are verbatim from the former fill pipeline's source stage.
+// Texture fragment hook: the plain leaf read. The expressions
+// are verbatim from the fill pipeline's source stage.
 #define TextureSampler_0 Texture_Sampler
 #define Subset Texture_Subset
 #define SubsetClampOn Texture_SubsetClampOn

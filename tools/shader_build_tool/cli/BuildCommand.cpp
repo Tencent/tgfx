@@ -283,7 +283,7 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
           ExpandStageIncludes(assembled.vertText, options.shaderDir, &expandError);
       const auto fragText =
           ExpandStageIncludes(assembled.fragText, options.shaderDir, &expandError);
-      // The interpreter assembly carries the chain-ops pragma the legacy kernels also use; the
+      // The interpreter assembly carries the chain-ops pragma the kernels use; the
       // declared path runs the same expansion after includes so both assemblies compile the same
       // operator table.
       auto vertExpanded = vertText.empty() ? std::string() : ExpandChainOpsPragma(vertText);

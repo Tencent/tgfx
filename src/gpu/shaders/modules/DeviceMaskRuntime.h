@@ -22,8 +22,8 @@
 
 namespace tgfx {
 
-/// A device-space mask folded into the coverage through a runtime branch (the former
-/// FILL_DEVICE_MASK_RUNTIME): the fields are declared unconditionally and HasDeviceMask selects
+/// A device-space mask folded into the coverage through a runtime branch: the fields are declared
+/// unconditionally and HasDeviceMask selects
 /// the sampling, so one variant serves both masked and unmasked draws — the contract the old
 /// QuadTexture and AtlasText kernels encoded.
 inline constexpr Element DeviceMaskRuntimeElements[] = {

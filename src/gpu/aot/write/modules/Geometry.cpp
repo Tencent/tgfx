@@ -165,8 +165,8 @@ void WriteMeshGeometryModule(WriteContext& context) {
   context.slot->set(Matrix, context.geometry.viewMatrix);
   context.slot->set(Color, context.geometry.commonColor);
   context.slot->set(HasCommonColor, static_cast<int32_t>(context.geometry.hasCommonColor ? 1 : 0));
-  // The mesh's color source is the sole texture leaf of the color graph, the transform the legacy
-  // walk reported first; a processor-free mesh has no transform to write.
+  // The mesh's color source is the sole texture leaf of the color graph, the transform the graph
+  // walk reports first; a processor-free mesh has no transform to write.
   if (const auto* leaf = FirstColorTextureLeaf(context.info.getCarriedIR())) {
     constexpr uint8_t CoordMatrix = UniformElementIndexOf(MeshGeometry, "CoordMatrix");
     context.slot->set(CoordMatrix, SourceCoordMatrix(*leaf, context.info.getGeometryLayout()));

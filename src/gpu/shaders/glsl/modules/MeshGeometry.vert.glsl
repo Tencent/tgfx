@@ -1,5 +1,5 @@
 // MeshGeometry vertex hook: the view transform plus the texture coordinate chain. The expressions
-// are verbatim from the former kernels/mesh_fill.vert.
+// are bit-exact by contract.
 void MeshGeometry_vertex(inout Vertex v) {
   v.position = (MeshGeometry_Matrix * vec3(MeshGeometry_Position, 1.0)).xy;
 #if MeshGeometry_TEX_COORDS

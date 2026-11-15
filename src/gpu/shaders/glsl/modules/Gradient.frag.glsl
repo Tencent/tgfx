@@ -1,6 +1,6 @@
-// Gradient fragment hook: the border clamp, the premultiply and the modulating input color alpha,
-// verbatim from the former kernels/shape_instanced_texture_coverage.frag's GRADIENT branch. The
-// layout maths live in the shared source/gradient_layout.inc.
+// Gradient fragment hook: the border clamp, the premultiply and the modulating input color alpha
+// of the GRADIENT branch, bit-exact by contract. The layout math lives in the shared
+// source/gradient_layout.inc.
 #include "source/gradient_layout.inc"
 
 void Gradient_fragment(inout Fragment f) {

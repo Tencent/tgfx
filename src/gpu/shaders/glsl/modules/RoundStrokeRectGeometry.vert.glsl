@@ -1,6 +1,6 @@
 // RoundStrokeRectGeometry vertex hook: the ellipse data and the per-vertex coverage forwarded to
 // the fragment stage. The position is already in device space. The expressions are verbatim from
-// the former kernels/round_stroke_rect_fill.vert.
+// the reference emission.
 void RoundStrokeRectGeometry_vertex(inout Vertex v) {
   v.position = RoundStrokeRectGeometry_Position;
   RoundStrokeRectGeometry_vOffsets = RoundStrokeRectGeometry_InEllipseOffset;

@@ -1,6 +1,5 @@
 // ComplexRRectGeometry fragment hook: the per-vertex color (or the exact Color uniform) and the
-// analytic per-corner ellipse SDF coverage. The call shape is verbatim from the former fill
-// pipeline's FILL_COVERAGE_COMPLEX_RRECT, with the stroke form selected by StrokeEnabled at runtime.
+// analytic per-corner ellipse SDF coverage. The expressions are bit-exact by contract.
 #include "geometry/complex_rrect_coverage.inc"
 
 void ComplexRRectGeometry_fragment(inout Fragment f) {

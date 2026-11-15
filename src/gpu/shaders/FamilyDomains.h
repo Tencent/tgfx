@@ -32,10 +32,10 @@ namespace tgfx {
  */
 PrecompiledShaderInfo AssembledFamilyInfo(const Family& family);
 
-/// The legacy interpreter's dimension cell a declared Chain variant stands for. One decode shared
-/// by the runtime matcher, the tool's equivalence test and the route assertions, so the mapping
-/// between the legacy permutation space and the declared dims cannot fork.
-struct ChainLegacyCell {
+/// The interpreter dimension cell a declared Chain variant stands for. One decode shared by the
+/// runtime matcher, the tool's equivalence test and the route assertions, so the mapping between
+/// the interpreter source dimensions and the declared dims cannot fork.
+struct ChainCell {
   int gpLayout = 0;
   int coverage = 1;
   int uvCoord = 0;
@@ -46,9 +46,9 @@ struct ChainLegacyCell {
   int xp = 0;
 };
 
-/// The declared geometry index and PROFILE value a legacy cell encodes (the matcher's direction).
-uint8_t ChainGeometryOfCell(const ChainLegacyCell& cell);
-uint8_t ChainProfileOfCell(const ChainLegacyCell& cell);
+/// The declared geometry index and PROFILE value a cell encodes (the matcher's direction).
+uint8_t ChainGeometryOfCell(const ChainCell& cell);
+uint8_t ChainProfileOfCell(const ChainCell& cell);
 
 /// The variant's identity in a bundle: Variant::id (the family index in the high bits, the
 /// family-local ordinal in the low 20). The tool writes the bundle and the runtime reads it, and

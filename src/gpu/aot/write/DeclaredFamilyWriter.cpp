@@ -42,34 +42,6 @@
 
 namespace tgfx {
 
-namespace {
-
-// MeshGeometry: the view transform, the color pair and the texture coordinate chain.
-// ShapeInstancedGeometry: the local-coordinate recovery, the view transform and the sampling
-// coordinate. The instance offset and the instance color ride the vertex attributes. The sampling
-// transform is the LAST one in the tree: the color graph's transforms come first, so a draw whose
-// only fragment processors are the color ones leaves this unwritten (the instanced fill family
-// carries no processor at all), and a coverage texture lands on it.
-// Gradient: the clamped single-interval gradient's whole record — the endpoints, the boundary
-// colors, the layout branch and the conic layout's bias/scale pair. The values are the ones
-// BindGradientNode uploads for the legacy instanced-shape kernel; the coordinate transform rides
-// the vertex block.
-/// The child's sampling fields the blur-style bodies share: the tiled recipe or the plain subset
-/// rect, plus the tiled-child selector. Both blur modules declare the same five fields, so the
-/// shared body templates on the module and resolves every element index at compile time.
-// GlassRefraction: the optics and shape records, sourced from the IR node instead of the
-// processor tree. The background-coordinate
-// transform is the tree's first coord transform (the standard helper upload).
-// HairlineLineGeometry / HairlineQuadGeometry: the view matrix, the color/coverage/AA triple and
-// the analytic clip the old declaration carried in the same block.
-// AnalyticClip: the runtime clip contract.
-/// Writes the analytic clip parameters (slot's module fields) from the draw's IR analytic term.
-/// The hairline families carry the same fields inside their geometry module, so the shared body
-/// templates on the module that owns the fields.
-// Xfer: the blend mode, the dst-texture coord mapping for the dst dialect, and the render-target
-// write swizzle — the same values BindPorterDuffXfer uploads for the legacy families.
-}  // namespace
-
 /// The declaration-driven families' writer. The variant is fixed at construction: the layout is
 /// derived once per program (not once per draw), and every field write addresses the element's
 /// index in its module's declaration (a compile-time constant) through the layout's elementField

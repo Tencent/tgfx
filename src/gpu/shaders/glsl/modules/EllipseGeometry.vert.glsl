@@ -1,5 +1,5 @@
 // EllipseGeometry vertex hook: the ellipse data forwarded to the fragment stage. The expressions
-// are verbatim from the former kernels/ellipse_fill.vert.
+// are bit-exact by contract.
 void EllipseGeometry_vertex(inout Vertex v) {
   v.position = EllipseGeometry_Position;
   // The raw position doubles as the local coordinate for any body module that maps it (the glass

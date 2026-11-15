@@ -59,7 +59,7 @@ namespace {
 /// The declared-chain variant back in the legacy cell's dims, for the route assertions: the
 /// matcher no longer decodes cells on the runtime path, so the mapping lives with the test that
 /// still checks the cell.
-bool DecodeChainCell(const Family& family, const Variant& variant, ChainLegacyCell* cell) {
+bool DecodeChainCell(const Family& family, const Variant& variant, ChainCell* cell) {
   const uint8_t subset = DimValueOf(family, variant, 1, 0);
   const uint8_t profile = DimValueOf(family, variant, 2, 0);
   cell->subset = subset;
@@ -438,7 +438,7 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
         // into the legacy dims so this assertion keeps checking the cell, not the route.
         const uint16_t chainIndex = FamilyIndexOf("Chain");
         auto decoded = DecodeVariant(chainIndex, recordOrdinal);
-        ChainLegacyCell cell = {};
+        ChainCell cell = {};
         if (!decoded.has_value() || !DecodeChainCell(Families()[chainIndex], *decoded, &cell)) {
           continue;
         }

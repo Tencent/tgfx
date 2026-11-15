@@ -1,6 +1,6 @@
 // MeshGeometry fragment hook: the per-vertex color, or the exact Color uniform when
-// HasCommonColor is set (meshes without per-vertex colors). The expressions are verbatim from the
-// former fill pipeline's FILL_COLOR_VARYING_OR_COMMON and FILL_COVERAGE_VERTEX.
+// HasCommonColor is set (meshes without per-vertex colors); the coverage is the per-vertex
+// channel. The expressions are bit-exact by contract.
 void MeshGeometry_fragment(inout Fragment f) {
   f.color = MeshGeometry_vColor;
   if (MeshGeometry_HasCommonColor != 0) {

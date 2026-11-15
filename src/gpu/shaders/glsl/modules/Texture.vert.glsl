@@ -1,7 +1,7 @@
 // Texture vertex hook: the source coordinate through the leaf transform, and the per-vertex subset
 // bounds through the same transform (SubsetMatrix carries the coord transform's value when the
 // geometry supplies uv coordinates, so one field serves both paths). The expressions are verbatim
-// from the former kernels/quad_texture_fill.vert.
+// from the reference emission.
 void Texture_vertex(inout Vertex v) {
   Texture_vCoord = Texture_CoordMatrix * vec3(v.localCoord, 1.0);
 #if Texture_HAS_SUBSET

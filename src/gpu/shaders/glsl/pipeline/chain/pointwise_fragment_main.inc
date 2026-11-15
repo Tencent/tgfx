@@ -208,7 +208,7 @@ void chainRunSlotAt(int n, inout vec4 result, inout vec4 clipRegister,
   CHAIN_SLOT_WRITE(n, value)
 }
 
-// The whole evaluation, shared verbatim by the two assemblies: the legacy kernel's main() calls
+// The whole evaluation, shared verbatim by the two assemblies: the interpreter's main() calls
 // it directly, and the declared Chain module's fragment hook calls it from the assembler's main.
 void chainMain() {
 #if GP_LAYOUT == 1

@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-/// A plain RGBA texture source (the former FILL_SOURCE_TEXTURE): the coordinate rides its own
+/// A plain RGBA texture source: the coordinate rides its own
 /// transform (HAS_SUBSET narrows it through the per-vertex subset bounds), and the leaf parameters
 /// select the read swizzle path, the alpha-only read and the RGBAAA dual-plane alpha.
 inline constexpr ModuleDim TextureDims[] = {{"HAS_SUBSET", 2, DimFact::Subset}};

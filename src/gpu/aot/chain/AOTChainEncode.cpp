@@ -246,8 +246,8 @@ bool EncodeTextureSourceSlot(AOTChainContext* ctx, size_t combined, size_t index
     // The runtime alpha-only readback is sample.a * inputColor, so the leaf's input
     // environment decides the modulation shape — expressed as ONE complete operation per
     // shape: the color root multiplies by the full geometry color in a single step (bit 4;
-    // the RGB is already premultiplied, so one multiply carries both halves — the former
-    // bit0+bit3 pair applied the paint alpha to the RGB twice), and a two-child blend
+    // the RGB is already premultiplied, so one multiply carries both halves; a bit0+bit3 pair
+    // would apply the paint alpha to the RGB twice), and a two-child blend
     // operand — whose input node is the opaque geometry designator — multiplies by
     // (geom.rgb, 1.0) (bit 3) because the xfer emission feeds each child
     // vec4(inputColor.rgb, 1.0). White inputs (single-child operands, folded masks) and
@@ -469,7 +469,7 @@ static bool EncodeChainSlots(AOTChainContext* ctx) {
   auto* layout = ctx->layout;
   ctx->slots.assign(ctx->ordered.size(), AOTChainSlot{});
   ctx->hasGradient = false;
-  // All-ones reproduces the legacy behavior (every target reads the uvCoord attribute when the GP
+  // All-ones reproduces the default behavior (every target reads the uvCoord attribute when the GP
   // carries one). The atlas-text route clears it and sets only the coverage leaves' bits.
   layout->program.coordSourceMask = ctx->coverageLeafFromUVCoord ? 0u : ~0u;
   layout->leafNodes.clear();

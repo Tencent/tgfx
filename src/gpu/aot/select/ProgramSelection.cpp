@@ -80,7 +80,7 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
   }
   // The same acceptance every route shares, now with the matched family's declared texture-read
   // semantics in play. The variant came out of EncodeVariant, so it is inside the family's
-  // reachable set by construction — the former buildable-permutation re-check here was a tautology
+  // reachable set by construction — a buildable-permutation re-check here would be a tautology
   // over the same declaration.
   if (!AdmitMatchedProgram(&info, shape, &Families()[match->variant.family], failure)) {
     return std::nullopt;

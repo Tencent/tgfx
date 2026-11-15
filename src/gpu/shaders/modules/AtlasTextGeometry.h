@@ -26,7 +26,7 @@ namespace tgfx {
 /// AtlasTextGeometryProcessor's glyph quad: the atlas coordinate is the per-vertex one scaled by
 /// the atlas size, the coverage is the optional per-vertex value, and the color is the per-vertex
 /// one or the exact Color uniform. The atlas sample itself replaces the color for a color atlas
-/// and contributes its alpha as the coverage (the former FILL_COVERAGE_ATLAS_TEXT), so the module
+/// and contributes its alpha as the coverage, so the module
 /// owns the atlas sampler, AlphaOnly and the size scale.
 inline constexpr ModuleDim AtlasTextGeometryDims[] = {{"HAS_COVERAGE", 2, DimFact::AtlasCoverage}};
 

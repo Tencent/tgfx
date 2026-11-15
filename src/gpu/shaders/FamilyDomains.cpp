@@ -33,7 +33,7 @@ PrecompiledShaderInfo AssembledFamilyInfo(const Family& family) {
   return PrecompiledShaderInfo{family.name, family.textureReads};
 }
 
-uint8_t ChainGeometryOfCell(const ChainLegacyCell& cell) {
+uint8_t ChainGeometryOfCell(const ChainCell& cell) {
   if (cell.gpLayout == 0) {
     if (cell.coverage != 0) {
       return cell.uvCoord != 0 ? 1 : 0;
@@ -58,7 +58,7 @@ uint8_t ChainGeometryOfCell(const ChainLegacyCell& cell) {
   return 8;
 }
 
-uint8_t ChainProfileOfCell(const ChainLegacyCell& cell) {
+uint8_t ChainProfileOfCell(const ChainCell& cell) {
   if (cell.textureCount == 0 && cell.mask == 0 && cell.resource == 0) {
     return 0;
   }

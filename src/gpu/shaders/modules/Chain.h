@@ -22,8 +22,8 @@
 
 namespace tgfx {
 
-// The pointwise interpreter's body, declared. The one joint dimension is PROFILE: the legacy
-// kernel's (TEXTURE_COUNT, HAS_MASK_TEXTURE, RESOURCE_KIND) product has exactly seven reachable
+// The pointwise interpreter's body, declared. The one joint dimension is PROFILE: the draw's
+// (texture count, mask texture, resource kind) product has exactly seven reachable
 // cells, and several fields exist for a union of two of those dimensions at once
 // (CoordTransformMatrix_0 spans "any resource source" and "four plain leaves"), which no per-dim
 // gate could express. The seven values keep every gate a single mask:
@@ -33,12 +33,12 @@ namespace tgfx {
 //            2 = plain four-leaf        5 = gradient four-leaf
 //
 // The masks below are the value sets of each conditional group. The names are bare (bareNames):
-// the module reuses the legacy kernel's interface spellings verbatim in the assembled text, while
+// the module spells the interpreter's interface names verbatim in the assembled text, while
 // the runtime addresses every field by element index through the derived layout.
 inline constexpr ModuleDim ChainDims[] = {{"PROFILE", 7}, {"GP_LAYOUT", 10}};
 
-// The two pool arrays' lengths per PROFILE: the legacy CHAIN_SLOT_CAPACITY was 16 for every plain
-// and gradient variant and 32 for the noise profile; the block region is 32 words, so the data
+// The two pool arrays' lengths per PROFILE: 16 slot records for every plain and gradient variant,
+// 32 for the noise profile; the block region is 32 words, so the data
 // pool is 16 * 7 + 32 = 144 or 32 * 7 + 32 = 256 entries (the 256 is the one that outgrew a byte).
 inline constexpr uint16_t ChainSlotPackedCounts[] = {16, 16, 16, 16, 16, 16, 32};
 inline constexpr uint16_t ChainDataCounts[] = {144, 144, 144, 144, 144, 144, 256};
@@ -74,7 +74,7 @@ inline constexpr UnrollSite ChainUnroll = {"chainRunSlotAt",
                                            /*capacityElement=*/1, /*countElement=*/0};
 
 inline constexpr Element ChainElements[] = {
-    // The specialization surface, in the legacy text's first-use order (the ids must line up):
+    // The specialization surface, in the compiled text's first-use order (the ids must line up):
     // SlotCount = id 1, SlotPacked = ids 2..(1 + 4 * capacity), then the three register indices.
     {Element::Kind::Param, ShaderType::Int, "SlotCount", 1, -1, 0, /*spec=*/true},
     {Element::Kind::Param, ShaderType::Int4, "SlotPacked", 1, -1, 0, /*spec=*/true, 0,
@@ -163,7 +163,7 @@ inline constexpr Element ChainElements[] = {
     {Element::Kind::Varying, ShaderType::Float3, "SourceCoords", 1, 0, ChainSourceMask},
     // The coordinate transforms: with a resource source the source owns matrix 0 and the leaves
     // shift to 1..4 (the fifth leaf matrix is declared alongside the four-leaf forms); without
-    // one the leaves own 0..3 and 4 is the declared-but-unread spare the legacy block kept.
+    // one the leaves own 0..3 and 4 is the declared-but-unread spare.
     {Element::Kind::VertexParam, ShaderType::Mat3, "CoordTransformMatrix_0", 1, 0,
      ChainCtmZeroMask},
     {Element::Kind::VertexParam, ShaderType::Mat3, "CoordTransformMatrix_1", 1, 0,

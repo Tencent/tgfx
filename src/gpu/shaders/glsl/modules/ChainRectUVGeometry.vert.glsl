@@ -1,4 +1,4 @@
-// The chain's rect layout with the UVCoord attribute: the vertex hook mirrors the legacy text's
+// The chain's rect layout with the UVCoord attribute: the vertex hook mirrors the shared text's
 // UVCoord branch (the subset corners go through CoordTransformMatrix_0, as the quad GP wrote them)
 // and flags CHAIN_UV_COORD_SOURCE so the body's transforms select the leaf source per leaf through
 // CoordSourceMask.

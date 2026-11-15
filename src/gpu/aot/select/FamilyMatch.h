@@ -30,8 +30,8 @@ class ProgramInfo;
 
 /// One declared family's match rule: the shape predicate plus the variant encoding, writing the
 /// matched variant and its data-source leaves into the result. The info is the draw's program
-/// being matched — the interpreter family compiles its carried IR through it (exactly what the
-/// legacy chain's Accept did), every other rule ignores it.
+/// being matched — the interpreter family compiles its carried IR through it, every other rule
+/// ignores it.
 using FamilyMatchFunction = bool (*)(const ProgramInfo* info, const DrawShape& shape,
                                      FamilyMatchResult* result);
 

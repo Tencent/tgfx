@@ -1,9 +1,8 @@
 // The declared Chain module's permutation macros, derived from its one joint dimension PROFILE.
-// The legacy kernel received TEXTURE_COUNT / HAS_MASK_TEXTURE / RESOURCE_KIND as separate dims;
-// the declared assembly folds their seven reachable cells into PROFILE (see modules/Chain.h), and
-// this prologue restates the legacy spellings the shared body text reads, so the body stays
-// verbatim. CHAIN_SLOT_CAPACITY keeps its macro form; the build emits it from the Chain module's
-// declared slot count, so the declaration is the one source.
+// PROFILE folds the draw's texture count, mask texture and resource kind into seven reachable
+// cells (see modules/Chain.h). This prologue restates the interface spellings the shared body text
+// reads, so the body stays verbatim. CHAIN_SLOT_CAPACITY keeps its macro form; the build emits it
+// from the Chain module's declared slot count, so the declaration is the one source.
 
 //   PROFILE  0 = plain leaf-free        3 = gradient leaf-free        6 = noise four-leaf
 //            1 = plain mask             4 = gradient mask
@@ -39,7 +38,7 @@
 #endif
 
 // The resource kinds carry the SourceCoords varying and reserve CoordTransformMatrix_0 for the
-// source module (the legacy HAS_SOURCE_COORDS vertex dim, mirrored from RESOURCE_KIND).
+// source module (the HAS_SOURCE_COORDS vertex dim, mirrored from RESOURCE_KIND).
 #if RESOURCE_KIND != 0
 #define TGFX_POINTWISE_SOURCE_COORDS 1
 #endif

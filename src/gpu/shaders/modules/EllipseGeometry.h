@@ -25,8 +25,8 @@ namespace tgfx {
 
 /// EllipseGeometryProcessor's ellipse: the normalized offset and radii ride the varyings, the color
 /// is the per-vertex one or the exact Color uniform, and StrokeEnabled scales the offset by the
-/// radii inside the SDF (the former FILL_COVERAGE_ELLIPSE). The device-space mask stays on the
-/// legacy family until its ALWAYS/RUNTIME semantics are split, so this module declares no mask.
+/// radii inside the SDF. The device-space mask lives in its own module (DeviceMask or
+/// DeviceMaskRuntime), so this module declares none.
 inline constexpr Element EllipseGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "Position"},
     {Element::Kind::Attribute, ShaderType::Float4, "InColor"},

@@ -79,14 +79,13 @@ struct Family {
   uint8_t moduleCount = 0;
   /// Optional product filter over enumerated variants (e.g. the textured-stroke exclusion).
   bool (*allowed)(const Variant& variant, const Family& family) = nullptr;
-  /// The last body module owns the fragment output (the legacy chain's interpreter mixes the
-  /// XferProcessor's blend pass inside its own evaluation): the assembler then declares the Xfer
+  /// The last body module owns the fragment output (the chain interpreter mixes the XferProcessor's
+  /// blend pass into its own evaluation): the assembler then declares the Xfer
   /// module's interface but skips its fragment hook, so the composition runs exactly once.
   bool bodyOwnsOutput = false;
   /// The family is the walk's last resort, not a peer: its acceptance is "the draw compiles",
   /// which is a superset of every curated shape predicate, so it is consulted only after every
-  /// non-fallback row rejected the draw and it takes no part in the disjointness tripwire. The
-  /// legacy kernel table gave its interpreter family exactly this role.
+  /// non-fallback row rejected the draw and it takes no part in the disjointness tripwire.
   bool fallback = false;
   /// The ShaderTextureRead bits the family's GLSL implements (see PrecompiledShader.h); the
   /// admission gate refuses a draw that needs a semantic its matched family does not declare.

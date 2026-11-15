@@ -7,8 +7,8 @@
 // positions of intervals 0..3 in ascending order, thresholds9_13 those of intervals 4..6; slots
 // beyond the real interval count are zero-padded with transparent scales/biases. The selection is
 // a linear scan: crossing a real threshold advances to the next interval, and the > 0 guard stops
-// the scan at the last real interval, matching the padded-transparent leaves of the legacy
-// binary tree for out-of-range t. The scan needs no explicit interval count (that is why the
+// the scan at the last real interval, matching the padded-transparent leaves of the binary tree
+// for out-of-range t. The scan needs no explicit interval count (that is why the
 // parameter was removed: it was never read). The selected (scale, bias) pair is identical to the
 // tree's in every case, so results are byte-identical.
 #ifndef TGFX_GRADIENT_COLORIZE_INC

@@ -176,8 +176,6 @@ size_t FamilyCount() {
   return FamilyTableCount();
 }
 
-/// The RRect family's product rule: the textured form never combines with stroke (the former
-/// NonAARRectFillShader's `allowed` predicate, carried over).
 /// The ShapeInstanced family's product rule: VERTEX_COLOR only reserves the geometry's
 /// stride-filler color slot, so the variant where it is present is never a real program.
 bool ShapeInstancedVariantAllowed(const Variant& variant, const Family&) {
@@ -186,8 +184,8 @@ bool ShapeInstancedVariantAllowed(const Variant& variant, const Family&) {
 
 /// The ShapeInstancedTextureCoverage family's product rule: VERTEX_COLOR only reserves the
 /// geometry's stride-filler coverage slot, so the variant where it is present is never a real
-/// program (the same hole ShapeInstanced carries); and the legacy kernel served the no-xfer case
-/// only, so the blended xfer kinds stay out of the bundle.
+/// program (the same hole ShapeInstanced carries); and the family serves the no-xfer case only, so
+/// the blended xfer kinds stay out of the bundle.
 bool ShapeInstancedTextureCoverageVariantAllowed(const Variant& variant, const Family& family) {
   // Slot layout: Frame(0), ShapeInstancedGeometry(1), Gradient(2), CoverageTexture(3),
   // AnalyticClip(4), Xfer(5).

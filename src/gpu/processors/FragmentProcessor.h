@@ -128,7 +128,7 @@ class FragmentProcessor : public Processor {
 
   /**
    * Appends the samplers this processor itself declares (not its children's) in the order the
-   * legacy texture-sampler enumeration reported them. Lowering walks the tree once and records
+   * sampler enumeration reports them. Lowering walks the tree once and records
    * the result on the draw IR, so the runtime never enumerates processors to bind samplers.
    */
 

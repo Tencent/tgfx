@@ -1,5 +1,5 @@
 // GlassLocalMask fragment hook: the SrcIn mask's alpha multiplies the running coverage, gated by
-// the runtime HasMask flag (the former HasLocalMask branch — a draw without a mask binds the
+// the runtime HasMask flag (the HasLocalMask branch — a draw without a mask binds the
 // shared dummy texture on the never-sampled slot). The mask only scales the coverage after the
 // refraction sample, so the branch cannot move a texture coordinate.
 void GlassLocalMask_fragment(inout Fragment f) {

@@ -24,8 +24,7 @@ namespace tgfx {
 
 /// QuadPerEdgeAAGeometryProcessor's rect geometry with the per-vertex color: the position is
 /// already in device space, the coverage rides the per-vertex slot and the color is either the
-/// broadcast vertex color or the exact Color uniform, selected by HasCommonColor (the former
-/// FILL_COLOR_VARYING_OR_COMMON).
+/// broadcast vertex color or the exact Color uniform, selected by HasCommonColor.
 inline constexpr Element QuadColorGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float2, "Position"},
     {Element::Kind::Attribute, ShaderType::Float, "Coverage"},

@@ -26,8 +26,8 @@ namespace tgfx {
 // uvMatrix, Mesh without texCoords). The attribute order is fixed and must pair by order with every
 // serving GP's compacted list while every location stays under that GP's physical-slot ceiling:
 // DefaultGP's ceiling is 3, so the color sits at ordinal 2; the subset attribute follows at 3 and
-// only QuadPerEdgeAA draws (ceiling 5) carry it. Names are bare (bareNames) so the legacy kernels'
-// interface spellings carry over verbatim.
+// only QuadPerEdgeAA draws (ceiling 5) carry it. Names are bare (bareNames) so the interface
+// spellings the shared text reads carry over verbatim.
 // The family's ordinals decode against one flat domain across the geometries, so every chain
 // geometry declares the same dim pair: SUBSET belongs to the rect classes, STROKE to the complex
 // class, and the family's allowed filter pins each geometry's unused dim to 0 (the variant space

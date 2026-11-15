@@ -23,13 +23,13 @@
 
 namespace tgfx {
 
-/// The glass quad's local shape mask (the former quad branch's HasLocalMask runtime gate): the
+/// The glass quad's local shape mask, behind a runtime gate: the
 /// SrcIn ShaderMaskFilter's coverage, applied as an always-declared runtime branch — the module
 /// exists in every GlassRefractionQuad variant and HasMask turns the sampling on, so the mask
 /// never widens the variant space (a draw without a mask binds the shared dummy texture on the
 /// never-sampled slot). The mask transform is affine by contract (the matcher rejects a
 /// projective mask), so the varying interpolates a plain vec2 — dividing an interpolated z is NOT
-/// bit-identical for an affine matrix, and this family must keep the legacy kernel's pixels.
+/// bit-identical for an affine matrix, and this family must keep its reference pixels.
 inline constexpr Element GlassLocalMaskElements[] = {
     {Element::Kind::VertexParam, ShaderType::Mat3, "CoordMatrix"},
     {Element::Kind::Varying, ShaderType::Float2, "Coord"},

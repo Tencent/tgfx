@@ -23,7 +23,7 @@
 
 namespace tgfx {
 
-/// The glass UDF tent-blur body (the former kernels/glass_udf_tent_blur.frag): a one-directional
+/// The glass UDF tent-blur body: a one-directional
 /// tent kernel whose weights are computed analytically from the per-field radii, one texture tap
 /// per step, writing one field of the UDF (the 24-bit fine field into RGB, the coarse field into
 /// A). The child read is a runtime branch, not a dimension: TiledChild selects the shared per-tap

@@ -15,7 +15,7 @@
 #endif
 
 // The declared assemblies declare their samplers from the module declarations (the Xfer
-// module's DstTextureSampler element), so only the legacy kernels declare it here.
+// module's DstTextureSampler element), so only the interpreter kernels declare it here.
 #ifndef TGFX_DECLARED_CHAIN
 layout(set = TGFX_TEXTURE_SET, binding = XP_DST_TEX_BINDING) uniform sampler2D DstTextureSampler;
 #endif

@@ -1,6 +1,5 @@
 // AtlasTextGeometry vertex hook: the atlas coordinate scaled by the atlas size and the per-vertex
-// coverage/color forwarded. The expressions are verbatim from the former
-// kernels/atlas_text_fill.vert.
+// coverage/color forwarded. The expressions are bit-exact by contract.
 void AtlasTextGeometry_vertex(inout Vertex v) {
   v.position = AtlasTextGeometry_Position;
   AtlasTextGeometry_vTexCoords = AtlasTextGeometry_MaskCoord * AtlasTextGeometry_AtlasSizeInv;

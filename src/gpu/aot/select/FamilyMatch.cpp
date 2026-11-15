@@ -90,7 +90,7 @@ bool EncodeMatchFromFacts(uint16_t family, uint8_t geometry, const DrawShape& sh
 
 namespace {
 
-/// The SolidColor family's rule, carried over from the former SolidColorFillShader: the
+/// The SolidColor family's rule: the
 /// DefaultGP's rect fill with no fragment processor, or one direct analytic clip (an AA rect or
 /// rounded rect) riding the runtime clip contract. Any xfer, alpha-only targets included.
 /// Slot layout: Frame(0), RectGeometry(1), AnalyticClip(2), Xfer(3: HAS_XP). No free dims in the
@@ -109,7 +109,7 @@ bool MatchSolidColor(const ProgramInfo* /*info*/, const DrawShape& shape,
   return EncodeMatchFromFacts(SolidColorIndex, 0, shape, &result->variant);
 }
 
-/// The MaskFill family's rule, carried over from the former MaskFillShader: the DefaultGP's rect
+/// The MaskFill family's rule: the DefaultGP's rect
 /// fill whose sole fragment processor is the rasterized alpha-only shape mask. The mask's
 /// sampler facts come off the IR's sole coverage term, so the acceptance reads the carried IR.
 /// Slot layout: Frame(0), RectGeometry(1), MaskTexture(2), Xfer(3: HAS_XP).
@@ -138,7 +138,7 @@ bool MatchMaskFill(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMa
   return true;
 }
 
-/// The TiledTextureFill family's rule, carried over from the former TiledTextureFillShader: a
+/// The TiledTextureFill family's rule: a
 /// position-only rect or quad whose sole color processor is the IR's tiled texture leaf (no
 /// operators above it). It serves the DefaultGP form and the Quad draws whose leaf is Tiled; a
 /// Plain-leaf Quad belongs to QuadTexture, whose rule is disjoint from this one. FULL and PRESENT
@@ -176,7 +176,7 @@ bool MatchTiledTextureFill(const ProgramInfo* /*info*/, const DrawShape& shape,
   return true;
 }
 
-/// The QuadColor family's rule, carried over from the former QuadColorFillShader: the
+/// The QuadColor family's rule: the
 /// QuadPerEdgeAA rect with no fragment processor, or one coverage processor (an analytic rect or
 /// rounded-rect clip, or a device-space mask). Slot layout: Frame(0), QuadColorGeometry(1),
 /// DeviceMask(2: PRESENT), AnalyticClip(3), Xfer(4: HAS_XP). The ordinal is PRESENT + 2 * HAS_XP.
@@ -200,7 +200,7 @@ bool MatchQuadColor(const ProgramInfo* /*info*/, const DrawShape& shape,
   return EncodeMatchFromFacts(QuadColorIndex, 0, shape, &result->variant);
 }
 
-/// The RRect family's rule, carried over from the former NonAARRectFillShader: the non-AA
+/// The RRect family's rule: the non-AA
 /// rounded rect, at most one fragment (a sole analytic clip riding the runtime contract, or the
 /// single-tap tiled fill), never alpha-only, any xfer.
 bool MatchRRect(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchResult* result) {
@@ -253,7 +253,7 @@ bool MatchRRect(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatch
 /// GradientSource over it. Its parameters carry the layout branch, the boundary colors and the
 /// colorizer endpoints the Gradient module writes.
 
-/// The Mesh family's rule, carried over from the former MeshFillShader: the mesh geometry with no
+/// The Mesh family's rule: the mesh geometry with no
 /// fragment processor and any xfer. The flattened dims are the geometry's TEX_COORDS then the
 /// Xfer's HAS_XP, so the ordinal is TEX_COORDS + 2 * HAS_XP.
 bool MatchMesh(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchResult* result) {
@@ -264,7 +264,7 @@ bool MatchMesh(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchR
   return EncodeMatchFromFacts(MeshIndex, 0, shape, &result->variant);
 }
 
-/// The ShapeInstanced family's rule, carried over from the former ShapeInstancedFillShader: the
+/// The ShapeInstanced family's rule: the
 /// instanced path-triangle geometry with no fragment processor and any xfer. VERTEX_COLOR stays
 /// at 0 (the reserved stride slot is never read; the allowed filter drops its 1 value), so the
 /// free values are [0, HAS_XP] and the ordinal is 2 * HAS_XP. The hand-rolled ordinal this rule
@@ -279,12 +279,12 @@ bool MatchShapeInstanced(const ProgramInfo* /*info*/, const DrawShape& shape,
   return EncodeMatchFromFacts(ShapeInstancedIndex, 0, shape, &result->variant);
 }
 
-/// The ShapeInstancedTextureCoverage family's rule, carried over from the former
-/// ShapeInstancedTextureCoverageShader: the instanced path triangles in their non-AA form (no AA
-/// coverage channel), the color either the instance color alone or one single-interval clamped
+/// The ShapeInstancedTextureCoverage family's rule: the instanced path triangles in their non-AA
+/// form (no AA coverage channel), the color either the instance color alone or one single-interval
+/// clamped
 /// gradient over it, and the coverage a plain non-YUV texture optionally accompanied by a bare
 /// analytic clip (the clip rides the runtime contract uniforms, so both forms select the same
-/// variant). The legacy kernel served XP_NONE only. The flattened dims are [VERTEX_COLOR,
+/// variant). The family serves XP_NONE only. The flattened dims are [VERTEX_COLOR,
 /// GRADIENT, HAS_XP] with the first and last pinned to 0, so the ordinal is 2 * GRADIENT.
 bool MatchShapeInstancedTextureCoverage(const ProgramInfo* /*info*/, const DrawShape& shape,
                                         FamilyMatchResult* result) {
@@ -338,7 +338,7 @@ bool MatchShapeInstancedTextureCoverage(const ProgramInfo* /*info*/, const DrawS
   return true;
 }
 
-/// The GaussianBlur family's rule, carried over from the former GaussianBlur1DShader.
+/// The GaussianBlur family's rule
 bool MatchGaussianBlur(const ProgramInfo* /*info*/, const DrawShape& shape,
                        FamilyMatchResult* result) {
   if (shape.geometry->kind != GeometryKind::Default &&
@@ -369,7 +369,7 @@ bool MatchGaussianBlur(const ProgramInfo* /*info*/, const DrawShape& shape,
   return true;
 }
 
-/// The GlassUDFTentBlur family's rule, carried over from the former GlassUDFTentBlurShader: the
+/// The GlassUDFTentBlur family's rule: the
 /// position-only rect providers with one color processor, a classifiable coverage, and the carried
 /// IR's tent-blur node over one servable texture child; the fixed loop bound caps the radius.
 bool MatchGlassUDFTentBlur(const ProgramInfo* /*info*/, const DrawShape& shape,
@@ -399,19 +399,19 @@ bool MatchGlassUDFTentBlur(const ProgramInfo* /*info*/, const DrawShape& shape,
   return true;
 }
 
-/// The glass families' shared rule, carried over from the former GlassRefractionShader: one color
+/// The glass families' shared rule: one color
 /// processor whose carried IR roots at the refraction opaque-kernel node with a known geometry
-/// kind and an affine background coordinate, never alpha-only, any xfer. The legacy GP_KIND
-/// dimension becomes the two families' geometries: the ellipse form requires the common color
+/// kind and an affine background coordinate, never alpha-only, any xfer. The one kernel dimension
+/// splits into the two families' geometries: the ellipse form requires the common color
 /// (the refraction output replaces the color entirely, so a per-vertex color would quantize
 /// through the UByte4 attribute for nothing), the quad form requires the uv-matrix layout (the
 /// quad vertex hook feeds the raw position to the background transform; a subset-carrying or
 /// projective quad keeps the fallback route). Only the quad family carries the local shape mask
-/// (the former runtime HasLocalMask branch): the sole coverage processor classifies as LocalMask
+/// (the runtime local-mask branch): the sole coverage processor classifies as LocalMask
 /// with an affine mask transform. Slot layout, both: Frame(0), geometry(1), GlassRefraction(2:
 /// DISPERSION, SHAPE), [GlassLocalMask(3),] AnalyticClip, Xfer. The flattened dims are
 /// [DISPERSION, SHAPE, HAS_XP], so the ordinal is DISPERSION + 2 * SHAPE + 6 * HAS_XP — 18
-/// variants per family, the legacy kernel's 36 across the two.
+/// variants per family, 36 across the two.
 bool MatchGlassRefraction(const ProgramInfo* /*info*/, const DrawShape& shape, GeometryKind kind,
                           uint16_t family, FamilyMatchResult* result) {
   if (shape.geometry->kind != kind || shape.alphaOnlyTarget) {
@@ -433,7 +433,7 @@ bool MatchGlassRefraction(const ProgramInfo* /*info*/, const DrawShape& shape, G
   const AOTTextureParameters* mask = nullptr;
   if (shape.fragmentCount != 1) {
     // The quad form's optional local shape mask (a SrcIn ShaderMaskFilter over a
-    // hardware-tiled RGBA texture), the only coverage the legacy kernel took.
+    // hardware-tiled RGBA texture), the only coverage this rule accepts.
     mask = LocalMaskCoverageLeaf(shape.ir);
     if (kind != GeometryKind::QuadPerEdgeAA || shape.fragmentCount != 2 ||
         !shape.coverage.has_value() || shape.coverage != Coverage::LocalMask || mask == nullptr ||
@@ -454,8 +454,8 @@ bool MatchGlassRefraction(const ProgramInfo* /*info*/, const DrawShape& shape, G
   return true;
 }
 
-/// The shared glass rule's two table entries: the legacy kernel's GP_KIND dimension is the two
-/// families' geometries, so each family row gets its own one-line entry.
+/// The shared glass rule's two table entries: one kernel dimension became the two families'
+/// geometries, so each family row gets its own one-line entry.
 bool MatchGlassRefractionEllipse(const ProgramInfo* /*info*/, const DrawShape& shape,
                                  FamilyMatchResult* result) {
   return MatchGlassRefraction(/*info=*/nullptr, shape, GeometryKind::Ellipse, GlassRefractionIndex,
@@ -468,7 +468,7 @@ bool MatchGlassRefractionQuad(const ProgramInfo* /*info*/, const DrawShape& shap
                               GlassRefractionQuadIndex, result);
 }
 
-/// The ComplexRRect family's rule, carried over from the former ComplexNonAARRectFillShader: the
+/// The ComplexRRect family's rule: the
 /// per-corner-radius rounded rect with no fragment processor and any xfer. The stroke form is the
 /// runtime StrokeEnabled uniform, so the ordinal is HAS_XP alone.
 bool MatchComplexRRect(const ProgramInfo* /*info*/, const DrawShape& shape,
@@ -480,7 +480,7 @@ bool MatchComplexRRect(const ProgramInfo* /*info*/, const DrawShape& shape,
   return EncodeMatchFromFacts(ComplexRRectIndex, 0, shape, &result->variant);
 }
 
-/// The hairline families' shared rule, carried over from the former HairlineLineShader and
+/// The hairline families' shared rule and
 /// HairlineQuadShader: the hairline geometry with no fragment processor, or one that is a bare
 /// analytic rect/rounded-rect clip (no color processors). Only HAS_XP varies, so the ordinal is
 /// HAS_XP alone.
@@ -513,7 +513,7 @@ bool MatchHairlineQuad(const ProgramInfo* /*info*/, const DrawShape& shape,
                        result);
 }
 
-/// The Ellipse family's rule, carried over from the former EllipseFillShader: the ellipse geometry
+/// The Ellipse family's rule: the ellipse geometry
 /// with no color processor, a coverage that is anything but a local mask, and any xfer. DeviceMask
 /// carries PRESENT, so the ordinal is PRESENT + 2 * HAS_XP.
 bool MatchEllipse(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchResult* result) {
@@ -525,7 +525,7 @@ bool MatchEllipse(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMat
   return EncodeMatchFromFacts(EllipseIndex, 0, shape, &result->variant);
 }
 
-/// The ComplexEllipse family's rule, carried over from the former ComplexEllipseFillShader: the
+/// The ComplexEllipse family's rule: the
 /// complex-ellipse geometry with no color processor, a coverage that is anything but a local mask,
 /// and any xfer. The flattened dims are STROKE, PRESENT, HAS_XP, so the ordinal is
 /// STROKE + 2 * PRESENT + 4 * HAS_XP.
@@ -539,7 +539,7 @@ bool MatchComplexEllipse(const ProgramInfo* /*info*/, const DrawShape& shape,
   return EncodeMatchFromFacts(ComplexEllipseIndex, 0, shape, &result->variant);
 }
 
-/// The RoundStrokeRect family's rule, carried over from the former RoundStrokeRectFillShader: the
+/// The RoundStrokeRect family's rule: the
 /// stroked rounded-rect geometry with no fragment processor, or one bare analytic rect/rrect clip,
 /// rejecting perspective uv matrices. UV_MATRIX and HAS_XP flatten in that order, so the ordinal
 /// is UV_MATRIX + 2 * HAS_XP.
@@ -559,7 +559,7 @@ bool MatchRoundStrokeRect(const ProgramInfo* /*info*/, const DrawShape& shape,
   return EncodeMatchFromFacts(RoundStrokeRectIndex, 0, shape, &result->variant);
 }
 
-/// The QuadTexture family's rule, carried over from the former QuadTextureFillShader: the
+/// The QuadTexture family's rule: the
 /// QuadPerEdgeAA geometry with exactly one Plain (non-YUV) texture leaf and no operators above it,
 /// an optional bare analytic clip, device mask or local-space mask, and any xfer. The flattened
 /// dims are [UV_COORD, SUBSET, SUBSET, PRESENT, HAS_XP], so the ordinal is
@@ -602,13 +602,13 @@ bool MatchQuadTexture(const ProgramInfo* /*info*/, const DrawShape& shape,
   return true;
 }
 
-/// The YUVTexture family's rule, the simplified former YUVTextureFillShader: the QuadPerEdgeAA
+/// The YUVTexture family's rule: the QuadPerEdgeAA
 /// geometry with exactly one multi-plane leaf, at most the bounded operator tail above it and no
 /// coverage processors, and any xfer. The tail itself is served by the YUVChainTail module, whose
 /// declared slot capacity the acceptance below enforces. The flattened dims are
 /// [UV_COORD, SUBSET=0, FORMAT, HAS_XP], so the ordinal is UV_COORD + 4*FORMAT + 8*HAS_XP.
 bool MatchYUVTexture(const ProgramInfo* info, const DrawShape& shape, FamilyMatchResult* result) {
-  // The acceptance is the legacy kernel's, verbatim: the QuadPerEdgeAA quad without a subset,
+  // The acceptance: the QuadPerEdgeAA quad without a subset,
   // the color graph is the multi-plane source with at most the tail's operators above it, and the
   // staleness guard keeps the tree and the graph in agreement.
   if (shape.geometry->kind != GeometryKind::QuadPerEdgeAA || shape.geometry->hasSubset ||
@@ -616,7 +616,7 @@ bool MatchYUVTexture(const ProgramInfo* info, const DrawShape& shape, FamilyMatc
       shape.xpType() < XP_NONE || shape.ir == nullptr) {
     return false;
   }
-  // The legacy shell declared ServesAlphaOnly = false: the YUV kernel has no write swizzle, so an
+  // ServesAlphaOnly is false: the YUV kernel has no write swizzle, so an
   // alpha-only target keeps the runtime path.
   if (RejectsAlphaOnlyTarget(/*servesAlphaOnly=*/false, info)) {
     return false;
@@ -626,8 +626,8 @@ bool MatchYUVTexture(const ProgramInfo* info, const DrawShape& shape, FamilyMatc
       shape.colorFPCount > 1 + tail.ops.size()) {
     return false;
   }
-  // The tail's slot budget is the compiled program's: the same bound the legacy kernel enforced
-  // through the shared capacity, so a shape it refused stays refused.
+  // The tail's slot budget is the compiled program's: the bound the shared capacity enforces, so a
+  // shape that overflows stays refused.
   if (info == nullptr || AOTChainBuilder::ResolveYUVProgram(info) == nullptr) {
     return false;
   }
@@ -653,7 +653,7 @@ bool MatchYUVTexture(const ProgramInfo* info, const DrawShape& shape, FamilyMatc
   return EncodeMatchFromFacts(YUVTextureIndex, 0, shape, &result->variant);
 }
 
-/// The AtlasText family's rule, carried over from the former AtlasTextFillShader: the atlas
+/// The AtlasText family's rule: the atlas
 /// geometry kind is the contract — no color processors, at most one coverage processor (a bare
 /// analytic clip or an alpha-only affine device mask), and any xfer. HAS_COVERAGE and HAS_XP
 /// flatten in that order, so the ordinal is HAS_COVERAGE + 2 * HAS_XP.
@@ -676,12 +676,12 @@ bool MatchAtlasText(const ProgramInfo* /*info*/, const DrawShape& shape,
   return EncodeMatchFromFacts(AtlasTextIndex, 0, shape, &result->variant);
 }
 
-/// Derives the legacy cell a compiled chain program resolves to. Every gate below is an
-/// acceptance rule of the retired legacy composition, carried over verbatim: the draw's geometry
+/// Derives the cell a compiled chain program resolves to. Every gate below is an acceptance rule:
+/// the draw's geometry
 /// classification and the program's expression shape either place it in the declared dims or make
 /// it fall to another family, so the chain never compiles a kernel it cannot feed.
-bool DeriveChainCell(const AOTProgram& program, const ProgramInfo* info, ChainLegacyCell* cell) {
-  // The gpKind axis comes from the one geometry classification (DescribeGeometryProcessor), so the
+bool DeriveChainCell(const AOTProgram& program, const ProgramInfo* info, ChainCell* cell) {
+  // The gpKind axis comes from the one geometry classification (ExtractDrawShape), so the
   // family's vertex-layout choice and the matcher's facts cannot disagree.
   auto gpKind = PointwiseGpKind(GeometryFactsOf(info->getGeometryLayout()));
   if (!gpKind.has_value()) {
@@ -849,11 +849,10 @@ bool DeriveChainCell(const AOTProgram& program, const ProgramInfo* info, ChainLe
   return true;
 }
 
-/// The chain family's rule: the legacy interpreter's Accept restated over the declared dims. The
-/// acceptance is the carried IR's compilability (the chain builder's slot budget and op support),
-/// not a shape predicate, so the rule compiles the draw's program exactly where the legacy Accept
-/// did — and derives every dimension from the compiled program rather than guessing from the
-/// shape, which is what kept the old matcher from accepting shapes its writer could not serve.
+/// The chain family's rule. The acceptance is the carried IR's compilability (the chain builder's
+/// slot budget and op support), not a shape predicate, so the rule compiles the draw's program and
+/// derives every dimension from the compiled program rather than guessing from the shape, which is
+/// what keeps the matcher from accepting shapes its writer could not serve.
 bool MatchChain(const ProgramInfo* info, const DrawShape& /*shape*/, FamilyMatchResult* result) {
   if (info == nullptr) {
     // The exclusivity test matches shapes without a program; the interpreter's acceptance needs
@@ -864,7 +863,7 @@ bool MatchChain(const ProgramInfo* info, const DrawShape& /*shape*/, FamilyMatch
   if (program == nullptr) {
     return false;
   }
-  ChainLegacyCell cell = {};
+  ChainCell cell = {};
   if (!DeriveChainCell(*program, info, &cell)) {
     return false;
   }
@@ -977,7 +976,7 @@ std::optional<Variant> MatchChainVariant(const AOTProgram& program, const Progra
   if (info == nullptr) {
     return std::nullopt;
   }
-  ChainLegacyCell cell = {};
+  ChainCell cell = {};
   if (!DeriveChainCell(program, info, &cell)) {
     return std::nullopt;
   }

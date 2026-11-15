@@ -72,7 +72,7 @@ struct Element {
   bool spec = false;
   /// When >= 0: the element's array count is countByValue[value of this dim] instead of `count`.
   /// The slot interpreter's two pool arrays are the one shape whose length is a capacity dim's
-  /// property (the former CHAIN_SLOT_CAPACITY macro, now a declaration fact). -1 = fixed count.
+  /// property, so the capacity dim carries it as a declaration fact. -1 = fixed count.
   int8_t countWhen = -1;
   const uint16_t* countByValue = nullptr;
 };
@@ -155,7 +155,7 @@ struct ModuleDim {
 /// One module's unrolled executor site: the assembler generates the macro <Name>_RUN_UNROLLED_SLOTS
 /// (one guarded call per slot of the variant's declared capacity) and the fragment hook invokes it
 /// inside the function whose locals `arguments` names — a macro, not a function, so the site stays
-/// a statement sequence in the caller's scope, exactly like the former tool pragma's expansion.
+/// a statement sequence in the caller's scope.
 struct UnrollSite {
   /// The module-local function that evaluates one slot, e.g. "chainRunSlotAt".
   const char* function = "";
@@ -181,8 +181,8 @@ struct Module {
   /// The module spells its interface names verbatim (no <Module>_ prefix): uniform, attribute
   /// and varying names, and its dim macros, appear exactly as declared. Frame and Xfer are the
   /// singletons whose names the shared contracts spell bare; the declared Chain modules set it
-  /// too, because they reuse the legacy kernel's interface spellings verbatim in the assembled
-  /// text. The runtime addresses those fields by element index through the derived layout.
+  /// too, because their assembled text reads the interpreter interface names verbatim. The runtime
+  /// addresses those fields by element index through the derived layout.
   bool bareNames = false;
   /// Present on the modules that carry an unrolled executor (the chain family); the assembler
   /// emits the site's macro from it.

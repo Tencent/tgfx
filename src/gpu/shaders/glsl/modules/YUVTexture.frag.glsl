@@ -1,11 +1,11 @@
 // YUVTexture fragment hook: the three-plane read, the YUV-to-RGB conversion and the bounded
-// pointwise tail the legacy kernel carried (the same slot encoding, the same operator table and
+// pointwise tail the interpreter carried (the same slot encoding, the same operator table and
 // the same XP composite as the chain interpreter, at the tail's own capacity). The expressions
 // are verbatim from the old kernel's main; the field names are the declared ones (the tail module
-// keeps the legacy bare spellings so the shared slot loop and the clip helper bind unchanged).
+// keeps the bare interface spellings so the shared slot loop and the clip helper bind unchanged).
 
 // The declared assembly declares the dst sampler among the Xfer module's elements, so the shared
-// xp include must skip its own legacy declaration (the same switch the chain assembly sets).
+// xp include must skip its own duplicate declaration (the same switch the chain assembly sets).
 #define TGFX_DECLARED_CHAIN 1
 
 #pragma tgfx_chain_ops

@@ -1,7 +1,7 @@
 // The geometry layouts' own per-pixel edge coverage formulas, selected by GP_LAYOUT: the ellipse,
 // hairline, complex-ellipse, non-AA rounded-rect and hairline-quad layouts evaluate coverage per
 // fragment (the rect layouts carry the vCoverage varying instead). Shared verbatim by the two
-// assemblies: the legacy kernel (through pointwise_interface_support.inc) and the declared Chain
+// assemblies: the interpreter (through pointwise_interface_support.inc) and the declared Chain
 // module's fragment hook.
 
 #ifndef TGSL_POINTWISE_GEOMETRY_COVERAGE_INCLUDED

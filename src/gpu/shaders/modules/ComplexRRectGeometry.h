@@ -24,7 +24,7 @@ namespace tgfx {
 
 /// ComplexNonAARRectGeometryProcessor's per-corner-radius rounded rect: the position is already in
 /// device space, the corner data rides the varyings and the coverage is the analytic per-corner
-/// ellipse SDF (the former FILL_COVERAGE_COMPLEX_RRECT). The stroke width attribute is
+/// ellipse SDF. The stroke width attribute is
 /// unconditional (the fill buffers write zeros) and the StrokeEnabled uniform selects the coverage
 /// form at runtime, so one variant serves both forms.
 inline constexpr Element ComplexRRectGeometryElements[] = {

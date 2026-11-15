@@ -1,4 +1,4 @@
-// The tent-blur body: the loop and the field encoding are the legacy kernel's, verbatim.
+// The tent-blur body: the loop and the field encoding are the interpreter's, verbatim.
 #define ShaderModeX GlassUDFTentBlur_ShaderModeX
 #define ShaderModeY GlassUDFTentBlur_ShaderModeY
 #define Subset GlassUDFTentBlur_Subset

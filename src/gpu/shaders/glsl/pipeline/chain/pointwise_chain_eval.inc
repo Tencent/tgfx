@@ -66,7 +66,7 @@ vec4 evalChainSlot(int slot) {
       if ((Packed.w & 16) != 0) {
         // The color root: the runtime readback multiplies the mask by its FULL input color
         // (sample.a * inputColor), one multiply over the premul geometry color — RGB and alpha
-        // in a single step (the former bit0|bit3 pair applied the paint alpha to the RGB twice).
+        // in a single step (the bit0|bit3 pair applied the paint alpha to the RGB twice).
         texColor = aotTextureModulate(texColor, TGFX_CHAIN_GEOM_COLOR, true);
       }
     }

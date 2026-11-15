@@ -1,8 +1,7 @@
-// TiledTexture fragment hook. FULL = 0 is the single-tap recipe of the former
-// fill_fragment_main.inc step FILL_SOURCE_TILED; FULL = 1 is the full nine-mode recipe of the
-// former kernels/tiled_texture_fill.frag (FILL_SOURCE_TILED_FULL), including the mipmap-repeat
-// 4-tap seam blend and the runtime read swizzle. Both aliases sets map the shared
-// tiled_sample.inc / tiled_full_sample.inc contract onto this module's field names.
+// TiledTexture fragment hook. FULL = 0 is the single-tap recipe; FULL = 1 is the full nine-mode
+// recipe (FILL_SOURCE_TILED_FULL), including the mipmap-repeat 4-tap seam blend and the runtime
+// read swizzle. Both alias sets map the shared tiled_sample.inc / tiled_full_sample.inc contract
+// onto this module's field names.
 #if TiledTexture_FULL
 #define ShaderModeX TiledTexture_ShaderModeX
 #define ShaderModeY TiledTexture_ShaderModeY

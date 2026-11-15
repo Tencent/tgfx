@@ -4,7 +4,7 @@
 // texture_sampling.inc stays unconditional; only the tiled state needs leaves). The two halves
 // live in their own files because the declared Chain assembly binds them at different points:
 // the geometry coverage belongs to the fragment hook's prologue, the xp and sampling forms to the
-// chain body's; the legacy kernel includes both here in its single include list.
+// chain body's; the interpreter includes both here in its single include list.
 
 #ifndef TGSL_POINTWISE_INTERFACE_SUPPORT_INCLUDED
 #define TGSL_POINTWISE_INTERFACE_SUPPORT_INCLUDED

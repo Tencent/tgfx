@@ -1,6 +1,6 @@
 // The chain body's vertex hook: the leaf and procedural-source coordinate transforms, reading the
 // coordinate source the geometry hook stored in Vertex::localCoord. The CHAIN_LEAF_SOURCE macros
-// are the same contract the legacy kernel defines from its layout's attributes — the UVCoord
+// are the same contract the interpreter defines from its layout's attributes — the UVCoord
 // layouts keep the per-leaf runtime selection through CoordSourceMask.
 
 #include "pipeline/chain/pointwise_declared_config.inc"

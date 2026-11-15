@@ -1,7 +1,6 @@
 // QuadTextureGeometry vertex hook: the per-vertex data forwarded to the fragment stage and the
 // source coordinate handed to the body modules (the per-vertex uv coordinate when the geometry
-// carries one, the position otherwise). The expressions are verbatim from the former
-// kernels/quad_texture_fill.vert.
+// carries one, the position otherwise). The expressions are bit-exact by contract.
 void QuadTextureGeometry_vertex(inout Vertex v) {
   v.position = QuadTextureGeometry_Position;
 #if QuadTextureGeometry_HAS_UV_COORD

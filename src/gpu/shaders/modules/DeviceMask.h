@@ -23,8 +23,7 @@
 namespace tgfx {
 
 /// A device-space alpha mask folded into the coverage: the shader samples the mask at
-/// gl_FragCoord through the module's transform. The former fill pipeline's
-/// FILL_DEVICE_MASK_ALWAYS.
+/// gl_FragCoord through the module's transform.
 inline constexpr ModuleDim DeviceMaskDims[] = {{"PRESENT", 2, DimFact::DeviceMaskPresent}};
 
 inline constexpr Element DeviceMaskElements[] = {

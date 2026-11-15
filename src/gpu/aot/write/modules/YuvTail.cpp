@@ -27,8 +27,8 @@
 namespace tgfx {
 
 void WriteYuvTailModule(WriteContext& context) {
-  // The analytic clip fields live in this module (bare names, the legacy spelling); the tail's slot
-  // records come from the compiled program through the same binder the legacy kernel used.
+  // The analytic clip fields live in this module (bare names, the interface spelling); the tail's
+  // slot records come from the compiled program through the shared binder.
   WriteClipParams<YUVChainTail>(context.info, context.slot);
   if (const auto* program = AOTChainBuilder::ResolveYUVProgram(&context.info)) {
     BindYUVProgram(*program, context.slot);

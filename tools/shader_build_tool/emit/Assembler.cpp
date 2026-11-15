@@ -49,8 +49,8 @@ void AppendBlockMember(const Module* module, const Element& element, uint16_t co
 
 /// The variant's specialization prologue: the master switch, one constant per declared id, the
 /// per-field accessors (constant when the runtime injected the values, the uniform otherwise) and
-/// one unrolled executor macro per module declaring a site. The generated forms mirror the former
-/// SpecCodegen output field for field, so the injectors and every backend keep their contracts.
+/// one unrolled executor macro per module declaring a site. The generated forms keep every
+/// injector and backend contract field for field.
 void AppendSpecBlock(const Family& family, const Variant& variant, const VariantModules& modules,
                      std::string* text) {
   const auto specFields = DeriveSpecFields(family, variant);
@@ -114,8 +114,8 @@ void AppendSpecBlock(const Family& family, const Variant& variant, const Variant
 }
 
 /// The unrolled executor's macro: one guarded call site per slot of the variant's declared
-/// capacity. A macro, not a function, so the sites stay statements in the calling hook's scope —
-/// the same expansion the former tool pragma produced, now derived from the declaration.
+/// capacity. A macro, not a function, so the sites stay statements in the calling hook's scope,
+/// derived entirely from the declaration.
 void AppendUnrollMacro(const Family& family, const Variant& variant, const Module* module,
                        uint8_t slot, std::string* text) {
   const UnrollSite& site = *module->unroll;
@@ -266,7 +266,7 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
         textureBinding++;
       }
     }
-    // A body that owns the output (the legacy chain's interpreter) keeps the Xfer module's
+    // A body that owns the output (the chain interpreter) keeps the Xfer module's
     // interface but not its hook: the composition already ran inside the body, and the hook's
     // framebuffer-fetch input declaration would collide with the body's own include.
     // The Xfer module always closes the sequence (ModulesOf appends it last).

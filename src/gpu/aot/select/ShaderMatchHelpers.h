@@ -103,7 +103,7 @@ std::optional<Coverage> ClassifyCoverageTerm(const AOTCoverageTerm& term);
 /// over the geometry-coverage unit, so the graph is exactly the unit plus the texture source.
 const AOTTextureParameters* BareTextureCoverageLeaf(const AOTCoverageTerm& term);
 
-/// The first texture source of the color graph, in graph order: the transform the legacy walk
+/// The first texture source of the color graph, in graph order: the transform the graph walk
 /// reported first (a single-leaf family's sole sampler).
 const AOTTextureParameters* FirstColorTextureLeaf(const DrawIR* ir);
 

@@ -1,7 +1,5 @@
 // ComplexEllipseGeometry fragment hook: the per-vertex color (or the exact Color uniform) and the
-// analytic complex-ellipse coverage. The call shape is verbatim from the former fill pipeline's
-// FILL_COLOR_VARYING_OR_COMMON and FILL_COVERAGE_COMPLEX_ELLIPSE, with the stroke form selected by
-// StrokeEnabled at runtime.
+// analytic complex-ellipse coverage. The expressions are bit-exact by contract.
 #include "geometry/complex_ellipse_coverage.inc"
 
 void ComplexEllipseGeometry_fragment(inout Fragment f) {

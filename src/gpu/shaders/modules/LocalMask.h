@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-/// A local-space texture-alpha coverage mask (the former FILL_LOCAL_MASK): the mask samples at its
+/// A local-space texture-alpha coverage mask: the mask samples at its
 /// own coordinate transform, its alpha multiplying the running coverage.
 inline constexpr ModuleDim LocalMaskDims[] = {{"PRESENT", 2, DimFact::LocalMaskPresent}};
 

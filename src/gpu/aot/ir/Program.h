@@ -95,8 +95,8 @@ struct AOTChainSlot {
   int textureModulateGeometryRGB = 0;
   // OP_TEXTURE only: 1 modulates an alpha-only leaf by the FULL geometry color (bit 4 of the
   // selector). The color root's runtime readback is sample.a * inputColor with the complete
-  // (premultiplied) geometry color, so one multiply carries the RGB and the alpha together;
-  // the former bit0+bit3 combination applied the paint alpha to the RGB twice.
+  // (premultiplied) geometry color, so one multiply carries the RGB and the alpha together (a
+  // bit0+bit3 pair would apply the paint alpha to the RGB twice).
   int textureModulateFullInput = 0;
   // OP_TEXTURE only: 1 modulates the sample by the coverage unit's alpha (bit 2 of the selector).
   // Set on a leaf that is the coverage subtree's root, matching the runtime coverage-FP readback

@@ -22,11 +22,11 @@
 
 namespace tgfx {
 
-/// The bounded pointwise tail the YUV family carries (the former YUVTextureFillShader's
-/// interpreter): the chain's instruction records at the tail's own capacity — the same slot
+/// The bounded pointwise tail the YUV family carries: the chain's instruction records at the tail's
+/// own capacity — the same slot
 /// encoding, the same data pool layout — plus the program-level color-space block and the
 /// analytic clip contract the composite folds in. bareNames because the shared slot loop and the
-/// clip helper read the legacy spellings verbatim, exactly as they did inside the old kernel.
+/// clip helper read the interface spellings verbatim.
 ///
 /// The tail's capacity is YUVChainTailSlotCapacity (3); a draw with no operators leaves SlotCount at 0
 /// and the loop never runs, so the fields cost a uniform block slot but no variant and no pass.

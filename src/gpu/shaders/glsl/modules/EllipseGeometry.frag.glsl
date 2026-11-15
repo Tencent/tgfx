@@ -1,6 +1,5 @@
 // EllipseGeometry fragment hook: the per-vertex color (or the exact Color uniform) and the
-// analytic ellipse edge coverage. The expressions are verbatim from the former fill pipeline's
-// FILL_COLOR_VARYING_OR_COMMON and FILL_COVERAGE_ELLIPSE.
+// analytic ellipse edge coverage. The expressions are bit-exact by contract.
 #include "geometry/ellipse_coverage.inc"
 
 void EllipseGeometry_fragment(inout Fragment f) {

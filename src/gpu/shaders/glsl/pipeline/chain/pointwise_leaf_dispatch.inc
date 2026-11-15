@@ -1,5 +1,5 @@
 // The leaf sampler dispatch: one statically bound sampler pick per instance, then the shared read
-// swizzle. This is the text the legacy emitter generated for the chain's InstanceDispatchDecl
+// swizzle. This is the text the emitter generated for the chain's InstanceDispatchDecl
 // (emit/StageEmitter.cpp EmitInstanceDispatch); the declared assembly spells it out because its
 // assembler generates no instance dispatches.
 #ifndef TGSL_POINTWISE_LEAF_DISPATCH_INCLUDED

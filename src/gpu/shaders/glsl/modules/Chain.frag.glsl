@@ -1,12 +1,12 @@
-// The chain body's fragment hook: the legacy interpreter's whole evaluation, verbatim. The
-// assembly order matters — the config prologue derives the legacy macros from PROFILE, the
+// The chain body's fragment hook: the shared evaluation, verbatim. The
+// assembly order matters — the config prologue derives the macros from PROFILE, the
 // chain-ops pragma expands the operator table the evaluation dispatches on, and the shared
 // includes supply the geometry coverage formulas, the xp forms and the resource modules before the
-// main text (the same order the legacy kernel's prologue and extra includes used).
+// main text (the same order the interpreter's prologue and extra includes used).
 //
 // TGFX_DECLARED_CHAIN switches the shared text to this assembly: the assembler declares
 // fragColor, the unrolled executor comes from the module's UnrollSite macro, and the entry point
-// is the hook below instead of the legacy thin main.
+// is the hook below instead of a separate main.
 
 #define TGFX_DECLARED_CHAIN 1
 

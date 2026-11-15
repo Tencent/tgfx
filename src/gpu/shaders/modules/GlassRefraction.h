@@ -23,12 +23,12 @@
 
 namespace tgfx {
 
-/// The refraction body (the former kernels/glass_refraction.frag): displaces the background
+/// The refraction body: displaces the background
 /// sample along the glass shape's refracted direction and adds the edge-light response. DISPERSION
-/// is the former DISPERSION_ON — a compile-time branch because the runtime emission compiles one
-/// path or the other and never both; SHAPE is the former GEOMETRY_KIND, carried by the geometry
+/// is a compile-time branch, because one compiled path serves dispersion on or off and never both;
+/// SHAPE rides the geometry
 /// child. The lighting and edge-mask gates stay runtime uniforms (LightingOn, EdgeMaskOn), exactly
-/// as the legacy kernel kept them: both only add to an already-sampled color, so the branch cannot
+/// as runtime uniforms must stay: both only add to an already-sampled color, so the branch cannot
 /// move a texture coordinate. The UDF kind always declares its two mask samplers (an edge-lit-off
 /// draw binds the shared dummy texture and clears EdgeMaskOn), so the UDF-only fields and samplers
 /// exist iff SHAPE == 2.

@@ -73,7 +73,7 @@ void WriteTextureModule(WriteContext& context) {
 }
 
 // TiledTexture: the single-tap or full nine-mode recipe, field for field the same values
-// BindTiledSourceLeaf uploads for the legacy families.
+// BindTiledSourceLeaf uploads.
 void WriteTiledTextureModule(WriteContext& context) {
   const auto* leaf = context.sources.tiledLeaf;
   if (leaf == nullptr) {
@@ -162,7 +162,7 @@ void WriteMaskTextureModule(WriteContext& context) {
 }
 
 // GlassLocalMask: the runtime gate plus the mask leaf's own coordinate transform — the second
-// transform the legacy walk reported.
+// transform the graph walk reports.
 void WriteGlassLocalMaskModule(WriteContext& context) {
   const auto* leaf = context.sources.maskLeaf;
   constexpr uint8_t HasMask = UniformElementIndexOf(GlassLocalMask, "HasMask");

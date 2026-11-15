@@ -1,5 +1,5 @@
-// Xfer fragment hook: the composition site. The expressions are verbatim from the former
-// xp/xp_output.inc and xp/xp_porter_duff.inc routes: HAS_XP = 0 writes the coverage-premultiplied
+// Xfer fragment hook: the composition site. The expressions are bit-exact by contract
+// (xp/xp_output.inc and xp/xp_porter_duff.inc): HAS_XP = 0 writes the coverage-premultiplied
 // source, HAS_XP = 1 reads the dst texture (with the zero-coverage discard), HAS_XP = 2 reads the
 // framebuffer through the subpass input. The blend helpers define xpBlendWithCoverage only when
 // HAS_XP is not 0.
@@ -26,7 +26,7 @@ void Xfer_fragment(inout Fragment f) {
 #else
   fragColor = f.color * f.coverage;
 #endif
-  // The render-target write swizzle (aligned with the former xp/output_swizzle.inc): only the
+  // The render-target write swizzle (the Xfer module's OutputAlphaSwizzle): only the
   // ALPHA_8 targets need the AAAA broadcast.
   if (OutputAlphaSwizzle != 0) {
     fragColor = fragColor.aaaa;

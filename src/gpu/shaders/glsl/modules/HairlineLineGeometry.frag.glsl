@@ -1,6 +1,5 @@
 // HairlineLineGeometry fragment hook: the exact paint color, the edge alpha times the draw
-// coverage and the analytic clip. The expressions are verbatim from the former fill pipeline's
-// FILL_COVERAGE_HAIRLINE_LINE and FILL_CLIP.
+// coverage and the analytic clip. The expressions are bit-exact by contract.
 #include "geometry/hairline_line_coverage.inc"
 #define Rect HairlineLineGeometry_Rect
 #define HasClip HairlineLineGeometry_HasClip

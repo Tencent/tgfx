@@ -25,7 +25,7 @@ namespace tgfx {
 // The chain's rect layout with the UVCoord attribute (QuadPerEdgeAAGP with a uvMatrix, Mesh with
 // texCoords). Ordinals 0..4 stand under the quad layout's five physical slots; a Mesh draw declares
 // 0..3 and stays under that GP's ceiling of 4. CoordSourceMask selects the leaf coordinate source
-// per leaf at runtime, exactly as the legacy kernel did.
+// per leaf at runtime.
 // The family's ordinals decode against one flat domain across the geometries, so every chain
 // geometry declares the same dim pair: SUBSET belongs to the rect classes, STROKE to the complex
 // class, and the family's allowed filter pins each geometry's unused dim to 0 (the variant space

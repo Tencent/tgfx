@@ -1,6 +1,6 @@
 // The rect (uvless) layout's interface facts for the fragment stage. The geometry modules own no
 // fragment work (the chain body computes coverage and color itself), but the body's shared text
-// branches on the legacy macro names, so the module declares them here — before the body's include,
+// branches on the contract macro names, so the module declares them here — before the body's include,
 // which the assembler emits after this slot.
 
 #define HAS_COVERAGE 1

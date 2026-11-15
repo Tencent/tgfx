@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-/// A three-plane YUV source (the simplified former YUVTextureFillShader): I420 declares the third
+/// A three-plane YUV source: I420 declares the third
 /// plane's sampler (FORMAT = 0) while NV12 reads the interleaved RG plane (FORMAT = 1). The color
 /// is the YUV-to-RGB conversion of the sampled planes, optionally through the RGBAAA dual-plane
 /// alpha; the bounded pointwise tail the old kernel embedded is stripped — color-graded YUV draws

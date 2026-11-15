@@ -1,6 +1,5 @@
 // HairlineQuadGeometry fragment hook: the exact paint color, the Loop-Blinn edge coverage times the
-// draw coverage and the analytic clip. The expressions are verbatim from the former fill
-// pipeline's FILL_COVERAGE_HAIRLINE_QUAD and FILL_CLIP.
+// draw coverage and the analytic clip. The expressions are bit-exact by contract.
 #include "geometry/hairline_quad_coverage.inc"
 #define Rect HairlineQuadGeometry_Rect
 #define HasClip HairlineQuadGeometry_HasClip

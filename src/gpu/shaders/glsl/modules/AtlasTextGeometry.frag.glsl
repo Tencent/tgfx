@@ -1,7 +1,6 @@
 // AtlasTextGeometry fragment hook: the atlas sample — an alpha-only atlas contributes its red
 // channel as the coverage and leaves the color, a color atlas replaces the color with its
-// unpremultiplied rgb and contributes its alpha. The expressions are verbatim from the former
-// fill pipeline's FILL_COLOR_VARYING_OR_COMMON and FILL_COVERAGE_ATLAS_TEXT.
+// unpremultiplied rgb and contributes its alpha.
 void AtlasTextGeometry_fragment(inout Fragment f) {
   f.color = AtlasTextGeometry_vColor;
   if (AtlasTextGeometry_HasCommonColor != 0) {
