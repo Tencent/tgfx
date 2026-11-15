@@ -279,7 +279,9 @@ void WriteChainHairlineGeometry(SlotWriter* writer, SlotWriter* chainWriter,
   colorParams->set(HasCommonColor, 1);
   colorParams->set(Color, p.commonColor);
   colorParams->set(Coverage, p.coverage);
-  colorParams->set(AAEnabled, p.aaType == AAType::Coverage ? 1 : 0);
+  // The same formula the dedicated hairline writers use: the two routes must agree on an MSAA
+  // target, where the hardware already antialiases and the analytic edge must still run.
+  colorParams->set(AAEnabled, p.aaType == AAType::None ? 0 : 1);
   writer->set(Matrix, p.viewMatrix);
 }
 
@@ -394,14 +396,12 @@ void ChainProgramWriter::writeUniforms(const ProgramInfo& info, UniformData* ver
   constexpr uint8_t GeomColor = UniformElementIndexOf(ChainColorParams, "Color");
   constexpr uint8_t GeomHasCommonColor = UniformElementIndexOf(ChainColorParams, "HasCommonColor");
   constexpr uint8_t GeomStrokeEnabled = UniformElementIndexOf(ChainColorParams, "StrokeEnabled");
-  constexpr uint8_t GeomAAEnabled = UniformElementIndexOf(ChainColorParams, "AAEnabled");
   constexpr uint8_t GeomCoverage = UniformElementIndexOf(ChainColorParams, "Coverage");
   {
     const auto& p = info.getGeometryLayout().parameters;
     colorParamsWriter.set(GeomColor, p.commonColor);
     colorParamsWriter.set(GeomHasCommonColor, static_cast<int32_t>(p.hasCommonColor ? 1 : 0));
     colorParamsWriter.set(GeomStrokeEnabled, static_cast<int32_t>(p.isStroke ? 1 : 0));
-    colorParamsWriter.set(GeomAAEnabled, static_cast<int32_t>(p.aaType == AAType::None ? 0 : 1));
     colorParamsWriter.set(GeomCoverage, p.coverage);
   }
   WriteChainGeometryUniforms(&geometryWriter, &chainWriter, &colorParamsWriter,
