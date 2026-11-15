@@ -12,8 +12,8 @@
 // slot 0. The FragmentUniformBlock must therefore declare the chain slot arrays (a capacity-1
 // include for the single-operator kernel) and the shared ChainCS* block. The OP_* constants come
 // from the shared op table; its guard makes the repeated per-slot inclusion of this file a no-op
-// rather than a redefinition. This interpreter dispatches on the AOTPointwiseOpType subset; the
-// chain-only defines in the table are simply unreferenced here.
+// rather than a redefinition. This interpreter dispatches on the pointwise subset of the table;
+// the chain-only defines are simply unreferenced here.
 
 // OP_BLEND needs the shared PorterDuff blend math regardless of the kernel's XP state; the
 // include is guarded, so the repeated inclusions of this file stay harmless.

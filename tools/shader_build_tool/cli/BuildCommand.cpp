@@ -261,7 +261,6 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
     shaderReport.name = family.name;
     shaderReport.rawCount = 0;
     shaderReport.compiledCount = 0;
-    shaderReport.errorCount = 0;
     const auto variants = EnumerateVariants(family, static_cast<uint16_t>(familyIndex));
     shaderReport.rawCount = static_cast<uint32_t>(variants.size());
     // A module carrying an unroll site is the interpreter assembly: its shared text reads the
@@ -426,11 +425,7 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       }
     }
     std::cout << "[" << shaderReport.name << "] raw=" << shaderReport.rawCount
-              << " compiled=" << shaderReport.compiledCount;
-    if (shaderReport.errorCount > 0) {
-      std::cout << " errors=" << shaderReport.errorCount;
-    }
-    std::cout << "\n";
+              << " compiled=" << shaderReport.compiledCount << "\n";
     report->shaders.push_back(std::move(shaderReport));
   }
 }

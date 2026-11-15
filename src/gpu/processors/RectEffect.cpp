@@ -20,7 +20,6 @@
 #include "core/utils/Log.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/shaders/KernelContract.h"
-#include "gpu/shaders/modules/AnalyticClipModule.h"
 
 namespace tgfx {
 

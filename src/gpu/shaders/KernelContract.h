@@ -54,8 +54,8 @@ constexpr const char* DeviceToLocal = "DeviceToLocal";
 
 // The pointwise color operators of the fused kernels, one row per operator: the single place an
 // operator's name, ABI value and facts are declared. Every mirror below is generated from this
-// list — the Op constants and the OP_* defines here, the AOTEffectKind / AOTPointwiseOpType /
-// AOTChainOp members and the parameter variant in the IR — so adding an operator is one row plus
+// list — the Op constants and the OP_* defines here, the AOTEffectKind and AOTChainOp members and
+// the parameter variant in the IR — so adding an operator is one row plus
 // its own semantics (parameter struct, math, bind), and removing a row fails every consumer's
 // compile instead of leaving a stale mirror behind.
 // Columns: name, ABI value (Op::*, frozen bundle compatibility), the IR parameter struct, the
@@ -76,10 +76,10 @@ namespace Op {
 // The op values of the chain interpreter and the pointwise slot interpreters: every one derives
 // from ChainISA's single list (contract/ChainISA.h), which is also the list Defines() turns into
 // the OP_* defines every compiled variant receives, and the AOTChainOp enum anchors to these
-// values by assignment. The single-slot interpreter
-// dispatches on the AOTPointwiseOpType subset, so it deliberately never emits the chain-only
-// operators (Texture, the coverage ops, the modulators). The pointwise color operators also have
-// an IR mirror (the list above), which the asserts below keep aligned with the ABI values.
+// values by assignment. The single-slot interpreter dispatches on the pointwise subset, so it
+// deliberately never emits the chain-only operators (Texture, the coverage ops, the modulators).
+// The pointwise color operators also have an IR mirror (the list above), which the asserts below
+// keep aligned with the ABI values.
 #define TGFX_OP_CONSTANT(name, id, inputs, sensitive, defineName) \
   constexpr int name = ChainISA::name;
 TGFX_CHAIN_OPS(TGFX_OP_CONSTANT)

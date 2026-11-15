@@ -19,7 +19,6 @@
 #include "DeviceSpaceTextureEffect.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
-#include "gpu/shaders/modules/DeviceMaskModule.h"
 
 namespace tgfx {
 DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy,

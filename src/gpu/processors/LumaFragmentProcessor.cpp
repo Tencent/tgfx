@@ -19,7 +19,6 @@
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "gpu/aot/ir/EffectGraph.h"
-#include "gpu/shaders/modules/PointwiseOpModule.h"
 namespace tgfx {
 bool LumaFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                        AOTNodeID* output) const {

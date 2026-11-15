@@ -41,14 +41,12 @@ enum ShaderTextureRead : uint32_t {
 };
 
 /**
- * Metadata describing a precompiled shader, including its permutation domain and source file
- * paths. The compiled variant list is defined by the matcher rules (see the family rules in
+ * Metadata describing a precompiled shader: the family it names and the texture-read semantics it
+ * implements. The compiled variant list is defined by the matcher rules (see the family rules in
  * FamilyMatch.cpp); no shader-side filter exists.
  */
 struct PrecompiledShaderInfo {
   std::string name;
-  std::string vertexFile;
-  std::string fragmentFile;
   /// ShaderTextureRead bits this family implements. Zero (the default) declares none.
   uint32_t textureReads = 0;
 };

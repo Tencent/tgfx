@@ -39,7 +39,7 @@ vec4 chainPlainLeafFetch(sampler2D texSampler, vec3 coord, vec4 leafSubset,
     uv = aotTextureClamp(uv, vTexSubset, true);
   }
 #endif
-  // Gated like the fill pipeline's Subset clamp: a leaf the runtime needSubset() does not clamp
+  // Gated like the fill pipeline's Subset clamp: a leaf the binder's subset rule does not clamp
   // (wrap-tiled, device-space) must read its sampler unclamped.
   highp vec2 finalCoord = aotTextureClamp(uv, leafSubset, leafClampOn != 0);
   vec4 color = aotTextureRead(texSampler, finalCoord, readSwizzle);

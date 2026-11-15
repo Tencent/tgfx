@@ -31,7 +31,6 @@ struct ShaderReport {
   std::string name;
   uint32_t rawCount = 0;
   uint32_t compiledCount = 0;
-  uint32_t errorCount = 0;
 };
 
 /// The whole build's outcome: the per-family reports, the produced variants, and the per-profile

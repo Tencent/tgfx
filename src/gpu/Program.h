@@ -20,7 +20,6 @@
 
 #include <list>
 #include "gpu/UniformData.h"
-#include "gpu/shaders/modules/ParamHandle.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/RenderPipeline.h"
 

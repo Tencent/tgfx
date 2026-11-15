@@ -62,9 +62,6 @@ class TiledTextureEffect : public FragmentProcessor {
     return textureProxy;
   }
 
-  /// Returns the ShaderMode for X/Y axes computed from the resolved sampling state.
-  void getShaderModes(int* outModeX, int* outModeY) const;
-
   bool isAlphaOnly() const;
 
   bool isStrict() const {

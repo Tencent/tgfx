@@ -36,7 +36,6 @@ struct ColorSpaceXformSteps;
 enum class AOTOpaqueKernel : int;
 struct AOTOpaqueKernelParameters;
 struct AOTTextureParameters;
-class QuadPerEdgeAAGeometryProcessor;
 struct AOTProgram;
 struct AOTCoverageTerm;
 struct Family;

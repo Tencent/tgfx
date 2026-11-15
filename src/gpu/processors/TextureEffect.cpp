@@ -24,7 +24,6 @@
 #include "gpu/YUVColorConversion.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
-#include "gpu/shaders/modules/TextureSourceModule.h"
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> TextureEffect::Make(BlockAllocator* allocator,
@@ -158,65 +157,6 @@ bool TextureEffect::isYUV() const {
 
 bool TextureEffect::isAlphaOnly() const {
   return textureProxy->isAlphaOnly();
-}
-
-bool TextureEffect::needSubset() const {
-  auto bounds = Rect::MakeWH(textureProxy->width(), textureProxy->height());
-  if (subset.has_value() && !(*subset).contains(bounds)) {
-    // if subset equal to bounds, we don't need to use subset.
-    return true;
-  }
-  auto textureView = getTextureView();
-  if (textureProxy->width() != textureView->width() ||
-      textureProxy->height() != textureView->height()) {
-    // If the texture size is different from the proxy size, we need to use subset.
-    return true;
-  }
-  auto type = textureView->getTexture()->type();
-  if (type == TextureType::External) {
-    // The descriptor size of external (OES) textures may not match the actual size of the
-    // underlying buffer, which can hold unstable padding outside the content bounds (for example,
-    // SurfaceTexture buffers aligned by hardware decoders). Always clamp the sampling to the
-    // content bounds to prevent bilinear filtering from reaching the padding area.
-    return true;
-  }
-  return false;
-}
-
-void TextureEffect::computeSubsetRect(float rect[4]) const {
-  auto textureView = getTextureView();
-  auto subsetRect = subset.value_or(Rect::MakeWH(textureProxy->width(), textureProxy->height()));
-  if (needSubset()) {
-    if (samplerState.magFilterMode == samplerState.minFilterMode &&
-        samplerState.magFilterMode == FilterMode::Nearest) {
-      subsetRect.roundOut();
-    }
-    auto type = textureView->getTexture()->type();
-    // Normally this would just need to take 1/2 a texel off each end, but because the chroma
-    // channels of YUV420 images are subsampled we may need to shrink the crop region by a whole
-    // texel on each side for external textures.
-    auto inset = type == TextureType::External ? 1.0f : 0.5f;
-    subsetRect = subsetRect.makeInset(inset, inset);
-  }
-  rect[0] = subsetRect.left;
-  rect[1] = subsetRect.top;
-  rect[2] = subsetRect.right;
-  rect[3] = subsetRect.bottom;
-  if (textureView->origin() == ImageOrigin::BottomLeft) {
-    auto h = static_cast<float>(textureView->height());
-    rect[1] = h - rect[1];
-    rect[3] = h - rect[3];
-    std::swap(rect[1], rect[3]);
-  }
-  auto type = textureView->getTexture()->type();
-  if (type != TextureType::Rectangle) {
-    auto lt = textureView->getTextureCoord(rect[0], rect[1]);
-    auto rb = textureView->getTextureCoord(rect[2], rect[3]);
-    rect[0] = lt.x;
-    rect[1] = lt.y;
-    rect[2] = rb.x;
-    rect[3] = rb.y;
-  }
 }
 
 PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(BlockAllocator* allocator,

@@ -324,7 +324,6 @@ class ProgramInfo {
   // for a plan pass.
 
   friend class ProgramWriter;
-  friend class PrecompiledProgramWriter;
   friend class ChainProgramWriter;
 };
 }  // namespace tgfx

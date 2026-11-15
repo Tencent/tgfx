@@ -38,10 +38,6 @@ class ClampedGradientEffect : public FragmentProcessor {
 
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
-  /** The kernel's LayoutType index for a layout processor's name (0 linear, 1 radial, 2 conic,
-   *  3 diamond). Shared with the runtime writer so the mapping lives in one place. */
-  static int LayoutTypeIndex(const std::string& layoutName);
-
  protected:
   ClampedGradientEffect(PlacementPtr<FragmentProcessor> colorizer,
                         PlacementPtr<FragmentProcessor> gradLayout, Color leftBorderColor,

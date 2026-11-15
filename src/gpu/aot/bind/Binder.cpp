@@ -515,10 +515,9 @@ void BindChainProgram(const AOTProgram& program, SlotWriter* chainWriter) {
 
 namespace {
 
-// The subset semantics below replicate TextureEffect::needSubset / computeSubsetRect and the
-// module bind's field writes from the binding's own data. The processor-side implementations stay
-// until the shell retires and serve the un-migrated families meanwhile; byte-for-byte parity is
-// what lets the binder take the chain's children over.
+// The subset semantics below derive the fields from the binding's own data, the same way the
+// module bind's field writes do; byte-for-byte parity is what lets the binder take the chain's
+// children over.
 bool BindingNeedsSubset(const std::shared_ptr<TextureProxy>& proxy, const TextureView* view,
                         const std::optional<Rect>& subset) {
   auto bounds = Rect::MakeWH(proxy->width(), proxy->height());
@@ -669,9 +668,8 @@ void BindChainBindings(const AOTProgram& program, SlotWriter* chainWriter) {
   if (chainWriter == nullptr) {
     return;
   }
-  // The leaf records live in the Chain module, one declared element per leaf slot: the legacy
-  // ParamWriter composed "Subset_1".."Subset_3" from an instance ordinal, while the declared
-  // module spells the same fields as elements, so the slot index selects the element directly.
+  // The leaf records live in the Chain module, one declared element per leaf slot, so the slot
+  // index selects the element directly instead of composing a name per instance ordinal.
   constexpr uint8_t Subsets[4] = {
       UniformElementIndexOf(Chain, "Subset"), UniformElementIndexOf(Chain, "Subset_1"),
       UniformElementIndexOf(Chain, "Subset_2"), UniformElementIndexOf(Chain, "Subset_3")};

@@ -59,7 +59,7 @@ static bool BuildTextureLeafBinding(const AOTEffectNode* node, AOTBinding* bindi
     // DeviceSpaceTextureEffect (clamp, linear, no mipmaps). Its coordinate transform is unused.
     // The runtime effect's emission is a bare texture lookup — no subset clamp for any view fact
     // (a smaller-than-proxy view, an External texture) — so this leaf's SubsetClampOn gate must be
-    // 0 unconditionally, not follow needSubset(). The unbounded sample area is what forces it;
+    // 0 unconditionally, not follow the subset rule. The unbounded sample area is what forces it;
     // without it, a view-mismatched device leaf would gain a clamp the runtime never emits.
     SamplingArgs args = {TileMode::Clamp, TileMode::Clamp,
                          SamplingOptions(FilterMode::Linear, MipmapMode::None),

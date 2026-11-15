@@ -21,11 +21,6 @@
 #include <iterator>
 #include "gpu/shaders/Module.h"
 
-#pragma once
-
-#include <iterator>
-#include "gpu/shaders/Module.h"
-
 namespace tgfx {
 
 /// The glass UDF tent-blur body (the former kernels/glass_udf_tent_blur.frag): a one-directional

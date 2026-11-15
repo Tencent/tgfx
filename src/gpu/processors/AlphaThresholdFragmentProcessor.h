@@ -19,7 +19,6 @@
 #pragma once
 
 #include "gpu/processors/FragmentProcessor.h"
-#include "gpu/shaders/modules/PointwiseOpModule.h"
 
 namespace tgfx {
 class AlphaThresholdFragmentProcessor : public FragmentProcessor {

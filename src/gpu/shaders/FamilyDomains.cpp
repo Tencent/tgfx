@@ -30,7 +30,7 @@ PrecompiledShaderInfo AssembledFamilyInfo(const Family& family) {
   // The declaration is the only variant description left: the info names the family and carries
   // the capability bits the matcher gates on. There is no domain to assemble, because the variant
   // space is what EnumerateVariants walks.
-  return PrecompiledShaderInfo{family.name, "", "", family.textureReads};
+  return PrecompiledShaderInfo{family.name, family.textureReads};
 }
 
 uint8_t ChainGeometryOfCell(const ChainLegacyCell& cell) {

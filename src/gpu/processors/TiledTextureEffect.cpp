@@ -28,7 +28,6 @@
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/processors/TextureEffect.h"
-#include "gpu/shaders/modules/TiledSourceModule.h"
 
 namespace tgfx {
 TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(TileMode tileMode,
@@ -265,17 +264,6 @@ const TiledTextureEffect::ResolvedSampling* TiledTextureEffect::resolveSampling(
   }
   resolvedSampling = makeResolvedSampling(source);
   return &*resolvedSampling;
-}
-
-void TiledTextureEffect::getShaderModes(int* outModeX, int* outModeY) const {
-  auto sampling = resolveSampling();
-  if (sampling == nullptr) {
-    *outModeX = 0;
-    *outModeY = 0;
-    return;
-  }
-  *outModeX = static_cast<int>(sampling->shaderModeX);
-  *outModeY = static_cast<int>(sampling->shaderModeY);
 }
 
 bool TiledTextureEffect::isAlphaOnly() const {

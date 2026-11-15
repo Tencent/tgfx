@@ -25,13 +25,13 @@
 namespace tgfx {
 namespace ChainISA {
 
-// The parameters of every chain operator, split the way the runtime carries them:
+// The parameters of every chain operator:
 //
 //   Data       per-instance values, written into the chain data pool. Every field owns whole vec4
 //              words, so a bare float costs one word; that is the padding rule the generator and
 //              the packer share, and it needs no per-type layout table.
-//   Structure  ints that change the code path. Each becomes one specialization constant per slot,
-//              and the same values ride the fallback form's uniform mirror.
+//   Selector   ints that change the code path; the encoder packs them into the slot's selector
+//              word, and the compiled executor reads them back from the specialization constants.
 //
 // A new operator declares its two field lists and one row in TGFX_CHAIN_OPS; the structs, the
 // word counts and the capacity checks below all derive from those, and the encoder, the packer
@@ -87,9 +87,7 @@ static_assert(sizeof(Int32) == sizeof(float), "an Int32 field must occupy exactl
 // The field-list vocabulary: a list is `#define <OP>_DATA(T) T(Float4, rect) ...`, so the same
 // list produces the struct member, the word count and, later, the packer and the GLSL reader.
 #define TGFX_CHAIN_DATA_MEMBER(type, name) type name = {};
-#define TGFX_CHAIN_STRUCT_MEMBER(type, name) type name = 0;
 #define TGFX_CHAIN_DATA_WORDS(type, name) +TGFX_CHAIN_WORD_COUNT_##type
-#define TGFX_CHAIN_STRUCT_FIELD(type, name) +1
 
 // Packing writes one field per word, in declaration order: the same walk the generated GLSL
 // readers perform, so the two sides cannot disagree about an offset. A mat3 occupies three words
@@ -172,18 +170,14 @@ static_assert(sizeof(Int32) == sizeof(float), "an Int32 field must occupy exactl
 /// The data-pool stride of one slot: the widest operator a single slot can carry.
 inline constexpr int PoolSlotWords = 7;
 
-#define TGFX_CHAIN_DECLARE_OP(name, dataFields, structureFields)                             \
+// The third argument documents the selector words the encoder packs into SlotPacked; the encoder
+// owns the bit layout, so the list is the vocabulary rather than a generated type.
+#define TGFX_CHAIN_DECLARE_OP(name, dataFields, selectorFields)                              \
   struct name##Data {                                                                        \
     dataFields(TGFX_CHAIN_DATA_MEMBER)                                                       \
   };                                                                                         \
-  struct name##Structure {                                                                   \
-    structureFields(TGFX_CHAIN_STRUCT_MEMBER)                                                \
-  };                                                                                         \
   inline constexpr int name##DataWords = 0 dataFields(TGFX_CHAIN_DATA_WORDS);                \
-  inline constexpr int name##StructureFields = 0 structureFields(TGFX_CHAIN_STRUCT_FIELD);   \
   static_assert(name##DataWords <= DataCapacity, #name " data exceeds the chain data pool"); \
-  static_assert(name##StructureFields <= StructureCapacity,                                  \
-                #name " declares more structural fields than a slot has columns");           \
   inline void Pack##name(const name##Data& data, float* words) {                             \
     (void)data;                                                                              \
     (void)words;                                                                             \

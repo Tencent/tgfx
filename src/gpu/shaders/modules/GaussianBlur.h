@@ -21,11 +21,6 @@
 #include <iterator>
 #include "gpu/shaders/Module.h"
 
-#pragma once
-
-#include <iterator>
-#include "gpu/shaders/Module.h"
-
 namespace tgfx {
 
 inline constexpr Element GaussianBlurElements[] = {

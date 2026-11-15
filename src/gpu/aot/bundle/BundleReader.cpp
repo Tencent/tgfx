@@ -18,7 +18,6 @@
 
 #include "gpu/aot/bundle/BundleReader.h"
 #include "core/utils/Log.h"
-#include "gpu/aot/bundle/BundleReader.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {

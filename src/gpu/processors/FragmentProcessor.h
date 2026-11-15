@@ -32,7 +32,6 @@
 namespace tgfx {
 class AOTNodeBuilder;
 class AOTNodeID;
-class ParamWriter;
 class ProgramInfo;
 class Image;
 class Shader;

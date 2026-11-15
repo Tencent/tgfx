@@ -69,8 +69,5 @@ class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
   int maxSigma = 10;
 
   void computeKernel(float strength) override;
-  int kernelLoopUpperBound() const override {
-    return 4 * maxSigma;
-  }
 };
 }  // namespace tgfx

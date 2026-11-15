@@ -22,8 +22,6 @@
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/TextureEffect.h"
-#include "gpu/shaders/modules/AnalyticClipModule.h"
-#include "gpu/shaders/modules/BlendParams.h"
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromSrcProcessor(

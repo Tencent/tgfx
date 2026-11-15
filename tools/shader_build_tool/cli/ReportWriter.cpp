@@ -209,8 +209,7 @@ bool WriteReportJson(const BuildReport& report, const std::string& outDir) {
     file << "      \"rawCount\": " << shader.rawCount << ",\n";
     file << "      \"compiledCount\": " << shader.compiledCount << ",\n";
     file << "      \"vertexBytes\": " << vertexBytes << ",\n";
-    file << "      \"fragmentBytes\": " << fragmentBytes << ",\n";
-    file << "      \"errorCount\": " << shader.errorCount << "\n";
+    file << "      \"fragmentBytes\": " << fragmentBytes << "\n";
     file << "    }";
     if (i + 1 < report.shaders.size()) {
       file << ",";

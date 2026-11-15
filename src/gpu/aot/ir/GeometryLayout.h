@@ -27,8 +27,8 @@ namespace tgfx {
 
 /// The geometry facts a draw carries: the vertex/instance attribute layout (with the physical
 /// slots precompiled shaders number their inputs by) and the uniform values the writers upload.
-/// The single value every geometry reader addresses, so the concrete geometry-processor type stays
-/// behind one derivation (GeometryLayoutOf) instead of at each consumer.
+/// The single value every geometry reader addresses, so a geometry flag has one definition instead
+/// of being re-derived at each consumer.
 struct GeometryLayout {
   AOTGeometryParameters parameters = {};
   std::vector<Attribute> vertexAttributes = {};
@@ -40,8 +40,7 @@ const char* GeometryKindName(GeometryKind kind);
 
 /// The geometry layouts, built from the draw's own facts: each factory reproduces the processor's
 /// declared slots (filtered by the same conditions, the physical slots keeping the declared
-/// numbering) and its uniform values. These are the onMakeGeometry results; the double-track form
-/// asserts them against GeometryLayoutOf while the processors remain.
+/// numbering) and its uniform values. These are the onMakeGeometry results.
 GeometryLayout DefaultGeometryLayout(PMColor color, AAType aaType, const Matrix& viewMatrix,
                                      const Matrix& uvMatrix);
 GeometryLayout RoundStrokeRectGeometryLayout(AAType aaType, const std::optional<PMColor>& color,

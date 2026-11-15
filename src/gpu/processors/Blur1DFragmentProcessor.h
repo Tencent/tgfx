@@ -28,9 +28,8 @@ class UniformData;
 /**
  * Base class for one-dimensional convolution blur processors whose kernel weights are precomputed
  * on the CPU and uploaded as a uniform vec4 array. Subclasses generate a blur-specific kernel in
- * computeKernel(strength) and provide the shader loop bound in kernelLoopUpperBound(). The kernel
- * must be symmetric: the half-kernel is stored in kernel[0..kernelRadius] and the shader indexes
- * it by abs(offset).
+ * computeKernel(strength). The kernel must be symmetric: the half-kernel is stored in
+ * kernel[0..kernelRadius] and the shader indexes it by abs(offset).
  */
 class Blur1DFragmentProcessor : public FragmentProcessor {
  public:
@@ -67,10 +66,6 @@ class Blur1DFragmentProcessor : public FragmentProcessor {
    * MAX_KERNEL_RADIUS so that the sample count fits the kernel table.
    */
   virtual void computeKernel(float strength) = 0;
-
-  // The compile-time upper bound of the shader sampling loop. It determines the generated shader
-  // code, so subclasses must include the loop bound in the processor key.
-  virtual int kernelLoopUpperBound() const = 0;
 
   /**
    * Uploads the packed kernel and radius uniforms. The half-kernel uploads kernelRadius + 1
