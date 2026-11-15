@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/aot/ir/GeometryParameters.h"
+#include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/aot/select/FamilyMatchResult.h"
 
 namespace tgfx {

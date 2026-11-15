@@ -20,7 +20,6 @@
 #include "gpu/CoordTransform.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/ir/GeometryLayout.h"
-#include "gpu/aot/ir/GeometryParameters.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
 

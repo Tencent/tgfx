@@ -20,8 +20,7 @@
 
 #include <cstdint>
 #include <optional>
-#include "gpu/aot/ir/GeometryKind.h"
-#include "gpu/aot/ir/GeometryParameters.h"
+#include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/aot/ir/XferFacts.h"
 #include "gpu/shaders/Family.h"
 
