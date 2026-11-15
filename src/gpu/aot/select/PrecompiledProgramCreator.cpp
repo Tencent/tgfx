@@ -39,7 +39,6 @@
 #include "gpu/aot/select/ProgramSelection.h"
 #include "gpu/aot/spec/SpecInjector.h"
 #include "gpu/aot/spec/SpecResolver.h"
-#include "gpu/aot/write/ProgramWriterFactory.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
@@ -594,16 +593,9 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
   cache->recordAOTStage(PrecompiledAOTStage::PipelineCreated,
                         MakeHitRecord(cache, programInfo, variant));
 
-  auto writer = MakeProgramWriter(*programInfo, variant);
-  if (writer == nullptr) {
-    // A family without a writer has no way to upload its uniforms. The matcher only ever returns
-    // table rows, so this is a defect rather than a draw the runtime can serve.
-    cache->recordFailure(PrecompiledFallbackReason::Unspecified,
-                         MakeFallbackRecord(cache, programInfo, &variant));
-    return nullptr;
-  }
   auto program = std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
-                                           std::move(fragmentUniformData), std::move(writer));
+                                           std::move(fragmentUniformData),
+                                           std::make_unique<ProgramWriter>(variant));
   program->setShaderName(shaderName);
   program->setExpectedTextureCount(static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));
   return program;

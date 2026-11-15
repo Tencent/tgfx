@@ -640,30 +640,6 @@ std::vector<CoordTransform> BuildChainCoordTransforms(const AOTProgram& program)
   return transforms;
 }
 
-void BindPorterDuffXfer(int blendMode, const DstTextureInfo& dstInfo, SlotWriter* xferWriter) {
-  constexpr uint8_t XPBlendMode = UniformElementIndexOf(Xfer, "XPBlendMode");
-  constexpr uint8_t DstTextureUpperLeft = UniformElementIndexOf(Xfer, "DstTextureUpperLeft");
-  constexpr uint8_t DstTextureCoordScale = UniformElementIndexOf(Xfer, "DstTextureCoordScale");
-  xferWriter->setIfPresent(XPBlendMode, blendMode);
-  if (dstInfo.textureProxy == nullptr) {
-    return;
-  }
-  auto dstView = dstInfo.textureProxy->getTextureView();
-  if (dstView == nullptr) {
-    return;
-  }
-  const float upperLeft[2] = {dstInfo.offset.x, dstInfo.offset.y};
-  xferWriter->setIfPresent(DstTextureUpperLeft, upperLeft);
-  int width = dstView->width();
-  int height = dstView->height();
-  if (dstView->getTexture()->type() == TextureType::Rectangle) {
-    width = 1;
-    height = 1;
-  }
-  const float scales[2] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
-  xferWriter->setIfPresent(DstTextureCoordScale, scales);
-}
-
 void BindChainBindings(const AOTProgram& program, SlotWriter* chainWriter) {
   if (chainWriter == nullptr) {
     return;

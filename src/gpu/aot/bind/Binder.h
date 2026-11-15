@@ -81,7 +81,6 @@ void BindChainBindings(const AOTProgram& program, SlotWriter* chainWriter);
 /// The xfer bind: the blend mode off the IR, the dst texture's instance-time facts off the made
 /// processor (the same layer the geometry facts read). The fields are addressed by their index in
 /// the Xfer module's declaration; an HAS_XP-less variant simply carries none of them.
-void BindPorterDuffXfer(int blendMode, const DstTextureInfo& dstInfo, SlotWriter* xferWriter);
 
 /**
  * The coordinate transforms the chain kernel's vertex stage consumes, in the order the geometry

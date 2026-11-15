@@ -108,16 +108,4 @@ const FragmentProcessor* FragmentProcessor::Iter::next() {
   return back;
 }
 
-FragmentProcessor::CoordTransformIter::CoordTransformIter(
-    const std::vector<CoordTransform>* transformList)
-    : transforms(transformList) {
-}
-
-const CoordTransform* FragmentProcessor::CoordTransformIter::next() {
-  if (transforms == nullptr || transformIndex >= transforms->size()) {
-    return nullptr;
-  }
-  return &(*transforms)[transformIndex++];
-}
-
 }  // namespace tgfx

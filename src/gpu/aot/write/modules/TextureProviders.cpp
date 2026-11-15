@@ -23,6 +23,7 @@
 #include "gpu/aot/write/TextureList.h"
 #include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/modules/AtlasTextGeometry.h"
+#include "gpu/shaders/modules/Chain.h"
 #include "gpu/shaders/modules/CoverageTexture.h"
 #include "gpu/shaders/modules/DeviceMask.h"
 #include "gpu/shaders/modules/DeviceMaskRuntime.h"
@@ -119,6 +120,25 @@ bool ProvideTextures(WriteContext& context, const Module& module) {
     }
     return textures->pushProxyFor(module, shape.edgeMaskProxy.get(),
                                   SamplerState(TileMode::Decal, TileMode::Decal));
+  }
+  if (&module == &Chain) {
+    // The interpreter's declared slots are its sampler children in binding order (leaves, the LUT,
+    // the noise tables, the phantom padding), then the mask slot: the compiled program's budget
+    // keeps that count equal to the declaration's.
+    const auto* program = context.sources.chain;
+    if (program == nullptr) {
+      return false;
+    }
+    for (const auto& binding : program->bindings) {
+      if (!textures->nextIsFor(module)) {
+        return false;
+      }
+      SamplerState state(binding.args.tileModeX, binding.args.tileModeY, binding.args.sampling);
+      if (!textures->pushProxyFor(module, binding.textureProxy.get(), state)) {
+        return false;
+      }
+    }
+    return true;
   }
   if (&module == &XferModule()) {
     const auto& xfer = context.info.getXferFacts();

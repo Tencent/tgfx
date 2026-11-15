@@ -158,8 +158,6 @@ class FragmentProcessor : public Processor {
    */
   class Iter {
    public:
-    // Empty iteration: the starting point of a CoordTransformIter that walks a caller-supplied
-    // transform sequence instead of a processor tree.
     Iter() = default;
 
     explicit Iter(const FragmentProcessor* fp) {
@@ -177,17 +175,6 @@ class FragmentProcessor : public Processor {
    * geometry writer the leaf-ordered transforms the compiled program's binding table describes,
    * so no processor tree exists to walk. The sequence must outlive the iterator.
    */
-  class CoordTransformIter {
-   public:
-    explicit CoordTransformIter(const std::vector<CoordTransform>* transforms);
-
-    const CoordTransform* next();
-
-   private:
-    const std::vector<CoordTransform>* transforms = nullptr;
-    size_t transformIndex = 0;
-  };
-
  protected:
   std::vector<PlacementPtr<FragmentProcessor>> childProcessors = {};
 

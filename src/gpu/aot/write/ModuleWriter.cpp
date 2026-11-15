@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/write/ModuleWriter.h"
+#include "gpu/aot/write/modules/ChainWrite.h"
 #include "gpu/aot/write/modules/ClipWrite.h"
 #include "gpu/aot/write/modules/Effects.h"
 #include "gpu/aot/write/modules/Frame.h"
@@ -36,8 +37,14 @@ ModuleWriter WriterOf(const Module& module) {
   if (&module == &XferModule()) {
     return WriteXferModule;
   }
+  if (const auto writer = ChainWriterOf(module)) {
+    return writer;
+  }
   // The geometry and texture-source modules each share one file: they are kinds of things, not
   // independent features.
+  if (const auto writer = ChainGeometryWriterOf(module)) {
+    return writer;
+  }
   if (const auto writer = GeometryWriterOf(module)) {
     return writer;
   }

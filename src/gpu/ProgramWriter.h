@@ -9,17 +9,16 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the License for the specific language governing permissions
-//  and limitations under the License.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
 #include <array>
-#include "gpu/UniformData.h"
 #include "gpu/shaders/Family.h"
 #include "gpu/shaders/Layout.h"
 #include "tgfx/core/TileMode.h"
@@ -31,6 +30,7 @@ class Program;
 class ProgramInfo;
 class RenderPass;
 class RenderTarget;
+class UniformData;
 
 /// The render-target adjust vector (2/width, -1, ±2/height, ±1): the Frame module's single field.
 /// The declared routes address it through their derived layouts, so both the chain and the
@@ -53,93 +53,40 @@ inline AddressMode ToAddressMode(TileMode tileMode) {
 }
 
 /**
- * Writes one program's per-draw uniform values and texture bindings. A Program owns its writer;
- * precompiled programs address their uniforms through the artifact's structural layout.
+ * Writes one program's per-draw uniform values and texture bindings. The variant is fixed at
+ * construction, so the layout is derived once per program (not once per draw) and every field
+ * write addresses an element index the layout resolves — no name is composed at draw time.
+ *
+ * Both families reach the same walk over the variant's modules: a declared family's module writers
+ * read the selection's leaves, the interpreter's read the compiled program, and neither path
+ * duplicates a value the other computes.
  */
 class ProgramWriter {
  public:
-  virtual ~ProgramWriter() = default;
+  explicit ProgramWriter(Variant variant);
 
   /**
    * Uploads every uniform and binds the samplers of the program for the draw described by info.
-   * @param info        The draw's processor tree and pipeline state.
+   * @param info        The draw's selection, geometry facts and pipeline state.
    * @param renderPass  The pass to bind the uniform buffer and the textures on.
    * @param program     The program whose uniform layout and declared sampler count drive the
    *                    writes.
-   * @return            False when the program needs a uniform block but no backing store is
-   *                    available (allocation or map failure); the caller must skip the draw
-   *                    rather than submit it with unwritten uniforms.
+   * @return            False when the program's content is unavailable (the interpreter route
+   *                    without a compiled program) or the uniform block has no backing store; the
+   *                    caller must skip the draw rather than submit it with unwritten uniforms.
    */
-  virtual bool write(const ProgramInfo& info, RenderPass* renderPass, Program* program) const;
-
-  /**
-   * Whether this writer can produce the program's full uniform content for the draw described by
-   * info. The base accepts every program; the compiled-program routes (the chain kernel, the YUV
-   * tail) refuse a draw whose compiled program is unavailable, so write() fails the draw before
-   * any uniform is written instead of submitting it with unwritten fields.
-   */
-  virtual bool canWrite(const ProgramInfo& info) const;
-
-  /**
-   * Writes every per-draw uniform value of the draw described by info into the two uniform data
-   * objects, without any GPU-side work: no uniform buffer is mapped and no sampler is bound. The
-   * upload path (write) feeds it the program's uniform data; the specialization capture feeds it a
-   * CPU scratch buffer, so the values a specialized shader folds and the values the upload writes
-   * come from one and the same code path.
-   * @param info               The draw's processor tree and pipeline state.
-   * @param vertexUniformData  The vertex stage's uniform data, over any writable buffer; may be
-   *                           null only when the stage declares no uniforms.
-   * @param fragmentUniformData  The fragment stage's uniform data, over any writable buffer.
-   */
-  void writeUniformValues(const ProgramInfo& info, UniformData* vertexUniformData,
-                          UniformData* fragmentUniformData) const;
-
- protected:
-  /**
-   * Writes every per-draw uniform value. A concrete writer either declares them from the variant's
-   * layout (the declared families walk their modules) or feeds the compiled program's records (the
-   * chain writer); there is no processor-tree default and no separate engine-default step left.
-   */
-  virtual void writeUniforms(const ProgramInfo& info, UniformData* vertexUniformData,
-                             UniformData* fragmentUniformData) const = 0;
-
-  /**
-   * Binds the draw's textures onto the program's sampler slots. Returns false when the draw's
-   * sources do not fill exactly the slots the program declares: a missing slot is an interface
-   * error, never a shift of the slots that follow it.
-   */
-  virtual bool writeSamplers(const ProgramInfo& info, Program* program,
-                             RenderPass* renderPass) const = 0;
-};
-
-/**
- * The fused chain kernel's writer: the draw's whole uniform content, its vertex transforms and its
- * sampler bindings all come from the compiled chain program the info carries (uniforms through the
- * aot binder, transforms from the binding table, samplers in binding order) — no processor tree is
- * walked. It stays a ProgramWriter until P7 folds the whole writer hierarchy away.
- */
-class ChainProgramWriter final : public ProgramWriter {
- public:
-  /// The writer addresses the chain's uniform block by the variant's derived layout: the slot
-  /// index of the Chain module and the element indices of its fields are fixed per program.
-  explicit ChainProgramWriter(Variant variant);
-
-  bool canWrite(const ProgramInfo& info) const override;
-
- protected:
-  void writeUniforms(const ProgramInfo& info, UniformData* vertexUniformData,
-                     UniformData* fragmentUniformData) const override;
-  bool writeSamplers(const ProgramInfo& info, Program* program,
-                     RenderPass* renderPass) const override;
+  bool write(const ProgramInfo& info, RenderPass* renderPass, Program* program) const;
 
  private:
+  void writeUniforms(const ProgramInfo& info, UniformData* vertexUniformData,
+                     UniformData* fragmentUniformData) const;
+  bool writeSamplers(const ProgramInfo& info, Program* program, RenderPass* renderPass) const;
+  /// Whether the draw carries everything the variant's writers read: the interpreter's modules
+  /// need the compiled program the selection attached.
+  bool carriesUniformContent(const ProgramInfo& info) const;
+
   Variant variant;
   Layout layout;
-  uint8_t chainSlot = 0;
-  uint8_t colorParamsSlot = 0;
-  uint8_t xferSlot = 0;
-  /// The geometry module's slot: Frame(0), the variant's one geometry(1), Chain(2), Xfer(3).
-  uint8_t geometrySlot = 1;
 };
 
 }  // namespace tgfx
