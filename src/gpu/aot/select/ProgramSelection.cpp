@@ -23,16 +23,38 @@
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
+#include "gpu/aot/select/ShapeKey.h"
 #include "gpu/aot/spec/SpecResolver.h"
 #include "gpu/shaders/Families.h"
 
 namespace tgfx {
 
 std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInfo& info,
-                                              PermutationMatchFailure* failure) {
+                                              PermutationMatchFailure* failure, ShapeKey* shapeKey,
+                                              bool* answeredFromCache) {
   // The route-independent gates first, so a draw they refuse reports its reason before any family
   // walk runs; the texture-read check needs the matched family and runs after the walk.
   const auto shape = ExtractDrawShape(&info);
+  // The attempt key is the draw's structure, not its values: a shape refused once stays refused
+  // however its colours and matrices change, and a shape served once is not blocked by another
+  // draw's values.
+  const ShapeKey key = MakeShapeKey(shape, info);
+  if (shapeKey != nullptr) {
+    *shapeKey = key;
+  }
+  auto* negativeCache = context != nullptr ? ContextCacheAccess::Cache(context) : nullptr;
+  if (negativeCache != nullptr && negativeCache->hasProgramMisses()) {
+    PrecompiledFallbackReason cachedReason = PrecompiledFallbackReason::Unspecified;
+    if (negativeCache->findProgramMiss(key, &cachedReason)) {
+      // The table already holds this shape's verdict; counting it again as a fresh miss would
+      // double the metrics, so the caller is told the answer came from the cache.
+      negativeCache->recordCachedMiss(cachedReason);
+      if (answeredFromCache != nullptr) {
+        *answeredFromCache = true;
+      }
+      return std::nullopt;
+    }
+  }
   if (!AdmitMatchedProgram(&info, shape, nullptr, failure)) {
     return std::nullopt;
   }

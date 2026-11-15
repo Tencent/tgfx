@@ -21,6 +21,7 @@
 #include <optional>
 #include "gpu/aot/AOTFailure.h"
 #include "gpu/aot/select/FamilyMatchResult.h"
+#include "gpu/aot/select/ShapeKey.h"
 #include "gpu/aot/spec/SpecValues.h"
 #include "gpu/shaders/Family.h"
 
@@ -48,8 +49,14 @@ struct ProgramSelection {
  * one) is served by the interpreter alone — the walk would re-derive a variant the expression has
  * already fixed. failure is written only when the result is null; a plain no-match defaults to
  * NoMatchingRule unless a gate named a finer reason, and a success reports None.
+ *
+ * shapeKey, when given, receives the draw's structural attempt key: the selection's own identity,
+ * which the caller uses for the negative table and for diagnostics. A refusal the table already
+ * answers short-circuits the walk and reports answeredFromCache, so the caller only counts it once.
  */
 std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInfo& info,
-                                              PermutationMatchFailure* failure = nullptr);
+                                              PermutationMatchFailure* failure = nullptr,
+                                              ShapeKey* shapeKey = nullptr,
+                                              bool* answeredFromCache = nullptr);
 
 }  // namespace tgfx
