@@ -99,4 +99,9 @@ void LeafSubsetRectForSampler(const std::shared_ptr<TextureProxy>& proxy, const 
                               const std::optional<Rect>& subset, const SamplerState& sampling,
                               float rect[4]);
 
+/// The device-space mask transform: the leaf's uv matrix scaled into the view's normalized
+/// coordinate space. The caller owns the missing-view policy — a chain bind skips the write, a
+/// declared writer keeps its own fallback.
+Matrix DeviceMaskCoordMatrix(const Matrix& uvMatrix, const TextureView& view);
+
 }  // namespace tgfx

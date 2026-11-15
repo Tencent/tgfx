@@ -29,13 +29,6 @@
 
 namespace tgfx {
 
-// Debug-only collection backing TakeGlassUDFDebugTextures; fills only while
-// TGFX_GLASS_UDF_DEBUG is set.
-static std::vector<std::shared_ptr<TextureProxy>>& GlassUDFDebugTextures() {
-  static std::vector<std::shared_ptr<TextureProxy>> textures = {};
-  return textures;
-}
-
 bool GlassUDFRequest::isValid() const {
   if (source == nullptr || coreWidth <= 0 || coreHeight <= 0 || textureRect.isEmpty()) {
     return false;
@@ -160,18 +153,7 @@ std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(Context* context,
                                                Point::Zero())) {
     return nullptr;
   }
-  auto result = verticalTarget->asTextureProxy();
-  if (std::getenv("TGFX_GLASS_UDF_DEBUG") != nullptr) {
-    GlassUDFDebugTextures().push_back(horizontalTarget->asTextureProxy());
-    GlassUDFDebugTextures().push_back(result);
-  }
-  return result;
-}
-
-std::vector<std::shared_ptr<TextureProxy>> TakeGlassUDFDebugTextures() {
-  auto collected = GlassUDFDebugTextures();
-  GlassUDFDebugTextures().clear();
-  return collected;
+  return verticalTarget->asTextureProxy();
 }
 
 }  // namespace tgfx

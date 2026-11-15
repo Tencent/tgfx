@@ -37,26 +37,8 @@
 
 namespace tgfx {
 
-namespace {
-
-// Specialization is on by default. The resolver's format gate decides which backends can consume
-// the values — today the GLSL text rewrite and Metal's function constants; a backend without an
-// injector keeps the generic form regardless of this switch. TGFX_AOT_SPECIALIZE=0 turns it off
-// for a run, which the cost audit and the A/B tests use.
-bool SpecializationRequestedByEnvironment() {
-  const char* value = std::getenv("TGFX_AOT_SPECIALIZE");
-  if (value == nullptr) {
-    return true;
-  }
-  std::string text = value;
-  return text != "0" && text != "false" && text != "off";
-}
-
-}  // namespace
-
 PrecompiledShaderCache::PrecompiledShaderCache(Context* context, Backend backend)
-    : _context(context), _backend(backend), _shaderCache(context),
-      _specializationEnabled(SpecializationRequestedByEnvironment()) {
+    : _context(context), _backend(backend), _shaderCache(context), _specializationEnabled(true) {
 }
 
 const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason) {

@@ -80,11 +80,4 @@ struct GlassUDFRequest {
 std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(Context* context,
                                                       const GlassUDFRequest& request);
 
-/**
- * Debug-only probe hook: returns the UDF textures generated since the previous call and clears the
- * collection. The collection only fills while TGFX_GLASS_UDF_DEBUG is set; without the flag every
- * call returns an empty vector and the generation path is untouched.
- */
-std::vector<std::shared_ptr<TextureProxy>> TakeGlassUDFDebugTextures();
-
 }  // namespace tgfx

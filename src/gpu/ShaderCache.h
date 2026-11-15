@@ -114,9 +114,6 @@ using PipelineKey = ShaderModuleKey;
  * they were built from, so without L1 a module is released as soon as its program is built. The
  * cache is owned by the Context's PrecompiledShaderCache and destroyed with the Context, after the
  * program cache, which is also what happens when the GPU context is lost.
- *
- * TGFX_SHADER_CACHE_DISABLE bypasses layers for A/B comparisons: L1, L2, or all. Disabling L1
- * disables L2 too, since pipelines are keyed by the modules' content keys.
  */
 class ShaderCache {
  public:
@@ -156,17 +153,6 @@ class ShaderCache {
 
   size_t pipelineCount() const {
     return pipelineMap.size();
-  }
-
-  /**
-   * Whether each layer is in use (TGFX_SHADER_CACHE_DISABLE turns them off).
-   */
-  bool moduleCacheActive() const {
-    return moduleCacheEnabled;
-  }
-
-  bool pipelineCacheActive() const {
-    return pipelineCacheEnabled;
   }
 
   const ShaderCacheStats& stats() const {
@@ -210,8 +196,6 @@ class ShaderCache {
   };
 
   Context* context = nullptr;
-  bool moduleCacheEnabled = true;
-  bool pipelineCacheEnabled = true;
   std::list<ShaderModuleKey> moduleLRU = {};
   std::unordered_map<ShaderModuleKey, ModuleEntry, ShaderModuleKeyHasher> moduleMap = {};
   // Reverse lookup from a cached module object to its content key, for encoding pipelines. An

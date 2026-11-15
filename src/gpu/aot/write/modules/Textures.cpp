@@ -45,14 +45,11 @@ namespace {
 /// The device-space mask transform: the leaf's raw matrix scaled by the instantiated view's
 /// normalized coordinate. Both mask modules that sample in device space upload this value.
 Matrix DeviceMaskMatrix(const AOTTextureParameters& leaf) {
-  Matrix matrix = leaf.uvMatrix;
   auto view = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
   if (view == nullptr || view->getTexture() == nullptr) {
-    return matrix;
+    return leaf.uvMatrix;
   }
-  const auto scale = view->getTextureCoord(1, 1);
-  matrix.postScale(scale.x, scale.y);
-  return matrix;
+  return DeviceMaskCoordMatrix(leaf.uvMatrix, *view);
 }
 
 }  // namespace

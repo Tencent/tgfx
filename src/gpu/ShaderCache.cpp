@@ -171,18 +171,7 @@ ShaderModuleKey MakeShaderModuleKey(const std::string& encoded) {
   return key;
 }
 
-static bool DisabledByEnvironment(const char* layer) {
-  const char* value = std::getenv("TGFX_SHADER_CACHE_DISABLE");
-  if (value == nullptr) {
-    return false;
-  }
-  std::string list = value;
-  return list.find("all") != std::string::npos || list.find(layer) != std::string::npos;
-}
-
-ShaderCache::ShaderCache(Context* context)
-    : context(context), moduleCacheEnabled(!DisabledByEnvironment("L1")),
-      pipelineCacheEnabled(moduleCacheEnabled && !DisabledByEnvironment("L2")) {
+ShaderCache::ShaderCache(Context* context) : context(context) {
 }
 
 ShaderCache::~ShaderCache() = default;
@@ -227,9 +216,6 @@ std::shared_ptr<RenderPipeline> ShaderCache::createPipeline(
 std::shared_ptr<RenderPipeline> ShaderCache::findOrCreatePipeline(
     const RenderPipelineDescriptor& descriptor) {
   _stats.pipelineRequests++;
-  if (!pipelineCacheEnabled) {
-    return createPipeline(descriptor);
-  }
   std::string encoded;
   auto keyOf = [this](const ShaderModule* module) { return findModuleKey(module); };
   if (!EncodeRenderPipelineDescriptor(descriptor, keyOf, &encoded)) {
@@ -273,9 +259,6 @@ std::shared_ptr<ShaderModule> ShaderCache::createModule(const ShaderModuleDescri
 std::shared_ptr<ShaderModule> ShaderCache::findOrCreateModule(
     const ShaderModuleDescriptor& descriptor) {
   _stats.moduleRequests++;
-  if (!moduleCacheEnabled) {
-    return createModule(descriptor);
-  }
   std::string encoded;
   EncodeShaderModuleDescriptor(descriptor, &encoded);
   auto key = MakeShaderModuleKey(encoded);

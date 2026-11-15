@@ -95,9 +95,6 @@ TGFX_TEST(ShaderCacheTest, RecreatedProgramReusesModules) {
   ASSERT_TRUE(surface != nullptr);
   auto* globalCache = context->globalCache();
   auto* shaderCache = ContextCacheAccess::Cache(context)->shaderCache();
-  if (!shaderCache->moduleCacheActive()) {
-    GTEST_SKIP() << "the module cache is disabled (TGFX_SHADER_CACHE_DISABLE)";
-  }
 
   globalCache->clearPrograms();
   shaderCache->clear();
@@ -297,9 +294,6 @@ TGFX_TEST(ShaderCacheTest, RecreatedProgramReusesPipeline) {
   ASSERT_TRUE(surface != nullptr);
   auto* globalCache = context->globalCache();
   auto* shaderCache = ContextCacheAccess::Cache(context)->shaderCache();
-  if (!shaderCache->pipelineCacheActive()) {
-    GTEST_SKIP() << "the pipeline cache is disabled (TGFX_SHADER_CACHE_DISABLE)";
-  }
 
   globalCache->clearPrograms();
   shaderCache->clear();
@@ -333,9 +327,6 @@ TGFX_TEST(ShaderCacheTest, DistinctProgramsShareIdenticalPipeline) {
   ASSERT_TRUE(surface != nullptr);
   auto* globalCache = context->globalCache();
   auto* shaderCache = ContextCacheAccess::Cache(context)->shaderCache();
-  if (!shaderCache->pipelineCacheActive()) {
-    GTEST_SKIP() << "the pipeline cache is disabled (TGFX_SHADER_CACHE_DISABLE)";
-  }
   globalCache->clearPrograms();
   shaderCache->clear();
   auto before = shaderCache->stats();

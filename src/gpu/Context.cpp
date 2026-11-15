@@ -53,11 +53,6 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
   _atlasManager = new AtlasManager(this);
   _atlasStrikeCache = new AtlasStrikeCache();
   _precompiledShaderCache = new PrecompiledShaderCache(this, _gpu->info()->backend);
-  // The environment knobs the GPU stack reads, inventoried in one place (name — scope — read
-  // site):
-  //   TGFX_AOT_SPECIALIZE       — every build, default on: PrecompiledShaderCache's master switch
-  //                               for specialization. The cost audits and A/B runs set it to 0.
-  //   TGFX_SHADER_CACHE_DISABLE — every build: the shader module/pipeline cache's layer list.
   {
     auto backend = _gpu->info()->backend;
     auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(backend);

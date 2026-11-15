@@ -423,7 +423,7 @@ class PrecompiledShaderCache {
   /// Whether the AOT route may specialize a precompiled variant with the draw's structural
   /// uniform values before creating its program. On by default, and the resolver's format gate
   /// keeps it to the backends whose stored form can consume the values (GLSL text rewrite, Metal
-  /// function constants); TGFX_AOT_SPECIALIZE=0 turns it off for a whole run.
+  /// function constants). setSpecializationEnabled() turns it off for a cost audit or an A/B run.
   bool specializationEnabled() const {
     return _specializationEnabled;
   }
@@ -434,8 +434,8 @@ class PrecompiledShaderCache {
 
   /// What the specialization route paid for: how many resolves returned values, and how many
   /// distinct value sets those resolves covered. The second number is the compile count a
-  /// fully-specialized runtime pays for one run of a scene on a cold pipeline cache, so the cost
-  /// audit compares it between runs with TGFX_AOT_SPECIALIZE off and on.
+  /// fully-specialized runtime pays for one run of a scene on a cold pipeline cache, so a cost
+  /// audit compares it between runs with specialization off and on.
   struct SpecStats {
     uint64_t captures = 0;
     uint64_t distinctStructures = 0;

@@ -405,9 +405,7 @@ void BindChainProgram(const AOTProgram& program, SlotWriter* chainWriter) {
     if (textureView == nullptr) {
       continue;
     }
-    auto deviceCoordMatrix = deviceLeaf.uvMatrix;
-    auto scale = textureView->getTextureCoord(1, 1);
-    deviceCoordMatrix.postScale(scale.x, scale.y);
+    auto deviceCoordMatrix = DeviceMaskCoordMatrix(deviceLeaf.uvMatrix, *textureView);
     std::array<float, 9> values = {
         deviceCoordMatrix[0], deviceCoordMatrix[1], deviceCoordMatrix[2],
         deviceCoordMatrix[3], deviceCoordMatrix[4], deviceCoordMatrix[5],
@@ -579,9 +577,7 @@ void BindDeviceMaskBinding(const AOTBinding& binding, SlotWriter* chainWriter) {
   if (textureView == nullptr) {
     return;
   }
-  auto deviceCoordMatrix = binding.uvMatrix;
-  auto scale = textureView->getTextureCoord(1, 1);
-  deviceCoordMatrix.postScale(scale.x, scale.y);
+  auto deviceCoordMatrix = DeviceMaskCoordMatrix(binding.uvMatrix, *textureView);
   constexpr uint8_t DeviceCoordMatrix = UniformElementIndexOf(Chain, "DeviceCoordMatrix");
   constexpr uint8_t DeviceMaskSubset = UniformElementIndexOf(Chain, "DeviceMaskSubset");
   chainWriter->setIfPresent(DeviceCoordMatrix, deviceCoordMatrix);
@@ -611,6 +607,13 @@ void LeafSubsetRectForSampler(const std::shared_ptr<TextureProxy>& proxy, const 
                               const std::optional<Rect>& subset, const SamplerState& sampling,
                               float rect[4]) {
   LeafSubsetRect(proxy, view, subset, sampling, rect);
+}
+
+Matrix DeviceMaskCoordMatrix(const Matrix& uvMatrix, const TextureView& view) {
+  const auto scale = view.getTextureCoord(1, 1);
+  Matrix matrix = uvMatrix;
+  matrix.postScale(scale.x, scale.y);
+  return matrix;
 }
 
 std::vector<CoordTransform> BuildChainCoordTransforms(const AOTProgram& program) {
