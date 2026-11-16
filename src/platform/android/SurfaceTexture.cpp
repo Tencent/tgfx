@@ -316,8 +316,10 @@ bool SurfaceTexture::updateTexImage() {
       env->ExceptionClear();
     } else {
       auto matrix = env->GetFloatArrayElements(floatArray, nullptr);
-      textureSize = ComputeTextureSize(matrix, width(), height());
-      env->ReleaseFloatArrayElements(floatArray, matrix, JNI_ABORT);
+      if (matrix != nullptr) {
+        textureSize = ComputeTextureSize(matrix, width(), height());
+        env->ReleaseFloatArrayElements(floatArray, matrix, JNI_ABORT);
+      }
     }
     env->DeleteLocalRef(floatArray);
   }
