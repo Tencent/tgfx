@@ -405,6 +405,11 @@ class DisplayList {
    * Collects the world-space rect each visible background style actually samples, so a capture can
    * cull layers that only touch the tile but lie under no background style. `worldBounds` limits
    * the walk to the area being captured.
+   *
+   * The rects come from `renderBounds` and `maxBackgroundOutset`, which an earlier render computed,
+   * so the result is only meaningful once the tree has been rendered at least once. Before that
+   * every layer reports empty bounds and the walk returns nothing, which callers must not read as
+   * "no background style samples here": it only means the bounds are not ready yet.
    */
   std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
 
