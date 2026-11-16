@@ -208,13 +208,13 @@ void SurfaceTexture::notifyFrameAvailable() {
   condition.notify_all();
 }
 
-static ISize ComputeTextureSize(float matrix[16], int width, int height) {
+static ISize ComputeTextureSize(const float matrix[16], int width, int height) {
   Size size = {static_cast<float>(width), static_cast<float>(height)};
   auto scaleX = fabsf(matrix[0]);
   if (scaleX > 0) {
     size.width = size.width / (scaleX + matrix[12] * 2);
   }
-  float scaleY = fabsf(matrix[5]);
+  auto scaleY = fabsf(matrix[5]);
   if (scaleY > 0) {
     size.height = size.height / (scaleY + (matrix[13] - scaleY) * 2);
   }
