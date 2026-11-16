@@ -484,9 +484,9 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
         cullRects = std::move(footprints);
       }
     }
-    // The capture runs even when no footprint reaches it: the walk reads render bounds computed by
-    // an earlier frame, so an empty list cannot be told apart from "bounds not ready yet", and
-    // skipping would drop a backdrop that is actually sampled.
+    // An empty list does not mean the capture is unnecessary: a subtree that keeps its own 3D
+    // context makes the walk give up on bounding the sampled area, and that capture still has to run
+    // so the backdrop its styles read stays there.
     snapshotMap = captureBackgrounds(surface, captureRects, cullRects);
   }
   std::vector<Rect> dirtyRects = {};

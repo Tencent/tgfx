@@ -406,10 +406,10 @@ class DisplayList {
    * cull layers that only touch the tile but lie under no background style. `worldBounds` limits
    * the walk to the area being captured.
    *
-   * The rects come from `renderBounds` and `maxBackgroundOutset`, which an earlier render computed,
-   * so the result is only meaningful once the tree has been rendered at least once. Before that
-   * every layer reports empty bounds and the walk returns nothing, which callers must not read as
-   * "no background style samples here": it only means the bounds are not ready yet.
+   * Reads `renderBounds` and `maxBackgroundOutset`, so it must run after the tree updated its
+   * render bounds, which `DisplayList::render` does before rendering. An empty result only means the
+   * capture cannot be culled: either no background style samples inside `worldBounds`, or a subtree
+   * keeps its own 3D context and 2D bounds cannot describe the area it samples.
    */
   std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
 
