@@ -3,7 +3,12 @@
 // source, HAS_XP = 1 reads the dst texture (with the zero-coverage discard), HAS_XP = 2 reads the
 // framebuffer through the subpass input. The blend helpers define xpBlendWithCoverage only when
 // HAS_XP is not 0.
+// The blend switch is reachable only through the xp helpers, which exist for HAS_XP != 0; a
+// fixed-pipeline variant would otherwise carry the whole switch as uncalled code. Chain and YUV
+// include the file themselves (pointwise_xp_support.inc).
+#if HAS_XP != 0
 #include "xp/xp_blend_colors.inc"
+#endif
 
 #if HAS_XP == 2
 layout(input_attachment_index = 0, set = TGFX_FBF_INPUT_SET, binding = 0) uniform subpassInput tgfx_SubpassInput;
