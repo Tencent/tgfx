@@ -18,7 +18,6 @@
 
 #include "platform/android/SurfaceTexture.h"
 #include <chrono>
-#include <cmath>
 #include "HandlerThread.h"
 #include "JNIUtil.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -209,16 +208,36 @@ void SurfaceTexture::notifyFrameAvailable() {
 }
 
 static ISize ComputeTextureSize(const float matrix[16], int width, int height) {
+  // SurfaceTexture.getTransformMatrix() returns a column-major 4x4 that maps normalized texture
+  // coordinates to the region the decoder actually produced. We can only recover the padded buffer
+  // size from a pure crop plus vertical flip, which is the form AOSP emits when the buffer carries
+  // no rotation and no horizontal flip: matrix[0] > 0, matrix[5] < 0, and the off-diagonal terms
+  // are zero. For AOSP's crop (scaleX = (cropW - 2 * shrink) / bufferW, transX = (cropLeft + shrink)
+  // / bufferW) the translation cancels the half-texel filtering shrink, so matrix[0] + 2 * matrix[12]
+  // collapses to cropW / bufferW; dividing the content width by it recovers bufferW, and the flipped
+  // Y axis follows the same derivation through matrix[13]. Any other form (rotation, horizontal flip,
+  // or a crop not anchored at the origin) would produce a wrong size, so we return an empty size and
+  // let the caller fall back to the content size.
+  if (matrix[1] != 0 || matrix[4] != 0 || matrix[0] <= 0 || matrix[5] >= 0) {
+    return {};
+  }
   Size size = {static_cast<float>(width), static_cast<float>(height)};
-  auto scaleX = fabsf(matrix[0]);
-  if (scaleX > 0) {
-    size.width = size.width / (scaleX + matrix[12] * 2);
+  auto denomX = matrix[0] + matrix[12] * 2;
+  if (denomX > 0) {
+    size.width = size.width / denomX;
   }
-  auto scaleY = fabsf(matrix[5]);
-  if (scaleY > 0) {
-    size.height = size.height / (scaleY + (matrix[13] - scaleY) * 2);
+  auto scaleY = -matrix[5];
+  auto denomY = scaleY + (matrix[13] - scaleY) * 2;
+  if (denomY > 0) {
+    size.height = size.height / denomY;
   }
-  return size.toRound();
+  auto result = size.toRound();
+  // A valid padded buffer is never smaller than the content it carries, so a smaller result means
+  // the matrix was not the expected crop form; fall back instead of trusting it.
+  if (result.width < width || result.height < height) {
+    return {};
+  }
+  return result;
 }
 
 std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, bool) {
@@ -309,19 +328,26 @@ bool SurfaceTexture::updateTexImage() {
         env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getTransfer, dataSpace);
     _colorSpace = AndroidDataSpaceToColorSpace(standard, transfer);
   }
-  if (SurfaceTexture_getTransformMatrix != nullptr) {
+  if (SurfaceTexture_getTransformMatrix != nullptr && !textureSizeResolved) {
     auto floatArray = env->NewFloatArray(16);
-    env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_getTransformMatrix, floatArray);
-    if (env->ExceptionCheck()) {
+    if (floatArray == nullptr) {
       env->ExceptionClear();
     } else {
-      auto matrix = env->GetFloatArrayElements(floatArray, nullptr);
-      if (matrix != nullptr) {
-        textureSize = ComputeTextureSize(matrix, width(), height());
-        env->ReleaseFloatArrayElements(floatArray, matrix, JNI_ABORT);
+      env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_getTransformMatrix, floatArray);
+      if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+      } else {
+        auto matrix = env->GetFloatArrayElements(floatArray, nullptr);
+        if (matrix != nullptr) {
+          // The content size is fixed for the lifetime of a SurfaceTexture, so the buffer padding
+          // never changes after the first frame; resolve the texture size once and reuse it.
+          textureSize = ComputeTextureSize(matrix, width(), height());
+          textureSizeResolved = true;
+          env->ReleaseFloatArrayElements(floatArray, matrix, JNI_ABORT);
+        }
       }
+      env->DeleteLocalRef(floatArray);
     }
-    env->DeleteLocalRef(floatArray);
   }
   return true;
 }
