@@ -1374,8 +1374,8 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   for (auto& rect : worldRects) {
     rect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
   }
-  // The layers to draw can be narrowed to the area the background styles actually sample, while the
-  // surface still covers every render rect: keeping the captured area unchanged keeps the multi-pass
+  // The layers to draw can be narrowed to the area the background styles sample, while the surface
+  // still covers every render rect: keeping the captured area unchanged keeps the multi-pass
   // structure (and the style output sharing that depends on it) intact. The walk is bounded by the
   // area this capture covers, so a style that only reaches into the outset ring still counts.
   std::vector<Rect> cullWorldRects = worldRects;
