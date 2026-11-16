@@ -232,6 +232,15 @@ static ISize ComputeTextureSize(const float matrix[16], int width, int height) {
     size.height = size.height / denomY;
   }
   auto result = size.toRound();
+  // The derivation only holds when the crop is anchored at the origin, with the decoder's alignment
+  // padding on the right and bottom. A crop carrying a left/top offset leaks that offset into the
+  // translation terms and overshoots the denominator, producing a wrong size that may still exceed
+  // the content. For an origin crop the translation is just the half-texel filtering shrink, so
+  // matrix[12] * bufferWidth and (1 - matrix[13]) * bufferHeight stay within one texel; a larger
+  // value means a non-origin crop, so fall back to the content size.
+  if (matrix[12] * result.width > 1.5f || (1 - matrix[13]) * result.height > 1.5f) {
+    return {};
+  }
   // A valid padded buffer is never smaller than the content it carries, so a smaller result means
   // the matrix was not the expected crop form; fall back instead of trusting it.
   if (result.width < width || result.height < height) {
