@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <vector>
+#include "layers/RasterizationState.h"
 #include "layers/compositing3d/Layer3DContext.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/Context.h"
@@ -44,6 +45,9 @@ class DrawArgs {
   Context* context = nullptr;
 
   uint32_t renderFlags = 0;
+
+  // Export-only failure propagation and allocation budget, inherited by offscreen passes.
+  RasterizationState* rasterization = nullptr;
 
   // Whether to exclude effects during the drawing process.
   // Note: When set to true, all layer styles and filters will be skipped.

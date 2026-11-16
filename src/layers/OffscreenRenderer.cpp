@@ -74,12 +74,20 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
   // through this subtree; otherwise a PictureRecorder is cheaper.
   if (args.backgroundHandler != nullptr && args.backgroundHandler->needsSurface(layer) &&
       args.context != nullptr) {
+    if (args.rasterization &&
+        !args.rasterization->checkSize(imageClip.width(), imageClip.height())) {
+      return {};
+    }
     auto surface =
         Surface::Make(args.context, static_cast<int>(imageClip.width()),
                       static_cast<int>(imageClip.height()), false, 1, false, 0, args.dstColorSpace);
     if (surface != nullptr) {
       result = RenderContentOnSurface(layer, args, std::move(surface), density, imageClip,
                                       *inputBounds, contentMatrix);
+    } else if (args.rasterization) {
+      // A picture fallback drops descendant backdrop styles. Explicit export must fail instead.
+      args.rasterization->failed = true;
+      return {};
     } else {
       result = RenderContentOnPicture(layer, args, density, imageClip, contentMatrix);
     }
@@ -88,12 +96,14 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
   }
 
   if (result.image == nullptr || !hasFilter) {
+    if (result.image == nullptr && args.rasterization) args.rasterization->failed = true;
     return result;
   }
   Point filterOffset = {};
   result.image = layer->applyFilters(std::move(result.image), density.getMaxScale(),
                                      inputContentBounds, &filterOffset);
   if (result.image == nullptr) {
+    if (args.rasterization) args.rasterization->failed = true;
     return {};
   }
   result.imageMatrix.preTranslate(filterOffset.x, filterOffset.y);
@@ -109,6 +119,7 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
   }
   auto backdrop = SnapshotOf(parentCanvas);
   if (!backdrop) {
+    if (args.rasterization) args.rasterization->failed = true;
     return {};
   }
   auto parentMatrix = parentCanvas->getMatrix();
@@ -120,12 +131,22 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
   }
 
   if (args.context != nullptr) {
+    if (args.rasterization &&
+        !args.rasterization->checkSize(surfaceRect.width(), surfaceRect.height())) {
+      return {};
+    }
     auto surface = Surface::Make(args.context, static_cast<int>(surfaceRect.width()),
                                  static_cast<int>(surfaceRect.height()), false, 1, false, 0,
                                  args.dstColorSpace);
     if (surface != nullptr) {
-      return RenderPassThroughOnSurface(layer, args, std::move(surface), backdrop, parentMatrix,
-                                        surfaceRect, *inputBounds);
+      auto result = RenderPassThroughOnSurface(layer, args, std::move(surface), backdrop,
+                                               parentMatrix, surfaceRect, *inputBounds);
+      if (result.isEmpty() && args.rasterization) args.rasterization->failed = true;
+      return result;
+    }
+    if (args.rasterization) {
+      args.rasterization->failed = true;
+      return {};
     }
   }
   return RenderPassThroughOnPicture(layer, args, backdrop, parentMatrix, surfaceRect);

@@ -245,10 +245,12 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
   Matrix toWorld = Matrix::I();
   Rect worldBounds = Rect::MakeEmpty();
   if (!ComputeSubGeometry(bgSource.get(), localBounds, localToWorld, &toWorld, &worldBounds)) {
+    if (parentArgs.rasterization) parentArgs.rasterization->failed = true;
     DEBUG_ASSERT(false);
     return nullptr;
   }
   auto subSource = bgSource->createFromSurface(surface, worldBounds, toWorld, localToSurface);
+  if (!subSource && parentArgs.rasterization) parentArgs.rasterization->failed = true;
   DEBUG_ASSERT(subSource != nullptr);
   return buildSubCapturer(parentArgs, std::move(subSource));
 }
@@ -343,6 +345,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   }
   auto bgImage = bgSource->getBackgroundImage();
   if (bgImage == nullptr) {
+    if (args.rasterization) args.rasterization->failed = true;
     return;
   }
   Matrix bgPixelToLocal = worldToLocal;
@@ -397,6 +400,11 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
   DEBUG_ASSERT(canCacheLayerStyleSource(layer));
   if (source == nullptr) {
     return nullptr;
+  }
+  if (!snapshots->rasterizeStyleSources) {
+    auto* raw = source.get();
+    snapshots->layerStyleSources.emplace(layer, std::move(source));
+    return raw;
   }
   // Rasterize so the first draw uploads a GPU texture and the second reuses it. Wrapping an image
   // again produces a new image object with its own GPU cache, so the geometry recording, which
@@ -469,11 +477,13 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     if (it == snapshots->snapshots.end()) {
       // Surface path: the map is authoritative, so a miss is a capture-side coverage bug.
       // Silently skip rather than masking the bug with on-the-fly synthesis.
+      if (args.rasterization) args.rasterization->failed = true;
       return;
     }
     auto& cursor = readCursors[key];
     DEBUG_ASSERT(cursor < it->second.size() && "capture/consume push-pop count mismatch");
     if (cursor >= it->second.size()) {
+      if (args.rasterization) args.rasterization->failed = true;
       return;
     }
     auto& entry = it->second[cursor++];

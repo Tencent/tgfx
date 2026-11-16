@@ -44,6 +44,7 @@ struct LayerStyleSource;
 struct MaskData;
 class BackgroundSource;
 class OffscreenRenderer;
+class LayerRasterizer;
 
 /**
  * The base class for all layers that can be placed on the display list. The layer class includes
@@ -795,6 +796,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   friend class BackgroundConsumer;
   friend class LayerProperty;
   friend class OffscreenRenderer;
+  friend class LayerRasterizer;
   friend class Layer3DContext;
 };
 }  // namespace tgfx

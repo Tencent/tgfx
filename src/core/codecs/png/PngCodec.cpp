@@ -286,6 +286,11 @@ static void UpdateReadInfo(png_structp p, png_infop pi) {
   if (originalColorType == PNG_COLOR_TYPE_GRAY || originalColorType == PNG_COLOR_TYPE_GRAY_ALPHA) {
     png_set_gray_to_rgb(p);
   }
+#ifdef PNG_READ_INTERLACING_SUPPORTED
+  // png_read_image() merges Adam7 passes, but interlace handling must be enabled before
+  // png_read_update_info() initializes the row layout and transformations.
+  png_set_interlace_handling(p);
+#endif
   png_read_update_info(p, pi);
 }
 
@@ -300,16 +305,19 @@ bool PngCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dst
   if (h == 0 || w == 0) {
     return false;
   }
+  auto dstInfo =
+      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
+  ImageInfo info =
+      ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Unpremultiplied, 0, colorSpace());
+  // Keep C++ owners outside the longjmp boundary, including failures during UpdateReadInfo().
+  if (setjmp(png_jmpbuf(readInfo->p))) {
+    return false;
+  }
   UpdateReadInfo(readInfo->p, readInfo->pi);
   readInfo->rowPtrs = (unsigned char**)malloc(sizeof(unsigned char*) * (size_t)h);
   if (readInfo->rowPtrs == nullptr) {
     return false;
   }
-  if (setjmp(png_jmpbuf(readInfo->p))) {
-    return false;
-  }
-  auto dstInfo =
-      ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   if (colorType == ColorType::RGBA_8888 && alphaType == AlphaType::Unpremultiplied) {
     for (size_t i = 0; i < static_cast<size_t>(h); i++) {
       readInfo->rowPtrs[i] = static_cast<unsigned char*>(dstPixels) + (dstRowBytes * i);
@@ -321,8 +329,6 @@ bool PngCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dst
     }
     return true;
   }
-  ImageInfo info =
-      ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Unpremultiplied, 0, colorSpace());
   readInfo->data = (unsigned char*)malloc(info.byteSize());
   if (readInfo->data == nullptr) {
     return false;

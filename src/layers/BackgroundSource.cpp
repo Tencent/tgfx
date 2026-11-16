@@ -56,7 +56,7 @@ static float MaxBlurOutset() {
 
 static TopLevelGeometry ComputeTopLevelGeometry(const Rect& drawRect, float maxOutset,
                                                 float minOutset, const Matrix& matrix,
-                                                int maxTextureSize) {
+                                                int maxTextureSize, bool preserveResolution) {
   TopLevelGeometry out;
   auto rect = drawRect;
   rect.outset(maxOutset, maxOutset);
@@ -68,12 +68,19 @@ static TopLevelGeometry ComputeTopLevelGeometry(const Rect& drawRect, float maxO
   // cannot push either dimension back over the hardware limit.
   out.surfaceScale = 1.0f;
   auto maxBlurOutset = MaxBlurOutset();
-  if (minOutset > maxBlurOutset) {
+  if (!preserveResolution && minOutset > maxBlurOutset) {
     out.surfaceScale = maxBlurOutset / minOutset;
   }
   auto safeTextureSize = static_cast<float>(maxTextureSize - 2);
-  out.surfaceScale =
-      std::min({out.surfaceScale, safeTextureSize / rect.width(), safeTextureSize / rect.height()});
+  if (preserveResolution) {
+    // Export supplies the complete dependency window on the global output pixel grid.
+    // Exceeding its allocation is an error; do not change sampling density per tile.
+    const auto textureSize = static_cast<float>(maxTextureSize);
+    if (rect.width() > textureSize || rect.height() > textureSize) return out;
+  } else {
+    out.surfaceScale = std::min(
+        {out.surfaceScale, safeTextureSize / rect.width(), safeTextureSize / rect.height()});
+  }
   rect.scale(out.surfaceScale, out.surfaceScale);
   rect.roundOut();
   out.surfaceMatrix = Matrix::MakeTrans(-rect.x(), -rect.y());
@@ -181,13 +188,16 @@ class SurfaceBackgroundSource : public BackgroundSource {
 std::shared_ptr<BackgroundSource> BackgroundSource::Make(Context* context, const Rect& drawRect,
                                                          float maxOutset, float minOutset,
                                                          const Matrix& matrix,
-                                                         std::shared_ptr<ColorSpace> colorSpace) {
+                                                         std::shared_ptr<ColorSpace> colorSpace,
+                                                         bool preserveResolution) {
   if (context == nullptr) {
     return nullptr;
   }
   auto maxTextureSize = context->gpu()->limits()->maxTextureDimension2D;
-  auto surfaceSizeLimit = std::min(maxTextureSize, MaxBackgroundSurfaceSize);
-  auto geometry = ComputeTopLevelGeometry(drawRect, maxOutset, minOutset, matrix, surfaceSizeLimit);
+  auto surfaceSizeLimit =
+      preserveResolution ? maxTextureSize : std::min(maxTextureSize, MaxBackgroundSurfaceSize);
+  auto geometry = ComputeTopLevelGeometry(drawRect, maxOutset, minOutset, matrix, surfaceSizeLimit,
+                                          preserveResolution);
   if (!geometry.valid) {
     return nullptr;
   }
