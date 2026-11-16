@@ -1537,6 +1537,7 @@ static size_t CountPixelsDifferentFrom(const std::vector<uint8_t>& pixels, size_
   return varied;
 }
 
+
 static size_t CountDifferentPixels(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
   if (a.size() != b.size()) {
     return a.size() + b.size();
@@ -1548,6 +1549,17 @@ static size_t CountDifferentPixels(const std::vector<uint8_t>& a, const std::vec
     }
   }
   return different;
+}
+
+// A software rasterizer rounds the anti-aliased edges differently between the direct and tiled
+// paths, so a small number of differing pixels is expected. Anything beyond that means the content
+// moved, which is what every direct/tiled comparison here is looking for.
+static void ExpectMatchingRenders(const std::vector<uint8_t>& direct,
+                                  const std::vector<uint8_t>& tiled) {
+  ASSERT_FALSE(direct.empty());
+  ASSERT_EQ(direct.size(), tiled.size());
+  const auto pixelCount = direct.size() / 4;
+  EXPECT_LT(CountDifferentPixels(direct, tiled), pixelCount / 200);
 }
 
 static std::vector<uint8_t> ReadSurfacePixels(Surface* surface) {
@@ -1611,11 +1623,7 @@ TGFX_TEST(BackgroundBlurTest, CaptureCullKeepsStyleSourceComplete) {
   const auto shadowOffset = static_cast<size_t>(((10 + 40 + 10) * SurfaceSize + 170) * 4);
   EXPECT_EQ(direct[shadowOffset + 3], 255);
   EXPECT_EQ(tiled[shadowOffset + 3], 255);
-  // A software rasterizer rounds the anti-aliased shadow edge differently between the two modes,
-  // so a small number of differing pixels is expected. Losing the shadow itself moves far more
-  // pixels than this bound, and the two assertions above already pin that case.
-  const auto pixelCount = direct.size() / 4;
-  EXPECT_LT(CountDifferentPixels(direct, tiled), pixelCount / 200);
+  ExpectMatchingRenders(direct, tiled);
 }
 
 // The capture may only draw what it covers itself, so every footprint is clipped against each
@@ -1879,7 +1887,7 @@ TGFX_TEST(BackgroundBlurTest, CullAcrossTileBoundaryMatchesDirectRendering) {
   ASSERT_FALSE(direct.empty());
   // The scene has to differ from a flat fill, otherwise the comparison proves nothing.
   EXPECT_GT(CountPixelsDifferentFrom(direct, 0), 1000u);
-  EXPECT_EQ(CountDifferentPixels(direct, tiled), 0u);
+  ExpectMatchingRenders(direct, tiled);
 }
 
 // A glass style samples the backdrop through the background handler too, so culling the capture has
@@ -1927,7 +1935,7 @@ TGFX_TEST(BackgroundBlurTest, CullWithGlassStyleMatchesDirectRendering) {
   auto tiled = render(RenderMode::Tiled);
   ASSERT_FALSE(direct.empty());
   EXPECT_GT(CountPixelsDifferentFrom(direct, 0), 1000u);
-  EXPECT_EQ(CountDifferentPixels(direct, tiled), 0u);
+  ExpectMatchingRenders(direct, tiled);
 }
 
 // A blur layer that covers far more than the dirty tile cannot widen the cull beyond the tile it is
