@@ -484,6 +484,9 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
         cullRects = std::move(footprints);
       }
     }
+    // The capture runs even when no footprint reaches it: the walk reads render bounds computed by
+    // an earlier frame, so an empty list cannot be told apart from "bounds not ready yet", and
+    // skipping would drop a backdrop that is actually sampled.
     snapshotMap = captureBackgrounds(surface, captureRects, cullRects);
   }
   std::vector<Rect> dirtyRects = {};
@@ -1380,8 +1383,9 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     // The footprints already include the blur reach of every background style the layer owns, so
     // they are used as they are: widening them again would draw layers no style can read.
     auto narrowed = narrowCullRects(cullRects, worldRects);
-    // An empty list means no style samples inside this capture, in which case the whole area is
-    // kept rather than replaying the tree for nothing.
+    // A footprint can still miss this capture (the caller collects them for the whole tile union
+    // while the capture is split per rect). Keeping the whole area then only costs the culling for
+    // this frame, which is the safe side: the capture may draw more, never something else.
     if (!narrowed.empty()) {
       mergeCullRects(&narrowed);
       cullWorldRects = std::move(narrowed);
