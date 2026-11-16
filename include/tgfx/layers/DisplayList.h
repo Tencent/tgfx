@@ -423,12 +423,10 @@ class DisplayList {
 
   /**
    * Captures the backdrop the background styles sample. `renderRects` are surface-space rects that
-   * size the capture; `cullRects` are the world-space footprints of those styles, and only the
-   * layers they reach are drawn. Pass no `cullRects` to replay the whole captured area.
+   * size the capture; the layers drawn are culled to the footprints those styles sample inside it.
    */
   std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(
-      Surface* surface, const std::vector<Rect>& renderRects,
-      const std::vector<Rect>& cullRects = {}) const;
+      Surface* surface, const std::vector<Rect>& renderRects) const;
 
   void updateMousePosition();
 };

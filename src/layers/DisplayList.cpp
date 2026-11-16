@@ -466,28 +466,9 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       captureRect.offset(_contentOffset.x, _contentOffset.y);
       captureRects.push_back(captureRect);
     }
-    // A background style only samples the area under its own bounds plus the blur reach, so cull
-    // the capture against those footprints instead of the whole tile. Layers that overlap the tile
-    // but sit under no background style are then not drawn. The captured area stays the tile union,
-    // so the surfaces and the way sibling styles share their output do not change.
-    std::vector<Rect> cullRects = {};
-    auto viewMatrix = getViewMatrix();
-    Matrix inverse = Matrix::I();
-    if (viewMatrix.invert(&inverse)) {
-      auto capturedRect = Rect::MakeEmpty();
-      for (const auto& rect : captureRects) {
-        capturedRect.join(rect);
-      }
-      auto footprints = collectBackgroundFootprints(inverse.mapRect(capturedRect));
-      if (!footprints.empty()) {
-        mergeCullRects(&footprints);
-        cullRects = std::move(footprints);
-      }
-    }
-    // An empty list does not mean the capture is unnecessary: a subtree that keeps its own 3D
-    // context makes the walk give up on bounding the sampled area, and that capture still has to run
-    // so the backdrop its styles read stays there.
-    snapshotMap = captureBackgrounds(surface, captureRects, cullRects);
+    // The capture culls the layers no background style samples, using the footprints it collects for
+    // the area it covers.
+    snapshotMap = captureBackgrounds(surface, captureRects);
   }
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
@@ -1332,8 +1313,7 @@ std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBoun
 }
 
 std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
-    Surface* surface, const std::vector<Rect>& renderRects,
-    const std::vector<Rect>& cullRects) const {
+    Surface* surface, const std::vector<Rect>& renderRects) const {
   DEBUG_ASSERT(surface != nullptr);
   if (!_root->hasBackgroundStyle()) {
     return nullptr;
@@ -1372,19 +1352,22 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   for (auto& rect : worldRects) {
     rect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
   }
-  // The layers to draw can be narrowed to the area the background styles actually sample, while
-  // the surface still covers every render rect: a style never reads outside its footprint, and
-  // keeping the captured area unchanged keeps the multi-pass structure (and the style output
-  // sharing that depends on it) intact.
+  // The layers to draw can be narrowed to the area the background styles actually sample, while the
+  // surface still covers every render rect: keeping the captured area unchanged keeps the multi-pass
+  // structure (and the style output sharing that depends on it) intact. The walk is bounded by the
+  // area this capture covers, so a style that only reaches into the outset ring still counts.
   std::vector<Rect> cullWorldRects = worldRects;
   bool culled = false;
-  if (!cullRects.empty()) {
-    // The footprints already include the blur reach of every background style the layer owns, so
-    // they are used as they are: widening them again would draw layers no style can read.
-    auto narrowed = narrowCullRects(cullRects, worldRects);
-    // A footprint can still miss this capture (the caller collects them for the whole tile union
-    // while the capture is split per rect). Keeping the whole area then only costs the culling for
-    // this frame, which is the safe side: the capture may draw more, never something else.
+  auto captureBounds = Rect::MakeEmpty();
+  for (const auto& rect : worldRects) {
+    captureBounds.join(rect);
+  }
+  auto footprints = collectBackgroundFootprints(captureBounds);
+  if (!footprints.empty()) {
+    auto narrowed = narrowCullRects(footprints, worldRects);
+    // A footprint can still miss this capture, and keeping the whole area then only costs the
+    // culling for this frame, which is the safe side: the capture may draw more, never something
+    // else.
     if (!narrowed.empty()) {
       mergeCullRects(&narrowed);
       cullWorldRects = std::move(narrowed);

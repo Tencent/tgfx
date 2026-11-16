@@ -1678,7 +1678,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullRectsStayInsideTheFootprints){T
   auto captureRect = Rect::MakeWH(200.0f, 200.0f);
   auto footprints = displayList->collectBackgroundFootprints(captureRect);
   ASSERT_EQ(footprints.size(), 1u);
-  auto snapshots = displayList->captureBackgrounds(surface.get(), {captureRect}, footprints);
+  auto snapshots = displayList->captureBackgrounds(surface.get(), {captureRect});
   ASSERT_TRUE(snapshots != nullptr);
   ASSERT_EQ(snapshots->cullRects.size(), 1u);
 
@@ -1960,7 +1960,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullStaysInsideTheDirtyTile){TGFX_P
   auto tileRect = Rect::MakeXYWH(128.0f, 128.0f, 128.0f, 128.0f);
   auto footprints = displayList->collectBackgroundFootprints(tileRect);
   ASSERT_EQ(footprints.size(), 1u);
-  auto snapshots = displayList->captureBackgrounds(surface.get(), {tileRect}, footprints);
+  auto snapshots = displayList->captureBackgrounds(surface.get(), {tileRect});
   ASSERT_TRUE(snapshots != nullptr);
   ASSERT_EQ(snapshots->cullRects.size(), 1u);
 
@@ -2039,7 +2039,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, ManyStylesStillCullTheCapture) {
     // Well above MAX_CULL_RECTS, so the merge is what keeps the cull alive.
     ASSERT_GT(footprints.size(), 32u);
 
-    auto snapshots = displayList->captureBackgrounds(surface.get(), {captureRect}, footprints);
+    auto snapshots = displayList->captureBackgrounds(surface.get(), {captureRect});
     ASSERT_TRUE(snapshots != nullptr);
     ASSERT_FALSE(snapshots->cullRects.empty());
     // The per-layer cull loop only affords MAX_CULL_RECTS rects, so the merge has to get under it
