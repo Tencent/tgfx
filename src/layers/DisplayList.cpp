@@ -1231,7 +1231,7 @@ void DisplayList::mergeCullRects(std::vector<Rect>* rects) {
   }
   // Each join restarts the scan, so the merge cost grows with the square of the list. Only a list
   // close to the budget is worth merging: anything longer collapses into one rect below.
-  if (rects->size() <= 2 * MAX_CULL_RECTS) {
+  if (rects->size() <= 4 * MAX_CULL_RECTS) {
     bool merged = true;
     while (merged) {
       merged = false;
