@@ -209,18 +209,15 @@ void SurfaceTexture::notifyFrameAvailable() {
 
 static ISize ComputeTextureSize(const float matrix[16], int width, int height) {
   // SurfaceTexture.getTransformMatrix() returns a column-major 4x4 that maps normalized texture
-  // coordinates to the region the decoder actually produced. We can only recover the padded buffer
-  // size from a pure crop plus vertical flip, which is the form AOSP emits when the buffer carries
-  // no rotation and no horizontal flip: matrix[0] > 0, matrix[5] < 0, and the off-diagonal terms
-  // are zero. For AOSP's crop (scaleX = (cropW - 2 * shrink) / bufferW, transX = (cropLeft + shrink)
-  // / bufferW) the translation cancels the half-texel filtering shrink, so matrix[0] + 2 * matrix[12]
-  // collapses to cropW / bufferW; dividing the content width by it recovers bufferW, and the flipped
-  // Y axis follows the same derivation through matrix[13]. Rotation, horizontal flip and vertical
-  // flip are rejected by the guard below. The recovery is exact only for a crop anchored at the
-  // origin, i.e. the decoder's alignment padding sitting on the right and bottom, which is the only
-  // form a hardware decoder produces here; a crop carrying a left/top offset would recover a
-  // slightly wrong size, but the result-below-content check still catches the gross cases and falls
-  // back to the content size.
+  // coordinates to the region the decoder actually produced inside its (possibly padded) buffer.
+  // We only recover the padded buffer size when that matrix is a pure crop plus vertical flip, the
+  // form the targeted decoders emit: matrix[0] > 0, matrix[5] < 0, and the off-diagonal terms are
+  // zero. Rotation, horizontal flip, or a missing vertical flip are rejected by the guard below.
+  // The scale and translation terms encode cropSize / bufferSize (the translation cancels the
+  // half-texel filtering shrink), so dividing the content size by them recovers the buffer size;
+  // this matches the real device matrices this fix was validated against. Any matrix the formula
+  // cannot invert yields a size below the content, which the final check rejects so the caller
+  // falls back to the content size, i.e. the pre-fix behavior.
   if (matrix[1] != 0 || matrix[4] != 0 || matrix[0] <= 0 || matrix[5] >= 0) {
     return {};
   }
