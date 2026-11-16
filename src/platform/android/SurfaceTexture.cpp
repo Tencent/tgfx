@@ -215,32 +215,23 @@ static ISize ComputeTextureSize(const float matrix[16], int width, int height) {
   // are zero. For AOSP's crop (scaleX = (cropW - 2 * shrink) / bufferW, transX = (cropLeft + shrink)
   // / bufferW) the translation cancels the half-texel filtering shrink, so matrix[0] + 2 * matrix[12]
   // collapses to cropW / bufferW; dividing the content width by it recovers bufferW, and the flipped
-  // Y axis follows the same derivation through matrix[13]. Any other form (rotation, horizontal flip,
-  // or a crop not anchored at the origin) would produce a wrong size, so we return an empty size and
-  // let the caller fall back to the content size.
+  // Y axis follows the same derivation through matrix[13]. Rotation, horizontal flip and vertical
+  // flip are rejected by the guard below. The recovery is exact only for a crop anchored at the
+  // origin, i.e. the decoder's alignment padding sitting on the right and bottom, which is the only
+  // form a hardware decoder produces here; a crop carrying a left/top offset would recover a
+  // slightly wrong size, but the result-below-content check still catches the gross cases and falls
+  // back to the content size.
   if (matrix[1] != 0 || matrix[4] != 0 || matrix[0] <= 0 || matrix[5] >= 0) {
     return {};
   }
-  Size size = {static_cast<float>(width), static_cast<float>(height)};
   auto denomX = matrix[0] + matrix[12] * 2;
-  if (denomX > 0) {
-    size.width = size.width / denomX;
-  }
   auto scaleY = -matrix[5];
   auto denomY = scaleY + (matrix[13] - scaleY) * 2;
-  if (denomY > 0) {
-    size.height = size.height / denomY;
-  }
-  auto result = size.toRound();
-  // The derivation only holds when the crop is anchored at the origin, with the decoder's alignment
-  // padding on the right and bottom. A crop carrying a left/top offset leaks that offset into the
-  // translation terms and overshoots the denominator, producing a wrong size that may still exceed
-  // the content. For an origin crop the translation is just the half-texel filtering shrink, so
-  // matrix[12] * bufferWidth and (1 - matrix[13]) * bufferHeight stay within one texel; a larger
-  // value means a non-origin crop, so fall back to the content size.
-  if (matrix[12] * result.width > 1.5f || (1 - matrix[13]) * result.height > 1.5f) {
+  if (denomX <= 0 || denomY <= 0) {
     return {};
   }
+  Size size = {static_cast<float>(width) / denomX, static_cast<float>(height) / denomY};
+  auto result = size.toRound();
   // A valid padded buffer is never smaller than the content it carries, so a smaller result means
   // the matrix was not the expected crop form; fall back instead of trusting it.
   if (result.width < width || result.height < height) {
@@ -353,6 +344,8 @@ bool SurfaceTexture::updateTexImage() {
           textureSize = ComputeTextureSize(matrix, width(), height());
           textureSizeResolved = true;
           env->ReleaseFloatArrayElements(floatArray, matrix, JNI_ABORT);
+        } else {
+          env->ExceptionClear();
         }
       }
       env->DeleteLocalRef(floatArray);
