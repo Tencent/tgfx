@@ -1387,8 +1387,10 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   auto footprints = collectBackgroundFootprints(captureBounds);
   if (!footprints.empty()) {
     auto narrowed = narrowCullRects(footprints, worldRects);
-    // A footprint can still miss this capture, and keeping the whole area then only costs the
-    // culling for this frame, which is the safe side: the capture may draw more, never something
+    // An empty list does not mean the capture is unnecessary: a subtree that keeps its own 3D
+    // context makes the walk give up on bounding the sampled area, and that capture still has to
+    // run so the backdrop its styles read stays there. Keeping the whole area then only costs the
+    // culling for this frame, which is the safe side: the capture may draw more, never anything
     // else.
     if (!narrowed.empty()) {
       mergeCullRects(&narrowed);
