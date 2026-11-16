@@ -12,6 +12,10 @@
 #ifndef TGFX_TRANSFER_FUNCTION_INC
 #define TGFX_TRANSFER_FUNCTION_INC
 
+// The transfer functions are only reachable from the color-space transform, which is gated on the
+// same operator bit; a chain without ColorSpaceXform cuts this math with it.
+#pragma tgfx_spec_reader
+#pragma tgfx_spec_gate TransferTF : (SPEC_UsedOps() & (1 << OP_COLOR_SPACE_XFORM)) != 0
 vec3 transferTF(vec3 x, vec4 tf0, vec4 tf1, int tfType) {
   vec3 s = sign(x);
   x = abs(x);

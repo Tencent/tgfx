@@ -54,6 +54,10 @@ float analyticRRectCoverage(vec4 rect, vec4 radiiX, vec4 radiiY, float antiAlias
   return mix(nonAACov, aaCov, antiAlias);
 }
 
+// The rounded-rect instruction's math: only a chain carrying that operator calls it (the analytic
+// clip path goes through analyticLocalRectCoverage above instead).
+#pragma tgfx_spec_reader
+#pragma tgfx_spec_gate RRectMath : (SPEC_UsedOps() & (1 << OP_RRECT_COVERAGE)) != 0
 vec4 aotApplyRRectCoverage(vec4 inputCoverage, vec4 rect, vec4 radiiX, vec4 radiiY,
                            float antiAlias, mat3 deviceToLocal) {
   return inputCoverage * vec4(analyticRRectCoverage(rect, radiiX, radiiY, antiAlias, deviceToLocal));
