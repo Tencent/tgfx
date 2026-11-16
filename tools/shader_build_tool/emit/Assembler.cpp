@@ -125,6 +125,11 @@ void AppendUnrollMacro(const Family& family, const Variant& variant, const Modul
   const std::string countAccessor =
       (module->bareNames ? std::string() : std::string(module->name) + "_") +
       SpecContract::FieldAccessorPrefix + countElement.name;
+  // One guarded call site per slot. The guard is a runtime `if` on a spec constant: the source
+  // preprocessor resolves every #if before the tool sees the text, so a source-level guard would
+  // be folded away at build time and never reach the driver. (A post-preprocessing rewrite that
+  // guards the sites would keep ~16 copies of the evaluator out of the driver's input; it needs
+  // its own text pass and is not in place yet.)
   *text += "#define " + std::string(module->name) + "_RUN_UNROLLED_SLOTS() \\\n";
   for (uint16_t slotIndex = 0; slotIndex < capacity; ++slotIndex) {
     *text += "  if (" + countAccessor + "() > " + std::to_string(slotIndex) + ") { " +

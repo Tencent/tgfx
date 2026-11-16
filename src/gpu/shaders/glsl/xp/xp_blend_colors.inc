@@ -24,6 +24,7 @@ float xpSaturation(vec3 c) {
   return max(max(c.r, c.g), c.b) - min(min(c.r, c.g), c.b);
 }
 
+#pragma tgfx_spec_gate BlendLuminance : SPEC_NeedsBlendMath() != 0
 vec3 xpSetLuminance(vec3 hueSat, float alpha, vec3 lumColor) {
   // Match GLSLBlend's set_luminance: subtract the colors before computing luminance so the
   // floating-point reduction has the same rounding path on the runtime and precompiled routes.
@@ -40,6 +41,7 @@ vec3 xpSetLuminance(vec3 hueSat, float alpha, vec3 lumColor) {
   return mix(outColor, highClamped, bvec3(maxComp > alpha && maxComp != outLum));
 }
 
+#pragma tgfx_spec_gate BlendSaturation : SPEC_NeedsBlendMath() != 0
 vec3 xpSetSaturation(vec3 hueLumColor, vec3 satColor) {
   // Component-wise rank form of the classic min/mid/max permutation tree: every channel maps to
   // sat * (c - min) / (max - min), which is exactly the tree's mid-channel expression, while the
