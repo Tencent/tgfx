@@ -457,6 +457,197 @@ std::vector<SpecGateInfo> ScanGatePragmas(const std::string& fragmentSource,
   return gates;
 }
 
+namespace {
+
+/// Folds a gate's mask expression: decimal literals, `|`, `<<` and parentheses. The canonical
+/// condition is a single field's bit test, so the mask grammar stays this small; anything else
+/// is a build error rather than a gate the runtime cannot evaluate.
+class GateMaskParser {
+ public:
+  GateMaskParser(const std::string& text, size_t cursor) : text(text), cursor(cursor) {
+  }
+
+  bool ParseOr(uint32_t* value) {
+    uint32_t left = 0;
+    if (!ParseShift(&left)) {
+      return false;
+    }
+    while (Take('|')) {
+      uint32_t right = 0;
+      if (!ParseShift(&right)) {
+        return false;
+      }
+      left |= right;
+    }
+    *value = left;
+    return true;
+  }
+
+  size_t Cursor() const {
+    return cursor;
+  }
+
+ private:
+  void SkipSpaces() {
+    while (cursor < text.size() && (text[cursor] == ' ' || text[cursor] == '\t')) {
+      ++cursor;
+    }
+  }
+
+  bool Take(char expected) {
+    SkipSpaces();
+    if (cursor < text.size() && text[cursor] == expected) {
+      ++cursor;
+      return true;
+    }
+    return false;
+  }
+
+  bool ParseShift(uint32_t* value) {
+    uint32_t left = 0;
+    if (!ParseAtom(&left)) {
+      return false;
+    }
+    SkipSpaces();
+    while (text.compare(cursor, 2, "<<") == 0) {
+      cursor += 2;
+      uint32_t right = 0;
+      if (!ParseAtom(&right) || right >= 32) {
+        return false;
+      }
+      left = left << right;
+    }
+    *value = left;
+    return true;
+  }
+
+  bool ParseAtom(uint32_t* value) {
+    SkipSpaces();
+    if (Take('(')) {
+      if (!ParseOr(value) || !Take(')')) {
+        return false;
+      }
+      return true;
+    }
+    const auto start = cursor;
+    uint64_t result = 0;
+    while (cursor < text.size() && std::isdigit(static_cast<unsigned char>(text[cursor])) != 0) {
+      result = result * 10 + static_cast<uint64_t>(text[cursor] - '0');
+      if (result > 0xFFFFFFFFull) {
+        return false;
+      }
+      ++cursor;
+    }
+    if (cursor == start) {
+      return false;
+    }
+    *value = static_cast<uint32_t>(result);
+    return true;
+  }
+
+  const std::string& text;
+  size_t cursor = 0;
+};
+
+}  // namespace
+
+bool NormalizeGateCondition(SpecGateInfo* gate, const std::vector<SpecEntry>& entries) {
+  // The pragma writes the operator bits by name (1 << OP_LUMA); the mask grammar is numeric, so
+  // the OP_ constants fold here — the same table the gate's translated condition carries.
+  std::string substituted;
+  substituted.reserve(gate->expr.size());
+  for (size_t i = 0; i < gate->expr.size();) {
+    if (IsIdentifierChar(gate->expr[i]) != 0) {
+      const auto start = i;
+      while (i < gate->expr.size() && IsIdentifierChar(gate->expr[i]) != 0) {
+        ++i;
+      }
+      const auto token = gate->expr.substr(start, i - start);
+      if (token.compare(0, 3, "OP_") == 0) {
+        const auto found = OpConstantMap().find(token);
+        if (found == OpConstantMap().end()) {
+          return false;
+        }
+        substituted += found->second;
+      } else {
+        substituted += token;
+      }
+      continue;
+    }
+    substituted += gate->expr[i];
+    ++i;
+  }
+  const std::string& expr = substituted;
+  size_t at = 0;
+  auto skipSpaces = [&expr, &at]() {
+    while (at < expr.size() && (expr[at] == ' ' || expr[at] == '\t')) {
+      ++at;
+    }
+  };
+  auto expect = [&expr, &at, &skipSpaces](const char* token) {
+    skipSpaces();
+    const auto length = std::char_traits<char>::length(token);
+    if (expr.compare(at, length, token) != 0) {
+      return false;
+    }
+    at += length;
+    return true;
+  };
+  auto parseField = [&expr, &at, &expect](std::string* name) {
+    if (!expect(SpecContract::FieldAccessorPrefix)) {
+      return false;
+    }
+    const auto start = at;
+    while (at < expr.size() && IsIdentifierChar(expr[at])) {
+      ++at;
+    }
+    if (at == start) {
+      return false;
+    }
+    *name = expr.substr(start, at - start);
+    return expect("()");
+  };
+  std::string field;
+  uint32_t mask = 0;
+  skipSpaces();
+  if (at < expr.size() && expr[at] == '(') {
+    ++at;
+    if (!parseField(&field) || !expect("&")) {
+      return false;
+    }
+    GateMaskParser maskParser(expr, at);
+    if (!maskParser.ParseOr(&mask)) {
+      return false;
+    }
+    at = maskParser.Cursor();
+    if (!expect(")")) {
+      return false;
+    }
+  } else {
+    if (!parseField(&field)) {
+      return false;
+    }
+    mask = 0xFFFFFFFFu;
+  }
+  if (!expect("!=") || !expect("0")) {
+    return false;
+  }
+  skipSpaces();
+  if (at != expr.size() || mask == 0) {
+    return false;
+  }
+  const auto found = std::find_if(entries.begin(), entries.end(), [&field](const SpecEntry& entry) {
+    return entry.name == field && entry.arraySize == 1;
+  });
+  if (found == entries.end()) {
+    return false;
+  }
+  gate->mask = mask;
+  gate->expr = "(" + std::string(SpecContract::FieldAccessorPrefix) + field + "() & " +
+               std::to_string(mask) + ") != 0";
+  return true;
+}
+
 bool GateEvaluatable(const SpecGateInfo& gate, const std::vector<SpecEntry>& entries) {
   size_t at = 0;
   while ((at = gate.expr.find(SpecContract::FieldAccessorPrefix, at)) != std::string::npos) {

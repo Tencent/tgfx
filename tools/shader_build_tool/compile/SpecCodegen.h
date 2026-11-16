@@ -104,6 +104,13 @@ std::vector<SpecGateInfo> ScanGatePragmas(const std::string& fragmentSource,
 /// stays in every form — ungated, never cut.
 bool GateEvaluatable(const SpecGateInfo& gate, const std::vector<SpecEntry>& entries);
 
+/// Rewrites the gate's condition into the one canonical form the emitted text and the runtime
+/// both read: `(SPEC_<field>() & <decimal mask>) != 0`. Accepts that form and the plain
+/// `SPEC_<field>() != 0` (any set bit), folds the mask's integer expression (literals, `|`, `<<`
+/// and parentheses), and records the mask on the gate. Any other shape is rejected — a condition
+/// the runtime cannot evaluate is a build error, not a silently ungated body.
+bool NormalizeGateCondition(SpecGateInfo* gate, const std::vector<SpecEntry>& entries);
+
 /// Rewrites a preprocessed fragment text so each declared gate becomes a preprocessor
 /// conditional: a `#define TGFX_GATE_<name> (<master switch> == 0 || (<cond>))` header line after
 /// #version (at the top for a dialect without one), and the gated function's body wrapped as

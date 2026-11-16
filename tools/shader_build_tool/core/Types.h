@@ -73,6 +73,10 @@ struct SpecGateInfo {
   /// The gated function's name, parsed at scan time: the preprocessor drops unknown pragma
   /// lines, so the text passes locate the function by name, never by the pragma.
   std::string functionName;
+  /// The normalized bit test this gate is: `values[specId] & mask`. Filled by
+  /// NormalizeGateCondition (the condition grammar is a single field's bit test) and non-zero
+  /// for every gate the build accepts, because the runtime reads the emitted define line back.
+  uint32_t mask = 0;
 };
 
 struct StageReflectionData {

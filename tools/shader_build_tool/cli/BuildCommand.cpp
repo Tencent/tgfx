@@ -400,10 +400,20 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       // here, not on a device.
       std::vector<SpecGateInfo> supportedGates = {};
       if (!specEntries.empty()) {
-        for (const auto& gate : ScanGatePragmas(fragExpanded, info.name, &report->diagnostics)) {
-          if (GateEvaluatable(gate, specEntries)) {
-            supportedGates.push_back(gate);
+        for (auto gate : ScanGatePragmas(fragExpanded, info.name, &report->diagnostics)) {
+          if (!GateEvaluatable(gate, specEntries)) {
+            continue;
           }
+          if (!NormalizeGateCondition(&gate, specEntries)) {
+            RecordBuildError(
+                &report->diagnostics, Layer::Compile, DiagnosticCode::SpecGateUnmatched, info.name,
+                "", static_cast<int>(variant.ordinal), static_cast<int>(variant.ordinal),
+                "the gate '" + gate.name +
+                    "' condition is not a single-field bit test; the runtime evaluates "
+                    "`(SPEC_<field>() & <mask>) != 0` only");
+            continue;
+          }
+          supportedGates.push_back(gate);
         }
         std::vector<SpecGateInfo> unvalidatedGates = {};
         for (const auto& gate : supportedGates) {

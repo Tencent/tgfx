@@ -27,6 +27,7 @@
 #include "core/DiagnosticCodes.h"
 #include "core/Diagnostics.h"
 #include "gpu/aot/ir/Program.h"
+#include "gpu/aot/spec/SpecGatePruner.h"
 #include "gpu/shaders/contract/SpecContract.h"
 #include "gtest/gtest.h"
 
@@ -157,6 +158,103 @@ TEST(SpecGateTest, HlslWrapUsesTheSpirvCrossPrefixAndNoVersionLine) {
             std::string::npos);
   EXPECT_NE(gated.text.find("#else\n{ return float4(0.0, 0.0, 0.0, 0.0); }\n#endif"),
             std::string::npos);
+}
+
+namespace {
+
+// The shape ApplyTextSpecGates emits, trimmed to the gate it wraps.
+const char* GatedText =
+    "#version 450\n"
+    "#define TGFX_GATE_Noise (TGFX_SPEC_0 == 0 || ((TGFX_SPEC_9 & 32768) != 0))\n"
+    "vec4 evalNoise(int slot)\n"
+    "#if TGFX_GATE_Noise\n"
+    "{\n  return vec4(1.0);\n}\n"
+    "#else\n"
+    "{ return vec4(0.0); }\n"
+    "#endif\n"
+    "int tail() { return 1; }\n";
+
+}  // namespace
+
+TEST(SpecGateTest, PrunerSplicesAClosedGateOut) {
+  std::vector<uint32_t> values = std::vector<uint32_t>(10, 0);
+  values[0] = 1;
+  const auto pruned = ResolveSpecGates(GatedText, values, SpecContract::ConstantPrefix);
+  EXPECT_EQ(pruned.find("return vec4(1.0);"), std::string::npos);
+  EXPECT_NE(pruned.find("vec4 evalNoise(int slot)\n{ return vec4(0.0); }\n"), std::string::npos);
+  EXPECT_EQ(pruned.find("#if "), std::string::npos);
+  EXPECT_EQ(pruned.find("#define TGFX_GATE_"), std::string::npos);
+  EXPECT_NE(pruned.find("int tail() { return 1; }"), std::string::npos);
+}
+
+TEST(SpecGateTest, PrunerKeepsAnOpenGateBody) {
+  std::vector<uint32_t> values = std::vector<uint32_t>(10, 0);
+  values[0] = 1;
+  values[9] = 32768;
+  const auto pruned = ResolveSpecGates(GatedText, values, SpecContract::ConstantPrefix);
+  EXPECT_NE(pruned.find("return vec4(1.0);"), std::string::npos);
+  EXPECT_EQ(pruned.find("return vec4(0.0);"), std::string::npos);
+  EXPECT_EQ(pruned.find("#if "), std::string::npos);
+}
+
+TEST(SpecGateTest, PrunerLeavesATextWithoutGatesAlone) {
+  const std::string text = "#version 450\nint f() { return 1; }\n";
+  EXPECT_EQ(ResolveSpecGates(text, {1}, SpecContract::ConstantPrefix), text);
+}
+
+TEST(SpecGateTest, PrunerFailsClosedOnMalformedText) {
+  std::vector<uint32_t> values = std::vector<uint32_t>(10, 0);
+  values[0] = 1;
+  // An unterminated gate, an unknown gate name, and a directive inside a span each return the
+  // input unchanged: the caller serves exactly what it served before this pass existed.
+  const std::string unterminated =
+      "#version 450\n#define TGFX_GATE_Noise (TGFX_SPEC_0 == 0 || ((TGFX_SPEC_9 & 1) != 0))\n"
+      "#if TGFX_GATE_Noise\n{ return vec4(0.0); }\n#else\n{ return vec4(1.0); }\n";
+  EXPECT_EQ(ResolveSpecGates(unterminated, values, SpecContract::ConstantPrefix), unterminated);
+  const std::string unknown =
+      "#version 450\n#if TGFX_GATE_Missing\n{ return vec4(0.0); }\n#else\n{ return vec4(1.0); "
+      "}\n#endif\n";
+  EXPECT_EQ(ResolveSpecGates(unknown, values, SpecContract::ConstantPrefix), unknown);
+  const std::string nested =
+      "#version 450\n#define TGFX_GATE_Noise (TGFX_SPEC_0 == 0 || ((TGFX_SPEC_9 & 1) != 0))\n"
+      "#if TGFX_GATE_Noise\n#if OTHER\n{ }\n#endif\n#else\n{ return vec4(1.0); }\n#endif\n";
+  EXPECT_EQ(ResolveSpecGates(nested, values, SpecContract::ConstantPrefix), nested);
+}
+
+TEST(SpecGateTest, PrunerRoundTripsTheToolsOwnGate) {
+  // The strongest link: the tool emits the gate, the runtime parses what the tool emitted.
+  const auto gated =
+      ApplyTextSpecGates("#version 450\nvec4 f(int a) {\n  return vec4(1.0);\n}\n",
+                         {{"ColorOps", "(SPEC_UsedOps() & 16) != 0", "f"}}, {Entry("UsedOps", 7)});
+  ASSERT_TRUE(gated.error.empty());
+  ASSERT_EQ(gated.wrapped, 1u);
+  std::vector<uint32_t> values = std::vector<uint32_t>(8, 0);
+  values[0] = 1;
+  const auto closed = ResolveSpecGates(gated.text, values, SpecContract::ConstantPrefix);
+  EXPECT_EQ(closed.find("return vec4(1.0);"), std::string::npos);
+  EXPECT_NE(closed.find("return vec4(0.0);"), std::string::npos);
+  values[7] = 16;
+  const auto open = ResolveSpecGates(gated.text, values, SpecContract::ConstantPrefix);
+  EXPECT_NE(open.find("return vec4(1.0);"), std::string::npos);
+}
+
+TEST(SpecGateTest, NormalizeAcceptsTheCanonicalForms) {
+  const std::vector<SpecEntry> entries = {Entry("UsedOps", 7)};
+  SpecGateInfo gate = {"Ops", "(SPEC_UsedOps() & ((1 << OP_LUMA) | (1 << OP_COLOR_MATRIX))) != 0",
+                       "f", 0};
+  ASSERT_TRUE(NormalizeGateCondition(&gate, entries));
+  EXPECT_EQ(gate.mask, (1u << 1u) | (1u << 0u));
+  EXPECT_EQ(gate.expr, "(SPEC_UsedOps() & 3) != 0");
+  SpecGateInfo plain = {"Ops", "SPEC_UsedOps() != 0", "f", 0};
+  ASSERT_TRUE(NormalizeGateCondition(&plain, entries));
+  EXPECT_EQ(plain.mask, 0xFFFFFFFFu);
+  // A range comparison, an unknown field and a zero mask are all rejected.
+  SpecGateInfo range = {"Ops", "SPEC_UsedOps() > 2", "f", 0};
+  EXPECT_FALSE(NormalizeGateCondition(&range, entries));
+  SpecGateInfo missing = {"Ops", "(SPEC_Gone() & 1) != 0", "f", 0};
+  EXPECT_FALSE(NormalizeGateCondition(&missing, entries));
+  SpecGateInfo zero = {"Ops", "(SPEC_UsedOps() & 0) != 0", "f", 0};
+  EXPECT_FALSE(NormalizeGateCondition(&zero, entries));
 }
 
 TEST(SpecGateTest, FeatureMasksFollowTheSlots) {

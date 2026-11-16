@@ -7,6 +7,9 @@
 #ifndef TGFX_POINTWISE_MATH_INC
 #define TGFX_POINTWISE_MATH_INC
 
+// This file reads the specialization surface (the per-operator gates below).
+#pragma tgfx_spec_reader
+
 #include "operator/transfer_function.inc"
 
 // ColorSpaceXform stage flags (the CSFlags / ChainCSFlags bit set), shared by both evaluators.
@@ -18,6 +21,10 @@
 #define CS_SRC_OOTF 32
 #define CS_DST_OOTF 64
 
+// Each operator's math is only reachable from a chain whose slots carry that operator: the
+// dispatch branch holds a constant `op` under specialization, so an absent operator's call sites
+// fold away and the runtime splices the body out.
+#pragma tgfx_spec_gate ColorMatrixMath : (SPEC_UsedOps() & (1 << OP_COLOR_MATRIX)) != 0
 vec4 pmApplyColorMatrix(vec4 color, mat4 matrix, vec4 vector) {
   // Unpremultiply, apply matrix + vector, clamp, re-premultiply.
   color = vec4(color.rgb / max(color.a, 9.9999997473787516e-05), color.a);
@@ -26,10 +33,12 @@ vec4 pmApplyColorMatrix(vec4 color, mat4 matrix, vec4 vector) {
   return color;
 }
 
+#pragma tgfx_spec_gate LumaMath : (SPEC_UsedOps() & (1 << OP_LUMA)) != 0
 vec4 pmApplyLuma(vec4 color, vec3 lumaCoefficients) {
   return vec4(dot(color.rgb, lumaCoefficients));
 }
 
+#pragma tgfx_spec_gate AlphaThresholdMath : (SPEC_UsedOps() & (1 << OP_ALPHA_THRESHOLD)) != 0
 vec4 pmApplyAlphaThreshold(vec4 color, float threshold) {
   vec4 result = vec4(0.0);
   if (color.a > 0.0) {
@@ -41,6 +50,7 @@ vec4 pmApplyAlphaThreshold(vec4 color, float threshold) {
 }
 
 // 0 = Ignore (replace), 1 = ModulateRGBA, 2 = ModulateA.
+#pragma tgfx_spec_gate ConstColorMath : (SPEC_UsedOps() & (1 << OP_CONST_COLOR)) != 0
 vec4 pmApplyConstColor(vec4 constColor, vec4 inputColor, int inputMode) {
   if (inputMode == 1) {
     return constColor * inputColor;

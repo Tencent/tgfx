@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/spec/SpecInjector.h"
+#include <cstdlib>
+#include <cstring>
+#include "gpu/aot/spec/SpecGatePruner.h"
 #include "gpu/shaders/contract/SpecContract.h"
 
 namespace tgfx {
@@ -65,24 +68,34 @@ class MacroPrefixInjector final : public SpecInjector {
       return false;
     }
     std::string defines;
+    std::vector<uint32_t> valuesById = {};
     for (const auto& entry : injection->constants) {
       defines += "#define " + prefix + entry.first + " " +
                  std::to_string(static_cast<int>(entry.second)) + "\n";
+      const auto id = static_cast<size_t>(std::strtoul(entry.first.c_str(), nullptr, 10));
+      if (valuesById.size() <= id) {
+        valuesById.resize(id + 1, 0);
+      }
+      valuesById[id] = static_cast<uint32_t>(static_cast<int64_t>(entry.second));
     }
     injection->constants.clear();
+    // Splice the closed gates out before the driver ever sees the text: the stored form carries
+    // every body the draw could reach, and this draw reaches one shape of it. A text without
+    // gates comes back unchanged, which is the generic form's whole text.
+    const auto pruned = ResolveSpecGates(code, valuesById, prefix.c_str());
     if (!afterVersion) {
-      injection->code = defines + code;
+      injection->code = defines + pruned;
       return true;
     }
-    const auto versionPos = code.find("#version");
+    const auto versionPos = pruned.find("#version");
     if (versionPos == std::string::npos) {
       return false;
     }
-    const auto versionEnd = code.find('\n', versionPos);
+    const auto versionEnd = pruned.find('\n', versionPos);
     if (versionEnd == std::string::npos) {
       return false;
     }
-    injection->code = code.substr(0, versionEnd + 1) + defines + code.substr(versionEnd + 1);
+    injection->code = pruned.substr(0, versionEnd + 1) + defines + pruned.substr(versionEnd + 1);
     return true;
   }
 

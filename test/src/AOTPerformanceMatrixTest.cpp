@@ -602,6 +602,50 @@ TGFX_TEST(AOTPerformanceMatrixTest, ChainSpecializationGain) {
   cache->setDecompositionEnabled(true);
 }
 
+// The specialization A/B on a shape whose draw uses NO color operator: the texture draw carries
+// only the leaf, so the color-operator math is closed in the text gates and the specialized
+// program hands the driver a smaller source than the generic one. The pair runs back-to-back in
+// one process, so the cold delta is the prune's effect rather than the machine's drift.
+TGFX_TEST(AOTPerformanceMatrixTest, ChainSpecializationGainPlain) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
+  ASSERT_NE(context, nullptr);
+  auto* cache = ContextCacheAccess::Cache(context);
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+
+  for (int size : {512, 1024}) {
+    const float scale = static_cast<float>(size) / 128.0f;
+    auto scene = [&](Canvas* canvas) {
+      canvas->save();
+      canvas->scale(scale, scale);
+      Paint paint = {};
+      paint.setAlpha(0.8f);
+      canvas->drawImage(image, 0, 0, &paint);
+      canvas->restore();
+    };
+    cache->setSpecializationEnabled(false);
+    auto generic = MeasureRoute(context, cache, scene, size, true, false);
+    cache->setSpecializationEnabled(true);
+    auto specialized = MeasureRoute(context, cache, scene, size, true, false);
+    cache->setSpecializationEnabled(false);
+
+    ExpectMeasurementValid("plain-chain-generic", generic);
+    ExpectMeasurementValid("plain-chain-specialized", specialized);
+    PrintResult("plain-chain-generic", "aot", generic, size);
+    PrintResult("plain-chain-specialized", "aot", specialized, size);
+    printf(
+        "[PlainSpecGap] size=%d genericCold=%.3fms specializedCold=%.3fms cold=%.2fx "
+        "genericHot=%.3fms specializedHot=%.3fms hot=%.2fx\n",
+        size, generic.coldMedianMs, specialized.coldMedianMs,
+        specialized.coldMedianMs > 0 ? generic.coldMedianMs / specialized.coldMedianMs : 0.0,
+        generic.hotMedianMs, specialized.hotMedianMs,
+        specialized.hotMedianMs > 0 ? generic.hotMedianMs / specialized.hotMedianMs : 0.0);
+  }
+  cache->setDecompositionEnabled(true);
+}
+
 // The same route contrast for the hot dedicated families, with the dedicated family forced off for
 // the chain row. Route evidence prints with each row so a row that silently landed on another
 // family is visible. A path draws as an alpha mask below 162 pixels and as triangles above, so the
