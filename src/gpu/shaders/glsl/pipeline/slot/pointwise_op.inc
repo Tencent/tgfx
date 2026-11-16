@@ -1,9 +1,9 @@
 // Shared pointwise-operator logic. Provides applyPointwiseOp(slot, ...), which applies one
 // premultiplied-in/premultiplied-out pointwise operator read from a chain slot record:
 // SlotPacked[slot].x selects the operator (0 = ColorMatrix, 1 = Luma, 2 = AlphaThreshold,
-// 3 = ColorSpaceXform, 4 = None, 6 = ConstColor, 7 = Blend), the parameters are the slot's
-// registers (SlotMat / SlotVec0..2; the Chain module's elements declare their allocation),
-// and the operator's small value rides the selector's low byte.
+// 3 = ColorSpaceXform, 4 = None, 6 = ConstColor, 7 = Blend), the parameters are the slot's data
+// block in the chain pool (read back by the chainLoad* readers), and the operator's small value
+// rides the selector's low byte.
 // OP_NONE lets a producer kernel (e.g. the YUV tail) emit its raw premultiplied output when
 // no operator FP is composed on top of it, while the same slot record absorbs the composed case.
 //
@@ -44,7 +44,7 @@ vec4 applyPointwiseOp(int slot, vec4 color) {
     // (operator/pointwise_color_dispatch.inc); this interpreter supplies the slot's pool offset.
     result = evalPointwiseColorOp(opType, color, dataAt, SlotPacked[slot].w);
   } else if (opType == OP_BLEND) {
-    // Blend with a constant operand held in SlotVec1; the selector's bit 8 picks the operand order
+    // Blend with the slot's constant operand (chainLoadBlend); the selector's bit 8 picks the order
     // (the slot kernel's meaning of that bit; the chain's Blend reads register operands instead).
     // Select the arguments before the call so the compiler inlines xpBlendColors once instead of
     // twice (one per ternary branch).

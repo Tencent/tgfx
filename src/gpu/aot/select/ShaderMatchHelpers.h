@@ -94,7 +94,7 @@ std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir, AOT
 
 /// Records why a candidate rejected the draw into the match's failure out-parameter (the first
 /// rejection wins) and returns nullopt.
-std::nullopt_t Fail(PermutationMatchFailure* failure, PermutationMatchFailure reason);
+std::nullopt_t Fail(AOTFailure* failure, AOTFailure reason);
 
 /// Classifies one lowered coverage term (see Coverage); nullopt when it cannot be classified.
 std::optional<Coverage> ClassifyCoverageTerm(const AOTCoverageTerm& term);
@@ -142,6 +142,6 @@ bool RejectsAlphaOnlyTarget(bool servesAlphaOnly, const ProgramInfo* programInfo
 /// family skips that check and it runs once the family is known). A route that skips one of
 /// these gates would serve a draw the kernels cannot render correctly.
 bool AdmitMatchedProgram(const ProgramInfo* programInfo, const DrawShape& shape,
-                         const Family* family, PermutationMatchFailure* failure);
+                         const Family* family, AOTFailure* failure);
 
 }  // namespace tgfx

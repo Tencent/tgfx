@@ -175,8 +175,7 @@ BytesKey MakeProgramKey(Context* context, const ProgramInfo& info, uint32_t vari
   }
   // The output formula's key contribution: whether the shader runs the xfer stage, and the
   // destination texture when the formula samples one. blendMode already rides the pipeline state
-  // key below, and a null proxy means the backend's framebuffer fetch (the third state the old
-  // processor's class ID used to encode).
+  // key below, and a null proxy means the backend's framebuffer fetch.
   const auto& xfer = info.getXferFacts();
   key.write(static_cast<uint32_t>(xfer.shaderBlend() ? 1u : 0u));
   if (xfer.shaderBlend()) {

@@ -23,11 +23,10 @@
 namespace tgfx {
 
 /**
- * Why a precompiled program did not serve a draw, in one vocabulary. Two layers used to define
- * their own enums — the matcher's per-family rejection reasons and the cache's coarse fallback
- * categories — and the second was derived from the first by a mapping function. Both names remain
- * as aliases of this type, so call sites read naturally while new reasons are appended in one
- * place.
+ * Why a precompiled program did not serve a draw, in one vocabulary: the matcher's per-family
+ * rejection reasons and the cache's fallback categories share it, so a new reason is appended in
+ * one place. A sink that reports coarse categories collapses the fine values explicitly rather
+ * than maintaining a second enum.
  *
  * The match-side values (from UnsupportedOutputSwizzle through PermutationNotEnumerated) describe
  * where the walk rejected the draw; the cache-side values (from CacheNotLoaded through
@@ -80,12 +79,6 @@ enum class AOTFailure : uint8_t {
   /// One past the last reason, for fixed-size tables.
   Count,
 };
-
-/// The matcher's historical name for the same vocabulary.
-using PermutationMatchFailure = AOTFailure;
-
-/// The cache's historical name for the same vocabulary.
-using PrecompiledFallbackReason = AOTFailure;
 
 /// The one name table. The diagnostics print these, and the coverage gate counts by them, so a
 /// new reason must be named here in the same commit that appends it.

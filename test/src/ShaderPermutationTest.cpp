@@ -388,7 +388,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderCacheStats) {
   cache.recordAOTStage(PrecompiledAOTStage::CacheAvailable);
   PrecompiledFallbackRecord fallbackRecord;
   fallbackRecord.pipelineSignature = "GP=Test;ColorFP=[];CoverageFP=[];XP=Test";
-  cache.recordArtifactMiss(PrecompiledFallbackReason::NoMatchingRule, fallbackRecord);
+  cache.recordArtifactMiss(AOTFailure::NoMatchingRule, fallbackRecord);
 
   EXPECT_EQ(cache.hitCount(), 1u);
   EXPECT_EQ(cache.missCount(), 1u);
@@ -399,14 +399,14 @@ TGFX_TEST(ShaderPermutationTest, ShaderCacheStats) {
   EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::VertexModuleCreated), 1u);
   EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::FragmentModuleCreated), 1u);
   EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::PipelineCreated), 1u);
-  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
+  EXPECT_EQ(cache.fallbackCount(AOTFailure::NoMatchingRule), 1u);
   auto hitRecords = cache.hitRecords();
   ASSERT_EQ(hitRecords.size(), 1u);
   EXPECT_EQ(hitRecords[0].shaderName, hitRecord.shaderName);
   EXPECT_EQ(hitRecords[0].pipelineSignature, hitRecord.pipelineSignature);
   auto fallbackRecords = cache.fallbackRecords();
   ASSERT_EQ(fallbackRecords.size(), 1u);
-  EXPECT_EQ(fallbackRecords[0].reason, PrecompiledFallbackReason::NoMatchingRule);
+  EXPECT_EQ(fallbackRecords[0].reason, AOTFailure::NoMatchingRule);
 
   EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::PipelineCreated), 1u);
   EXPECT_EQ(cache.hitRecords().size(), 1u);
@@ -416,19 +416,19 @@ TGFX_TEST(ShaderPermutationTest, ShaderCacheStats) {
   EXPECT_EQ(cache.hitCount(), 0u);
   EXPECT_EQ(cache.missCount(), 0u);
   EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::Attempt), 0u);
-  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+  EXPECT_EQ(cache.fallbackCount(AOTFailure::NoMatchingRule), 0u);
   EXPECT_TRUE(cache.hitRecords().empty());
   EXPECT_TRUE(cache.fallbackRecords().empty());
 
-  cache.recordArtifactMiss(PrecompiledFallbackReason::VertexArtifactMissing);
-  cache.recordFailure(PrecompiledFallbackReason::VertexModuleCreationFailed);
-  cache.recordFailure(PrecompiledFallbackReason::PipelineCreationFailed);
+  cache.recordArtifactMiss(AOTFailure::VertexArtifactMissing);
+  cache.recordFailure(AOTFailure::VertexModuleCreationFailed);
+  cache.recordFailure(AOTFailure::PipelineCreationFailed);
   cache.recordArtifactHit();
   EXPECT_EQ(cache.hitCount(), 1u);
   EXPECT_EQ(cache.missCount(), 1u);
-  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::VertexArtifactMissing), 1u);
-  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::VertexModuleCreationFailed), 1u);
-  EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::PipelineCreationFailed), 1u);
+  EXPECT_EQ(cache.fallbackCount(AOTFailure::VertexArtifactMissing), 1u);
+  EXPECT_EQ(cache.fallbackCount(AOTFailure::VertexModuleCreationFailed), 1u);
+  EXPECT_EQ(cache.fallbackCount(AOTFailure::PipelineCreationFailed), 1u);
 }
 
 TGFX_TEST(ShaderPermutationTest, EmbeddedBundleLoadFromMemory) {
@@ -653,22 +653,20 @@ TGFX_TEST(ShaderPermutationTest, DrawsInABuildWithoutABundleReportNoBundleForBac
   paint.setColor(Color::FromRGBA(0, 128, 255, 255));
   surface->getCanvas()->drawRect(Rect::MakeXYWH(4, 4, 32, 32), paint);
   context->flushAndSubmit(true);
-  EXPECT_GT(cache->fallbackCount(PrecompiledFallbackReason::NoBundleForBackend), 0u);
-  EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::BundleRejected), 0u);
-  EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::CacheNotLoaded), 0u);
+  EXPECT_GT(cache->fallbackCount(AOTFailure::NoBundleForBackend), 0u);
+  EXPECT_EQ(cache->fallbackCount(AOTFailure::BundleRejected), 0u);
+  EXPECT_EQ(cache->fallbackCount(AOTFailure::CacheNotLoaded), 0u);
 }
 
 TGFX_TEST(ShaderPermutationTest, FallbackReasonNamesAreDistinct) {
   std::set<std::string> names;
-  for (size_t i = 0; i < static_cast<size_t>(PrecompiledFallbackReason::Count); ++i) {
-    names.insert(PrecompiledFallbackReasonName(static_cast<PrecompiledFallbackReason>(i)));
+  for (size_t i = 0; i < static_cast<size_t>(AOTFailure::Count); ++i) {
+    names.insert(AOTFailureName(static_cast<AOTFailure>(i)));
   }
-  EXPECT_EQ(names.size(), static_cast<size_t>(PrecompiledFallbackReason::Count));
+  EXPECT_EQ(names.size(), static_cast<size_t>(AOTFailure::Count));
   EXPECT_EQ(names.count("Unknown"), 0u);
-  EXPECT_STREQ(PrecompiledFallbackReasonName(PrecompiledFallbackReason::NoBundleForBackend),
-               "NoBundleForBackend");
-  EXPECT_STREQ(PrecompiledFallbackReasonName(PrecompiledFallbackReason::BundleRejected),
-               "BundleRejected");
+  EXPECT_STREQ(AOTFailureName(AOTFailure::NoBundleForBackend), "NoBundleForBackend");
+  EXPECT_STREQ(AOTFailureName(AOTFailure::BundleRejected), "BundleRejected");
 }
 
 static void SetTestBundleIdentity(std::vector<uint8_t>* bundle);
@@ -1037,11 +1035,11 @@ TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {
   EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::PipelineCreated), 0u);
   EXPECT_EQ(cache->hitCount(), 0u);
   EXPECT_EQ(cache->missCount(), 1u);
-  EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::VertexArtifactMissing), 1u);
+  EXPECT_EQ(cache->fallbackCount(AOTFailure::VertexArtifactMissing), 1u);
   auto fallbackRecords = cache->fallbackRecords();
   EXPECT_EQ(fallbackRecords.size(), 1u);
   if (!fallbackRecords.empty()) {
-    EXPECT_EQ(fallbackRecords[0].reason, PrecompiledFallbackReason::VertexArtifactMissing);
+    EXPECT_EQ(fallbackRecords[0].reason, AOTFailure::VertexArtifactMissing);
     EXPECT_TRUE(fallbackRecords[0].deliberate);
     EXPECT_FALSE(fallbackRecords[0].shaderName.empty());
     EXPECT_FALSE(fallbackRecords[0].effectSignature.empty());
@@ -1060,17 +1058,17 @@ TGFX_TEST(ShaderPermutationTest, ProgramMissCacheClearsOnBundleChange) {
   PrecompiledShaderCache cache(nullptr, Backend::Unknown);
   BytesKey key;
   key.write(7);
-  PrecompiledFallbackReason reason = PrecompiledFallbackReason::Unspecified;
+  AOTFailure reason = AOTFailure::Unspecified;
   EXPECT_FALSE(cache.findProgramMiss(key, &reason));
-  cache.recordProgramMiss(key, PrecompiledFallbackReason::NoMatchingRule);
+  cache.recordProgramMiss(key, AOTFailure::NoMatchingRule);
   ASSERT_TRUE(cache.findProgramMiss(key, &reason));
-  EXPECT_EQ(reason, PrecompiledFallbackReason::NoMatchingRule);
+  EXPECT_EQ(reason, AOTFailure::NoMatchingRule);
 
   auto bundle = MakeTestBundle("bounds", 1, 1, 50);
   ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
   EXPECT_FALSE(cache.findProgramMiss(key, &reason));
 
-  cache.recordProgramMiss(key, PrecompiledFallbackReason::VertexArtifactMissing);
+  cache.recordProgramMiss(key, AOTFailure::VertexArtifactMissing);
   ASSERT_TRUE(cache.findProgramMiss(key, &reason));
   ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
   EXPECT_FALSE(cache.findProgramMiss(key, &reason));
@@ -1493,10 +1491,10 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto ir = LowerDraw({}, coverageList, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
-    auto failure = PermutationMatchFailure::CoverageShape;
+    auto failure = AOTFailure::CoverageShape;
     auto match = SelectProgram(context, programInfo, &failure);
     ASSERT_TRUE(match.has_value()) << "clipFirst=" << clipFirst;
-    EXPECT_EQ(failure, PermutationMatchFailure::None);
+    EXPECT_EQ(failure, AOTFailure::None);
     EXPECT_EQ(Families()[match->variant.family].name, "ShapeInstancedTextureCoverage");
     EXPECT_EQ(match->variant.ordinal, expectedIndex);
   }
@@ -1517,13 +1515,12 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
                                BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(twoMaskIR.has_value());
     programInfo.setCarriedIR(&*twoMaskIR);
-    auto failure = PermutationMatchFailure::None;
+    auto failure = AOTFailure::None;
     EXPECT_FALSE(SelectProgram(context, programInfo, &failure).has_value());
     // The rejection itself is the contract. The reason is a diagnostic classification that
     // collapses to NoMatchingRule for the fallback report, so asserting one specific sub-reason
     // would freeze an internal detail of the family's predicate shape.
-    EXPECT_TRUE(failure == PermutationMatchFailure::CoverageShape ||
-                failure == PermutationMatchFailure::NoMatchingRule);
+    EXPECT_TRUE(failure == AOTFailure::CoverageShape || failure == AOTFailure::NoMatchingRule);
   }
 }
 
@@ -1549,7 +1546,7 @@ TGFX_TEST(ShaderPermutationTest, ComplexEllipseTextureCoverageIsServedByChain) {
   ASSERT_TRUE(ir.has_value());
   ProgramInfo rejected(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, false);
   rejected.setCarriedIR(&*ir);
-  auto failure = PermutationMatchFailure::None;
+  auto failure = AOTFailure::None;
   auto served = SelectProgram(context, rejected, &failure);
   ASSERT_TRUE(served.has_value());
   EXPECT_STREQ(Families()[served->variant.family].name, "Chain");
@@ -1558,7 +1555,7 @@ TGFX_TEST(ShaderPermutationTest, ComplexEllipseTextureCoverageIsServedByChain) {
   auto match = SelectProgram(context, accepted, &failure);
   ASSERT_TRUE(match.has_value());
   EXPECT_EQ(Families()[match->variant.family].name, "ComplexEllipse");
-  EXPECT_EQ(failure, PermutationMatchFailure::None);
+  EXPECT_EQ(failure, AOTFailure::None);
 }
 
 TGFX_TEST(ShaderPermutationTest, EffectDecomposerTripleFP) {
@@ -1712,7 +1709,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectComposedCoverageIsServedByChain) {
   ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp, std::nullopt,
                           BlendMode::SrcOver, false);
   programInfo.setCarriedIR(&*ir);
-  auto failure = PermutationMatchFailure::None;
+  auto failure = AOTFailure::None;
   auto served = SelectProgram(context, programInfo, &failure);
   ASSERT_TRUE(served.has_value());
   EXPECT_STREQ(Families()[served->variant.family].name, "Chain");

@@ -41,10 +41,6 @@ PrecompiledShaderCache::PrecompiledShaderCache(Context* context, Backend backend
     : _context(context), _backend(backend), _shaderCache(context), _specializationEnabled(true) {
 }
 
-const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason) {
-  return AOTFailureName(reason);
-}
-
 const char* PrecompiledAOTStageName(PrecompiledAOTStage stage) {
   switch (stage) {
     case PrecompiledAOTStage::Attempt:
@@ -75,7 +71,7 @@ void PrecompiledShaderCache::recordArtifactHit() {
   recordAOTStage(PrecompiledAOTStage::ArtifactsFound);
 }
 
-void PrecompiledShaderCache::recordArtifactMiss(PrecompiledFallbackReason reason,
+void PrecompiledShaderCache::recordArtifactMiss(AOTFailure reason,
                                                 const PrecompiledFallbackRecord& record) {
   if (statsRecordingPaused() || missPaused.load(std::memory_order_relaxed)) {
     return;
@@ -84,7 +80,7 @@ void PrecompiledShaderCache::recordArtifactMiss(PrecompiledFallbackReason reason
   recordFailure(reason, record);
 }
 
-void PrecompiledShaderCache::recordFailure(PrecompiledFallbackReason reason,
+void PrecompiledShaderCache::recordFailure(AOTFailure reason,
                                            const PrecompiledFallbackRecord& record) {
   if (statsRecordingPaused()) {
     return;
@@ -552,8 +548,7 @@ bool PrecompiledShaderCache::loadBundle(const std::string& path) {
   return loadBundle(data.data(), fileSize);
 }
 
-bool PrecompiledShaderCache::findProgramMiss(const BytesKey& key,
-                                             PrecompiledFallbackReason* reason) const {
+bool PrecompiledShaderCache::findProgramMiss(const BytesKey& key, AOTFailure* reason) const {
   std::lock_guard<std::mutex> lock(_programMissMutex);
   auto it = _programMisses.find(key);
   if (it == _programMisses.end()) {
@@ -570,8 +565,7 @@ bool PrecompiledShaderCache::hasProgramMisses() const {
   return !_programMisses.empty();
 }
 
-void PrecompiledShaderCache::recordProgramMiss(const BytesKey& key,
-                                               PrecompiledFallbackReason reason) {
+void PrecompiledShaderCache::recordProgramMiss(const BytesKey& key, AOTFailure reason) {
   std::lock_guard<std::mutex> lock(_programMissMutex);
   if (_programMisses.find(key) != _programMisses.end()) {
     return;
@@ -584,7 +578,7 @@ void PrecompiledShaderCache::recordProgramMiss(const BytesKey& key,
   _programMissOrder.push_back(key);
 }
 
-void PrecompiledShaderCache::recordCachedMiss(PrecompiledFallbackReason reason) {
+void PrecompiledShaderCache::recordCachedMiss(AOTFailure reason) {
   if (statsRecordingPaused() || missPaused.load(std::memory_order_relaxed)) {
     return;
   }

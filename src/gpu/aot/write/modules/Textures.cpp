@@ -55,8 +55,8 @@ Matrix DeviceMaskMatrix(const AOTTextureParameters& leaf) {
 }  // namespace
 
 // Texture: the plain leaf source. Both matrices carry the source coordinate transform — the subset
-// bounds go through the leaf's bare total transform (the old kernel's texSubsetMatrix), while the
-// source coordinate takes the transform with the geometry's uv matrix pre-concatenated.
+// bounds go through the leaf's bare total transform, while the source coordinate takes the
+// transform with the geometry's uv matrix pre-concatenated.
 void WriteTextureModule(WriteContext& context) {
   const auto* leaf = context.sources.tiledLeaf;
   if (leaf == nullptr) {

@@ -657,7 +657,7 @@ void ExpectReportedShapeServed(const ReportedShape& shape) {
     context->globalCache()->resetProgramStats();
     RenderReportedShape(context, shape, image, &candidate);
     EXPECT_EQ(cache->drawStats().droppedDraws, 0u) << shape.label;
-    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u) << shape.label;
+    EXPECT_EQ(cache->fallbackCount(AOTFailure::NoMatchingRule), 0u) << shape.label;
     // Every served program records its original effect signature, which proves the scene
     // reproduces the reported shape.
     bool reproduced = false;
@@ -675,8 +675,7 @@ void ExpectReportedShapeServed(const ReportedShape& shape) {
                             << seen;
     std::string misses = {};
     for (const auto& record : cache->fallbackRecords()) {
-      misses +=
-          record.effectSignature + " [" + PrecompiledFallbackReasonName(record.reason) + "]\n";
+      misses += record.effectSignature + " [" + AOTFailureName(record.reason) + "]\n";
     }
     EXPECT_TRUE(misses.empty()) << shape.label << " misses:\n" << misses;
     cache->setDiagnosticRecordingEnabled(false);
@@ -726,7 +725,7 @@ void ExpectSceneServed(const char* label, const char* gpName, const char* signat
     context->globalCache()->resetProgramStats();
     render(&candidate);
     EXPECT_EQ(cache->drawStats().droppedDraws, 0u) << label;
-    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u) << label;
+    EXPECT_EQ(cache->fallbackCount(AOTFailure::NoMatchingRule), 0u) << label;
     bool reproduced = false;
     std::string seen = {};
     std::string allSeen = {};

@@ -95,11 +95,8 @@ std::string ProgramInfo::FormatDiagnosticKey(const BytesKey& key) {
   return stream.str();
 }
 
-const BytesKey& ProgramInfo::programKey() const {
-  if (!cachedProgramKey.has_value()) {
-    cachedProgramKey = buildProgramKey();
-  }
-  return *cachedProgramKey;
+BytesKey ProgramInfo::programKey() const {
+  return buildProgramKey();
 }
 
 BytesKey ProgramInfo::buildProgramKey() const {

@@ -21,11 +21,11 @@
 #include "gpu/ContextInternal.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/Program.h"
-#include "gpu/ProgramSignature.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/chain/AOTShapeRules.h"
 #include "gpu/aot/ir/DrawIR.h"
+#include "gpu/aot/select/PrecompiledDiagnostics.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/processors/TextureEffect.h"
@@ -122,7 +122,6 @@ void StandardDrawOp::configureProgramInfo(ProgramInfo* info, PixelFormat depthSt
     depthStencil.format = depthStencilFormat;
     info->setDepthStencil(depthStencil);
   }
-  // Snapshot the geometry into the layout value every reader addresses; a draw that never
   onConfigureProgramInfo(*info);
 }
 

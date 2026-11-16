@@ -87,8 +87,8 @@ struct PrecompiledProgramRecord {
 struct PrecompiledHitRecord : PrecompiledProgramRecord {};
 
 struct PrecompiledFallbackRecord : PrecompiledProgramRecord {
-  PrecompiledFallbackReason reason = PrecompiledFallbackReason::Unspecified;
-  // Sub-reason of the miss as a PermutationMatchFailure value (0 = None). NoMatchingRule alone
+  AOTFailure reason = AOTFailure::Unspecified;
+  // Sub-reason of the miss as a AOTFailure value (0 = None). NoMatchingRule alone
   // cannot say whether the GL gate, a subset attribute, the gradient budget or the enumerated
   // variant set rejected the draw.
   uint8_t matchFailure = 0;
@@ -97,7 +97,6 @@ struct PrecompiledFallbackRecord : PrecompiledProgramRecord {
   bool deliberate = false;
 };
 
-const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason);
 const char* PrecompiledAOTStageName(PrecompiledAOTStage stage);
 
 /**
@@ -187,7 +186,7 @@ class PrecompiledShaderCache {
 
   /// What became of the embedded bundle when the owning Context loaded it. Set once by the Context;
   /// later loadBundle()/unload() calls (tests swap bundles in and out) do not change it. It only
-  /// tells a draw that finds the cache empty WHY: see PrecompiledFallbackReason.
+  /// tells a draw that finds the cache empty WHY: see AOTFailure.
   EmbeddedBundleState embeddedBundleState() const {
     return _embeddedBundleState;
   }
@@ -245,8 +244,8 @@ class PrecompiledShaderCache {
   /// the same key are refused without walking the permutation rules again. Cleared whenever the
   /// bundle changes, because a new bundle may serve a key the old one refused. The table is
   /// bounded: a miss is a shortcut, so evicting the oldest entry only costs one repeated walk.
-  bool findProgramMiss(const BytesKey& key, PrecompiledFallbackReason* reason) const;
-  void recordProgramMiss(const BytesKey& key, PrecompiledFallbackReason reason);
+  bool findProgramMiss(const BytesKey& key, AOTFailure* reason) const;
+  void recordProgramMiss(const BytesKey& key, AOTFailure reason);
 
   /// Whether any miss is recorded. An empty table cannot answer a lookup, which lets the caller
   /// skip the attempt key's whole-expression hash.
@@ -254,7 +253,7 @@ class PrecompiledShaderCache {
 
   /// Counts a miss served from the negative cache: the cheap counters move, but the per-draw
   /// fallback record (which formats strings) is not built again.
-  void recordCachedMiss(PrecompiledFallbackReason reason);
+  void recordCachedMiss(AOTFailure reason);
 
   /// Returns the number of successful lookups where both vertex and fragment artifacts were found.
   uint32_t hitCount() const {
@@ -270,12 +269,10 @@ class PrecompiledShaderCache {
   void recordArtifactHit();
 
   /// Records one artifact-lookup miss using a fixed low-cardinality reason.
-  void recordArtifactMiss(PrecompiledFallbackReason reason,
-                          const PrecompiledFallbackRecord& record = {});
+  void recordArtifactMiss(AOTFailure reason, const PrecompiledFallbackRecord& record = {});
 
   /// Records a module or pipeline failure without changing artifact lookup counters.
-  void recordFailure(PrecompiledFallbackReason reason,
-                     const PrecompiledFallbackRecord& record = {});
+  void recordFailure(AOTFailure reason, const PrecompiledFallbackRecord& record = {});
 
   /// Records successful progress through one stage of the AOT program-creation pipeline. A
   /// PipelineCreated event optionally stores its full diagnostic record when recording is enabled.
@@ -291,7 +288,7 @@ class PrecompiledShaderCache {
   }
 
   /// Returns the number of failed attempts for the specified fallback reason.
-  uint32_t fallbackCount(PrecompiledFallbackReason reason) const {
+  uint32_t fallbackCount(AOTFailure reason) const {
     auto index = static_cast<size_t>(reason);
     if (index >= fallbackCounts.size()) {
       return 0;
@@ -486,7 +483,7 @@ class PrecompiledShaderCache {
   std::set<std::vector<int32_t>> _specStructures;
   std::shared_ptr<const ParsedBundle> _bundle = nullptr;
   mutable std::mutex _programMissMutex;
-  std::unordered_map<BytesKey, PrecompiledFallbackReason, BytesKeyHasher> _programMisses;
+  std::unordered_map<BytesKey, AOTFailure, BytesKeyHasher> _programMisses;
   /// Insertion order of the miss table, so overflow evicts the oldest entry instead of growing.
   std::deque<BytesKey> _programMissOrder;
   /// The most misses kept; a larger set only means a repeated rule walk, never a wrong answer.
@@ -503,8 +500,7 @@ class PrecompiledShaderCache {
   std::atomic<uint32_t> _missCount{0};
   std::array<std::atomic<uint32_t>, static_cast<size_t>(PrecompiledAOTStage::Count)>
       aotStageCounts = {};
-  std::array<std::atomic<uint32_t>, static_cast<size_t>(PrecompiledFallbackReason::Count)>
-      fallbackCounts = {};
+  std::array<std::atomic<uint32_t>, static_cast<size_t>(AOTFailure::Count)> fallbackCounts = {};
   std::atomic<bool> diagnosticsEnabled{false};
   std::atomic<bool> statsPaused{false};
   std::atomic<bool> missPaused{false};

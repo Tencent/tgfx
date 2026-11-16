@@ -22,19 +22,17 @@
 #include <climits>
 #include <cstdlib>
 #include <cstring>
-#include <iomanip>
-#include <sstream>
 #include <vector>
 #include "core/utils/Log.h"
 #include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/ProgramSignature.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/plan/DrawPlan.h"
+#include "gpu/aot/select/PrecompiledDiagnostics.h"
 #include "gpu/aot/select/ProgramKey.h"
 #include "gpu/aot/select/ProgramSelection.h"
 #include "gpu/aot/spec/SpecInjector.h"
@@ -57,131 +55,30 @@ static bool IsBinaryFormat(ShaderCodeFormat format) {
          format == ShaderCodeFormat::DXBC;
 }
 
-static void AppendFragmentProcessor(std::stringstream& stream, const FragmentProcessor* processor) {
-  stream << processor->name();
-  if (processor->numChildProcessors() == 0) {
-    return;
-  }
-  stream << "(";
-  for (size_t i = 0; i < processor->numChildProcessors(); ++i) {
-    if (i > 0) {
-      stream << ",";
-    }
-    AppendFragmentProcessor(stream, processor->childProcessor(i));
-  }
-  stream << ")";
-}
-
-std::string BuildEffectSignature(const GeometryLayout& geometry,
-                                 const std::vector<const FragmentProcessor*>& colorProcessors,
-                                 const std::vector<const FragmentProcessor*>& coverageProcessors,
-                                 const XferFacts& xfer) {
-  std::stringstream stream;
-  stream << "GP=" << GeometryKindName(geometry.parameters.kind) << ";ColorFP=[";
-  for (size_t i = 0; i < colorProcessors.size(); ++i) {
-    if (i > 0) {
-      stream << ",";
-    }
-    AppendFragmentProcessor(stream, colorProcessors[i]);
-  }
-  stream << "];CoverageFP=[";
-  for (size_t i = 0; i < coverageProcessors.size(); ++i) {
-    if (i > 0) {
-      stream << ",";
-    }
-    AppendFragmentProcessor(stream, coverageProcessors[i]);
-  }
-  stream << "];XP=" << (xfer.shaderBlend() ? "shader" : "fixed");
-  return stream.str();
-}
-
-static void AppendStencilSignature(std::stringstream& stream, const char* name,
-                                   const StencilDescriptor& stencil) {
-  stream << ";" << name << "Compare=" << static_cast<uint32_t>(stencil.compare) << ";" << name
-         << "Fail=" << static_cast<uint32_t>(stencil.failOp) << ";" << name
-         << "DepthFail=" << static_cast<uint32_t>(stencil.depthFailOp) << ";" << name
-         << "Pass=" << static_cast<uint32_t>(stencil.passOp);
-}
-
-static std::string BuildPipelineSignature(const ProgramInfo* programInfo) {
-  std::stringstream stream;
-  const auto colorAttachment = programInfo->getPipelineColorAttachment();
-  const auto& depthStencil = programInfo->getDepthStencil();
-  stream << programInfo->getEffectSignature()
-         << ";Swizzle=" << programInfo->getOutputSwizzle().c_str()
-         << ";Format=" << static_cast<uint32_t>(colorAttachment.format)
-         << ";BlendEnable=" << static_cast<uint32_t>(colorAttachment.blendEnable)
-         << ";SrcColorBlend=" << static_cast<uint32_t>(colorAttachment.srcColorBlendFactor)
-         << ";DstColorBlend=" << static_cast<uint32_t>(colorAttachment.dstColorBlendFactor)
-         << ";ColorBlendOp=" << static_cast<uint32_t>(colorAttachment.colorBlendOp)
-         << ";SrcAlphaBlend=" << static_cast<uint32_t>(colorAttachment.srcAlphaBlendFactor)
-         << ";DstAlphaBlend=" << static_cast<uint32_t>(colorAttachment.dstAlphaBlendFactor)
-         << ";AlphaBlendOp=" << static_cast<uint32_t>(colorAttachment.alphaBlendOp)
-         << ";Samples=" << programInfo->getSampleCount()
-         << ";Cull=" << static_cast<uint32_t>(programInfo->getCullMode())
-         << ";ColorWriteMask=" << colorAttachment.colorWriteMask
-         << ";DepthStencilFormat=" << static_cast<uint32_t>(depthStencil.format)
-         << ";DepthCompare=" << static_cast<uint32_t>(depthStencil.depthCompare)
-         << ";DepthWrite=" << static_cast<uint32_t>(depthStencil.depthWriteEnabled)
-         << ";StencilReadMask=" << depthStencil.stencilReadMask
-         << ";StencilWriteMask=" << depthStencil.stencilWriteMask;
-  AppendStencilSignature(stream, "StencilFront", depthStencil.stencilFront);
-  AppendStencilSignature(stream, "StencilBack", depthStencil.stencilBack);
-  return stream.str();
-}
-
-static PrecompiledFallbackRecord MakeFallbackRecord(const PrecompiledShaderCache* cache,
-                                                    const ProgramInfo* programInfo,
-                                                    const Variant* variant = nullptr) {
-  PrecompiledFallbackRecord record;
-  if (!cache->diagnosticRecordingEnabled()) {
-    return record;
-  }
-  record.programKey = ProgramInfo::FormatDiagnosticKey(programInfo->programKey());
-  record.effectSignature = programInfo->getEffectSignature();
-  record.pipelineSignature = BuildPipelineSignature(programInfo);
-  if (variant != nullptr) {
-    record.shaderName = Families()[variant->family].name;
-    record.variantId = variant->id();
-  }
-  return record;
-}
-
-static PrecompiledHitRecord MakeHitRecord(const PrecompiledShaderCache* cache,
-                                          const ProgramInfo* programInfo, const Variant& variant) {
-  PrecompiledHitRecord record;
-  if (!cache->diagnosticRecordingEnabled()) {
-    return record;
-  }
-  record.programKey = ProgramInfo::FormatDiagnosticKey(programInfo->programKey());
-  record.effectSignature = programInfo->getEffectSignature();
-  record.pipelineSignature = BuildPipelineSignature(programInfo);
-  record.shaderName = Families()[variant.family].name;
-  record.variantId = variant.id();
-  return record;
-}
-
-static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failure) {
+// The coarse category a miss is counted under: every walk-side rejection the cache and its
+// statistics treat alike collapses into NoMatchingRule, while the finer value stays in the
+// record's matchFailure field. Folding is deliberate, not a lost distinction.
+static AOTFailure ToFallbackReason(AOTFailure failure) {
   switch (failure) {
-    case PermutationMatchFailure::UnsupportedOutputSwizzle:
-      return PrecompiledFallbackReason::UnsupportedOutputSwizzle;
-    case PermutationMatchFailure::NoMatchingRule:
-      return PrecompiledFallbackReason::NoMatchingRule;
-    case PermutationMatchFailure::UnsupportedTextureRead:
-      return PrecompiledFallbackReason::UnsupportedTextureRead;
-    case PermutationMatchFailure::GlGateRejected:
-    case PermutationMatchFailure::QuadSubset:
-    case PermutationMatchFailure::GradientOrNoiseBudget:
-    case PermutationMatchFailure::CoverageShape:
-    case PermutationMatchFailure::NoMatchingFamily:
-    case PermutationMatchFailure::PermutationNotEnumerated:
-      return PrecompiledFallbackReason::NoMatchingRule;
-    case PermutationMatchFailure::None:
-      return PrecompiledFallbackReason::Unspecified;
+    case AOTFailure::UnsupportedOutputSwizzle:
+      return AOTFailure::UnsupportedOutputSwizzle;
+    case AOTFailure::NoMatchingRule:
+      return AOTFailure::NoMatchingRule;
+    case AOTFailure::UnsupportedTextureRead:
+      return AOTFailure::UnsupportedTextureRead;
+    case AOTFailure::GlGateRejected:
+    case AOTFailure::QuadSubset:
+    case AOTFailure::GradientOrNoiseBudget:
+    case AOTFailure::CoverageShape:
+    case AOTFailure::NoMatchingFamily:
+    case AOTFailure::PermutationNotEnumerated:
+      return AOTFailure::NoMatchingRule;
+    case AOTFailure::None:
+      return AOTFailure::Unspecified;
     default:
-      return PrecompiledFallbackReason::Unspecified;
+      return AOTFailure::Unspecified;
   }
-  return PrecompiledFallbackReason::Unspecified;
+  return AOTFailure::Unspecified;
 }
 
 // Whether a runtime vertex format feeds a shader input the declaration types as `declared`.
@@ -227,7 +124,7 @@ static bool DeclaredInputAcceptsAttribute(PrecompiledShaderCache* cache,
   if (VertexFormatFeedsInput(runtime.format(), declared.format)) {
     return true;
   }
-  cache->recordFailure(PrecompiledFallbackReason::VertexLayoutMismatch,
+  cache->recordFailure(AOTFailure::VertexLayoutMismatch,
                        MakeFallbackRecord(cache, programInfo, &variant));
   LOGE(
       "PrecompiledProgramCreator: vertex interface mismatch for %s[variant=%u]: %s attribute %s "
@@ -245,13 +142,13 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     // Say why nothing is loaded: a backend or build with no bundle is by design, a rejected bundle
     // is a defect that needs regenerating. Anything else (a standalone cache, for example) keeps
     // the generic reason.
-    auto reason = PrecompiledFallbackReason::CacheNotLoaded;
+    auto reason = AOTFailure::CacheNotLoaded;
     switch (cache->embeddedBundleState()) {
       case EmbeddedBundleState::NoBundleForBackend:
-        reason = PrecompiledFallbackReason::NoBundleForBackend;
+        reason = AOTFailure::NoBundleForBackend;
         break;
       case EmbeddedBundleState::Rejected:
-        reason = PrecompiledFallbackReason::BundleRejected;
+        reason = AOTFailure::BundleRejected;
         break;
       default:
         break;
@@ -261,7 +158,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   }
   cache->recordAOTStage(PrecompiledAOTStage::CacheAvailable);
 
-  PermutationMatchFailure matchFailure = PermutationMatchFailure::None;
+  AOTFailure matchFailure = AOTFailure::None;
   ShapeKey shapeKey = {};
   bool answeredFromCache = false;
   auto selection =
@@ -272,7 +169,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
       return nullptr;
     }
     auto reason = ToFallbackReason(matchFailure);
-    if (reason == PrecompiledFallbackReason::NoMatchingRule) {
+    if (reason == AOTFailure::NoMatchingRule) {
       // A sampler whose proxy resolves no view yet (a lazy/deferred upload) drops its content
       // through the runtime stub program by design; classify it apart from real coverage gaps so
       // the production metrics stay honest. The record rides the IR, not the processor list.
@@ -280,7 +177,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
       if (ir != nullptr) {
         for (const auto& proxy : ir->textures) {
           if (proxy != nullptr && proxy->getTextureView() == nullptr) {
-            reason = PrecompiledFallbackReason::DeferredTexture;
+            reason = AOTFailure::DeferredTexture;
             break;
           }
         }
@@ -289,7 +186,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     auto record = MakeFallbackRecord(cache, programInfo);
     record.matchFailure = static_cast<uint8_t>(matchFailure);
     cache->recordArtifactMiss(reason, record);
-    if (reason != PrecompiledFallbackReason::DeferredTexture) {
+    if (reason != AOTFailure::DeferredTexture) {
       // A deferred texture may be instantiated later, which can make the same key serviceable:
       // only the definitive refusals enter the negative cache.
       cache->recordProgramMiss(shapeKey, reason);
@@ -354,14 +251,14 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
 
   auto vertBlob = cache->findVertex(variantId);
   if (vertBlob == nullptr) {
-    cache->recordArtifactMiss(PrecompiledFallbackReason::VertexArtifactMissing,
+    cache->recordArtifactMiss(AOTFailure::VertexArtifactMissing,
                               MakeFallbackRecord(cache, programInfo, &variant));
     LOGE("PrecompiledShaderMiss: vert blob not found for %s[variant=%u]", shaderName, variantId);
     return nullptr;
   }
   auto fragBlob = cache->findFragment(variantId);
   if (fragBlob == nullptr) {
-    cache->recordArtifactMiss(PrecompiledFallbackReason::FragmentArtifactMissing,
+    cache->recordArtifactMiss(AOTFailure::FragmentArtifactMissing,
                               MakeFallbackRecord(cache, programInfo, &variant));
     LOGE("PrecompiledShaderMiss: frag blob not found for %s[variant=%u]", shaderName, variantId);
     return nullptr;
@@ -430,7 +327,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
   auto* shaderCache = cache->shaderCache();
   auto vertexShader = shaderCache->findOrCreateModule(vertexDesc);
   if (vertexShader == nullptr) {
-    cache->recordFailure(PrecompiledFallbackReason::VertexModuleCreationFailed,
+    cache->recordFailure(AOTFailure::VertexModuleCreationFailed,
                          MakeFallbackRecord(cache, programInfo, &variant));
     LOGE("PrecompiledProgramCreator: Failed to create vertex shader module for %s[variant=%u]",
          shaderName, variantId);
@@ -442,7 +339,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
     if (specInjected) {
       return FallbackToGeneric(context, programInfo, variant, "fragment module");
     }
-    cache->recordFailure(PrecompiledFallbackReason::FragmentModuleCreationFailed,
+    cache->recordFailure(AOTFailure::FragmentModuleCreationFailed,
                          MakeFallbackRecord(cache, programInfo, &variant));
     LOGE("PrecompiledProgramCreator: Failed to create fragment shader module for %s[variant=%u]",
          shaderName, variantId);
@@ -472,7 +369,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
   }
   if (declaredVertex.size() > geometryAttributes.size() ||
       declaredInstance.size() > instanceAttributes.size()) {
-    cache->recordFailure(PrecompiledFallbackReason::VertexLayoutMismatch,
+    cache->recordFailure(AOTFailure::VertexLayoutMismatch,
                          MakeFallbackRecord(cache, programInfo, &variant));
     LOGE(
         "PrecompiledProgramCreator: vertex interface mismatch for %s[variant=%u]: the declaration "
@@ -543,44 +440,13 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
     if (specInjected) {
       return FallbackToGeneric(context, programInfo, variant, "pipeline");
     }
-    // The same shader variant (identical vert/frag artifact) can create successfully for some draws
-    // and fail for others, so the mismatch must live in the runtime-derived pipeline state rather
-    // than the compiled modules. Dump every state field the descriptor carries so a failing draw
-    // can be diffed against a succeeding one (the backend logs the underlying error separately).
-    std::ostringstream diag;
-    diag << "PrecompiledProgramCreator: Failed to create render pipeline for " << shaderName
-         << "[variant=" << variantId << "]";
-    if (!descriptor.fragment.colorAttachments.empty()) {
-      const auto& color = descriptor.fragment.colorAttachments[0];
-      diag << " colorFormat=" << static_cast<int>(color.format)
-           << " blendEnable=" << (color.blendEnable ? 1 : 0) << " blend=("
-           << static_cast<int>(color.srcColorBlendFactor) << ","
-           << static_cast<int>(color.dstColorBlendFactor) << ",op"
-           << static_cast<int>(color.colorBlendOp) << " / "
-           << static_cast<int>(color.srcAlphaBlendFactor) << ","
-           << static_cast<int>(color.dstAlphaBlendFactor) << ",op"
-           << static_cast<int>(color.alphaBlendOp) << ") writeMask=0x" << std::hex
-           << color.colorWriteMask << std::dec;
-    }
-    diag << " sampleCount=" << descriptor.multisample.count
-         << " depthStencilFormat=" << static_cast<int>(descriptor.depthStencil.format)
-         << " depthCompare=" << static_cast<int>(descriptor.depthStencil.depthCompare)
-         << " depthWrite=" << (descriptor.depthStencil.depthWriteEnabled ? 1 : 0)
-         << " uniformBlocks=" << descriptor.layout.uniformBlocks.size()
-         << " samplers=" << descriptor.layout.textureSamplers.size()
-         << " vertexBuffers=" << descriptor.vertex.bufferLayouts.size();
-    for (size_t i = 0; i < descriptor.vertex.bufferLayouts.size(); ++i) {
-      const auto& layout = descriptor.vertex.bufferLayouts[i];
-      diag << " buffer" << i << "(step=" << static_cast<int>(layout.stepMode)
-           << ",stride=" << layout.stride << ",attrs=";
-      for (const auto& attr : layout.attributes) {
-        diag << attr.name() << ":" << static_cast<int>(attr.format()) << " ";
-      }
-      diag << ")";
-    }
-    LOGE("%s", diag.str().c_str());
+    // The same shader variant (identical vert/frag artifact) can create successfully for
+    // some draws and fail for others, so the mismatch lives in the runtime-derived pipeline
+    // state rather than the compiled modules; dump that state for a failing-versus-succeeding
+    // diff.
+    LogPipelineCreationFailure(descriptor, shaderName, variantId);
 
-    cache->recordFailure(PrecompiledFallbackReason::PipelineCreationFailed,
+    cache->recordFailure(AOTFailure::PipelineCreationFailed,
                          MakeFallbackRecord(cache, programInfo, &variant));
     return nullptr;
   }

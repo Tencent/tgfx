@@ -55,7 +55,7 @@ struct ProgramSelection {
  * answers short-circuits the walk and reports answeredFromCache, so the caller only counts it once.
  */
 std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInfo& info,
-                                              PermutationMatchFailure* failure = nullptr,
+                                              AOTFailure* failure = nullptr,
                                               ShapeKey* shapeKey = nullptr,
                                               bool* answeredFromCache = nullptr);
 

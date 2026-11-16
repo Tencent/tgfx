@@ -45,8 +45,8 @@ struct SamplerInfo {
 };
 
 /**
- * This immutable object contains information needed to build a shader program and set API state for
- * a draw.
+ * One draw's program-lookup input and result: the pipeline state and the expression the draw asks
+ * for (the carried DrawIR), plus the selection resolved from them by getProgram().
  */
 class ProgramInfo {
  public:
@@ -170,7 +170,6 @@ class ProgramInfo {
    */
   void setCullMode(CullMode mode) {
     cullMode = mode;
-    cachedProgramKey.reset();
   }
 
   /**
@@ -188,7 +187,6 @@ class ProgramInfo {
    */
   void setDepthStencil(const DepthStencilDescriptor& descriptor) {
     depthStencil = descriptor;
-    cachedProgramKey.reset();
   }
 
   /**
@@ -207,16 +205,14 @@ class ProgramInfo {
    */
   void setColorWriteMask(uint32_t mask) {
     colorWriteMask = mask;
-    cachedProgramKey.reset();
   }
 
   /**
-   * The attempt key: what the draw is before any match ran, computed once per info. The program
-   * cache is keyed by MakeProgramKey instead (a program's key carries its matched variant), so this
-   * key only addresses the negative cache and the diagnostic records. The setters above invalidate
-   * it, so it always reflects the current pipeline state.
+   * The attempt key: what the draw is before any match ran, derived on each call from the current
+   * pipeline state. The program cache is keyed by MakeProgramKey instead (a program's key carries
+   * its matched variant), so this key only addresses the diagnostic records.
    */
-  const BytesKey& programKey() const;
+  BytesKey programKey() const;
 
   /** Formats a program key as the hex string the diagnostic records carry. */
   static std::string FormatDiagnosticKey(const BytesKey& key);
@@ -234,7 +230,7 @@ class ProgramInfo {
    * atlas-text draws (whose glyph leaf needs the geometry processor), and every info built with
    * replaced colors.
    */
-  void setCarriedIR(const DrawIR* ir) const {
+  void setCarriedIR(const DrawIR* ir) {
     carriedIR = ir;
   }
 
@@ -246,7 +242,7 @@ class ProgramInfo {
    * The diagnostics-only effect signature, built by the op from its processor lists (empty when
    * diagnostic recording is off). Nothing that selects, keys or writes a program reads it.
    */
-  void setEffectSignature(std::string signature) const {
+  void setEffectSignature(std::string signature) {
     effectSignature = std::move(signature);
   }
 
@@ -299,29 +295,16 @@ class ProgramInfo {
 
   BytesKey buildProgramKey() const;
 
-  // The cache below is the one deliberate exemption to the no-mutable rule: it holds an
-  // idempotent derived value (the same inputs always produce the same result), computed lazily
-  // because the key inputs (colorWriteMask, depthStencil, cullMode) are set after construction.
-  // No observable behavior depends on whether it is filled, so the object stays semantically
-  // immutable.
-
-  // The cached attempt key (see programKey()), invalidated by the pipeline-state setters.
-  mutable std::optional<BytesKey> cachedProgramKey;
-
-  // The draw's record-time DrawIR, attached through setCarriedIR() before first use. Mutable only
-  // so the attachment can happen right after construction (the pipeline-state setters already
-  // run in that window); it is an input, never recomputed, and null unless explicitly attached.
-  mutable const DrawIR* carriedIR = nullptr;
+  // The draw's record-time DrawIR, attached through setCarriedIR() before getProgram(); an input,
+  // never recomputed, and null unless explicitly attached.
+  const DrawIR* carriedIR = nullptr;
 
   // The diagnostics-only signature (see setEffectSignature).
-  mutable std::string effectSignature = {};
+  std::string effectSignature = {};
 
   // The draw's single selection result (see getPlan), filled by getProgram()'s first call. An
   // input to the upload, never recomputed; null when no selection ran.
   std::optional<DrawPlan> plan = std::nullopt;
-
-  // The scope getProgram() resolves in: a draw's own expression by default, the compiled chain
-  // for a plan pass.
 
   friend class ProgramWriter;
   friend class ChainProgramWriter;

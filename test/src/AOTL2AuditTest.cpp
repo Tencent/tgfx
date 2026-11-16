@@ -160,7 +160,7 @@ static void RenderShaderScene(Context* context, PrecompiledShaderCache* cache,
   ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
   outBitmap->unlockPixels();
   *outHits = cache->hitCount();
-  *outNoMatch = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+  *outNoMatch = cache->fallbackCount(AOTFailure::NoMatchingRule);
 }
 
 TGFX_TEST(AOTL2AuditTest, CleanBlendPrefersPointwiseChain) {

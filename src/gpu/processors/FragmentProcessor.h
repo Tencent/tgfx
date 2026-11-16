@@ -126,12 +126,6 @@ class FragmentProcessor : public Processor {
 
   virtual bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const;
 
-  /**
-   * Appends the samplers this processor itself declares (not its children's) in the order the
-   * sampler enumeration reports them. Lowering walks the tree once and records
-   * the result on the draw IR, so the runtime never enumerates processors to bind samplers.
-   */
-
   size_t numChildProcessors() const {
     return childProcessors.size();
   }
@@ -170,11 +164,6 @@ class FragmentProcessor : public Processor {
     std::vector<const FragmentProcessor*> fpStack;
   };
 
-  /**
-   * Iterates a caller-supplied sequence of coordinate transforms: the AOT upload feeds the
-   * geometry writer the leaf-ordered transforms the compiled program's binding table describes,
-   * so no processor tree exists to walk. The sequence must outlive the iterator.
-   */
  protected:
   std::vector<PlacementPtr<FragmentProcessor>> childProcessors = {};
 

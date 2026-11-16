@@ -109,8 +109,7 @@ bool AOTCoverageGateMet(const AOTCoverageGateResult& gate, uint64_t precompiledA
 #define TGFX_BACKEND_NAME "unknown"
 #endif
 
-static constexpr size_t FALLBACK_REASON_COUNT =
-    static_cast<size_t>(PrecompiledFallbackReason::Count);
+static constexpr size_t FALLBACK_REASON_COUNT = static_cast<size_t>(AOTFailure::Count);
 static constexpr size_t AOT_STAGE_COUNT = static_cast<size_t>(PrecompiledAOTStage::Count);
 
 // The reviewed list of draw shapes the precompiled system cannot serve today. Attribution is per
@@ -380,8 +379,8 @@ static nlohmann::json FallbackCountsToJSON(
     const std::array<uint64_t, FALLBACK_REASON_COUNT>& counts) {
   nlohmann::json result = nlohmann::json::object();
   for (size_t i = 0; i < FALLBACK_REASON_COUNT; ++i) {
-    auto reason = static_cast<PrecompiledFallbackReason>(i);
-    result[PrecompiledFallbackReasonName(reason)] = counts[i];
+    auto reason = static_cast<AOTFailure>(i);
+    result[AOTFailureName(reason)] = counts[i];
   }
   return result;
 }
@@ -390,8 +389,8 @@ static nlohmann::json FallbackCountsToJSON(
     const std::array<uint32_t, FALLBACK_REASON_COUNT>& counts) {
   nlohmann::json result = nlohmann::json::object();
   for (size_t i = 0; i < FALLBACK_REASON_COUNT; ++i) {
-    auto reason = static_cast<PrecompiledFallbackReason>(i);
-    result[PrecompiledFallbackReasonName(reason)] = counts[i];
+    auto reason = static_cast<AOTFailure>(i);
+    result[AOTFailureName(reason)] = counts[i];
   }
   return result;
 }
@@ -482,7 +481,7 @@ static nlohmann::json BuildRootCauseProgramKeyAttribution(
   std::map<std::string, std::map<std::string, Row>> byCategory;
   for (const auto& result : results) {
     for (const auto& fallback : result.fallbackRecords) {
-      if (fallback.reason != PrecompiledFallbackReason::NoMatchingRule) {
+      if (fallback.reason != AOTFailure::NoMatchingRule) {
         continue;
       }
       std::string category;
@@ -522,12 +521,10 @@ static nlohmann::json BuildRootCauseProgramKeyAttribution(
 }
 
 static nlohmann::json FallbackRecordToJSON(const PrecompiledFallbackRecord& record) {
-  nlohmann::json result = {{"programKey", record.programKey},
-                           {"reason", PrecompiledFallbackReasonName(record.reason)},
-                           {"deliberate", record.deliberate},
-                           {"effect", record.effectSignature},
-                           {"pipeline", record.pipelineSignature},
-                           {"shader", record.shaderName}};
+  nlohmann::json result = {
+      {"programKey", record.programKey},      {"reason", AOTFailureName(record.reason)},
+      {"deliberate", record.deliberate},      {"effect", record.effectSignature},
+      {"pipeline", record.pipelineSignature}, {"shader", record.shaderName}};
   auto invalidIndex = std::numeric_limits<uint32_t>::max();
   result["variantId"] =
       record.variantId == invalidIndex ? nlohmann::json(nullptr) : nlohmann::json(record.variantId);
@@ -589,8 +586,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
           result.aotStageCounts[i] = cache->aotStageCount(static_cast<PrecompiledAOTStage>(i));
         }
         for (size_t i = 0; i < FALLBACK_REASON_COUNT; ++i) {
-          result.fallbackCounts[i] =
-              cache->fallbackCount(static_cast<PrecompiledFallbackReason>(i));
+          result.fallbackCounts[i] = cache->fallbackCount(static_cast<AOTFailure>(i));
         }
         result.hitRecords = cache->hitRecords();
         result.fallbackRecords = cache->fallbackRecords();
@@ -833,13 +829,12 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     }
     nlohmann::json fallbackEffectsByReasonJSON = nlohmann::json::array();
     for (const auto& effect : sortedFallbackEffectsByReason) {
-      fallbackEffectsByReasonJSON.push_back(
-          {{"reason", PrecompiledFallbackReasonName(effect.record.reason)},
-           {"effect", effect.record.effectSignature},
-           {"deliberate", effect.record.deliberate},
-           {"shader", effect.record.shaderName},
-           {"count", effect.count},
-           {"tests", effect.tests}});
+      fallbackEffectsByReasonJSON.push_back({{"reason", AOTFailureName(effect.record.reason)},
+                                             {"effect", effect.record.effectSignature},
+                                             {"deliberate", effect.record.deliberate},
+                                             {"shader", effect.record.shaderName},
+                                             {"count", effect.count},
+                                             {"tests", effect.tests}});
     }
     nlohmann::json fallbackStructuresJSON = nlohmann::json::array();
     for (const auto& fallback : sortedFallbacks) {
@@ -867,8 +862,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     // reported next to it, never subtracted from what the run recorded.
     uint64_t rawNoMatching = 0;
     for (const auto& result : testResults) {
-      rawNoMatching +=
-          result.fallbackCounts[static_cast<size_t>(PrecompiledFallbackReason::NoMatchingRule)];
+      rawNoMatching += result.fallbackCounts[static_cast<size_t>(AOTFailure::NoMatchingRule)];
       uint64_t deliberateNoMatching = 0;
       uint64_t environmentCompileFailures = 0;
       size_t gapIndex = knownGapCount;
@@ -883,18 +877,17 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       }
       bool hasUnlistedSignature = false;
       for (const auto& record : result.fallbackRecords) {
-        if (record.deliberate || record.reason == PrecompiledFallbackReason::DeferredTexture) {
+        if (record.deliberate || record.reason == AOTFailure::DeferredTexture) {
           ++excludedFallbacks;
         }
-        if (record.deliberate && record.reason == PrecompiledFallbackReason::NoMatchingRule) {
+        if (record.deliberate && record.reason == AOTFailure::NoMatchingRule) {
           ++deliberateNoMatching;
         }
         if (!record.deliberate) {
-          if (record.reason == PrecompiledFallbackReason::FragmentModuleCreationFailed &&
-              swiftShaderBackend) {
+          if (record.reason == AOTFailure::FragmentModuleCreationFailed && swiftShaderBackend) {
             ++environmentCompileFailures;
           }
-          if (record.reason == PrecompiledFallbackReason::NoMatchingRule) {
+          if (record.reason == AOTFailure::NoMatchingRule) {
             // A listed test may hold one reviewed shape only: a second signature in the same test
             // is a different gap and stays unlisted.
             if (gapIndex != knownGapCount) {
@@ -911,7 +904,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       uint64_t knownGapDrops = 0;
       if (gapIndex < knownGapCount) {
         const auto rawMisses =
-            result.fallbackCounts[static_cast<size_t>(PrecompiledFallbackReason::NoMatchingRule)];
+            result.fallbackCounts[static_cast<size_t>(AOTFailure::NoMatchingRule)];
         const bool hasEvidence = rawMisses > 0 || result.drawStats.droppedDraws > 0;
         if (hasEvidence && !hasUnlistedSignature) {
           knownGapMatched[gapIndex] = true;
@@ -1076,8 +1069,8 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       const auto& fallback = sortedFallbacks[i];
       std::printf("  MISS %zu. count=%llu reason=%s shader=%s pipeline=%s\n", i + 1,
                   static_cast<unsigned long long>(fallback.count),
-                  PrecompiledFallbackReasonName(fallback.record.reason),
-                  fallback.record.shaderName.c_str(), fallback.record.pipelineSignature.c_str());
+                  AOTFailureName(fallback.record.reason), fallback.record.shaderName.c_str(),
+                  fallback.record.pipelineSignature.c_str());
     }
     std::printf("  report=%s\n", outputPath.c_str());
     // WP5 strict coverage targets. The terminal state requires zero NoMatchingRule fallbacks and
@@ -1142,12 +1135,12 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         // Deliberate records are provoked on purpose by test fixtures (e.g. the creator-funnel
         // artifact-miss test) and are already excluded from the production metrics.
         if (sortedFallbacks[i].record.deliberate ||
-            sortedFallbacks[i].record.reason == PrecompiledFallbackReason::DeferredTexture) {
+            sortedFallbacks[i].record.reason == AOTFailure::DeferredTexture) {
           continue;
         }
         std::printf("  PENDING %zu. count=%llu reason=%s effect=%s\n", i + 1,
                     static_cast<unsigned long long>(sortedFallbacks[i].count),
-                    PrecompiledFallbackReasonName(sortedFallbacks[i].record.reason),
+                    AOTFailureName(sortedFallbacks[i].record.reason),
                     sortedFallbacks[i].record.effectSignature.c_str());
       }
       for (const auto& result : testResults) {

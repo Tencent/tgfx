@@ -35,10 +35,10 @@
 
 namespace tgfx {
 
-std::nullopt_t Fail(PermutationMatchFailure* failure, PermutationMatchFailure reason) {
+std::nullopt_t Fail(AOTFailure* failure, AOTFailure reason) {
   // The match entry points that run without failure accounting (the plan-pass program match)
   // pass nullptr; failing must still be a plain rejection, never a null dereference.
-  if (failure != nullptr && *failure == PermutationMatchFailure::None) {
+  if (failure != nullptr && *failure == AOTFailure::None) {
     *failure = reason;
   }
   return std::nullopt;
@@ -342,9 +342,8 @@ bool SupportedFillKernelSteps(const ColorSpaceXformSteps* steps) {
   return true;
 }
 
-// The IR form of a blur kernel's servable child (the old FP-walk IsServableBlurChild's
-// replacement): the opaque node's input must be a single texture leaf whose per-tap sampling the
-// kernels can express. A plain leaf must be Clamp — the kernels clamp plain-child taps to the
+// The IR form of a blur kernel's servable child: the opaque node's input must be a single texture
+// leaf whose per-tap sampling the kernels can express. A plain leaf must be Clamp — the kernels clamp plain-child taps to the
 // subset (edge stretch), which is only the Clamp tap semantics: a Decal child must return
 // transparent outside its subset, a drop shadow's blurred source is exactly that. A tiled leaf
 // must be non-perspective and limited to the ShaderMode values tiled_sample.inc implements.
@@ -417,21 +416,21 @@ std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir,
 // yet: with a bundle loaded there is no runtime route, so their draws are dropped and counted as
 // droppedDraws.
 bool AdmitMatchedProgram(const ProgramInfo* programInfo, const DrawShape& shape,
-                         const Family* family, PermutationMatchFailure* failure) {
+                         const Family* family, AOTFailure* failure) {
   auto outputSwizzle = programInfo->getOutputSwizzle();
   if (outputSwizzle != Swizzle::RGBA() && outputSwizzle != Swizzle::AAAA()) {
-    Fail(failure, PermutationMatchFailure::UnsupportedOutputSwizzle);
+    Fail(failure, AOTFailure::UnsupportedOutputSwizzle);
     return false;
   }
   if (programInfo->backend() == Backend::OpenGL &&
       (!programInfo->glProfileMatchesCache() || !programInfo->samplersAre2D())) {
-    Fail(failure, PermutationMatchFailure::GlGateRejected);
+    Fail(failure, AOTFailure::GlGateRejected);
     return false;
   }
   if (family != nullptr && (shape.requiredTextureReads & ~family->textureReads) != 0) {
     // Default deny: the matched family's shader would read these textures without the semantic
     // the runtime applies, so the draw is a reported miss rather than wrong pixels.
-    Fail(failure, PermutationMatchFailure::UnsupportedTextureRead);
+    Fail(failure, AOTFailure::UnsupportedTextureRead);
     return false;
   }
   return true;

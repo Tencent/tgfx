@@ -30,7 +30,7 @@
 namespace tgfx {
 
 std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInfo& info,
-                                              PermutationMatchFailure* failure, ShapeKey* shapeKey,
+                                              AOTFailure* failure, ShapeKey* shapeKey,
                                               bool* answeredFromCache) {
   // The route-independent gates first, so a draw they refuse reports its reason before any family
   // walk runs; the texture-read check needs the matched family and runs after the walk.
@@ -44,7 +44,7 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
   }
   auto* negativeCache = context != nullptr ? ContextCacheAccess::Cache(context) : nullptr;
   if (negativeCache != nullptr && negativeCache->hasProgramMisses()) {
-    PrecompiledFallbackReason cachedReason = PrecompiledFallbackReason::Unspecified;
+    AOTFailure cachedReason = AOTFailure::Unspecified;
     if (negativeCache->findProgramMiss(key, &cachedReason)) {
       // The table already holds this shape's verdict; counting it again as a fresh miss would
       // double the metrics, so the caller is told the answer came from the cache.
@@ -58,7 +58,7 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
   if (!AdmitMatchedProgram(&info, shape, nullptr, failure)) {
     return std::nullopt;
   }
-  auto matchFailure = PermutationMatchFailure::None;
+  auto matchFailure = AOTFailure::None;
   std::optional<FamilyMatchResult> match = std::nullopt;
   const auto* carried = info.getCarriedIR();
   if (carried != nullptr && carried->carriedChainProgram() != nullptr) {
@@ -87,13 +87,13 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
       match = MatchChainProgram(&info);
     }
     if (!match && alphaOnly) {
-      matchFailure = PermutationMatchFailure::NoMatchingFamily;
+      matchFailure = AOTFailure::NoMatchingFamily;
     }
   }
   if (!match) {
     // No rejecting site named a reason: the generic no-matching-rule verdict.
-    if (matchFailure == PermutationMatchFailure::None) {
-      matchFailure = PermutationMatchFailure::NoMatchingRule;
+    if (matchFailure == AOTFailure::None) {
+      matchFailure = AOTFailure::NoMatchingRule;
     }
     if (failure != nullptr) {
       *failure = matchFailure;
@@ -114,7 +114,7 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
       SpecResolver::Resolve(context != nullptr ? ContextCacheAccess::Cache(context) : nullptr,
                             info.backend(), match->variant, match->chain);
   if (failure != nullptr) {
-    *failure = PermutationMatchFailure::None;
+    *failure = AOTFailure::None;
   }
   ProgramSelection selection = {};
   selection.variant = match->variant;
