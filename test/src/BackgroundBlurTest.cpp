@@ -1535,7 +1535,6 @@ static size_t CountPixelsDifferentFrom(const std::vector<uint8_t>& pixels, size_
   return varied;
 }
 
-
 static size_t CountDifferentPixels(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
   if (a.size() != b.size()) {
     return a.size() + b.size();
@@ -2011,48 +2010,46 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, NestedStyleChainAddsOneFootprint){TGFX_PRI
 
 // More styles than the per-layer cull loop can afford must still cull: the rects are merged instead
 // of dropping the cull altogether.
-TGFX_TEST_PRIVATE(BackgroundBlurTest, ManyStylesStillCullTheCapture) {
-  TGFX_PRIVATE_ACCESS({
-    ContextScope scope;
-    auto context = scope.getContext();
-    ASSERT_TRUE(context != nullptr);
-    auto surface = Surface::Make(context, 400, 400);
-    ASSERT_TRUE(surface != nullptr);
-    auto displayList = std::make_unique<DisplayList>();
-    displayList->setRenderMode(RenderMode::Tiled);
+TGFX_TEST_PRIVATE(BackgroundBlurTest, ManyStylesStillCullTheCapture){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
 
-    for (int i = 0; i < 40; ++i) {
-      auto layer = ShapeLayer::Make();
-      Path path;
-      path.addRect(Rect::MakeWH(8, 8));
-      layer->setPath(path);
-      layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 30)));
-      layer->setMatrix(Matrix::MakeTrans(40.0f + static_cast<float>(i % 8) * 9.0f,
-                                         40.0f + static_cast<float>(i / 8) * 9.0f));
-      layer->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
-      displayList->root()->addChild(layer);
-    }
+  for (int i = 0; i < 40; ++i) {
+    auto layer = ShapeLayer::Make();
+    Path path;
+    path.addRect(Rect::MakeWH(8, 8));
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 30)));
+    layer->setMatrix(Matrix::MakeTrans(40.0f + static_cast<float>(i % 8) * 9.0f,
+                                       40.0f + static_cast<float>(i / 8) * 9.0f));
+    layer->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+    displayList->root()->addChild(layer);
+  }
 
-    displayList->render(surface.get());
-    auto captureRect = Rect::MakeWH(400.0f, 400.0f);
-    auto footprints = displayList->collectBackgroundFootprints(captureRect);
-    // Well above MAX_CULL_RECTS, so the merge is what keeps the cull alive.
-    ASSERT_GT(footprints.size(), 32u);
+  displayList->render(surface.get());
+  auto captureRect = Rect::MakeWH(400.0f, 400.0f);
+  auto footprints = displayList->collectBackgroundFootprints(captureRect);
+  // Well above MAX_CULL_RECTS, so the merge is what keeps the cull alive.
+  ASSERT_GT(footprints.size(), 32u);
 
-    auto snapshots = displayList->captureBackgrounds(surface.get(), {captureRect});
-    ASSERT_TRUE(snapshots != nullptr);
-    ASSERT_FALSE(snapshots->cullRects.empty());
-    // The per-layer cull loop only affords MAX_CULL_RECTS rects, so the merge has to get under it
-    // instead of dropping the cull.
-    EXPECT_LE(snapshots->cullRects.size(), 32u);
-    auto cullArea = 0.0f;
-    for (const auto& rect : snapshots->cullRects) {
-      cullArea += rect.width() * rect.height();
-    }
-    EXPECT_LT(cullArea, captureRect.width() * captureRect.height() * 0.5f);
-    context->flushAndSubmit();
-  })
-}
+  auto snapshots = displayList->captureBackgrounds(surface.get(), {captureRect});
+  ASSERT_TRUE(snapshots != nullptr);
+  ASSERT_FALSE(snapshots->cullRects.empty());
+  // The per-layer cull loop only affords MAX_CULL_RECTS rects, so the merge has to get under it
+  // instead of dropping the cull.
+  EXPECT_LE(snapshots->cullRects.size(), 32u);
+  auto cullArea = 0.0f;
+  for (const auto& rect : snapshots->cullRects) {
+    cullArea += rect.width() * rect.height();
+  }
+  EXPECT_LT(cullArea, captureRect.width() * captureRect.height() * 0.5f);
+  context->flushAndSubmit();
+})}
 
 // A style reads a background image cropped to the recording it resolves, so a neighbour outside its
 // bounds cannot reach the blur. This is what lets the footprint stop at the layer bounds: were the
