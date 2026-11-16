@@ -17,16 +17,25 @@
 // ClampToBorder and RepeatLinear/mipmap modes require unnormalized (pixel-space) coordinates:
 // the incoming coord is divided by Dimension before tiling and multiplied back when sampling.
 // Matches GLSLTiledTextureEffect::ShaderModeRequiresUnormCoord (3/4/5/7/8).
+
+// The tiling math is reachable only when some recipe names a shader-side tiled leaf (a hardware
+// wrap never enters this file's branches); a chain whose leaves are all hardware-tiled closes the
+// gate and the runtime splices the whole block out of the text it hands the driver. Families whose
+// spec table has no TextureFlags drop these gates and keep the file verbatim.
+#pragma tgfx_spec_reader
+#pragma tgfx_spec_gate TiledUnorm : (SPEC_TextureFlags() & 2) != 0
 bool tiledUsesUnorm(int mode) {
   return mode == 3 || mode == 4 || mode == 5 || mode == 7 || mode == 8;
 }
 
+#pragma tgfx_spec_gate TiledEffectiveUnorm : (SPEC_TextureFlags() & 2) != 0
 bool tiledEffectiveUnorm(int modeX, int modeY) {
   return tiledUsesUnorm(modeX) || tiledUsesUnorm(modeY);
 }
 
 // Clamp, RepeatNearest, MirrorRepeat and ClampToBorderLinear clamp the tiled coordinate to the Clamp
 // rect; None and ClampToBorderNearest do not. Matches ShaderModeUsesClamp().
+#pragma tgfx_spec_gate TiledClamp : (SPEC_TextureFlags() & 2) != 0
 bool tiledUsesClamp(int mode) {
   // Matches ShaderModeUsesClamp(): Clamp, RepeatNearest/Linear(None+Mipmap), MirrorRepeat and
   // ClampToBorderLinear clamp; None and ClampToBorderNearest do not. Modes 4/5 are only reached by
@@ -35,6 +44,7 @@ bool tiledUsesClamp(int mode) {
 }
 
 // Computes the pre-clamp subset coordinate for a single axis, matching the runtime subsetCoord().
+#pragma tgfx_spec_gate TiledSubsetCoord : (SPEC_TextureFlags() & 2) != 0
 float tiledSubsetCoord(float coord, float subLo, float subHi, int mode) {
   if (mode == 2 || mode == 3) {
     // RepeatNearestNone(2) / RepeatLinearNone(3): wrap into [subLo, subHi). The two share this
@@ -54,6 +64,7 @@ float tiledSubsetCoord(float coord, float subLo, float subHi, int mode) {
 // Maps an incoming texture coordinate through the tiling and returns the coordinate to sample. The
 // intermediate coordinates needed by tiledApplyBorder() are returned via out parameters. When strict
 // is true, the sample coordinate is additionally clamped to the Clamp rect (SrcRectConstraint).
+#pragma tgfx_spec_gate TiledMapCoord : (SPEC_TextureFlags() & 2) != 0
 vec2 tiledMapCoord(vec2 texCoord, bool strict, out vec2 inCoordOut, out vec2 subsetCoordOut,
                    out vec2 clampedCoordOut) {
   bool unorm = tiledEffectiveUnorm(ShaderModeX, ShaderModeY);
@@ -80,6 +91,7 @@ vec2 tiledMapCoord(vec2 texCoord, bool strict, out vec2 inCoordOut, out vec2 sub
 
 // Applies the ClampToBorder post-processing to a sampled color, matching the runtime: linear border
 // fades by the clamp error, nearest border discards texels whose snapped center is outside Subset.
+#pragma tgfx_spec_gate TiledBorder : (SPEC_TextureFlags() & 2) != 0
 vec4 tiledApplyBorder(vec4 color, vec2 inCoord, vec2 subsetCoord, vec2 clampedCoord) {
   if (ShaderModeX == 8) {
     float errX = subsetCoord.x - clampedCoord.x;

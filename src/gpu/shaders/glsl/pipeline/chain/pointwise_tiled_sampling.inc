@@ -9,6 +9,9 @@
 #ifndef TGSL_POINTWISE_TILED_SAMPLING_INCLUDED
 #define TGSL_POINTWISE_TILED_SAMPLING_INCLUDED
 
+// This file reads the specialization surface (the tiled gates below).
+#pragma tgfx_spec_reader
+
 int chainTiledModeX;
 int chainTiledModeY;
 highp vec4 chainTiledSubset;
@@ -38,6 +41,7 @@ highp vec2 chainTiledDimension;
 // the reads (coordinate mapping, seam blend, border) then exists once for all leaves instead of
 // once per leaf: a GPU compiler inlines every call site, so per-leaf call sites used to carry one
 // copy of that code per leaf.
+#pragma tgfx_spec_gate TiledSeamBlend : (SPEC_TextureFlags() & 2) != 0
 vec4 tiledSeamBlend(int leafIndex, vec4 texColor, vec2 subsetCoord, vec2 clampedCoord,
                     int readSwizzle) {
   bool repeatX = ShaderModeX == 3 && subsetCoord.x != clampedCoord.x;

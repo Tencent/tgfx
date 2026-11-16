@@ -263,11 +263,15 @@ class D3D12Emitter : public ProfileEmitter {
     const auto gated = ApplyHlslSpecGates(
         fragmentText, *input.fragGates,
         input.fragSpecEntries == nullptr ? std::vector<SpecEntry>{} : *input.fragSpecEntries);
-    if (!gated.error.empty() || gated.wrapped != input.fragGates->size()) {
+    // A gate whose function is absent is legitimate here: the variant's defines can compile a
+    // whole block out of the GLSL before translation (the tiled math under NTEX == 0), and the
+    // SPIR-V then carries no such function. Only "nothing applyable at all" means the translator
+    // dropped what the GLSL had, so that is the loud failure.
+    if (!gated.error.empty() || gated.wrapped == 0) {
       ReportFailure(input, profile(), DiagnosticCode::SpecGateUnmatched,
                     !gated.error.empty()
                         ? "the HLSL text cannot carry its gates: " + gated.error
-                        : "the HLSL translation inlined a gated function away; gate a function "
+                        : "the HLSL translation inlined every gated function away; gate a function "
                           "the translator keeps");
       return std::nullopt;
     }

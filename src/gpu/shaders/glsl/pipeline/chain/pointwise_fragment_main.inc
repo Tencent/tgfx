@@ -70,6 +70,7 @@ vec3 chainLeafCoordVarying(int leafIndex) {
 // reads, the border post-pass). main() calls it from a single site inside a loop over the leaves,
 // reading the leaf's texture through aotChainRead's per-index sampler pick, so the tiling code
 // exists once in the binary instead of once per leaf (a GPU compiler inlines every call site).
+#pragma tgfx_spec_gate TiledFetch : (SPEC_TextureFlags() & 2) != 0
 vec4 chainTiledLeafFetch(int leafIndex) {
   highp vec2 uv = chainLeafCoord(chainLeafCoordVarying(leafIndex), leafIndex);
   int readSwizzle = LeafReadSwizzles[leafIndex];
@@ -87,6 +88,7 @@ vec4 chainTiledLeafFetch(int leafIndex) {
 // Whether leaf leafIndex goes through the shader-side tiling: some recipe set names it. Reads the
 // recipe selectors only (the constant-bound loop unrolls into two or three compares), so the plain
 // fetches in main() do not load any tiling state.
+#pragma tgfx_spec_gate TiledTest : (SPEC_TextureFlags() & 2) != 0
 bool chainLeafIsTiled(int leafIndex) {
   for (int recipe = 0; recipe < CHAIN_TILED_RECIPES; ++recipe) {
     if (chainTiledRecipeLeaf(recipe) == leafIndex) {

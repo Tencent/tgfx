@@ -28,6 +28,18 @@ vec4 chainXPSrc = vec4(0.0);
 vec4 chainXPDst = vec4(0.0);
 #endif
 
+// OP_COLOR_SPACE_XFORM's parameters are the program-level block, not per-slot registers, so the
+// transform is its own function: a text gate can only wrap a whole body, and a chain whose slots
+// carry no ColorSpaceXform never reaches the fallthrough that calls this. The gate is closed for
+// every libpag draw (the operator is unused there), and the stub's value is never observed.
+#pragma tgfx_spec_gate ColorSpace : (SPEC_UsedOps() & (1 << OP_COLOR_SPACE_XFORM)) != 0
+vec4 chainApplyColorSpaceXform(vec4 color) {
+  PM_APPLY_COLOR_SPACE_XFORM(color, ChainCSFlags, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType,
+                             ChainSrcOOTF, ChainColorXform, ChainDstOOTF, ChainDstTF0,
+                             ChainDstTF1, ChainDstTFType)
+  return color;
+}
+
 // Evaluates slot `slot`, reading its fields from the uniform arrays. OP_TEXTURE slots read the
 // prefetched sample from chainLeafTex (fetched in main with statically bound samplers) and apply
 // the leaf modulation flags; every other op shares this single implementation so the op library
@@ -171,11 +183,7 @@ vec4 evalChainSlot(int slot) {
   }
   // OP_COLOR_SPACE_XFORM (the registered exception: its parameters are the program-level block,
   // not per-slot registers, so it does not ride the shared dispatch)
-  vec4 color = in0;
-  PM_APPLY_COLOR_SPACE_XFORM(color, ChainCSFlags, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType,
-                             ChainSrcOOTF, ChainColorXform, ChainDstOOTF, ChainDstTF0,
-                             ChainDstTF1, ChainDstTFType)
-  return color;
+  return chainApplyColorSpaceXform(in0);
 }
 
 
