@@ -40,6 +40,78 @@ vec4 chainApplyColorSpaceXform(vec4 color) {
   return color;
 }
 
+// OP_TEXTURE's modulation stage: only a chain whose slots carry a texture leaf reaches it, so a
+// chain without one closes the gate and the runtime splices the branch out of the text.
+#pragma tgfx_spec_gate TextureSlot : (SPEC_UsedOps() & (1 << OP_TEXTURE)) != 0
+vec4 chainEvalTextureSlot(int slot, int selector) {
+  vec4 texColor = chainLeafTex[slot];
+  if ((selector & 2) != 0) {
+    // Alpha-only leaf (R8 on Metal returns (r,0,0,1)): splat .r into all channels so the alpha
+    // channel carries the mask value, matching the runtime TextureEffect alpha-only readback.
+    texColor = aotTextureAlphaOnly(texColor);
+    if ((selector & 8) != 0) {
+      // A two-child blend operand: the xfer emission feeds each child vec4(inputColor.rgb, 1.0),
+      // so the mask modulates by the geometry RGB with opaque alpha.
+      texColor = aotTextureModulate(texColor, vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0), true);
+    }
+    if ((selector & 16) != 0) {
+      // The color root: the runtime readback multiplies the mask by its FULL input color
+      // (sample.a * inputColor), one multiply over the premul geometry color — RGB and alpha
+      // in a single step (the bit0|bit3 pair applied the paint alpha to the RGB twice).
+      texColor = aotTextureModulate(texColor, TGFX_CHAIN_GEOM_COLOR, true);
+    }
+  }
+  if ((selector & 4) != 0) {
+    // Coverage-root leaf: modulated by the coverage unit's alpha, matching the runtime
+    // coverage-FP readback (tex * coverageIn.a).
+    texColor = aotTextureModulate(texColor, TGFX_CHAIN_UNIT_COVERAGE, false);
+  }
+  if ((selector & 1) != 0) {
+    // Color-source leaves are modulated by the geometry color's alpha, matching the runtime
+    // paint-alpha wrap. Mask and blend-operand leaves sample raw, as the runtime emits them.
+    texColor = aotTextureModulate(texColor, TGFX_CHAIN_GEOM_COLOR, false);
+  }
+  return texColor;
+}
+
+// A texture whose runtime input is a computed value splits into a raw sampling slot in the
+// leading block (static sampler binding) plus this modulate instruction in topological order.
+// chainLeafTex is prefetched in main and never recycled, so any later slot may read it by index.
+// The two modulations follow the TextureEffect readback: alpha-only is sample.a * inputColor,
+// RGBA is sample * inputColor.a. The source slot ordinal and the alpha-only flag ride the
+// selector (bits 16-19 and bit 0), not Packed.z, because the register allocator rewrites every
+// non-negative Packed.y/Packed.z into a result register index.
+#pragma tgfx_spec_gate TexModulate : (SPEC_UsedOps() & (1 << OP_TEX_MODULATE)) != 0
+vec4 chainEvalTexModulate(int slot, int selector, vec4 in0) {
+  int srcSlot = (selector >> 16) & 0xF;
+  vec4 tex = chainLeafTex[srcSlot];
+  if ((selector & 1) != 0) {
+    tex = aotTextureAlphaOnly(tex);
+  }
+  return aotTextureModulate(tex, in0, (selector & 1) != 0);
+}
+
+// The blend site serves both a chain's Blend slots and the xfer's advanced blend pass (slot
+// SlotCount synthesizes an OP_BLEND), so the gate is the combined fact, not the op bit alone.
+#pragma tgfx_spec_gate BlendSlot : SPEC_NeedsBlendMath() != 0
+vec4 chainEvalBlend(int slot, int selector, vec4 in0, vec4 in1) {
+  vec4 blendSrc = in0;
+  vec4 blendDst = in1;
+#if HAS_XP >= 1
+  if (slot == SPEC_SlotCount()) {
+    blendSrc = chainXPSrc;
+    blendDst = chainXPDst;
+  }
+#endif
+  vec4 blendResult = xpBlendColors(blendSrc, blendDst, selector & 0xFF);
+  // Bit 8 of the selector: the two-child xfer epilogue re-multiplies by the input color's alpha,
+  // which at the color root is the geometry color's alpha.
+  if ((selector & 0x100) != 0) {
+    blendResult *= TGFX_CHAIN_GEOM_COLOR.a;
+  }
+  return blendResult;
+}
+
 // Evaluates slot `slot`, reading its fields from the uniform arrays. OP_TEXTURE slots read the
 // prefetched sample from chainLeafTex (fetched in main with statically bound samplers) and apply
 // the leaf modulation flags; every other op shares this single implementation so the op library
@@ -65,34 +137,7 @@ vec4 evalChainSlot(int slot) {
     return vec4(0.0);
   }
   if (Packed.x == OP_TEXTURE) {
-    vec4 texColor = chainLeafTex[slot];
-    if ((Packed.w & 2) != 0) {
-      // Alpha-only leaf (R8 on Metal returns (r,0,0,1)): splat .r into all channels so the alpha
-      // channel carries the mask value, matching the runtime TextureEffect alpha-only readback.
-      texColor = aotTextureAlphaOnly(texColor);
-      if ((Packed.w & 8) != 0) {
-        // A two-child blend operand: the xfer emission feeds each child vec4(inputColor.rgb,
-        // 1.0), so the mask modulates by the geometry RGB with opaque alpha.
-        texColor = aotTextureModulate(texColor, vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0), true);
-      }
-      if ((Packed.w & 16) != 0) {
-        // The color root: the runtime readback multiplies the mask by its FULL input color
-        // (sample.a * inputColor), one multiply over the premul geometry color — RGB and alpha
-        // in a single step (the bit0|bit3 pair applied the paint alpha to the RGB twice).
-        texColor = aotTextureModulate(texColor, TGFX_CHAIN_GEOM_COLOR, true);
-      }
-    }
-    if ((Packed.w & 4) != 0) {
-      // Coverage-root leaf: modulated by the coverage unit's alpha, matching the runtime
-      // coverage-FP readback (tex * coverageIn.a).
-      texColor = aotTextureModulate(texColor, TGFX_CHAIN_UNIT_COVERAGE, false);
-    }
-    if ((Packed.w & 1) != 0) {
-      // Color-source leaves are modulated by the geometry color's alpha, matching the runtime
-      // paint-alpha wrap. Mask and blend-operand leaves sample raw, as the runtime emits them.
-      texColor = aotTextureModulate(texColor, TGFX_CHAIN_GEOM_COLOR, false);
-    }
-    return texColor;
+    return chainEvalTextureSlot(slot, Packed.w);
   }
   vec4 in0 = Packed.y == -1   ? TGFX_CHAIN_GEOM_COLOR
              : Packed.y == -3 ? TGFX_CHAIN_UNIT_COVERAGE
@@ -107,20 +152,7 @@ vec4 evalChainSlot(int slot) {
              : Packed.z < 0   ? vec4(0.0)
                               : chainResults[Packed.z];
   if (Packed.x == OP_TEX_MODULATE) {
-    // A texture whose runtime input is a computed value splits into a raw sampling slot in the
-    // leading block (static sampler binding) plus this modulate instruction in topological
-    // order. chainLeafTex is prefetched in main and never recycled, so any later slot may read
-    // it by index. The two modulations follow the TextureEffect readback: alpha-only is
-    // sample.a * inputColor, RGBA is
-    // sample * inputColor.a. The source slot ordinal and the alpha-only flag ride the
-    // selector (bits 16-19 and bit 0), not Packed.z, because the register allocator rewrites
-    // every non-negative Packed.y/Packed.z into a result register index.
-    int srcSlot = (Packed.w >> 16) & 0xF;
-    vec4 tex = chainLeafTex[srcSlot];
-    if ((Packed.w & 1) != 0) {
-      tex = aotTextureAlphaOnly(tex);
-    }
-    return aotTextureModulate(tex, in0, (Packed.w & 1) != 0);
+    return chainEvalTexModulate(slot, Packed.w, in0);
   }
   if (Packed.x == OP_INPUT_OPAQUE) {
     // A two-child xfer whose input is a computed node C feeds its children
@@ -142,21 +174,7 @@ vec4 evalChainSlot(int slot) {
     return evalPointwiseColorOp(Packed.x, in0, dataAt, Packed.w);
   }
   if (Packed.x == OP_BLEND) {
-    vec4 blendSrc = in0;
-    vec4 blendDst = in1;
-#if HAS_XP >= 1
-    if (slot == SPEC_SlotCount()) {
-      blendSrc = chainXPSrc;
-      blendDst = chainXPDst;
-    }
-#endif
-    vec4 blendResult = xpBlendColors(blendSrc, blendDst, Packed.w & 0xFF);
-    // Bit 8 of the selector: the two-child xfer epilogue re-multiplies by the input color's
-    // alpha, which at the color root is the geometry color's alpha.
-    if ((Packed.w & 0x100) != 0) {
-      blendResult *= TGFX_CHAIN_GEOM_COLOR.a;
-    }
-    return blendResult;
+    return chainEvalBlend(slot, Packed.w, in0, in1);
   }
   if (Packed.x == OP_AARECT_COVERAGE) {
     // Analytic AA-rect coverage (identical math to GLSLRectEffect): falloff from the fragment's
