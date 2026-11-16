@@ -480,7 +480,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       }
       auto footprints = collectBackgroundFootprints(inverse.mapRect(capturedRect));
       if (!footprints.empty()) {
-        normalizeCullRects(&footprints);
+        mergeCullRects(&footprints);
         cullRects = std::move(footprints);
       }
     }
@@ -1221,27 +1221,35 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
 }
 
-// Joins the rects that overlap or touch, so many styles sitting next to each other do not multiply
-// the per-layer cull loop. When even that leaves more than MAX_CULL_RECTS a single bounding rect is
-// used: a coarser cull still draws less than the whole tile, so it never falls back to unculled.
-void DisplayList::normalizeCullRects(std::vector<Rect>* rects) {
-  bool merged = true;
-  while (merged) {
-    merged = false;
-    for (size_t i = 0; i < rects->size() && !merged; ++i) {
-      for (size_t j = i + 1; j < rects->size(); ++j) {
-        auto& current = (*rects)[i];
-        const auto& other = (*rects)[j];
-        auto joined = current;
-        joined.join(other);
-        // Only merge when the join adds no area of its own, which covers both overlap and a shared
-        // edge but leaves a real gap alone.
-        auto joinedArea = joined.width() * joined.height();
-        if (joinedArea <= current.width() * current.height() + other.width() * other.height()) {
-          current = joined;
-          rects->erase(rects->begin() + static_cast<long>(j));
-          merged = true;
-          break;
+// Merges the rects that overlap or touch, so many styles sitting next to each other do not multiply
+// the per-layer cull loop. A capture can produce footprints x tiles rects, so the pairwise join only
+// runs for a small list; a longer one collapses straight into its bounding rect, which still draws
+// less than the whole tile.
+void DisplayList::mergeCullRects(std::vector<Rect>* rects) {
+  if (rects->size() < 2) {
+    return;
+  }
+  // Each join restarts the scan, so the merge cost grows with the square of the list. Only a list
+  // close to the budget is worth merging: anything longer collapses into one rect below.
+  if (rects->size() <= 2 * MAX_CULL_RECTS) {
+    bool merged = true;
+    while (merged) {
+      merged = false;
+      for (size_t i = 0; i < rects->size() && !merged; ++i) {
+        for (size_t j = i + 1; j < rects->size(); ++j) {
+          auto& current = (*rects)[i];
+          const auto& other = (*rects)[j];
+          auto joined = current;
+          joined.join(other);
+          // Only merge when the join adds no area of its own, which covers both overlap and a shared
+          // edge but leaves a real gap alone.
+          auto joinedArea = joined.width() * joined.height();
+          if (joinedArea <= current.width() * current.height() + other.width() * other.height()) {
+            current = joined;
+            rects->erase(rects->begin() + static_cast<long>(j));
+            merged = true;
+            break;
+          }
         }
       }
     }
@@ -1375,7 +1383,7 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     // An empty list means no style samples inside this capture, in which case the whole area is
     // kept rather than replaying the tree for nothing.
     if (!narrowed.empty()) {
-      normalizeCullRects(&narrowed);
+      mergeCullRects(&narrowed);
       cullWorldRects = std::move(narrowed);
       culled = true;
     }

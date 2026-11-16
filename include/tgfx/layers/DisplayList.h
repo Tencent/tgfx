@@ -414,7 +414,7 @@ class DisplayList {
   static std::vector<Rect> narrowCullRects(const std::vector<Rect>& footprints,
                                            const std::vector<Rect>& captureRects);
 
-  static void normalizeCullRects(std::vector<Rect>* rects);
+  static void mergeCullRects(std::vector<Rect>* rects);
 
   /**
    * Captures the backdrop the background styles sample. `renderRects` are surface-space rects that

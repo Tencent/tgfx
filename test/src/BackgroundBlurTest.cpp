@@ -1693,12 +1693,12 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullRectsStayInsideTheFootprints){T
 // Dense styles must not multiply the per-layer cull loop: the rects that touch are joined, and a
 // list that still exceeds the budget collapses into one bounding rect instead of falling back to
 // the whole tile.
-TGFX_TEST_PRIVATE(BackgroundBlurTest, NormalizeCullRectsMergesDenseFootprints){TGFX_PRIVATE_ACCESS({
+TGFX_TEST_PRIVATE(BackgroundBlurTest, MergeCullRectsJoinsDenseFootprints){TGFX_PRIVATE_ACCESS({
   std::vector<Rect> touching = {};
   for (int i = 0; i < 40; ++i) {
     touching.push_back(Rect::MakeXYWH(static_cast<float>(i * 10), 0.0f, 10.0f, 10.0f));
   }
-  DisplayList::normalizeCullRects(&touching);
+  DisplayList::mergeCullRects(&touching);
   ASSERT_EQ(touching.size(), 1u);
   EXPECT_EQ(touching[0], Rect::MakeXYWH(0.0f, 0.0f, 400.0f, 10.0f));
 
@@ -1707,7 +1707,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, NormalizeCullRectsMergesDenseFootprints){T
     clustered.push_back(Rect::MakeXYWH(static_cast<float>(i * 10), 0.0f, 10.0f, 10.0f));
     clustered.push_back(Rect::MakeXYWH(static_cast<float>(i * 10), 100.0f, 10.0f, 10.0f));
   }
-  DisplayList::normalizeCullRects(&clustered);
+  DisplayList::mergeCullRects(&clustered);
   ASSERT_EQ(clustered.size(), 2u);
   EXPECT_EQ(clustered[0], Rect::MakeXYWH(0.0f, 0.0f, 200.0f, 10.0f));
   EXPECT_EQ(clustered[1], Rect::MakeXYWH(0.0f, 100.0f, 200.0f, 10.0f));
@@ -1719,9 +1719,20 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, NormalizeCullRectsMergesDenseFootprints){T
     scattered.push_back(
         Rect::MakeXYWH(static_cast<float>(i * 40), static_cast<float>(i * 40), 10.0f, 10.0f));
   }
-  DisplayList::normalizeCullRects(&scattered);
+  DisplayList::mergeCullRects(&scattered);
   ASSERT_EQ(scattered.size(), 1u);
   EXPECT_EQ(scattered[0], Rect::MakeXYWH(0.0f, 0.0f, 1570.0f, 1570.0f));
+
+  // Far above the merge cap the list collapses straight into its bounding rect, which keeps the
+  // cost linear in the number of rects a capture can produce (footprints x tiles).
+  std::vector<Rect> many = {};
+  for (int i = 0; i < 200; ++i) {
+    many.push_back(Rect::MakeXYWH(static_cast<float>(i % 20) * 100.0f,
+                                  static_cast<float>(i / 20) * 100.0f, 10.0f, 10.0f));
+  }
+  DisplayList::mergeCullRects(&many);
+  ASSERT_EQ(many.size(), 1u);
+  EXPECT_EQ(many[0], Rect::MakeXYWH(0.0f, 0.0f, 1910.0f, 910.0f));
 })}
 
 // A nested style adds no footprint of its own: the parent's bounds and outset already cover the
