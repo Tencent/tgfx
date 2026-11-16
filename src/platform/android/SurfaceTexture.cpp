@@ -18,6 +18,7 @@
 
 #include "platform/android/SurfaceTexture.h"
 #include <chrono>
+#include <cmath>
 #include "HandlerThread.h"
 #include "JNIUtil.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -39,6 +40,7 @@ static jmethodID SurfaceTexture_attachToGLContext;
 static jmethodID SurfaceTexture_detachFromGLContext;
 static jmethodID SurfaceTexture_release;
 static jmethodID SurfaceTexture_getDataSpace;
+static jmethodID SurfaceTexture_getTransformMatrix;
 static Global<jclass> SurfaceClass;
 static jmethodID Surface_Constructor;
 static Global<jclass> HandlerClass;
@@ -86,6 +88,11 @@ void SurfaceTexture::JNIInit(JNIEnv* env) {
   SurfaceTexture_release = env->GetMethodID(SurfaceTextureClass.get(), "release", "()V");
   SurfaceTexture_getDataSpace = env->GetMethodID(SurfaceTextureClass.get(), "getDataSpace", "()I");
   if (SurfaceTexture_getDataSpace == nullptr) {
+    env->ExceptionClear();
+  }
+  SurfaceTexture_getTransformMatrix =
+      env->GetMethodID(SurfaceTextureClass.get(), "getTransformMatrix", "([F)V");
+  if (SurfaceTexture_getTransformMatrix == nullptr) {
     env->ExceptionClear();
   }
   SurfaceClass = env->FindClass("android/view/Surface");
@@ -201,6 +208,19 @@ void SurfaceTexture::notifyFrameAvailable() {
   condition.notify_all();
 }
 
+static ISize ComputeTextureSize(float matrix[16], int width, int height) {
+  Size size = {static_cast<float>(width), static_cast<float>(height)};
+  auto scaleX = fabsf(matrix[0]);
+  if (scaleX > 0) {
+    size.width = size.width / (scaleX + matrix[12] * 2);
+  }
+  float scaleY = fabsf(matrix[5]);
+  if (scaleY > 0) {
+    size.height = size.height / (scaleY + (matrix[13] - scaleY) * 2);
+  }
+  return size.toRound();
+}
+
 std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, bool) {
   auto textureID = makeExternalOESTexture(context);
   if (textureID == 0) {
@@ -211,15 +231,21 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
     gl->deleteTextures(1, &textureID);
     return nullptr;
   }
-  // Use the video content size (width()/height()) for the texture descriptor rather than the
-  // hardware buffer's aligned size. Hardware decoders may pad the output buffer to a larger
-  // aligned size (e.g. 720x1560 -> 720x1568), and the extra rows hold unstable padding. Since
-  // getTextureCoord() maps content coordinates to UVs by dividing by these dimensions, using the
-  // content size preserves the "texture pixel coord == content coord" invariant and excludes the
-  // padding rows from sampling. Do not switch this back to the buffer-aligned size, which caused
-  // the edge-flicker regression this restores.
-  TextureDescriptor descriptor = {width(), height(), PixelFormat::RGBA_8888,
-                                  false,   1,        TextureUsage::TEXTURE_BINDING};
+  // The descriptor must match the real size of the OES texture, otherwise getTextureCoord()
+  // converts pixel coordinates with a wrong base: hardware decoders pad the output buffer to an
+  // aligned size (e.g. 720x1560 -> 720x1568), and every pixel->UV conversion that relies on it would
+  // be scaled by contentSize / bufferSize. That shifted the whole video and, for RGBAAA sequences
+  // whose alpha plane is packed next to the color plane, displaced alpha against color and exposed
+  // the black background of the video as an outline around the content. The padding rows are kept
+  // out of the sampling by the subset clamp that needSubset() enables for external textures.
+  auto descriptorWidth = textureSize.isEmpty() ? width() : textureSize.width;
+  auto descriptorHeight = textureSize.isEmpty() ? height() : textureSize.height;
+  TextureDescriptor descriptor = {descriptorWidth,
+                                  descriptorHeight,
+                                  PixelFormat::RGBA_8888,
+                                  false,
+                                  1,
+                                  TextureUsage::TEXTURE_BINDING};
   auto gpu = static_cast<GLGPU*>(context->gpu());
   auto texture = gpu->makeResource<GLTexture>(
       descriptor, static_cast<unsigned>(GL_TEXTURE_EXTERNAL_OES), textureID);
@@ -282,6 +308,18 @@ bool SurfaceTexture::updateTexImage() {
     jint transfer =
         env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getTransfer, dataSpace);
     _colorSpace = AndroidDataSpaceToColorSpace(standard, transfer);
+  }
+  if (SurfaceTexture_getTransformMatrix != nullptr) {
+    auto floatArray = env->NewFloatArray(16);
+    env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_getTransformMatrix, floatArray);
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+    } else {
+      auto matrix = env->GetFloatArrayElements(floatArray, nullptr);
+      textureSize = ComputeTextureSize(matrix, width(), height());
+      env->ReleaseFloatArrayElements(floatArray, matrix, JNI_ABORT);
+    }
+    env->DeleteLocalRef(floatArray);
   }
   return true;
 }
