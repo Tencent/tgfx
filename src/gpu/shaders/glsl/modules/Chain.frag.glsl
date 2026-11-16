@@ -21,5 +21,11 @@
 #include "pipeline/chain/pointwise_fragment_main.inc"
 
 void Chain_fragment(inout Fragment f) {
+#ifdef CHAIN_GEOMETRY_HOOK_CONTRACT
+  // The geometry hook handed the body its color and coverage (see the geometry's fragment hook);
+  // the aliased layouts compute both inline inside chainMain instead.
+  chainGeomColor = f.color;
+  gpPixelCoverage = f.coverage.x;
+#endif
   chainMain();
 }

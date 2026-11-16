@@ -103,11 +103,15 @@ vec4 chainResults[TGFX_CHAIN_REGISTERS];
 // the OP_TEXTURE branch of evalChainSlot reads them back by instruction index.
 vec4 chainLeafTex[4];
 
-// The per-pixel GP edge coverage of the layouts that carry one (GP_LAYOUT 1, 2, 3, 5, 7, 9:
-// ellipse, hairline-line, complex rounded rect, the non-AA rounded rects and the hairline quad).
-// Computed ahead of the chain evaluation in main so the coverage subtree's unit input can consume
-// it like the rect layouts' vCoverage varying; 1.0 keeps the define valid for the rect variants.
+// The geometry's coverage: the hook-contract layouts copy it in from Fragment::coverage (see
+// Chain_fragment), the aliased layouts compute their per-pixel GP edge coverage ahead of the chain
+// evaluation (GP_LAYOUT 1, 2, 3, 5, 7, 9: ellipse, hairline-line, complex rounded rect, the non-AA
+// rounded rects and the hairline quad). 1.0 keeps the value valid for the layouts without coverage.
 highp float gpPixelCoverage = 1.0;
+
+// The geometry's color, written by the hook-contract layouts (see Chain_fragment); the aliased
+// layouts read their varying through TGFX_CHAIN_GEOM_COLOR instead.
+vec4 chainGeomColor = vec4(0.0);
 
 // The declared geometries spell their varyings with the module prefix; the body reads the bare
 // names. One alias block per geometry keeps this text geometry-agnostic: the selectors are the
@@ -143,18 +147,40 @@ highp float gpPixelCoverage = 1.0;
 #define vStrokeWidth ComplexRRectGeometry_vStrokeWidth
 #endif
 
-// Geometry color source: the per-vertex color attribute, or the exact Color uniform for
-// common-color draws (the broadcast into the unconditional attribute is 8-bit quantized). The
-// selection is a runtime uniform, so a single variant serves both sources.
+// Whether the geometry contributes true coverage: the epilogue replaces it with the coverage
+// subtree's root instead of modulating the source with it. The hook-contract layouts declare the
+// fact themselves; the aliased layouts derive it from the layout class they encode.
+#ifdef CHAIN_GEOMETRY_HOOK_CONTRACT
+#if CHAIN_GEOMETRY_OWNS_COVERAGE
+#define CHAIN_HAS_GEOMETRY_COVERAGE 1
+#else
+#define CHAIN_HAS_GEOMETRY_COVERAGE 0
+#endif
+#elif GP_LAYOUT >= 1 || HAS_COVERAGE
+#define CHAIN_HAS_GEOMETRY_COVERAGE 1
+#else
+#define CHAIN_HAS_GEOMETRY_COVERAGE 0
+#endif
+
+// Geometry color source: the hook contract's value, or — for the aliased layouts — the per-vertex
+// color attribute, or the exact Color uniform for common-color draws (the broadcast into the
+// unconditional attribute is 8-bit quantized). The selection is a runtime uniform, so a single
+// variant serves both sources.
+#ifdef CHAIN_GEOMETRY_HOOK_CONTRACT
+#define TGFX_CHAIN_GEOM_COLOR chainGeomColor
+#else
 #define TGFX_CHAIN_GEOM_COLOR \
   ((ChainColorParams_HasCommonColor != 0) ? ChainColorParams_Color : vColor)
+#endif
 
 // The coverage subtree's unit input (slot designator -3): the GP's output coverage, which is
-// what the runtime coverage chain starts from. The rect layouts carry it as the vCoverage
-// varying; the ellipse and hairline layouts evaluate their per-pixel edge coverage ahead of the
-// chain (see gpPixelCoverage). The vec4(1.0) form keeps the define valid for the remaining
-// variants.
-#if GP_LAYOUT == 0 && HAS_COVERAGE
+// what the runtime coverage chain starts from. The hook-contract layouts hand it in through
+// gpPixelCoverage; the aliased rect layouts carry it as the vCoverage varying, and the ellipse and
+// hairline layouts evaluate their per-pixel edge coverage ahead of the chain (see gpPixelCoverage).
+// The vec4(1.0) form keeps the define valid for the remaining variants.
+#ifdef CHAIN_GEOMETRY_HOOK_CONTRACT
+#define TGFX_CHAIN_UNIT_COVERAGE vec4(gpPixelCoverage)
+#elif GP_LAYOUT == 0 && HAS_COVERAGE
 #define TGFX_CHAIN_UNIT_COVERAGE vec4(vCoverage)
 #elif GP_LAYOUT >= 1
 #define TGFX_CHAIN_UNIT_COVERAGE vec4(gpPixelCoverage)
@@ -169,8 +195,8 @@ highp float gpPixelCoverage = 1.0;
 #include "pipeline/chain/pointwise_chain_eval.inc"
 
 // The XferProcessor source without coverage: the root, times the coverage subtree root in the
-// layouts without a coverage varying (see the epilogue below).
-#if GP_LAYOUT >= 1 || HAS_COVERAGE
+// layouts whose geometry contributes no coverage (see the epilogue below).
+#if CHAIN_HAS_GEOMETRY_COVERAGE
 #define CHAIN_XP_SRC_UNPREMUL result
 #else
 #define CHAIN_XP_SRC_UNPREMUL \
@@ -382,7 +408,7 @@ void chainMain() {
   // the clip-coverage register instead (see ClipCoverageRegister above): the glyph mask is TRUE
   // coverage in the runtime composite, unlike the MaskFilter's source-modulating mask
   // (MaskCoverageBlendModesOnOpaqueBackground, byte-parity across Src/SrcOver/Multiply/Darken).
-#if GP_LAYOUT >= 1 || HAS_COVERAGE
+#if CHAIN_HAS_GEOMETRY_COVERAGE
   highp vec4 finalCoverage =
       SPEC_CoverageRootIndex() >= 0 ? coverageRootRegister : TGFX_CHAIN_UNIT_COVERAGE;
 #else
