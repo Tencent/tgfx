@@ -50,6 +50,7 @@ constexpr uint8_t YUVElement(const char* name) {
 // Every field the binder addresses, evaluated once as constants: a name missing from the
 // declaration is a link error (Module.h's ElementNameNotFound), so the indices must be constant.
 struct ChainIndices {
+  uint8_t blendModes = ChainElement("BlendModes");
   uint8_t chainData = ChainElement("ChainData");
   uint8_t clipCoverageRegister = ChainElement("ClipCoverageRegister");
   uint8_t coverageRootIndex = ChainElement("CoverageRootIndex");
@@ -57,6 +58,7 @@ struct ChainIndices {
   uint8_t deviceLeafMask = ChainElement("DeviceLeafMask");
   uint8_t gradientColorizerKind = ChainElement("GradientColorizerKind");
   uint8_t gradientIntervalCount = ChainElement("GradientIntervalCount");
+  uint8_t gradientKinds = ChainElement("GradientKinds");
   uint8_t gradientLayoutType = ChainElement("GradientLayoutType");
   uint8_t gradientLUTLeaf = ChainElement("GradientLUTLeaf");
   uint8_t hasMaskTexture = ChainElement("HasMaskTexture");
@@ -65,6 +67,8 @@ struct ChainIndices {
   uint8_t rootIndex = ChainElement("RootIndex");
   uint8_t slotCount = ChainElement("SlotCount");
   uint8_t slotPacked = ChainElement("SlotPacked");
+  uint8_t textureFlags = ChainElement("TextureFlags");
+  uint8_t usedOps = ChainElement("UsedOps");
   uint8_t tiledClamp = ChainElement("TiledClamp");
   uint8_t tiledClamp2 = ChainElement("TiledClamp2");
   uint8_t tiledDimension = ChainElement("TiledDimension");
@@ -392,6 +396,13 @@ void BindChainProgram(const AOTProgram& program, SlotWriter* chainWriter) {
   chainWriter->set(ChainField.coverageRootIndex, program.coverageRootRegister);
   chainWriter->set(ChainField.clipCoverageRegister, program.clipCoverageRegister);
   chainWriter->set(ChainField.slotCount, static_cast<int>(slotCount));
+  // The feature masks the text gates read. The specialized form takes the same numbers as
+  // constants (ResolveChainSpec); the generic form reads them here, so both gate identically.
+  const auto featureMasks = ChainFeatureMasksOf(program);
+  chainWriter->set(ChainField.usedOps, static_cast<int>(featureMasks.usedOps));
+  chainWriter->set(ChainField.blendModes, static_cast<int>(featureMasks.blendModes));
+  chainWriter->set(ChainField.textureFlags, static_cast<int>(featureMasks.textureFlags));
+  chainWriter->set(ChainField.gradientKinds, static_cast<int>(featureMasks.gradientKinds));
   // Written for every draw (absent in leaf-free variants): a stale mask from an earlier draw
   // would make an ordinary leaf sample in device space.
   uint32_t deviceMask = 0;

@@ -32,6 +32,9 @@ SpecValues ResolveChainSpec(const AOTProgram& program, const std::vector<SpecFie
   // The inactive tail's record is the zeroed slot, the same value the runtime binder uploads
   // (its OP_NONE marker and zero selector protect the static texture prefetch).
   const AOTChainSlot inactiveSlot = {};
+  // The feature masks the gate conditions read: the same derivation the generic form's uniform
+  // upload uses, so a specialized and a generic compile gate identically.
+  const auto featureMasks = ChainFeatureMasksOf(program);
   for (const auto& field : fields) {
     if (field.name == "SlotCount") {
       result.values.push_back(static_cast<int32_t>(slots.size()));
@@ -57,6 +60,22 @@ SpecValues ResolveChainSpec(const AOTProgram& program, const std::vector<SpecFie
     }
     if (field.name == "ClipCoverageRegister") {
       result.values.push_back(program.clipCoverageRegister);
+      continue;
+    }
+    if (field.name == "UsedOps") {
+      result.values.push_back(static_cast<int32_t>(featureMasks.usedOps));
+      continue;
+    }
+    if (field.name == "BlendModes") {
+      result.values.push_back(static_cast<int32_t>(featureMasks.blendModes));
+      continue;
+    }
+    if (field.name == "TextureFlags") {
+      result.values.push_back(static_cast<int32_t>(featureMasks.textureFlags));
+      continue;
+    }
+    if (field.name == "GradientKinds") {
+      result.values.push_back(static_cast<int32_t>(featureMasks.gradientKinds));
       continue;
     }
     // A field this family does not carry means the declaration and the subject drifted apart;

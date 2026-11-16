@@ -82,6 +82,14 @@ inline constexpr Element ChainElements[] = {
     {Element::Kind::Param, ShaderType::Int, "CoverageRootIndex", 1, -1, 0, /*spec=*/true},
     {Element::Kind::Param, ShaderType::Int, "RootIndex", 1, -1, 0, /*spec=*/true},
     {Element::Kind::Param, ShaderType::Int, "ClipCoverageRegister", 1, -1, 0, /*spec=*/true},
+    // The feature masks the text gates read: what this chain's slots actually carry, so a gate can
+    // cut the code the draw never reaches. ChainFeatureMasksOf fills them from one scan of the
+    // slots; the specialization values and the generic form's uniforms carry the same numbers, so
+    // both forms gate identically.
+    {Element::Kind::Param, ShaderType::Int, "UsedOps", 1, -1, 0, /*spec=*/true},
+    {Element::Kind::Param, ShaderType::Int, "BlendModes", 1, -1, 0, /*spec=*/true},
+    {Element::Kind::Param, ShaderType::Int, "TextureFlags", 1, -1, 0, /*spec=*/true},
+    {Element::Kind::Param, ShaderType::Int, "GradientKinds", 1, -1, 0, /*spec=*/true},
     // The core block: the leaf-0 subset pair is unconditional; the color-space xform block is one
     // chain-wide region shared by every profile.
     {Element::Kind::Param, ShaderType::Float4, "Subset"},

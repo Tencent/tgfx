@@ -158,19 +158,25 @@ TEST(ChainEquivalenceTest, SpecFieldsKeepTheLegacyIdOrder) {
   ASSERT_FALSE(variants.empty());
   for (const auto& variant : variants) {
     const auto fields = DeriveSpecFields(family, variant);
-    ASSERT_EQ(fields.size(), 5u);
+    ASSERT_EQ(fields.size(), 9u);
     const uint8_t profile = DimValueOf(family, variant, 2, 0);
     const uint16_t capacity = profile == 6 ? 32 : 16;
     // The legacy first-use order: SlotCount, SlotPacked, CoverageRootIndex, RootIndex,
-    // ClipCoverageRegister; the array takes four ids per element.
+    // ClipCoverageRegister; the array takes four ids per element. The feature masks the text
+    // gates read follow it, so the legacy ids are unchanged.
     EXPECT_EQ(fields[0].firstId, 1u);
     EXPECT_EQ(fields[1].firstId, 2u);
     EXPECT_EQ(fields[2].firstId, static_cast<uint16_t>(2 + 4 * capacity));
     EXPECT_EQ(fields[3].firstId, static_cast<uint16_t>(3 + 4 * capacity));
     EXPECT_EQ(fields[4].firstId, static_cast<uint16_t>(4 + 4 * capacity));
+    EXPECT_EQ(fields[5].firstId, static_cast<uint16_t>(5 + 4 * capacity));
+    EXPECT_EQ(fields[6].firstId, static_cast<uint16_t>(6 + 4 * capacity));
+    EXPECT_EQ(fields[7].firstId, static_cast<uint16_t>(7 + 4 * capacity));
+    EXPECT_EQ(fields[8].firstId, static_cast<uint16_t>(8 + 4 * capacity));
     const auto modules = ModulesOf(family, variant);
-    const std::vector<std::string> expected = {"SlotCount", "SlotPacked", "CoverageRootIndex",
-                                               "RootIndex", "ClipCoverageRegister"};
+    const std::vector<std::string> expected = {
+        "SlotCount", "SlotPacked", "CoverageRootIndex", "RootIndex",    "ClipCoverageRegister",
+        "UsedOps",   "BlendModes", "TextureFlags",      "GradientKinds"};
     for (size_t index = 0; index < fields.size(); ++index) {
       const Module* module = modules.list[fields[index].slot];
       ASSERT_NE(module, nullptr);

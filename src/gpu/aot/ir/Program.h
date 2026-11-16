@@ -210,4 +210,50 @@ struct AOTProgram {
   AOTResourceProfile profile = AOTResourceProfile::Automatic;
 };
 
+/// What one chain program's slots carry, as the bit sets the text gates read through scalar spec
+/// constants: a gate such as `(SPEC_UsedOps() & (1 << OP_PERLIN_NOISE)) != 0` cuts the noise
+/// reader out of every variant whose draw never reaches it. The masks are a function of the
+/// program alone, so the specialization values and the generic form's uniform upload derive them
+/// from this one place instead of each walking the slots.
+struct AOTChainFeatureMasks {
+  /// Bit `Op::<name>` set for every op a slot carries.
+  uint32_t usedOps = 0;
+  /// Bit `BlendMode` set for every Blend slot's mode (the enum has 29 values, within 32 bits).
+  uint32_t blendModes = 0;
+  /// Bit 0 an alpha-only leaf, bit 1 a shader-side tiled recipe, bit 2 a destination-space leaf.
+  uint32_t textureFlags = 0;
+  /// Bits 0-3 the gradient colorizer kind, bits 8-11 the layout type: the two nibbles the
+  /// gradient reader branches on.
+  uint32_t gradientKinds = 0;
+};
+
+inline AOTChainFeatureMasks ChainFeatureMasksOf(const AOTProgram& program) {
+  constexpr uint32_t kAlphaOnlyLeaf = 0x1;
+  constexpr uint32_t kShaderTiledLeaf = 0x2;
+  constexpr uint32_t kDeviceSpaceLeaf = 0x4;
+  AOTChainFeatureMasks masks = {};
+  for (const auto& slot : program.slots) {
+    masks.usedOps |= 1u << static_cast<uint32_t>(slot.op);
+    if (slot.op == AOTChainOp::Blend) {
+      masks.blendModes |= 1u << static_cast<uint32_t>(slot.blend.blendMode);
+    }
+    if (slot.op == AOTChainOp::Texture && slot.textureAlphaOnly != 0) {
+      masks.textureFlags |= kAlphaOnlyLeaf;
+    }
+    if (slot.op == AOTChainOp::Gradient) {
+      masks.gradientKinds |= 1u << (static_cast<uint32_t>(slot.gradient.colorizerKind) & 0x0Fu);
+      masks.gradientKinds |= 1u << (8u + (static_cast<uint32_t>(slot.gradient.layoutType) & 0x0Fu));
+    }
+  }
+  // The tiled and device-space facts live on the program's leaf records, not on the slots: only
+  // the leaves that need shader-side wrap emulation or a destination-space matrix appear there.
+  if (!program.tiledLeaves.empty()) {
+    masks.textureFlags |= kShaderTiledLeaf;
+  }
+  if (!program.deviceLeaves.empty()) {
+    masks.textureFlags |= kDeviceSpaceLeaf;
+  }
+  return masks;
+}
+
 }  // namespace tgfx

@@ -26,6 +26,7 @@
 #include "compile/SpecCodegen.h"
 #include "core/DiagnosticCodes.h"
 #include "core/Diagnostics.h"
+#include "gpu/aot/ir/Program.h"
 #include "gpu/shaders/contract/SpecContract.h"
 #include "gtest/gtest.h"
 
@@ -156,6 +157,28 @@ TEST(SpecGateTest, HlslWrapUsesTheSpirvCrossPrefixAndNoVersionLine) {
             std::string::npos);
   EXPECT_NE(gated.text.find("#else\n{ return float4(0.0, 0.0, 0.0, 0.0); }\n#endif"),
             std::string::npos);
+}
+
+TEST(SpecGateTest, FeatureMasksFollowTheSlots) {
+  AOTProgram program = {};
+  AOTChainSlot blend = {};
+  blend.op = AOTChainOp::Blend;
+  blend.blend.blendMode = 5;  // tgfx::BlendMode::SrcIn
+  AOTChainSlot gradient = {};
+  gradient.op = AOTChainOp::Gradient;
+  gradient.gradient.colorizerKind = 2;
+  gradient.gradient.layoutType = 1;
+  program.slots = {blend, gradient};
+  const auto masks = ChainFeatureMasksOf(program);
+  EXPECT_NE(masks.usedOps & (1u << static_cast<uint32_t>(AOTChainOp::Blend)), 0u);
+  EXPECT_NE(masks.usedOps & (1u << static_cast<uint32_t>(AOTChainOp::Gradient)), 0u);
+  EXPECT_EQ(masks.usedOps & (1u << static_cast<uint32_t>(AOTChainOp::PerlinNoise)), 0u);
+  EXPECT_EQ(masks.blendModes, 1u << 5u);
+  EXPECT_EQ(masks.gradientKinds, (1u << 2u) | (1u << 9u));
+  EXPECT_EQ(masks.textureFlags, 0u);
+  // The tiled and device-space facts live on the leaf records, not the slots.
+  program.tiledLeaves.push_back({});
+  EXPECT_EQ(ChainFeatureMasksOf(program).textureFlags, 0x2u);
 }
 
 TEST(SpecGateTest, StubOutReplacesTheBodies) {
