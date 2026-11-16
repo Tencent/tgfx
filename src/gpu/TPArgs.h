@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include "gpu/BackingFit.h"
 #include "tgfx/core/SamplingOptions.h"
 
