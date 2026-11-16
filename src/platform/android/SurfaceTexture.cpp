@@ -249,11 +249,12 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
   }
   // The descriptor must match the real size of the OES texture, otherwise getTextureCoord()
   // converts pixel coordinates with a wrong base: hardware decoders pad the output buffer to an
-  // aligned size (e.g. 720x1560 -> 720x1568), and every pixel->UV conversion that relies on it would
-  // be scaled by contentSize / bufferSize. That shifted the whole video and, for RGBAAA sequences
-  // whose alpha plane is packed next to the color plane, displaced alpha against color and exposed
-  // the black background of the video as an outline around the content. The padding rows are kept
-  // out of the sampling by the subset clamp that needSubset() enables for external textures.
+  // aligned size (e.g. 720x1560 -> 720x1568), and every pixel->UV conversion that relies on it
+  // would be scaled by contentSize / bufferSize. That shifted the whole video and, for RGBAAA
+  // sequences whose alpha plane is packed next to the color plane, displaced alpha against color
+  // and exposed the black background of the video as an outline around the content. The padding
+  // rows are kept out of the sampling by the subset clamp that needSubset() enables for external
+  // textures.
   auto descriptorWidth = textureSize.isEmpty() ? width() : textureSize.width;
   auto descriptorHeight = textureSize.isEmpty() ? height() : textureSize.height;
   TextureDescriptor descriptor = {descriptorWidth,
