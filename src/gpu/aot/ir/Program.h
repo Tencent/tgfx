@@ -227,6 +227,22 @@ struct AOTChainFeatureMasks {
   uint32_t gradientKinds = 0;
 };
 
+/// Whether the chain fragment needs the shared blend-mode switch: a Blend slot executes it for the
+/// slot's mode, and a shader-side xfer with an advanced mode runs it in the draw's blend pass.
+/// Both callers (the specialization values and the generic form's uniform upload) derive the flag
+/// from this one rule, so the specialized and generic texts gate identically.
+inline bool ChainNeedsBlendMath(const AOTProgram& program, bool xpAdvancedMode) {
+  if (xpAdvancedMode) {
+    return true;
+  }
+  for (const auto& slot : program.slots) {
+    if (slot.op == AOTChainOp::Blend) {
+      return true;
+    }
+  }
+  return false;
+}
+
 inline AOTChainFeatureMasks ChainFeatureMasksOf(const AOTProgram& program) {
   constexpr uint32_t kAlphaOnlyLeaf = 0x1;
   constexpr uint32_t kShaderTiledLeaf = 0x2;

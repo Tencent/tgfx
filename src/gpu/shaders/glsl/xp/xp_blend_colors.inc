@@ -1,4 +1,6 @@
 // PorterDuff blend math shared by the xfer processors and the fused pointwise-chain kernel.
+#pragma tgfx_spec_reader
+
 // xpBlendColors(S, D, mode) blends two premultiplied colors with a runtime-selected mode. This
 // file has its own include guard so kernels that need the blend math without the dst-texture XP
 // machinery (the chain interpreter) can include it directly.
@@ -52,6 +54,9 @@ vec3 xpSetSaturation(vec3 hueLumColor, vec3 satColor) {
   return mix(ranked, vec3(sat), equal(hueLumColor, vec3(maxComp)));
 }
 
+// The switch is reachable only when a Blend slot's mode or the draw's advanced xfer mode runs it,
+// so a chain with neither closes the gate and the runtime hands the driver the stub.
+#pragma tgfx_spec_gate BlendSwitch : SPEC_NeedsBlendMath() != 0
 vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
   // The coefficient modes (3-14) mirror the runtime's AppendCoeffBlend, whose Add/Subtract
   // operations clamp the result to [0,1] (GLSLBlend.cpp). Porter-Duff is closed over in-range

@@ -110,9 +110,16 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
   // The specialization values are part of the program's identity: the processor tree cannot tell
   // two chain shapes apart (a rect clip's anti-alias flag, for one, is not in it), so a program
   // built for one shape must never answer the other.
+  // The blend switch's fact needs both the slot array and the draw's xfer: an advanced shader-side
+  // mode runs the loop's blend pass even when no slot carries a Blend op.
+  const bool needsBlendMath =
+      match->chain != nullptr &&
+      ChainNeedsBlendMath(*match->chain, info.getXferFacts().shaderBlend() &&
+                                             static_cast<int>(info.getBlendMode()) >=
+                                                 static_cast<int>(BlendMode::Overlay));
   const SpecValues spec =
       SpecResolver::Resolve(context != nullptr ? ContextCacheAccess::Cache(context) : nullptr,
-                            info.backend(), match->variant, match->chain);
+                            info.backend(), match->variant, match->chain, needsBlendMath);
   if (failure != nullptr) {
     *failure = AOTFailure::None;
   }

@@ -63,6 +63,7 @@ struct ChainIndices {
   uint8_t gradientLUTLeaf = ChainElement("GradientLUTLeaf");
   uint8_t hasMaskTexture = ChainElement("HasMaskTexture");
   uint8_t leafReadSwizzles = ChainElement("LeafReadSwizzles");
+  uint8_t needsBlendMath = ChainElement("NeedsBlendMath");
   uint8_t noiseModeOctaves = ChainElement("NoiseModeOctaves");
   uint8_t rootIndex = ChainElement("RootIndex");
   uint8_t slotCount = ChainElement("SlotCount");
@@ -381,7 +382,7 @@ void BindYUVProgram(const AOTProgram& program, SlotWriter* yuvWriter) {
   }
 }
 
-void BindChainProgram(const AOTProgram& program, SlotWriter* chainWriter) {
+void BindChainProgram(const AOTProgram& program, SlotWriter* chainWriter, bool needsBlendMath) {
   const auto& slots = program.slots;
   const auto slotCount = slots.size();
   if (chainWriter == nullptr) {
@@ -403,6 +404,7 @@ void BindChainProgram(const AOTProgram& program, SlotWriter* chainWriter) {
   chainWriter->set(ChainField.blendModes, static_cast<int>(featureMasks.blendModes));
   chainWriter->set(ChainField.textureFlags, static_cast<int>(featureMasks.textureFlags));
   chainWriter->set(ChainField.gradientKinds, static_cast<int>(featureMasks.gradientKinds));
+  chainWriter->set(ChainField.needsBlendMath, needsBlendMath ? 1 : 0);
   // Written for every draw (absent in leaf-free variants): a stale mask from an earlier draw
   // would make an ordinary leaf sample in device space.
   uint32_t deviceMask = 0;

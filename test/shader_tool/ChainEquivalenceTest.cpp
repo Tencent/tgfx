@@ -158,7 +158,7 @@ TEST(ChainEquivalenceTest, SpecFieldsKeepTheLegacyIdOrder) {
   ASSERT_FALSE(variants.empty());
   for (const auto& variant : variants) {
     const auto fields = DeriveSpecFields(family, variant);
-    ASSERT_EQ(fields.size(), 9u);
+    ASSERT_EQ(fields.size(), 10u);
     const uint8_t profile = DimValueOf(family, variant, 2, 0);
     const uint16_t capacity = profile == 6 ? 32 : 16;
     // The legacy first-use order: SlotCount, SlotPacked, CoverageRootIndex, RootIndex,
@@ -173,10 +173,11 @@ TEST(ChainEquivalenceTest, SpecFieldsKeepTheLegacyIdOrder) {
     EXPECT_EQ(fields[6].firstId, static_cast<uint16_t>(6 + 4 * capacity));
     EXPECT_EQ(fields[7].firstId, static_cast<uint16_t>(7 + 4 * capacity));
     EXPECT_EQ(fields[8].firstId, static_cast<uint16_t>(8 + 4 * capacity));
+    EXPECT_EQ(fields[9].firstId, static_cast<uint16_t>(9 + 4 * capacity));
     const auto modules = ModulesOf(family, variant);
     const std::vector<std::string> expected = {
-        "SlotCount", "SlotPacked", "CoverageRootIndex", "RootIndex",    "ClipCoverageRegister",
-        "UsedOps",   "BlendModes", "TextureFlags",      "GradientKinds"};
+        "SlotCount", "SlotPacked", "CoverageRootIndex", "RootIndex",     "ClipCoverageRegister",
+        "UsedOps",   "BlendModes", "TextureFlags",      "GradientKinds", "NeedsBlendMath"};
     for (size_t index = 0; index < fields.size(); ++index) {
       const Module* module = modules.list[fields[index].slot];
       ASSERT_NE(module, nullptr);

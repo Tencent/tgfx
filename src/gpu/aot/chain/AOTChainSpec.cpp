@@ -21,7 +21,8 @@
 
 namespace tgfx {
 
-SpecValues ResolveChainSpec(const AOTProgram& program, const std::vector<SpecFieldInfo>& fields) {
+SpecValues ResolveChainSpec(const AOTProgram& program, const std::vector<SpecFieldInfo>& fields,
+                            bool needsBlendMath) {
   SpecValues result;
   if (fields.empty()) {
     return result;
@@ -76,6 +77,10 @@ SpecValues ResolveChainSpec(const AOTProgram& program, const std::vector<SpecFie
     }
     if (field.name == "GradientKinds") {
       result.values.push_back(static_cast<int32_t>(featureMasks.gradientKinds));
+      continue;
+    }
+    if (field.name == "NeedsBlendMath") {
+      result.values.push_back(needsBlendMath ? 1 : 0);
       continue;
     }
     // A field this family does not carry means the declaration and the subject drifted apart;

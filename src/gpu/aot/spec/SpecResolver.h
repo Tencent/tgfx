@@ -52,7 +52,7 @@ class SpecResolver {
    *                  when the draw serves the generic form.
    */
   static SpecValues Resolve(PrecompiledShaderCache* cache, Backend backend, const Variant& variant,
-                            const AOTProgram* chain);
+                            const AOTProgram* chain, bool needsBlendMath);
 };
 
 /// The code format a backend's payload arrives in. The backend picks the dialect and the bundle

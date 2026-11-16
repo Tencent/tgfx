@@ -30,6 +30,7 @@ namespace tgfx {
 /// the bundle's spec table, so the values a specialized shader folds are the values the runtime
 /// would have uploaded. Returns an empty set when the table names a field this family does not
 /// have, so a drifted declaration fails closed instead of specifying nothing.
-SpecValues ResolveChainSpec(const AOTProgram& program, const std::vector<SpecFieldInfo>& fields);
+SpecValues ResolveChainSpec(const AOTProgram& program, const std::vector<SpecFieldInfo>& fields,
+                            bool needsBlendMath);
 
 }  // namespace tgfx

@@ -86,7 +86,12 @@ void WriteChainModule(WriteContext& context) {
   const auto transforms = BuildChainCoordTransforms(*program);
   WriteChainTransformBases(context.slot, context.geometry, context.sources.variant.geometry,
                            transforms);
-  BindChainProgram(*program, context.slot);
+  // The blend switch's fact: a Blend slot's mode or an advanced shader-side xfer mode.
+  const bool needsBlendMath =
+      ChainNeedsBlendMath(*program, context.info.getXferFacts().shaderBlend() &&
+                                        static_cast<int>(context.info.getBlendMode()) >=
+                                            static_cast<int>(BlendMode::Overlay));
+  BindChainProgram(*program, context.slot, needsBlendMath);
   BindChainBindings(*program, context.slot);
 }
 

@@ -56,7 +56,7 @@ void BindRRectCoverageSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t 
  * variant's derived field offsets; the vertex-side geometry fields (the coord-source mask and the
  * coordinate transforms) belong to the geometry writer.
  */
-void BindChainProgram(const AOTProgram& program, SlotWriter* chainWriter);
+void BindChainProgram(const AOTProgram& program, SlotWriter* chainWriter, bool needsBlendMath);
 
 /**
  * Writes the YUV family's compiled tail program (ResolveYUVProgram): SlotCount plus the

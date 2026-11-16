@@ -90,6 +90,10 @@ inline constexpr Element ChainElements[] = {
     {Element::Kind::Param, ShaderType::Int, "BlendModes", 1, -1, 0, /*spec=*/true},
     {Element::Kind::Param, ShaderType::Int, "TextureFlags", 1, -1, 0, /*spec=*/true},
     {Element::Kind::Param, ShaderType::Int, "GradientKinds", 1, -1, 0, /*spec=*/true},
+    // The shared blend switch is needed by a Blend slot's mode or by a shader-side xfer whose mode
+    // is advanced (the loop's blend pass); neither is visible in the slot array alone, so the
+    // declaration carries the combined fact the gate reads.
+    {Element::Kind::Param, ShaderType::Int, "NeedsBlendMath", 1, -1, 0, /*spec=*/true},
     // The core block: the leaf-0 subset pair is unconditional; the color-space xform block is one
     // chain-wide region shared by every profile.
     {Element::Kind::Param, ShaderType::Float4, "Subset"},
