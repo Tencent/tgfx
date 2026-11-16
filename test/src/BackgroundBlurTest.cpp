@@ -1486,9 +1486,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CullFootprintsCoverTheSampledArea) {
 
     auto footprints = displayList->collectBackgroundFootprints(Rect::MakeWH(240, 240));
     ASSERT_EQ(footprints.size(), 1u);
-    auto expected = blurred->renderBounds;
-    expected.outset(blurred->maxBackgroundOutset, blurred->maxBackgroundOutset);
-    EXPECT_EQ(footprints[0], expected);
+    EXPECT_EQ(footprints[0], blurred->renderBounds);
 
     // A perspective transform leaves the 2D bounds unable to delimit the sampled area, so the walk
     // gives up and the caller keeps whole tiles.
@@ -1775,9 +1773,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, NestedStylesShareTheParentFootprint){TGFX_
   displayList->render(surface.get());
   auto footprints = displayList->collectBackgroundFootprints(Rect::MakeWH(300.0f, 300.0f));
   ASSERT_EQ(footprints.size(), 1u);
-  auto expected = parent->renderBounds;
-  expected.outset(parent->maxBackgroundOutset, parent->maxBackgroundOutset);
-  EXPECT_EQ(footprints[0], expected);
+  EXPECT_EQ(footprints[0], parent->renderBounds);
 })}
 
 // A background style nested inside another one samples pixels the parent's bounds already cover, so
@@ -2010,9 +2006,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, NestedStyleChainAddsOneFootprint){TGFX_PRI
   displayList->render(surface.get());
   auto footprints = displayList->collectBackgroundFootprints(Rect::MakeWH(300.0f, 300.0f));
   ASSERT_EQ(footprints.size(), 1u);
-  auto expected = root->renderBounds;
-  expected.outset(root->maxBackgroundOutset, root->maxBackgroundOutset);
-  EXPECT_EQ(footprints[0], expected);
+  EXPECT_EQ(footprints[0], root->renderBounds);
 })}
 
 // More styles than the per-layer cull loop can afford must still cull: the rects are merged instead
@@ -2058,6 +2052,56 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, ManyStylesStillCullTheCapture) {
     EXPECT_LT(cullArea, captureRect.width() * captureRect.height() * 0.5f);
     context->flushAndSubmit();
   })
+}
+
+// A style reads a background image cropped to the recording it resolves, so a neighbour outside its
+// bounds cannot reach the blur. This is what lets the footprint stop at the layer bounds: were the
+// style to sample beyond them, the tiled path (culled to the footprint) would lose the bar.
+TGFX_TEST(BackgroundBlurTest, BlurDoesNotSampleOutsideItsBounds) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int SurfaceSize = 240;
+
+  auto render = [&](RenderMode mode) {
+    auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
+    EXPECT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(mode);
+
+    auto back = SolidLayer::Make();
+    back->setColor(Color::FromRGBA(20, 90, 180, 255));
+    back->setWidth(SurfaceSize);
+    back->setHeight(SurfaceSize);
+    displayList->root()->addChild(back);
+
+    // 6px wide bar ending exactly at the blurred layer's left edge: outside its bounds, inside the
+    // blur reach of sigma 4.
+    auto bar = ShapeLayer::Make();
+    Path barPath;
+    barPath.addRect(Rect::MakeXYWH(0, 0, 6, 40));
+    bar->setPath(barPath);
+    bar->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
+    bar->setMatrix(Matrix::MakeTrans(70, 80));
+    displayList->root()->addChild(bar);
+
+    auto blurred = ShapeLayer::Make();
+    Path blurPath;
+    blurPath.addRect(Rect::MakeWH(40, 40));
+    blurred->setPath(blurPath);
+    blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 40)));
+    blurred->setMatrix(Matrix::MakeTrans(80, 80));
+    blurred->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
+    displayList->root()->addChild(blurred);
+
+    displayList->render(surface.get());
+    return ReadSurfacePixels(surface.get());
+  };
+
+  auto direct = render(RenderMode::Direct);
+  auto tiled = render(RenderMode::Tiled);
+  EXPECT_GT(CountPixelsDifferentFrom(direct, 0), 1000u);
+  ExpectMatchingRenders(direct, tiled);
 }
 
 }  // namespace tgfx

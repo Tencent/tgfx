@@ -1305,11 +1305,10 @@ bool DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bo
                                static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
         continue;
       }
-      // The style samples the backdrop under its own bounds plus the blur reach, and a child's own
-      // footprint stays inside it: renderBounds folds the children in and the outset propagates up.
-      auto footprint = layer->renderBounds;
-      footprint.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
-      footprints->push_back(footprint);
+      // The background image a style reads is cropped to the recording it resolves, so nothing
+      // outside this layer's own bounds can reach it: no blur reach is added here. A child's own
+      // footprint stays inside this one because renderBounds folds the children in.
+      footprints->push_back(layer->renderBounds);
       pushed = true;
       break;
     }
