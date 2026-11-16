@@ -201,15 +201,6 @@ class D3D12Emitter : public ProfileEmitter {
   }
 
   std::optional<EmittedStages> emit(const EmitInput& input, StageCompiler* compiler) override {
-    if (input.fragGates != nullptr && !input.fragGates->empty() && !D3D12UsesDxbc()) {
-      // The HLSL text form is compiled on the device at module creation, so it wants the same
-      // preprocessor gating — not implemented yet. Fail closed instead of shipping the ungated
-      // text silently (the DXBC form compiles here, so it never needs gates).
-      ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
-                    "spec gates are not yet implemented for the HLSL text form; use the dxbc "
-                    "form or drop the gates for this family");
-      return std::nullopt;
-    }
     const auto& hlslVert = compiler->translateHLSL(*input.vertSpirv, ShaderStageType::Vertex);
     if (!hlslVert.success) {
       ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
@@ -236,7 +227,11 @@ class D3D12Emitter : public ProfileEmitter {
                       "HLSL translation error: " + hlslFrag.error);
         return std::nullopt;
       }
-      return EmitHlslStages(input, compiler, hlslVert.text, hlslFrag.text);
+      auto gatedFrag = GateHlslFragment(input, hlslFrag.text);
+      if (!gatedFrag) {
+        return std::nullopt;
+      }
+      return EmitHlslStages(input, compiler, hlslVert.text, *gatedFrag);
     }
     const auto& hlslFrag =
         compiler->translateHLSL(input.fragStage->spirv, ShaderStageType::Fragment);
@@ -245,10 +240,40 @@ class D3D12Emitter : public ProfileEmitter {
                     "HLSL translation error: " + hlslFrag.error);
       return std::nullopt;
     }
-    return EmitHlslStages(input, compiler, hlslVert.text, hlslFrag.text);
+    auto gatedFrag = GateHlslFragment(input, hlslFrag.text);
+    if (!gatedFrag) {
+      return std::nullopt;
+    }
+    return EmitHlslStages(input, compiler, hlslVert.text, *gatedFrag);
   }
 
  private:
+  /// The HLSL text form is compiled on the device (D3DCompile), so it carries the same
+  /// preprocessor gating the GL text backends get: SPIRV-Cross spelled the constants
+  /// SPIRV_CROSS_CONSTANT_ID_<id>, the runtime's HLSL injector defines them, and the
+  /// preprocessor removes a closed gate's body before the compiler parses a line of it. The
+  /// wrapper is applied after translation, so a function the translator inlined away fails loudly
+  /// here instead of shipping an ungated body silently. The DXBC form compiles here with the
+  /// defaults (every gate open), so it never depends on the injection.
+  std::optional<std::string> GateHlslFragment(const EmitInput& input,
+                                              const std::string& fragmentText) {
+    if (input.fragGates == nullptr || input.fragGates->empty()) {
+      return fragmentText;
+    }
+    const auto gated = ApplyHlslSpecGates(
+        fragmentText, *input.fragGates,
+        input.fragSpecEntries == nullptr ? std::vector<SpecEntry>{} : *input.fragSpecEntries);
+    if (!gated.error.empty() || gated.wrapped != input.fragGates->size()) {
+      ReportFailure(input, profile(), DiagnosticCode::SpecGateUnmatched,
+                    !gated.error.empty()
+                        ? "the HLSL text cannot carry its gates: " + gated.error
+                        : "the HLSL translation inlined a gated function away; gate a function "
+                          "the translator keeps");
+      return std::nullopt;
+    }
+    return gated.text;
+  }
+
   std::optional<EmittedStages> EmitHlslStages(const EmitInput& input, StageCompiler* compiler,
                                               const std::string& vertText,
                                               const std::string& fragText) {

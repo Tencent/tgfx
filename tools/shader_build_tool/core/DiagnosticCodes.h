@@ -67,6 +67,7 @@ inline constexpr const char* SpecReader = "spec.reader-undeclared";
 
 /// A gate did not apply where it had to: twice-declared in one text, a pragma not followed by a
 /// stubbable function, or an expression the variant's spec table cannot evaluate.
+inline constexpr const char* SpecGateUnmatched = "spec.gate-unmatched";
 
 /// The uniform layout differs between the generic and the spec-dialect compile.
 inline constexpr const char* SpecLayoutDrift = "spec.layout-drift";
@@ -113,10 +114,21 @@ inline constexpr const char* OutputDuplicateKey = "output.duplicate-key";
 /// must be referenced by at least one site (an unreferenced one is dead, or a site that still
 /// reports through something else).
 inline constexpr const char* AllCodes[] = {
-    SourcesUnreadable, CompileGlsl,         CompileCacheDisabled, ReflectUnknownType,
-    EmitFailed,        EmitFormLeak,        SpecReader,           SpecLayoutDrift,
-    VerifyReflection,  VerifyBindingLayout, VerifyNotApplicable,  VerifyPointwiseDispatch,
-    OutputWrite,       OutputDuplicateKey,
+    SourcesUnreadable,
+    CompileGlsl,
+    CompileCacheDisabled,
+    ReflectUnknownType,
+    EmitFailed,
+    EmitFormLeak,
+    SpecReader,
+    SpecGateUnmatched,
+    SpecLayoutDrift,
+    VerifyReflection,
+    VerifyBindingLayout,
+    VerifyNotApplicable,
+    VerifyPointwiseDispatch,
+    OutputWrite,
+    OutputDuplicateKey,
 };
 
 }  // namespace DiagnosticCode

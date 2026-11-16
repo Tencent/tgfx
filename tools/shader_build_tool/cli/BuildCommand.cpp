@@ -274,6 +274,11 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         familyNeedsChainContract = true;
       }
     }
+    // The gate names whose stubbed bodies already compiled once for this family: a gate's
+    // signature is the same in every variant that carries its file, so one stub compile per
+    // distinct gate proves the closed form's call sites, and a later variant only re-checks the
+    // gates it adds.
+    std::set<std::string> gatesStubValidated;
     for (const auto& variant : variants) {
       const auto assembled = AssembleVariant(family, variant);
       // The assembled text carries module #includes; the compiler never sees one, so the same
@@ -366,7 +371,6 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
                          "the assembled text's reflection does not match the derived layout");
         continue;
       }
-      shaderReport.compiledCount++;
       // The specialization table, derived from the declaration like the generated text was: the
       // same DeriveSpecFields call feeds the accessor ids the text carries, so the table the
       // runtime injects through cannot disagree with the constants the shader reads.
@@ -388,6 +392,51 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
           specEntries.push_back(std::move(entry));
         }
       }
+      // The gate declarations ride in the assembled fragment's inc files, so each variant scans
+      // its own expanded text: a variant that prunes a gated file carries neither the pragma nor
+      // the function, and a gate whose condition reads a field this variant's spec table does not
+      // carry stays in every form (dropped here, never wrapped). The closed gates' stub bodies
+      // are compiled once per distinct gate: a stub the call sites cannot accept fails the build
+      // here, not on a device.
+      std::vector<SpecGateInfo> supportedGates = {};
+      if (!specEntries.empty()) {
+        for (const auto& gate : ScanGatePragmas(fragExpanded, info.name, &report->diagnostics)) {
+          if (GateEvaluatable(gate, specEntries)) {
+            supportedGates.push_back(gate);
+          }
+        }
+        std::vector<SpecGateInfo> unvalidatedGates = {};
+        for (const auto& gate : supportedGates) {
+          if (gatesStubValidated.find(gate.name) == gatesStubValidated.end()) {
+            unvalidatedGates.push_back(gate);
+          }
+        }
+        if (!unvalidatedGates.empty()) {
+          const auto stubbed = StubOutGatedFunctions(fragExpanded, unvalidatedGates);
+          if (stubbed.empty()) {
+            RecordBuildError(&report->diagnostics, Layer::Compile,
+                             DiagnosticCode::SpecGateUnmatched, info.name, "",
+                             static_cast<int>(variant.ordinal), static_cast<int>(variant.ordinal),
+                             "a gate pragma does not precede a stubbable function (scalar or "
+                             "vector return type required)");
+            continue;
+          }
+          const auto& stubResult =
+              compiler->compileSpirv(PrependDefines(stubbed, fragDefines),
+                                     ShaderStageType::Fragment, info.name, variant.ordinal, false);
+          if (!stubResult.success) {
+            RecordBuildError(&report->diagnostics, Layer::Compile,
+                             DiagnosticCode::SpecGateUnmatched, info.name, "",
+                             static_cast<int>(variant.ordinal), static_cast<int>(variant.ordinal),
+                             "the closed gates' stub form failed to compile: " + stubResult.error);
+            continue;
+          }
+          for (const auto& gate : unvalidatedGates) {
+            gatesStubValidated.insert(gate.name);
+          }
+        }
+      }
+      shaderReport.compiledCount++;
       for (auto& emitterEntry : emitters) {
         if (!PermutationCompilesForBackend(static_cast<uint16_t>(familyIndex), variant.ordinal,
                                            emitterEntry.first)) {
@@ -404,6 +453,8 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         input.fragDefines = &fragDefines;
         input.vertSpirv = &vertResult.spirv;
         input.fragStage = &fragResult;
+        input.fragGates = &supportedGates;
+        input.fragSpecEntries = &specEntries;
         input.diagnostics = &report->diagnostics;
         auto stages = emitterEntry.second->emit(input, compiler);
         if (!stages) {

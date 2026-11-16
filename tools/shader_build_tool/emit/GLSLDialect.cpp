@@ -22,6 +22,7 @@
 #include <cstring>
 #include <iostream>
 #include <regex>
+#include "gpu/shaders/contract/SpecContract.h"
 
 namespace tgfx {
 
@@ -433,6 +434,13 @@ std::string EmitDirectGLSL330Impl(const std::string& source, ShaderStageType sta
 
 bool FoldIntegerExpression(const std::string& expr, int64_t* value) {
   return IntegerExpressionParser::Evaluate(expr, value);
+}
+
+TextGateResult ApplyHlslSpecGates(const std::string& hlslText,
+                                  const std::vector<SpecGateInfo>& gates,
+                                  const std::vector<SpecEntry>& entries) {
+  return ApplyTextSpecGates(hlslText, gates, entries,
+                            GateDialect{SpecContract::HlslConstantPrefix, true});
 }
 
 std::string EmitDirectGLSL330(const std::string& source, ShaderStageType stage,

@@ -23,6 +23,7 @@
 #include <vector>
 #include "core/Diagnostics.h"
 #include "core/Types.h"
+#include "gpu/shaders/contract/SpecContract.h"
 
 namespace tgfx {
 
@@ -77,16 +78,43 @@ struct TextGateResult {
   std::string error;
 };
 
+/// The text dialect a gate pass emits for. The GLSL family's macros carry the TGFX_SPEC_ prefix
+/// and the text hangs its gate defines on the #version line; the HLSL SPIRV-Cross emits spells
+/// the constants SPIRV_CROSS_CONSTANT_ID_<id>, has no version line, and uses the HLSL scalar and
+/// vector types in signatures and stubs.
+struct GateDialect {
+  /// The runtime-injectable constant macro prefix (SpecContract::ConstantPrefix or
+  /// HlslConstantPrefix); the master switch is this prefix plus "0".
+  const char* constantPrefix = SpecContract::ConstantPrefix;
+  /// Whether the signatures and stubs use the HLSL types (float4) instead of the GLSL ones (vec4).
+  bool hlsl = false;
+};
+
+/// Collects the `#pragma tgfx_spec_gate <NAME> : <expr>` declarations from one expanded fragment
+/// source. The gated function's name is the identifier ending at the first '(' after the pragma
+/// line, parsed here because the pragma itself does not survive preprocessing. A pragma not
+/// followed by a function definition reports spec.gate-unmatched; a name declared twice keeps its
+/// first entry; a comment cannot declare a gate.
+std::vector<SpecGateInfo> ScanGatePragmas(const std::string& fragmentSource,
+                                          const std::string& shaderName, Diagnostics* diagnostics);
+
+/// Whether this variant's spec table can evaluate the gate's condition: every SPEC_<field>() the
+/// expression reads must be a scalar entry, because an ivec4 array element cannot appear in a
+/// preprocessor condition. A gate that cannot be evaluated is dropped by the caller, so its body
+/// stays in every form — ungated, never cut.
+bool GateEvaluatable(const SpecGateInfo& gate, const std::vector<SpecEntry>& entries);
+
 /// Rewrites a preprocessed fragment text so each declared gate becomes a preprocessor
-/// conditional: a `#define TGFX_GATE_<name> (TGFX_SPEC_0 == 0 || (<cond>))` header line after
-/// #version, and the gated function's body wrapped as `#if TGFX_GATE_<name> <body> #else <stub>
-/// #endif`. The runtime then removes whole code regions by defining the value macros before the
-/// driver's preprocessor runs. A gate whose pragma is absent (the variant pruned the file) is
-/// skipped, not an error. The stub keeps the signature and returns the type's zero value, so
-/// callers stay valid and the closed branch folds away.
+/// conditional: a `#define TGFX_GATE_<name> (<master switch> == 0 || (<cond>))` header line after
+/// #version (at the top for a dialect without one), and the gated function's body wrapped as
+/// `#if TGFX_GATE_<name> <body> #else <stub> #endif`. The runtime then removes whole code regions
+/// by defining the value macros before the driver's preprocessor runs. A gate whose function is
+/// absent (the variant pruned the file) is skipped, not an error. The stub keeps the signature and
+/// returns the type's zero value, so callers stay valid and the closed branch folds away.
 TextGateResult ApplyTextSpecGates(const std::string& preprocessedText,
                                   const std::vector<SpecGateInfo>& gates,
-                                  const std::vector<SpecEntry>& entries);
+                                  const std::vector<SpecEntry>& entries,
+                                  const GateDialect& dialect = {});
 
 /// Replaces every gated function's body with the generated stub, in the 450 source form both
 /// real dialects derive from. The build compiles the result once per family, so a stub that

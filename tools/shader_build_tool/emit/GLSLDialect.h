@@ -46,6 +46,15 @@ std::string EmitDirectGLSLES300(const std::string& source, ShaderStageType stage
                                 const std::vector<SpecGateInfo>* gates,
                                 const std::vector<SpecEntry>* entries, std::string* error);
 
+/// Applies the family's text gates to a translated HLSL fragment: the SPIRV-Cross HLSL spells
+/// the runtime-injectable constants SPIRV_CROSS_CONSTANT_ID_<id> and opens with includes instead
+/// of a version line, so the wrapper uses that prefix and hangs its defines at the top. Defined
+/// with the other text-dialect gate plumbing so the profile emitters stay dependent on the
+/// dialect helpers alone.
+TextGateResult ApplyHlslSpecGates(const std::string& hlslText,
+                                  const std::vector<SpecGateInfo>& gates,
+                                  const std::vector<SpecEntry>& entries);
+
 /// Evaluates an integer constant expression of a layout id after preprocessing: decimal
 /// literals, unary +/-, binary + - *, and parentheses. Returns false on any other form (an
 /// identifier included, and a literal beyond the int64 range), so the caller keeps the original
