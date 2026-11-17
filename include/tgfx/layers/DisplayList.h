@@ -405,9 +405,10 @@ class DisplayList {
                      bool autoClear, BackgroundSnapshotMap* snapshots) const;
 
   /**
-   * Collects the world-space rect each visible background style actually samples, so a capture can
-   * cull layers that only touch the tile but lie under no background style. The walk visits only the
-   * subtrees that hold a style, bounded by `worldBounds`, the area being captured.
+   * Collects the world-space rect each visible background style may sample, its render bounds
+   * widened by its blur reach, so a capture can cull layers that only touch the tile but lie under
+   * no background style. The walk visits only the subtrees that hold a style, bounded by
+   * `worldBounds`, the area being captured.
    *
    * An empty result only means the capture cannot be culled: no background style samples inside
    * `worldBounds`, so there is nothing to narrow the draw to.

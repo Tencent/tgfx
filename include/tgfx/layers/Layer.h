@@ -719,10 +719,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasBackgroundStyle();
 
-  /**
-   * Returns true when this layer itself owns a style that samples the backdrop. Unlike
-   * hasBackgroundStyle(), which also counts the descendants, this answers for the layer alone.
-   */
   bool hasOwnBackgroundStyle() const;
 
   bool hasDescendantBackgroundStyle();

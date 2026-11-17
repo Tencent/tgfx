@@ -2337,7 +2337,8 @@ void Layer::propagateLayerState() {
 
 bool Layer::hasOwnBackgroundStyle() const {
   for (const auto& style : _layerStyles) {
-    if (style != nullptr && NeedsBackgroundSource(style->extraSourceType())) {
+    DEBUG_ASSERT(style != nullptr);
+    if (NeedsBackgroundSource(style->extraSourceType())) {
       return true;
     }
   }

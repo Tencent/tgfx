@@ -1234,8 +1234,8 @@ void DisplayList::mergeCullRects(std::vector<Rect>* rects) {
 
 // Builds the list a capture culls its draw against. Merging only pays for a small list, and when too
 // many groups stay apart, bounding them per captured rect keeps every rect inside the rect it came
-// from: the capture then never draws more than it would without culling, and still drops the rects
-// no style reaches.
+// from and still drops the rects no style reaches. Only when even that exceeds the budget, or covers
+// more than the union does, the union is used, which may also span the gaps between captured rects.
 std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprints,
                                               const std::vector<Rect>& captureRects) {
   auto narrowed = narrowCullRects(footprints, captureRects);
@@ -1321,9 +1321,9 @@ std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprin
   return narrowed;
 }
 
-// Walks only the subtrees that hold a background style, and stops at the first layer whose bounds
-// cover everything below it: a style reads the recording under its own bounds, and renderBounds folds
-// the descendants in.
+// Walks only the subtrees that hold a background style, and stops at the first layer whose footprint
+// covers everything below it: renderBounds folds the descendants in, and maxBackgroundOutset is the
+// largest reach among this layer and its descendants.
 void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds,
                                               std::vector<Rect>* footprints) {
   if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
@@ -1331,7 +1331,11 @@ void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bo
     return;
   }
   if (layer->hasOwnBackgroundStyle()) {
-    footprints->push_back(layer->renderBounds);
+    // renderBounds is cut by a scrollRect or a mask, but the style blurs the backdrop of its whole
+    // content, so a pixel next to the cut still reads up to the blur reach beyond it.
+    auto footprint = layer->renderBounds;
+    footprint.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
+    footprints->push_back(footprint);
     return;
   }
   for (const auto& child : layer->_children) {
