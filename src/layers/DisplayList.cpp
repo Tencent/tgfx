@@ -1322,30 +1322,34 @@ std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprin
 }
 
 // Walks only the subtrees that hold a background style, and stops at the first layer whose footprint
-// covers everything below it: renderBounds folds the descendants in, and maxBackgroundOutset is the
-// largest reach among this layer and its descendants.
-void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds,
+// covers everything below it: renderBounds folds the descendants in. `clipped` tells whether an
+// ancestor cuts the render bounds with a scrollRect or a mask.
+void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds, bool clipped,
                                               std::vector<Rect>* footprints) {
   if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
       !Rect::Intersects(bounds, layer->renderBounds)) {
     return;
   }
+  clipped = clipped || layer->_scrollRect != nullptr || layer->hasValidMask();
   if (layer->hasOwnBackgroundStyle()) {
-    // renderBounds is cut by a scrollRect or a mask, but the style blurs the backdrop of its whole
-    // content, so a pixel next to the cut still reads up to the blur reach beyond it.
+    // A style blurs the backdrop of its whole content, so it samples nothing outside its bounds
+    // unless a scrollRect or a mask cut them: a pixel next to the cut still reads up to the blur
+    // reach beyond it.
     auto footprint = layer->renderBounds;
-    footprint.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
+    if (clipped) {
+      footprint.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
+    }
     footprints->push_back(footprint);
     return;
   }
   for (const auto& child : layer->_children) {
-    collectBackgroundFootprints(child.get(), bounds, footprints);
+    collectBackgroundFootprints(child.get(), bounds, clipped, footprints);
   }
 }
 
 std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds) const {
   std::vector<Rect> footprints = {};
-  collectBackgroundFootprints(_root.get(), worldBounds, &footprints);
+  collectBackgroundFootprints(_root.get(), worldBounds, false, &footprints);
   return footprints;
 }
 

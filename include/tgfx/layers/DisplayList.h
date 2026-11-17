@@ -405,17 +405,18 @@ class DisplayList {
                      bool autoClear, BackgroundSnapshotMap* snapshots) const;
 
   /**
-   * Collects the world-space rect each visible background style may sample, its render bounds
-   * widened by its blur reach, so a capture can cull layers that only touch the tile but lie under
-   * no background style. The walk visits only the subtrees that hold a style, bounded by
-   * `worldBounds`, the area being captured.
+   * Collects the world-space rect each visible background style may sample, so a capture can cull
+   * layers that only touch the tile but lie under no background style. A footprint is the style's
+   * render bounds, widened by its blur reach only when a scrollRect or a mask cut those bounds. The
+   * walk visits only the subtrees that hold a style, bounded by `worldBounds`, the area being
+   * captured.
    *
    * An empty result only means the capture cannot be culled: no background style samples inside
    * `worldBounds`, so there is nothing to narrow the draw to.
    */
   std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
 
-  static void collectBackgroundFootprints(const Layer* layer, const Rect& bounds,
+  static void collectBackgroundFootprints(const Layer* layer, const Rect& bounds, bool clipped,
                                           std::vector<Rect>* footprints);
 
   static std::vector<Rect> narrowCullRects(const std::vector<Rect>& footprints,
