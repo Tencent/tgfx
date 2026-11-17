@@ -719,6 +719,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasBackgroundStyle();
 
+  /**
+   * Returns true when this layer itself owns a style that samples the backdrop. Unlike
+   * hasBackgroundStyle(), which also counts the descendants, this answers for the layer alone.
+   */
+  bool hasOwnBackgroundStyle() const;
+
   bool hasDescendantBackgroundStyle();
 
   std::shared_ptr<BackgroundSource> createBackgroundSource(
@@ -788,12 +794,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   // down-sampling when the outset exceeds the single-pass blur budget.
   float maxBackgroundOutset = 0.f;
   float minBackgroundOutset = std::numeric_limits<float>::max();
-
-  // World-space areas this subtree needs the capture to draw: the bounds of each background style
-  // (its descendants add nothing inside it), and the bounds of a subtree that keeps its own 3D
-  // context. Aggregated bottom-up by updateRenderBounds, so a clean subtree keeps the value a previous
-  // frame computed and no walk is needed when nothing changed.
-  std::vector<Rect> backgroundFootprints = {};
 
   friend class RootLayer;
   friend class DisplayList;

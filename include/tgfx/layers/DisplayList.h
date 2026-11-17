@@ -406,14 +406,16 @@ class DisplayList {
 
   /**
    * Collects the world-space rect each visible background style actually samples, so a capture can
-   * cull layers that only touch the tile but lie under no background style. The rects are the ones
-   * `Layer::updateRenderBounds` aggregates over the tree, filtered down to the ones that intersect
-   * `worldBounds`, the area being captured.
+   * cull layers that only touch the tile but lie under no background style. The walk visits only the
+   * subtrees that hold a style, bounded by `worldBounds`, the area being captured.
    *
    * An empty result only means the capture cannot be culled: no background style samples inside
    * `worldBounds`, so there is nothing to narrow the draw to.
    */
   std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
+
+  static void collectBackgroundFootprints(const Layer* layer, const Rect& bounds,
+                                          std::vector<Rect>* footprints);
 
   static std::vector<Rect> narrowCullRects(const std::vector<Rect>& footprints,
                                            const std::vector<Rect>& captureRects);

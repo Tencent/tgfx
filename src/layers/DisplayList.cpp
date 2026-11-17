@@ -1298,14 +1298,27 @@ std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprin
   return narrowed;
 }
 
+// Walks only the subtrees that hold a background style, and stops at the first layer whose bounds
+// cover everything below it: a style reads the recording under its own bounds, and renderBounds folds
+// the descendants in.
+void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds,
+                                              std::vector<Rect>* footprints) {
+  if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
+      !Rect::Intersects(bounds, layer->renderBounds)) {
+    return;
+  }
+  if (layer->hasOwnBackgroundStyle()) {
+    footprints->push_back(layer->renderBounds);
+    return;
+  }
+  for (const auto& child : layer->_children) {
+    collectBackgroundFootprints(child.get(), bounds, footprints);
+  }
+}
+
 std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds) const {
   std::vector<Rect> footprints = {};
-  footprints.reserve(_root->backgroundFootprints.size());
-  for (const auto& footprint : _root->backgroundFootprints) {
-    if (Rect::Intersects(footprint, worldBounds)) {
-      footprints.push_back(footprint);
-    }
-  }
+  collectBackgroundFootprints(_root.get(), worldBounds, &footprints);
   return footprints;
 }
 

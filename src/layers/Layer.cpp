@@ -2186,7 +2186,6 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   } else {
     renderBounds.setEmpty();
   }
-  std::vector<std::vector<Rect>*> childFootprints = {};
   for (auto& child : _children) {
     if (!child->bitFields.visible || child->_alpha <= 0) {
       if (child->bitFields.dirtyTransform) {
@@ -2232,7 +2231,6 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     child->bitFields.dirtyTransform = false;
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);
-      childFootprints.push_back(&child->backgroundFootprints);
     }
   }
   auto backOutset = 0.f;
@@ -2280,26 +2278,6 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver) ||
       (content && content->hasBlendMode())) {
     bitFields.hasBlendMode = true;
-  }
-  backgroundFootprints.clear();
-  auto hasBackgroundStyle = false;
-  for (auto& style : _layerStyles) {
-    if (style != nullptr && NeedsBackgroundSource(style->extraSourceType())) {
-      hasBackgroundStyle = true;
-      break;
-    }
-  }
-  for (auto* childFootprints : childFootprints) {
-    backgroundFootprints.insert(backgroundFootprints.end(), childFootprints->begin(),
-                                childFootprints->end());
-  }
-  // A background style reads only the recording under its own bounds, so its descendants add nothing
-  // to it: the subtree's whole list collapses into this layer's bounds.
-  if (hasBackgroundStyle) {
-    backgroundFootprints.clear();
-    if (!renderBounds.isEmpty()) {
-      backgroundFootprints.push_back(renderBounds);
-    }
   }
   propagateLayerState();
   bitFields.dirtyDescendents = false;
@@ -2355,6 +2333,15 @@ void Layer::propagateLayerState() {
     }
     layer = layer->_parent;
   }
+}
+
+bool Layer::hasOwnBackgroundStyle() const {
+  for (const auto& style : _layerStyles) {
+    if (style != nullptr && NeedsBackgroundSource(style->extraSourceType())) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool Layer::hasBackgroundStyle() {

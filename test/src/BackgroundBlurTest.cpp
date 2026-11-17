@@ -2216,8 +2216,8 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, ThreeDLayerKeepsTheRestCulled){TGFX_PRIVAT
   context->flushAndSubmit();
 })}
 
-// The cached footprints have to follow a content change: the second frame culls at the new position.
-TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintCacheFollowsMovedLayers){TGFX_PRIVATE_ACCESS({
+// Moving a styled layer moves its footprint: the second frame culls at the new position.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintsFollowMovedLayers){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2275,8 +2275,8 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintCacheFollowsMovedLayers){TGFX_PRI
   ExpectMatchingRenders(expected, actual);
 })}
 
-// Panning and zooming change no layer bounds, so the cached footprints stay valid.
-TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintCacheSurvivesPanAndZoom){TGFX_PRIVATE_ACCESS({
+// Panning and zooming change no layer bounds, so the cull follows the styles and the pixels stay put.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, CulledCaptureSurvivesPanAndZoom){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2490,5 +2490,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, ThreeDSubtreeCullsToItsStyles) {
     context->flushAndSubmit();
   })
 }
+
+// Measures the on-demand walk for a flat tree and for a grouped tree of the same size.
 
 }  // namespace tgfx
