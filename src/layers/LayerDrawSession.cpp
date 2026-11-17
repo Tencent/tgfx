@@ -272,9 +272,6 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
       session->canvasCaptureCullRect =
           request.canvasRooted ? session->canvasRenderRect : request.canvasDrawBounds;
     }
-    auto deviceBounds = request.canvasMatrix.mapRect(request.canvasDrawBounds);
-    deviceBounds.roundOut();
-    session->outputPixelBounds = ToPixelRect(deviceBounds);
     return session;
   }
 
@@ -413,12 +410,9 @@ RegionPlanResult LayerDrawSession::planCanvasRegion(DrawControl* control) const 
     return result;
   }
   result.code = RegionPlanCode::Ready;
-  result.region.coreRect = outputPixelBounds;
-  result.region.renderRect = outputPixelBounds;
   if (needsBackground) {
     auto dependencies = std::make_shared<RegionDependencyPlan>();
     dependencies->needsBackground = true;
-    dependencies->captureRect = ToPixelRect(canvasBackgroundDrawRect);
     result.region.dependencies = std::move(dependencies);
   }
   return result;

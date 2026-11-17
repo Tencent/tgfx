@@ -259,7 +259,8 @@ class LayerDrawSession {
                                                    DrawControl* control);
 
   // Derives the surface window and background dependency of one core region. It only describes
-  // CPU geometry and never allocates GPU pixels.
+  // CPU geometry and never allocates GPU pixels. CanvasDefault only returns a background-needed
+  // marker; its original floating-point canvas state remains authoritative.
   RegionPlanResult planRegion(const PixelRect& core, const LayerDrawLimits& limits,
                               DrawControl* control) const;
 

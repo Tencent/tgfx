@@ -279,6 +279,66 @@ TGFX_TEST(LayerImageReaderTest, TiledMatchesSingleSurface) {
   }
 }
 
+TGFX_TEST(LayerImageReaderTest, CanvasDefaultKeepsLargePictureCoordinates) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto content = SolidLayer::Make();
+  content->setColor(Color::Red());
+  content->setWidth(10);
+  content->setHeight(10);
+  constexpr float LargeScale = 1073741824.0f;
+  PictureRecorder recorder = {};
+  auto recording = recorder.beginRecording();
+  recording->scale(LargeScale, LargeScale);
+  content->draw(recording);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+  EXPECT_EQ(picture->getBounds(), Rect::MakeWH(10.0f * LargeScale, 10.0f * LargeScale));
+  auto surface = Surface::Make(context, 10, 10, false, 1, false, 0, ColorSpace::SRGB());
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->scale(1.0f / LargeScale, 1.0f / LargeScale);
+  canvas->drawPicture(picture);
+  auto info = OutputInfo(10, 10);
+  std::vector<uint8_t> pixels(info.byteSize());
+  ASSERT_TRUE(surface->readPixels(info, pixels.data()));
+  auto offset = static_cast<size_t>(5) * info.rowBytes() + 5 * 4;
+  EXPECT_EQ(pixels[offset], 255);
+  EXPECT_EQ(pixels[offset + 1], 0);
+  EXPECT_EQ(pixels[offset + 2], 0);
+  EXPECT_EQ(pixels[offset + 3], 255);
+}
+
+TGFX_TEST(LayerImageReaderTest, CanvasDefaultPlanningUsesFloatingPointState) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto content = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeWH(10, 10));
+  content->setPath(path);
+  content->setFillStyle(ShapeStyle::Make(Color::White()));
+  content->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
+  for (auto scale : {2.0f, 1073741824.0f}) {
+    LayerDrawRequest request = {};
+    request.target = content.get();
+    request.captureRoot = content.get();
+    request.context = context;
+    request.canvasMatrix = Matrix::MakeScale(scale);
+    request.canvasDrawBounds = Rect::MakeWH(10, 10);
+    auto session = LayerDrawSession::Prepare(context, request, nullptr);
+    ASSERT_TRUE(session != nullptr);
+    auto result = session->planRegion(PixelRect(), LayerDrawLimits(), nullptr);
+    ASSERT_EQ(result.code, RegionPlanCode::Ready);
+    EXPECT_TRUE(result.region.coreRect.isEmpty());
+    EXPECT_TRUE(result.region.renderRect.isEmpty());
+    ASSERT_TRUE(result.region.dependencies != nullptr);
+    EXPECT_TRUE(result.region.dependencies->needsBackground);
+    EXPECT_TRUE(result.region.dependencies->captureRect.isEmpty());
+  }
+}
+
 TGFX_TEST(LayerImageReaderTest, CanvasDrawMatchesDisplayList) {
   ContextScope scope;
   auto context = scope.getContext();
