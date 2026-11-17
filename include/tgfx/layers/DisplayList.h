@@ -406,20 +406,15 @@ class DisplayList {
 
   /**
    * Collects the world-space rect each visible background style actually samples, so a capture can
-   * cull layers that only touch the tile but lie under no background style. `worldBounds` limits
-   * the walk to the area being captured.
+   * cull layers that only touch the tile but lie under no background style. The rects are the ones
+   * `Layer::updateRenderBounds` aggregates over the tree, filtered down to the ones that intersect
+   * `worldBounds`, the area being captured.
    *
-   * Reads `renderBounds` and `maxBackgroundOutset`, so it must run after the tree updated its
-   * render bounds, which `DisplayList::render` does before rendering. Subtree roots that keep their
-   * own 3D context cannot be culled, so their bounds join the list as an area that must be captured.
    * An empty result only means the capture cannot be culled: either no background style samples
    * inside `worldBounds`, or a subtree has a non-affine 3D matrix, whose covered area 2D bounds
    * cannot describe.
    */
   std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
-
-  static bool collectBackgroundFootprints(const Layer* layer, const Rect& bounds,
-                                          std::vector<Rect>* footprints, bool collect);
 
   static std::vector<Rect> narrowCullRects(const std::vector<Rect>& footprints,
                                            const std::vector<Rect>& captureRects);

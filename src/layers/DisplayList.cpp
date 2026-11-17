@@ -1206,43 +1206,32 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
 }
 
 // Merges the rects that overlap or touch, so many styles sitting next to each other do not multiply
-// the per-layer cull loop. A capture can produce footprints x tiles rects, so the pairwise join
-// only runs for a small list; a longer one collapses into its bounding rect, which may cover the
-// gaps between scattered tiles but never more than the captured area.
+// the per-layer cull loop. Every join restarts the scan and a scan is O(n^2), so the loop is O(n^3)
+// in the worst case: the callers size the list before calling.
 void DisplayList::mergeCullRects(std::vector<Rect>* rects) {
-  if (rects->size() < 2) {
-    return;
-  }
-  // Every join restarts the scan, and a scan is O(n^2), so the loop is O(n^3) in the worst case.
-  // Only a list close to the budget is worth that: anything longer collapses into one rect below.
-  if (rects->size() <= 4 * MAX_CULL_RECTS) {
-    bool merged = true;
-    while (merged) {
-      merged = false;
-      for (size_t i = 0; i < rects->size() && !merged; ++i) {
-        for (size_t j = i + 1; j < rects->size(); ++j) {
-          auto& current = (*rects)[i];
-          const auto& other = (*rects)[j];
-          auto joined = current;
-          joined.join(other);
-          // Only merge when the join adds no area of its own, which covers both overlap and a shared
-          // edge but leaves a real gap alone.
-          auto joinedArea = joined.width() * joined.height();
-          if (joinedArea <= current.width() * current.height() + other.width() * other.height()) {
-            current = joined;
-            rects->erase(rects->begin() + static_cast<long>(j));
-            merged = true;
-            break;
-          }
+  bool merged = true;
+  while (merged) {
+    merged = false;
+    for (size_t i = 0; i < rects->size() && !merged; ++i) {
+      for (size_t j = i + 1; j < rects->size(); ++j) {
+        auto& current = (*rects)[i];
+        const auto& other = (*rects)[j];
+        auto joined = current;
+        joined.join(other);
+        // Only merge when the join adds no area of its own, which covers both overlap and a shared
+        // edge but leaves a real gap alone.
+        auto joinedArea = joined.width() * joined.height();
+        if (joinedArea <= current.width() * current.height() + other.width() * other.height()) {
+          current = joined;
+          rects->erase(rects->begin() + static_cast<long>(j));
+          merged = true;
+          break;
         }
       }
     }
   }
 }
 
-// Intersects each footprint with each captured rect instead of with their union, so the narrowed
-// cull never covers more than the capture would have drawn without the footprints. Footprints that
-// overlap no captured rect are dropped.
 // Builds the list a capture culls its draw against. Merging only pays for a small list, and when too
 // many groups stay apart, bounding them per captured rect keeps every rect inside the rect it came
 // from: the capture then never draws more than it would without culling, and still drops the rects
@@ -1277,7 +1266,7 @@ std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprint
     }
   }
   // A frame that repaints more captured rects than the per-layer loop can afford has no list to
-  // give: bounding them per rect would already exceed the budget, so this frame draws everything.
+  // give: bounding them per rect would already exceed the budget, so it falls back to the union.
   if (perCapture.size() > MAX_CULL_RECTS) {
     return {unionRect};
   }
@@ -1291,6 +1280,9 @@ std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprint
   return {unionRect};
 }
 
+// Intersects each footprint with each captured rect instead of with their union, so the narrowed
+// cull never covers more than the capture would have drawn without the footprints. Footprints that
+// overlap no captured rect are dropped.
 std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprints,
                                                const std::vector<Rect>& captureRects) {
   std::vector<Rect> narrowed = {};
@@ -1304,55 +1296,6 @@ std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprin
     }
   }
   return narrowed;
-}
-
-// Adds the world rect each visible background style samples. Returns false when the subtree cannot
-// bound what its styles sample, so the caller keeps the whole tile instead.
-bool DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds,
-                                              std::vector<Rect>* footprints, bool collect) {
-  if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
-      !Rect::Intersects(bounds, layer->renderBounds)) {
-    return true;
-  }
-  // A non-affine 3D matrix leaves renderBounds without a usable extent for what the layer draws, so
-  // the walk cannot bound it and the caller keeps the whole captured area.
-  if (!layer->bitFields.matrix3DIsAffine) {
-    return false;
-  }
-  bool pushed = false;
-  if (collect) {
-    // A layer that keeps its own 3D context is composited through the BSP, so its subtree cannot be
-    // culled. Its render bounds still bound what it draws, so they join the list as an area that
-    // must be captured: everything under them stays drawn, and the rest of the capture keeps its
-    // culling.
-    if (layer->canPreserve3D()) {
-      footprints->push_back(layer->renderBounds);
-      pushed = true;
-    }
-    for (const auto& style : layer->_layerStyles) {
-      if (pushed) {
-        break;
-      }
-      if (style == nullptr || (style->extraSourceType() &
-                               static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
-        continue;
-      }
-      // The background image a style reads is cropped to the recording it resolves, so nothing
-      // outside this layer's own bounds can reach it: no blur reach is added here. A child's own
-      // footprint stays inside this one because renderBounds folds the children in.
-      footprints->push_back(layer->renderBounds);
-      pushed = true;
-      break;
-    }
-  }
-  // The descendants of a layer that pushed its own footprint are covered by it, so only the safety
-  // checks below still have to walk them.
-  for (const auto& child : layer->_children) {
-    if (!collectBackgroundFootprints(child.get(), bounds, footprints, collect && !pushed)) {
-      return false;
-    }
-  }
-  return true;
 }
 
 std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds) const {
