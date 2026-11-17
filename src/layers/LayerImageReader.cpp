@@ -197,7 +197,8 @@ bool LayerImageReader::Impl::validateDestination(const Pixmap& destination,
     return false;
   }
   if (info.width() != bandInfo.width() || info.colorType() != bandInfo.colorType() ||
-      info.alphaType() != bandInfo.alphaType() || info.colorSpace() != bandInfo.colorSpace()) {
+      info.alphaType() != bandInfo.alphaType() ||
+      !ColorSpace::Equals(info.colorSpace().get(), bandInfo.colorSpace().get())) {
     return false;
   }
   if (requiredRows <= 0 || info.height() < requiredRows) {

@@ -562,6 +562,41 @@ TGFX_TEST(LayerImageReaderTest, BgraOutputSwapsChannels) {
   EXPECT_EQ(different, 0);
 }
 
+TGFX_TEST(LayerImageReaderTest, EquivalentColorSpacesAcceptIndependentInstances) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto root = Layer::Make();
+  auto customP3 = ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
+  ASSERT_TRUE(customP3 != nullptr);
+  for (const auto& outputColorSpace : {ColorSpace::DisplayP3(), customP3}) {
+    auto destinationColorSpace =
+        ColorSpace::MakeRGB(NamedTransferFunction::SRGB, NamedGamut::DisplayP3);
+    ASSERT_TRUE(destinationColorSpace != nullptr);
+    ASSERT_NE(outputColorSpace.get(), destinationColorSpace.get());
+    ASSERT_TRUE(ColorSpace::Equals(outputColorSpace.get(), destinationColorSpace.get()));
+    LayerImageRequest request = {};
+    request.target = root;
+    request.sceneRoot = root;
+    request.outputSize = {8, 4};
+    request.outputColorSpace = outputColorSpace;
+    LayerImageReadOptions options = {};
+    options.bandRows = 4;
+    auto reader = LayerImageReader::Make(context, request, options);
+    ASSERT_TRUE(reader != nullptr);
+    auto info = reader->bandInfo().makeColorSpace(destinationColorSpace);
+    std::vector<uint8_t> pixels(info.byteSize(), 0x7f);
+    auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
+    ASSERT_EQ(result.code, LayerImageReadCode::BandReady);
+    EXPECT_EQ(result.firstRow, 0);
+    EXPECT_EQ(result.rowCount, 4);
+    EXPECT_TRUE(result.lastBand);
+    EXPECT_EQ(reader->rowsRead(), 4);
+    EXPECT_TRUE(reader->isDone());
+    EXPECT_EQ(pixels, std::vector<uint8_t>(pixels.size(), 0));
+  }
+}
+
 TGFX_TEST(LayerImageReaderTest, TileSizeDoesNotChangePixels) {
   ContextScope scope;
   auto context = scope.getContext();
