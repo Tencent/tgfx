@@ -1241,18 +1241,57 @@ void DisplayList::mergeCullRects(std::vector<Rect>* rects) {
       }
     }
   }
-  if (rects->size() > MAX_CULL_RECTS) {
-    auto unionRect = Rect::MakeEmpty();
-    for (const auto& rect : *rects) {
-      unionRect.join(rect);
-    }
-    rects->assign(1, unionRect);
-  }
 }
 
 // Intersects each footprint with each captured rect instead of with their union, so the narrowed
 // cull never covers more than the capture would have drawn without the footprints. Footprints that
 // overlap no captured rect are dropped.
+// Builds the list a capture culls its draw against. Merging only pays for a small list, and when too
+// many groups stay apart, bounding them per captured rect keeps every rect inside the rect it came
+// from: the capture then never draws more than it would without culling, and still drops the rects
+// no style reaches.
+std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprints,
+                                              const std::vector<Rect>& captureRects) {
+  auto narrowed = narrowCullRects(footprints, captureRects);
+  if (narrowed.empty()) {
+    return {};
+  }
+  if (narrowed.size() <= 4 * MAX_CULL_RECTS) {
+    mergeCullRects(&narrowed);
+    if (narrowed.size() <= MAX_CULL_RECTS) {
+      return narrowed;
+    }
+  }
+  auto unionRect = Rect::MakeEmpty();
+  for (const auto& rect : narrowed) {
+    unionRect.join(rect);
+  }
+  auto perCapture = std::vector<Rect>{};
+  perCapture.reserve(captureRects.size());
+  for (const auto& captureRect : captureRects) {
+    auto bounds = Rect::MakeEmpty();
+    for (const auto& rect : narrowed) {
+      if (Rect::Intersects(rect, captureRect)) {
+        bounds.join(rect);
+      }
+    }
+    if (!bounds.isEmpty()) {
+      perCapture.push_back(bounds);
+    }
+  }
+  if (perCapture.empty() || perCapture.size() > MAX_CULL_RECTS) {
+    return {unionRect};
+  }
+  auto perCaptureArea = 0.0f;
+  for (const auto& rect : perCapture) {
+    perCaptureArea += rect.width() * rect.height();
+  }
+  if (perCaptureArea <= unionRect.width() * unionRect.height()) {
+    return perCapture;
+  }
+  return {unionRect};
+}
+
 std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprints,
                                                const std::vector<Rect>& captureRects) {
   std::vector<Rect> narrowed = {};
@@ -1399,13 +1438,12 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   auto footprints =
       _captureCullingEnabled ? collectBackgroundFootprints(captureBounds) : std::vector<Rect>{};
   if (!footprints.empty()) {
-    auto narrowed = narrowCullRects(footprints, worldRects);
+    auto narrowed = buildCullRects(footprints, worldRects);
     // A footprint can still miss every captured rect, which happens when it only covers the gaps
     // between scattered tiles: nothing samples a backdrop there. Keeping the whole area then costs
     // the culling for this frame, which is the safe side: the capture may draw more, never
     // something else.
     if (!narrowed.empty()) {
-      mergeCullRects(&narrowed);
       cullWorldRects = std::move(narrowed);
       culled = true;
     }

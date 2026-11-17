@@ -433,6 +433,9 @@ class DisplayList {
 
   static void mergeCullRects(std::vector<Rect>* rects);
 
+  static std::vector<Rect> buildCullRects(const std::vector<Rect>& footprints,
+                                          const std::vector<Rect>& captureRects);
+
   /**
    * Captures the backdrop the background styles sample. `renderRects` are surface-space rects that
    * size the capture; the layers drawn are culled to the footprints those styles sample inside it.

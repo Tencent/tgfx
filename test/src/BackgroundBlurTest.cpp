@@ -1721,27 +1721,42 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, MergeCullRectsJoinsDenseFootprints){TGFX_P
   EXPECT_EQ(clustered[0], Rect::MakeXYWH(0.0f, 0.0f, 200.0f, 10.0f));
   EXPECT_EQ(clustered[1], Rect::MakeXYWH(0.0f, 100.0f, 200.0f, 10.0f));
 
-  // Scattered rects cannot be joined, so they collapse into their bounding rect rather than
-  // leaving the capture unculled.
+  // Scattered rects cannot be joined, and merging leaves them alone: bounding them is the job of
+  // buildCullRects, which keeps every rect inside the capture rect it came from.
   std::vector<Rect> scattered = {};
   for (int i = 0; i < 40; ++i) {
     scattered.push_back(
         Rect::MakeXYWH(static_cast<float>(i * 40), static_cast<float>(i * 40), 10.0f, 10.0f));
   }
   DisplayList::mergeCullRects(&scattered);
-  ASSERT_EQ(scattered.size(), 1u);
-  EXPECT_EQ(scattered[0], Rect::MakeXYWH(0.0f, 0.0f, 1570.0f, 1570.0f));
+  EXPECT_EQ(scattered.size(), 40u);
+})}
 
-  // Far above the merge cap the list collapses straight into its bounding rect, which keeps the
-  // cost linear in the number of rects a capture can produce (footprints x tiles).
-  std::vector<Rect> many = {};
-  for (int i = 0; i < 200; ++i) {
-    many.push_back(Rect::MakeXYWH(static_cast<float>(i % 20) * 100.0f,
-                                  static_cast<float>(i / 20) * 100.0f, 10.0f, 10.0f));
+// A list too long to merge is bounded per captured rect, so every cull rect stays inside its own
+// rect: the capture never draws more than it would without culling, and the rects no style reaches
+// are still dropped.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, BuildCullRectsBoundsEachCapture){TGFX_PRIVATE_ACCESS({
+  std::vector<Rect> captureRects = {};
+  for (int i = 0; i < 4; ++i) {
+    captureRects.push_back(Rect::MakeXYWH(static_cast<float>(i) * 200.0f, 0.0f, 200.0f, 200.0f));
   }
-  DisplayList::mergeCullRects(&many);
-  ASSERT_EQ(many.size(), 1u);
-  EXPECT_EQ(many[0], Rect::MakeXYWH(0.0f, 0.0f, 1910.0f, 910.0f));
+  std::vector<Rect> footprints = {};
+  for (int i = 0; i < 400; ++i) {
+    // Two small islands per capture rect, never touching each other.
+    auto column = static_cast<float>(i % 2) * 120.0f;
+    auto row = static_cast<float>((i / 2) % 10) * 20.0f;
+    auto capture = static_cast<float>((i / 20) % 4) * 200.0f;
+    footprints.push_back(Rect::MakeXYWH(capture + 20.0f + column, 20.0f + row, 8.0f, 8.0f));
+  }
+  auto cullRects = DisplayList::buildCullRects(footprints, captureRects);
+  ASSERT_EQ(cullRects.size(), 4u);
+  for (const auto& cullRect : cullRects) {
+    bool inside = false;
+    for (const auto& captureRect : captureRects) {
+      inside = inside || captureRect.contains(cullRect);
+    }
+    EXPECT_TRUE(inside);
+  }
 })}
 
 // A nested style adds no footprint of its own: the parent's bounds and outset already cover the
