@@ -2294,8 +2294,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
                                 childFootprints->end());
   }
   // A background style reads only the recording under its own bounds, so its descendants add nothing
-  // to it. A subtree that keeps its own 3D context cannot be culled when it samples a backdrop, and
-  // its bounds stand in for everything it draws.
+  // to it: the subtree's whole list collapses into this layer's bounds.
   if (hasBackgroundStyle) {
     backgroundFootprints.clear();
     if (!renderBounds.isEmpty()) {
