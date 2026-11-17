@@ -404,11 +404,10 @@ class DisplayList {
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear, BackgroundSnapshotMap* snapshots) const;
 
-  std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds, float pixelSize) const;
+  std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
 
-  static void collectBackgroundFootprints(const Layer* layer, const Rect& bounds, float margin,
-                                          bool clipped, bool covered,
-                                          std::vector<Rect>* footprints);
+  static void collectBackgroundFootprints(const Layer* layer, const Rect& bounds, bool clipped,
+                                          bool covered, std::vector<Rect>* footprints);
 
   static std::vector<Rect> narrowCullRects(const std::vector<Rect>& footprints,
                                            const std::vector<Rect>& captureRects);
@@ -419,7 +418,7 @@ class DisplayList {
                                           const std::vector<Rect>& captureRects);
 
   std::vector<Rect> computeCaptureCullRects(const std::vector<Rect>& worldRects,
-                                            float pixelSize) const;
+                                            const Matrix& pixelToWorld) const;
 
   /**
    * Captures the backdrop the background styles sample. `renderRects` are surface-space rects that

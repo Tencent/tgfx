@@ -39,9 +39,6 @@ static constexpr int FALLBACK_GRID_SIZE = 64;
 static constexpr int MAX_ATLAS_SIZE = 8192;
 // Number of rects the per-layer cull loop can afford.
 static constexpr size_t MAX_CULL_RECTS = 32;
-// Captured background pixels a style may read past its render bounds: one from rounding out the
-// captured background and one from rounding out the recording the style resolves.
-static constexpr float SAMPLE_ROUNDING_PIXELS = 2.0f;
 
 class DrawTask {
  public:
@@ -1283,12 +1280,28 @@ std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprint
   return {unionRect};
 }
 
+// A style reads the captured background over the recording it resolves, which is rounded out to its
+// own pixel grid and so may reach up to one captured pixel past the render bounds, and the copy is
+// then rounded out to the captured pixels. Widening a footprint by one captured pixel and rounding
+// it out to that grid covers both roundings and nothing more.
+static Rect RoundOutToCapturedPixels(const Rect& footprint, const Matrix& worldToPixel,
+                                     const Matrix& pixelToWorld) {
+  auto pixelRect = worldToPixel.mapRect(footprint);
+  pixelRect.outset(1.0f, 1.0f);
+  pixelRect.roundOut();
+  return pixelToWorld.mapRect(pixelRect);
+}
+
 // Returns the world rects the capture may cull its draw to, or an empty list when the whole captured
-// area has to be drawn. `worldRects` are the captured rects before the blur outset, and `pixelSize`
-// is the world size of one pixel of the captured background.
+// area has to be drawn. `worldRects` are the captured rects before the blur outset, and
+// `pixelToWorld` maps a pixel of the captured background to the world.
 std::vector<Rect> DisplayList::computeCaptureCullRects(const std::vector<Rect>& worldRects,
-                                                       float pixelSize) const {
+                                                       const Matrix& pixelToWorld) const {
   if (!_captureCullingEnabled) {
+    return {};
+  }
+  Matrix worldToPixel = Matrix::I();
+  if (!pixelToWorld.invert(&worldToPixel)) {
     return {};
   }
   auto outsetRects = worldRects;
@@ -1301,9 +1314,12 @@ std::vector<Rect> DisplayList::computeCaptureCullRects(const std::vector<Rect>& 
   }
   // An empty list means no style samples inside this capture, so there is nothing to narrow the draw
   // to, but the capture still runs: keeping the whole area only costs the culling for this frame.
-  auto footprints = collectBackgroundFootprints(captureBounds, pixelSize);
+  auto footprints = collectBackgroundFootprints(captureBounds);
   if (footprints.empty()) {
     return {};
+  }
+  for (auto& footprint : footprints) {
+    footprint = RoundOutToCapturedPixels(footprint, worldToPixel, pixelToWorld);
   }
   return buildCullRects(footprints, outsetRects);
 }
@@ -1333,9 +1349,8 @@ std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprin
 // and widening the footprint by that reach covers every style below it for good. `clipped` tells
 // whether this layer or an ancestor is cut, and `covered` whether a footprint above already covers
 // this layer.
-void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds, float margin,
-                                              bool clipped, bool covered,
-                                              std::vector<Rect>* footprints) {
+void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds, bool clipped,
+                                              bool covered, std::vector<Rect>* footprints) {
   if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
       !Rect::Intersects(bounds, layer->renderBounds)) {
     return;
@@ -1345,9 +1360,10 @@ void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bo
     covered = false;
   }
   if (!covered && layer->hasOwnBackgroundStyle()) {
-    auto outset = clipped ? margin + layer->maxBackgroundOutset : margin;
     auto footprint = layer->renderBounds;
-    footprint.outset(outset, outset);
+    if (clipped) {
+      footprint.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
+    }
     footprints->push_back(footprint);
     if (clipped) {
       return;
@@ -1355,17 +1371,13 @@ void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bo
     covered = true;
   }
   for (const auto& child : layer->_children) {
-    collectBackgroundFootprints(child.get(), bounds, margin, clipped, covered, footprints);
+    collectBackgroundFootprints(child.get(), bounds, clipped, covered, footprints);
   }
 }
 
-// The captured background is rounded out to its pixel grid, and so is the recording a style
-// resolves, so a style can read up to a pixel of each past its render bounds.
-std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds,
-                                                           float pixelSize) const {
+std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds) const {
   std::vector<Rect> footprints = {};
-  collectBackgroundFootprints(_root.get(), worldBounds, SAMPLE_ROUNDING_PIXELS * pixelSize, false,
-                              false, &footprints);
+  collectBackgroundFootprints(_root.get(), worldBounds, false, false, &footprints);
   return footprints;
 }
 
@@ -1420,8 +1432,7 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   // The layers to draw can be narrowed to the area the background styles sample, while the surface
   // still covers every render rect: keeping the captured area unchanged keeps the multi-pass
   // structure (and the style output sharing that depends on it) intact.
-  auto pixelSize = 1.0f / (viewMatrix.getMinScale() * bgSource->surfaceScale());
-  auto culledRects = computeCaptureCullRects(visibleRects, pixelSize);
+  auto culledRects = computeCaptureCullRects(visibleRects, bgSource->backgroundMatrix());
   auto cullWorldRects = worldRects;
   if (!culledRects.empty()) {
     cullWorldRects = std::move(culledRects);
