@@ -466,8 +466,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       captureRect.offset(_contentOffset.x, _contentOffset.y);
       captureRects.push_back(captureRect);
     }
-    // The capture culls the layers no background style samples, using the footprints it collects for
-    // the area it covers.
+    // The capture culls the layers no background style samples, using the footprints it collects
+    // for the area it covers.
     snapshotMap = captureBackgrounds(surface, captureRects);
   }
   std::vector<Rect> dirtyRects = {};
@@ -1218,8 +1218,9 @@ void DisplayList::mergeCullRects(std::vector<Rect>* rects) {
         const auto& other = (*rects)[j];
         auto joined = current;
         joined.join(other);
-        // Only merge when the join adds no area of its own, which covers both overlap and a shared
-        // edge but leaves a real gap alone.
+        // Merge when the bounding rect is no larger than the two areas combined: always true for a
+        // shared edge or containment, and for overlaps that are nearly aligned, while a real gap is
+        // left alone. The bounding rect may add a little area, which only draws a little more.
         auto joinedArea = joined.width() * joined.height();
         if (joinedArea <= current.width() * current.height() + other.width() * other.height()) {
           current = joined;
@@ -1232,10 +1233,11 @@ void DisplayList::mergeCullRects(std::vector<Rect>* rects) {
   }
 }
 
-// Builds the list a capture culls its draw against. Merging only pays for a small list, and when too
-// many groups stay apart, bounding them per captured rect keeps every rect inside the rect it came
-// from and still drops the rects no style reaches. Only when even that exceeds the budget, or covers
-// more than the union does, the union is used, which may also span the gaps between captured rects.
+// Builds the list a capture culls its draw against. Merging only pays for a small list, and when
+// too many groups stay apart, bounding them per captured rect keeps every rect inside its captured
+// rect and still drops the rects no style reaches. Only when even that exceeds the budget, or
+// covers more than the union does, the union is used, which may also span the gaps between captured
+// rects.
 std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprints,
                                               const std::vector<Rect>& captureRects) {
   auto narrowed = narrowCullRects(footprints, captureRects);
@@ -1256,9 +1258,13 @@ std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprint
   perCapture.reserve(captureRects.size());
   for (const auto& captureRect : captureRects) {
     auto bounds = Rect::MakeEmpty();
+    // Captured rects overlap once they are widened by the blur reach, so a piece narrowed to a
+    // neighbour may reach into this one. Clipping it first keeps the bounds inside this rect, and
+    // the neighbour still covers the piece in full.
     for (const auto& rect : narrowed) {
-      if (Rect::Intersects(rect, captureRect)) {
-        bounds.join(rect);
+      auto clipped = rect;
+      if (clipped.intersect(captureRect)) {
+        bounds.join(clipped);
       }
     }
     if (!bounds.isEmpty()) {
@@ -1280,12 +1286,12 @@ std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprint
   return {unionRect};
 }
 
-// A style reads the captured background under the recording it resolves. The recording measures
-// the same geometry the layer bounds do, but it is rounded out to the layer's own pixels, which are
-// no larger than the captured ones, and the copy is then rounded out to the captured pixels.
-// Widening a footprint by one captured pixel and rounding it out to that grid covers both roundings
-// and nothing more. A rotated layer's pixel spans a little more than that, but the copy is resampled
-// on the layer's grid, so the extra column only feeds the filtering tail.
+// A style reads the captured background under the recording it resolves. The recording measures the
+// same geometry the layer bounds do, but it is rounded out to the layer's own pixels, which are no
+// larger than the captured ones since both follow the capture canvas scale, and the copy is then
+// rounded out to the captured pixels. Widening a footprint by one captured pixel and rounding it
+// out to that grid covers both roundings. A rotated layer reads no farther: the style resamples the
+// copy on its own grid inside its content bounds.
 static Rect RoundOutToCapturedPixels(const Rect& footprint, const Matrix& worldToPixel,
                                      const Matrix& pixelToWorld) {
   auto pixelRect = worldToPixel.mapRect(footprint);
@@ -1294,9 +1300,9 @@ static Rect RoundOutToCapturedPixels(const Rect& footprint, const Matrix& worldT
   return pixelToWorld.mapRect(pixelRect);
 }
 
-// Returns the world rects the capture may cull its draw to, or an empty list when the whole captured
-// area has to be drawn. `worldRects` are the captured rects before the blur outset, and
-// `pixelToWorld` maps a pixel of the captured background to the world.
+// Returns the world rects the capture may cull its draw to, or an empty list when the whole
+// captured area has to be drawn. `worldRects` are the captured rects, already widened by the blur
+// reach, and `pixelToWorld` maps a pixel of the captured background to the world.
 std::vector<Rect> DisplayList::computeCaptureCullRects(const std::vector<Rect>& worldRects,
                                                        const Matrix& pixelToWorld) const {
   if (!_captureCullingEnabled) {
@@ -1306,16 +1312,13 @@ std::vector<Rect> DisplayList::computeCaptureCullRects(const std::vector<Rect>& 
   if (!pixelToWorld.invert(&worldToPixel)) {
     return {};
   }
-  auto outsetRects = worldRects;
-  for (auto& rect : outsetRects) {
-    rect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
-  }
   auto captureBounds = Rect::MakeEmpty();
-  for (const auto& rect : outsetRects) {
+  for (const auto& rect : worldRects) {
     captureBounds.join(rect);
   }
-  // An empty list means no style samples inside this capture, so there is nothing to narrow the draw
-  // to, but the capture still runs: keeping the whole area only costs the culling for this frame.
+  // An empty list means no style samples inside this capture, so there is nothing to narrow the
+  // draw to, but the capture still runs: keeping the whole area only costs the culling for this
+  // frame.
   auto footprints = collectBackgroundFootprints(captureBounds);
   if (footprints.empty()) {
     return {};
@@ -1323,7 +1326,7 @@ std::vector<Rect> DisplayList::computeCaptureCullRects(const std::vector<Rect>& 
   for (auto& footprint : footprints) {
     footprint = RoundOutToCapturedPixels(footprint, worldToPixel, pixelToWorld);
   }
-  return buildCullRects(footprints, outsetRects);
+  return buildCullRects(footprints, worldRects);
 }
 
 // Intersects each footprint with each captured rect instead of with their union, so the narrowed
@@ -1345,12 +1348,12 @@ std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprin
 }
 
 // Walks only the subtrees that hold a background style. A style blurs the backdrop of its whole
-// content, which its render bounds cover, so the footprint of a layer nothing cuts also covers every
-// style below it until a scrollRect or a mask cuts that subtree again. A cut layer still blurs the
-// backdrop of its whole content, so a pixel next to the cut reads up to the blur reach beyond it,
-// and widening the footprint by that reach covers every style below it for good. `clipped` tells
-// whether this layer or an ancestor is cut, and `covered` whether a footprint above already covers
-// this layer.
+// content, which its render bounds cover, so the footprint of a layer nothing cuts also covers
+// every style below it until a scrollRect or a mask cuts that subtree again. A cut layer still
+// blurs the backdrop of its whole content, so a pixel next to the cut reads up to the blur reach
+// beyond it, and widening the footprint by that reach covers every style below it for good.
+// `clipped` tells whether this layer or an ancestor is cut, and `covered` whether a footprint above
+// already covers this layer.
 void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds, bool clipped,
                                               bool covered, std::vector<Rect>* footprints) {
   if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
@@ -1434,7 +1437,7 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   // The layers to draw can be narrowed to the area the background styles sample, while the surface
   // still covers every render rect: keeping the captured area unchanged keeps the multi-pass
   // structure (and the style output sharing that depends on it) intact.
-  auto culledRects = computeCaptureCullRects(visibleRects, bgSource->backgroundMatrix());
+  auto culledRects = computeCaptureCullRects(worldRects, bgSource->backgroundMatrix());
   auto cullWorldRects = worldRects;
   if (!culledRects.empty()) {
     cullWorldRects = std::move(culledRects);

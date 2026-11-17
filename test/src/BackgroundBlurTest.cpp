@@ -1539,8 +1539,8 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CullFootprintsCoverTheSampledArea) {
     ASSERT_EQ(footprints3D.size(), 1u);
     EXPECT_EQ(footprints3D[0], blurred3D->renderBounds);
 
-    // Submitting flushes the render tasks these frames queued, so they do not leak into the next test
-    // through the shared drawing buffer.
+    // Submitting flushes the render tasks these frames queued, so they do not leak into the next
+    // test through the shared drawing buffer.
     context->flushAndSubmit();
   })
 }
@@ -1719,11 +1719,10 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullRectsStayInsideTheFootprints){T
   auto captureRect = Rect::MakeWH(200.0f, 200.0f);
   auto footprints = displayList->collectBackgroundFootprints(captureRect);
   ASSERT_EQ(footprints.size(), 1u);
-  auto cullRects = displayList->computeCaptureCullRects({captureRect}, Matrix::I());
-  ASSERT_EQ(cullRects.size(), 1u);
-
   auto captureWithOutset = captureRect;
   captureWithOutset.outset(rootOutset, rootOutset);
+  auto cullRects = displayList->computeCaptureCullRects({captureWithOutset}, Matrix::I());
+  ASSERT_EQ(cullRects.size(), 1u);
   for (const auto& rect : cullRects) {
     EXPECT_TRUE(captureWithOutset.contains(rect));
   }
@@ -1792,6 +1791,31 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, BuildCullRectsBoundsEachCapture){TGFX_PRIV
       inside = inside || captureRect.contains(cullRect);
     }
     EXPECT_TRUE(inside);
+  }
+
+  // Dirty tiles overlap once they are widened by the blur reach. Tiles (0,0), (1,0) and (0,1) are
+  // dirty and (1,1) is not; a footprint crossing each seam of (0,0) must not let its bounds reach
+  // into the corner no captured rect covers.
+  std::vector<Rect> overlapping = {};
+  for (auto origin : {Point::Make(0, 0), Point::Make(100, 0), Point::Make(0, 100)}) {
+    auto tile = Rect::MakeXYWH(origin.x, origin.y, 100.0f, 100.0f);
+    tile.outset(10.0f, 10.0f);
+    overlapping.push_back(tile);
+  }
+  std::vector<Rect> scattered = {Rect::MakeLTRB(80, 40, 120, 50), Rect::MakeLTRB(40, 80, 50, 120)};
+  for (const auto& origin : {Point::Make(0, 0), Point::Make(100, 0), Point::Make(0, 100)}) {
+    for (int i = 0; i < 20; ++i) {
+      auto x = origin.x + 10.0f + static_cast<float>(i % 5) * 20.0f;
+      auto y = origin.y + 10.0f + static_cast<float>(i / 5) * 20.0f;
+      scattered.push_back(Rect::MakeXYWH(x, y, 2.0f, 2.0f));
+    }
+  }
+  auto overlapCull = DisplayList::buildCullRects(scattered, overlapping);
+  ASSERT_EQ(overlapCull.size(), overlapping.size());
+  auto uncovered = Rect::MakeLTRB(110, 110, 210, 210);
+  for (size_t i = 0; i < overlapCull.size(); ++i) {
+    EXPECT_TRUE(overlapping[i].contains(overlapCull[i]));
+    EXPECT_FALSE(Rect::Intersects(overlapCull[i], uncovered));
   }
 })}
 
@@ -2011,12 +2035,13 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullStaysInsideTheDirtyTile){TGFX_P
   auto tileRect = Rect::MakeXYWH(128.0f, 128.0f, 128.0f, 128.0f);
   auto footprints = displayList->collectBackgroundFootprints(tileRect);
   ASSERT_EQ(footprints.size(), 1u);
-  auto cullRects = displayList->computeCaptureCullRects({tileRect}, Matrix::I());
+  // The capture takes the dirty tile widened by the blur reach.
+  auto tileWithOutset = tileRect;
+  tileWithOutset.outset(rootOutset, rootOutset);
+  auto cullRects = displayList->computeCaptureCullRects({tileWithOutset}, Matrix::I());
   ASSERT_EQ(cullRects.size(), 1u);
 
   // The footprint covers the whole document, so the tile bounds the cull instead.
-  auto tileWithOutset = tileRect;
-  tileWithOutset.outset(rootOutset, rootOutset);
   EXPECT_EQ(cullRects[0], tileWithOutset);
   EXPECT_LT(cullRects[0].width(), footprints[0].width());
   context->flushAndSubmit();
@@ -2159,9 +2184,9 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, BlurDoesNotSampleOutsideItsBounds){TGFX_PR
   context->flushAndSubmit();
 })}
 
-// A blurred layer off the pixel grid reads more than its bounds: the recording its style resolves is
-// rounded out to the layer's own pixels, and the captured background it copies is rounded out to the
-// captured pixels. A bar ending a fraction of a pixel before the bounds still reaches the blur
+// A blurred layer off the pixel grid reads more than its bounds: the recording its style resolves
+// is rounded out to the layer's own pixels, and the captured background it copies is rounded out to
+// the captured pixels. A bar ending a fraction of a pixel before the bounds still reaches the blur
 // through either rounding and has to stay in the capture.
 TGFX_TEST_PRIVATE(BackgroundBlurTest, FractionalBlurKeepsTheRoundedSample){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
@@ -2224,66 +2249,200 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, FractionalBlurKeepsTheRoundedSample){TGFX_
 
 // A stroked rounded rect or oval has no corner a miter could extend, so the recording its style
 // resolves must stop half the stroke width past the path, where the layer bounds stop. Were the
-// recording measured with the miter, the style would read a margin of backdrop the footprint misses.
-TGFX_TEST_PRIVATE(BackgroundBlurTest,
-                  StrokedRoundShapeBlurStaysInsideItsBounds){TGFX_PRIVATE_ACCESS({
+// recording measured with the miter, the style would read a margin of backdrop the footprint
+// misses.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, StrokedRoundShapeBlurStaysInsideItsBounds) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    constexpr int SurfaceSize = 240;
+
+    auto render = [&](bool oval, RenderMode mode, bool cull, bool withBar) {
+      auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
+      EXPECT_TRUE(surface != nullptr);
+      auto displayList = std::make_unique<DisplayList>();
+      displayList->setRenderMode(mode);
+      displayList->_captureCullingEnabled = cull;
+      displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
+
+      if (withBar) {
+        auto bar = ShapeLayer::Make();
+        Path barPath;
+        barPath.addRect(Rect::MakeWH(6, 40));
+        bar->setPath(barPath);
+        bar->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
+        bar->setMatrix(Matrix::MakeTrans(oval ? 46 : 70, 100));
+        displayList->root()->addChild(bar);
+      }
+
+      auto blurred = ShapeLayer::Make();
+      Path path;
+      if (oval) {
+        path.addOval(Rect::MakeXYWH(60, 100, 120, 40));
+      } else {
+        RRect rRect = {};
+        rRect.setRectXY(Rect::MakeXYWH(90, 90, 60, 60), 4, 4);
+        path.addRRect(rRect);
+      }
+      blurred->setPath(path);
+      blurred->setStrokeStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 60)));
+      blurred->setLineWidth(oval ? 8 : 20);
+      blurred->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
+      displayList->root()->addChild(blurred);
+
+      displayList->render(surface.get());
+      EXPECT_FALSE(withBar && Rect::Intersects(displayList->root()->_children[0]->renderBounds,
+                                               blurred->renderBounds));
+      return ReadSurfacePixels(surface.get());
+    };
+
+    for (auto oval : {false, true}) {
+      for (auto mode : {RenderMode::Direct, RenderMode::Tiled}) {
+        auto expected = render(oval, mode, false, true);
+        EXPECT_EQ(CountDifferentPixels(expected, render(oval, mode, true, true)), 0u);
+      }
+    }
+    context->flushAndSubmit();
+  })
+}
+
+enum class TransformedBlur { Rotated, Perspective, ThreeDContext };
+
+struct TransformedBlurScene {
+  TransformedBlur kind = TransformedBlur::Rotated;
+  float angle = 0.0f;
+  float dx = 0.0f;
+  float dy = 0.0f;
+  float scale = 1.0f;
+};
+
+static Matrix3D AroundCenter(const Matrix3D& transform, float x, float y, float scale) {
+  return Matrix3D::MakeTranslate(x, y, 0) * transform * Matrix3D::MakeScale(scale, scale, 1) *
+         Matrix3D::MakeTranslate(-30, -20, 0);
+}
+
+static Matrix3D PerspectiveRotation(const Vec3& axis, float angle) {
+  auto projection = Matrix3D::I();
+  projection.setRowColumn(3, 2, -1.0f / 300.0f);
+  return projection * Matrix3D::MakeRotate(axis, angle);
+}
+
+static std::shared_ptr<ShapeLayer> MakeTransformedBlur(const TransformedBlurScene& scene) {
+  auto blurred = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeWH(60, 40));
+  blurred->setPath(path);
+  blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 40)));
+  blurred->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
+  auto x = 120.0f + scene.dx;
+  auto y = 120.0f + scene.dy;
+  if (scene.kind == TransformedBlur::Rotated) {
+    auto matrix = Matrix::MakeTrans(x, y);
+    matrix.preRotate(scene.angle);
+    matrix.preScale(scene.scale, scene.scale);
+    matrix.preTranslate(-30, -20);
+    blurred->setMatrix(matrix);
+  } else {
+    blurred->setMatrix3D(
+        AroundCenter(PerspectiveRotation({0, 1, 0}, scene.angle), x, y, scene.scale));
+  }
+  return blurred;
+}
+
+static void AddTransformedBlur(DisplayList* displayList, const TransformedBlurScene& scene) {
+  auto blurred = MakeTransformedBlur(scene);
+  if (scene.kind != TransformedBlur::ThreeDContext) {
+    displayList->root()->addChild(blurred);
+    return;
+  }
+  // The sibling crosses the blurred plane in depth, so the BSP has to split them.
+  auto group = Layer::Make();
+  group->setPreserve3D(true);
+  auto sibling = SolidLayer::Make();
+  sibling->setColor(Color::FromRGBA(255, 200, 0, 255));
+  sibling->setWidth(60);
+  sibling->setHeight(40);
+  sibling->setMatrix3D(AroundCenter(PerspectiveRotation({1, 0, 0}, 50), 122, 120, scene.scale));
+  group->addChild(sibling);
+  group->addChild(blurred);
+  displayList->root()->addChild(group);
+}
+
+static std::vector<uint8_t> RenderTransformedBlur(Context* context,
+                                                  const TransformedBlurScene& scene,
+                                                  const std::vector<Rect>& bars, bool cull,
+                                                  std::vector<Rect>* cullRects) {
+  auto surface = Surface::Make(context, 240, 240);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileSize(64);
+  displayList->_captureCullingEnabled = cull;
+  displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
+  for (const auto& bar : bars) {
+    auto layer = ShapeLayer::Make();
+    Path path;
+    path.addRect(bar);
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
+    displayList->root()->addChild(layer);
+  }
+  AddTransformedBlur(displayList.get(), scene);
+  displayList->render(surface.get());
+  if (cullRects != nullptr) {
+    auto captureRect = Rect::MakeWH(240.0f, 240.0f);
+    captureRect.outset(displayList->root()->maxBackgroundOutset,
+                       displayList->root()->maxBackgroundOutset);
+    *cullRects = displayList->computeCaptureCullRects({captureRect}, Matrix::I());
+  }
+  return ReadSurfacePixels(surface.get());
+}
+
+// A rotated, perspective or 3D-composited blurred layer reads its backdrop through the same rounded
+// recording, so a bar hugging any side of its cull rect from outside must leave the pixels as they
+// are: were the style to read past the cull, dropping the bar would change the blur. The scaled
+// down layers are the ones whose recording grid lands farthest from the captured one.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, TransformedBlurKeepsTheRoundedSample){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  constexpr int SurfaceSize = 240;
-
-  auto render = [&](bool oval, RenderMode mode, bool cull, bool withBar) {
-    auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
-    EXPECT_TRUE(surface != nullptr);
-    auto displayList = std::make_unique<DisplayList>();
-    displayList->setRenderMode(mode);
-    displayList->_captureCullingEnabled = cull;
-    displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
-
-    if (withBar) {
-      auto bar = ShapeLayer::Make();
-      Path barPath;
-      barPath.addRect(Rect::MakeWH(6, 40));
-      bar->setPath(barPath);
-      bar->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
-      bar->setMatrix(Matrix::MakeTrans(oval ? 46 : 70, 100));
-      displayList->root()->addChild(bar);
-    }
-
-    auto blurred = ShapeLayer::Make();
-    Path path;
-    if (oval) {
-      path.addOval(Rect::MakeXYWH(60, 100, 120, 40));
-    } else {
-      RRect rRect = {};
-      rRect.setRectXY(Rect::MakeXYWH(90, 90, 60, 60), 4, 4);
-      path.addRRect(rRect);
-    }
-    blurred->setPath(path);
-    blurred->setStrokeStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 60)));
-    blurred->setLineWidth(oval ? 8 : 20);
-    blurred->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
-    displayList->root()->addChild(blurred);
-
-    displayList->render(surface.get());
-    EXPECT_FALSE(withBar && Rect::Intersects(displayList->root()->_children[0]->renderBounds,
-                                             blurred->renderBounds));
-    return ReadSurfacePixels(surface.get());
+  TransformedBlurScene scenes[] = {
+      {TransformedBlur::Rotated, 7.0f, 0.0f, 0.0f, 0.37f},
+      {TransformedBlur::Rotated, 30.0f, 0.5f, 0.0f, 0.37f},
+      {TransformedBlur::Rotated, 45.0f, 0.13f, 0.62f, 0.37f},
+      {TransformedBlur::Rotated, 45.0f, 0.77f, 0.62f, 1.0f},
+      {TransformedBlur::Perspective, 35.0f, 0.13f, 0.31f, 1.0f},
+      {TransformedBlur::Perspective, 35.0f, 0.13f, 0.31f, 0.37f},
+      {TransformedBlur::ThreeDContext, 40.0f, 0.5f, 0.62f, 1.0f},
+      {TransformedBlur::ThreeDContext, 40.0f, 0.5f, 0.62f, 0.37f},
   };
-
-  for (auto oval : {false, true}) {
-    for (auto mode : {RenderMode::Direct, RenderMode::Tiled}) {
-      auto expected = render(oval, mode, false, true);
-      EXPECT_EQ(CountDifferentPixels(expected, render(oval, mode, true, true)), 0u);
+  for (const auto& scene : scenes) {
+    if (scene.kind != TransformedBlur::Rotated) {
+      ASSERT_TRUE(PerspectiveRotation({0, 1, 0}, scene.angle).asMatrix().hasPerspective());
     }
+    std::vector<Rect> cullRects = {};
+    RenderTransformedBlur(context, scene, {}, true, &cullRects);
+    ASSERT_EQ(cullRects.size(), 1u);
+    auto cull = cullRects[0];
+    auto cx = cull.centerX();
+    auto cy = cull.centerY();
+    std::vector<Rect> bars = {Rect::MakeLTRB(cull.left - 3, cy - 30, cull.left, cy + 30),
+                              Rect::MakeLTRB(cull.right, cy - 30, cull.right + 3, cy + 30),
+                              Rect::MakeLTRB(cx - 30, cull.top - 3, cx + 30, cull.top),
+                              Rect::MakeLTRB(cx - 30, cull.bottom, cx + 30, cull.bottom + 3)};
+    auto expected = RenderTransformedBlur(context, scene, bars, false, nullptr);
+    auto actual = RenderTransformedBlur(context, scene, bars, true, nullptr);
+    EXPECT_GT(CountPixelsDifferentFrom(expected, 0), 500u);
+    EXPECT_EQ(CountDifferentPixels(expected, actual), 0u);
   }
   context->flushAndSubmit();
 })}
 
 // A scrollRect or a mask cuts the render bounds of a blurred layer, but the style still blurs the
-// backdrop of its whole content, so a pixel next to the cut reads past it. A bar sitting just outside
-// the cut has to stay in the capture, or the blur along that edge changes. The cut may sit on the
-// blurred layer, on its parent, or below another blurred layer whose own footprint is not widened.
+// backdrop of its whole content, so a pixel next to the cut reads past it. A bar sitting just
+// outside the cut has to stay in the capture, or the blur along that edge changes. The cut may sit
+// on the blurred layer, on its parent, or below another blurred layer whose own footprint is not
+// widened.
 TGFX_TEST_PRIVATE(BackgroundBlurTest, ClippedBlurKeepsTheBackdropPastTheClip){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
   auto context = scope.getContext();
@@ -2517,7 +2676,8 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintsFollowMovedLayers){TGFX_PRIVATE_
   context->flushAndSubmit();
 })}
 
-// Panning and zooming change no layer bounds, so the cull follows the styles and the pixels stay put.
+// Panning and zooming change no layer bounds, so the cull follows the styles and the pixels stay
+// put.
 TGFX_TEST_PRIVATE(BackgroundBlurTest, CulledCaptureSurvivesPanAndZoom){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
   auto context = scope.getContext();
@@ -2625,7 +2785,8 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintsFollowVisibilityAndStyles){TGFX_
   context->flushAndSubmit();
 })}
 
-// A perspective layer that samples no backdrop must not turn the culling off for the whole document.
+// A perspective layer that samples no backdrop must not turn the culling off for the whole
+// document.
 TGFX_TEST_PRIVATE(BackgroundBlurTest,
                   PerspectiveLayerWithoutStylesKeepsTheRestCulled){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
