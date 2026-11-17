@@ -2384,44 +2384,111 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintsFollowVisibilityAndStyles){TGFX_
 })}
 
 // A perspective layer that samples no backdrop must not turn the culling off for the whole document.
-TGFX_TEST_PRIVATE(BackgroundBlurTest, PerspectiveLayerWithoutStylesKeepsTheRestCulled) {
+TGFX_TEST_PRIVATE(BackgroundBlurTest,
+                  PerspectiveLayerWithoutStylesKeepsTheRestCulled){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 240, 240);
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+
+  auto perspective = ShapeLayer::Make();
+  Path cubePath;
+  cubePath.addRect(Rect::MakeWH(60, 60));
+  perspective->setPath(cubePath);
+  perspective->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 120, 0, 255)));
+  auto matrix3D = Matrix3D::I();
+  matrix3D.setRowColumn(3, 2, -1.0f / 400.0f);
+  perspective->setMatrix3D(matrix3D);
+  displayList->root()->addChild(perspective);
+
+  auto blurred = ShapeLayer::Make();
+  Path blurPath;
+  blurPath.addRect(Rect::MakeWH(40, 40));
+  blurred->setPath(blurPath);
+  blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
+  blurred->setMatrix(Matrix::MakeTrans(150, 150));
+  blurred->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+  displayList->root()->addChild(blurred);
+
+  displayList->render(surface.get());
+  auto snapshots = displayList->captureBackgrounds(surface.get(), {Rect::MakeWH(240.0f, 240.0f)});
+  ASSERT_TRUE(snapshots != nullptr);
+  ASSERT_EQ(snapshots->cullRects.size(), 1u);
+  EXPECT_EQ(snapshots->cullRects[0], blurred->renderBounds);
+  context->flushAndSubmit();
+})}
+
+// Experiment: does a perspective layer draw outside the renderBounds it reports?
+
+// A 3D subtree is composited through the BSP, but its styles still sample only their own bounds, so
+// the capture culls to those bounds instead of covering everything the subtree draws.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, ThreeDSubtreeCullsToItsStyles) {
   TGFX_PRIVATE_ACCESS({
     ContextScope scope;
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
-    auto surface = Surface::Make(context, 240, 240);
-    ASSERT_TRUE(surface != nullptr);
-    auto displayList = std::make_unique<DisplayList>();
-    displayList->setRenderMode(RenderMode::Tiled);
+    constexpr int SurfaceSize = 240;
 
-    auto perspective = ShapeLayer::Make();
-    Path cubePath;
-    cubePath.addRect(Rect::MakeWH(60, 60));
-    perspective->setPath(cubePath);
-    perspective->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 120, 0, 255)));
-    auto matrix3D = Matrix3D::I();
-    matrix3D.setRowColumn(3, 2, -1.0f / 400.0f);
-    perspective->setMatrix3D(matrix3D);
-    displayList->root()->addChild(perspective);
+    auto render = [&](bool cull) {
+      auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
+      EXPECT_TRUE(surface != nullptr);
+      auto displayList = std::make_unique<DisplayList>();
+      displayList->setRenderMode(RenderMode::Tiled);
+      displayList->_captureCullingEnabled = cull;
+      displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
 
-    auto blurred = ShapeLayer::Make();
-    Path blurPath;
-    blurPath.addRect(Rect::MakeWH(40, 40));
-    blurred->setPath(blurPath);
-    blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
-    blurred->setMatrix(Matrix::MakeTrans(150, 150));
-    blurred->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
-    displayList->root()->addChild(blurred);
+      auto group = Layer::Make();
+      group->setPreserve3D(true);
+      auto cube = ShapeLayer::Make();
+      Path cubePath;
+      cubePath.addRect(Rect::MakeWH(40, 40));
+      cube->setPath(cubePath);
+      cube->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 120, 0, 255)));
+      cube->setMatrix(Matrix::MakeTrans(150, 20));
+      group->addChild(cube);
 
-    displayList->render(surface.get());
-    auto snapshots = displayList->captureBackgrounds(surface.get(), {Rect::MakeWH(240.0f, 240.0f)});
+      auto blurred3D = ShapeLayer::Make();
+      Path blurPath;
+      blurPath.addRect(Rect::MakeWH(40, 40));
+      blurred3D->setPath(blurPath);
+      blurred3D->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
+      blurred3D->setMatrix(Matrix::MakeTrans(20, 20));
+      blurred3D->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+      group->addChild(blurred3D);
+      displayList->root()->addChild(group);
+
+      auto blurred = ShapeLayer::Make();
+      blurred->setPath(blurPath);
+      blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
+      blurred->setMatrix(Matrix::MakeTrans(150, 150));
+      blurred->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+      displayList->root()->addChild(blurred);
+
+      displayList->render(surface.get());
+      return std::make_pair(std::move(displayList), ReadSurfacePixels(surface.get()));
+    };
+
+    auto culledResult = render(true);
+    auto unculledResult = render(false);
+    ExpectMatchingRenders(unculledResult.second, culledResult.second);
+
+    auto& displayList = culledResult.first;
+    auto captureSurface = Surface::Make(context, SurfaceSize, SurfaceSize);
+    ASSERT_TRUE(captureSurface != nullptr);
+    auto snapshots =
+        displayList->captureBackgrounds(captureSurface.get(), {Rect::MakeWH(240.0f, 240.0f)});
     ASSERT_TRUE(snapshots != nullptr);
-    ASSERT_EQ(snapshots->cullRects.size(), 1u);
-    EXPECT_EQ(snapshots->cullRects[0], blurred->renderBounds);
+    ASSERT_EQ(snapshots->cullRects.size(), 2u);
+    auto expectedA = displayList->root()->_children[0]->_children[1]->renderBounds;
+    auto expectedB = displayList->root()->_children[1]->renderBounds;
+    auto matches = [&](const Rect& rect) { return rect == expectedA || rect == expectedB; };
+    EXPECT_TRUE(matches(snapshots->cullRects[0]));
+    EXPECT_TRUE(matches(snapshots->cullRects[1]));
     context->flushAndSubmit();
   })
 }
-
-// Experiment: does a perspective layer draw outside the renderBounds it reports?
 
 }  // namespace tgfx
