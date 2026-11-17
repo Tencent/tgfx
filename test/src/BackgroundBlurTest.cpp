@@ -2260,9 +2260,10 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintCacheFollowsMovedLayers){TGFX_PRI
 
   blurred->setMatrix(Matrix::MakeTrans(150, 20));
   displayList->render(surface.get());
-  // The cache has to follow the move: the next capture culls at the new bounds.
-  ASSERT_EQ(displayList->_backgroundFootprints.size(), 1u);
-  EXPECT_EQ(displayList->_backgroundFootprints[0], blurred->renderBounds);
+  // The cached bounds have to follow the move: the next capture culls at the new bounds.
+  auto movedFootprints = displayList->collectBackgroundFootprints(Rect::MakeWH(240.0f, 240.0f));
+  ASSERT_EQ(movedFootprints.size(), 1u);
+  EXPECT_EQ(movedFootprints[0], blurred->renderBounds);
   auto actual = ReadSurfacePixels(surface.get());
   ExpectMatchingRenders(expected, actual);
 })}

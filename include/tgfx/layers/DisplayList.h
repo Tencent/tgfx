@@ -327,11 +327,6 @@ class DisplayList {
   int _subtreeCacheMaxSize = 0;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
-  // World-space footprints of the background styles, cached until a frame reports a dirty region:
-  // panning and zooming move the view but not the layers, so the tree walk only reruns on content
-  // changes.
-  std::vector<Rect> _backgroundFootprints = {};
-  bool _backgroundFootprintsValid = false;
   // Every render mode culls its capture, so a direct/tiled comparison compares two culled captures.
   // Tests switch this off to keep an unculled reference.
   bool _captureCullingEnabled = true;
@@ -425,8 +420,6 @@ class DisplayList {
 
   static bool collectBackgroundFootprints(const Layer* layer, const Rect& bounds,
                                           std::vector<Rect>* footprints, bool collect);
-
-  void updateBackgroundFootprints();
 
   static std::vector<Rect> narrowCullRects(const std::vector<Rect>& footprints,
                                            const std::vector<Rect>& captureRects);

@@ -323,9 +323,6 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   }
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
-  if (!dirtyRegions.empty() || !_backgroundFootprintsValid) {
-    updateBackgroundFootprints();
-  }
   if (_zoomScaleInt == 0) {
     if (autoClear) {
       auto canvas = surface->getCanvas();
@@ -1357,30 +1354,17 @@ bool DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bo
 }
 
 std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds) const {
-  std::vector<Rect> footprints = {};
-  if (!_backgroundFootprintsValid) {
-    // No cached walk yet: answer the caller directly instead of caching through a const method.
-    if (!collectBackgroundFootprints(_root.get(), worldBounds, &footprints, true)) {
-      return {};
-    }
-    return footprints;
+  if (_root->backgroundFootprintsUnbounded) {
+    return {};
   }
-  footprints.reserve(_backgroundFootprints.size());
-  for (const auto& footprint : _backgroundFootprints) {
+  std::vector<Rect> footprints = {};
+  footprints.reserve(_root->backgroundFootprints.size());
+  for (const auto& footprint : _root->backgroundFootprints) {
     if (Rect::Intersects(footprint, worldBounds)) {
       footprints.push_back(footprint);
     }
   }
   return footprints;
-}
-
-void DisplayList::updateBackgroundFootprints() {
-  _backgroundFootprints.clear();
-  auto unbounded = Rect::MakeLTRB(-1e9f, -1e9f, 1e9f, 1e9f);
-  if (!collectBackgroundFootprints(_root.get(), unbounded, &_backgroundFootprints, true)) {
-    _backgroundFootprints.clear();
-  }
-  _backgroundFootprintsValid = true;
 }
 
 std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(

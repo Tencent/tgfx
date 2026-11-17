@@ -2279,6 +2279,33 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       (content && content->hasBlendMode())) {
     bitFields.hasBlendMode = true;
   }
+  backgroundFootprints.clear();
+  backgroundFootprintsUnbounded = !bitFields.matrix3DIsAffine;
+  auto hasBackgroundStyle = false;
+  for (auto& style : _layerStyles) {
+    if (style != nullptr && NeedsBackgroundSource(style->extraSourceType())) {
+      hasBackgroundStyle = true;
+      break;
+    }
+  }
+  for (auto& child : _children) {
+    if (!child->bitFields.visible || child->_alpha <= 0) {
+      continue;
+    }
+    backgroundFootprints.insert(backgroundFootprints.end(), child->backgroundFootprints.begin(),
+                                child->backgroundFootprints.end());
+    backgroundFootprintsUnbounded =
+        backgroundFootprintsUnbounded || child->backgroundFootprintsUnbounded;
+  }
+  // A background style reads only the recording under its own bounds, so its descendants add nothing
+  // to it. A subtree that keeps its own 3D context cannot be culled when it samples a backdrop, and
+  // its bounds stand in for everything it draws.
+  if (hasBackgroundStyle || (canPreserve3D() && !backgroundFootprints.empty())) {
+    backgroundFootprints.clear();
+    if (!renderBounds.isEmpty()) {
+      backgroundFootprints.push_back(renderBounds);
+    }
+  }
   propagateLayerState();
   bitFields.dirtyDescendents = false;
 }
