@@ -1586,11 +1586,12 @@ TGFX_TEST(BackgroundBlurTest, CaptureCullKeepsStyleSourceComplete) {
     return child;
   };
 
-  auto render = [&](RenderMode mode) {
+  auto render = [&](RenderMode mode, bool cull) {
     auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
     EXPECT_TRUE(surface != nullptr);
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(mode);
+    displayList->_captureCullingEnabled = cull;
 
     auto parent = Layer::Make();
     parent->setLayerStyles({DropShadowStyle::Make(0, 20, 0, 0, Color::Black())});
@@ -1611,8 +1612,9 @@ TGFX_TEST(BackgroundBlurTest, CaptureCullKeepsStyleSourceComplete) {
     return ReadSurfacePixels(surface.get());
   };
 
-  auto direct = render(RenderMode::Direct);
-  auto tiled = render(RenderMode::Tiled);
+  // Both modes cull now, so the reference has to be an unculled render.
+  auto direct = render(RenderMode::Direct, false);
+  auto tiled = render(RenderMode::Tiled, true);
   ASSERT_FALSE(direct.empty());
   ASSERT_EQ(direct.size(), tiled.size());
 
@@ -1777,17 +1779,18 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, NestedStylesShareTheParentFootprint){TGFX_
 
 // A background style nested inside another one samples pixels the parent's bounds already cover, so
 // culling the capture to the parent footprint must not change the result.
-TGFX_TEST(BackgroundBlurTest, NestedBlursMatchDirectRendering) {
+TGFX_TEST_PRIVATE(BackgroundBlurTest, NestedBlursMatchDirectRendering){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   constexpr int SurfaceSize = 240;
 
-  auto render = [&](RenderMode mode) {
+  auto render = [&](RenderMode mode, bool cull) {
     auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
     EXPECT_TRUE(surface != nullptr);
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(mode);
+    displayList->_captureCullingEnabled = cull;
 
     auto back = SolidLayer::Make();
     back->setColor(Color::FromRGBA(20, 90, 180, 255));
@@ -1817,33 +1820,27 @@ TGFX_TEST(BackgroundBlurTest, NestedBlursMatchDirectRendering) {
     return ReadSurfacePixels(surface.get());
   };
 
-  auto direct = render(RenderMode::Direct);
-  auto tiled = render(RenderMode::Tiled);
-  ASSERT_FALSE(direct.empty());
-  ASSERT_EQ(direct.size(), tiled.size());
-  size_t different = 0;
-  for (size_t i = 0; i < direct.size(); i += 4) {
-    if (tiled[i] != direct[i] || tiled[i + 1] != direct[i + 1] || tiled[i + 2] != direct[i + 2] ||
-        tiled[i + 3] != direct[i + 3]) {
-      ++different;
-    }
-  }
-  EXPECT_EQ(different, 0u);
-}
-
+  // Both modes cull now, so the reference has to be an unculled render.
+  auto direct = render(RenderMode::Direct, false);
+  auto tiled = render(RenderMode::Tiled, true);
+  EXPECT_GT(CountPixelsDifferentFrom(direct, 0), 1000u);
+  ExpectMatchingRenders(direct, tiled);
+})}
 // A footprint that crosses a tile boundary must not lose the layers on either side of the seam.
-TGFX_TEST(BackgroundBlurTest, CullAcrossTileBoundaryMatchesDirectRendering) {
+TGFX_TEST_PRIVATE(BackgroundBlurTest,
+                  CullAcrossTileBoundaryMatchesDirectRendering){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   constexpr int SurfaceSize = 256;
   constexpr int TileSize = 128;
 
-  auto render = [&](RenderMode mode) {
+  auto render = [&](RenderMode mode, bool cull) {
     auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
     EXPECT_TRUE(surface != nullptr);
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(mode);
+    displayList->_captureCullingEnabled = cull;
     displayList->setTileSize(TileSize);
 
     // Content on both sides of the seam at (128, 128).
@@ -1877,27 +1874,27 @@ TGFX_TEST(BackgroundBlurTest, CullAcrossTileBoundaryMatchesDirectRendering) {
     return ReadSurfacePixels(surface.get());
   };
 
-  auto direct = render(RenderMode::Direct);
-  auto tiled = render(RenderMode::Tiled);
-  ASSERT_FALSE(direct.empty());
-  // The scene has to differ from a flat fill, otherwise the comparison proves nothing.
+  // Both modes cull now, so the reference has to be an unculled render.
+  auto direct = render(RenderMode::Direct, false);
+  auto tiled = render(RenderMode::Tiled, true);
   EXPECT_GT(CountPixelsDifferentFrom(direct, 0), 1000u);
   ExpectMatchingRenders(direct, tiled);
-}
-
+})}
 // A glass style samples the backdrop through the background handler too, so culling the capture has
 // to keep the same pixels as direct rendering.
-TGFX_TEST(BackgroundBlurTest, CullWithGlassStyleMatchesDirectRendering) {
+TGFX_TEST_PRIVATE(BackgroundBlurTest,
+                  CullWithGlassStyleMatchesDirectRendering){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   constexpr int SurfaceSize = 240;
 
-  auto render = [&](RenderMode mode) {
+  auto render = [&](RenderMode mode, bool cull) {
     auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
     EXPECT_TRUE(surface != nullptr);
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(mode);
+    displayList->_captureCullingEnabled = cull;
 
     auto back = SolidLayer::Make();
     back->setColor(Color::FromRGBA(20, 90, 180, 255));
@@ -1926,13 +1923,12 @@ TGFX_TEST(BackgroundBlurTest, CullWithGlassStyleMatchesDirectRendering) {
     return ReadSurfacePixels(surface.get());
   };
 
-  auto direct = render(RenderMode::Direct);
-  auto tiled = render(RenderMode::Tiled);
-  ASSERT_FALSE(direct.empty());
+  // Both modes cull now, so the reference has to be an unculled render.
+  auto direct = render(RenderMode::Direct, false);
+  auto tiled = render(RenderMode::Tiled, true);
   EXPECT_GT(CountPixelsDifferentFrom(direct, 0), 1000u);
   ExpectMatchingRenders(direct, tiled);
-}
-
+})}
 // A blur layer that covers far more than the dirty tile cannot widen the cull beyond the tile it is
 // captured for, otherwise the whole frame's content would be replayed.
 TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullStaysInsideTheDirtyTile){TGFX_PRIVATE_ACCESS({
@@ -2060,11 +2056,12 @@ TGFX_TEST(BackgroundBlurTest, BlurDoesNotSampleOutsideItsBounds) {
   ASSERT_TRUE(context != nullptr);
   constexpr int SurfaceSize = 240;
 
-  auto render = [&](RenderMode mode) {
+  auto render = [&](RenderMode mode, bool cull) {
     auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
     EXPECT_TRUE(surface != nullptr);
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(mode);
+    displayList->_captureCullingEnabled = cull;
 
     auto back = SolidLayer::Make();
     back->setColor(Color::FromRGBA(20, 90, 180, 255));
@@ -2095,10 +2092,61 @@ TGFX_TEST(BackgroundBlurTest, BlurDoesNotSampleOutsideItsBounds) {
     return ReadSurfacePixels(surface.get());
   };
 
-  auto direct = render(RenderMode::Direct);
-  auto tiled = render(RenderMode::Tiled);
+  // Both modes cull now, so the reference has to be an unculled render.
+  auto direct = render(RenderMode::Direct, false);
+  auto tiled = render(RenderMode::Tiled, true);
   EXPECT_GT(CountPixelsDifferentFrom(direct, 0), 1000u);
   ExpectMatchingRenders(direct, tiled);
+}
+
+// The cull only skips whole layers, so a scene built from a background color proves more than one
+// built from a full-screen layer: the small squares below are the only content the blur can sample,
+// and a cull that misses them changes the pixels instead of just the layer count.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, CulledCaptureKeepsTheSampledLayers) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    constexpr int SurfaceSize = 240;
+
+    auto render = [&](RenderMode mode, bool cull) {
+      auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
+      EXPECT_TRUE(surface != nullptr);
+      auto displayList = std::make_unique<DisplayList>();
+      displayList->setRenderMode(mode);
+      displayList->_captureCullingEnabled = cull;
+      displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
+
+      for (int i = 0; i < 4; ++i) {
+        auto block = ShapeLayer::Make();
+        Path path;
+        path.addRect(Rect::MakeWH(16, 16));
+        block->setPath(path);
+        block->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
+        block->setMatrix(Matrix::MakeTrans(66.0f + static_cast<float>(i % 2) * 60.0f,
+                                           66.0f + static_cast<float>(i / 2) * 60.0f));
+        displayList->root()->addChild(block);
+      }
+
+      auto blurred = ShapeLayer::Make();
+      Path blurPath;
+      blurPath.addRect(Rect::MakeWH(120, 120));
+      blurred->setPath(blurPath);
+      blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 40)));
+      blurred->setMatrix(Matrix::MakeTrans(60, 60));
+      blurred->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
+      displayList->root()->addChild(blurred);
+
+      displayList->render(surface.get());
+      return ReadSurfacePixels(surface.get());
+    };
+
+    // Both modes cull now, so the reference has to be an unculled render.
+    auto direct = render(RenderMode::Direct, false);
+    auto tiled = render(RenderMode::Tiled, true);
+    EXPECT_GT(CountPixelsDifferentFrom(direct, 0), 1000u);
+    ExpectMatchingRenders(direct, tiled);
+  })
 }
 
 }  // namespace tgfx

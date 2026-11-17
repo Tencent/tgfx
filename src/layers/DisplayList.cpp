@@ -1384,7 +1384,8 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   for (const auto& rect : worldRects) {
     captureBounds.join(rect);
   }
-  auto footprints = collectBackgroundFootprints(captureBounds);
+  auto footprints =
+      _captureCullingEnabled ? collectBackgroundFootprints(captureBounds) : std::vector<Rect>{};
   if (!footprints.empty()) {
     auto narrowed = narrowCullRects(footprints, worldRects);
     // An empty list does not mean the capture is unnecessary: a subtree that keeps its own 3D
