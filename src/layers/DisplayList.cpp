@@ -39,6 +39,9 @@ static constexpr int FALLBACK_GRID_SIZE = 64;
 static constexpr int MAX_ATLAS_SIZE = 8192;
 // Number of rects the per-layer cull loop can afford.
 static constexpr size_t MAX_CULL_RECTS = 32;
+// Captured background pixels a style may read past its render bounds: one from rounding out the
+// captured background and one from rounding out the recording the style resolves.
+static constexpr float SAMPLE_ROUNDING_PIXELS = 2.0f;
 
 class DrawTask {
  public:
@@ -1281,8 +1284,10 @@ std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprint
 }
 
 // Returns the world rects the capture may cull its draw to, or an empty list when the whole captured
-// area has to be drawn. `worldRects` are the captured rects before the blur outset.
-std::vector<Rect> DisplayList::computeCaptureCullRects(const std::vector<Rect>& worldRects) const {
+// area has to be drawn. `worldRects` are the captured rects before the blur outset, and `pixelSize`
+// is the world size of one pixel of the captured background.
+std::vector<Rect> DisplayList::computeCaptureCullRects(const std::vector<Rect>& worldRects,
+                                                       float pixelSize) const {
   if (!_captureCullingEnabled) {
     return {};
   }
@@ -1296,7 +1301,7 @@ std::vector<Rect> DisplayList::computeCaptureCullRects(const std::vector<Rect>& 
   }
   // An empty list means no style samples inside this capture, so there is nothing to narrow the draw
   // to, but the capture still runs: keeping the whole area only costs the culling for this frame.
-  auto footprints = collectBackgroundFootprints(captureBounds);
+  auto footprints = collectBackgroundFootprints(captureBounds, pixelSize);
   if (footprints.empty()) {
     return {};
   }
@@ -1321,35 +1326,46 @@ std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprin
   return narrowed;
 }
 
-// Walks only the subtrees that hold a background style, and stops at the first layer whose footprint
-// covers everything below it: renderBounds folds the descendants in. `clipped` tells whether an
-// ancestor cuts the render bounds with a scrollRect or a mask.
-void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds, bool clipped,
+// Walks only the subtrees that hold a background style. A style blurs the backdrop of its whole
+// content, which its render bounds cover, so the footprint of a layer nothing cuts also covers every
+// style below it until a scrollRect or a mask cuts that subtree again. A cut layer still blurs the
+// backdrop of its whole content, so a pixel next to the cut reads up to the blur reach beyond it,
+// and widening the footprint by that reach covers every style below it for good. `clipped` tells
+// whether this layer or an ancestor is cut, and `covered` whether a footprint above already covers
+// this layer.
+void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds, float margin,
+                                              bool clipped, bool covered,
                                               std::vector<Rect>* footprints) {
   if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
       !Rect::Intersects(bounds, layer->renderBounds)) {
     return;
   }
-  clipped = clipped || layer->_scrollRect != nullptr || layer->hasValidMask();
-  if (layer->hasOwnBackgroundStyle()) {
-    // A style blurs the backdrop of its whole content, so it samples nothing outside its bounds
-    // unless a scrollRect or a mask cut them: a pixel next to the cut still reads up to the blur
-    // reach beyond it.
+  if (layer->_scrollRect != nullptr || layer->hasValidMask()) {
+    clipped = true;
+    covered = false;
+  }
+  if (!covered && layer->hasOwnBackgroundStyle()) {
+    auto outset = clipped ? margin + layer->maxBackgroundOutset : margin;
     auto footprint = layer->renderBounds;
-    if (clipped) {
-      footprint.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
-    }
+    footprint.outset(outset, outset);
     footprints->push_back(footprint);
-    return;
+    if (clipped) {
+      return;
+    }
+    covered = true;
   }
   for (const auto& child : layer->_children) {
-    collectBackgroundFootprints(child.get(), bounds, clipped, footprints);
+    collectBackgroundFootprints(child.get(), bounds, margin, clipped, covered, footprints);
   }
 }
 
-std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds) const {
+// The captured background is rounded out to its pixel grid, and so is the recording a style
+// resolves, so a style can read up to a pixel of each past its render bounds.
+std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds,
+                                                           float pixelSize) const {
   std::vector<Rect> footprints = {};
-  collectBackgroundFootprints(_root.get(), worldBounds, false, &footprints);
+  collectBackgroundFootprints(_root.get(), worldBounds, SAMPLE_ROUNDING_PIXELS * pixelSize, false,
+                              false, &footprints);
   return footprints;
 }
 
@@ -1393,14 +1409,6 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   for (auto& rect : worldRects) {
     rect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
   }
-  // The layers to draw can be narrowed to the area the background styles sample, while the surface
-  // still covers every render rect: keeping the captured area unchanged keeps the multi-pass
-  // structure (and the style output sharing that depends on it) intact.
-  auto culledRects = computeCaptureCullRects(visibleRects);
-  auto cullWorldRects = worldRects;
-  if (!culledRects.empty()) {
-    cullWorldRects = std::move(culledRects);
-  }
   DrawArgs args(context);
   args.dstColorSpace = surface->colorSpace();
   args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
@@ -1408,6 +1416,15 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
       _root->createBackgroundSource(context, surfaceUnion, viewMatrix, false, args.dstColorSpace);
   if (bgSource == nullptr) {
     return nullptr;
+  }
+  // The layers to draw can be narrowed to the area the background styles sample, while the surface
+  // still covers every render rect: keeping the captured area unchanged keeps the multi-pass
+  // structure (and the style output sharing that depends on it) intact.
+  auto pixelSize = 1.0f / (viewMatrix.getMinScale() * bgSource->surfaceScale());
+  auto culledRects = computeCaptureCullRects(visibleRects, pixelSize);
+  auto cullWorldRects = worldRects;
+  if (!culledRects.empty()) {
+    cullWorldRects = std::move(culledRects);
   }
   auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
   snapshotMap->multiPass = renderRects.size() > 1;

@@ -404,19 +404,10 @@ class DisplayList {
   void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear, BackgroundSnapshotMap* snapshots) const;
 
-  /**
-   * Collects the world-space rect each visible background style may sample, so a capture can cull
-   * layers that only touch the tile but lie under no background style. A footprint is the style's
-   * render bounds, widened by its blur reach only when a scrollRect or a mask cut those bounds. The
-   * walk visits only the subtrees that hold a style, bounded by `worldBounds`, the area being
-   * captured.
-   *
-   * An empty result only means the capture cannot be culled: no background style samples inside
-   * `worldBounds`, so there is nothing to narrow the draw to.
-   */
-  std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
+  std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds, float pixelSize) const;
 
-  static void collectBackgroundFootprints(const Layer* layer, const Rect& bounds, bool clipped,
+  static void collectBackgroundFootprints(const Layer* layer, const Rect& bounds, float margin,
+                                          bool clipped, bool covered,
                                           std::vector<Rect>* footprints);
 
   static std::vector<Rect> narrowCullRects(const std::vector<Rect>& footprints,
@@ -427,7 +418,8 @@ class DisplayList {
   static std::vector<Rect> buildCullRects(const std::vector<Rect>& footprints,
                                           const std::vector<Rect>& captureRects);
 
-  std::vector<Rect> computeCaptureCullRects(const std::vector<Rect>& worldRects) const;
+  std::vector<Rect> computeCaptureCullRects(const std::vector<Rect>& worldRects,
+                                            float pixelSize) const;
 
   /**
    * Captures the backdrop the background styles sample. `renderRects` are surface-space rects that
