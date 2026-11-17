@@ -324,11 +324,15 @@ void chainMain() {
 #endif
 // The unrolled executor rides behind a tool-set macro: the stub pass (reflection and the inline
 // policy) compiles the loop alone, while the generic and the spec forms compile both — the
-// generic GL driver then folds the branch away through the master-switch constant. The default
-// keeps the unrolled form in whenever the macro is not injected, so a bare compile never loses
-// the specialization machinery.
+// generic GL driver then folds the branch away through the master-switch constant.
+//
+// The default is the loop: the unrolled form inlines one dispatch copy per slot, and the binary
+// backends keep that expansion (SPIR-V through the shaderc optimization, metallib through xcrun),
+// which measured 7x on the Metal bundle (10.46MB -> 1.53MB) and 40% on its first-program time,
+// with no hot-path change on Metal or GL. The unrolled form stays behind the macro for callers
+// that set it explicitly.
 #ifndef TGFX_SPEC_UNROLLED_EXECUTOR
-#define TGFX_SPEC_UNROLLED_EXECUTOR 1
+#define TGFX_SPEC_UNROLLED_EXECUTOR 0
 #endif
 #if TGFX_SPEC_UNROLLED_EXECUTOR
   if (SPEC_ACTIVE()) {
