@@ -1572,7 +1572,7 @@ static std::vector<uint8_t> ReadSurfacePixels(Surface* surface) {
 // The capture culls its draw calls to the footprints of the background styles, but the layer style
 // sources it caches are reused for the whole tile: a child outside the footprint must still reach
 // the shadow of the styled parent.
-TGFX_TEST(BackgroundBlurTest, CaptureCullKeepsStyleSourceComplete) {
+TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullKeepsStyleSourceComplete){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -1626,9 +1626,7 @@ TGFX_TEST(BackgroundBlurTest, CaptureCullKeepsStyleSourceComplete) {
   EXPECT_EQ(tiled[shadowOffset + 3], 255);
   ExpectMatchingRenders(direct, tiled);
   context->flushAndSubmit();
-}
-
-// The capture may only draw what it covers itself, so every footprint is clipped against each
+})}  // The capture may only draw what it covers itself, so every footprint is clipped against each
 // captured rect rather than against their union: a footprint stretched over the gap between two
 // tiles must not pull in the layers under that gap.
 TGFX_TEST_PRIVATE(BackgroundBlurTest, NarrowCullRectsToTheCaptureArea){TGFX_PRIVATE_ACCESS({
@@ -2068,7 +2066,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, ManyStylesStillCullTheCapture){TGFX_PRIVAT
 // A style reads a background image cropped to the recording it resolves, so a neighbour outside its
 // bounds cannot reach the blur. This is what lets the footprint stop at the layer bounds: were the
 // style to sample beyond them, the tiled path (culled to the footprint) would lose the bar.
-TGFX_TEST(BackgroundBlurTest, BlurDoesNotSampleOutsideItsBounds) {
+TGFX_TEST_PRIVATE(BackgroundBlurTest, BlurDoesNotSampleOutsideItsBounds){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2116,8 +2114,7 @@ TGFX_TEST(BackgroundBlurTest, BlurDoesNotSampleOutsideItsBounds) {
   EXPECT_GT(CountPixelsDifferentFrom(direct, 0), 1000u);
   ExpectMatchingRenders(direct, tiled);
   context->flushAndSubmit();
-}
-
+})}
 // The cull only skips whole layers, so a scene built from a background color proves more than one
 // built from a full-screen layer: the small squares below are the only content the blur can sample,
 // and a cull that misses them changes the pixels instead of just the layer count.
