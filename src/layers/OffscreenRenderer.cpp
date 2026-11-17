@@ -148,13 +148,6 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
   }
 
   if (args.context != nullptr) {
-    if (args.drawControl != nullptr && ExceedsDeviceLimit(args.context, surfaceRect)) {
-      args.drawControl->fail(DrawFailureCode::SurfaceLimit, DrawStage::Rendering, layer,
-                             ISize::Make(static_cast<int>(surfaceRect.width()),
-                                         static_cast<int>(surfaceRect.height())),
-                             "a pass-through surface exceeds the device texture limit");
-      return {};
-    }
     auto surface = Surface::Make(args.context, static_cast<int>(surfaceRect.width()),
                                  static_cast<int>(surfaceRect.height()), false, 1, false, 0,
                                  args.dstColorSpace);
