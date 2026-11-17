@@ -1210,14 +1210,14 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
 
 // Merges the rects that overlap or touch, so many styles sitting next to each other do not multiply
 // the per-layer cull loop. A capture can produce footprints x tiles rects, so the pairwise join only
-// runs for a small list; a longer one collapses straight into its bounding rect, which still draws
-// less than the whole tile.
+// runs for a small list; a longer one collapses into its bounding rect, which may cover gaps between
+// scattered tiles but never more than the captured area.
 void DisplayList::mergeCullRects(std::vector<Rect>* rects) {
   if (rects->size() < 2) {
     return;
   }
-  // Each join restarts the scan, so the merge cost grows with the square of the list. Only a list
-  // close to the budget is worth merging: anything longer collapses into one rect below.
+  // Every join restarts the scan, and a scan is O(n^2), so the loop is O(n^3) in the worst case.
+  // Only a list close to the budget is worth that: anything longer collapses into one rect below.
   if (rects->size() <= 4 * MAX_CULL_RECTS) {
     bool merged = true;
     while (merged) {
