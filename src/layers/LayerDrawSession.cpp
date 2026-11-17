@@ -50,30 +50,83 @@ static constexpr float ExportBackgroundSurfaceScale = 1.0f;
 // every region surface and its intermediates stay bounded, and the count of regions stays sane.
 static constexpr int DefaultExportSurfaceLimit = 2048;
 
-static bool IsFiniteRect(const Rect& rect) {
-  return std::isfinite(rect.left) && std::isfinite(rect.top) && std::isfinite(rect.right) &&
-         std::isfinite(rect.bottom);
-}
-
-static bool IsSafePixelRect(const Rect& rect) {
-  constexpr float MaxPixelDimension = static_cast<float>(INT32_MAX >> 2);
-  return IsFiniteRect(rect) && rect.width() <= MaxPixelDimension &&
-         rect.height() <= MaxPixelDimension;
-}
-
 static Rect ToRect(const PixelRect& rect) {
   return Rect::MakeLTRB(static_cast<float>(rect.left), static_cast<float>(rect.top),
                         static_cast<float>(rect.right), static_cast<float>(rect.bottom));
 }
 
-static PixelRect ToPixelRect(const Rect& rect) {
-  auto rounded = rect;
-  rounded.roundOut();
-  PixelRect result;
-  result.left = static_cast<int>(rounded.left);
-  result.top = static_cast<int>(rounded.top);
-  result.right = static_cast<int>(rounded.right);
-  result.bottom = static_cast<int>(rounded.bottom);
+// Region planning maps output pixels through the capture-root matrices. Rect is float-based and
+// cannot hold every integer pixel coordinate of a large output exactly (16777217 is already
+// rounded to 16777216), which would shift the region grid of the last tiles. The planning math is
+// therefore done in double precision and only the final region rects are converted to integers.
+struct PreciseRect {
+  double left = 0.0;
+  double top = 0.0;
+  double right = 0.0;
+  double bottom = 0.0;
+
+  void outset(double dx, double dy) {
+    left -= dx;
+    top -= dy;
+    right += dx;
+    bottom += dy;
+  }
+
+  void roundOut() {
+    left = std::floor(left);
+    top = std::floor(top);
+    right = std::ceil(right);
+    bottom = std::ceil(bottom);
+  }
+};
+
+static PreciseRect ToPreciseRect(const PixelRect& rect) {
+  PreciseRect result = {};
+  result.left = rect.left;
+  result.top = rect.top;
+  result.right = rect.right;
+  result.bottom = rect.bottom;
+  return result;
+}
+
+static PreciseRect MapPreciseRect(const Matrix& matrix, const PreciseRect& rect) {
+  const double xs[] = {rect.left, rect.right};
+  const double ys[] = {rect.top, rect.bottom};
+  PreciseRect result = {};
+  for (int i = 0; i < 2; ++i) {
+    for (int j = 0; j < 2; ++j) {
+      auto x = xs[i];
+      auto y = ys[j];
+      auto mappedX = matrix.getScaleX() * x + matrix.getSkewX() * y + matrix.getTranslateX();
+      auto mappedY = matrix.getSkewY() * x + matrix.getScaleY() * y + matrix.getTranslateY();
+      if (i == 0 && j == 0) {
+        result.left = result.right = mappedX;
+        result.top = result.bottom = mappedY;
+        continue;
+      }
+      result.left = std::min(result.left, mappedX);
+      result.right = std::max(result.right, mappedX);
+      result.top = std::min(result.top, mappedY);
+      result.bottom = std::max(result.bottom, mappedY);
+    }
+  }
+  return result;
+}
+
+static bool IsSafePixelRect(const PreciseRect& rect) {
+  constexpr double MaxPixelCoordinate = static_cast<double>(INT32_MAX >> 2);
+  return std::isfinite(rect.left) && std::isfinite(rect.top) && std::isfinite(rect.right) &&
+         std::isfinite(rect.bottom) && rect.left >= -MaxPixelCoordinate &&
+         rect.top >= -MaxPixelCoordinate && rect.right <= MaxPixelCoordinate &&
+         rect.bottom <= MaxPixelCoordinate;
+}
+
+static PixelRect ToPixelRect(const PreciseRect& rect) {
+  PixelRect result = {};
+  result.left = static_cast<int>(rect.left);
+  result.top = static_cast<int>(rect.top);
+  result.right = static_cast<int>(rect.right);
+  result.bottom = static_cast<int>(rect.bottom);
   return result;
 }
 
@@ -83,6 +136,34 @@ static float MaxAbsOutset(const Rect& rect) {
     return 0.0f;
   }
   return std::ceil(outset);
+}
+
+static float FilterOutset(Layer* layer, float scale) {
+  if (!std::isfinite(scale) || scale <= 0.0f) {
+    return 0.0f;
+  }
+  auto& filters = layer->filters();
+  auto bounds = Rect::MakeEmpty();
+  for (auto index = filters.size(); index > 0; --index) {
+    auto& filter = filters[index - 1];
+    if (filter != nullptr) {
+      bounds = filter->filterBounds(bounds, scale, MapDirection::Reverse);
+    }
+  }
+  return MaxAbsOutset(bounds);
+}
+
+static float AncestorFilterOutset(Layer* target, Layer* captureRoot) {
+  auto outset = 0.0f;
+  for (auto ancestor = target->parent(); ancestor != nullptr && ancestor != captureRoot;
+       ancestor = ancestor->parent()) {
+    if (ancestor->filters().empty()) {
+      continue;
+    }
+    auto ancestorToRoot = ancestor->getRelativeMatrix3D(captureRoot).asMatrix();
+    outset += FilterOutset(ancestor, ancestorToRoot.getMaxScale());
+  }
+  return outset;
 }
 
 static bool FitsLimit(const PixelRect& rect, int limitWidth, int limitHeight) {
@@ -130,11 +211,16 @@ bool LayerDrawSession::IsSupportedAncestorChain(Layer* target, Layer* captureRoo
 }
 
 void LayerDrawSession::ScanBackgroundOutset(Layer* layer, const Matrix& localToRoot,
-                                            float* maxOutset, bool* needsBackground) {
+                                            float ancestorOutset, float* maxOutset,
+                                            bool* needsBackground) {
   auto scale = localToRoot.getMaxScale();
   if (!std::isfinite(scale) || scale <= 0.0f) {
     return;
   }
+  // A background style reads the backdrop after every enclosing filter has spread it, so the input
+  // it needs covers the filter outsets of the whole ancestor chain, not only the style's own
+  // outset. Missing them truncates the capture and leaves band seams.
+  auto filterOutset = ancestorOutset + FilterOutset(layer, scale);
   float backOutset = 0.0f;
   for (const auto& style : layer->layerStyles()) {
     if (style == nullptr || !NeedsBackgroundSource(style->extraSourceType())) {
@@ -142,11 +228,7 @@ void LayerDrawSession::ScanBackgroundOutset(Layer* layer, const Matrix& localToR
     }
     *needsBackground = true;
     auto bounds = style->filterBackground(Rect::MakeEmpty(), scale);
-    backOutset = std::max(backOutset, MaxAbsOutset(bounds));
-  }
-  if (backOutset > 0.0f && !layer->filters().empty()) {
-    auto baseBounds = layer->mapOutputBoundsToInput(Rect::MakeEmpty(), scale);
-    backOutset += MaxAbsOutset(baseBounds);
+    backOutset = std::max(backOutset, filterOutset + MaxAbsOutset(bounds));
   }
   *maxOutset = std::max(*maxOutset, backOutset);
   for (const auto& child : layer->children()) {
@@ -155,7 +237,7 @@ void LayerDrawSession::ScanBackgroundOutset(Layer* layer, const Matrix& localToR
     }
     auto childMatrix = localToRoot;
     childMatrix.preConcat(child->getMatrixWithScrollRect().asMatrix());
-    ScanBackgroundOutset(child.get(), childMatrix, maxOutset, needsBackground);
+    ScanBackgroundOutset(child.get(), childMatrix, filterOutset, maxOutset, needsBackground);
   }
 }
 
@@ -313,13 +395,10 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
     }
     return nullptr;
   }
-  auto logicalBounds = request.logicalOutputBounds;
-  if (!std::isfinite(logicalBounds.left) || !std::isfinite(logicalBounds.top) ||
-      !std::isfinite(logicalBounds.right) || !std::isfinite(logicalBounds.bottom) ||
-      logicalBounds.isEmpty()) {
+  if (request.outputSize.width <= 0 || request.outputSize.height <= 0) {
     if (control != nullptr) {
       control->fail(DrawFailureCode::InvalidRequest, DrawStage::Validation, request.target, {},
-                    "the logical output bounds are invalid");
+                    "the output size is invalid");
     }
     return nullptr;
   }
@@ -371,7 +450,7 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
   captureRootToGlobal.invert(&globalToCaptureRoot);
   session->globalToOutput = session->rootToOutput;
   session->globalToOutput.preConcat(globalToCaptureRoot);
-  session->outputPixelBounds = ToPixelRect(logicalBounds);
+  session->outputPixelBounds = {0, 0, request.outputSize.width, request.outputSize.height};
 
   auto actualRoot = request.captureRoot->root();
   if (actualRoot != nullptr) {
@@ -379,15 +458,27 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
     // requested capture root is a smaller subtree.
     actualRoot->updateRenderBounds();
     session->needsBackground = request.target->hasBackgroundStyle();
-    session->backgroundOutset = request.target->maxBackgroundOutset;
+    auto ancestorOutset = AncestorFilterOutset(request.target, request.captureRoot);
+    float outset = 0.0f;
+    bool needs = false;
+    ScanBackgroundOutset(request.target, targetToRoot, ancestorOutset, &outset, &needs);
+    session->needsBackground = session->needsBackground || needs;
+    session->backgroundOutset =
+        std::max(outset, request.target->maxBackgroundOutset + ancestorOutset);
   } else {
     float outset = 0.0f;
     bool needs = false;
-    ScanBackgroundOutset(request.captureRoot, Matrix::I(), &outset, &needs);
+    ScanBackgroundOutset(request.captureRoot, Matrix::I(), 0.0f, &outset, &needs);
     session->needsBackground = needs;
     session->backgroundOutset = outset;
   }
   if (!std::isfinite(session->backgroundOutset) || session->backgroundOutset < 0.0f) {
+    session->backgroundOutset = 0.0f;
+  }
+  // Layer::draw() returns before drawing anything for a zero alpha, so the export must not need a
+  // backdrop either: nothing is sampled and the delivered band stays the clear color.
+  if (request.alpha <= 0.0f) {
+    session->needsBackground = false;
     session->backgroundOutset = 0.0f;
   }
   // The export never keeps a borrowed context beyond the lock it was created in; every later call
@@ -442,20 +533,20 @@ RegionPlanResult LayerDrawSession::planExportRegion(const PixelRect& core,
   // inside the drawn surface: its input comes from the shared capture, and a nested offscreen
   // clipped exactly at the delivery edge would truncate that input. The capture region and the
   // drawn region therefore cover the same dependency window, while only the core is delivered.
-  auto globalCore = outputToGlobal.mapRect(ToRect(core));
-  if (!IsSafePixelRect(globalCore)) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::InvalidRequest, DrawStage::Planning, request.target, {},
-                    "the core region exceeds the supported pixel range");
-    }
-    result.code = RegionPlanCode::Failed;
-    return result;
-  }
   PixelRect renderRect = {};
   PixelRect captureRect = {};
   if (needsBackground) {
-    auto globalInput = globalCore;
-    globalInput.outset(backgroundOutset + 1.0f, backgroundOutset + 1.0f);
+    auto globalInput = MapPreciseRect(outputToGlobal, ToPreciseRect(core));
+    if (!IsSafePixelRect(globalInput)) {
+      if (control != nullptr) {
+        control->fail(DrawFailureCode::InvalidRequest, DrawStage::Planning, request.target, {},
+                      "the core region exceeds the supported pixel range");
+      }
+      result.code = RegionPlanCode::Failed;
+      return result;
+    }
+    auto margin = static_cast<double>(backgroundOutset) + 1.0;
+    globalInput.outset(margin, margin);
     globalInput.roundOut();
     if (!IsSafePixelRect(globalInput)) {
       if (control != nullptr) {
@@ -465,7 +556,7 @@ RegionPlanResult LayerDrawSession::planExportRegion(const PixelRect& core,
       result.code = RegionPlanCode::Failed;
       return result;
     }
-    auto outputRect = globalToOutput.mapRect(globalInput);
+    auto outputRect = MapPreciseRect(globalToOutput, globalInput);
     outputRect.roundOut();
     if (!IsSafePixelRect(outputRect)) {
       if (control != nullptr) {
@@ -478,7 +569,11 @@ RegionPlanResult LayerDrawSession::planExportRegion(const PixelRect& core,
     renderRect = ToPixelRect(outputRect);
     captureRect = renderRect;
   } else {
-    renderRect = ToPixelRect(ToRect(core).makeOutset(1.0f, 1.0f));
+    renderRect = core;
+    renderRect.left--;
+    renderRect.top--;
+    renderRect.right++;
+    renderRect.bottom++;
   }
   if (!FitsLimit(renderRect, surfaceLimit.width, surfaceLimit.height)) {
     if (core.width() <= 1 && core.height() <= 1) {
@@ -769,7 +864,11 @@ DrawOutcome LayerDrawSession::drawExportRegion(Context* context, LayerDrawBatch&
   BackgroundConsumer consumer(batch.impl->hasSnapshots ? &batch.impl->snapshots : nullptr, false);
   args.backgroundHandler = batch.impl->needsBackground ? static_cast<BackgroundHandler*>(&consumer)
                                                        : BackgroundHandler::NoOp();
-  request.target->drawLayer(args, canvas, request.alpha, request.blendMode);
+  // Layer::draw() returns before drawing for a zero alpha. Skipping the draw here keeps that
+  // semantic, so a Clear or Src blend mode cannot erase the cleared output.
+  if (request.alpha > 0.0f) {
+    request.target->drawLayer(args, canvas, request.alpha, request.blendMode);
+  }
   if (control != nullptr) {
     if (control->failed()) {
       return DrawOutcome::Failed;

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <vector>
 #include "layers/DrawArgs.h"
@@ -25,12 +26,14 @@
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/gpu/GPU.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/LayerImageReader.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "utils/TestUtils.h"
 
@@ -53,6 +56,14 @@ class FailingCancelLayer final : public Layer {
                            "test drawing failure before cancellation");
     reader->requestCancel();
     return true;
+  }
+};
+
+class FailingFilter final : public LayerFilter {
+ protected:
+  std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image>, float, const Rect&,
+                                       Point*) override {
+    return nullptr;
   }
 };
 
@@ -256,6 +267,26 @@ static int CountDifferentPixels(const PixelImage& a, const PixelImage& b, int to
     }
   }
   return different;
+}
+
+static float MaxOutset(const Rect& rect) {
+  return std::max(std::max(-rect.left, -rect.top), std::max(rect.right, rect.bottom));
+}
+
+static std::shared_ptr<Layer> BuildNestedFilteredBackdropScene(Layer** group) {
+  auto root = Layer::Make();
+  auto filteredGroup = Layer::Make();
+  filteredGroup->setFilters({BlurFilter::Make(4.0f, 4.0f)});
+  auto glass = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeWH(30, 30));
+  glass->setPath(path);
+  glass->setFillStyle(ShapeStyle::Make(Color::White()));
+  glass->setLayerStyles({BackgroundBlurStyle::Make(4.0f, 4.0f)});
+  filteredGroup->addChild(glass);
+  root->addChild(filteredGroup);
+  *group = filteredGroup.get();
+  return root;
 }
 
 }  // namespace
@@ -1034,6 +1065,176 @@ TGFX_TEST(LayerImageReaderTest, RejectsTinyTileLimit) {
   auto info = reader->bandInfo();
   auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), info.byteSize());
   EXPECT_EQ(result.code, LayerImageReadCode::BandReady);
+}
+
+TGFX_TEST(LayerImageReaderTest, BackgroundCaptureIncludesAncestorFilterOutset) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto styleBounds =
+      BackgroundBlurStyle::Make(4.0f, 4.0f)->filterBackground(Rect::MakeEmpty(), 1.0f);
+  auto filterBounds =
+      BlurFilter::Make(4.0f, 4.0f)->filterBounds(Rect::MakeEmpty(), 1.0f, MapDirection::Reverse);
+  auto requiredOutset =
+      static_cast<int>(std::ceil(MaxOutset(styleBounds) + MaxOutset(filterBounds)));
+  ASSERT_GT(requiredOutset, 0);
+  const PixelRect core = {20, 20, 60, 60};
+  for (bool attached : {false, true}) {
+    Layer* group = nullptr;
+    auto content = BuildNestedFilteredBackdropScene(&group);
+    std::shared_ptr<Layer> sceneRoot = content;
+    std::unique_ptr<DisplayList> displayList = nullptr;
+    if (attached) {
+      displayList = MakeDisplayList(content);
+      sceneRoot = displayList->root()->shared_from_this();
+    }
+    LayerDrawRequest request = {};
+    request.target = group;
+    request.captureRoot = sceneRoot.get();
+    request.context = context;
+    request.samplingMode = LayerSamplingMode::ExportFixed;
+    request.outputSize = {200, 200};
+    DrawControl control = {};
+    auto session = LayerDrawSession::Prepare(context, request, &control);
+    ASSERT_TRUE(session != nullptr) << control.firstFailure.message;
+    LayerDrawLimits limits = {};
+    limits.gpuLimits = *context->gpu()->limits();
+    auto plan = session->planRegion(core, limits, &control);
+    ASSERT_EQ(plan.code, RegionPlanCode::Ready) << control.firstFailure.message;
+    ASSERT_TRUE(plan.region.dependencies != nullptr);
+    auto captureRect = plan.region.dependencies->captureRect;
+    EXPECT_GE(captureRect.width(), core.width() + 2 * requiredOutset);
+    EXPECT_GE(captureRect.height(), core.height() + 2 * requiredOutset);
+  }
+}
+
+TGFX_TEST(LayerImageReaderTest, FilterFailureFailsTheBand) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto root = Layer::Make();
+  auto content = SolidLayer::Make();
+  content->setColor(Color::Red());
+  content->setWidth(16);
+  content->setHeight(16);
+  content->setFilters({std::make_shared<FailingFilter>()});
+  root->addChild(content);
+  LayerImageRequest request = {};
+  request.target = root;
+  request.sceneRoot = root;
+  request.outputSize = {16, 16};
+  LayerImageReadOptions options = {};
+  options.bandRows = 4;
+  auto reader = LayerImageReader::Make(context, request, options);
+  ASSERT_TRUE(reader != nullptr);
+  std::vector<uint8_t> pixels(static_cast<size_t>(16) * 4 * 4, 0x7f);
+  auto info = reader->bandInfo();
+  auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), info.byteSize());
+  EXPECT_EQ(result.code, LayerImageReadCode::Failed);
+  EXPECT_EQ(result.error.code, LayerImageErrorCode::DrawFailed);
+  EXPECT_EQ(result.error.stage, LayerImageStage::Rendering);
+  EXPECT_EQ(result.error.message, "a layer filter produced no image");
+  EXPECT_EQ(reader->rowsRead(), 0);
+  EXPECT_FALSE(reader->isDone());
+}
+
+TGFX_TEST(LayerImageReaderTest, ZeroAlphaKeepsClearedOutput) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto content = SolidLayer::Make();
+  content->setColor(Color::Red());
+  content->setWidth(8);
+  content->setHeight(8);
+  LayerImageRequest request = {};
+  request.target = content;
+  request.sceneRoot = content;
+  request.outputSize = {8, 8};
+  request.alpha = 0.0f;
+  request.blendMode = BlendMode::Clear;
+  request.clearColor = Color::FromRGBA(10, 200, 30, 255);
+  LayerImageReadOptions options = {};
+  options.bandRows = 8;
+  auto reader = LayerImageReader::Make(context, request, options);
+  ASSERT_TRUE(reader != nullptr);
+  std::vector<uint8_t> pixels(static_cast<size_t>(8) * 8 * 4, 0x7f);
+  auto info = reader->bandInfo();
+  auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), info.byteSize());
+  ASSERT_EQ(result.code, LayerImageReadCode::BandReady);
+  EXPECT_TRUE(result.lastBand);
+  for (size_t i = 0; i + 3 < pixels.size(); i += 4) {
+    EXPECT_EQ(pixels[i], 10);
+    EXPECT_EQ(pixels[i + 1], 200);
+    EXPECT_EQ(pixels[i + 2], 30);
+    EXPECT_EQ(pixels[i + 3], 255);
+  }
+}
+
+TGFX_TEST(LayerImageReaderTest, PlusDarkerBlendModeIsAccepted) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto content = SolidLayer::Make();
+  content->setColor(Color::FromRGBA(200, 100, 50, 255));
+  content->setWidth(8);
+  content->setHeight(4);
+  LayerImageRequest request = {};
+  request.target = content;
+  request.sceneRoot = content;
+  request.outputSize = {8, 4};
+  request.blendMode = BlendMode::PlusDarker;
+  LayerImageReadOptions options = {};
+  options.bandRows = 4;
+  LayerImageError error = {};
+  auto reader = LayerImageReader::Make(context, request, options, &error);
+  ASSERT_TRUE(reader != nullptr) << static_cast<int>(error.code);
+  EXPECT_EQ(error.code, LayerImageErrorCode::None);
+  std::vector<uint8_t> pixels(static_cast<size_t>(8) * 4 * 4, 0x7f);
+  auto info = reader->bandInfo();
+  auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), info.byteSize());
+  EXPECT_EQ(result.code, LayerImageReadCode::BandReady);
+  EXPECT_TRUE(result.lastBand);
+}
+
+TGFX_TEST(LayerImageReaderTest, LargeOutputKeepsIntegerBounds) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  // One pixel wider than the largest integer a float holds exactly.
+  constexpr int OutputWidth = 16777217;
+  auto root = Layer::Make();
+  auto marker = SolidLayer::Make();
+  marker->setColor(Color::Red());
+  marker->setWidth(8);
+  marker->setHeight(1);
+  marker->setMatrix(Matrix::MakeTrans(static_cast<float>(OutputWidth - 5), 0.0f));
+  root->addChild(marker);
+  LayerImageRequest request = {};
+  request.target = root;
+  request.sceneRoot = root;
+  request.outputSize = {OutputWidth, 1};
+  request.clearColor = Color::FromRGBA(0, 0, 0, 255);
+  LayerImageReadOptions options = {};
+  options.bandRows = 1;
+  LayerImageError error = {};
+  auto reader = LayerImageReader::Make(context, request, options, &error);
+  ASSERT_TRUE(reader != nullptr) << error.message;
+  std::vector<uint8_t> pixels(static_cast<size_t>(OutputWidth) * 4, 0);
+  auto info = reader->bandInfo();
+  ASSERT_EQ(info.width(), OutputWidth);
+  auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), info.byteSize());
+  ASSERT_EQ(result.code, LayerImageReadCode::BandReady)
+      << "code=" << static_cast<int>(result.error.code) << " message=" << result.error.message;
+  EXPECT_TRUE(result.lastBand);
+  EXPECT_TRUE(reader->isDone());
+  auto* last = pixels.data() + static_cast<size_t>(OutputWidth - 1) * 4;
+  EXPECT_EQ(last[0], 255);
+  EXPECT_EQ(last[1], 0);
+  EXPECT_EQ(last[2], 0);
+  EXPECT_EQ(last[3], 255);
+  auto* first = pixels.data();
+  EXPECT_EQ(first[0], 0);
+  EXPECT_EQ(first[3], 255);
 }
 
 }  // namespace tgfx

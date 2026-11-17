@@ -81,7 +81,9 @@ struct LayerDrawRequest {
   Context* context = nullptr;
 
   Matrix targetLocalToOutput = Matrix::I();
-  Rect logicalOutputBounds = {};
+  // Size of the final output pixel grid. ExportFixed only; the regular canvas path keeps using the
+  // canvas state below. It stays integral so that a large output keeps its exact pixel bounds.
+  ISize outputSize = {};
   std::shared_ptr<ColorSpace> renderColorSpace = ColorSpace::SRGB();
   Color clearColor = Color::Transparent();
   float alpha = 1.0f;
@@ -287,8 +289,8 @@ class LayerDrawSession {
 
   static bool IsSupported2DSubtree(Layer* layer);
   static bool IsSupportedAncestorChain(Layer* target, Layer* captureRoot);
-  static void ScanBackgroundOutset(Layer* layer, const Matrix& localToRoot, float* maxOutset,
-                                   bool* needsBackground);
+  static void ScanBackgroundOutset(Layer* layer, const Matrix& localToRoot, float ancestorOutset,
+                                   float* maxOutset, bool* needsBackground);
 
   RegionPlanResult planExportRegion(const PixelRect& core, const LayerDrawLimits& limits,
                                     DrawControl* control) const;

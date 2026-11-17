@@ -118,6 +118,12 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
   result.image = layer->applyFilters(std::move(result.image), density.getMaxScale(),
                                      inputContentBounds, &filterOffset);
   if (result.image == nullptr) {
+    // A filter that returns no image drops the whole layer content, so a strict draw must fail
+    // instead of delivering an empty result as a success.
+    if (args.drawControl != nullptr) {
+      args.drawControl->fail(DrawFailureCode::RenderingFailure, DrawStage::Rendering, layer, {},
+                             "a layer filter produced no image");
+    }
     return {};
   }
   result.imageMatrix.preTranslate(filterOffset.x, filterOffset.y);

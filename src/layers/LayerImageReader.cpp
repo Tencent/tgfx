@@ -51,7 +51,7 @@ static bool IsSupportedAlphaType(AlphaType alphaType) {
 static bool IsSupportedBlendMode(BlendMode blendMode) {
   auto value = static_cast<int>(blendMode);
   return value >= static_cast<int>(BlendMode::Clear) &&
-         value <= static_cast<int>(BlendMode::Luminosity);
+         value <= static_cast<int>(BlendMode::PlusDarker);
 }
 
 static LayerImageStage ToImageStage(DrawStage stage) {
@@ -539,8 +539,7 @@ std::unique_ptr<LayerImageReader> LayerImageReader::Make(Context* context,
   drawRequest.captureRoot = request.sceneRoot.get();
   drawRequest.context = context;
   drawRequest.targetLocalToOutput = request.targetLocalToOutput;
-  drawRequest.logicalOutputBounds = Rect::MakeWH(static_cast<float>(request.outputSize.width),
-                                                 static_cast<float>(request.outputSize.height));
+  drawRequest.outputSize = request.outputSize;
   drawRequest.renderColorSpace = request.renderColorSpace;
   drawRequest.clearColor = request.clearColor;
   drawRequest.alpha = request.alpha;

@@ -905,14 +905,11 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   request.canvasCacheEnabled = true;
   request.canvasColorSpace = ColorSpace::SRGB();
   request.renderColorSpace = ColorSpace::SRGB();
-  request.logicalOutputBounds = bounds;
   if (surface) {
     request.canvasCacheEnabled = !(surface->renderFlags() & RenderFlags::DisableCache);
     request.canvasColorSpace = surface->colorSpace();
     request.renderColorSpace = request.canvasColorSpace;
     request.context = surface->getContext();
-    request.logicalOutputBounds =
-        Rect::MakeWH(static_cast<float>(surface->width()), static_cast<float>(surface->height()));
   }
 
   auto session = LayerDrawSession::Prepare(request.context, request, nullptr);
