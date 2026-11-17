@@ -40,4 +40,12 @@ namespace tgfx {
 std::string ResolveSpecGates(const std::string& text, const std::vector<uint32_t>& valuesById,
                              const char* valuePrefix);
 
+/// Deletes function definitions the text never calls, cascading until no definition is left
+/// uncalled. The gates' stubs orphan whole reader/helper families whose call sites lived inside
+/// the closed branches; the driver still parses and lowers every one of them, which measured 21%
+/// of a chain program's cold compile (7.95 -> 6.25ms on a real GL driver) and 16% slower when
+/// dead code was added back. `main` is never a candidate. Any definition whose braces do not
+/// balance aborts the pass and returns the input unchanged.
+std::string RemoveUncalledFunctions(const std::string& text);
+
 }  // namespace tgfx

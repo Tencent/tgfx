@@ -188,4 +188,91 @@ std::string ResolveSpecGates(const std::string& text, const std::vector<uint32_t
   return output;
 }
 
+std::string RemoveUncalledFunctions(const std::string& text) {
+  struct Span {
+    size_t begin;
+    size_t end;
+  };
+  std::string current = text;
+  for (int pass = 0; pass < 4; ++pass) {
+    std::vector<std::pair<size_t, std::string>> definitions = {};
+    for (size_t lineStart = 0; lineStart < current.size();) {
+      const auto lineEnd = current.find('\n', lineStart);
+      const auto stop = lineEnd == std::string::npos ? current.size() : lineEnd;
+      const auto line = current.substr(lineStart, stop - lineStart);
+      const auto brace = line.find('{');
+      const auto paren = line.find('(');
+      const bool candidate = !line.empty() && line[0] != '#' && line[0] != '/' &&
+                             std::isalpha(static_cast<unsigned char>(line[0])) != 0 &&
+                             paren != std::string::npos && brace != std::string::npos;
+      if (candidate) {
+        const auto space = line.find(' ');
+        const auto nameStart =
+            space == std::string::npos ? std::string::npos : line.find_first_not_of(' ', space);
+        if (nameStart != std::string::npos && nameStart < paren) {
+          const auto name = line.substr(nameStart, paren - nameStart);
+          const bool identifier =
+              !name.empty() &&
+              (std::isalpha(static_cast<unsigned char>(name[0])) != 0 || name[0] == '_') &&
+              name.find_first_not_of(
+                  "abcdefghijklmnopqrstuvwxyz"
+                  "ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789") == std::string::npos;
+          if (identifier && name != "main") {
+            definitions.push_back({lineStart, name});
+          }
+        }
+      }
+      if (lineEnd == std::string::npos) {
+        break;
+      }
+      lineStart = lineEnd + 1;
+    }
+    if (definitions.empty()) {
+      break;
+    }
+    std::vector<Span> dead = {};
+    for (const auto& definition : definitions) {
+      const auto& name = definition.second;
+      size_t calls = 0;
+      for (size_t hit = current.find(name, 0); hit != std::string::npos;
+           hit = current.find(name, hit + 1)) {
+        auto after = hit + name.size();
+        while (after < current.size() && current[after] == ' ') {
+          ++after;
+        }
+        if (after < current.size() && current[after] == '(') {
+          ++calls;
+        }
+      }
+      if (calls > 1) {
+        continue;  // the definition plus at least one call site
+      }
+      const auto open = current.find('{', definition.first);
+      if (open == std::string::npos) {
+        return text;
+      }
+      int depth = 0;
+      size_t cursor = open;
+      for (; cursor < current.size(); ++cursor) {
+        if (current[cursor] == '{') {
+          ++depth;
+        } else if (current[cursor] == '}' && --depth == 0) {
+          break;
+        }
+      }
+      if (depth != 0 || cursor >= current.size()) {
+        return text;  // unbalanced: leave the text alone rather than cutting into it
+      }
+      dead.push_back({definition.first, cursor + 1});
+    }
+    if (dead.empty()) {
+      break;
+    }
+    for (auto it = dead.rbegin(); it != dead.rend(); ++it) {
+      current.erase(it->begin, it->end - it->begin);
+    }
+  }
+  return current;
+}
+
 }  // namespace tgfx

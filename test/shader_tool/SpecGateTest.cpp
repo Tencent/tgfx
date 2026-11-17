@@ -221,6 +221,25 @@ TEST(SpecGateTest, PrunerFailsClosedOnMalformedText) {
   EXPECT_EQ(ResolveSpecGates(nested, values, SpecContract::ConstantPrefix), nested);
 }
 
+TEST(SpecGateTest, UncalledFunctionsAreRemovedAndCascade) {
+  const std::string text =
+      "int live() { return 1; }\n"
+      "int orphanA() { return 2; }\n"
+      "int orphanB() { return orphanA() + 1; }\n"
+      "void main() { float c = float(live()); }\n";
+  const auto pruned = RemoveUncalledFunctions(text);
+  EXPECT_NE(pruned.find("int live()"), std::string::npos);
+  EXPECT_EQ(pruned.find("orphanA"), std::string::npos);
+  EXPECT_EQ(pruned.find("orphanB"), std::string::npos) << "the cascade must drop both";
+  EXPECT_NE(pruned.find("void main()"), std::string::npos);
+  EXPECT_EQ(RemoveUncalledFunctions("int f() { return 1; }\n"), "\n");
+}
+
+TEST(SpecGateTest, AnUnbalancedDefinitionLeavesTheTextAlone) {
+  const std::string text = "int broken() { if (true) { return 1; }\n";
+  EXPECT_EQ(RemoveUncalledFunctions(text), text);
+}
+
 TEST(SpecGateTest, PrunerRoundTripsTheToolsOwnGate) {
   // The strongest link: the tool emits the gate, the runtime parses what the tool emitted.
   const auto gated =

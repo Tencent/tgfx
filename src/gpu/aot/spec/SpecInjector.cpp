@@ -82,7 +82,9 @@ class MacroPrefixInjector final : public SpecInjector {
     // Splice the closed gates out before the driver ever sees the text: the stored form carries
     // every body the draw could reach, and this draw reaches one shape of it. A text without
     // gates comes back unchanged, which is the generic form's whole text.
-    const auto pruned = ResolveSpecGates(code, valuesById, prefix.c_str());
+    // The closed gates orphan the readers whose call sites lived inside them; dropping those
+    // definitions keeps the driver from parsing and lowering code no draw can reach.
+    const auto pruned = RemoveUncalledFunctions(ResolveSpecGates(code, valuesById, prefix.c_str()));
     if (!afterVersion) {
       injection->code = defines + pruned;
       return true;
