@@ -1625,6 +1625,7 @@ TGFX_TEST(BackgroundBlurTest, CaptureCullKeepsStyleSourceComplete) {
   EXPECT_EQ(direct[shadowOffset + 3], 255);
   EXPECT_EQ(tiled[shadowOffset + 3], 255);
   ExpectMatchingRenders(direct, tiled);
+  context->flushAndSubmit();
 }
 
 // The capture may only draw what it covers itself, so every footprint is clipped against each
@@ -2114,6 +2115,7 @@ TGFX_TEST(BackgroundBlurTest, BlurDoesNotSampleOutsideItsBounds) {
   auto tiled = render(RenderMode::Tiled, true);
   EXPECT_GT(CountPixelsDifferentFrom(direct, 0), 1000u);
   ExpectMatchingRenders(direct, tiled);
+  context->flushAndSubmit();
 }
 
 // The cull only skips whole layers, so a scene built from a background color proves more than one
@@ -2319,6 +2321,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintCacheSurvivesPanAndZoom) {
     displayList->render(surface.get());
     auto actual = ReadSurfacePixels(surface.get());
     ExpectMatchingRenders(expected, actual);
+    context->flushAndSubmit();
   })
 }
 

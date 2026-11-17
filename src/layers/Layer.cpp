@@ -2186,6 +2186,8 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   } else {
     renderBounds.setEmpty();
   }
+  std::vector<std::vector<Rect>*> childFootprints = {};
+  bool childUnboundedSaw = false;
   for (auto& child : _children) {
     if (!child->bitFields.visible || child->_alpha <= 0) {
       if (child->bitFields.dirtyTransform) {
@@ -2231,6 +2233,8 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     child->bitFields.dirtyTransform = false;
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);
+      childFootprints.push_back(&child->backgroundFootprints);
+      childUnboundedSaw |= child->backgroundFootprintsUnbounded;
     }
   }
   auto backOutset = 0.f;
@@ -2288,15 +2292,11 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       break;
     }
   }
-  for (auto& child : _children) {
-    if (!child->bitFields.visible || child->_alpha <= 0) {
-      continue;
-    }
-    backgroundFootprints.insert(backgroundFootprints.end(), child->backgroundFootprints.begin(),
-                                child->backgroundFootprints.end());
-    backgroundFootprintsUnbounded =
-        backgroundFootprintsUnbounded || child->backgroundFootprintsUnbounded;
+  for (auto* childFootprints : childFootprints) {
+    backgroundFootprints.insert(backgroundFootprints.end(), childFootprints->begin(),
+                                childFootprints->end());
   }
+  backgroundFootprintsUnbounded = backgroundFootprintsUnbounded || childUnboundedSaw;
   // A background style reads only the recording under its own bounds, so its descendants add nothing
   // to it. A subtree that keeps its own 3D context cannot be culled when it samples a backdrop, and
   // its bounds stand in for everything it draws.
