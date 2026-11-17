@@ -2348,13 +2348,7 @@ bool Layer::hasBackgroundStyle() {
   if (!bitFields.dirtyDescendents) {
     return maxBackgroundOutset > 0;
   }
-  for (const auto& style : _layerStyles) {
-    DEBUG_ASSERT(style != nullptr);
-    if (NeedsBackgroundSource(style->extraSourceType())) {
-      return true;
-    }
-  }
-  return hasDescendantBackgroundStyle();
+  return hasOwnBackgroundStyle() || hasDescendantBackgroundStyle();
 }
 
 bool Layer::hasDescendantBackgroundStyle() {

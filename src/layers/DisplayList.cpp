@@ -1280,9 +1280,6 @@ std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprint
   return {unionRect};
 }
 
-// Intersects each footprint with each captured rect instead of with their union, so the narrowed
-// cull never covers more than the capture would have drawn without the footprints. Footprints that
-// overlap no captured rect are dropped.
 // Returns the world rects the capture may cull its draw to, or an empty list when the whole captured
 // area has to be drawn. `worldRects` are the captured rects before the blur outset.
 std::vector<Rect> DisplayList::computeCaptureCullRects(const std::vector<Rect>& worldRects) const {
@@ -1306,6 +1303,9 @@ std::vector<Rect> DisplayList::computeCaptureCullRects(const std::vector<Rect>& 
   return buildCullRects(footprints, outsetRects);
 }
 
+// Intersects each footprint with each captured rect instead of with their union, so the narrowed
+// cull never covers more than the capture would have drawn without the footprints. Footprints that
+// overlap no captured rect are dropped.
 std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprints,
                                                const std::vector<Rect>& captureRects) {
   std::vector<Rect> narrowed = {};
@@ -1389,7 +1389,10 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   // still covers every render rect: keeping the captured area unchanged keeps the multi-pass
   // structure (and the style output sharing that depends on it) intact.
   auto culledRects = computeCaptureCullRects(visibleRects);
-  auto cullWorldRects = culledRects.empty() ? worldRects : culledRects;
+  auto cullWorldRects = worldRects;
+  if (!culledRects.empty()) {
+    cullWorldRects = std::move(culledRects);
+  }
   DrawArgs args(context);
   args.dstColorSpace = surface->colorSpace();
   args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
