@@ -2101,10 +2101,10 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, ManyStylesStillCullTheCapture){TGFX_PRIVAT
   context->flushAndSubmit();
 })}
 
-// A style reads a background image cropped to the recording it resolves, so a neighbour outside its
-// bounds cannot reach the blur. This is what lets the footprint of an unclipped layer stop at its
-// bounds rounded out to the captured pixels: were the style to sample beyond them, the culled render
-// would lose the bar.
+// A style reads a background image cropped to the recording it resolves, and that recording stays
+// inside the layer bounds up to its pixel rounding, so a neighbour outside them cannot reach the
+// blur. This is what lets the footprint of an unclipped layer stop at its bounds rounded out to the
+// captured pixels: were the style to sample beyond them, the culled render would lose the bar.
 TGFX_TEST_PRIVATE(BackgroundBlurTest, BlurDoesNotSampleOutsideItsBounds){TGFX_PRIVATE_ACCESS({
   ContextScope scope;
   auto context = scope.getContext();
@@ -2217,6 +2217,64 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, FractionalBlurKeepsTheRoundedSample){TGFX_
                                            SurfaceSize, blurredArea),
                 0u);
       EXPECT_EQ(CountDifferentPixels(expected, render(placement, mode, true, true)), 0u);
+    }
+  }
+  context->flushAndSubmit();
+})}
+
+// A stroked rounded rect or oval has no corner a miter could extend, so the recording its style
+// resolves must stop half the stroke width past the path, where the layer bounds stop. Were the
+// recording measured with the miter, the style would read a margin of backdrop the footprint misses.
+TGFX_TEST_PRIVATE(BackgroundBlurTest,
+                  StrokedRoundShapeBlurStaysInsideItsBounds){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int SurfaceSize = 240;
+
+  auto render = [&](bool oval, RenderMode mode, bool cull, bool withBar) {
+    auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
+    EXPECT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(mode);
+    displayList->_captureCullingEnabled = cull;
+    displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
+
+    if (withBar) {
+      auto bar = ShapeLayer::Make();
+      Path barPath;
+      barPath.addRect(Rect::MakeWH(6, 40));
+      bar->setPath(barPath);
+      bar->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
+      bar->setMatrix(Matrix::MakeTrans(oval ? 46 : 70, 100));
+      displayList->root()->addChild(bar);
+    }
+
+    auto blurred = ShapeLayer::Make();
+    Path path;
+    if (oval) {
+      path.addOval(Rect::MakeXYWH(60, 100, 120, 40));
+    } else {
+      RRect rRect = {};
+      rRect.setRectXY(Rect::MakeXYWH(90, 90, 60, 60), 4, 4);
+      path.addRRect(rRect);
+    }
+    blurred->setPath(path);
+    blurred->setStrokeStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 60)));
+    blurred->setLineWidth(oval ? 8 : 20);
+    blurred->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
+    displayList->root()->addChild(blurred);
+
+    displayList->render(surface.get());
+    EXPECT_FALSE(withBar && Rect::Intersects(displayList->root()->_children[0]->renderBounds,
+                                             blurred->renderBounds));
+    return ReadSurfacePixels(surface.get());
+  };
+
+  for (auto oval : {false, true}) {
+    for (auto mode : {RenderMode::Direct, RenderMode::Tiled}) {
+      auto expected = render(oval, mode, false, true);
+      EXPECT_EQ(CountDifferentPixels(expected, render(oval, mode, true, true)), 0u);
     }
   }
   context->flushAndSubmit();

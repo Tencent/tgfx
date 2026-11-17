@@ -19,6 +19,7 @@
 #include "MeasureContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/StrokeUtils.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Shape.h"
 #include "utils/MathExtra.h"
 
@@ -52,12 +53,25 @@ void MeasureContext::drawPath(const Path& path, const Matrix& matrix, const Clip
   addLocalBounds(matrix, clip, localBounds, path.isInverseFillType());
 }
 
+// A rect, a round rect or an oval turns only through right angles or smoothly, so no miter join
+// reaches past half the stroke width. Canvas sends a stroked round rect here whenever its corners
+// are too tight for the dedicated path, and measuring it with the miter would make the recording
+// several stroke widths wider than the layer that drew it.
+static bool HasNoMiterReach(const Shape& shape) {
+  if (!shape.isSimplePath()) {
+    return false;
+  }
+  auto path = shape.getPath();
+  RRect rRect = {};
+  return path.isRect() || path.isOval() || path.isRRect(&rRect);
+}
+
 void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix,
                                const ClipStack& clip, const Brush&, const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
   auto localBounds = shape->getBounds();
   if (stroke) {
-    ApplyStrokeToBounds(*stroke, &localBounds, matrix, true);
+    ApplyStrokeToBounds(*stroke, &localBounds, matrix, !HasNoMiterReach(*shape));
   }
   addLocalBounds(matrix, clip, localBounds, shape->isInverseFillType());
 }

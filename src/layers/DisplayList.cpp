@@ -1280,10 +1280,12 @@ std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprint
   return {unionRect};
 }
 
-// A style reads the captured background over the recording it resolves, which is rounded out to its
-// own pixel grid and so may reach up to one captured pixel past the render bounds, and the copy is
-// then rounded out to the captured pixels. Widening a footprint by one captured pixel and rounding
-// it out to that grid covers both roundings and nothing more.
+// A style reads the captured background under the recording it resolves. The recording measures
+// the same geometry the layer bounds do, but it is rounded out to the layer's own pixels, which are
+// no larger than the captured ones, and the copy is then rounded out to the captured pixels.
+// Widening a footprint by one captured pixel and rounding it out to that grid covers both roundings
+// and nothing more. A rotated layer's pixel spans a little more than that, but the copy is resampled
+// on the layer's grid, so the extra column only feeds the filtering tail.
 static Rect RoundOutToCapturedPixels(const Rect& footprint, const Matrix& worldToPixel,
                                      const Matrix& pixelToWorld) {
   auto pixelRect = worldToPixel.mapRect(footprint);
