@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "platform/ImageStream.h"
 #include "tgfx/platform/android/Global.h"
 
