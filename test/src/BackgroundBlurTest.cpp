@@ -2369,35 +2369,6 @@ static void AddTransformedBlur(DisplayList* displayList, const TransformedBlurSc
   displayList->root()->addChild(group);
 }
 
-static std::vector<uint8_t> RenderTransformedBlur(Context* context,
-                                                  const TransformedBlurScene& scene,
-                                                  const std::vector<Rect>& bars, bool cull,
-                                                  std::vector<Rect>* cullRects) {
-  auto surface = Surface::Make(context, 240, 240);
-  auto displayList = std::make_unique<DisplayList>();
-  displayList->setRenderMode(RenderMode::Tiled);
-  displayList->setTileSize(64);
-  displayList->_captureCullingEnabled = cull;
-  displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
-  for (const auto& bar : bars) {
-    auto layer = ShapeLayer::Make();
-    Path path;
-    path.addRect(bar);
-    layer->setPath(path);
-    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
-    displayList->root()->addChild(layer);
-  }
-  AddTransformedBlur(displayList.get(), scene);
-  displayList->render(surface.get());
-  if (cullRects != nullptr) {
-    auto captureRect = Rect::MakeWH(240.0f, 240.0f);
-    captureRect.outset(displayList->root()->maxBackgroundOutset,
-                       displayList->root()->maxBackgroundOutset);
-    *cullRects = displayList->computeCaptureCullRects({captureRect}, Matrix::I());
-  }
-  return ReadSurfacePixels(surface.get());
-}
-
 // A rotated, perspective or 3D-composited blurred layer reads its backdrop through the same rounded
 // recording, so a bar hugging any side of its cull rect from outside must leave the pixels as they
 // are: were the style to read past the cull, dropping the bar would change the blur. The scaled
@@ -2406,6 +2377,34 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, TransformedBlurKeepsTheRoundedSample){TGFX
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+
+  auto render = [&](const TransformedBlurScene& scene, const std::vector<Rect>& bars, bool cull,
+                    std::vector<Rect>* cullRects) {
+    auto surface = Surface::Make(context, 240, 240);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(RenderMode::Tiled);
+    displayList->setTileSize(64);
+    displayList->_captureCullingEnabled = cull;
+    displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
+    for (const auto& bar : bars) {
+      auto layer = ShapeLayer::Make();
+      Path path;
+      path.addRect(bar);
+      layer->setPath(path);
+      layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
+      displayList->root()->addChild(layer);
+    }
+    AddTransformedBlur(displayList.get(), scene);
+    displayList->render(surface.get());
+    if (cullRects != nullptr) {
+      auto captureRect = Rect::MakeWH(240.0f, 240.0f);
+      captureRect.outset(displayList->root()->maxBackgroundOutset,
+                         displayList->root()->maxBackgroundOutset);
+      *cullRects = displayList->computeCaptureCullRects({captureRect}, Matrix::I());
+    }
+    return ReadSurfacePixels(surface.get());
+  };
+
   TransformedBlurScene scenes[] = {
       {TransformedBlur::Rotated, 7.0f, 0.0f, 0.0f, 0.37f},
       {TransformedBlur::Rotated, 30.0f, 0.5f, 0.0f, 0.37f},
@@ -2421,7 +2420,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, TransformedBlurKeepsTheRoundedSample){TGFX
       ASSERT_TRUE(PerspectiveRotation({0, 1, 0}, scene.angle).asMatrix().hasPerspective());
     }
     std::vector<Rect> cullRects = {};
-    RenderTransformedBlur(context, scene, {}, true, &cullRects);
+    render(scene, {}, true, &cullRects);
     ASSERT_EQ(cullRects.size(), 1u);
     auto cull = cullRects[0];
     auto cx = cull.centerX();
@@ -2430,8 +2429,8 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, TransformedBlurKeepsTheRoundedSample){TGFX
                               Rect::MakeLTRB(cull.right, cy - 30, cull.right + 3, cy + 30),
                               Rect::MakeLTRB(cx - 30, cull.top - 3, cx + 30, cull.top),
                               Rect::MakeLTRB(cx - 30, cull.bottom, cx + 30, cull.bottom + 3)};
-    auto expected = RenderTransformedBlur(context, scene, bars, false, nullptr);
-    auto actual = RenderTransformedBlur(context, scene, bars, true, nullptr);
+    auto expected = render(scene, bars, false, nullptr);
+    auto actual = render(scene, bars, true, nullptr);
     EXPECT_GT(CountPixelsDifferentFrom(expected, 0), 500u);
     EXPECT_EQ(CountDifferentPixels(expected, actual), 0u);
   }
