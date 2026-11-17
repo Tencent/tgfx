@@ -738,31 +738,90 @@ TGFX_TEST(LayerImageReaderTest, RejectsReadOnlyAndMismatchedDestination) {
   request.outputSize = {40, 30};
   LayerImageReadOptions options = {};
   options.bandRows = 8;
-  auto reader = LayerImageReader::Make(context, request, options);
-  ASSERT_TRUE(reader != nullptr);
-  std::vector<uint8_t> pixels(static_cast<size_t>(40) * 8 * 4);
-  auto info = reader->bandInfo();
+  const std::vector<uint8_t> untouched(static_cast<size_t>(40) * 8 * 4, 0x7f);
+  auto pixels = untouched;
+
+  auto readOnlyReader = LayerImageReader::Make(context, request, options);
+  ASSERT_TRUE(readOnlyReader != nullptr);
+  auto info = readOnlyReader->bandInfo();
   const Pixmap readOnly(info, static_cast<const void*>(pixels.data()));
-  auto result = reader->readNextBand(context, readOnly, info.byteSize());
+  auto result = readOnlyReader->readNextBand(context, readOnly, info.byteSize());
   EXPECT_EQ(result.code, LayerImageReadCode::Failed);
   EXPECT_EQ(result.error.code, LayerImageErrorCode::InvalidInput);
+  EXPECT_EQ(result.error.stage, LayerImageStage::Validation);
+  EXPECT_EQ(result.firstRow, 0);
+  EXPECT_EQ(result.rowCount, 0);
+  EXPECT_EQ(readOnlyReader->rowsRead(), 0);
+  EXPECT_EQ(pixels, untouched);
 
+  auto narrowReader = LayerImageReader::Make(context, request, options);
+  ASSERT_TRUE(narrowReader != nullptr);
+  pixels = untouched;
   auto narrowInfo =
       ImageInfo::Make(39, 8, info.colorType(), info.alphaType(), 39 * 4, info.colorSpace());
   Pixmap narrow(narrowInfo, pixels.data());
-  result = reader->readNextBand(context, narrow, narrowInfo.byteSize());
-  EXPECT_EQ(result.code, LayerImageReadCode::Failed);
-
-  Pixmap shortBuffer(info, pixels.data());
-  result = reader->readNextBand(context, shortBuffer, info.byteSize() - 1);
-  EXPECT_EQ(result.code, LayerImageReadCode::Failed);
-
-  // A failed reader keeps the original failure and never writes again.
-  pixels.assign(pixels.size(), 0x7f);
-  result = reader->readNextBand(context, Pixmap(info, pixels.data()), info.byteSize());
+  result = narrowReader->readNextBand(context, narrow, narrowInfo.byteSize());
   EXPECT_EQ(result.code, LayerImageReadCode::Failed);
   EXPECT_EQ(result.error.code, LayerImageErrorCode::InvalidInput);
-  EXPECT_EQ(reader->rowsRead(), 0);
+  EXPECT_EQ(result.error.stage, LayerImageStage::Validation);
+  EXPECT_EQ(result.firstRow, 0);
+  EXPECT_EQ(result.rowCount, 0);
+  EXPECT_EQ(narrowReader->rowsRead(), 0);
+  EXPECT_EQ(pixels, untouched);
+
+  auto shortReader = LayerImageReader::Make(context, request, options);
+  ASSERT_TRUE(shortReader != nullptr);
+  pixels = untouched;
+  Pixmap shortBuffer(info, pixels.data());
+  result = shortReader->readNextBand(context, shortBuffer, info.byteSize() - 1);
+  EXPECT_EQ(result.code, LayerImageReadCode::Failed);
+  EXPECT_EQ(result.error.code, LayerImageErrorCode::InvalidInput);
+  EXPECT_EQ(result.error.stage, LayerImageStage::Validation);
+  EXPECT_EQ(result.firstRow, 0);
+  EXPECT_EQ(result.rowCount, 0);
+  EXPECT_EQ(shortReader->rowsRead(), 0);
+  EXPECT_EQ(pixels, untouched);
+}
+
+TGFX_TEST(LayerImageReaderTest, FailedReaderKeepsOriginalFailureAndPixels) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto root = BuildTestScene(false);
+  LayerImageRequest request = {};
+  request.target = root;
+  request.sceneRoot = root;
+  request.outputSize = {40, 30};
+  LayerImageReadOptions options = {};
+  options.bandRows = 8;
+  auto reader = LayerImageReader::Make(context, request, options);
+  ASSERT_TRUE(reader != nullptr);
+  auto info = reader->bandInfo();
+  std::vector<uint8_t> pixels(info.byteSize(), 0x7f);
+  const Pixmap readOnly(info, static_cast<const void*>(pixels.data()));
+  const auto first = reader->readNextBand(context, readOnly, pixels.size());
+  ASSERT_EQ(first.code, LayerImageReadCode::Failed);
+  ASSERT_EQ(first.error.code, LayerImageErrorCode::InvalidInput);
+  ASSERT_EQ(first.error.stage, LayerImageStage::Validation);
+  EXPECT_EQ(pixels, std::vector<uint8_t>(pixels.size(), 0x7f));
+
+  Context* readContexts[] = {nullptr, context};
+  for (auto* readContext : readContexts) {
+    pixels.assign(pixels.size(), 0x3f);
+    auto result = reader->readNextBand(readContext, Pixmap(info, pixels.data()), pixels.size());
+    EXPECT_EQ(result.code, LayerImageReadCode::Failed);
+    EXPECT_EQ(result.firstRow, 0);
+    EXPECT_EQ(result.rowCount, 0);
+    EXPECT_FALSE(result.lastBand);
+    EXPECT_EQ(result.error.code, first.error.code);
+    EXPECT_EQ(result.error.stage, first.error.stage);
+    EXPECT_EQ(result.error.firstRow, first.error.firstRow);
+    EXPECT_EQ(result.error.surfaceSize, first.error.surfaceSize);
+    EXPECT_EQ(result.error.message, first.error.message);
+    EXPECT_EQ(reader->rowsRead(), 0);
+    EXPECT_FALSE(reader->isDone());
+    EXPECT_EQ(pixels, std::vector<uint8_t>(pixels.size(), 0x3f));
+  }
 }
 
 TGFX_TEST(LayerImageReaderTest, DrawingFailureTakesPriorityOverCancellation) {
