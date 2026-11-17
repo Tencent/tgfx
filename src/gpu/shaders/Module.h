@@ -152,22 +152,6 @@ struct ModuleDim {
   DimFact source = DimFact::Unspecified;
 };
 
-/// One module's unrolled executor site: the assembler generates the macro <Name>_RUN_UNROLLED_SLOTS
-/// (one guarded call per slot of the variant's declared capacity) and the fragment hook invokes it
-/// inside the function whose locals `arguments` names — a macro, not a function, so the site stays
-/// a statement sequence in the caller's scope.
-struct UnrollSite {
-  /// The module-local function that evaluates one slot, e.g. "chainRunSlotAt".
-  const char* function = "";
-  /// Forwarded verbatim after the slot index (the caller's locals, e.g.
-  /// "result, clipRegister, coverageRootRegister").
-  const char* arguments = "";
-  /// The spec Int4 array element whose variant count bounds the unroll (SlotPacked).
-  uint8_t capacityElement = 0;
-  /// The spec Int scalar element holding the live slot count (SlotCount).
-  uint8_t countElement = 0;
-};
-
 struct Module {
   const char* name = "";
   const ModuleDim* dims = nullptr;
@@ -184,9 +168,6 @@ struct Module {
   /// too, because their assembled text reads the interpreter interface names verbatim. The runtime
   /// addresses those fields by element index through the derived layout.
   bool bareNames = false;
-  /// Present on the modules that carry an unrolled executor (the chain family); the assembler
-  /// emits the site's macro from it.
-  const UnrollSite* unroll = nullptr;
   /// The module's shared text reads the chain contract's C++ constants (the operator table and the
   /// slot-pool capacities as OP_* / TGFX_CHAIN_* defines). The build injects them for a family
   /// that declares such a module — the unrolled interpreter (Chain) and the bounded tail

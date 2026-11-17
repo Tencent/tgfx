@@ -322,38 +322,11 @@ void chainMain() {
   chainXPDst = xpReadDstColor();
   vec4 xpBlended = vec4(0.0);
 #endif
-// The unrolled executor rides behind a tool-set macro: the stub pass (reflection and the inline
-// policy) compiles the loop alone, while the generic and the spec forms compile both — the
-// generic GL driver then folds the branch away through the master-switch constant.
-//
-// The default is the loop: the unrolled form inlines one dispatch copy per slot, and the binary
-// backends keep that expansion (SPIR-V through the shaderc optimization, metallib through xcrun),
-// which measured 7x on the Metal bundle (10.46MB -> 1.53MB) and 40% on its first-program time,
-// with no hot-path change on Metal or GL. The unrolled form stays behind the macro for callers
-// that set it explicitly.
-#ifndef TGFX_SPEC_UNROLLED_EXECUTOR
-#define TGFX_SPEC_UNROLLED_EXECUTOR 0
-#endif
-#if TGFX_SPEC_UNROLLED_EXECUTOR
-  if (SPEC_ACTIVE()) {
-    // The specialized executor: one call site per slot with literal indices. Once the runtime
-    // injects the values, every guard and every selector word becomes a compile-time constant, so
-    // the driver deletes the out-of-range call sites entirely.
-    // One guarded call site per slot of the declared capacity, generated from the module's
-    // UnrollSite declaration (one line per slot of the variant's own capacity).
-    Chain_RUN_UNROLLED_SLOTS()
-#if HAS_XP >= 1
-    if (xpNeedsBlendPass()) {
-      chainXPSrc = CHAIN_XP_SRC_UNPREMUL;
-      xpBlended = evalChainSlot(SPEC_SlotCount());
-    }
-#endif
-  } else
-#endif
   {
-    // The generic executor: the runtime loop over uniform data. The compiler cannot unroll it
-    // because the bound is uniform data; this is the zero-compile path every unspecialized
-    // compile runs.
+    // The executor: one loop over the slots, one dispatch copy. The unrolled form that emitted a
+    // call site per slot let the binary backends inline a full dispatch copy into each; it
+    // measured 7x the Metal bundle (10.46MB -> 1.53MB) and 40% of its first-program time with no
+    // hot-path gain on Metal or GL, so it is deleted rather than kept behind a flag.
 #if HAS_XP >= 1
     int passCount = SPEC_SlotCount() + (xpNeedsBlendPass() ? 1 : 0);
 #else

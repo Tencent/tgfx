@@ -72,7 +72,6 @@ inline constexpr Module YUVChainTail = {
     /*hasVertex=*/false,
     /*hasFragment=*/false,
     /*bareNames=*/true,
-    /*unroll=*/nullptr,
     /*chainContract=*/true};
 
 }  // namespace tgfx

@@ -67,12 +67,6 @@ inline constexpr uint8_t ChainCtmZeroMask = 0x7C;
 inline constexpr uint8_t ChainCtmOneToFourMask = 0x64;
 inline constexpr uint8_t ChainCtmFiveMask = 0x60;
 
-// The unrolled executor: chainRunSlotAt (the shared fragment main) per slot of the variant's own
-// capacity, with the caller's three register locals forwarded verbatim.
-inline constexpr UnrollSite ChainUnroll = {"chainRunSlotAt",
-                                           "result, clipRegister, coverageRootRegister",
-                                           /*capacityElement=*/1, /*countElement=*/0};
-
 inline constexpr Element ChainElements[] = {
     // The specialization surface, in the compiled text's first-use order (the ids must line up):
     // SlotCount = id 1, SlotPacked = ids 2..(1 + 4 * capacity), then the three register indices.
@@ -199,7 +193,6 @@ inline constexpr Module Chain = {
     true,
     true,
     /*bareNames=*/true,
-    &ChainUnroll,
     /*chainContract=*/true};
 
 }  // namespace tgfx

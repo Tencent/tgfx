@@ -41,12 +41,8 @@ inline constexpr Element TestSpecElements[] = {
     {Element::Kind::Param, ShaderType::Float4, "Payload", 1, -1, 0, false, 0, TestPoolCounts},
 };
 
-inline constexpr UnrollSite TestUnroll = {"runSlotAt", "result", /*capacityElement=*/1,
-                                          /*countElement=*/0};
-
 inline constexpr Module TestSpecModule = {"TestSpec", TestSpecDims, 2,    TestSpecElements,
-                                          4,          false,        true, /*bareNames=*/false,
-                                          &TestUnroll};
+                                          4,          false,        true, /*bareNames=*/false};
 
 inline constexpr ModuleDim TestGeomDims[] = {{"STROKE", 2}};
 

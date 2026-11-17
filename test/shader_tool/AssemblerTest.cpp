@@ -58,25 +58,6 @@ TEST(AssemblerTest, GeneratesTheSpecPrologueFromTheDeclaration) {
   EXPECT_FALSE(Contains(assembled.vertText, "TGFX_SPEC")) << assembled.vertText;
 }
 
-TEST(AssemblerTest, UnrollSitesFollowTheVariantCapacity) {
-  const auto wide = AssembleVariant(test_modules::TestFamily, test_modules::TestVariant(1));
-  EXPECT_TRUE(Contains(wide.fragText, "#define TestSpec_RUN_UNROLLED_SLOTS()")) << wide.fragText;
-  EXPECT_TRUE(
-      Contains(wide.fragText, "if (TestSpec_SPEC_SlotCount() > 0) { runSlotAt(0, result); }"))
-      << wide.fragText;
-  EXPECT_TRUE(
-      Contains(wide.fragText, "if (TestSpec_SPEC_SlotCount() > 31) { runSlotAt(31, result); }"))
-      << wide.fragText;
-
-  // The 3-slot capacity emits three sites only: the capacity is a declaration fact, so no
-  // preprocessor guard is needed (the former CHAIN_SLOT_CAPACITY #if brackets).
-  const auto tail = AssembleVariant(test_modules::TestFamily, test_modules::TestVariant(2));
-  EXPECT_TRUE(
-      Contains(tail.fragText, "if (TestSpec_SPEC_SlotCount() > 2) { runSlotAt(2, result); }"))
-      << tail.fragText;
-  EXPECT_FALSE(Contains(tail.fragText, "runSlotAt(3,")) << tail.fragText;
-}
-
 TEST(AssemblerTest, FamiliesWithoutSpecKeepACleanText) {
   uint16_t solidColor = 0xFFFF;
   for (size_t index = 0; index < FamilyCount(); ++index) {
@@ -89,7 +70,6 @@ TEST(AssemblerTest, FamiliesWithoutSpecKeepACleanText) {
   variant.family = solidColor;
   const auto assembled = AssembleVariant(Families()[solidColor], variant);
   EXPECT_FALSE(Contains(assembled.fragText, "TGFX_SPEC")) << assembled.fragText;
-  EXPECT_FALSE(Contains(assembled.fragText, "RUN_UNROLLED_SLOTS")) << assembled.fragText;
 }
 
 }  // namespace tgfx

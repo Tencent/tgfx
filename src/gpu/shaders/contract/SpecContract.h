@@ -40,7 +40,6 @@ inline constexpr const char* HlslConstantPrefix = "SPIRV_CROSS_CONSTANT_ID_";
 inline constexpr const char* MasterSwitch = "TGFX_SPEC_0";
 
 /// The macro that marks an executor whose call sites were fully unrolled at build time.
-inline constexpr const char* UnrolledExecutorMacro = "TGFX_SPEC_UNROLLED_EXECUTOR";
 
 /// The per-field accessor (`<prefix><field>`), which reads the constant when specialized and the
 /// uniform otherwise.

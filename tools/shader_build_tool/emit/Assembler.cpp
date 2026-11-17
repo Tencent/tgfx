@@ -113,35 +113,6 @@ void AppendSpecBlock(const Family& family, const Variant& variant, const Variant
   }
 }
 
-/// The unrolled executor's macro: one guarded call site per slot of the variant's declared
-/// capacity. A macro, not a function, so the sites stay statements in the calling hook's scope,
-/// derived entirely from the declaration.
-void AppendUnrollMacro(const Family& family, const Variant& variant, const Module* module,
-                       uint8_t slot, std::string* text) {
-  const UnrollSite& site = *module->unroll;
-  const Element& countElement = module->elements[site.countElement];
-  const uint16_t capacity = ElementCountOf(module->elements[site.capacityElement],
-                                           DimOffsetOf(family, variant, slot), variant);
-  const std::string countAccessor =
-      (module->bareNames ? std::string() : std::string(module->name) + "_") +
-      SpecContract::FieldAccessorPrefix + countElement.name;
-  // One guarded call site per slot. The guard is a runtime `if` on a spec constant: the source
-  // preprocessor resolves every #if before the tool sees the text, so a source-level guard would
-  // be folded away at build time and never reach the driver. (A post-preprocessing rewrite that
-  // guards the sites would keep ~16 copies of the evaluator out of the driver's input; it needs
-  // its own text pass and is not in place yet.)
-  *text += "#define " + std::string(module->name) + "_RUN_UNROLLED_SLOTS() \\\n";
-  for (uint16_t slotIndex = 0; slotIndex < capacity; ++slotIndex) {
-    *text += "  if (" + countAccessor + "() > " + std::to_string(slotIndex) + ") { " +
-             site.function + "(" + std::to_string(slotIndex);
-    if (site.arguments != nullptr && site.arguments[0] != '\0') {
-      *text += ", " + std::string(site.arguments);
-    }
-    *text += "); }";
-    *text += slotIndex + 1 < capacity ? " \\\n" : "\n";
-  }
-}
-
 }  // namespace
 
 AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
@@ -286,13 +257,6 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
   frag += samplers;
   frag += "layout(location = 0) out vec4 fragColor;\n";
   AppendSpecBlock(family, variant, modules, &frag);
-  for (uint8_t slot = 0; slot < modules.count; ++slot) {
-    const Module* module = modules.list[slot];
-    if (module == nullptr || !ModulePresent(family, variant, slot) || module->unroll == nullptr) {
-      continue;
-    }
-    AppendUnrollMacro(family, variant, module, slot, &frag);
-  }
   frag += includes;
   frag += "void main() {\n";
   frag += "  Fragment f;\n";
