@@ -215,9 +215,11 @@ static ISize ComputeTextureSize(const float matrix[16], int width, int height) {
   // zero. Rotation, horizontal flip, or a missing vertical flip are rejected by the guard below.
   // The scale and translation terms encode cropSize / bufferSize (the translation cancels the
   // half-texel filtering shrink), so dividing the content size by them recovers the buffer size;
-  // this matches the real device matrices this fix was validated against. Any matrix the formula
-  // cannot invert yields a size below the content, which the final check rejects so the caller
-  // falls back to the content size, i.e. the pre-fix behavior.
+  // this matches the real device matrices this fix was validated against. The recovery is only
+  // guaranteed for a crop anchored at the buffer origin. A crop offset from the origin recovers a
+  // size larger than the content but still wrong (for example content 720 inside a 768 buffer with
+  // an 8-pixel left crop recovers 751), and the final check below only rejects results smaller than
+  // the content, so it cannot catch that case. Non-origin crops are a known, unhandled limitation.
   if (matrix[1] != 0 || matrix[4] != 0 || matrix[0] <= 0 || matrix[5] >= 0) {
     return {};
   }

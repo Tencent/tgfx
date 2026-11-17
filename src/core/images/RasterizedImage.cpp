@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RasterizedImage.h"
-#include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
@@ -42,9 +41,17 @@ std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& ar
   // The cached texture view may be larger than the content it carries, for example a
   // hardware-decoded video buffer aligned by the decoder. Report the content size in that case so
   // the coordinate transform in asFragmentProcessor() does not stretch the content over the
-  // padding and the sampling clamps to the content instead of the whole padded texture.
-  auto contentWidth = FloatSaturateToInt(static_cast<float>(width()) * newScale);
-  auto contentHeight = FloatSaturateToInt(static_cast<float>(height()) * newScale);
+  // padding and the sampling clamps to the content instead of the whole padded texture. Only clamp
+  // at full scale: a downscaled cache texture is created at the rounded dimensions returned by
+  // getScaledDimensions() (round for most codecs, ceil for JPEG), so recomputing the size here with
+  // a truncating multiply would undershoot the real texture by one pixel and make a wrapped proxy
+  // disagree with the freshly created one. Pass 0 for that case to keep the proxy at its real size.
+  auto contentWidth = 0;
+  auto contentHeight = 0;
+  if (newScale == 1.0f) {
+    contentWidth = width();
+    contentHeight = height();
+  }
   auto textureProxy =
       proxyProvider->findOrWrapTextureProxy(textureKey, contentWidth, contentHeight);
   if (textureProxy != nullptr) {

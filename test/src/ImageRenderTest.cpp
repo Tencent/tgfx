@@ -22,6 +22,9 @@
 #include "core/images/TransformImage.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/ResourceCache.h"
+#include "gpu/TPArgs.h"
+#include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
@@ -594,6 +597,32 @@ TGFX_TEST(ImageRenderTest, RasterizedMipmapImage) {
       EXPECT_TRUE(mipmapKey == std::static_pointer_cast<RasterizedImage>(image)->getTextureKey());
       mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
       EXPECT_TRUE(mipmapTexture != nullptr));
+}
+
+TGFX_TEST(ImageRenderTest, RasterizedScaledProxySize) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  // GenMesh.png is 1563x1563, an odd size so that width * 0.5 is not an integer. The decoder rounds
+  // the downscaled cache texture to round(1563 * 0.5) = 782, while a truncating content-size clamp
+  // would report 781. A wrapped proxy that reused that truncated size would make a cached draw
+  // sample one fewer column and row than the first draw.
+  auto image = MakeImage("resources/assets/GenMesh.png");
+  ASSERT_TRUE(image != nullptr);
+  image = image->makeRasterized();
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, 800, 800);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->setMatrix(Matrix::MakeScale(0.4f));
+  canvas->drawImage(image);
+  context->flushAndSubmit();
+  TGFX_PRIVATE_ACCESS(auto raster = std::static_pointer_cast<RasterizedImage>(image);
+                      auto scaledKey = raster->getTextureKey(0.5f);
+                      EXPECT_TRUE(context->resourceCache()->hasUniqueResource(scaledKey));
+                      TPArgs tpArgs(context, 0, false, 0.5f, BackingFit::Exact);
+                      auto proxy = raster->lockTextureProxy(tpArgs); ASSERT_TRUE(proxy != nullptr);
+                      EXPECT_EQ(proxy->width(), 782); EXPECT_EQ(proxy->height(), 782));
 }
 
 TGFX_TEST(ImageRenderTest, drawScaleImage) {
