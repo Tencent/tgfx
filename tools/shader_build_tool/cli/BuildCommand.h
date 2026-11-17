@@ -41,7 +41,35 @@ struct BuildOptions {
   /// quietly producing the other form.
   std::string d3d12ShaderFormat = "dxbc";
   std::string metalMinOS;
+  /// Where the stamp manifest lands (the build's bundle_stamp): the tool's identity plus every
+  /// written bundle's digest, so a later --verify can prove the artifacts on disk are the ones
+  /// this tool produced.
+  std::string stampPath;
+  /// Verify a stamp manifest and exit: every recorded bundle must exist, match its digest, and
+  /// have been produced by the running tool.
+  std::string verifyPath;
 };
+
+/// One bundle recorded in the stamp manifest.
+struct StampFileEntry {
+  /// The backend tag the bundle carries (its filename's middle segment).
+  std::string backend;
+  /// The bundle's path on disk.
+  std::string path;
+};
+
+/// Writes the stamp manifest: the generating tool's identity, a schema line, and one row per
+/// bundle with its SHA-256 and size. Atomic (a temp file renamed into place), so a failed write
+/// never leaves a half stamp behind.
+bool WriteStampManifest(const std::string& stampPath, const std::string& toolIdentity,
+                        const std::vector<StampFileEntry>& entries, std::string* error);
+
+/// Reads a stamp manifest and re-checks everything it records: the bundles must exist with their
+/// recorded sizes and digests, and the manifest must have been written by the running tool. Every
+/// failure message ends with the same fix (delete the stamp and rebuild), so a stale or tampered
+/// artifact is one command away from regeneration.
+bool VerifyStampManifest(const std::string& stampPath, const std::string& toolIdentity,
+                         std::string* error);
 
 /// The usage text, one entry per option ParseArgs accepts. Returned rather than printed so a test
 /// can assert the documented options and the parser agree (see test/shader_tool/CliTest.cpp).

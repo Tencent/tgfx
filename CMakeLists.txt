@@ -1041,15 +1041,18 @@ if (TGFX_EMBED_SHADER_BUNDLES)
                         ${TGFX_SHADER_TOOL_METAL_ARGS}
                         ${TGFX_SHADER_TOOL_FORMAT_ARGS}
                         --compress
-                COMMAND ${CMAKE_COMMAND} -E touch ${TGFX_SHADER_BUNDLE_STAMP}
+                        --stamp ${TGFX_SHADER_BUNDLE_STAMP}
                 DEPENDS ${TGFX_SHADER_TOOL_DEPENDS} ${TGFX_SHADER_SOURCES}
                 COMMENT "Compiling precompiled shader bundles (${TGFX_SHADER_BACKENDS})")
 
     # Depend on the stamp only: the bundle files are BYPRODUCTS of the rule that writes the stamp,
     # and the Makefile generators cannot resolve a direct dependency on a byproduct that does not
-    # exist yet on the first build ("No rule to make target"). The stamp is touched after the tool
-    # succeeds, so its presence guarantees the files exist.
-    add_custom_target(tgfx_shader_bundles DEPENDS ${TGFX_SHADER_BUNDLE_STAMP})
+    # exist yet on the first build ("No rule to make target"). The stamp is a manifest the tool
+    # writes (its own identity plus every bundle's digest), and the target re-verifies it on every
+    # build, so a stale, tampered or missing bundle fails loudly instead of embedding quietly.
+    add_custom_target(tgfx_shader_bundles
+            COMMAND ${TGFX_SHADER_TOOL_COMMAND} --verify ${TGFX_SHADER_BUNDLE_STAMP}
+            DEPENDS ${TGFX_SHADER_BUNDLE_STAMP} ${TGFX_SHADER_TOOL_DEPENDS})
 
     set(TGFX_EMBEDDED_BUNDLE_DIR "${CMAKE_BINARY_DIR}/generated/embedded")
     file(MAKE_DIRECTORY ${TGFX_EMBEDDED_BUNDLE_DIR})

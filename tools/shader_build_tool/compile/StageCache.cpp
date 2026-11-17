@@ -270,22 +270,16 @@ std::string StageCacheKey::finish() {
 
 StageCache::StageCache() = default;
 
-bool StageCache::open(const std::string& dir, std::string* error) {
-  directory.clear();
-  identity.clear();
-  if (!Sha256SelfTest()) {
-    *error = "SHA-256 self-test failed";
-    return false;
-  }
+std::string ComputeToolIdentity(std::string* error) {
   auto executable = ExecutablePath();
   if (executable.empty()) {
     *error = "cannot locate the shader_build_tool executable to identify it";
-    return false;
+    return {};
   }
   std::ifstream file(executable, std::ios::binary);
   if (!file.is_open()) {
     *error = "cannot read " + executable + " to identify it";
-    return false;
+    return {};
   }
   Sha256 toolHash;
   std::vector<char> chunk(1 << 20);
@@ -293,13 +287,26 @@ bool StageCache::open(const std::string& dir, std::string* error) {
     file.read(chunk.data(), static_cast<std::streamsize>(chunk.size()));
     toolHash.update(chunk.data(), static_cast<size_t>(file.gcount()));
   }
+  return Sha256::Hex(toolHash.finish());
+}
+
+bool StageCache::open(const std::string& dir, std::string* error) {
+  directory.clear();
+  identity.clear();
+  if (!Sha256SelfTest()) {
+    *error = "SHA-256 self-test failed";
+    return false;
+  }
+  identity = ComputeToolIdentity(error);
+  if (identity.empty()) {
+    return false;
+  }
   std::error_code code;
   std::filesystem::create_directories(dir, code);
   if (code) {
     *error = "cannot create " + dir + ": " + code.message();
     return false;
   }
-  identity = Sha256::Hex(toolHash.finish());
   directory = dir;
   return true;
 }

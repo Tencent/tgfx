@@ -79,6 +79,11 @@ struct StageCacheStats {
 /// a damaged entry counts as corrupt and is recompiled. Entries are written to a temporary file
 /// and renamed into place, so a concurrent or interrupted build never leaves a half-written entry
 /// that can be read back. Only successful compilations are stored.
+/// The SHA-256 of the running executable as hex, or "" with *error set. The stage cache keys and
+/// the bundle stamp manifest both carry this one identity, so a rebuilt tool invalidates the
+/// cache entries and fails the stamp's verification together.
+std::string ComputeToolIdentity(std::string* error);
+
 class StageCache {
  public:
   StageCache();

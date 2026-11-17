@@ -20,10 +20,13 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <set>
+#include <sstream>
 #include <utility>
 #include <vector>
 #include "cli/ReportWriter.h"
@@ -126,6 +129,136 @@ static void RecordBuildError(Diagnostics* diagnostics, Layer layer, const char* 
 
 }  // namespace
 
+namespace {
+
+std::string DigestOfFile(const std::string& path, uint64_t* size, std::string* error) {
+  std::ifstream file(path, std::ios::binary);
+  if (!file.is_open()) {
+    *error = "cannot read " + path;
+    return {};
+  }
+  Sha256 hash;
+  std::vector<char> chunk(1 << 16);
+  uint64_t total = 0;
+  while (file) {
+    file.read(chunk.data(), static_cast<std::streamsize>(chunk.size()));
+    const auto got = static_cast<size_t>(file.gcount());
+    hash.update(chunk.data(), got);
+    total += got;
+  }
+  *size = total;
+  return Sha256::Hex(hash.finish());
+}
+
+std::string FileNameOf(const std::string& path) {
+  const auto slash = path.find_last_of('/');
+  return slash == std::string::npos ? path : path.substr(slash + 1);
+}
+
+std::string DirectoryOf(const std::string& path) {
+  const auto slash = path.find_last_of('/');
+  return slash == std::string::npos ? std::string(".") : path.substr(0, slash);
+}
+
+}  // namespace
+
+bool WriteStampManifest(const std::string& stampPath, const std::string& toolIdentity,
+                        const std::vector<StampFileEntry>& entries, std::string* error) {
+  std::string text = "tool=" + toolIdentity + "\nschema=1\n";
+  for (const auto& entry : entries) {
+    uint64_t size = 0;
+    std::string digestError;
+    const auto digest = DigestOfFile(entry.path, &size, &digestError);
+    if (digest.empty()) {
+      *error = "stamp: " + digestError;
+      return false;
+    }
+    text += entry.backend + " " + digest + " " + std::to_string(size) + " " +
+            FileNameOf(entry.path) + "\n";
+  }
+  const auto temp = stampPath + ".tmp";
+  {
+    std::ofstream file(temp, std::ios::binary | std::ios::trunc);
+    file.write(text.data(), static_cast<std::streamsize>(text.size()));
+    file.close();
+    if (!file.good()) {
+      *error = "stamp: cannot write " + temp;
+      return false;
+    }
+  }
+  std::error_code code;
+  std::filesystem::rename(temp, stampPath, code);
+  if (code) {
+    std::filesystem::remove(temp, code);
+    *error = "stamp: cannot move " + temp + " onto " + stampPath;
+    return false;
+  }
+  return true;
+}
+
+bool VerifyStampManifest(const std::string& stampPath, const std::string& toolIdentity,
+                         std::string* error) {
+  std::ifstream file(stampPath, std::ios::binary);
+  if (!file.is_open()) {
+    *error = "verify: no stamp at " + stampPath;
+    return false;
+  }
+  const std::string fix = "fix: delete " + stampPath + " and rebuild";
+  std::string line;
+  if (!std::getline(file, line) || line.rfind("tool=", 0) != 0) {
+    *error = "verify: " + stampPath + " is not a stamp manifest; " + fix;
+    return false;
+  }
+  const auto recordedTool = line.substr(5);
+  if (recordedTool != toolIdentity) {
+    *error = "verify: the stamp was written by tool " + recordedTool.substr(0, 12) +
+             " but the running tool is " + toolIdentity.substr(0, 12) + "; " + fix;
+    return false;
+  }
+  if (!std::getline(file, line) || line != "schema=1") {
+    *error = "verify: unknown stamp schema; " + fix;
+    return false;
+  }
+  const auto dir = DirectoryOf(stampPath);
+  size_t checked = 0;
+  while (std::getline(file, line)) {
+    if (line.empty()) {
+      continue;
+    }
+    std::istringstream row(line);
+    std::string backend;
+    std::string digest;
+    std::string name;
+    uint64_t size = 0;
+    if (!(row >> backend >> digest >> size >> name)) {
+      *error = "verify: malformed stamp row '" + line + "'; " + fix;
+      return false;
+    }
+    uint64_t actualSize = 0;
+    std::string digestError;
+    const auto actual = DigestOfFile(dir + "/" + name, &actualSize, &digestError);
+    if (actual.empty()) {
+      *error = "verify: " + digestError + "; " + fix;
+      return false;
+    }
+    if (actualSize != size) {
+      *error = "verify: " + name + " is " + std::to_string(actualSize) +
+               " bytes, the stamp recorded " + std::to_string(size) + "; " + fix;
+      return false;
+    }
+    if (actual != digest) {
+      *error = "verify: " + name + " does not match its recorded digest; " + fix;
+      return false;
+    }
+    ++checked;
+  }
+  if (checked == 0) {
+    *error = "verify: the stamp records no bundles; " + fix;
+    return false;
+  }
+  return true;
+}
+
 std::string UsageText() {
   return "Usage: shader_build_tool [options]\n"
          "  --shader-dir <path>   Directory containing shader sources\n"
@@ -136,6 +269,11 @@ std::string UsageText() {
          "  --compress            Compress data pool with zstd in output bundles\n"
          "  --cache-dir <path>    Persistent stage cache (default: <out-dir>/stage_cache)\n"
          "  --no-cache            Compile every stage, reading and writing no persistent cache\n"
+         "\n"
+         "  --stamp <path>        Write a stamp manifest after the bundles: the tool's identity\n"
+         "                        and every bundle's digest, for --verify to check later\n"
+         "  --verify <path>       Check a stamp manifest and exit: every bundle must match its\n"
+         "                        recorded digest and the tool that wrote the stamp\n"
          "\n"
          "  --metal-sdk <sdk>     Platform of the Metal bundle: macosx (default), iphoneos or\n"
          "                        iphonesimulator. A metallib only works on its own platform\n"
@@ -166,6 +304,10 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->cacheDir = argv[++i];
     } else if (std::strcmp(argv[i], "--no-cache") == 0) {
       options->noCache = true;
+    } else if (std::strcmp(argv[i], "--stamp") == 0 && i + 1 < argc) {
+      options->stampPath = argv[++i];
+    } else if (std::strcmp(argv[i], "--verify") == 0 && i + 1 < argc) {
+      options->verifyPath = argv[++i];
 
     } else if (std::strcmp(argv[i], "--metal-sdk") == 0 && i + 1 < argc) {
       options->metalSdk = argv[++i];
@@ -497,6 +639,22 @@ int RunBuildCommand(const BuildOptions& options) {
     report.diagnostics.registerProfile(ProfileTag(profile));
   }
   // Every family is a row of the declaration table; nothing else can register work.
+  if (!options.verifyPath.empty()) {
+    std::string identityError;
+    const auto identity = ComputeToolIdentity(&identityError);
+    if (identity.empty()) {
+      std::cerr << "verify: " << identityError << "\n";
+      return 1;
+    }
+    std::string error;
+    if (!VerifyStampManifest(options.verifyPath, identity, &error)) {
+      std::cerr << error << "\n";
+      return 1;
+    }
+    std::cout << "Bundles verified.\n";
+    return 0;
+  }
+
   if (FamilyCount() == 0) {
     std::cerr << "No shaders registered in the declaration table.\n";
     return 1;
@@ -558,6 +716,7 @@ int RunBuildCommand(const BuildOptions& options) {
   }
 
   // Write bundle files grouped by backend (profileTag)
+  std::vector<StampFileEntry> stampEntries = {};
   if (!report.variants.empty()) {
     std::map<std::string, std::vector<VariantData>> byBackend;
     for (auto& v : report.variants) {
@@ -571,6 +730,19 @@ int RunBuildCommand(const BuildOptions& options) {
         return 1;
       }
       std::cout << "Bundle written: " << filename << " (" << pair.second.size() << " entries)\n";
+      stampEntries.push_back({pair.first, path});
+    }
+  }
+  // The stamp is a manifest of what this tool just wrote, so a later --verify can prove the
+  // bundles on disk are these ones.
+  if (!options.stampPath.empty()) {
+    std::string identityError;
+    const auto identity = ComputeToolIdentity(&identityError);
+    std::string stampError;
+    if (identity.empty() ||
+        !WriteStampManifest(options.stampPath, identity, stampEntries, &stampError)) {
+      std::cerr << (identity.empty() ? identityError : stampError) << "\n";
+      return 1;
     }
   }
 
