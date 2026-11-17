@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <cstdlib>
 #include <vector>
+#include "layers/DrawArgs.h"
+#include "layers/LayerDrawSession.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Pixmap.h"
@@ -38,6 +40,21 @@ namespace {
 
 static constexpr int TestWidth = 160;
 static constexpr int TestHeight = 120;
+
+class FailingCancelLayer final : public Layer {
+ public:
+  LayerImageReader* reader = nullptr;
+  int drawCount = 0;
+
+ protected:
+  bool drawLayer(const DrawArgs& args, Canvas*, float, BlendMode) override {
+    drawCount++;
+    args.drawControl->fail(DrawFailureCode::RenderingFailure, DrawStage::Rendering, this, {},
+                           "test drawing failure before cancellation");
+    reader->requestCancel();
+    return true;
+  }
+};
 
 struct PixelImage {
   std::vector<uint8_t> pixels = {};
@@ -739,6 +756,52 @@ TGFX_TEST(LayerImageReaderTest, RejectsReadOnlyAndMismatchedDestination) {
   EXPECT_EQ(result.code, LayerImageReadCode::Failed);
   EXPECT_EQ(result.error.code, LayerImageErrorCode::InvalidInput);
   EXPECT_EQ(reader->rowsRead(), 0);
+}
+
+TGFX_TEST(LayerImageReaderTest, DrawingFailureTakesPriorityOverCancellation) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto root = std::make_shared<FailingCancelLayer>();
+  LayerImageRequest request = {};
+  request.target = root;
+  request.sceneRoot = root;
+  request.outputSize = {8, 4};
+  LayerImageReadOptions options = {};
+  options.bandRows = 4;
+  auto reader = LayerImageReader::Make(context, request, options);
+  ASSERT_TRUE(reader != nullptr);
+  root->reader = reader.get();
+  auto info = reader->bandInfo();
+  std::vector<uint8_t> pixels(info.byteSize(), 0x7f);
+  auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
+  ASSERT_EQ(root->drawCount, 1);
+  ASSERT_EQ(result.code, LayerImageReadCode::Failed);
+  EXPECT_EQ(result.firstRow, 0);
+  EXPECT_EQ(result.rowCount, 0);
+  EXPECT_FALSE(result.lastBand);
+  EXPECT_EQ(result.error.code, LayerImageErrorCode::DrawFailed);
+  EXPECT_EQ(result.error.stage, LayerImageStage::Rendering);
+  EXPECT_EQ(result.error.firstRow, 0);
+  EXPECT_EQ(result.error.message, "test drawing failure before cancellation");
+  EXPECT_EQ(reader->rowsRead(), 0);
+  EXPECT_FALSE(reader->isDone());
+  EXPECT_EQ(pixels, std::vector<uint8_t>(pixels.size(), 0x7f));
+
+  auto next = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
+  EXPECT_EQ(next.code, LayerImageReadCode::Failed);
+  EXPECT_EQ(next.firstRow, result.firstRow);
+  EXPECT_EQ(next.rowCount, 0);
+  EXPECT_FALSE(next.lastBand);
+  EXPECT_EQ(next.error.code, result.error.code);
+  EXPECT_EQ(next.error.stage, result.error.stage);
+  EXPECT_EQ(next.error.firstRow, result.error.firstRow);
+  EXPECT_EQ(next.error.surfaceSize, result.error.surfaceSize);
+  EXPECT_EQ(next.error.message, result.error.message);
+  EXPECT_EQ(root->drawCount, 1);
+  EXPECT_EQ(reader->rowsRead(), 0);
+  EXPECT_FALSE(reader->isDone());
+  EXPECT_EQ(pixels, std::vector<uint8_t>(pixels.size(), 0x7f));
 }
 
 TGFX_TEST(LayerImageReaderTest, CancelledReaderStaysCancelled) {

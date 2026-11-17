@@ -425,16 +425,15 @@ LayerImageReadResult LayerImageReader::Impl::readNextBand(Context* context,
     LayerImageReadResult failure = {};
     auto outcome = drawRegionList(context, regions, bandFirstRow, destination, &control,
                                   &surfaceCache, &failure);
-    if (outcome == DrawOutcome::Cancelled || cancelRequested.load()) {
-      return cancel();
-    }
-    if (outcome != DrawOutcome::Success) {
+    if (outcome == DrawOutcome::Failed) {
       if (failure.code == LayerImageReadCode::Failed) {
-        result = failure;
-        return result;
+        return failure;
       }
       return fail(LayerImageErrorCode::DrawFailed, LayerImageStage::Rendering,
                   "failed to draw a band");
+    }
+    if (outcome == DrawOutcome::Cancelled || cancelRequested.load()) {
+      return cancel();
     }
     bandOffsetY += chunkHeight;
   }
