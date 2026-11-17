@@ -2271,56 +2271,111 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintCacheFollowsMovedLayers){TGFX_PRI
 })}
 
 // Panning and zooming change no layer bounds, so the cached footprints stay valid.
-TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintCacheSurvivesPanAndZoom) {
+TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintCacheSurvivesPanAndZoom){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int SurfaceSize = 240;
+
+  auto build = [&](std::unique_ptr<DisplayList>* out) {
+    out->reset(new DisplayList());
+    (*out)->setRenderMode(RenderMode::Tiled);
+    (*out)->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
+    for (int i = 0; i < 4; ++i) {
+      auto block = ShapeLayer::Make();
+      Path path;
+      path.addRect(Rect::MakeWH(16, 16));
+      block->setPath(path);
+      block->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
+      block->setMatrix(Matrix::MakeTrans(30.0f + static_cast<float>(i) * 50.0f, 110.0f));
+      (*out)->root()->addChild(block);
+    }
+    auto blurred = ShapeLayer::Make();
+    Path blurPath;
+    blurPath.addRect(Rect::MakeWH(60, 60));
+    blurred->setPath(blurPath);
+    blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 60)));
+    blurred->setMatrix(Matrix::MakeTrans(80, 60));
+    blurred->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
+    (*out)->root()->addChild(blurred);
+  };
+
+  auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
+  // Reference: the panned and zoomed view, without culling.
+  auto reference = std::unique_ptr<DisplayList>();
+  build(&reference);
+  reference->setRenderMode(RenderMode::Direct);
+  reference->_captureCullingEnabled = false;
+  reference->setZoomScale(1.5f);
+  reference->setContentOffset(-30.0f, -10.0f);
+  reference->render(surface.get());
+  auto expected = ReadSurfacePixels(surface.get());
+
+  // Same list: render, warm the cache, then pan and zoom without touching any layer.
+  auto displayList = std::unique_ptr<DisplayList>();
+  build(&displayList);
+  displayList->render(surface.get());
+  displayList->setZoomScale(1.5f);
+  displayList->setContentOffset(-30.0f, -10.0f);
+  displayList->render(surface.get());
+  auto actual = ReadSurfacePixels(surface.get());
+  ExpectMatchingRenders(expected, actual);
+  context->flushAndSubmit();
+})}
+
+// Hiding a layer, removing it, or adding and dropping a background style all have to reach the
+// footprints that the next capture culls with.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintsFollowVisibilityAndStyles) {
   TGFX_PRIVATE_ACCESS({
     ContextScope scope;
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
-    constexpr int SurfaceSize = 240;
+    auto surface = Surface::Make(context, 240, 240);
+    ASSERT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(RenderMode::Tiled);
+    displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
 
-    auto build = [&](std::unique_ptr<DisplayList>* out) {
-      out->reset(new DisplayList());
-      (*out)->setRenderMode(RenderMode::Tiled);
-      (*out)->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
-      for (int i = 0; i < 4; ++i) {
-        auto block = ShapeLayer::Make();
-        Path path;
-        path.addRect(Rect::MakeWH(16, 16));
-        block->setPath(path);
-        block->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
-        block->setMatrix(Matrix::MakeTrans(30.0f + static_cast<float>(i) * 50.0f, 110.0f));
-        (*out)->root()->addChild(block);
-      }
-      auto blurred = ShapeLayer::Make();
-      Path blurPath;
-      blurPath.addRect(Rect::MakeWH(60, 60));
-      blurred->setPath(blurPath);
-      blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 60)));
-      blurred->setMatrix(Matrix::MakeTrans(80, 60));
-      blurred->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
-      (*out)->root()->addChild(blurred);
-    };
+    auto block = ShapeLayer::Make();
+    Path blockPath;
+    blockPath.addRect(Rect::MakeWH(16, 16));
+    block->setPath(blockPath);
+    block->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
+    block->setMatrix(Matrix::MakeTrans(60, 60));
+    displayList->root()->addChild(block);
 
-    auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
-    // Reference: the panned and zoomed view, without culling.
-    auto reference = std::unique_ptr<DisplayList>();
-    build(&reference);
-    reference->setRenderMode(RenderMode::Direct);
-    reference->_captureCullingEnabled = false;
-    reference->setZoomScale(1.5f);
-    reference->setContentOffset(-30.0f, -10.0f);
-    reference->render(surface.get());
-    auto expected = ReadSurfacePixels(surface.get());
+    auto blurred = ShapeLayer::Make();
+    Path blurPath;
+    blurPath.addRect(Rect::MakeWH(60, 60));
+    blurred->setPath(blurPath);
+    blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 60)));
+    blurred->setMatrix(Matrix::MakeTrans(50, 50));
+    blurred->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
+    displayList->root()->addChild(blurred);
 
-    // Same list: render, warm the cache, then pan and zoom without touching any layer.
-    auto displayList = std::unique_ptr<DisplayList>();
-    build(&displayList);
+    auto captureRect = Rect::MakeWH(240.0f, 240.0f);
     displayList->render(surface.get());
-    displayList->setZoomScale(1.5f);
-    displayList->setContentOffset(-30.0f, -10.0f);
+    auto footprints = displayList->collectBackgroundFootprints(captureRect);
+    ASSERT_EQ(footprints.size(), 1u);
+    EXPECT_EQ(footprints[0], blurred->renderBounds);
+
+    blurred->setVisible(false);
     displayList->render(surface.get());
-    auto actual = ReadSurfacePixels(surface.get());
-    ExpectMatchingRenders(expected, actual);
+    EXPECT_TRUE(displayList->collectBackgroundFootprints(captureRect).empty());
+
+    blurred->setVisible(true);
+    displayList->render(surface.get());
+    EXPECT_EQ(displayList->collectBackgroundFootprints(captureRect).size(), 1u);
+
+    blurred->setLayerStyles({});
+    displayList->render(surface.get());
+    EXPECT_TRUE(displayList->collectBackgroundFootprints(captureRect).empty());
+
+    blurred->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
+    displayList->render(surface.get());
+    displayList->root()->removeChildAt(1);
+    displayList->render(surface.get());
+    EXPECT_TRUE(displayList->collectBackgroundFootprints(captureRect).empty());
     context->flushAndSubmit();
   })
 }
