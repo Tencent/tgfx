@@ -1276,15 +1276,25 @@ bool DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bo
       !Rect::Intersects(bounds, layer->renderBounds)) {
     return true;
   }
-  // A layer that keeps its own 3D context is composited through the BSP, and a non-affine 3D matrix
-  // leaves the 2D renderBounds without a usable extent for the sampled area. Either way bail out
-  // and let the caller keep the whole tile.
-  if (layer->canPreserve3D() || !layer->bitFields.matrix3DIsAffine) {
+  // A non-affine 3D matrix leaves renderBounds without a usable extent for what the layer draws, so
+  // the walk cannot bound it and the caller keeps the whole captured area.
+  if (!layer->bitFields.matrix3DIsAffine) {
     return false;
   }
   bool pushed = false;
   if (collect) {
+    // A layer that keeps its own 3D context is composited through the BSP, so its subtree cannot be
+    // culled. Its render bounds still bound what it draws, so they join the list as an area that
+    // must be captured: everything under them stays drawn, and the rest of the capture keeps its
+    // culling.
+    if (layer->canPreserve3D()) {
+      footprints->push_back(layer->renderBounds);
+      pushed = true;
+    }
     for (const auto& style : layer->_layerStyles) {
+      if (pushed) {
+        break;
+      }
       if (style == nullptr || (style->extraSourceType() &
                                static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
         continue;
@@ -1384,15 +1394,16 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   for (const auto& rect : worldRects) {
     captureBounds.join(rect);
   }
+  // An empty list does not mean the capture is unnecessary: it is also what a non-affine 3D subtree
+  // returns, and that capture still has to run so the backdrop its styles read stays there.
   auto footprints =
       _captureCullingEnabled ? collectBackgroundFootprints(captureBounds) : std::vector<Rect>{};
   if (!footprints.empty()) {
     auto narrowed = narrowCullRects(footprints, worldRects);
-    // An empty list does not mean the capture is unnecessary: a subtree that keeps its own 3D
-    // context makes the walk give up on bounding the sampled area, and that capture still has to
-    // run so the backdrop its styles read stays there. Keeping the whole area then only costs the
-    // culling for this frame, which is the safe side: the capture may draw more, never anything
-    // else.
+    // A footprint can still miss every captured rect, which happens when it only covers the gaps
+    // between scattered tiles: nothing samples a backdrop there. Keeping the whole area then costs
+    // the culling for this frame, which is the safe side: the capture may draw more, never
+    // something else.
     if (!narrowed.empty()) {
       mergeCullRects(&narrowed);
       cullWorldRects = std::move(narrowed);

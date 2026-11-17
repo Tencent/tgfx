@@ -415,9 +415,11 @@ class DisplayList {
    * the walk to the area being captured.
    *
    * Reads `renderBounds` and `maxBackgroundOutset`, so it must run after the tree updated its
-   * render bounds, which `DisplayList::render` does before rendering. An empty result only means the
-   * capture cannot be culled: either no background style samples inside `worldBounds`, or a subtree
-   * keeps its own 3D context and 2D bounds cannot describe the area it samples.
+   * render bounds, which `DisplayList::render` does before rendering. Subtree roots that keep their
+   * own 3D context cannot be culled, so their bounds join the list as an area that must be captured.
+   * An empty result only means the capture cannot be culled: either no background style samples
+   * inside `worldBounds`, or a subtree has a non-affine 3D matrix, whose covered area 2D bounds
+   * cannot describe.
    */
   std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
 
