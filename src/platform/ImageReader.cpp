@@ -87,6 +87,9 @@ const std::shared_ptr<ColorSpace>& ImageReader::colorSpace() const {
 std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {
   std::lock_guard<std::mutex> autoLock(locker);
   DEBUG_ASSERT(!weakThis.expired());
+  if (!stream->hasNewFrame()) {
+    return nullptr;
+  }
   bufferVersion++;
   return std::make_shared<ImageReaderBuffer>(weakThis.lock(), bufferVersion);
 }
@@ -115,10 +118,11 @@ std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t contentVersion, C
   } else {
     success = stream->onUpdateTexture(textureView);
   }
-  if (success) {
-    textureView->removeUniqueKey();
-    textureVersion = contentVersion;
+  if (!success) {
+    return nullptr;
   }
+  textureView->removeUniqueKey();
+  textureVersion = contentVersion;
   return textureView;
 }
 }  // namespace tgfx

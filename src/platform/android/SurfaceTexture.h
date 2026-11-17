@@ -60,6 +60,10 @@ class SurfaceTexture : public ImageStream {
   }
 
  protected:
+  bool hasNewFrame() const override {
+    return frameAvailable.load(std::memory_order_acquire);
+  }
+
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override;
 
   bool onUpdateTexture(std::shared_ptr<TextureView> textureView) override;
@@ -68,7 +72,7 @@ class SurfaceTexture : public ImageStream {
   std::mutex locker = {};
   std::condition_variable condition = {};
   Global<jobject> surfaceTexture;
-  bool frameAvailable = false;
+  mutable std::atomic<bool> frameAvailable = {false};
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
   static void JNIInit(JNIEnv* env);
