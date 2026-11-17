@@ -291,8 +291,7 @@ void GLSLSmoothRRectEffect::emitCode(EmitArgs& args) const {
   }
 
   // Coverage
-  const auto [circleCornerDistFunc, ellipseCornerDistFunc] =
-      EmitSmoothCornerFunctions(fragBuilder);
+  const auto [circleCornerDistFunc, ellipseCornerDistFunc] = EmitSmoothCornerFunctions(fragBuilder);
 
   fragBuilder->codeAppendf("highp vec4 bounds = %s;", rectName.c_str());
   fragBuilder->codeAppendf("highp vec4 xRadii = %s;", radiiXName.c_str());

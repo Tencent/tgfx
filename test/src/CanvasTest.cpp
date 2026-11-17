@@ -58,15 +58,15 @@
 
 namespace tgfx {
 
-TGFX_PRIVATE_ACCESS(
 /**
  * Flushes the pending draws of the surface and returns the last recorded render task.
  */
-static OpsRenderTask* FlushAndGetLastRenderTask(const std::shared_ptr<Surface>& surface) {
-  surface->renderContext->flush();
-  auto drawingBuffer = surface->getContext()->drawingManager()->getDrawingBuffer();
-  return static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
-})
+TGFX_PRIVATE_ACCESS(
+    static OpsRenderTask* FlushAndGetLastRenderTask(const std::shared_ptr<Surface>& surface) {
+      surface->renderContext->flush();
+      auto drawingBuffer = surface->getContext()->drawingManager()->getDrawingBuffer();
+      return static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+    })
 
 // Creates a regular pentagon path centered at the origin with the given circumradius.
 static Path MakePentagonPath(float radius) {
@@ -2100,7 +2100,6 @@ TGFX_TEST(CanvasTest, NonAARRectOpStroke) {
     EXPECT_EQ(complexOp->rectCount, 2u);
   });
 
-
   const auto rect = Rect::MakeXYWH(0, 0, cellWidth, cellHeight);
   // Case 11: Stroked smoothed RRect at smoothness 1 with circular and elliptical corners.
   const auto radii11 = std::array<Point, 4>{{{24, 24}, {32, 24}, {20, 20}, {36, 24}}};
@@ -2500,10 +2499,10 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   canvas->drawRRect(rRect5, strokePaint);
   canvas->restore();
   {
-    TGFX_PRIVATE_ACCESS(
-        auto* task = FlushAndGetLastRenderTask(surface);
-        auto* op5 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-        EXPECT_EQ(op5->type(), DrawOp::Type::RRectDrawOp); EXPECT_TRUE(op5->isComplex));
+    TGFX_PRIVATE_ACCESS(auto* task = FlushAndGetLastRenderTask(surface);
+                        auto* op5 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+                        EXPECT_EQ(op5->type(), DrawOp::Type::RRectDrawOp);
+                        EXPECT_TRUE(op5->isComplex));
   }
 
   // Case 6: Case 5 under non-uniform scale and rotation, verifying the RRect draw path still
@@ -2518,10 +2517,10 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   canvas->drawRRect(rRect6, strokePaint);
   canvas->restore();
   {
-    TGFX_PRIVATE_ACCESS(
-        auto* task = FlushAndGetLastRenderTask(surface);
-        auto* op6 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-        EXPECT_EQ(op6->type(), DrawOp::Type::RRectDrawOp); EXPECT_TRUE(op6->isComplex));
+    TGFX_PRIVATE_ACCESS(auto* task = FlushAndGetLastRenderTask(surface);
+                        auto* op6 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+                        EXPECT_EQ(op6->type(), DrawOp::Type::RRectDrawOp);
+                        EXPECT_TRUE(op6->isComplex));
   }
 
   // Case 7: Case 5 rotated by the special 90-degree angle, verifying the RRect draw path still
@@ -2536,10 +2535,10 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   canvas->drawRRect(rRect7, strokePaint);
   canvas->restore();
   {
-    TGFX_PRIVATE_ACCESS(
-        auto* task = FlushAndGetLastRenderTask(surface);
-        auto* op7 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
-        EXPECT_EQ(op7->type(), DrawOp::Type::RRectDrawOp); EXPECT_TRUE(op7->isComplex));
+    TGFX_PRIVATE_ACCESS(auto* task = FlushAndGetLastRenderTask(surface);
+                        auto* op7 = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+                        EXPECT_EQ(op7->type(), DrawOp::Type::RRectDrawOp);
+                        EXPECT_TRUE(op7->isComplex));
   }
 
   // Case 8: Filled RRect fallback triggered by a sharp (zero-radius) corner.

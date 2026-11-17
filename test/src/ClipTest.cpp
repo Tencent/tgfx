@@ -140,8 +140,7 @@ TGFX_TEST_PRIVATE(ClipTest, RRectEffect) {
 
 TGFX_TEST_PRIVATE(ClipTest, SmoothRRectEffect) {
   TGFX_PRIVATE_ACCESS(
-      BlockAllocator allocator;
-      BytesKey transformKey = {};
+      BlockAllocator allocator; BytesKey transformKey = {};
 
       // Case 1: Circular, elliptical and sharp corners at full smoothness under a non-uniform scale
       // followed by a rotation produce the transform variant.

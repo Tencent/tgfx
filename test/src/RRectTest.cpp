@@ -121,8 +121,8 @@ TGFX_TEST(RRectTest, Smoothness) {
   EXPECT_NEAR(rRect.smoothness(), 0.6f, 1e-6f);
 
   // Case 3: Radii overflowing an edge reset the smoothness to 0.
-  rRect = RRect::MakeRectRadii(Rect::MakeWH(100, 80), {{{60, 10}, {60, 10}, {10, 10}, {10, 10}}},
-                               0.8f);
+  rRect =
+      RRect::MakeRectRadii(Rect::MakeWH(100, 80), {{{60, 10}, {60, 10}, {10, 10}, {10, 10}}}, 0.8f);
   EXPECT_EQ(rRect.type(), RRect::Type::Complex);
   EXPECT_FLOAT_EQ(rRect.smoothness(), 0.f);
 

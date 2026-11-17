@@ -82,8 +82,7 @@ class GlobalCache {
    * or stroking, with specified anti-aliasing mode. Smoothed rounded rectangles share the NonAA
    * indices in every mode.
    */
-  std::shared_ptr<GPUBufferProxy> getRRectIndexBuffer(bool stroke, AAType aaType,
-                                                      bool isSmooth);
+  std::shared_ptr<GPUBufferProxy> getRRectIndexBuffer(bool stroke, AAType aaType, bool isSmooth);
 
   /**
    * Returns a shared GPU buffer containing indices for rendering hairline lines.
