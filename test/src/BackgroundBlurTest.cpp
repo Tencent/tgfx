@@ -1684,19 +1684,18 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullRectsStayInsideTheFootprints){T
   auto captureRect = Rect::MakeWH(200.0f, 200.0f);
   auto footprints = displayList->collectBackgroundFootprints(captureRect);
   ASSERT_EQ(footprints.size(), 1u);
-  auto snapshots = displayList->captureBackgrounds(surface.get(), {captureRect});
-  ASSERT_TRUE(snapshots != nullptr);
-  ASSERT_EQ(snapshots->cullRects.size(), 1u);
+  auto cullRects = displayList->computeCaptureCullRects({captureRect});
+  ASSERT_EQ(cullRects.size(), 1u);
 
   auto captureWithOutset = captureRect;
   captureWithOutset.outset(rootOutset, rootOutset);
-  for (const auto& rect : snapshots->cullRects) {
+  for (const auto& rect : cullRects) {
     EXPECT_TRUE(captureWithOutset.contains(rect));
   }
   // The cull is the footprint itself: its blur reach is already folded in, and widening it again
   // would draw layers no style can read.
-  EXPECT_EQ(snapshots->cullRects[0], footprints[0]);
-  EXPECT_LT(snapshots->cullRects[0].width() * snapshots->cullRects[0].height(),
+  EXPECT_EQ(cullRects[0], footprints[0]);
+  EXPECT_LT(cullRects[0].width() * cullRects[0].height(),
             captureRect.width() * captureRect.height());
 
   context->flushAndSubmit();
@@ -1978,15 +1977,14 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullStaysInsideTheDirtyTile){TGFX_P
   auto tileRect = Rect::MakeXYWH(128.0f, 128.0f, 128.0f, 128.0f);
   auto footprints = displayList->collectBackgroundFootprints(tileRect);
   ASSERT_EQ(footprints.size(), 1u);
-  auto snapshots = displayList->captureBackgrounds(surface.get(), {tileRect});
-  ASSERT_TRUE(snapshots != nullptr);
-  ASSERT_EQ(snapshots->cullRects.size(), 1u);
+  auto cullRects = displayList->computeCaptureCullRects({tileRect});
+  ASSERT_EQ(cullRects.size(), 1u);
 
   // The footprint covers the whole document, so the tile bounds the cull instead.
   auto tileWithOutset = tileRect;
   tileWithOutset.outset(rootOutset, rootOutset);
-  EXPECT_EQ(snapshots->cullRects[0], tileWithOutset);
-  EXPECT_LT(snapshots->cullRects[0].width(), footprints[0].width());
+  EXPECT_EQ(cullRects[0], tileWithOutset);
+  EXPECT_LT(cullRects[0].width(), footprints[0].width());
   context->flushAndSubmit();
 })}
 
@@ -2056,14 +2054,13 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, ManyStylesStillCullTheCapture){TGFX_PRIVAT
   // Well above MAX_CULL_RECTS, so the merge is what keeps the cull alive.
   ASSERT_GT(footprints.size(), 32u);
 
-  auto snapshots = displayList->captureBackgrounds(surface.get(), {captureRect});
-  ASSERT_TRUE(snapshots != nullptr);
-  ASSERT_FALSE(snapshots->cullRects.empty());
-  // The per-layer cull loop only affords MAX_CULL_RECTS rects, so the merge has to get under it
+  auto cullRects = displayList->computeCaptureCullRects({captureRect});
+  ASSERT_FALSE(cullRects.empty());
+  // The per-layer cull loop only affords MAX_CULL_RECTS rects, so the build has to stay under it
   // instead of dropping the cull.
-  EXPECT_LE(snapshots->cullRects.size(), 32u);
+  EXPECT_LE(cullRects.size(), 32u);
   auto cullArea = 0.0f;
-  for (const auto& rect : snapshots->cullRects) {
+  for (const auto& rect : cullRects) {
     cullArea += rect.width() * rect.height();
   }
   EXPECT_LT(cullArea, captureRect.width() * captureRect.height() * 0.5f);
@@ -2203,13 +2200,12 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, ThreeDLayerKeepsTheRestCulled){TGFX_PRIVAT
 
   displayList->render(surface.get());
   auto captureRect = Rect::MakeWH(240.0f, 240.0f);
-  auto snapshots = displayList->captureBackgrounds(surface.get(), {captureRect});
-  ASSERT_TRUE(snapshots != nullptr);
   // The 3D subtree samples no backdrop of its own, so only the blurred layer's area is culled to.
-  ASSERT_EQ(snapshots->cullRects.size(), 1u);
-  EXPECT_EQ(snapshots->cullRects[0], blurred->renderBounds);
+  auto cullRects = displayList->computeCaptureCullRects({captureRect});
+  ASSERT_EQ(cullRects.size(), 1u);
+  EXPECT_EQ(cullRects[0], blurred->renderBounds);
   auto cullArea = 0.0f;
-  for (const auto& rect : snapshots->cullRects) {
+  for (const auto& rect : cullRects) {
     cullArea += rect.width() * rect.height();
   }
   EXPECT_LT(cullArea, captureRect.width() * captureRect.height() * 0.5f);
@@ -2414,14 +2410,11 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest,
   displayList->root()->addChild(blurred);
 
   displayList->render(surface.get());
-  auto snapshots = displayList->captureBackgrounds(surface.get(), {Rect::MakeWH(240.0f, 240.0f)});
-  ASSERT_TRUE(snapshots != nullptr);
-  ASSERT_EQ(snapshots->cullRects.size(), 1u);
-  EXPECT_EQ(snapshots->cullRects[0], blurred->renderBounds);
+  auto cullRects = displayList->computeCaptureCullRects({Rect::MakeWH(240.0f, 240.0f)});
+  ASSERT_EQ(cullRects.size(), 1u);
+  EXPECT_EQ(cullRects[0], blurred->renderBounds);
   context->flushAndSubmit();
 })}
-
-// Experiment: does a perspective layer draw outside the renderBounds it reports?
 
 // A 3D subtree is composited through the BSP, but its styles still sample only their own bounds, so
 // the capture culls to those bounds instead of covering everything the subtree draws.
@@ -2476,17 +2469,13 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, ThreeDSubtreeCullsToItsStyles) {
     ExpectMatchingRenders(unculledResult.second, culledResult.second);
 
     auto& displayList = culledResult.first;
-    auto captureSurface = Surface::Make(context, SurfaceSize, SurfaceSize);
-    ASSERT_TRUE(captureSurface != nullptr);
-    auto snapshots =
-        displayList->captureBackgrounds(captureSurface.get(), {Rect::MakeWH(240.0f, 240.0f)});
-    ASSERT_TRUE(snapshots != nullptr);
-    ASSERT_EQ(snapshots->cullRects.size(), 2u);
+    auto cullRects = displayList->computeCaptureCullRects({Rect::MakeWH(240.0f, 240.0f)});
+    ASSERT_EQ(cullRects.size(), 2u);
     auto expectedA = displayList->root()->_children[0]->_children[1]->renderBounds;
     auto expectedB = displayList->root()->_children[1]->renderBounds;
     auto matches = [&](const Rect& rect) { return rect == expectedA || rect == expectedB; };
-    EXPECT_TRUE(matches(snapshots->cullRects[0]));
-    EXPECT_TRUE(matches(snapshots->cullRects[1]));
+    EXPECT_TRUE(matches(cullRects[0]));
+    EXPECT_TRUE(matches(cullRects[1]));
     context->flushAndSubmit();
   })
 }

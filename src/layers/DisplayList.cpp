@@ -1283,6 +1283,29 @@ std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprint
 // Intersects each footprint with each captured rect instead of with their union, so the narrowed
 // cull never covers more than the capture would have drawn without the footprints. Footprints that
 // overlap no captured rect are dropped.
+// Returns the world rects the capture may cull its draw to, or an empty list when the whole captured
+// area has to be drawn. `worldRects` are the captured rects before the blur outset.
+std::vector<Rect> DisplayList::computeCaptureCullRects(const std::vector<Rect>& worldRects) const {
+  if (!_captureCullingEnabled) {
+    return {};
+  }
+  auto outsetRects = worldRects;
+  for (auto& rect : outsetRects) {
+    rect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
+  }
+  auto captureBounds = Rect::MakeEmpty();
+  for (const auto& rect : outsetRects) {
+    captureBounds.join(rect);
+  }
+  // An empty list means no style samples inside this capture, so there is nothing to narrow the draw
+  // to, but the capture still runs: keeping the whole area only costs the culling for this frame.
+  auto footprints = collectBackgroundFootprints(captureBounds);
+  if (footprints.empty()) {
+    return {};
+  }
+  return buildCullRects(footprints, outsetRects);
+}
+
 std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprints,
                                                const std::vector<Rect>& captureRects) {
   std::vector<Rect> narrowed = {};
@@ -1364,29 +1387,9 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   }
   // The layers to draw can be narrowed to the area the background styles sample, while the surface
   // still covers every render rect: keeping the captured area unchanged keeps the multi-pass
-  // structure (and the style output sharing that depends on it) intact. The walk is bounded by the
-  // area this capture covers, so a style that only reaches into the outset ring still counts.
-  std::vector<Rect> cullWorldRects = worldRects;
-  bool culled = false;
-  auto captureBounds = Rect::MakeEmpty();
-  for (const auto& rect : worldRects) {
-    captureBounds.join(rect);
-  }
-  // An empty list means no style samples inside this capture, so there is nothing to narrow the draw
-  // to, but the capture still runs: keeping the whole area only costs the culling for this frame.
-  auto footprints =
-      _captureCullingEnabled ? collectBackgroundFootprints(captureBounds) : std::vector<Rect>{};
-  if (!footprints.empty()) {
-    auto narrowed = buildCullRects(footprints, worldRects);
-    // A footprint can still miss every captured rect, which happens when it only covers the gaps
-    // between scattered tiles: nothing samples a backdrop there. Keeping the whole area then costs
-    // the culling for this frame, which is the safe side: the capture may draw more, never
-    // something else.
-    if (!narrowed.empty()) {
-      cullWorldRects = std::move(narrowed);
-      culled = true;
-    }
-  }
+  // structure (and the style output sharing that depends on it) intact.
+  auto culledRects = computeCaptureCullRects(visibleRects);
+  auto cullWorldRects = culledRects.empty() ? worldRects : culledRects;
   DrawArgs args(context);
   args.dstColorSpace = surface->colorSpace();
   args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
@@ -1396,11 +1399,6 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     return nullptr;
   }
   auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
-  // Only the narrowed list is recorded: the fallback keeps the whole captured area, which the
-  // caller already knows from renderRects.
-  if (culled) {
-    snapshotMap->cullRects = cullWorldRects;
-  }
   snapshotMap->multiPass = renderRects.size() > 1;
   snapshotMap->visibleRects = std::move(visibleRects);
   snapshotMap->renderTargetWidth = surface->width();
