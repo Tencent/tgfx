@@ -18,6 +18,7 @@
 
 #include "BackgroundSource.h"
 #include <algorithm>
+#include <cmath>
 #include <utility>
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/utils/Log.h"
@@ -202,6 +203,36 @@ std::shared_ptr<BackgroundSource> BackgroundSource::Make(Context* context, const
   auto* canvas = result->getCanvas();
   canvas->clear();
   canvas->setMatrix(geometry.surfaceMatrix);
+  return result;
+}
+
+std::shared_ptr<BackgroundSource> BackgroundSource::MakeWithGeometry(
+    Context* context, const BackgroundRasterGeometry& geometry,
+    std::shared_ptr<ColorSpace> colorSpace) {
+  if (context == nullptr || context->gpu() == nullptr) {
+    return nullptr;
+  }
+  auto maxTextureSize = context->gpu()->limits()->maxTextureDimension2D;
+  if (geometry.size.isEmpty() || geometry.size.width > maxTextureSize ||
+      geometry.size.height > maxTextureSize) {
+    return nullptr;
+  }
+  if (!geometry.sceneRootToSurface.isFinite() || !geometry.sceneRootToSurface.invertible() ||
+      !geometry.imageToSceneRoot.isFinite() || !geometry.imageToSceneRoot.invertible() ||
+      !std::isfinite(geometry.surfaceScale) || geometry.surfaceScale <= 0.0f) {
+    return nullptr;
+  }
+  auto surface = Surface::Make(context, geometry.size.width, geometry.size.height, false, 1, false,
+                               0, colorSpace);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto result = std::make_shared<SurfaceBackgroundSource>(
+      std::move(surface), geometry.imageToSceneRoot, geometry.sourceCoverage, geometry.surfaceScale,
+      colorSpace);
+  auto* canvas = result->getCanvas();
+  canvas->clear();
+  canvas->setMatrix(geometry.sceneRootToSurface);
   return result;
 }
 

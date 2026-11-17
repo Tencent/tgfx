@@ -17,9 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
+
+/**
+ * Explicit background sampling geometry. It lets a tiled export create every background surface
+ * on one fixed pixel grid instead of letting the current capture rect pick the sampling density.
+ * All matrices map between the capture root's local space and the background surface pixels.
+ */
+struct BackgroundRasterGeometry {
+  ISize size = {};
+  Matrix sceneRootToSurface = Matrix::I();
+  Matrix imageToSceneRoot = Matrix::I();
+  Rect sourceCoverage = {};
+  float surfaceScale = 1.0f;
+};
 
 /**
  * Read-only query handle that lets Background-sourced LayerStyles sample the already-rendered
@@ -35,6 +49,13 @@ class BackgroundSource {
                                                 float maxOutset, float minOutset,
                                                 const Matrix& matrix,
                                                 std::shared_ptr<ColorSpace> colorSpace);
+
+  // Creates the top-level source with an explicit, already aligned geometry. The factory only
+  // validates and allocates the requested geometry; it never re-selects a surface scale or caps
+  // the size to an internal limit.
+  static std::shared_ptr<BackgroundSource> MakeWithGeometry(
+      Context* context, const BackgroundRasterGeometry& geometry,
+      std::shared_ptr<ColorSpace> colorSpace);
 
   virtual ~BackgroundSource() = default;
 

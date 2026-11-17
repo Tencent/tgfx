@@ -36,6 +36,7 @@
 #include "layers/BackgroundSource.h"
 #include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
+#include "layers/LayerDrawSession.h"
 #include "layers/LayerStyleSource.h"
 #include "layers/MaskContext.h"
 #include "layers/OffscreenRenderer.h"
@@ -50,19 +51,6 @@
 #include "tgfx/layers/ShapeLayer.h"
 
 namespace tgfx {
-
-// Returns true if the given source flags include the requested source type.
-static bool HasExtraSource(uint32_t sourceFlags, LayerStyleExtraSourceType type) {
-  return (sourceFlags & static_cast<uint32_t>(type)) != 0;
-}
-
-static bool NeedsBackgroundSource(uint32_t sourceFlags) {
-  return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Background);
-}
-
-static bool NeedsContourSource(uint32_t sourceFlags) {
-  return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour);
-}
 
 // The minimum size (longest edge) for subtree cache. This prevents creating excessively small
 // mipmap levels that would be inefficient to cache.
@@ -897,84 +885,57 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     return;
   }
 
-  auto surface = canvas->getSurface();
-  DrawArgs args = {};
-  Context* context = nullptr;
-
   auto bounds = getBounds();
   auto clippedBounds = GetClippedBounds(bounds, canvas);
   if (clippedBounds.isEmpty()) {
     return;
   }
-  auto localToGlobalMatrix = getGlobalMatrix();
-  auto globalToLocalMatrix = Matrix3D::I();
-  bool canInvert = localToGlobalMatrix.invert(&globalToLocalMatrix);
 
-  Rect renderRect = {};
-  std::vector<Rect> renderRectsVec = {};
-  if (_root && canInvert) {
-    _root->updateRenderBounds();
-    renderRect = localToGlobalMatrix.mapRect(clippedBounds);
-    renderRectsVec = {renderRect};
-    args.renderRects = &renderRectsVec;
-  }
-
+  auto surface = canvas->getSurface();
+  LayerDrawRequest request = {};
+  request.target = this;
+  request.captureRoot = _root ? _root : this;
+  request.alpha = alpha;
+  request.blendMode = blendMode;
+  request.samplingMode = LayerSamplingMode::CanvasDefault;
+  request.hasCanvasState = true;
+  request.canvasMatrix = canvas->getMatrix();
+  request.canvasDrawBounds = clippedBounds;
+  request.canvasRooted = _root != nullptr;
+  request.canvasCacheEnabled = true;
+  request.canvasColorSpace = ColorSpace::SRGB();
+  request.renderColorSpace = ColorSpace::SRGB();
+  request.logicalOutputBounds = bounds;
   if (surface) {
-    args.dstColorSpace = surface->colorSpace();
-    context = surface->getContext();
-    if (!(surface->renderFlags() & RenderFlags::DisableCache)) {
-      args.context = context;
-    }
+    request.canvasCacheEnabled = !(surface->renderFlags() & RenderFlags::DisableCache);
+    request.canvasColorSpace = surface->colorSpace();
+    request.renderColorSpace = request.canvasColorSpace;
+    request.context = surface->getContext();
+    request.logicalOutputBounds =
+        Rect::MakeWH(static_cast<float>(surface->width()), static_cast<float>(surface->height()));
   }
 
-  // Capture pass — only when this layer or descendants have Background-sourced styles. Disabled
-  // in 3D subtrees. Requires a GPU context; on picture-canvas paths the capture is skipped and
-  // the consumer falls back to on-the-fly synthesis (signalled by passing a null snapshot map).
-  BackgroundSnapshotMap snapshotMap = {};
-  BackgroundSnapshotMap* snapshotsPtr = nullptr;
-  bool needBackground = canInvert && !canPreserve3D() && hasBackgroundStyle();
-  if (needBackground && context != nullptr) {
-    auto rectForDraw = maxBackgroundOutset > 0.0f ? clippedBounds : bounds;
-    Matrix backgroundMatrix = canvas->getMatrix();
-    Rect drawRect = backgroundMatrix.mapRect(rectForDraw);
-    if (_root != nullptr) {
-      // Capture replays from _root, so bgCanvas accumulates globalMatrix when reaching this
-      // layer. But Layer::draw() itself paints via drawLayer without concatenating globalMatrix,
-      // so the device position is just outerCanvas * self-local. Compose the viewMatrix as
-      // outerCanvas * invert(globalMatrix) so that surfaceMatrix * globalMatrix collapses back
-      // to outerCanvas, aligning capture and consume in the same device-pixel space.
-      // drawRect stays at outerCanvas.mapRect(rectForDraw) (the device-pixel layer rect)
-      // computed above, since BackgroundSource uses it to size the surface.
-      backgroundMatrix.preConcat(globalToLocalMatrix.asMatrix());
-    }
-    if (auto bgSource = createBackgroundSource(context, drawRect, backgroundMatrix,
-                                               rectForDraw == bounds, args.dstColorSpace)) {
-      // Replay from _root so ancestor matrices apply; orphan layers replay from themselves.
-      // The capture rect is in the captureRoot's local coordinate space: world (root-local) when
-      // rooted, or this layer's local bounds when orphan.
-      Layer* captureRoot = _root ? _root : this;
-      Rect captureRect = _root ? renderRect : clippedBounds;
-      BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), &snapshotMap, {captureRect});
-      snapshotsPtr = &snapshotMap;
-    }
+  auto session = LayerDrawSession::Prepare(request.context, request, nullptr);
+  if (session == nullptr) {
+    return;
   }
-
-  // Consume pass — normal render. NoOp when there's no background style so stray ones silently
-  // skip (same as contour / 3D subtrees). A null snapshot map signals the picture-canvas path,
-  // which makes the consumer synthesize backdrops on the fly via PictureRecorder.
-  AutoCanvasRestore autoRestore(canvas);
-  BackgroundConsumer consumer(snapshotsPtr, false);
-  BackgroundHandler* handler =
-      needBackground ? static_cast<BackgroundHandler*>(&consumer) : BackgroundHandler::NoOp();
-  DrawArgs drawArgs = args;
-  drawArgs.backgroundHandler = handler;
-  // Check if the current layer needs to start a 3D context. Since Layer::draw is called directly
-  // without going through a parent layer's drawChildren, 3D context handling must be done here.
-  if (canPreserve3D()) {
-    drawByStarting3DContext(drawArgs, canvas, getMatrixWithScrollRect(), &Layer::drawLayer, alpha);
-  } else {
-    drawLayer(drawArgs, canvas, alpha, blendMode);
+  LayerDrawLimits limits = {};
+  auto regionResult = session->planRegion(PixelRect(), limits, nullptr);
+  if (regionResult.code != RegionPlanCode::Ready) {
+    return;
   }
+  std::vector<LayerRegionPlan> regions = {regionResult.region};
+  auto batchResult = session->planBatch(regions, limits, nullptr);
+  if (batchResult.code != BatchPlanCode::Ready || batchResult.plan == nullptr) {
+    return;
+  }
+  auto batch = session->prepareBatch(request.context, *batchResult.plan, nullptr);
+  if (batch == nullptr) {
+    return;
+  }
+  LayerDrawTarget target = {};
+  target.canvas = canvas;
+  session->drawRegion(request.context, *batch, 0, target, nullptr);
 }
 
 void Layer::invalidateContent() {
@@ -1555,6 +1516,10 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   auto invertImageMatrix = Matrix::I();
   if (result.isEmpty() || !result.imageMatrix.invert(&invertImageMatrix)) {
+    if (!result.isEmpty() && args.drawControl != nullptr) {
+      args.drawControl->fail(DrawFailureCode::RenderingFailure, DrawStage::Rendering, this, {},
+                             "the offscreen image matrix is not invertible");
+    }
     return;
   }
 

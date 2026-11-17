@@ -95,6 +95,10 @@ struct BackgroundSnapshotKeyHash {
  * contents through a non-const path.
  */
 struct BackgroundSnapshotMap {
+  // Explicit large-image export keeps style sources as lazy pictures. Rasterizing a full-content
+  // recording would allocate a texture the size of the whole layer, while each output region only
+  // samples its own part of it.
+  bool rasterizeStyleSources = true;
   std::unordered_map<BackgroundSnapshotKey, std::vector<BackgroundSnapshotEntry>,
                      BackgroundSnapshotKeyHash>
       snapshots = {};

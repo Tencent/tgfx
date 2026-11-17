@@ -18,9 +18,11 @@
 
 #include "layers/OffscreenRenderer.h"
 #include "layers/BackgroundHandler.h"
+#include "layers/LayerDrawSession.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/gpu/GPU.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
@@ -40,6 +42,14 @@ void SeedBackdrop(Canvas* canvas, const std::shared_ptr<Image>& backdrop, const 
   canvas->setMatrix(Matrix::MakeTrans(-surfaceRect.x(), -surfaceRect.y()));
   canvas->drawImage(backdrop);
   canvas->restore();
+}
+
+bool ExceedsDeviceLimit(Context* context, const Rect& rect) {
+  if (context == nullptr || context->gpu() == nullptr) {
+    return false;
+  }
+  auto limit = static_cast<float>(context->gpu()->limits()->maxTextureDimension2D);
+  return rect.width() > limit || rect.height() > limit;
 }
 
 }  // namespace
@@ -74,12 +84,26 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
   // through this subtree; otherwise a PictureRecorder is cheaper.
   if (args.backgroundHandler != nullptr && args.backgroundHandler->needsSurface(layer) &&
       args.context != nullptr) {
+    if (args.drawControl != nullptr && ExceedsDeviceLimit(args.context, imageClip)) {
+      args.drawControl->fail(
+          DrawFailureCode::SurfaceLimit, DrawStage::Rendering, layer,
+          ISize::Make(static_cast<int>(imageClip.width()), static_cast<int>(imageClip.height())),
+          "an intermediate backdrop surface exceeds the device texture limit");
+      return {};
+    }
     auto surface =
         Surface::Make(args.context, static_cast<int>(imageClip.width()),
                       static_cast<int>(imageClip.height()), false, 1, false, 0, args.dstColorSpace);
     if (surface != nullptr) {
       result = RenderContentOnSurface(layer, args, std::move(surface), density, imageClip,
                                       *inputBounds, contentMatrix);
+    } else if (args.drawControl != nullptr) {
+      // A picture fallback would drop descendant backdrop styles, so a strict draw fails instead.
+      args.drawControl->fail(
+          DrawFailureCode::AllocationFailure, DrawStage::Rendering, layer,
+          ISize::Make(static_cast<int>(imageClip.width()), static_cast<int>(imageClip.height())),
+          "failed to allocate an intermediate backdrop surface");
+      return {};
     } else {
       result = RenderContentOnPicture(layer, args, density, imageClip, contentMatrix);
     }
@@ -109,6 +133,10 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
   }
   auto backdrop = SnapshotOf(parentCanvas);
   if (!backdrop) {
+    if (args.drawControl != nullptr) {
+      args.drawControl->fail(DrawFailureCode::RenderingFailure, DrawStage::Rendering, layer, {},
+                             "failed to snapshot the pass-through backdrop");
+    }
     return {};
   }
   auto parentMatrix = parentCanvas->getMatrix();
@@ -120,12 +148,27 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
   }
 
   if (args.context != nullptr) {
+    if (args.drawControl != nullptr && ExceedsDeviceLimit(args.context, surfaceRect)) {
+      args.drawControl->fail(DrawFailureCode::SurfaceLimit, DrawStage::Rendering, layer,
+                             ISize::Make(static_cast<int>(surfaceRect.width()),
+                                         static_cast<int>(surfaceRect.height())),
+                             "a pass-through surface exceeds the device texture limit");
+      return {};
+    }
     auto surface = Surface::Make(args.context, static_cast<int>(surfaceRect.width()),
                                  static_cast<int>(surfaceRect.height()), false, 1, false, 0,
                                  args.dstColorSpace);
     if (surface != nullptr) {
       return RenderPassThroughOnSurface(layer, args, std::move(surface), backdrop, parentMatrix,
                                         surfaceRect, *inputBounds);
+    }
+    if (args.drawControl != nullptr) {
+      // The picture variant cannot sample the parent backdrop, so a strict draw fails instead.
+      args.drawControl->fail(DrawFailureCode::AllocationFailure, DrawStage::Rendering, layer,
+                             ISize::Make(static_cast<int>(surfaceRect.width()),
+                                         static_cast<int>(surfaceRect.height())),
+                             "failed to allocate a pass-through surface");
+      return {};
     }
   }
   return RenderPassThroughOnPicture(layer, args, backdrop, parentMatrix, surfaceRect);

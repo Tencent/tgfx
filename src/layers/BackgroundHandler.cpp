@@ -22,6 +22,7 @@
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
 #include "layers/DrawArgs.h"
+#include "layers/LayerDrawSession.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/PictureRecorder.h"
@@ -244,11 +245,23 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
     const Matrix& localToWorld, const Matrix& localToSurface) const {
   Matrix toWorld = Matrix::I();
   Rect worldBounds = Rect::MakeEmpty();
+  ISize surfaceSize =
+      surface != nullptr ? ISize::Make(surface->width(), surface->height()) : ISize{};
   if (!ComputeSubGeometry(bgSource.get(), localBounds, localToWorld, &toWorld, &worldBounds)) {
+    if (parentArgs.drawControl != nullptr) {
+      parentArgs.drawControl->fail(DrawFailureCode::MissingDependency, DrawStage::Background,
+                                   nullptr, surfaceSize,
+                                   "failed to derive a nested background geometry");
+    }
     DEBUG_ASSERT(false);
     return nullptr;
   }
   auto subSource = bgSource->createFromSurface(surface, worldBounds, toWorld, localToSurface);
+  if (subSource == nullptr && parentArgs.drawControl != nullptr) {
+    parentArgs.drawControl->fail(DrawFailureCode::AllocationFailure, DrawStage::Background, nullptr,
+                                 surfaceSize,
+                                 "failed to create a nested background surface source");
+  }
   DEBUG_ASSERT(subSource != nullptr);
   return buildSubCapturer(parentArgs, std::move(subSource));
 }
@@ -343,6 +356,10 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   }
   auto bgImage = bgSource->getBackgroundImage();
   if (bgImage == nullptr) {
+    if (args.drawControl != nullptr) {
+      args.drawControl->fail(DrawFailureCode::RenderingFailure, DrawStage::Background, layer, {},
+                             "failed to read the background snapshot image");
+    }
     return;
   }
   Matrix bgPixelToLocal = worldToLocal;
@@ -397,6 +414,11 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
   DEBUG_ASSERT(canCacheLayerStyleSource(layer));
   if (source == nullptr) {
     return nullptr;
+  }
+  if (!snapshots->rasterizeStyleSources) {
+    auto* raw = source.get();
+    snapshots->layerStyleSources.emplace(layer, std::move(source));
+    return raw;
   }
   // Rasterize so the first draw uploads a GPU texture and the second reuses it. Wrapping an image
   // again produces a new image object with its own GPU cache, so the geometry recording, which
@@ -469,11 +491,19 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     if (it == snapshots->snapshots.end()) {
       // Surface path: the map is authoritative, so a miss is a capture-side coverage bug.
       // Silently skip rather than masking the bug with on-the-fly synthesis.
+      if (args.drawControl != nullptr) {
+        args.drawControl->fail(DrawFailureCode::MissingDependency, DrawStage::Rendering, layer, {},
+                               "the background capture is missing a layer style snapshot");
+      }
       return;
     }
     auto& cursor = readCursors[key];
     DEBUG_ASSERT(cursor < it->second.size() && "capture/consume push-pop count mismatch");
     if (cursor >= it->second.size()) {
+      if (args.drawControl != nullptr) {
+        args.drawControl->fail(DrawFailureCode::MissingDependency, DrawStage::Rendering, layer, {},
+                               "the background capture ran out of layer style snapshots");
+      }
       return;
     }
     auto& entry = it->second[cursor++];

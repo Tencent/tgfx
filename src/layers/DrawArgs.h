@@ -27,6 +27,7 @@
 namespace tgfx {
 class BackgroundHandler;
 class OpaqueContext;
+struct DrawControl;
 
 /**
  * DrawArgs represents the arguments passed to the draw method of a Layer.
@@ -44,6 +45,10 @@ class DrawArgs {
   Context* context = nullptr;
 
   uint32_t renderFlags = 0;
+
+  // Strict-mode failure feedback for the tiled export path. Null keeps the regular draw behavior,
+  // in which intermediate failures are handled silently by the existing fallbacks.
+  DrawControl* drawControl = nullptr;
 
   // Whether to exclude effects during the drawing process.
   // Note: When set to true, all layer styles and filters will be skipped.
