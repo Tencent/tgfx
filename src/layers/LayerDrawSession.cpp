@@ -237,7 +237,8 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
     }
     return nullptr;
   }
-  if (!std::isfinite(request.alpha) || request.alpha < 0.0f || request.alpha > 1.0f) {
+  if (request.samplingMode == LayerSamplingMode::ExportFixed &&
+      (!std::isfinite(request.alpha) || request.alpha < 0.0f || request.alpha > 1.0f)) {
     if (control != nullptr) {
       control->fail(DrawFailureCode::InvalidRequest, DrawStage::Validation, request.target, {},
                     "alpha is not a finite value in [0, 1]");

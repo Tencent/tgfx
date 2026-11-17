@@ -339,6 +339,41 @@ TGFX_TEST(LayerImageReaderTest, CanvasDefaultPlanningUsesFloatingPointState) {
   }
 }
 
+TGFX_TEST(LayerImageReaderTest, CanvasDrawPreservesAlphaModulationAboveOne) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto content = SolidLayer::Make();
+  auto color = Color::Red();
+  color.alpha = 0.25f;
+  content->setColor(color);
+  content->setWidth(8);
+  content->setHeight(8);
+  auto surface = Surface::Make(context, 8, 8, false, 1, false, 0, ColorSpace::SRGB());
+  ASSERT_TRUE(surface != nullptr);
+  content->draw(surface->getCanvas(), 2.0f);
+  auto info = OutputInfo(8, 8);
+  std::vector<uint8_t> pixels(info.byteSize());
+  ASSERT_TRUE(surface->readPixels(info, pixels.data()));
+  auto offset = static_cast<size_t>(4) * info.rowBytes() + 4 * 4;
+  EXPECT_NEAR(pixels[offset], 128, 1);
+  EXPECT_EQ(pixels[offset + 1], 0);
+  EXPECT_EQ(pixels[offset + 2], 0);
+  EXPECT_NEAR(pixels[offset + 3], 128, 1);
+
+  LayerImageRequest request = {};
+  request.target = content;
+  request.sceneRoot = content;
+  request.outputSize = {8, 8};
+  request.alpha = 2.0f;
+  LayerImageReadOptions options = {};
+  options.bandRows = 1;
+  LayerImageError error = {};
+  EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
+  EXPECT_EQ(error.code, LayerImageErrorCode::InvalidInput);
+  EXPECT_EQ(error.stage, LayerImageStage::Validation);
+}
+
 TGFX_TEST(LayerImageReaderTest, CanvasDrawMatchesDisplayList) {
   ContextScope scope;
   auto context = scope.getContext();
