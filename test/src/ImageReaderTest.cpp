@@ -24,7 +24,8 @@
 namespace tgfx {
 // A controllable ImageStream used to drive the platform-independent ImageReader logic without a
 // real video source. hasNewFrame() and the texture-update result can both be forced to exercise
-// the frame-availability gate and the update-failure path.
+// the frame-availability gate and the update-failure path. It only overrides protected virtuals,
+// so it compiles on toolchains without private test access.
 class FakeImageStream : public ImageStream {
  public:
   FakeImageStream(int width, int height) : ImageStream(width, height) {
@@ -63,62 +64,51 @@ class FakeImageStream : public ImageStream {
  * acquired buffer must stay valid (not expire) so the caller keeps rendering the current frame
  * instead of a stale one.
  */
-TGFX_TEST(ImageReaderTest, AcquireReturnsNullWithoutNewFrame) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto stream = std::make_shared<FakeImageStream>(16, 16);
-  auto reader = ImageReader::MakeFrom(stream);
-  ASSERT_TRUE(reader != nullptr);
+TGFX_TEST_PRIVATE(ImageReaderTest, AcquireReturnsNullWithoutNewFrame) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_TRUE(context != nullptr);
+      auto stream = std::make_shared<FakeImageStream>(16, 16);
+      auto reader = ImageReader::MakeFrom(stream); ASSERT_TRUE(reader != nullptr);
 
-  stream->newFrame = true;
-  auto firstBuffer = reader->acquireNextBuffer();
-  ASSERT_TRUE(firstBuffer != nullptr);
-  auto firstTexture = TextureView::MakeFrom(context, firstBuffer, false);
-  EXPECT_TRUE(firstTexture != nullptr);
+      stream->newFrame = true; auto firstBuffer = reader->acquireNextBuffer();
+      ASSERT_TRUE(firstBuffer != nullptr);
+      auto firstTexture = TextureView::MakeFrom(context, firstBuffer, false);
+      EXPECT_TRUE(firstTexture != nullptr);
 
-  // No new frame has arrived: the gate returns nullptr and does not advance the buffer version, so
-  // the previously acquired buffer is still valid.
-  stream->newFrame = false;
-  EXPECT_TRUE(reader->acquireNextBuffer() == nullptr);
-  EXPECT_FALSE(firstBuffer->expired());
+      // No new frame has arrived: the gate returns nullptr and does not advance the buffer
+      // version, so the previously acquired buffer is still valid.
+      stream->newFrame = false;
+      EXPECT_TRUE(reader->acquireNextBuffer() == nullptr); EXPECT_FALSE(firstBuffer->expired());)
 }
 
 /**
  * When onUpdateTexture() fails, readTexture() must return nullptr instead of the previously created
  * texture view, so a stale frame is never reused as new content.
  */
-TGFX_TEST(ImageReaderTest, ReadTextureFailsWithoutReusingStaleTexture) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto stream = std::make_shared<FakeImageStream>(16, 16);
-  auto reader = ImageReader::MakeFrom(stream);
-  ASSERT_TRUE(reader != nullptr);
+TGFX_TEST_PRIVATE(ImageReaderTest, ReadTextureFailsWithoutReusingStaleTexture) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_TRUE(context != nullptr);
+      auto stream = std::make_shared<FakeImageStream>(16, 16);
+      auto reader = ImageReader::MakeFrom(stream); ASSERT_TRUE(reader != nullptr);
 
-  // First frame: onMakeTexture() creates the shared texture view.
-  auto firstBuffer = reader->acquireNextBuffer();
-  ASSERT_TRUE(firstBuffer != nullptr);
-  auto firstTexture = TextureView::MakeFrom(context, firstBuffer, false);
-  EXPECT_TRUE(firstTexture != nullptr);
-  EXPECT_EQ(stream->makeTextureCount, 1);
-  EXPECT_EQ(stream->updateTextureCount, 0);
+      // First frame: onMakeTexture() creates the shared texture view.
+      auto firstBuffer = reader->acquireNextBuffer();
+      ASSERT_TRUE(firstBuffer != nullptr);
+      auto firstTexture = TextureView::MakeFrom(context, firstBuffer, false);
+      EXPECT_TRUE(firstTexture != nullptr); EXPECT_EQ(stream->makeTextureCount, 1);
+      EXPECT_EQ(stream->updateTextureCount, 0);
 
-  // Second frame: onUpdateTexture() fails, so readTexture() returns nullptr rather than the
-  // previously created texture view.
-  stream->updateShouldFail = true;
-  auto secondBuffer = reader->acquireNextBuffer();
-  ASSERT_TRUE(secondBuffer != nullptr);
-  auto secondTexture = TextureView::MakeFrom(context, secondBuffer, false);
-  EXPECT_TRUE(secondTexture == nullptr);
-  EXPECT_EQ(stream->updateTextureCount, 1);
+      // Second frame: onUpdateTexture() fails, so readTexture() returns nullptr rather than the
+      // previously created texture view.
+      stream->updateShouldFail = true;
+      auto secondBuffer = reader->acquireNextBuffer(); ASSERT_TRUE(secondBuffer != nullptr);
+      auto secondTexture = TextureView::MakeFrom(context, secondBuffer, false);
+      EXPECT_TRUE(secondTexture == nullptr); EXPECT_EQ(stream->updateTextureCount, 1);
 
-  // Third frame: onUpdateTexture() succeeds again, so a valid texture view is produced.
-  stream->updateShouldFail = false;
-  auto thirdBuffer = reader->acquireNextBuffer();
-  ASSERT_TRUE(thirdBuffer != nullptr);
-  auto thirdTexture = TextureView::MakeFrom(context, thirdBuffer, false);
-  EXPECT_TRUE(thirdTexture != nullptr);
-  EXPECT_EQ(stream->updateTextureCount, 2);
+      // Third frame: onUpdateTexture() succeeds again, so a valid texture view is produced.
+      stream->updateShouldFail = false;
+      auto thirdBuffer = reader->acquireNextBuffer(); ASSERT_TRUE(thirdBuffer != nullptr);
+      auto thirdTexture = TextureView::MakeFrom(context, thirdBuffer, false);
+      EXPECT_TRUE(thirdTexture != nullptr); EXPECT_EQ(stream->updateTextureCount, 2);)
 }
 }  // namespace tgfx
