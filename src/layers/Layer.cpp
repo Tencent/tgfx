@@ -311,7 +311,7 @@ void Layer::setPosition(const Point& value) {
 
 Matrix Layer::matrix() const {
   auto affineMatrix = Matrix::I();
-  if (!bitFields.matrix3DIsAffine && (hasBackgroundStyle || !backgroundFootprints.empty())) {
+  if (!bitFields.matrix3DIsAffine) {
     return Matrix::I();
   }
   affineMatrix.setAll(_matrix3D.getRowColumn(0, 0), _matrix3D.getRowColumn(0, 1),
@@ -2300,7 +2300,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   // A non-affine matrix drops the perspective row from the 2D bounds (Matrix3D::asMatrix), so they no
   // longer describe where this subtree draws. Only a backdrop sampled underneath can be affected, so
   // the flag stops at subtrees that sample nothing.
-  if (!bitFields.matrix3DIsAffine) {
+  if (!bitFields.matrix3DIsAffine && (hasBackgroundStyle || !backgroundFootprints.empty())) {
     backgroundFootprintsUnbounded = true;
   }
   // A background style reads only the recording under its own bounds, so its descendants add nothing
