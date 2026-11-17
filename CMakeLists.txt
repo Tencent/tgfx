@@ -233,7 +233,7 @@ if (TGFX_BUILD_SVG)
 endif ()
 
 if (TGFX_BUILD_LAYERS)
-    file(GLOB_RECURSE LAYERS_FILES CONFIGURE_DEPENDS
+    file(GLOB_RECURSE LAYERS_FILES
             src/layers/*.*)
     list(APPEND TGFX_FILES ${LAYERS_FILES})
 endif ()

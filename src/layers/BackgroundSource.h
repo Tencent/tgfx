@@ -34,8 +34,7 @@ class BackgroundSource {
   static std::shared_ptr<BackgroundSource> Make(Context* context, const Rect& drawRect,
                                                 float maxOutset, float minOutset,
                                                 const Matrix& matrix,
-                                                std::shared_ptr<ColorSpace> colorSpace,
-                                                bool preserveResolution = false);
+                                                std::shared_ptr<ColorSpace> colorSpace);
 
   virtual ~BackgroundSource() = default;
 

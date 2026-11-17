@@ -95,9 +95,6 @@ struct BackgroundSnapshotKeyHash {
  * contents through a non-const path.
  */
 struct BackgroundSnapshotMap {
-  // Explicit large-image export keeps pictures lazy, allowing each tile to sample a subset.
-  // Eager rasterization would allocate a texture the size of the complete styled layer.
-  bool rasterizeStyleSources = true;
   std::unordered_map<BackgroundSnapshotKey, std::vector<BackgroundSnapshotEntry>,
                      BackgroundSnapshotKeyHash>
       snapshots = {};
