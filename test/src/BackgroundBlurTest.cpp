@@ -1488,8 +1488,8 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CullFootprintsCoverTheSampledArea) {
     ASSERT_EQ(footprints.size(), 1u);
     EXPECT_EQ(footprints[0], blurred->renderBounds);
 
-    // A perspective transform leaves the 2D bounds unable to delimit the sampled area, so the walk
-    // gives up and the caller keeps whole tiles.
+    // A perspective transform keeps its bounds: Matrix3D::mapRect projects the corners through the
+    // perspective divide and clips them against the camera plane, so the box stays conservative.
     auto perspective = ShapeLayer::Make();
     auto matrix3D = Matrix3D::I();
     matrix3D.setRowColumn(3, 2, -1.0f / 400.0f);
@@ -1500,7 +1500,9 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CullFootprintsCoverTheSampledArea) {
     displayList->root()->addChild(perspective);
     displayList->render(surface.get());
 
-    EXPECT_TRUE(displayList->collectBackgroundFootprints(Rect::MakeWH(240, 240)).empty());
+    auto perspectiveFootprints = displayList->collectBackgroundFootprints(Rect::MakeWH(240, 240));
+    ASSERT_EQ(perspectiveFootprints.size(), 2u);
+    EXPECT_EQ(perspectiveFootprints[1], perspective->renderBounds);
 
     // A layer that keeps its own 3D context composites through the BSP, so its subtree cannot be
     // culled: it joins the list as an area that must be captured.
@@ -2419,5 +2421,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, PerspectiveLayerWithoutStylesKeepsTheRestC
     context->flushAndSubmit();
   })
 }
+
+// Experiment: does a perspective layer draw outside the renderBounds it reports?
 
 }  // namespace tgfx

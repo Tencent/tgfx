@@ -410,9 +410,8 @@ class DisplayList {
    * `Layer::updateRenderBounds` aggregates over the tree, filtered down to the ones that intersect
    * `worldBounds`, the area being captured.
    *
-   * An empty result only means the capture cannot be culled: either no background style samples
-   * inside `worldBounds`, or a subtree has a non-affine 3D matrix, whose covered area 2D bounds
-   * cannot describe.
+   * An empty result only means the capture cannot be culled: no background style samples inside
+   * `worldBounds`, so there is nothing to narrow the draw to.
    */
   std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
 

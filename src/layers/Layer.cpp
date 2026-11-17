@@ -2187,7 +2187,6 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     renderBounds.setEmpty();
   }
   std::vector<std::vector<Rect>*> childFootprints = {};
-  bool childUnboundedSaw = false;
   for (auto& child : _children) {
     if (!child->bitFields.visible || child->_alpha <= 0) {
       if (child->bitFields.dirtyTransform) {
@@ -2234,7 +2233,6 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);
       childFootprints.push_back(&child->backgroundFootprints);
-      childUnboundedSaw |= child->backgroundFootprintsUnbounded;
     }
   }
   auto backOutset = 0.f;
@@ -2284,7 +2282,6 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     bitFields.hasBlendMode = true;
   }
   backgroundFootprints.clear();
-  backgroundFootprintsUnbounded = false;
   auto hasBackgroundStyle = false;
   for (auto& style : _layerStyles) {
     if (style != nullptr && NeedsBackgroundSource(style->extraSourceType())) {
@@ -2295,13 +2292,6 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   for (auto* childFootprints : childFootprints) {
     backgroundFootprints.insert(backgroundFootprints.end(), childFootprints->begin(),
                                 childFootprints->end());
-  }
-  backgroundFootprintsUnbounded = backgroundFootprintsUnbounded || childUnboundedSaw;
-  // A non-affine matrix drops the perspective row from the 2D bounds (Matrix3D::asMatrix), so they no
-  // longer describe where this subtree draws. Only a backdrop sampled underneath can be affected, so
-  // the flag stops at subtrees that sample nothing.
-  if (!bitFields.matrix3DIsAffine && (hasBackgroundStyle || !backgroundFootprints.empty())) {
-    backgroundFootprintsUnbounded = true;
   }
   // A background style reads only the recording under its own bounds, so its descendants add nothing
   // to it. A subtree that keeps its own 3D context cannot be culled when it samples a backdrop, and

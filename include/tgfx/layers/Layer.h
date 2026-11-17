@@ -794,9 +794,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   // context. Aggregated bottom-up by updateRenderBounds, so a clean subtree keeps the value a previous
   // frame computed and no walk is needed when nothing changed.
   std::vector<Rect> backgroundFootprints = {};
-  // Set when some layer of this subtree has a non-affine 3D matrix: its 2D bounds cannot describe
-  // what it draws, so the capture cannot be culled at all.
-  bool backgroundFootprintsUnbounded = false;
 
   friend class RootLayer;
   friend class DisplayList;

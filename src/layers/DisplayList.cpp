@@ -1299,9 +1299,6 @@ std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprin
 }
 
 std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds) const {
-  if (_root->backgroundFootprintsUnbounded) {
-    return {};
-  }
   std::vector<Rect> footprints = {};
   footprints.reserve(_root->backgroundFootprints.size());
   for (const auto& footprint : _root->backgroundFootprints) {
@@ -1362,8 +1359,8 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   for (const auto& rect : worldRects) {
     captureBounds.join(rect);
   }
-  // An empty list does not mean the capture is unnecessary: it is also what a non-affine 3D subtree
-  // returns, and that capture still has to run so the backdrop its styles read stays there.
+  // An empty list means no style samples inside this capture, so there is nothing to narrow the draw
+  // to, but the capture still runs: keeping the whole area only costs the culling for this frame.
   auto footprints =
       _captureCullingEnabled ? collectBackgroundFootprints(captureBounds) : std::vector<Rect>{};
   if (!footprints.empty()) {
