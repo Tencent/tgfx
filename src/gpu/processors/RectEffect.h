@@ -30,12 +30,13 @@ namespace tgfx {
 class RectEffect : public FragmentProcessor {
  public:
   /**
-   * @param localRect    The rectangle in local space.
-   * @param matrix       Maps localRect to device space. Defaults to identity.
-   * @param antiAlias    If true, the shader produces a soft edge that ramps over one pixel centered
-   *                     on the boundary; otherwise a hard edge.
-   *
-   * Returns nullptr when matrix has perspective or its scale components are zero.
+   * Creates a coverage FragmentProcessor for the rectangle clip.
+   * @param localRect The rectangle in local space.
+   * @param matrix Maps localRect to device space. Defaults to identity.
+   * @param antiAlias If true, the shader produces a soft edge that ramps over one pixel centered on
+   *        the boundary; otherwise a hard edge.
+   * @return The new effect, or nullptr when the matrix has perspective or its scale components are
+   *         zero.
    */
   static PlacementPtr<RectEffect> Make(BlockAllocator* allocator, const Rect& localRect,
                                        const Matrix& matrix = Matrix::I(), bool antiAlias = true);

@@ -205,7 +205,15 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
                              std::move(reference), std::move(colorSpace)) {
   }
 
-  bool isComplex() const override {
+  bool hasComplex() const override {
+    return false;
+  }
+
+  bool hasUnscaledGeometry() const override {
+    return false;
+  }
+
+  bool hasSmoothness() const override {
     return false;
   }
 
@@ -354,7 +362,15 @@ class NonAARRectsVertexProvider final : public RRectsVertexProvider {
                              std::move(reference), std::move(colorSpace)) {
   }
 
-  bool isComplex() const override {
+  bool hasComplex() const override {
+    return false;
+  }
+
+  bool hasUnscaledGeometry() const override {
+    return false;
+  }
+
+  bool hasSmoothness() const override {
     return false;
   }
 
@@ -453,8 +469,16 @@ class AAComplexRRectsVertexProvider final : public RRectsVertexProvider {
                              std::move(reference), std::move(colorSpace)) {
   }
 
-  bool isComplex() const override {
+  bool hasComplex() const override {
     return true;
+  }
+
+  bool hasUnscaledGeometry() const override {
+    return false;
+  }
+
+  bool hasSmoothness() const override {
+    return false;
   }
 
   size_t vertexCount() const override {
@@ -572,8 +596,16 @@ class NonAAComplexRRectsVertexProvider final : public RRectsVertexProvider {
                              std::move(reference), std::move(colorSpace)) {
   }
 
-  bool isComplex() const override {
+  bool hasComplex() const override {
     return true;
+  }
+
+  bool hasUnscaledGeometry() const override {
+    return false;
+  }
+
+  bool hasSmoothness() const override {
+    return false;
   }
 
   size_t vertexCount() const override {
@@ -667,6 +699,162 @@ class NonAAComplexRRectsVertexProvider final : public RRectsVertexProvider {
   }
 };
 
+/**
+ * Returns true if the record is a stroke whose width is distorted by unequal axis scales of the
+ * view matrix. Hairlines are one device pixel wide under any matrix, so they are never distorted.
+ * @param record the rounded rectangle record with its view matrix
+ * @param stroke the stroke of the record, or nullptr for a fill
+ */
+static bool IsNonUniformScaledStroke(const RRectRecord& record, const Stroke* stroke) {
+  if (stroke == nullptr) {
+    return false;
+  }
+  const auto scales = record.viewMatrix.getAxisScales();
+  return stroke->width > 0.0f && scales.x != scales.y;
+}
+
+class SmoothRRectsVertexProvider final : public RRectsVertexProvider {
+ public:
+  SmoothRRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
+                             PlacementArray<Stroke>&& strokes,
+                             std::shared_ptr<BlockAllocator> reference,
+                             std::shared_ptr<ColorSpace> colorSpace, bool hasComplex,
+                             bool hasUnscaledGeometry)
+      : RRectsVertexProvider(std::move(rects), aaType, hasColor, std::move(strokes),
+                             std::move(reference), std::move(colorSpace)),
+        _hasComplex(hasComplex), _hasUnscaledGeometry(hasUnscaledGeometry) {
+  }
+
+  bool hasComplex() const override {
+    return _hasComplex;
+  }
+
+  bool hasUnscaledGeometry() const override {
+    return _hasUnscaledGeometry;
+  }
+
+  bool hasSmoothness() const override {
+    return true;
+  }
+
+  size_t vertexCount() const override {
+    // Smooth: 4 vertices per RRect.
+    //   position(2) + localCoord(2) + xRadii(4) + yRadii(4) + smoothness(1) + rectBounds(4) = 17.
+    //   Optional: color(1), halfStrokeWidth(1), invScale(2, AA unscaledGeometry only).
+    size_t floatsPerVertex = 17;
+    if (bitFields.hasColor) {
+      floatsPerVertex += 1;
+    }
+    if (bitFields.hasStroke) {
+      floatsPerVertex += 1;
+    }
+    if (_hasUnscaledGeometry && aaType() != AAType::None) {
+      floatsPerVertex += 2;
+    }
+    return rects.size() * 4 * floatsPerVertex;
+  }
+
+  void getVertices(float* vertices) const override {
+    size_t index = 0;
+    auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
+
+    size_t currentIndex = 0;
+    for (auto& record : rects) {
+      auto viewMatrix = record->viewMatrix;
+      auto rRect = record->rRect;
+      auto scales = viewMatrix.getAxisScales();
+      auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
+      const auto unscaledGeometry = IsNonUniformScaledStroke(*record, stroke);
+      float minScale = 1.0f;
+      // Per-axis factors that convert unscaled local distances to the scaled frame of the AA ramp.
+      // Baked records are already in the scaled frame and use (1, 1). Skew is not accounted for.
+      Point invScale = {1.0f, 1.0f};
+      StrokeParams strokeParams = {};
+      if (unscaledGeometry) {
+        // Skip baking: radii, rect bounds and localCoord stay in the original local frame, and
+        // vertex positions are mapped by the full matrix.
+        minScale = viewMatrix.getMinScale();
+        strokeParams.halfStrokeX = 0.5f * stroke->width;
+        strokeParams.halfStrokeY = strokeParams.halfStrokeX;
+        invScale = {1.0f / scales.x, 1.0f / scales.y};
+      } else {
+        strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
+      }
+      uint32_t uintColor = 0;
+      if (bitFields.hasColor) {
+        uintColor = ToUintPMColor(record->color, steps.get());
+      }
+
+      const auto& rect = rRect.rect();
+      const auto& radii = rRect.radii();
+      const auto currentAAType = aaType();
+      // Extend the quad so the AA coverage ramp is fully covered. On MSAA, bloat enough to
+      // guarantee any pixel that might be touched by the rRect has full sample coverage.
+      const auto aaBloat = currentAAType == AAType::None
+                               ? 0.0f
+                               : (currentAAType == AAType::MSAA ? FLOAT_SQRT2 : 0.5f);
+      // Strokes extend the quad by the half stroke width to cover the outer edge of the ring.
+      // In the local stroke frame the AA bloat converts by the largest local-per-device factor.
+      const auto aaExtra = unscaledGeometry ? aaBloat / minScale : aaBloat;
+      const auto quad =
+          rect.makeOutset(strokeParams.halfStrokeX + aaExtra, strokeParams.halfStrokeY + aaExtra);
+      // Corner positions for a quad: TL, TR, BR, BL
+      const Point corners[] = {
+          {quad.left, quad.top},
+          {quad.right, quad.top},
+          {quad.right, quad.bottom},
+          {quad.left, quad.bottom},
+      };
+      for (int v = 0; v < 4; ++v) {
+        auto point = corners[v];
+        viewMatrix.mapPoints(&point, 1);
+        // position (2 floats)
+        vertices[index++] = point.x;
+        vertices[index++] = point.y;
+        // localCoord (2 floats) - coordinates within the rect for shape evaluation
+        vertices[index++] = corners[v].x;
+        vertices[index++] = corners[v].y;
+        // xRadii (4 floats) - per-corner x radii [TL, TR, BR, BL]
+        vertices[index++] = radii[0].x;
+        vertices[index++] = radii[1].x;
+        vertices[index++] = radii[2].x;
+        vertices[index++] = radii[3].x;
+        // yRadii (4 floats) - per-corner y radii [TL, TR, BR, BL]
+        vertices[index++] = radii[0].y;
+        vertices[index++] = radii[1].y;
+        vertices[index++] = radii[2].y;
+        vertices[index++] = radii[3].y;
+        // smoothness (1 float)
+        vertices[index++] = record->rRect.smoothness();
+        // rectBounds (4 floats)
+        vertices[index++] = rect.left;
+        vertices[index++] = rect.top;
+        vertices[index++] = rect.right;
+        vertices[index++] = rect.bottom;
+        // Optional color
+        if (bitFields.hasColor) {
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
+        }
+        // halfStroke (1 float) - only for stroke mode; in the evaluation frame of the record
+        // (baked device pixels, or local units for an unscaledGeometry record).
+        if (bitFields.hasStroke) {
+          vertices[index++] = strokeParams.halfStrokeX;
+        }
+        // invScale (2 floats) - only for AA unscaledGeometry records.
+        if (_hasUnscaledGeometry && currentAAType != AAType::None) {
+          vertices[index++] = invScale.x;
+          vertices[index++] = invScale.y;
+        }
+      }
+      currentIndex++;
+    }
+  }
+
+ private:
+  bool _hasComplex = false;
+  bool _hasUnscaledGeometry = false;
+};
+
 PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
     BlockAllocator* allocator, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
     std::vector<PlacementPtr<Stroke>>&& strokes, std::shared_ptr<ColorSpace> colorSpace) {
@@ -675,20 +863,36 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
   }
   auto hasColor = false;
   auto hasComplex = false;
+  auto hasNonUniformScaledStroke = false;
   auto& firstColor = rects.front()->color;
-  for (auto& record : rects) {
+  const auto firstIsSmooth = rects.front()->rRect.smoothness() > 0.0f;
+  for (size_t i = 0; i < rects.size(); ++i) {
+    const auto& record = rects[i];
+    // Plain and smoothed rrects, as well as plain simple and complex rrects, use different vertex
+    // layouts, so a batch never mixes them.
+    DEBUG_ASSERT((record->rRect.smoothness() > 0.0f) == firstIsSmooth);
+    DEBUG_ASSERT(firstIsSmooth || record->rRect.isComplex() == rects.front()->rRect.isComplex());
     if (record->color != firstColor) {
       hasColor = true;
     }
     if (record->rRect.isComplex()) {
       hasComplex = true;
     }
-    if (hasColor && hasComplex) {
+    if (firstIsSmooth && !hasNonUniformScaledStroke) {
+      const auto stroke = i < strokes.size() ? strokes[i].get() : nullptr;
+      hasNonUniformScaledStroke = IsNonUniformScaledStroke(*record, stroke);
+    }
+    if (hasColor && (!firstIsSmooth || (hasNonUniformScaledStroke && hasComplex))) {
       break;
     }
   }
   auto array = allocator->makeArray(std::move(rects));
   auto strokeArray = allocator->makeArray(std::move(strokes));
+  if (firstIsSmooth) {
+    return allocator->make<SmoothRRectsVertexProvider>(
+        std::move(array), aaType, hasColor, std::move(strokeArray), allocator->addReference(),
+        std::move(colorSpace), hasComplex, hasNonUniformScaledStroke);
+  }
   if (aaType == AAType::None) {
     if (hasComplex) {
       return allocator->make<NonAAComplexRRectsVertexProvider>(

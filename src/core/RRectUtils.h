@@ -25,6 +25,32 @@
 
 namespace tgfx {
 
+/**
+ * Coefficients of a smoothed right-angle corner with unit radius.
+ *
+ * The corner outline consists of an incoming transition curve, a retained arc and an outgoing
+ * transition curve. The transition curves are cubic bezier curves, and the retained arc is
+ * approximated by a cubic bezier curve. The two transition curves mirror each other across the
+ * corner's bisector, so the coefficients only describe the incoming transition curve and the
+ * retained arc.
+ */
+struct UnitSmoothCornerCoeffs {
+  // Distance from the corner vertex to the start point of the incoming transition curve, where
+  // the curve leaves the edge.
+  float start = 1.0f;
+  // Spacing between the two inner control points of the incoming transition curve. The start point
+  // and both inner control points lie on the edge, with the inner control points 2 and 3 steps
+  // from the start point.
+  float step = 0.0f;
+  // Offsets of the retained arc's start point, which ends the incoming transition curve, from the
+  // inner control point nearer the arc: along the direction from the curve's start point toward
+  // the corner vertex, and perpendicular to it toward the inside of the shape.
+  float arcOffsetAlong = 0.0f;
+  float arcOffsetCross = 0.0f;
+  // Handle length of the bezier curve that approximates the retained arc.
+  float arcHandle = 0.0f;
+};
+
 class RRectUtils {
  public:
   /**
@@ -38,22 +64,24 @@ class RRectUtils {
   static std::optional<RRect> ConservativeIntersect(const RRect& a, const RRect& b);
 
   /**
-   * Tests whether a point lies inside the RRect.
+   * Conservatively tests whether a point lies inside the RRect.
    * @param rRect  the rounded rectangle
    * @param point  the point to test
-   * @return true if the point lies inside the RRect
+   * @return true if the point is guaranteed to lie inside the RRect; false if it lies outside or
+   *         containment cannot be decided, which is always the case for smoothed RRects
    */
-  static bool ContainsPoint(const RRect& rRect, const Point& point);
+  static bool ConservativeContainsPoint(const RRect& rRect, const Point& point);
 
   /**
-   * Tests whether a rect lies entirely inside the RRect.
+   * Conservatively tests whether a rect lies entirely inside the RRect.
    * @param rRect  the rounded rectangle
    * @param rect  the rect to test
-   * @return true if the rect lies entirely inside the RRect
+   * @return true if the rect is guaranteed to lie entirely inside the RRect; false if it does not
+   *         or containment cannot be decided
    * @note Because an RRect is convex, this holds exactly when all four corners of the rect are
    *       contained.
    */
-  static bool ContainsRect(const RRect& rRect, const Rect& rect);
+  static bool ConservativeContainsRect(const RRect& rRect, const Rect& rect);
 
   /**
    * Computes a large axis-aligned rectangle fully contained within the RRect.
@@ -74,6 +102,21 @@ class RRectUtils {
    *         matrix is not axis-aligned or the transform cannot produce a valid RRect.
    */
   static std::optional<RRect> TryAxisAlignedTransform(const RRect& src, const Matrix& matrix);
+
+  /**
+   * Tests whether the two corners of either diagonal pair together span more than the side length
+   * on the x or y axis.
+   * @param rRect the rounded rectangle
+   * @return true if either diagonal corner pair overlaps on the x or y axis
+   */
+  static bool HasDiagonalCornerAxisOverlap(const RRect& rRect);
+
+  /**
+   * Computes the coefficients of a smoothed corner with unit radius.
+   * @param smoothness the corner smoothness, clamped to [0, 1]
+   * @return the coefficients for the clamped smoothness
+   */
+  static UnitSmoothCornerCoeffs ComputeUnitSmoothCornerCoeffs(float smoothness);
 };
 
 }  // namespace tgfx

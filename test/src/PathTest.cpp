@@ -907,4 +907,106 @@ TGFX_TEST(PathTest, ToWindingRejectsNonFiniteCoordinates) {
   EXPECT_EQ(path.getFillType(), PathFillType::EvenOdd) << "a failure must leave the path alone";
 }
 
+struct ExpectedSegment {
+  PathVerb verb = PathVerb::Move;
+  std::vector<Point> points = {};
+};
+
+/**
+ * Compares the leading segments of the path with the expected verbs and points.
+ */
+static void ExpectLeadingSegments(const Path& path, const std::vector<ExpectedSegment>& expected) {
+  size_t index = 0;
+  for (auto segment : path) {
+    if (index == expected.size()) {
+      break;
+    }
+    const auto& expectedSegment = expected[index++];
+    ASSERT_EQ(segment.verb, expectedSegment.verb);
+    const size_t firstPoint = segment.verb == PathVerb::Move ? 0 : 1;
+    for (size_t i = 0; i < expectedSegment.points.size(); ++i) {
+      EXPECT_NEAR(segment.points[firstPoint + i].x, expectedSegment.points[i].x, 1e-3f);
+      EXPECT_NEAR(segment.points[firstPoint + i].y, expectedSegment.points[i].y, 1e-3f);
+    }
+  }
+  EXPECT_EQ(index, expected.size());
+}
+
+TGFX_TEST(PathTest, SmoothRRect) {
+  const auto rect = Rect::MakeWH(200, 100);
+  const std::array<Point, 4> radii = {{{20, 20}, {30, 30}, {20, 10}, {0, 0}}};
+
+  // Case 1: Two circular corners, an elliptical corner and a sharp corner at smoothness 0.5.
+  const auto rRect = RRect::MakeRectRadii(rect, radii, 0.5f);
+  EXPECT_FLOAT_EQ(rRect.smoothness(), 0.5f);
+  Path path = {};
+  path.addRRect(rRect);
+  EXPECT_FALSE(path.isRRect(nullptr));
+  EXPECT_FALSE(path.isOval());
+  const std::vector<ExpectedSegment> expected = {
+      {PathVerb::Move, {{30, 0}}},
+      {PathVerb::Line, {{155, 0}}},
+      {PathVerb::Cubic, {{168.978f, 0}, {175.967f, 0}, {181.481f, 2.284f}}},
+      {PathVerb::Cubic, {{188.831f, 5.328f}, {194.672f, 11.169f}, {197.716f, 18.519f}}},
+      {PathVerb::Cubic, {{200, 24.033f}, {200, 31.022f}, {200, 45}}},
+      {PathVerb::Line, {{200, 85}}},
+      {PathVerb::Cubic, {{200, 89.659f}, {200, 91.989f}, {198.478f, 93.827f}}},
+      {PathVerb::Cubic, {{196.448f, 96.277f}, {192.554f, 98.224f}, {187.654f, 99.239f}}},
+      {PathVerb::Cubic, {{183.978f, 100}, {179.319f, 100}, {170, 100}}},
+      {PathVerb::Line, {{0, 100}}},
+      {PathVerb::Cubic, {{0, 100}, {0, 100}, {0, 100}}},
+      {PathVerb::Cubic, {{0, 100}, {0, 100}, {0, 100}}},
+      {PathVerb::Cubic, {{0, 100}, {0, 100}, {0, 100}}},
+      {PathVerb::Line, {{0, 30}}},
+      {PathVerb::Cubic, {{0, 20.681f}, {0, 16.022f}, {1.522f, 12.346f}}},
+      {PathVerb::Cubic, {{3.552f, 7.446f}, {7.446f, 3.552f}, {12.346f, 1.522f}}},
+      {PathVerb::Cubic, {{16.022f, 0}, {20.681f, 0}, {30, 0}}},
+      {PathVerb::Close, {}},
+  };
+  EXPECT_EQ(path.countVerbs(), static_cast<int>(expected.size()));
+  ExpectLeadingSegments(path, expected);
+
+  // Case 2: The same corners at smoothness 1, where each corner drops its arc.
+  const auto fullRRect = RRect::MakeRectRadii(rect, radii, 1.0f);
+  EXPECT_FLOAT_EQ(fullRRect.smoothness(), 1.0f);
+  Path fullPath = {};
+  fullPath.addRRect(fullRRect);
+  const std::vector<ExpectedSegment> fullExpected = {
+      {PathVerb::Move, {{40, 0}}},
+      {PathVerb::Line, {{140, 0}}},
+      {PathVerb::Cubic, {{168.284f, 0}, {182.426f, 0}, {191.213f, 8.787f}}},
+      {PathVerb::Cubic, {{200, 17.574f}, {200, 31.716f}, {200, 60}}},
+      {PathVerb::Line, {{200, 80}}},
+      {PathVerb::Cubic, {{200, 89.428f}, {200, 94.142f}, {194.142f, 97.071f}}},
+      {PathVerb::Cubic, {{188.284f, 100}, {178.856f, 100}, {160, 100}}},
+      {PathVerb::Line, {{0, 100}}},
+      {PathVerb::Cubic, {{0, 100}, {0, 100}, {0, 100}}},
+      {PathVerb::Cubic, {{0, 100}, {0, 100}, {0, 100}}},
+      {PathVerb::Line, {{0, 40}}},
+      {PathVerb::Cubic, {{0, 21.144f}, {0, 11.716f}, {5.858f, 5.858f}}},
+      {PathVerb::Cubic, {{11.716f, 0}, {21.144f, 0}, {40, 0}}},
+      {PathVerb::Close, {}},
+  };
+  EXPECT_EQ(fullPath.countVerbs(), static_cast<int>(fullExpected.size()));
+  ExpectLeadingSegments(fullPath, fullExpected);
+
+  // Case 3: A forward contour from an odd startIndex.
+  Path forwardPath = {};
+  forwardPath.addRRect(rRect, false, 3);
+  const std::vector<ExpectedSegment> forwardExpected = {
+      {PathVerb::Move, {{200, 85}}},
+      {PathVerb::Cubic, {{200, 89.659f}, {200, 91.989f}, {198.478f, 93.827f}}},
+  };
+  ExpectLeadingSegments(forwardPath, forwardExpected);
+
+  // Case 4: A reversed contour from an even startIndex.
+  Path reversedPath = {};
+  reversedPath.addRRect(rRect, true, 2);
+  const std::vector<ExpectedSegment> reversedExpected = {
+      {PathVerb::Move, {{200, 45}}},
+      {PathVerb::Cubic, {{200, 31.022f}, {200, 24.033f}, {197.716f, 18.519f}}},
+  };
+  ExpectLeadingSegments(reversedPath, reversedExpected);
+}
+
 }  // namespace tgfx

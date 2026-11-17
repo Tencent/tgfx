@@ -107,4 +107,29 @@ TGFX_TEST(RRectTest, Scale) {
   EXPECT_FLOAT_EQ(rRect.radii()[2].y, 2.5f);
 }
 
+TGFX_TEST(RRectTest, Smoothness) {
+  // Case 1: Out-of-range smoothness is clamped to [0, 1].
+  auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 10, -0.5f);
+  EXPECT_FLOAT_EQ(rRect.smoothness(), 0.f);
+  rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 10, 2.0f);
+  EXPECT_FLOAT_EQ(rRect.smoothness(), 1.f);
+
+  // Case 2: Short edges reduce the smoothness, and the tightest edge determines it.
+  rRect =
+      RRect::MakeRectRadii(Rect::MakeWH(100, 80), {{{20, 20}, {10, 10}, {5, 5}, {30, 30}}}, 1.0f);
+  // The left edge holds 30 + 20 = 50 of radii in 80 pixels, allowing s up to 80 / 50 - 1 = 0.6.
+  EXPECT_NEAR(rRect.smoothness(), 0.6f, 1e-6f);
+
+  // Case 3: Radii overflowing an edge reset the smoothness to 0.
+  rRect = RRect::MakeRectRadii(Rect::MakeWH(100, 80), {{{60, 10}, {60, 10}, {10, 10}, {10, 10}}},
+                               0.8f);
+  EXPECT_EQ(rRect.type(), RRect::Type::Complex);
+  EXPECT_FLOAT_EQ(rRect.smoothness(), 0.f);
+
+  // Case 4: Zero radii produce a plain rect, and the smoothness is normalized to 0 as well.
+  rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 0, 0, 0.6f);
+  EXPECT_EQ(rRect.type(), RRect::Type::Rect);
+  EXPECT_FLOAT_EQ(rRect.smoothness(), 0.f);
+}
+
 }  // namespace tgfx

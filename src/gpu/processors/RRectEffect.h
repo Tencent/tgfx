@@ -28,19 +28,20 @@ namespace tgfx {
 
 /**
  * Coverage FragmentProcessor for an affine-mapped rounded rectangle clip, in either AA or NonAA
- * mode. Accepts RRects of type Oval, Simple, or Complex; for Rect type, prefer RectEffect for
- * better performance. Perspective and degenerate matrices are not supported.
+ * mode. Accepts RRects of type Oval, Simple, or Complex without corner smoothness; for Rect type,
+ * prefer RectEffect for better performance. Perspective and degenerate matrices are not supported.
  */
 class RRectEffect : public FragmentProcessor {
  public:
   /**
-   * @param rRect       Rounded rectangle in local space. For Rect type, prefer RectEffect for
-   *                    better performance.
-   * @param matrix      Maps the local-space rRect to device space. Defaults to identity.
-   * @param antiAlias   If true, the shader produces a soft edge that ramps over one pixel centered
-   *                    on the boundary; otherwise a hard edge.
-   *
-   * Returns nullptr when the matrix has perspective or its scale components are zero.
+   * Creates a coverage FragmentProcessor for the rounded rectangle clip.
+   * @param rRect Rounded rectangle in local space without corner smoothness. For Rect type, prefer
+   *        RectEffect for better performance.
+   * @param matrix Maps the local-space rRect to device space. Defaults to identity.
+   * @param antiAlias If true, the shader produces a soft edge that ramps over one pixel centered on
+   *        the boundary; otherwise a hard edge.
+   * @return The new effect, or nullptr when the matrix has perspective or its scale components are
+   *         zero.
    */
   static PlacementPtr<RRectEffect> Make(BlockAllocator* allocator, const RRect& rRect,
                                         const Matrix& matrix = Matrix::I(), bool antiAlias = true);

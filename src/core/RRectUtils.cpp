@@ -20,6 +20,7 @@
 #include <array>
 #include <cmath>
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 
@@ -168,6 +169,11 @@ std::optional<RRect> RRectUtils::ConservativeIntersect(const RRect& a, const RRe
     // Bounding rects do not overlap; return an explicit empty RRect.
     return RRect();
   }
+  // A smoothed corner can cross a plain corner of a larger radius, and the intersection then
+  // cannot be represented as an RRect.
+  if (a.smoothness() > 0.0f || b.smoothness() > 0.0f) {
+    return std::nullopt;
+  }
 
   std::array<Point, 4> radii = {};
   for (auto corner : {RectCorner::TL, RectCorner::TR, RectCorner::BR, RectCorner::BL}) {
@@ -190,15 +196,20 @@ std::optional<RRect> RRectUtils::ConservativeIntersect(const RRect& a, const RRe
   return result;
 }
 
-bool RRectUtils::ContainsPoint(const RRect& rRect, const Point& point) {
+bool RRectUtils::ConservativeContainsPoint(const RRect& rRect, const Point& point) {
+  // IsInnerToCorners tests against the ellipse equation of each corner. Smoothed corners would need
+  // a costlier test against their cubic transition curves, so containment is reported as undecided.
+  if (rRect.smoothness() > 0.0f) {
+    return false;
+  }
   return rRect.rect().contains(point.x, point.y) && IsInnerToCorners(rRect, point);
 }
 
-bool RRectUtils::ContainsRect(const RRect& rRect, const Rect& rect) {
-  return ContainsPoint(rRect, {rect.left, rect.top}) &&
-         ContainsPoint(rRect, {rect.right, rect.top}) &&
-         ContainsPoint(rRect, {rect.right, rect.bottom}) &&
-         ContainsPoint(rRect, {rect.left, rect.bottom});
+bool RRectUtils::ConservativeContainsRect(const RRect& rRect, const Rect& rect) {
+  return ConservativeContainsPoint(rRect, {rect.left, rect.top}) &&
+         ConservativeContainsPoint(rRect, {rect.right, rect.top}) &&
+         ConservativeContainsPoint(rRect, {rect.right, rect.bottom}) &&
+         ConservativeContainsPoint(rRect, {rect.left, rect.bottom});
 }
 
 Rect RRectUtils::InnerBounds(const RRect& rr) {
@@ -214,21 +225,25 @@ Rect RRectUtils::InnerBounds(const RRect& rr) {
   const auto bottomShift = std::max(r[3].y, r[2].y);
   const auto dw = leftShift + rightShift;
   const auto dh = topShift + bottomShift;
-  const auto horizArea = (innerBounds.width() - dw) * innerBounds.height();
-  const auto vertArea = (innerBounds.height() - dh) * innerBounds.width();
+  // Smoothed corners occupy (1 + smoothness) * radius along each edge.
+  const auto edgeScale = 1.0f + rr.smoothness();
+  const auto horizArea = (innerBounds.width() - edgeScale * dw) * innerBounds.height();
+  const auto vertArea = (innerBounds.height() - edgeScale * dh) * innerBounds.width();
   // The maximum inscribed rectangle at the corner ellipse has a corner at
   // sqrt(2)/2 * (rX, rY). Scale all corner shifts by (1 - sqrt(2)/2) to get the safe inset.
   // Add a small epsilon so the shifted corners stay safely inside the curves.
+  // A smoothed corner passes through the same point, as the middle of its retained arc or the join
+  // of its transition curves, so smoothness does not change this inset.
   static constexpr float diagInsetScale = (1.0f - 0.70710678118f) + 1e-5f;
   const auto innerArea =
       (innerBounds.width() - diagInsetScale * dw) * (innerBounds.height() - diagInsetScale * dh);
 
   if (horizArea > vertArea && horizArea > innerArea) {
-    innerBounds.left += leftShift;
-    innerBounds.right -= rightShift;
+    innerBounds.left += edgeScale * leftShift;
+    innerBounds.right -= edgeScale * rightShift;
   } else if (vertArea > innerArea) {
-    innerBounds.top += topShift;
-    innerBounds.bottom -= bottomShift;
+    innerBounds.top += edgeScale * topShift;
+    innerBounds.bottom -= edgeScale * bottomShift;
   } else if (innerArea > 0.f) {
     innerBounds.left += diagInsetScale * leftShift;
     innerBounds.right -= diagInsetScale * rightShift;
@@ -327,8 +342,38 @@ std::optional<RRect> RRectUtils::TryAxisAlignedTransform(const RRect& src, const
   }
 
   RRect dst = {};
-  dst.setRectRadii(newRect, radii);
+  dst.setRectRadii(newRect, radii, src.smoothness());
   return dst;
+}
+
+bool RRectUtils::HasDiagonalCornerAxisOverlap(const RRect& rRect) {
+  // Other types have equal radii at all corners, so each diagonal sum equals an adjacent sum,
+  // which RRect already keeps within the side length.
+  if (!rRect.isComplex()) {
+    return false;
+  }
+  const auto rScale = 1.0f + rRect.smoothness();
+  const auto& r = rRect.radii();
+  const auto w = rRect.rect().width();
+  const auto h = rRect.rect().height();
+  return (r[0].x + r[2].x) * rScale > w || (r[0].y + r[2].y) * rScale > h ||
+         (r[1].x + r[3].x) * rScale > w || (r[1].y + r[3].y) * rScale > h;
+}
+
+UnitSmoothCornerCoeffs RRectUtils::ComputeUnitSmoothCornerCoeffs(float smoothness) {
+  const auto s = std::clamp(smoothness, 0.0f, 1.0f);
+  // Angle the tangent turns through along one transition curve.
+  const auto turnAngle = M_PI_F * 0.25f * s;
+  // Sweep angle of the retained arc.
+  const auto arcSweep = M_PI_2_F * (1.0f - s);
+  const auto tanTurn = tanf(turnAngle);
+  UnitSmoothCornerCoeffs coeffs = {};
+  coeffs.start = 1.0f + s;
+  coeffs.arcOffsetAlong = tanf(turnAngle * 0.5f) * cosf(turnAngle);
+  coeffs.step = (s + sinf(turnAngle) - coeffs.arcOffsetAlong) / 3.0f;
+  coeffs.arcOffsetCross = coeffs.arcOffsetAlong * tanTurn;
+  coeffs.arcHandle = (4.0f / 3.0f) * tanf(arcSweep * 0.25f);
+  return coeffs;
 }
 
 }  // namespace tgfx
