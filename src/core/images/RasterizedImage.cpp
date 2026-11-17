@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RasterizedImage.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
@@ -38,7 +39,14 @@ std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& ar
   // mipmap branch in getTextureKey().
   auto newScale = source->hasMipmaps() ? 1.0f : source->getRasterizedScale(args.drawScale);
   auto textureKey = getTextureKey(newScale);
-  auto textureProxy = proxyProvider->findOrWrapTextureProxy(textureKey);
+  // The cached texture view may be larger than the content it carries, for example a
+  // hardware-decoded video buffer aligned by the decoder. Report the content size in that case so
+  // the coordinate transform in asFragmentProcessor() does not stretch the content over the
+  // padding and the sampling clamps to the content instead of the whole padded texture.
+  auto contentWidth = FloatSaturateToInt(static_cast<float>(width()) * newScale);
+  auto contentHeight = FloatSaturateToInt(static_cast<float>(height()) * newScale);
+  auto textureProxy =
+      proxyProvider->findOrWrapTextureProxy(textureKey, contentWidth, contentHeight);
   if (textureProxy != nullptr) {
     return textureProxy;
   }

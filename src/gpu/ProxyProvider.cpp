@@ -663,7 +663,8 @@ std::shared_ptr<GPUBufferProxy> ProxyProvider::findOrWrapGPUBufferProxy(
   return proxy;
 }
 
-std::shared_ptr<TextureProxy> ProxyProvider::findOrWrapTextureProxy(const UniqueKey& uniqueKey) {
+std::shared_ptr<TextureProxy> ProxyProvider::findOrWrapTextureProxy(const UniqueKey& uniqueKey,
+                                                                    int width, int height) {
   auto proxy = std::static_pointer_cast<TextureProxy>(findProxy(uniqueKey));
   if (proxy != nullptr) {
     return proxy;
@@ -682,6 +683,12 @@ std::shared_ptr<TextureProxy> ProxyProvider::findOrWrapTextureProxy(const Unique
     proxy = std::shared_ptr<TextureProxy>(
         new TextureProxy(textureView->width(), textureView->height(), format,
                          textureView->hasMipmaps(), textureView->origin()));
+  }
+  if (width > 0) {
+    proxy->_width = std::min(proxy->_width, width);
+  }
+  if (height > 0) {
+    proxy->_height = std::min(proxy->_height, height);
   }
   proxy->resource = std::move(textureView);
   addResourceProxy(proxy, uniqueKey);

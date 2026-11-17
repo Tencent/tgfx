@@ -50,8 +50,14 @@ class ProxyProvider {
   /**
    * Returns the texture proxy for the given UniqueKey. If the proxy doesn't exist but a texture
    * view with the same UniqueKey does, it wraps the texture view in a texture proxy and returns it.
+   * A wrapped texture view may be larger than the content it carries, for example hardware-decoded
+   * video buffers aligned by the decoder, so the caller may pass the expected content size through
+   * width and height. Non-positive values keep the size of the texture view. Otherwise the wrapped
+   * proxy reports the smaller of the two sizes, which keeps the coordinate transforms and the
+   * subset clamp of the sampling based on the content instead of the padded texture.
    */
-  std::shared_ptr<TextureProxy> findOrWrapTextureProxy(const UniqueKey& uniqueKey);
+  std::shared_ptr<TextureProxy> findOrWrapTextureProxy(const UniqueKey& uniqueKey, int width = 0,
+                                                       int height = 0);
 
   /**
    * Creates a GPUBufferProxy for the given data source. The source will be released after being
