@@ -34,6 +34,9 @@ struct BuildOptions {
   // Persistent stage cache. Defaults to <out-dir>/stage_cache; --no-cache keeps it memory-only.
   std::string cacheDir;
   bool noCache = false;
+  /// The stage cache's size cap (--cache-max-mb, 2GiB by default): the open-time eviction brings
+  /// the current identity's entries down to 80% of it.
+  uint64_t cacheMaxBytes = 2048ull << 20;
   // The platform the Metal bundle is compiled for (see SetMetalTarget).
   std::string metalSdk = "macosx";
   /// What a d3d12 bundle stores: dxbc (bytecode compiled here, the default) or hlsl (source the

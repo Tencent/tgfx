@@ -19,6 +19,7 @@
 #include "BuildCommand.h"
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -269,6 +270,8 @@ std::string UsageText() {
          "  --compress            Compress data pool with zstd in output bundles\n"
          "  --cache-dir <path>    Persistent stage cache (default: <out-dir>/stage_cache)\n"
          "  --no-cache            Compile every stage, reading and writing no persistent cache\n"
+         "  --cache-max-mb <mb>   Stage cache size cap in MiB (default 2048); opening the cache\n"
+         "                        evicts entries oldest-first down to 80% of it\n"
          "\n"
          "  --stamp <path>        Write a stamp manifest after the bundles: the tool's identity\n"
          "                        and every bundle's digest, for --verify to check later\n"
@@ -304,6 +307,8 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->cacheDir = argv[++i];
     } else if (std::strcmp(argv[i], "--no-cache") == 0) {
       options->noCache = true;
+    } else if (std::strcmp(argv[i], "--cache-max-mb") == 0 && i + 1 < argc) {
+      options->cacheMaxBytes = static_cast<uint64_t>(std::strtoull(argv[++i], nullptr, 10)) << 20;
     } else if (std::strcmp(argv[i], "--stamp") == 0 && i + 1 < argc) {
       options->stampPath = argv[++i];
     } else if (std::strcmp(argv[i], "--verify") == 0 && i + 1 < argc) {
@@ -666,7 +671,7 @@ int RunBuildCommand(const BuildOptions& options) {
   if (compiling && !options.noCache) {
     auto cacheDir = options.cacheDir.empty() ? options.outDir + "/stage_cache" : options.cacheDir;
     std::string cacheError;
-    if (!stageCache.open(cacheDir, &cacheError)) {
+    if (!stageCache.open(cacheDir, options.cacheMaxBytes, &cacheError)) {
       Diagnostic diagnostic;
       diagnostic.severity = Severity::Warning;
       diagnostic.layer = Layer::Compile;
@@ -753,6 +758,9 @@ int RunBuildCommand(const BuildOptions& options) {
                                           : std::string("memory only"));
     if (stageCache.persistent()) {
       std::cout << " (tool " << stageCache.toolIdentity().substr(0, 12) << ")";
+      if (stageCache.bytesPrunedAtOpen() > 0) {
+        std::cout << ", pruned " << (stageCache.bytesPrunedAtOpen() >> 20) << "MB";
+      }
     }
     std::cout << "\n";
     for (const auto& entry : stageCache.allStats()) {

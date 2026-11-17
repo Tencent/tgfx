@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "compile/StageCache.h"
+#include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -77,6 +79,31 @@ uint64_t GetLE(const std::vector<uint8_t>& bytes, size_t offset, size_t width) {
     value |= static_cast<uint64_t>(bytes[offset + i]) << (8 * i);
   }
   return value;
+}
+
+bool IsHexName(const std::string& name, size_t length) {
+  if (name.size() != length) {
+    return false;
+  }
+  for (const char character : name) {
+    const bool hex =
+        (character >= '0' && character <= '9') || (character >= 'a' && character <= 'f');
+    if (!hex) {
+      return false;
+    }
+  }
+  return true;
+}
+
+uint64_t DirectoryBytes(const std::filesystem::path& root) {
+  uint64_t total = 0;
+  std::error_code code;
+  for (const auto& entry : std::filesystem::recursive_directory_iterator(root, code)) {
+    if (entry.is_regular_file(code)) {
+      total += static_cast<uint64_t>(entry.file_size(code));
+    }
+  }
+  return total;
 }
 
 std::array<uint8_t, 32> Sha256Of(const void* data, size_t size) {
@@ -290,9 +317,101 @@ std::string ComputeToolIdentity(std::string* error) {
   return Sha256::Hex(toolHash.finish());
 }
 
-bool StageCache::open(const std::string& dir, std::string* error) {
+uint64_t PruneForeignIdentities(const std::string& cacheDir, const std::string& currentIdentity,
+                                size_t keepOthers, int64_t graceSeconds) {
+  std::error_code code;
+  std::vector<std::pair<std::filesystem::file_time_type, std::string>> foreign;
+  uint64_t removed = 0;
+  const auto staleBefore =
+      std::filesystem::file_time_type::clock::now() - std::chrono::seconds(graceSeconds);
+  for (const auto& entry : std::filesystem::directory_iterator(cacheDir, code)) {
+    const auto path = entry.path();
+    const auto name = path.filename().string();
+    if (!entry.is_directory(code)) {
+      continue;
+    }
+    if (name == currentIdentity) {
+      continue;  // the current identity is never a candidate
+    }
+    if (name.size() == 2 && IsHexName(name, 2)) {
+      // A legacy bucket from before identity directories: its entries belong to a tool that no
+      // longer matches any identity, so it is pure dead weight.
+      removed += DirectoryBytes(path);
+      std::filesystem::remove_all(path, code);
+      continue;
+    }
+    if (!IsHexName(name, 12)) {
+      continue;  // not one of ours
+    }
+    auto used = std::filesystem::last_write_time(path / "last_used", code);
+    if (code) {
+      used = std::filesystem::last_write_time(path, code);
+    }
+    foreign.emplace_back(used, path.string());
+  }
+  // Newest first: the first keepOthers survive (branch switching stays cheap), a directory whose
+  // marker is inside the grace window survives (a concurrent build is using it), the rest go.
+  std::sort(foreign.begin(), foreign.end(),
+            [](const auto& left, const auto& right) { return left.first > right.first; });
+  for (size_t index = 0; index < foreign.size(); ++index) {
+    const auto& candidate = foreign[index];
+    if (index < keepOthers ||
+        (candidate.first.time_since_epoch().count() != 0 && candidate.first > staleBefore)) {
+      continue;
+    }
+    removed += DirectoryBytes(candidate.second);
+    std::filesystem::remove_all(candidate.second, code);
+  }
+  return removed;
+}
+
+uint64_t EvictToCap(const std::string& root, uint64_t maxBytes) {
+  struct Entry {
+    std::filesystem::file_time_type modified;
+    uint64_t size;
+    std::filesystem::path path;
+  };
+  std::vector<Entry> entries;
+  uint64_t total = 0;
+  std::error_code code;
+  for (const auto& entry : std::filesystem::recursive_directory_iterator(root, code)) {
+    if (!entry.is_regular_file(code)) {
+      continue;
+    }
+    const auto size = static_cast<uint64_t>(entry.file_size(code));
+    const auto modified = entry.last_write_time(code);
+    if (code) {
+      continue;
+    }
+    total += size;
+    entries.push_back({modified, size, entry.path()});
+  }
+  if (total <= maxBytes || entries.empty()) {
+    return 0;
+  }
+  const auto target = maxBytes / 5 * 4;  // evict down to 80% of the cap
+  std::sort(entries.begin(), entries.end(),
+            [](const Entry& left, const Entry& right) { return left.modified < right.modified; });
+  uint64_t removed = 0;
+  for (const auto& entry : entries) {
+    if (total <= target) {
+      break;
+    }
+    std::error_code removeCode;
+    std::filesystem::remove(entry.path, removeCode);
+    if (!removeCode) {
+      total -= entry.size;
+      removed += entry.size;
+    }
+  }
+  return removed;
+}
+
+bool StageCache::open(const std::string& dir, uint64_t maxBytes, std::string* error) {
   directory.clear();
   identity.clear();
+  root.clear();
+  prunedBytes = 0;
   if (!Sha256SelfTest()) {
     *error = "SHA-256 self-test failed";
     return false;
@@ -307,12 +426,25 @@ bool StageCache::open(const std::string& dir, std::string* error) {
     *error = "cannot create " + dir + ": " + code.message();
     return false;
   }
+  root = dir + "/" + identity.substr(0, 12);
+  std::filesystem::create_directories(root, code);
+  if (code) {
+    *error = "cannot create " + root + ": " + code.message();
+    return false;
+  }
+  {
+    // The freshness marker the pruning reads: an identity directory touched now is in use and
+    // survives the grace window even when it is a foreign one.
+    std::ofstream marker(root + "/last_used", std::ios::binary | std::ios::trunc);
+  }
   directory = dir;
+  prunedBytes = PruneForeignIdentities(dir, identity.substr(0, 12), 1, 3600);
+  prunedBytes += EvictToCap(root, maxBytes);
   return true;
 }
 
 std::string StageCache::entryPath(const std::string& key) const {
-  return directory + "/" + key.substr(0, 2) + "/" + key;
+  return root + "/" + key.substr(0, 2) + "/" + key;
 }
 
 bool StageCache::load(const std::string& key, std::vector<uint8_t>* payload,
@@ -349,7 +481,7 @@ void StageCache::store(const std::string& key, const std::vector<uint8_t>& paylo
   }
   auto path = entryPath(key);
   std::error_code code;
-  std::filesystem::create_directories(directory + "/" + key.substr(0, 2), code);
+  std::filesystem::create_directories(std::filesystem::path(path).parent_path(), code);
   if (code) {
     return;
   }

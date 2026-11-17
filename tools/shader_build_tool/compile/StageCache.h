@@ -74,25 +74,46 @@ struct StageCacheStats {
   uint64_t corrupt = 0;
 };
 
-/// A content-addressed store of compiled shader stages, shared by every build of one output
-/// directory. An entry is only returned when its key matches and its payload checksum verifies;
-/// a damaged entry counts as corrupt and is recompiled. Entries are written to a temporary file
-/// and renamed into place, so a concurrent or interrupted build never leaves a half-written entry
-/// that can be read back. Only successful compilations are stored.
 /// The SHA-256 of the running executable as hex, or "" with *error set. The stage cache keys and
 /// the bundle stamp manifest both carry this one identity, so a rebuilt tool invalidates the
 /// cache entries and fails the stamp's verification together.
 std::string ComputeToolIdentity(std::string* error);
 
+/// Removes the entries of other tool identities from a cache directory: every identity directory
+/// but the current one is a candidate, and so are the legacy two-character buckets that predate
+/// identity directories (their entries belong to a tool that no longer exists). The newest
+/// `keepOthers` foreign identities are spared so switching branches does not thrash, an identity
+/// whose last_used marker is younger than `graceSeconds` is spared so concurrent builds of
+/// different tools do not delete each other's entries, and the current identity is never touched.
+/// Returns the bytes removed.
+uint64_t PruneForeignIdentities(const std::string& cacheDir, const std::string& currentIdentity,
+                                size_t keepOthers, int64_t graceSeconds);
+
+/// Enforces a size cap on one identity's entries: when the tree under root exceeds maxBytes,
+/// entries are removed oldest-first (by mtime) until the tree is at or under 80% of the cap.
+/// Returns the bytes removed.
+uint64_t EvictToCap(const std::string& root, uint64_t maxBytes);
+
+/// A content-addressed store of compiled shader stages, shared by every build of one output
+/// directory. An entry is only returned when its key matches and its payload checksum verifies;
+/// a damaged entry counts as corrupt and is recompiled. Entries are written to a temporary file
+/// and renamed into place, so a concurrent or interrupted build never leaves a half-written entry
+/// that can be read back. Only successful compilations are stored.
+///
+/// The entries live under <dir>/<identity12>/<key2>/<key>, so every entry belongs to exactly one
+/// tool build: opening prunes the other identities' directories and enforces a size cap on this
+/// one, which is what keeps the cache bounded across tool rebuilds (each rebuild changes the
+/// identity and would otherwise leave the previous entries behind forever).
 class StageCache {
  public:
   StageCache();
   StageCache(const StageCache&) = delete;
   StageCache& operator=(const StageCache&) = delete;
 
-  /// Enables the persistent store under dir. Returns false (and stays memory-only) when the
-  /// directory cannot be created or the tool's own identity cannot be determined.
-  bool open(const std::string& dir, std::string* error);
+  /// Enables the persistent store under dir with a size cap in bytes (the open-time eviction
+  /// targets 80% of it). Returns false (and stays memory-only) when the directory cannot be
+  /// created or the tool's own identity cannot be determined.
+  bool open(const std::string& dir, uint64_t maxBytes, std::string* error);
 
   bool persistent() const {
     return !directory.empty();
@@ -118,6 +139,11 @@ class StageCache {
     return kindStats[kind];
   }
 
+  /// The bytes the open-time pruning and eviction removed, for the cli's summary line.
+  uint64_t bytesPrunedAtOpen() const {
+    return prunedBytes;
+  }
+
   /// The per-kind counters, for the cli renderer — printing is the cli's job; the cache only
   /// counts.
   const std::map<std::string, StageCacheStats>& allStats() const {
@@ -128,6 +154,9 @@ class StageCache {
   std::string entryPath(const std::string& key) const;
 
   std::string directory = {};
+  /// The current identity's entry root: <directory>/<identity12>.
+  std::string root;
+  uint64_t prunedBytes = 0;
   std::string identity = {};
   std::map<std::string, StageCacheStats> kindStats = {};
   uint64_t tempCounter = 0;

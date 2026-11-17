@@ -46,7 +46,8 @@ std::vector<uint8_t> Payload(const std::string& text) {
 std::string OnlyEntryFile(const std::string& dir) {
   std::string found;
   for (const auto& item : std::filesystem::recursive_directory_iterator(dir)) {
-    if (item.is_regular_file()) {
+    // The identity directory's freshness marker is bookkeeping, not an entry.
+    if (item.is_regular_file() && item.path().filename() != "last_used") {
       EXPECT_TRUE(found.empty()) << "more than one entry file";
       found = item.path().string();
     }
@@ -61,7 +62,7 @@ class StageCacheTest : public ::testing::Test {
 
   void SetUp() override {
     std::string error;
-    ASSERT_TRUE(cache.open(scratch.dir(), &error)) << error;
+    ASSERT_TRUE(cache.open(scratch.dir(), 1ull << 40, &error)) << error;
   }
 
   // Keys cover the identity of the tool the same way the compiler's keys do.
@@ -267,7 +268,7 @@ TEST_F(StageCacheTest, NoTemporaryFilesAreLeftBehind) {
   }
   size_t entries = 0;
   for (const auto& item : std::filesystem::recursive_directory_iterator(scratch.dir())) {
-    if (item.is_regular_file()) {
+    if (item.is_regular_file() && item.path().filename() != "last_used") {
       ++entries;
       EXPECT_EQ(item.path().string().find(".tmp"), std::string::npos) << item.path();
     }
@@ -279,7 +280,8 @@ TEST_F(StageCacheTest, AnEntryLivesUnderTheFirstDigitsOfItsKey) {
   auto key = KeyOf("spirv", "source", 1);
   StageCacheStats stats;
   cache.store(key, Payload("bytes"), &stats);
-  auto expected = std::filesystem::path(scratch.dir()) / key.substr(0, 2) / key;
+  auto expected = std::filesystem::path(scratch.dir()) / cache.toolIdentity().substr(0, 12) /
+                  key.substr(0, 2) / key;
   EXPECT_TRUE(std::filesystem::exists(expected)) << expected;
 }
 
@@ -288,7 +290,7 @@ TEST_F(StageCacheTest, ReopeningTheSameDirectoryKeepsTheEntries) {
   StageCacheStats stats;
   cache.store(key, Payload("kept"), &stats);
   std::string error;
-  ASSERT_TRUE(cache.open(scratch.dir(), &error)) << error;
+  ASSERT_TRUE(cache.open(scratch.dir(), 1ull << 40, &error)) << error;
   std::vector<uint8_t> loaded;
   EXPECT_TRUE(cache.load(key, &loaded, &stats));
   EXPECT_EQ(loaded, Payload("kept"));
@@ -301,7 +303,7 @@ TEST_F(StageCacheTest, AnEntryOfAnotherDirectoryIsNotVisible) {
 
   ScratchDir other("stage_cache_other");
   std::string error;
-  ASSERT_TRUE(cache.open(other.dir(), &error)) << error;
+  ASSERT_TRUE(cache.open(other.dir(), 1ull << 40, &error)) << error;
   std::vector<uint8_t> loaded;
   EXPECT_FALSE(cache.load(key, &loaded, &stats));
 }
@@ -310,7 +312,7 @@ TEST_F(StageCacheTest, ADirectoryThatCannotBeCreatedKeepsTheCacheInMemory) {
   // A path below a regular file cannot become a directory.
   scratch.write("a_file", "not a directory");
   std::string error;
-  EXPECT_FALSE(cache.open(scratch.dir() + "/a_file/below", &error));
+  EXPECT_FALSE(cache.open(scratch.dir() + "/a_file/below", 1ull << 40, &error));
   EXPECT_FALSE(error.empty());
   EXPECT_FALSE(cache.persistent());
   // Without a store, loads miss and stores are silent no-ops.
