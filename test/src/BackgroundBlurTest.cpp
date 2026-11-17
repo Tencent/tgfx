@@ -2328,7 +2328,61 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintCacheSurvivesPanAndZoom){TGFX_PRI
 
 // Hiding a layer, removing it, or adding and dropping a background style all have to reach the
 // footprints that the next capture culls with.
-TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintsFollowVisibilityAndStyles) {
+TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintsFollowVisibilityAndStyles){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 240, 240);
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
+
+  auto block = ShapeLayer::Make();
+  Path blockPath;
+  blockPath.addRect(Rect::MakeWH(16, 16));
+  block->setPath(blockPath);
+  block->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
+  block->setMatrix(Matrix::MakeTrans(60, 60));
+  displayList->root()->addChild(block);
+
+  auto blurred = ShapeLayer::Make();
+  Path blurPath;
+  blurPath.addRect(Rect::MakeWH(60, 60));
+  blurred->setPath(blurPath);
+  blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 60)));
+  blurred->setMatrix(Matrix::MakeTrans(50, 50));
+  blurred->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
+  displayList->root()->addChild(blurred);
+
+  auto captureRect = Rect::MakeWH(240.0f, 240.0f);
+  displayList->render(surface.get());
+  auto footprints = displayList->collectBackgroundFootprints(captureRect);
+  ASSERT_EQ(footprints.size(), 1u);
+  EXPECT_EQ(footprints[0], blurred->renderBounds);
+
+  blurred->setVisible(false);
+  displayList->render(surface.get());
+  EXPECT_TRUE(displayList->collectBackgroundFootprints(captureRect).empty());
+
+  blurred->setVisible(true);
+  displayList->render(surface.get());
+  EXPECT_EQ(displayList->collectBackgroundFootprints(captureRect).size(), 1u);
+
+  blurred->setLayerStyles({});
+  displayList->render(surface.get());
+  EXPECT_TRUE(displayList->collectBackgroundFootprints(captureRect).empty());
+
+  blurred->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
+  displayList->render(surface.get());
+  displayList->root()->removeChildAt(1);
+  displayList->render(surface.get());
+  EXPECT_TRUE(displayList->collectBackgroundFootprints(captureRect).empty());
+  context->flushAndSubmit();
+})}
+
+// A perspective layer that samples no backdrop must not turn the culling off for the whole document.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, PerspectiveLayerWithoutStylesKeepsTheRestCulled) {
   TGFX_PRIVATE_ACCESS({
     ContextScope scope;
     auto context = scope.getContext();
@@ -2337,48 +2391,31 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintsFollowVisibilityAndStyles) {
     ASSERT_TRUE(surface != nullptr);
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(RenderMode::Tiled);
-    displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
 
-    auto block = ShapeLayer::Make();
-    Path blockPath;
-    blockPath.addRect(Rect::MakeWH(16, 16));
-    block->setPath(blockPath);
-    block->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
-    block->setMatrix(Matrix::MakeTrans(60, 60));
-    displayList->root()->addChild(block);
+    auto perspective = ShapeLayer::Make();
+    Path cubePath;
+    cubePath.addRect(Rect::MakeWH(60, 60));
+    perspective->setPath(cubePath);
+    perspective->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 120, 0, 255)));
+    auto matrix3D = Matrix3D::I();
+    matrix3D.setRowColumn(3, 2, -1.0f / 400.0f);
+    perspective->setMatrix3D(matrix3D);
+    displayList->root()->addChild(perspective);
 
     auto blurred = ShapeLayer::Make();
     Path blurPath;
-    blurPath.addRect(Rect::MakeWH(60, 60));
+    blurPath.addRect(Rect::MakeWH(40, 40));
     blurred->setPath(blurPath);
-    blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 60)));
-    blurred->setMatrix(Matrix::MakeTrans(50, 50));
-    blurred->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
+    blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
+    blurred->setMatrix(Matrix::MakeTrans(150, 150));
+    blurred->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
     displayList->root()->addChild(blurred);
 
-    auto captureRect = Rect::MakeWH(240.0f, 240.0f);
     displayList->render(surface.get());
-    auto footprints = displayList->collectBackgroundFootprints(captureRect);
-    ASSERT_EQ(footprints.size(), 1u);
-    EXPECT_EQ(footprints[0], blurred->renderBounds);
-
-    blurred->setVisible(false);
-    displayList->render(surface.get());
-    EXPECT_TRUE(displayList->collectBackgroundFootprints(captureRect).empty());
-
-    blurred->setVisible(true);
-    displayList->render(surface.get());
-    EXPECT_EQ(displayList->collectBackgroundFootprints(captureRect).size(), 1u);
-
-    blurred->setLayerStyles({});
-    displayList->render(surface.get());
-    EXPECT_TRUE(displayList->collectBackgroundFootprints(captureRect).empty());
-
-    blurred->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
-    displayList->render(surface.get());
-    displayList->root()->removeChildAt(1);
-    displayList->render(surface.get());
-    EXPECT_TRUE(displayList->collectBackgroundFootprints(captureRect).empty());
+    auto snapshots = displayList->captureBackgrounds(surface.get(), {Rect::MakeWH(240.0f, 240.0f)});
+    ASSERT_TRUE(snapshots != nullptr);
+    ASSERT_EQ(snapshots->cullRects.size(), 1u);
+    EXPECT_EQ(snapshots->cullRects[0], blurred->renderBounds);
     context->flushAndSubmit();
   })
 }

@@ -311,7 +311,7 @@ void Layer::setPosition(const Point& value) {
 
 Matrix Layer::matrix() const {
   auto affineMatrix = Matrix::I();
-  if (!bitFields.matrix3DIsAffine) {
+  if (!bitFields.matrix3DIsAffine && (hasBackgroundStyle || !backgroundFootprints.empty())) {
     return Matrix::I();
   }
   affineMatrix.setAll(_matrix3D.getRowColumn(0, 0), _matrix3D.getRowColumn(0, 1),
@@ -2284,7 +2284,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     bitFields.hasBlendMode = true;
   }
   backgroundFootprints.clear();
-  backgroundFootprintsUnbounded = !bitFields.matrix3DIsAffine;
+  backgroundFootprintsUnbounded = false;
   auto hasBackgroundStyle = false;
   for (auto& style : _layerStyles) {
     if (style != nullptr && NeedsBackgroundSource(style->extraSourceType())) {
@@ -2297,6 +2297,12 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
                                 childFootprints->end());
   }
   backgroundFootprintsUnbounded = backgroundFootprintsUnbounded || childUnboundedSaw;
+  // A non-affine matrix drops the perspective row from the 2D bounds (Matrix3D::asMatrix), so they no
+  // longer describe where this subtree draws. Only a backdrop sampled underneath can be affected, so
+  // the flag stops at subtrees that sample nothing.
+  if (!bitFields.matrix3DIsAffine) {
+    backgroundFootprintsUnbounded = true;
+  }
   // A background style reads only the recording under its own bounds, so its descendants add nothing
   // to it. A subtree that keeps its own 3D context cannot be culled when it samples a backdrop, and
   // its bounds stand in for everything it draws.
