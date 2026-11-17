@@ -1606,6 +1606,51 @@ TGFX_TEST(SVGExportTest, FilterAndShaderExport) {
   composeBlendPaint.setColorFilter(composeColorFilter);
   canvas->drawRect(Rect::MakeXYWH(25, 425, 150, 150), composeBlendPaint);
 
+  // 9. Blur FilterImage drawn with a scaled matrix: the blur spreads over the green underlay.
+  Paint underlayPaint;
+  underlayPaint.setColor(Color::Green());
+  canvas->drawRect(Rect::MakeXYWH(195, 420, 160, 160), underlayPaint);
+  PictureRecorder recorder;
+  auto recordingCanvas = recorder.beginRecording();
+  Paint rectPaint;
+  rectPaint.setColor(Color::Red());
+  recordingCanvas->drawRect(Rect::MakeWH(40, 40), rectPaint);
+  auto rectImage = Image::MakeFrom(recorder.finishRecordingAsPicture(), 40, 40);
+  ASSERT_TRUE(rectImage != nullptr);
+  Point blurOffset = {};
+  auto blurImage = rectImage->makeWithFilter(ImageFilter::Blur(10, 10), &blurOffset);
+  ASSERT_TRUE(blurImage != nullptr);
+  canvas->save();
+  canvas->translate(235, 460);
+  canvas->scale(2, 2);
+  canvas->drawImage(blurImage, blurOffset.x, blurOffset.y);
+  canvas->restore();
+
+  // 10. DropShadowOnly FilterImage drawn with a scaled matrix: the shadow spreads over the green
+  // underlay.
+  canvas->drawRect(Rect::MakeXYWH(415, 440, 120, 120), underlayPaint);
+  Point dropShadowOffset = {};
+  auto dropShadowImage = rectImage->makeWithFilter(
+      ImageFilter::DropShadowOnly(5, 5, 5, 5, Color::Red()), &dropShadowOffset);
+  ASSERT_TRUE(dropShadowImage != nullptr);
+  canvas->save();
+  canvas->translate(425, 450);
+  canvas->scale(2, 2);
+  canvas->drawImage(dropShadowImage, dropShadowOffset.x, dropShadowOffset.y);
+  canvas->restore();
+
+  // 11. InnerShadow FilterImage drawn with a scaled matrix: the shadow band along the left and top
+  // edges is as wide as the scaled offset.
+  Point innerShadowOffset = {};
+  auto innerShadowImage = rectImage->makeWithFilter(
+      ImageFilter::InnerShadow(10, 10, 2, 2, Color::Black()), &innerShadowOffset);
+  ASSERT_TRUE(innerShadowImage != nullptr);
+  canvas->save();
+  canvas->translate(635, 460);
+  canvas->scale(2, 2);
+  canvas->drawImage(innerShadowImage, innerShadowOffset.x, innerShadowOffset.y);
+  canvas->restore();
+
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/FilterAndShaderExport"));
 }

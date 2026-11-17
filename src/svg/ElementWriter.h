@@ -87,10 +87,12 @@ class ElementWriter {
    * Emits SVG <filter> resources for the given image filter and returns all filter IDs. For a
    * Compose filter, each sub-filter gets its own <filter> element, and all IDs are returned in
    * application order (innermost first). The caller can use these IDs to create nested <g>
-   * elements. Must be called within a parent <defs> element.
+   * elements. bound is the filter input area in the filter's source space, and matrix maps that
+   * space to the user space of the element that references the filters. Must be called within a
+   * parent <defs> element.
    */
   std::vector<std::string> addImageFilterChain(const std::shared_ptr<ImageFilter>& imageFilter,
-                                               const Rect& bound,
+                                               const Rect& bound, const Matrix& matrix,
                                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                                Context* context,
                                                std::vector<PendingImage>* pendings = nullptr);
@@ -168,6 +170,7 @@ class ElementWriter {
   std::string addUnsupportedGradientDef(const GradientInfo& info, const Matrix& matrix);
 
   std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
+                             const Matrix& matrix,
                              const std::shared_ptr<SVGCustomWriter>& exportWriter, Context* context,
                              std::vector<PendingImage>* pendings = nullptr);
   std::string emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter,

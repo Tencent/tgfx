@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ElementWriter.h"
+#include <cmath>
 #include "SVGExportContext.h"
 #include "SVGUtils.h"
 #include "core/codecs/jpeg/JpegCodec.h"
@@ -396,16 +397,76 @@ std::string ElementWriter::emitFilterElement(const std::shared_ptr<ImageFilter>&
   return filterID;
 }
 
+// Returns the blurriness along the user space axes after mapping the source-space blur through
+// the linear part of matrix. SVG cannot express the orientation of a blur that is not aligned
+// with the user space axes, so only the spread along each axis is kept.
+static Point MapFilterBlurriness(const Matrix& matrix, float blurrinessX, float blurrinessY) {
+  return {std::hypot(matrix.getScaleX() * blurrinessX, matrix.getSkewX() * blurrinessY),
+          std::hypot(matrix.getSkewY() * blurrinessX, matrix.getScaleY() * blurrinessY)};
+}
+
+static Point MapShadowFilterBlurriness(const Matrix& matrix,
+                                       const std::shared_ptr<ImageFilter>& blurFilter) {
+  if (blurFilter == nullptr || Types::Get(blurFilter.get()) != Types::ImageFilterType::Blur) {
+    return {};
+  }
+  const auto gaussianFilter = static_cast<const GaussianBlurImageFilter*>(blurFilter.get());
+  return MapFilterBlurriness(matrix, gaussianFilter->blurrinessX, gaussianFilter->blurrinessY);
+}
+
+static Point MapFilterOffset(const Matrix& matrix, float dx, float dy) {
+  return {matrix.getScaleX() * dx + matrix.getSkewX() * dy,
+          matrix.getSkewY() * dx + matrix.getScaleY() * dy};
+}
+
+// Returns the filter with its blurriness and offset mapped into the user space of the filtered
+// element, since the <g> referencing the filter carries no transform.
+static std::shared_ptr<ImageFilter> MapFilterToUserSpace(const std::shared_ptr<ImageFilter>& filter,
+                                                         const Matrix& matrix) {
+  if (matrix.isTranslate()) {
+    return filter;
+  }
+
+  switch (Types::Get(filter.get())) {
+    case Types::ImageFilterType::Blur: {
+      const auto blurFilter = static_cast<const GaussianBlurImageFilter*>(filter.get());
+      auto blurriness =
+          MapFilterBlurriness(matrix, blurFilter->blurrinessX, blurFilter->blurrinessY);
+      return std::make_shared<GaussianBlurImageFilter>(blurriness.x, blurriness.y,
+                                                       blurFilter->tileMode);
+    }
+    case Types::ImageFilterType::DropShadow: {
+      const auto shadowFilter = static_cast<const DropShadowImageFilter*>(filter.get());
+      auto blurriness = MapShadowFilterBlurriness(matrix, shadowFilter->blurFilter);
+      auto offset = MapFilterOffset(matrix, shadowFilter->dx, shadowFilter->dy);
+      return std::make_shared<DropShadowImageFilter>(offset.x, offset.y, blurriness.x,
+                                                     blurriness.y, shadowFilter->color,
+                                                     shadowFilter->shadowOnly);
+    }
+    case Types::ImageFilterType::InnerShadow: {
+      const auto shadowFilter = static_cast<const InnerShadowImageFilter*>(filter.get());
+      auto blurriness = MapShadowFilterBlurriness(matrix, shadowFilter->blurFilter);
+      auto offset = MapFilterOffset(matrix, shadowFilter->dx, shadowFilter->dy);
+      return std::make_shared<InnerShadowImageFilter>(offset.x, offset.y, blurriness.x,
+                                                      blurriness.y, shadowFilter->color,
+                                                      shadowFilter->shadowOnly);
+    }
+    default:
+      return filter;
+  }
+}
+
 std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter,
-                                          const Rect& bound,
+                                          const Rect& bound, const Matrix& matrix,
                                           const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                           Context* context, std::vector<PendingImage>* pendings) {
-  auto filteredBound = imageFilter->filterBounds(bound);
-  return emitFilterElement(imageFilter, exportWriter, context, false, filteredBound, pendings);
+  auto filteredBound = matrix.mapRect(imageFilter->filterBounds(bound));
+  auto userSpaceFilter = MapFilterToUserSpace(imageFilter, matrix);
+  return emitFilterElement(userSpaceFilter, exportWriter, context, false, filteredBound, pendings);
 }
 
 std::vector<std::string> ElementWriter::addImageFilterChain(
-    const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
+    const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound, const Matrix& matrix,
     const std::shared_ptr<SVGCustomWriter>& exportWriter, Context* context,
     std::vector<PendingImage>* pendings) {
   if (!imageFilter) {
@@ -417,15 +478,16 @@ std::vector<std::string> ElementWriter::addImageFilterChain(
     // GPU pipeline: each sub-filter receives the previous sub-filter's full output as its source.
     // In SVG, nested <g filter="..."> achieves exactly this: each layer's SourceGraphic/SourceAlpha
     // is the output of the inner layer's filter. This matches the GPU's serial FilterImage chain.
-    auto composeBound = imageFilter->filterBounds(bound);
+    auto composeBound = matrix.mapRect(imageFilter->filterBounds(bound));
     std::vector<std::string> filterIDs;
     for (const auto& filterItem : composeFilter->filters) {
+      auto userSpaceFilter = MapFilterToUserSpace(filterItem, matrix);
       filterIDs.push_back(
-          emitFilterElement(filterItem, exportWriter, context, true, composeBound, pendings));
+          emitFilterElement(userSpaceFilter, exportWriter, context, true, composeBound, pendings));
     }
     return filterIDs;
   }
-  auto id = addImageFilter(imageFilter, bound, exportWriter, context, pendings);
+  auto id = addImageFilter(imageFilter, bound, matrix, exportWriter, context, pendings);
   if (!id.empty()) {
     return {id};
   }

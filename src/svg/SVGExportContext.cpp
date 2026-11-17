@@ -413,20 +413,20 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     // hard-edged banding from the implicit source edge at the sandbox boundary).
     auto contentMatrix = matrix;
     contentMatrix.preTranslate(outer.x - offset.x, outer.y - offset.y);
-    bound = contentMatrix.mapRect(bound);
 
     Resources resources;
     std::vector<std::string> filterIDs;
     if (filter) {
       ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                          _assignColorSpace);
-      filterIDs = defs.addImageFilterChain(filter, bound, customWriter, context, _pendingImages);
+      filterIDs = defs.addImageFilterChain(filter, bound, contentMatrix, customWriter, context,
+                                           _pendingImages);
       if (filterIDs.size() == 1) {
         resources.filter = "url(#" + filterIDs[0] + ")";
       }
     }
     auto clipPath = clip.getClipPath();
-    bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+    bool needsClip = !clipPath.isEmpty() && !clipPath.contains(contentMatrix.mapRect(bound));
     // Close any active clip group from prior draws BEFORE emitting our own <clipPath> resource
     // and brush <g>. Otherwise the <clipPath> definition would be nested inside the stale wrapper
     // and the new <g> would sit at the wrong XML depth. On exit, leave both members cleared so
@@ -831,14 +831,16 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
                                  const ClipStack& clip, const Brush& brush) {
   DEBUG_ASSERT(picture != nullptr);
   std::vector<std::string> filterIDs;
-  auto bound = matrix.mapRect(picture->getBounds());
+  auto pictureBounds = picture->getBounds();
   if (imageFilter) {
     ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                        _assignColorSpace);
-    filterIDs = defs.addImageFilterChain(imageFilter, bound, customWriter, context, _pendingImages);
+    filterIDs = defs.addImageFilterChain(imageFilter, pictureBounds, matrix, customWriter, context,
+                                         _pendingImages);
   }
   auto clipPath = clip.getClipPath();
-  bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+  auto bounds = matrix.mapRect(pictureBounds);
+  bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bounds);
   std::string clipID;
   if (needsClip) {
     clipID = defineClipPath(clipPath);
@@ -1075,8 +1077,8 @@ void SVGExportContext::drawRRectInnerShadowShader(const RRectInnerShadowShader& 
   }
 
   // The mask image is recorded over the shadow's image bounds rather than its own tight bounds:
-  // tight bounds would require a matrix on the mask shader to reposition it, and SVG mask export
-  // does not support matrix-wrapped mask shaders.
+  // the mask is inverted, and SVG export only applies the inversion within the mask image's
+  // extent, so the extent must cover the whole shadow image.
   // A FilterImage mask is rasterized on export; to keep the mask vector, the blur is baked into
   // the picture recording instead of applied via makeWithFilter.
   auto maskImage = RRectToImage(maskShape, Color::White(), &imageBounds, nullptr, blurFilter);

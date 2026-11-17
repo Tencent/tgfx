@@ -3981,7 +3981,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
   }
 
   // Case 22: VectorLayer Rect fill in a group rotated 90 degrees with a non-uniform scale, on a
-  // layer rotated 30 degrees, spread=8 (analytic)
+  // layer rotated -45 degrees, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
