@@ -1276,7 +1276,9 @@ std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprint
       perCapture.push_back(bounds);
     }
   }
-  if (perCapture.empty() || perCapture.size() > MAX_CULL_RECTS) {
+  // A frame that repaints more captured rects than the per-layer loop can afford has no list to
+  // give: bounding them per rect would already exceed the budget, so this frame draws everything.
+  if (perCapture.size() > MAX_CULL_RECTS) {
     return {unionRect};
   }
   auto perCaptureArea = 0.0f;
