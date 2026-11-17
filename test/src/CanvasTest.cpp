@@ -2879,6 +2879,8 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   canvas->scale(0.8f, 0.8f);
   canvas->concat(Matrix::MakeAll(1, 0, 0, 0, 1, 0, 0, 0.004f, 1));
   canvas->translate(-cellWidth / 2, -cellHeight / 2);
+  fillPaint.setColor(Color::Red());
+  canvas->drawRRect(RRect::MakeRectRadii(rect, radii17), fillPaint);
   fillPaint.setColor(Color::White());
   canvas->drawRRect(rRect17, fillPaint);
   canvas->restore();
