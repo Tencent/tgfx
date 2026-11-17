@@ -500,7 +500,8 @@ std::unique_ptr<LayerImageReader> LayerImageReader::Make(Context* context,
     return FailMake(error, LayerImageErrorCode::InvalidInput, LayerImageStage::Validation,
                     "bandRows must be positive");
   }
-  if ((options.tileSizeLimit.width > 0) != (options.tileSizeLimit.height > 0)) {
+  if (options.tileSizeLimit.width < 0 || options.tileSizeLimit.height < 0 ||
+      (options.tileSizeLimit.width > 0) != (options.tileSizeLimit.height > 0)) {
     return FailMake(error, LayerImageErrorCode::InvalidInput, LayerImageStage::Validation,
                     "tileSizeLimit must be (0, 0) or positive on both dimensions");
   }

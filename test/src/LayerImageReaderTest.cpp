@@ -700,6 +700,13 @@ TGFX_TEST(LayerImageReaderTest, RejectsInvalidOptions) {
   EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
   EXPECT_EQ(error.code, LayerImageErrorCode::InvalidInput);
 
+  for (const auto& tileSizeLimit : {ISize{-1, -1}, ISize{-1, 0}, ISize{0, -1}}) {
+    options.tileSizeLimit = tileSizeLimit;
+    EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
+    EXPECT_EQ(error.code, LayerImageErrorCode::InvalidInput);
+    EXPECT_EQ(error.stage, LayerImageStage::Validation);
+  }
+
   options.tileSizeLimit = {0, 0};
   request.colorType = ColorType::ALPHA_8;
   EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
