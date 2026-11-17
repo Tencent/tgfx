@@ -235,6 +235,24 @@ TEST(SpecGateTest, UncalledFunctionsAreRemovedAndCascade) {
   EXPECT_EQ(RemoveUncalledFunctions("int f() { return 1; }\n"), "\n");
 }
 
+TEST(SpecGateTest, BranchPragmasDeleteOnlyTheArmsTheDrawCannotReach) {
+  const std::string text =
+      "#pragma tgfx_spec_branch 1 4096\n"
+      "if (Packed.x == 12) { return modulate(); }\n"
+      "#pragma tgfx_spec_branch 1 64\n"
+      "if (Packed.x == 6) { return colorOp(); }\n"
+      "int after() { return 1; }\n";
+  // UsedOps(id 1) carries bit 12 only.
+  const auto pruned = ResolveSpecBranches(text, {1u, 4096u});
+  EXPECT_NE(pruned.find("modulate()"), std::string::npos);
+  EXPECT_EQ(pruned.find("colorOp()"), std::string::npos);
+  EXPECT_EQ(pruned.find("tgfx_spec_branch"), std::string::npos);
+  EXPECT_NE(pruned.find("int after()"), std::string::npos);
+  // An id the draw does not carry keeps its block rather than guessing.
+  const std::string unknown = "#pragma tgfx_spec_branch 9 1\nint keep() { return 2; }\n";
+  EXPECT_NE(ResolveSpecBranches(unknown, {1u, 0u}).find("int keep()"), std::string::npos);
+}
+
 TEST(SpecGateTest, AnUnbalancedDefinitionLeavesTheTextAlone) {
   const std::string text = "int broken() { if (true) { return 1; }\n";
   EXPECT_EQ(RemoveUncalledFunctions(text), text);

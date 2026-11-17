@@ -126,6 +126,14 @@ TextGateResult ApplyTextSpecGates(const std::string& preprocessedText,
 /// Replaces every gated function's body with the generated stub, in the 450 source form both
 /// real dialects derive from. The build compiles the result once per family, so a stub that
 /// cannot satisfy the call sites fails the build instead of surfacing on a device.
+/// Inserts `#pragma tgfx_spec_branch <id> <mask>` before each chain dispatch branch
+/// (`if (Packed.x == N)`, including the `||` chains), where id is UsedOps' spec id and mask has one
+/// bit per op the branch answers. The emitter inserts it after preprocessing, so the line reaches
+/// the stored text verbatim — a source pragma would be rewritten by the preprocessor (spaces
+/// dropped, operators replaced). The runtime then deletes the blocks whose mask bit the draw does
+/// not set; the branch the draw uses only loses its pragma.
+std::string AnnotateSpecBranches(const std::string& text, const std::vector<SpecEntry>& entries);
+
 std::string StubOutGatedFunctions(const std::string& source,
                                   const std::vector<SpecGateInfo>& gates);
 

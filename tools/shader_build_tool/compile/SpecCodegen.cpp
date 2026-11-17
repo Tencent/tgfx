@@ -551,6 +551,54 @@ class GateMaskParser {
 
 }  // namespace
 
+std::string AnnotateSpecBranches(const std::string& text, const std::vector<SpecEntry>& entries) {
+  uint32_t usedOpsId = 0;
+  bool found = false;
+  for (const auto& entry : entries) {
+    if (entry.name == "UsedOps") {
+      usedOpsId = entry.firstId;
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    return text;
+  }
+  std::string output;
+  output.reserve(text.size());
+  size_t at = 0;
+  while (at < text.size()) {
+    const auto lineEnd = text.find('\n', at);
+    const auto stop = lineEnd == std::string::npos ? text.size() : lineEnd;
+    const auto line = text.substr(at, stop - at);
+    // The dispatch's own shape: `if (Packed.x == N) {` or an `||` chain of them.
+    uint32_t mask = 0;
+    size_t count = 0;
+    if (line.find("if (Packed.x == ") != std::string::npos && line.back() == '{') {
+      const char* cursor = line.c_str();
+      while (const char* hit = strstr(cursor, "Packed.x == ")) {
+        const auto value =
+            static_cast<uint32_t>(std::strtoul(hit + strlen("Packed.x == "), nullptr, 10));
+        if (value < 32) {
+          mask |= (1u << value);
+          ++count;
+        }
+        cursor = hit + 1;
+      }
+    }
+    if (count > 0) {
+      const auto indent = line.find_first_not_of(" \t");
+      output += std::string(indent == std::string::npos ? 0 : indent, ' ');
+      output += "#pragma tgfx_spec_branch " + std::to_string(usedOpsId) + " " +
+                std::to_string(mask) + "\n";
+    }
+    output.append(line);
+    output += '\n';
+    at = stop + 1;
+  }
+  return output;
+}
+
 bool NormalizeGateCondition(SpecGateInfo* gate, const std::vector<SpecEntry>& entries) {
   // The pragma writes the operator bits by name (1 << OP_LUMA); the mask grammar is numeric, so
   // the OP_ constants fold here — the same table the gate's translated condition carries.

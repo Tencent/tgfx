@@ -84,7 +84,11 @@ class MacroPrefixInjector final : public SpecInjector {
     // gates comes back unchanged, which is the generic form's whole text.
     // The closed gates orphan the readers whose call sites lived inside them; dropping those
     // definitions keeps the driver from parsing and lowering code no draw can reach.
-    const auto pruned = RemoveUncalledFunctions(ResolveSpecGates(code, valuesById, prefix.c_str()));
+    // Order matters: whole-function gates first, then the dispatch branches the draw never takes,
+    // then the definitions those branches orphaned.
+    const auto branched =
+        ResolveSpecBranches(ResolveSpecGates(code, valuesById, prefix.c_str()), valuesById);
+    const auto pruned = RemoveUncalledFunctions(branched);
     if (!afterVersion) {
       injection->code = defines + pruned;
       return true;

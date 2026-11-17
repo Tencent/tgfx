@@ -287,4 +287,58 @@ std::string RemoveUncalledFunctions(const std::string& text) {
   return current;
 }
 
+std::string ResolveSpecBranches(const std::string& text, const std::vector<uint32_t>& valuesById) {
+  static const char* kPrefix = "#pragma tgfx_spec_branch ";
+  if (text.find(kPrefix) == std::string::npos) {
+    return text;
+  }
+  std::string output;
+  output.reserve(text.size());
+  size_t at = 0;
+  while (at < text.size()) {
+    const auto lineEnd = text.find('\n', at);
+    const auto stop = lineEnd == std::string::npos ? text.size() : lineEnd;
+    const auto line = text.substr(at, stop - at);
+    const auto pragmaAt = line.find_first_not_of(" \t");
+    if (pragmaAt == std::string::npos || line.compare(pragmaAt, strlen(kPrefix), kPrefix) != 0) {
+      output.append(line);
+      output += '\n';
+      at = stop + 1;
+      continue;
+    }
+    uint32_t id = 0;
+    uint32_t mask = 0;
+    if (sscanf(line.c_str() + pragmaAt + strlen(kPrefix), "%u %u", &id, &mask) != 2) {
+      at = stop + 1;  // unparseable: drop the pragma, keep the block below it
+      continue;
+    }
+    at = stop + 1;
+    if (id >= valuesById.size()) {
+      continue;  // an id this draw does not carry: drop the pragma, keep the block
+    }
+    if ((valuesById[id] & mask) != 0) {
+      continue;
+    }
+    const auto open = text.find('{', at);
+    if (open == std::string::npos) {
+      break;
+    }
+    int depth = 0;
+    auto cursor = open;
+    for (; cursor < text.size(); ++cursor) {
+      if (text[cursor] == '{') {
+        ++depth;
+      } else if (text[cursor] == '}' && --depth == 0) {
+        break;
+      }
+    }
+    if (depth != 0 || cursor >= text.size()) {
+      return text;  // unbalanced: leave the whole text alone
+    }
+    at = text.find('\n', cursor);
+    at = at == std::string::npos ? text.size() : at + 1;
+  }
+  return output;
+}
+
 }  // namespace tgfx

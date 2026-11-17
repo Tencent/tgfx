@@ -465,6 +465,8 @@ std::string EmitDirectGLSL330(const std::string& source, ShaderStageType stage,
     }
     preprocessed = std::move(gated.text);
   }
+  preprocessed =
+      AnnotateSpecBranches(preprocessed, entries == nullptr ? std::vector<SpecEntry>{} : *entries);
   return EmitDirectGLSL330Impl(preprocessed, stage, "#version 330", false, false);
 }
 

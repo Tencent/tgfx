@@ -40,6 +40,13 @@ namespace tgfx {
 std::string ResolveSpecGates(const std::string& text, const std::vector<uint32_t>& valuesById,
                              const char* valuePrefix);
 
+/// Deletes `if` blocks whose branch condition this draw never reaches. The tool marks them after
+/// preprocessing with `#pragma tgfx_spec_branch <id> <mask>` (a source pragma would be rewritten by
+/// the preprocessor); the block stays when `valuesById[id] & mask` is non-zero and is removed whole
+/// otherwise. The pragma itself never reaches the driver. An id the draw does not carry keeps its
+/// block rather than deleting code the runtime cannot justify.
+std::string ResolveSpecBranches(const std::string& text, const std::vector<uint32_t>& valuesById);
+
 /// Deletes function definitions the text never calls, cascading until no definition is left
 /// uncalled. The gates' stubs orphan whole reader/helper families whose call sites lived inside
 /// the closed branches; the driver still parses and lowers every one of them, which measured 21%
