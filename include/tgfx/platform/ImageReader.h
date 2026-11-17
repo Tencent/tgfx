@@ -62,9 +62,9 @@ class ImageReader {
 
   /**
    * Acquires the next ImageBuffer from the ImageReader after a new image frame has been rendered
-   * into the associated video source. Returns nullptr if no new image frame is available in the
-   * video source since the last call. Note that the previously returned image buffers will
-   * immediately expire after the newly created ImageBuffer is drawn.
+   * into the associated video source. Returns nullptr if no new image frame has been rendered into
+   * the video source since the texture was last updated. Note that the previously returned image
+   * buffers will immediately expire after the newly created ImageBuffer is drawn.
    */
   std::shared_ptr<ImageBuffer> acquireNextBuffer();
 
