@@ -72,7 +72,7 @@ class SurfaceTexture : public ImageStream {
   std::mutex locker = {};
   std::condition_variable condition = {};
   Global<jobject> surfaceTexture;
-  mutable std::atomic<bool> frameAvailable = {false};
+  std::atomic<bool> frameAvailable = {false};
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
   static void JNIInit(JNIEnv* env);
