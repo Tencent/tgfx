@@ -2151,48 +2151,158 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CulledCaptureKeepsTheSampledLayers){TGFX_P
 
 // A 3D subtree only gives up its own culling: the rest of the capture keeps narrowing to the styles
 // that sample there.
-TGFX_TEST_PRIVATE(BackgroundBlurTest, ThreeDLayerKeepsTheRestCulled) {
+TGFX_TEST_PRIVATE(BackgroundBlurTest, ThreeDLayerKeepsTheRestCulled){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 240, 240);
+  ASSERT_TRUE(surface != nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+
+  auto group = Layer::Make();
+  group->setPreserve3D(true);
+  auto cube = ShapeLayer::Make();
+  Path cubePath;
+  cubePath.addRect(Rect::MakeWH(60, 60));
+  cube->setPath(cubePath);
+  cube->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 120, 0, 255)));
+  group->addChild(cube);
+  displayList->root()->addChild(group);
+
+  auto blurred = ShapeLayer::Make();
+  Path blurPath;
+  blurPath.addRect(Rect::MakeWH(40, 40));
+  blurred->setPath(blurPath);
+  blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
+  blurred->setMatrix(Matrix::MakeTrans(150, 150));
+  blurred->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+  displayList->root()->addChild(blurred);
+
+  displayList->render(surface.get());
+  auto captureRect = Rect::MakeWH(240.0f, 240.0f);
+  auto snapshots = displayList->captureBackgrounds(surface.get(), {captureRect});
+  ASSERT_TRUE(snapshots != nullptr);
+  // The 3D subtree samples no backdrop of its own, so only the blurred layer's area is culled to.
+  ASSERT_EQ(snapshots->cullRects.size(), 1u);
+  EXPECT_EQ(snapshots->cullRects[0], blurred->renderBounds);
+  auto cullArea = 0.0f;
+  for (const auto& rect : snapshots->cullRects) {
+    cullArea += rect.width() * rect.height();
+  }
+  EXPECT_LT(cullArea, captureRect.width() * captureRect.height() * 0.5f);
+  context->flushAndSubmit();
+})}
+
+// The cached footprints have to follow a content change: the second frame culls at the new position.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintCacheFollowsMovedLayers){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int SurfaceSize = 240;
+
+  auto addContent = [&](DisplayList* displayList) {
+    displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
+    for (int i = 0; i < 4; ++i) {
+      auto block = ShapeLayer::Make();
+      Path path;
+      path.addRect(Rect::MakeWH(16, 16));
+      block->setPath(path);
+      block->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
+      block->setMatrix(Matrix::MakeTrans(30.0f + static_cast<float>(i) * 50.0f, 110.0f));
+      displayList->root()->addChild(block);
+    }
+  };
+
+  // Reference: the scene at the moved position, without culling. A fresh cache cannot be stale.
+  auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
+  auto reference = std::make_unique<DisplayList>();
+  reference->setRenderMode(RenderMode::Direct);
+  reference->_captureCullingEnabled = false;
+  addContent(reference.get());
+  auto referenceBlur = ShapeLayer::Make();
+  Path blurPath;
+  blurPath.addRect(Rect::MakeWH(60, 60));
+  referenceBlur->setPath(blurPath);
+  referenceBlur->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 60)));
+  referenceBlur->setMatrix(Matrix::MakeTrans(150, 20));
+  referenceBlur->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
+  reference->root()->addChild(referenceBlur);
+  reference->render(surface.get());
+  auto expected = ReadSurfacePixels(surface.get());
+
+  // Same list, rendered at the old position first so the cache is warm, then moved.
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  addContent(displayList.get());
+  auto blurred = ShapeLayer::Make();
+  blurred->setPath(blurPath);
+  blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 60)));
+  blurred->setMatrix(Matrix::MakeTrans(20, 20));
+  blurred->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
+  displayList->root()->addChild(blurred);
+  displayList->render(surface.get());
+
+  blurred->setMatrix(Matrix::MakeTrans(150, 20));
+  displayList->render(surface.get());
+  // The cache has to follow the move: the next capture culls at the new bounds.
+  ASSERT_EQ(displayList->_backgroundFootprints.size(), 1u);
+  EXPECT_EQ(displayList->_backgroundFootprints[0], blurred->renderBounds);
+  auto actual = ReadSurfacePixels(surface.get());
+  ExpectMatchingRenders(expected, actual);
+})}
+
+// Panning and zooming change no layer bounds, so the cached footprints stay valid.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintCacheSurvivesPanAndZoom) {
   TGFX_PRIVATE_ACCESS({
     ContextScope scope;
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
-    auto surface = Surface::Make(context, 240, 240);
-    ASSERT_TRUE(surface != nullptr);
-    auto displayList = std::make_unique<DisplayList>();
-    displayList->setRenderMode(RenderMode::Tiled);
+    constexpr int SurfaceSize = 240;
 
-    auto group = Layer::Make();
-    group->setPreserve3D(true);
-    auto cube = ShapeLayer::Make();
-    Path cubePath;
-    cubePath.addRect(Rect::MakeWH(60, 60));
-    cube->setPath(cubePath);
-    cube->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 120, 0, 255)));
-    group->addChild(cube);
-    displayList->root()->addChild(group);
+    auto build = [&](std::unique_ptr<DisplayList>* out) {
+      out->reset(new DisplayList());
+      (*out)->setRenderMode(RenderMode::Tiled);
+      (*out)->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
+      for (int i = 0; i < 4; ++i) {
+        auto block = ShapeLayer::Make();
+        Path path;
+        path.addRect(Rect::MakeWH(16, 16));
+        block->setPath(path);
+        block->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
+        block->setMatrix(Matrix::MakeTrans(30.0f + static_cast<float>(i) * 50.0f, 110.0f));
+        (*out)->root()->addChild(block);
+      }
+      auto blurred = ShapeLayer::Make();
+      Path blurPath;
+      blurPath.addRect(Rect::MakeWH(60, 60));
+      blurred->setPath(blurPath);
+      blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 60)));
+      blurred->setMatrix(Matrix::MakeTrans(80, 60));
+      blurred->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
+      (*out)->root()->addChild(blurred);
+    };
 
-    auto blurred = ShapeLayer::Make();
-    Path blurPath;
-    blurPath.addRect(Rect::MakeWH(40, 40));
-    blurred->setPath(blurPath);
-    blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
-    blurred->setMatrix(Matrix::MakeTrans(150, 150));
-    blurred->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
-    displayList->root()->addChild(blurred);
+    auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
+    // Reference: the panned and zoomed view, without culling.
+    auto reference = std::unique_ptr<DisplayList>();
+    build(&reference);
+    reference->setRenderMode(RenderMode::Direct);
+    reference->_captureCullingEnabled = false;
+    reference->setZoomScale(1.5f);
+    reference->setContentOffset(-30.0f, -10.0f);
+    reference->render(surface.get());
+    auto expected = ReadSurfacePixels(surface.get());
 
+    // Same list: render, warm the cache, then pan and zoom without touching any layer.
+    auto displayList = std::unique_ptr<DisplayList>();
+    build(&displayList);
     displayList->render(surface.get());
-    auto captureRect = Rect::MakeWH(240.0f, 240.0f);
-    auto snapshots = displayList->captureBackgrounds(surface.get(), {captureRect});
-    ASSERT_TRUE(snapshots != nullptr);
-    // The 3D subtree samples no backdrop of its own, so only the blurred layer's area is culled to.
-    ASSERT_EQ(snapshots->cullRects.size(), 1u);
-    EXPECT_EQ(snapshots->cullRects[0], blurred->renderBounds);
-    auto cullArea = 0.0f;
-    for (const auto& rect : snapshots->cullRects) {
-      cullArea += rect.width() * rect.height();
-    }
-    EXPECT_LT(cullArea, captureRect.width() * captureRect.height() * 0.5f);
-    context->flushAndSubmit();
+    displayList->setZoomScale(1.5f);
+    displayList->setContentOffset(-30.0f, -10.0f);
+    displayList->render(surface.get());
+    auto actual = ReadSurfacePixels(surface.get());
+    ExpectMatchingRenders(expected, actual);
   })
 }
 

@@ -1209,9 +1209,9 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
 }
 
 // Merges the rects that overlap or touch, so many styles sitting next to each other do not multiply
-// the per-layer cull loop. A capture can produce footprints x tiles rects, so the pairwise join only
-// runs for a small list; a longer one collapses into its bounding rect, which may cover gaps between
-// scattered tiles but never more than the captured area.
+// the per-layer cull loop. A capture can produce footprints x tiles rects, so the pairwise join
+// only runs for a small list; a longer one collapses into its bounding rect, which may cover the
+// gaps between scattered tiles but never more than the captured area.
 void DisplayList::mergeCullRects(std::vector<Rect>* rects) {
   if (rects->size() < 2) {
     return;
