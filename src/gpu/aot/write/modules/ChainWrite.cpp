@@ -87,10 +87,9 @@ void WriteChainModule(WriteContext& context) {
   WriteChainTransformBases(context.slot, context.geometry, context.sources.variant.geometry,
                            transforms);
   // The blend switch's fact: a Blend slot's mode or an advanced shader-side xfer mode.
-  const bool needsBlendMath =
-      ChainNeedsBlendMath(*program, context.info.getXferFacts().shaderBlend() &&
-                                        static_cast<int>(context.info.getBlendMode()) >=
-                                            static_cast<int>(BlendMode::Overlay));
+  const bool needsBlendMath = ChainNeedsBlendMath(
+      *program, XpNeedsAdvancedMath(context.info.getXferFacts().shaderBlend(),
+                                    static_cast<int>(context.info.getBlendMode())));
   BindChainProgram(*program, context.slot, needsBlendMath);
   BindChainBindings(*program, context.slot);
 }

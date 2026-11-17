@@ -47,6 +47,12 @@
 
 namespace tgfx {
 
+namespace {
+/// How many times a draw that carried spec values fell back to the generic form. Non-zero is a
+/// bug signal (declaration drift), not a statistic to tolerate; debug builds assert on the first.
+std::atomic<uint64_t> specInjectionFailures = {0};
+}  // namespace
+
 // Which descriptor field carries the blob. Derived from the format rather than from the bundle's
 // payload field so the two can never disagree: a format that names a container reads binaryData,
 // a format that names driver source reads code.
@@ -312,10 +318,17 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
         specConstants = std::move(injection.constants);
         specInjected = true;
       } else {
+        // Reaching here means the draw carried spec values and an injector exists, but the text had
+        // none of the declarations it rewrites: the specialization silently degraded to the generic
+        // form. That is a build/runtime drift, never a normal path, so it is counted and asserts in
+        // debug instead of scrolling past as one log line.
+        const auto failures = specInjectionFailures.fetch_add(1, std::memory_order_relaxed) + 1;
         LOGE(
             "PrecompiledProgramCreator: specialization injection found no TGFX_SPEC declarations "
-            "for %s[variant=%u]; serving the generic form",
-            shaderName, variantId);
+            "for %s[variant=%u, fields=%zu, values=%zu]; serving the generic form (failures=%llu)",
+            shaderName, variantId, DeriveSpecFieldInfos(variant).size(), spec->values.size(),
+            static_cast<unsigned long long>(failures));
+        DEBUG_ASSERT(false);
       }
     }
   }

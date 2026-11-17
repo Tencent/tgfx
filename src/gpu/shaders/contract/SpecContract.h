@@ -39,8 +39,6 @@ inline constexpr const char* HlslConstantPrefix = "SPIRV_CROSS_CONSTANT_ID_";
 /// The master switch's identifier (`ConstantPrefix` + 0): 1 means the draw is specialized.
 inline constexpr const char* MasterSwitch = "TGFX_SPEC_0";
 
-/// The macro that marks an executor whose call sites were fully unrolled at build time.
-
 /// The per-field accessor (`<prefix><field>`), which reads the constant when specialized and the
 /// uniform otherwise.
 inline constexpr const char* FieldAccessorPrefix = "SPEC_";

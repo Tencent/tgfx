@@ -114,9 +114,9 @@ std::optional<ProgramSelection> SelectProgram(Context* context, const ProgramInf
   // mode runs the loop's blend pass even when no slot carries a Blend op.
   const bool needsBlendMath =
       match->chain != nullptr &&
-      ChainNeedsBlendMath(*match->chain, info.getXferFacts().shaderBlend() &&
-                                             static_cast<int>(info.getBlendMode()) >=
-                                                 static_cast<int>(BlendMode::Overlay));
+      ChainNeedsBlendMath(*match->chain,
+                          XpNeedsAdvancedMath(info.getXferFacts().shaderBlend(),
+                                              static_cast<int>(info.getBlendMode())));
   const SpecValues spec =
       SpecResolver::Resolve(context != nullptr ? ContextCacheAccess::Cache(context) : nullptr,
                             info.backend(), match->variant, match->chain, needsBlendMath);

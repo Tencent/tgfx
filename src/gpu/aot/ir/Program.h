@@ -231,6 +231,20 @@ struct AOTChainFeatureMasks {
 /// slot's mode, and a shader-side xfer with an advanced mode runs it in the draw's blend pass.
 /// Both callers (the specialization values and the generic form's uniform upload) derive the flag
 /// from this one rule, so the specialized and generic texts gate identically.
+/// The blend mode where the shader-side (XP) implementation leaves the coefficient arms and enters
+/// the advanced group. Must equal XP_FIRST_ADVANCED_MODE in xp/xp_blend_colors.inc: the GLSL switch
+/// and this predicate decide the same thing, so a divergence silently runs the wrong arm (or skips
+/// the blend pass entirely). The static_assert pins the enum half of that pair.
+inline constexpr int XpFirstAdvancedMode = 15;
+static_assert(static_cast<int>(BlendMode::Overlay) == XpFirstAdvancedMode,
+              "XP_FIRST_ADVANCED_MODE (xp_blend_colors.inc) must track BlendMode::Overlay");
+
+/// Whether an advanced shader-side xfer mode applies: it runs the blend pass even when no slot
+/// carries a Blend op. One definition for the two writers that ask.
+inline bool XpNeedsAdvancedMath(bool shaderBlend, int blendMode) {
+  return shaderBlend && blendMode >= XpFirstAdvancedMode;
+}
+
 inline bool ChainNeedsBlendMath(const AOTProgram& program, bool xpAdvancedMode) {
   if (xpAdvancedMode) {
     return true;
