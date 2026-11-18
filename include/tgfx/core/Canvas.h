@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <array>
 #include <optional>
 #include <stack>
 #include "tgfx/core/Font.h"
@@ -493,10 +494,15 @@ class Canvas {
   DrawContext* drawContext = nullptr;
   Surface* surface = nullptr;
   Matrix _matrix = Matrix::I();
+  std::optional<std::array<double, 2>> tileTranslation = {};
   std::stack<std::unique_ptr<CanvasState>> stateStack;
   std::unique_ptr<ClipStack> clipStack;
 
   explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
+  void setMatrixForTile(const Matrix& localToOutput, int originX, int originY);
+  Matrix getConcatMatrix(const Matrix& matrix) const;
+  bool needsTileRebase() const;
+  Point getTileAnchor() const;
   void drawLine(const Point line[2], const Matrix& matrix, const ClipStack& clip,
                 const Brush& brush, const Stroke& stroke) const;
   void drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip, const Brush& brush,
@@ -513,6 +519,8 @@ class Canvas {
   void resetStateStack();
 
   friend class Surface;
+  friend class LayerDrawSession;
+  friend class BackgroundSource;
   friend class Picture;
   friend class PictureRecorder;
   friend class SVGExporter;
