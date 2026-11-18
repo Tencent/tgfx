@@ -634,10 +634,14 @@ const ShaderStageBlob* PrecompiledShaderCache::findComposed(uint32_t composedId)
 }
 
 const ShaderStageBlob* PrecompiledShaderCache::findFragmentSource(int op) const {
+  return findPackEntry(0x40000000u | static_cast<uint32_t>(op));
+}
+
+const ShaderStageBlob* PrecompiledShaderCache::findPackEntry(uint32_t id) const {
   if (_bundle == nullptr) {
     return nullptr;
   }
-  auto it = _bundle->fragmentSources.find(0x40000000u | static_cast<uint32_t>(op));
+  auto it = _bundle->fragmentSources.find(id);
   if (it == _bundle->fragmentSources.end()) {
     return nullptr;
   }

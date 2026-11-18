@@ -198,6 +198,11 @@ class PrecompiledShaderCache {
   /// nullptr if not found.
   const ShaderStageBlob* findFragmentSource(int op) const;
 
+  /// Looks up any pack entry by its raw id: the op fragments, the generated loaders, the interface
+  /// chunks, the tail template and the dependency files share the 0x40000000 id space (see
+  /// FragmentLibrary's FragmentPack* constants).
+  const ShaderStageBlob* findPackEntry(uint32_t id) const;
+
   /// Returns the number of packed fragment sources in the loaded bundle.
   size_t fragmentSourceCount() const {
     return _bundle == nullptr ? 0 : _bundle->fragmentSources.size();

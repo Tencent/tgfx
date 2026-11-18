@@ -440,6 +440,38 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       payload.blob.assign(text.begin(), text.end());
       report->composedByTag[profileTag].push_back(std::move(payload));
     }
+    // The pack's non-op entries: the generated loaders (the chain-ops pragma's own expansion), the
+    // interface chunk and tail template the assembler concatenates, and the shared dependency
+    // files the op fragments call into.
+    auto addEntry = [&report, &profileTag](uint32_t id, const char* name, const std::string& text) {
+      if (text.empty()) {
+        RecordBuildError(&report->diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
+                         name, profileTag, -1, -1,
+                         std::string("the pack entry ") + name + " is empty");
+        return;
+      }
+      ComposedPayload payload;
+      payload.name = name;
+      payload.id = id;
+      payload.blob.assign(text.begin(), text.end());
+      report->composedByTag[profileTag].push_back(std::move(payload));
+    };
+    auto readFile = [&options](const char* path) {
+      std::ifstream file(std::string(options.shaderDir) + "/" + path, std::ios::binary);
+      if (!file.is_open()) {
+        return std::string();
+      }
+      std::ostringstream buffer;
+      buffer << file.rdbuf();
+      return buffer.str();
+    };
+    addEntry(FragmentPackLoaders, "ChainLoaders", ExpandChainOpsPragma("#pragma tgfx_chain_ops\n"));
+    addEntry(FragmentPackEntryRect, "ChainEntryRect", readFile("entry/ChainEntryRect.glsl"));
+    addEntry(FragmentPackTail, "ChainTail", readFile("entry/ChainTail.glsl"));
+    addEntry(FragmentPackDepAnalyticClipMath, "AnalyticClipMath",
+             readFile("coverage/analytic_clip_math.inc"));
+    addEntry(FragmentPackDepTextureSwizzle, "TextureSwizzle",
+             readFile("source/texture_read_swizzle.inc"));
   }
   for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
     const Family& family = Families()[familyIndex];

@@ -30,6 +30,7 @@
 #include "gpu/UniformData.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/chain/ChainBodyEmitter.h"
+#include "gpu/aot/chain/ChainTextAssembler.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/plan/DrawPlan.h"
@@ -57,6 +58,13 @@ std::atomic<uint64_t> specInjectionFailures = {0};
 /// interpreter loop stays the serving path until the pixel-parity data says otherwise.
 bool ComposedChainEnabled() {
   static const bool enabled = std::getenv("TGFX_COMPOSED_CHAIN") != nullptr;
+  return enabled;
+}
+
+/// Whether the from-scratch assembled executor is active: its own experiment switch, off by
+/// default, ahead of the composed splice in the dispatch order.
+bool AssembledChainEnabled() {
+  static const bool enabled = std::getenv("TGFX_ASSEMBLED_CHAIN") != nullptr;
   return enabled;
 }
 }  // namespace
@@ -334,6 +342,32 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   } else {
     fragmentDesc.code = std::string(fragBlob->data.begin(), fragBlob->data.end());
   }
+  // The assembled executor: the rect-entry slice, put together from the bundle's pack — the
+  // interface chunk, the generated loaders, the used fragments and the tail, with no interpreter,
+  // no spec constants and no gates. Its own experiment switch; every decline (an unsupported
+  // operator, a non-rect geometry, a missing pack entry) keeps the paths below untouched.
+  bool composedAttempt = false;
+  if (allowComposed && AssembledChainEnabled() && format == ShaderCodeFormat::GLSL &&
+      strcmp(Families()[variant.family].name, "Chain") == 0 && variant.geometry == 0) {
+    const auto* assembledSources = programInfo->getSources();
+    if (assembledSources != nullptr && assembledSources->chain != nullptr) {
+      const Family& chainFamily = Families()[variant.family];
+      const uint8_t xferSlot = static_cast<uint8_t>(2 + chainFamily.moduleCount);
+      const bool leafFree = DimValueOf(chainFamily, variant, 2, 0) == 0;
+      const bool noXp = DimValueOf(chainFamily, variant, xferSlot, 0) == 0;
+      if (leafFree && noXp && fragmentDesc.code.find("in float vCoverage;") != std::string::npos) {
+        const bool xpPass = XpNeedsAdvancedMath(programInfo->getXferFacts().shaderBlend(),
+                                                static_cast<int>(programInfo->getBlendMode()));
+        const ChainComposition composition =
+            DescribeChainComposition(*assembledSources->chain, xpPass);
+        if (AssembleChainFragmentRectGLSL(composition, cache, &fragmentDesc.code)) {
+          composedAttempt = true;
+          LOGI("AssembledChain: rect entry for %s[variant=%u] (%zu bytes)", shaderName, variantId,
+               fragmentDesc.code.size());
+        }
+      }
+    }
+  }
   // The composed executor: a specialized GLSL chain draw trades the interpreter loop for one
   // straight-line evaluation. The lookup runs first — the bundle's pre-composed payload for this
   // exact shape is the stored text the build produced by running the same two operations — and a
@@ -341,7 +375,6 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   // Every decline keeps the injector path below; the uniforms, the layout and the key are
   // unchanged either way, because the body reads the same pool through the same per-operator
   // functions.
-  bool composedAttempt = false;
   const bool composedEligible = allowComposed && format == ShaderCodeFormat::GLSL &&
                                 ComposedChainEnabled() &&
                                 strcmp(Families()[variant.family].name, "Chain") == 0;
