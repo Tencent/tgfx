@@ -35,6 +35,9 @@ namespace tgfx {
 
 namespace {
 
+// Bound temporary planning storage while still sharing captures across neighboring regions.
+static constexpr size_t MaxRegionsPerBatch = 64;
+
 static bool IsFiniteColor(const Color& color) {
   return std::isfinite(color.red) && std::isfinite(color.green) && std::isfinite(color.blue) &&
          std::isfinite(color.alpha);
@@ -360,17 +363,20 @@ LayerImageReadResult LayerImageReader::Impl::readNextBand(Context* context,
   DrawControl control = {};
   control.cancelRequested = &cancelRequested;
   TileSurfaceCache surfaceCache = {};
+  const int outputWidth = request.outputSize.width;
+  const auto estimatedRegions = static_cast<size_t>((outputWidth - 1) / coreLimitWidth + 1);
+  std::vector<LayerRegionPlan> regions = {};
+  regions.reserve(std::min(estimatedRegions, MaxRegionsPerBatch));
   int bandOffsetY = 0;
   while (bandOffsetY < bandRows) {
     int chunkHeight = std::min(coreLimitHeight, bandRows - bandOffsetY);
-    std::vector<LayerRegionPlan> regions = {};
     bool planned = false;
     while (!planned) {
       regions.clear();
       planned = true;
       int offsetX = 0;
-      while (offsetX < request.outputSize.width) {
-        int width = std::min(coreLimitWidth, request.outputSize.width - offsetX);
+      while (offsetX < outputWidth) {
+        int width = std::min(coreLimitWidth, outputWidth - offsetX);
         LayerRegionPlan region = {};
         bool regionReady = false;
         for (;;) {
@@ -406,23 +412,29 @@ LayerImageReadResult LayerImageReader::Impl::readNextBand(Context* context,
         }
         regions.push_back(region);
         offsetX = region.coreRect.right;
+        if (regions.size() < MaxRegionsPerBatch && offsetX < outputWidth) {
+          continue;
+        }
+        LayerImageReadResult failure = {};
+        auto outcome = drawRegionList(context, regions, bandFirstRow, destination, &control,
+                                      &surfaceCache, &failure);
+        if (outcome == DrawOutcome::Failed) {
+          return failure;
+        }
+        if (outcome == DrawOutcome::Cancelled || cancelRequested.load()) {
+          return cancel();
+        }
+        regions.clear();
       }
       if (!planned) {
         if (chunkHeight <= 1) {
           return fail(LayerImageErrorCode::DeviceLimitExceeded, LayerImageStage::Planning,
                       "no output region fits inside the device texture limit");
         }
+        // Earlier batches may already have written into the destination. The shorter strip
+        // redraws from x = 0, and later strips overwrite any rows below it before publication.
         chunkHeight = std::max(1, chunkHeight / 2);
       }
-    }
-    LayerImageReadResult failure = {};
-    auto outcome = drawRegionList(context, regions, bandFirstRow, destination, &control,
-                                  &surfaceCache, &failure);
-    if (outcome == DrawOutcome::Failed) {
-      return failure;
-    }
-    if (outcome == DrawOutcome::Cancelled || cancelRequested.load()) {
-      return cancel();
     }
     bandOffsetY += chunkHeight;
   }

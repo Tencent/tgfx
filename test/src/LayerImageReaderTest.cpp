@@ -1931,4 +1931,57 @@ TGFX_TEST(LayerImageReaderTest, OffscreenBlurDoesNotEnlargeLocalTiles) {
   EXPECT_EQ(CountDifferentPixels(reference, output.image, 1), 0);
 }
 
+TGFX_TEST(LayerImageReaderTest, WideBandRemainsCompleteAfterLateHeightSubdivision) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int Width = 1024;
+  constexpr int Height = 14;
+  constexpr int GlassX = 960;
+  auto root = Layer::Make();
+  auto stripe = MakeExportSolid(Color::Red());
+  stripe->setWidth(8);
+  stripe->setHeight(Height);
+  stripe->setMatrix(Matrix::MakeTrans(GlassX + 4, 0));
+  root->addChild(stripe);
+  auto glass = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
+  glass->setWidth(24);
+  glass->setHeight(Height);
+  glass->setMatrix(Matrix::MakeTrans(GlassX, 0));
+  glass->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
+  root->addChild(glass);
+
+  LayerImageRequest request = {};
+  request.target = root;
+  request.sceneRoot = root;
+  request.outputSize = {Width, Height};
+  request.clearColor = Color::Black();
+  PixelImage reference = {};
+  // At the smaller limit the clear prefix takes over 64 cores of 14 pixels. The glass needs
+  // extra space for its blur and forces shorter cores only after that first batch has been drawn.
+  for (const auto& tileLimit : {ISize{2048, 64}, ISize{16, 16}}) {
+    LayerImageReadOptions options = {};
+    options.bandRows = Height;
+    options.tileSizeLimit = tileLimit;
+    auto reader = LayerImageReader::Make(context, request, options);
+    ASSERT_TRUE(reader != nullptr);
+    auto info = reader->bandInfo();
+    PixelImage output = {std::vector<uint8_t>(info.byteSize(), 0xcc), Width, Height,
+                         info.rowBytes()};
+    auto result = reader->readNextBand(context, Pixmap(info, output.pixels.data()),
+                                       output.pixels.size());
+    ASSERT_EQ(result.code, LayerImageReadCode::BandReady) << result.error.message;
+    EXPECT_EQ(result.firstRow, 0);
+    EXPECT_EQ(result.rowCount, Height);
+    EXPECT_TRUE(result.lastBand);
+    if (reference.pixels.empty()) {
+      const auto* center = output.pixels.data() + info.rowBytes() * 7 + (GlassX + 8) * 4;
+      EXPECT_GT(center[0], center[1]);
+      reference = std::move(output);
+    } else {
+      EXPECT_EQ(CountDifferentPixels(reference, output, 1), 0);
+    }
+  }
+}
+
 }  // namespace tgfx
