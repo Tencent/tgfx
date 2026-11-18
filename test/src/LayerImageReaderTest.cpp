@@ -1552,4 +1552,28 @@ TGFX_TEST(LayerImageReaderTest, TinyBackgroundBlurAtHighScaleFitsSmallTiles) {
   EXPECT_EQ(pixels[3], 255);
 }
 
+TGFX_TEST(LayerImageReaderTest, OffscreenBlurDoesNotEnlargeLocalTiles) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto root = BuildNestedBackdropScene();
+  auto displayList = MakeDisplayList(root);
+  auto sceneRoot = displayList->root()->shared_from_this();
+  auto upperGlass = MakeExportSolid(Color::FromRGBA(255, 255, 255, 64));
+  upperGlass->setWidth(50);
+  upperGlass->setHeight(30);
+  upperGlass->setMatrix(Matrix::MakeTrans(44, 42));
+  upperGlass->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+  root->addChild(upperGlass);
+  auto reference = RenderReference(context, displayList.get());
+  ASSERT_FALSE(reference.pixels.empty());
+  auto distant = MakeExportSolid(Color::Blue());
+  distant->setMatrix(Matrix::MakeTrans(10000, 0));
+  distant->setLayerStyles({BackgroundBlurStyle::Make(100, 100)});
+  root->addChild(distant);
+  auto output = ReadTiled(context, root, sceneRoot, {64, 64});
+  ASSERT_EQ(output.error.code, LayerImageErrorCode::None) << output.error.message;
+  EXPECT_EQ(CountDifferentPixels(reference, output.image, 1), 0);
+}
+
 }  // namespace tgfx
