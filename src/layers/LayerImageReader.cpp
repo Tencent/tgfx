@@ -227,11 +227,6 @@ DrawOutcome LayerImageReader::Impl::drawRegionList(Context* context,
   auto batchResult = session->planBatch(
       regions, LayerDrawLimits{*context->gpu()->limits(), options.tileSizeLimit}, control);
   if (batchResult.code == BatchPlanCode::RequiresSplit) {
-    if (regions.size() <= 1) {
-      *failure = fail(LayerImageErrorCode::DeviceLimitExceeded, LayerImageStage::Planning,
-                      "a single output region cannot share its background capture");
-      return DrawOutcome::Failed;
-    }
     using Difference = std::vector<LayerRegionPlan>::difference_type;
     auto mid = static_cast<Difference>(regions.size() / 2);
     std::vector<LayerRegionPlan> left(regions.begin(), regions.begin() + mid);
@@ -426,11 +421,7 @@ LayerImageReadResult LayerImageReader::Impl::readNextBand(Context* context,
     auto outcome = drawRegionList(context, regions, bandFirstRow, destination, &control,
                                   &surfaceCache, &failure);
     if (outcome == DrawOutcome::Failed) {
-      if (failure.code == LayerImageReadCode::Failed) {
-        return failure;
-      }
-      return fail(LayerImageErrorCode::DrawFailed, LayerImageStage::Rendering,
-                  "failed to draw a band");
+      return failure;
     }
     if (outcome == DrawOutcome::Cancelled || cancelRequested.load()) {
       return cancel();
