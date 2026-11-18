@@ -729,7 +729,7 @@ class PaddedImageBuffer : public ImageBuffer {
 
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override {
-    auto bufferHeight = _height + kPadding;
+    auto bufferHeight = _height + PADDING;
     std::vector<uint32_t> pixels(static_cast<size_t>(_width) * static_cast<size_t>(bufferHeight));
     for (int y = 0; y < bufferHeight; y++) {
       auto color = y < _height ? 0xFF00FF00u : 0xFFFF0000u;
@@ -743,7 +743,7 @@ class PaddedImageBuffer : public ImageBuffer {
   }
 
  private:
-  static constexpr int kPadding = 8;
+  static constexpr int PADDING = 8;
   int _width = 0;
   int _height = 0;
   std::shared_ptr<ColorSpace> imageColorSpace = ColorSpace::SRGB();
