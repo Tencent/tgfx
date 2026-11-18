@@ -1112,7 +1112,8 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (FloatNearlyZero(contentScale)) {
     return true;
   }
-  if (args.renderRects != nullptr && !args.renderRects->empty() && !renderBounds.isEmpty()) {
+  if (args.useSceneBounds && args.renderRects != nullptr && !args.renderRects->empty() &&
+      !renderBounds.isEmpty()) {
     bool anyHit = false;
     for (const auto& rect : *args.renderRects) {
       if (Rect::Intersects(rect, renderBounds)) {

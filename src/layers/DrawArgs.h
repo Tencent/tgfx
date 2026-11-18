@@ -57,6 +57,8 @@ class DrawArgs {
   // Layer whose renderBounds does not intersect any of these rects. Callers should pre-outset the
   // rects if blur sampling range needs to be included. nullptr means no culling (full recording).
   const std::vector<Rect>* renderRects = nullptr;
+  // A directly exported hidden branch has no current scene render bounds.
+  bool useSceneBounds = true;
 
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 

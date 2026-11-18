@@ -209,6 +209,12 @@ int BackgroundHandler::lastCaptureChildIndex(const Layer* parent) const {
 }
 
 int BackgroundCapturer::lastCaptureChildIndex(const Layer* parent) const {
+  if (capturePath != nullptr) {
+    auto next = capturePath->find(parent);
+    if (next != capturePath->end()) {
+      return next->second;
+    }
+  }
   if (isForcedCapture()) {
     return static_cast<int>(parent->children().size()) - 1;
   }
@@ -222,6 +228,23 @@ int BackgroundCapturer::lastCaptureChildIndex(const Layer* parent) const {
 }
 
 bool BackgroundCapturer::needsSurface(Layer* layer) const {
+  if (capturingHiddenTarget && layer != nullptr) {
+    // Scene updates skip hidden subtrees, so inspect their live styles instead of cached outsets.
+    for (const auto& child : layer->children()) {
+      if (!child->visible() || child->alpha() <= 0.0f || child->maskOwner != nullptr) {
+        continue;
+      }
+      for (const auto& style : child->layerStyles()) {
+        if (NeedsBackgroundSource(style->extraSourceType())) {
+          return true;
+        }
+      }
+      if (needsSurface(child.get())) {
+        return true;
+      }
+    }
+    return false;
+  }
   return layer != nullptr && layer->hasDescendantBackgroundStyle();
 }
 
@@ -231,6 +254,8 @@ std::unique_ptr<BackgroundCapturer> BackgroundCapturer::buildSubCapturer(
     return nullptr;
   }
   auto clone = std::make_unique<BackgroundCapturer>(snapshots, std::move(subSource));
+  clone->capturePath = capturePath;
+  clone->capturingHiddenTarget = capturingHiddenTarget;
   // Tiled capture and consumption must traverse the same styles, including at offscreen edges.
   if (parentArgs.drawControl == nullptr || parentArgs.renderRects == nullptr ||
       parentArgs.renderRects->empty()) {
@@ -624,6 +649,56 @@ void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
   captureArgs.backgroundHandler = &capturer;
   captureArgs.renderRects = &renderRects;
   captureRoot->drawLayer(captureArgs, bgCanvas, 1.0f, BlendMode::SrcOver);
+}
+
+Layer* BackgroundCapturer::HiddenBranch(Layer* captureRoot, Layer* target) {
+  Layer* hiddenBranch = nullptr;
+  for (auto* layer = target; layer != captureRoot; layer = layer->parent()) {
+    if (!layer->visible() || layer->alpha() <= 0.0f || layer->maskOwner != nullptr) {
+      hiddenBranch = layer;
+    }
+  }
+  return hiddenBranch;
+}
+
+void BackgroundCapturer::RunForTarget(Layer* captureRoot, Layer* target, float alpha,
+                                      BlendMode blendMode, const DrawArgs& baseArgs,
+                                      std::shared_ptr<BackgroundSource> bgSource,
+                                      BackgroundSnapshotMap* snapshots,
+                                      const std::vector<Rect>& renderRects) {
+  auto* hiddenBranch = HiddenBranch(captureRoot, target);
+  if (hiddenBranch == nullptr && target != captureRoot) {
+    Run(captureRoot, baseArgs, std::move(bgSource), snapshots, renderRects);
+    return;
+  }
+
+  auto* canvas = bgSource->getCanvas();
+  BackgroundCapturer capturer(snapshots, std::move(bgSource));
+  DrawArgs args = baseArgs;
+  args.backgroundHandler = &capturer;
+  args.renderRects = &renderRects;
+  AutoCanvasRestore restore(canvas);
+  if (hiddenBranch != nullptr) {
+    // Draw exactly the visible scene preceding the outermost hidden ancestor. Its own siblings
+    // further down the hidden branch never painted into this backdrop.
+    std::unordered_map<const Layer*, int> path;
+    for (auto* child = hiddenBranch; child != captureRoot; child = child->parent()) {
+      auto* parent = child->parent();
+      path.emplace(parent, parent->getChildIndex(child->shared_from_this()));
+    }
+    capturer.capturePath = &path;
+    {
+      AutoCanvasRestore restoreScene(canvas);
+      captureRoot->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
+    }
+    capturer.capturePath = nullptr;
+    canvas->concat(target->getRelativeMatrix3D(captureRoot).asMatrix());
+    // A hidden branch has no current scene render bounds or cached background outsets.
+    args.useSceneBounds = false;
+    capturer.capturingHiddenTarget = true;
+    capturer.beginForceDrawChildren();
+  }
+  target->drawLayer(args, canvas, alpha, blendMode);
 }
 
 }  // namespace tgfx
