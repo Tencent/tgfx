@@ -1218,6 +1218,13 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   return recorder.finishRecordingAsPicture();
 }
 
+static void RecordUnsupportedBackdrop(const DrawArgs& args, const Matrix3D& localToScene,
+                                      Rect bounds, const std::optional<Rect>& clip) {
+  if (!bounds.isEmpty() && (!clip.has_value() || bounds.intersect(*clip))) {
+    args.unsupportedBackdropBounds->push_back(localToScene.mapRect(bounds));
+  }
+}
+
 MaskData Layer::getMaskData(const DrawArgs& args, float scale,
                             const std::optional<Rect>& layerClipBounds) {
   DEBUG_ASSERT(_mask != nullptr);
@@ -1232,6 +1239,12 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
                   maskType == LayerMaskType::ContourInverted;
 
   auto relativeMatrix3D = _mask->getRelativeMatrix3D(this);
+  if (args.unsupportedBackdropBounds != nullptr &&
+      (_mask->canPreserve3D() || !Matrix3DUtils::IsMatrix3DAffine(relativeMatrix3D))) {
+    RecordUnsupportedBackdrop(args, getGlobalMatrix(),
+                              _mask->getBoundsInternal(relativeMatrix3D, false), layerClipBounds);
+    return MaskData(inverted);
+  }
   auto maskPicture = getMaskPicture(args, isContourMode, scale, relativeMatrix3D);
   if (maskPicture == nullptr) {
     return MaskData(inverted);
@@ -1757,6 +1770,14 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const 
 
 bool Layer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float alpha,
                       LayerDrawFunc drawFunc) {
+  if (args.unsupportedBackdropBounds != nullptr &&
+      (child->canPreserve3D() || !child->bitFields.matrix3DIsAffine)) {
+    // Test projected bounds in the current offscreen's parent space before entering a 3D
+    // context. Detached trees have no scene render bounds, but the canvas still has its clip.
+    auto bounds = child->getBoundsInternal(child->getMatrixWithScrollRect(), false);
+    RecordUnsupportedBackdrop(args, getGlobalMatrix(), bounds, GetClipBounds(canvas));
+    return true;
+  }
   // 2D → 3D switch: hand off to drawByStarting3DContext, which expands the 3D subtree internally.
   if (child->canPreserve3D()) {
     auto matrix3D = child->getMatrixWithScrollRect();

@@ -59,6 +59,9 @@ class DrawArgs {
   const std::vector<Rect>* renderRects = nullptr;
   // A directly exported hidden branch has no current scene render bounds.
   bool useSceneBounds = true;
+  // Projected scene bounds of unsupported inputs encountered before a background style.
+  // Export reports them only if the style actually needs the affected part of this capture.
+  std::vector<Rect>* unsupportedBackdropBounds = nullptr;
 
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 

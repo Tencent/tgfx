@@ -346,6 +346,20 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   auto bounds = contentBounds;
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
+  if (args.unsupportedBackdropBounds != nullptr && !args.unsupportedBackdropBounds->empty() &&
+      args.drawControl != nullptr && capturePath != nullptr &&
+      capturePath->target->doContains(layer)) {
+    auto inputBounds = style->filterBackground(bounds, contentScale);
+    inputBounds.scale(1.0f / contentScale, 1.0f / contentScale);
+    auto sceneBounds = layer->getGlobalMatrix().mapRect(inputBounds);
+    for (const auto& unsupported : *args.unsupportedBackdropBounds) {
+      if (Rect::Intersects(sceneBounds, unsupported)) {
+        args.drawControl->fail(DrawFailureCode::UnsupportedContent, DrawStage::Background, layer,
+                               {}, "the exported backdrop intersects unsupported 3D content");
+        return;
+      }
+    }
+  }
   // Use the runtime canvas chain (capture canvas matrix · bgSource->surfaceToWorldMatrix) so
   // capture and consume share the same frame of reference. Do NOT use getGlobalMatrix(): it walks
   // the static layer tree with per-step z-flattening and diverges from the runtime concat chain
@@ -687,6 +701,8 @@ void BackgroundCapturer::RunForTarget(Layer* captureRoot, Layer* target, float a
   DrawArgs args = baseArgs;
   args.backgroundHandler = &capturer;
   args.renderRects = &renderRects;
+  std::vector<Rect> unsupportedBounds;
+  args.unsupportedBackdropBounds = &unsupportedBounds;
   AutoCanvasRestore restore(canvas);
   ExportPath path = {};
   path.target = target;
