@@ -1428,4 +1428,48 @@ TGFX_TEST(LayerImageReaderTest, LargeTileOriginPreservesSinglePixelAlignment) {
   }
 }
 
+static std::shared_ptr<SolidLayer> MakeExportSolid(const Color& color) {
+  auto layer = SolidLayer::Make();
+  layer->setColor(color);
+  layer->setWidth(TestWidth);
+  layer->setHeight(TestHeight);
+  return layer;
+}
+
+TGFX_TEST(LayerImageReaderTest, HiddenTargetsKeepTheirExportBackdrop) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto background = MakeExportSolid(Color::Red());
+  auto displayList = MakeDisplayList(background);
+  auto sceneRoot = displayList->root()->shared_from_this();
+  auto group = Layer::Make();
+  sceneRoot->addChild(group);
+  auto sibling = MakeExportSolid(Color::Blue());
+  group->addChild(sibling);
+  auto glass = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
+  glass->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+  group->addChild(glass);
+  for (bool hideAncestor : {false, true}) {
+    sibling->setVisible(!hideAncestor);
+    auto reference = ReadTiled(context, glass, sceneRoot, {64, 64});
+    ASSERT_EQ(reference.error.code, LayerImageErrorCode::None) << reference.error.message;
+    const auto* center = reference.image.pixels.data() + reference.image.rowBytes * 60 + 80 * 4;
+    ASSERT_GT(center[hideAncestor ? 0 : 2], center[1]);
+    sibling->setVisible(true);
+    auto layer = hideAncestor ? group : std::static_pointer_cast<Layer>(glass);
+    for (bool useAlpha : {false, true}) {
+      SCOPED_TRACE(hideAncestor);
+      SCOPED_TRACE(useAlpha);
+      layer->setVisible(useAlpha);
+      layer->setAlpha(useAlpha ? 0.0f : 1.0f);
+      auto output = ReadTiled(context, glass, sceneRoot, {64, 64});
+      EXPECT_EQ(output.error.code, LayerImageErrorCode::None) << output.error.message;
+      EXPECT_EQ(reference.image.pixels, output.image.pixels);
+      layer->setVisible(true);
+      layer->setAlpha(1.0f);
+    }
+  }
+}
+
 }  // namespace tgfx
