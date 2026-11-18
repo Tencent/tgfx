@@ -193,6 +193,16 @@ class PrecompiledShaderCache {
     return _bundle == nullptr ? 0 : _bundle->composedEntries.size();
   }
 
+  /// Looks up a packed fragment source by operator (see FragmentLibrary: the id is 0x40000000 |
+  /// op). The blob is the verbatim GLSL the build read from the fragment's source file. Returns
+  /// nullptr if not found.
+  const ShaderStageBlob* findFragmentSource(int op) const;
+
+  /// Returns the number of packed fragment sources in the loaded bundle.
+  size_t fragmentSourceCount() const {
+    return _bundle == nullptr ? 0 : _bundle->fragmentSources.size();
+  }
+
   /// What became of the embedded bundle when the owning Context loaded it. Set once by the Context;
   /// later loadBundle()/unload() calls (tests swap bundles in and out) do not change it. It only
   /// tells a draw that finds the cache empty WHY: see AOTFailure.

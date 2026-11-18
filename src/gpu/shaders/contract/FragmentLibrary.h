@@ -86,6 +86,10 @@ struct FragmentDef {
   int op = 0;
   FragmentKind kind = FragmentKind::Function;
   const char* functionName = "";
+  /// The fragment's own source file, root-relative to the shader directory: what the build packs
+  /// into the bundle's fragment sources and the assembler includes verbatim. Null for inline
+  /// expressions and macro-based operators with no single home.
+  const char* sourceFile = nullptr;
   std::vector<FragmentParam> params = {};
   std::vector<FragmentArg> args = {};
   std::vector<const char*> deps = {};
@@ -94,6 +98,9 @@ struct FragmentDef {
 /// The fragment table, one entry per chain operator the assembler covers. Returns nullptr for an
 /// operator with no fragment (the caller keeps the interpreter path).
 const FragmentDef* FindFragment(int op);
+
+/// The fragment at the table's index, for walking the whole manifest (the build's pack emitter).
+const FragmentDef* FragmentAt(size_t index);
 
 /// The count of registered fragments (the full op coverage check walks it).
 size_t FragmentCount();

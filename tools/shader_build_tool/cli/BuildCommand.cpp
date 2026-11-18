@@ -48,6 +48,7 @@
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/Layout.h"
 #include "gpu/shaders/PrecompiledShader.h"
+#include "gpu/shaders/contract/FragmentLibrary.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/contract/SpecContract.h"
 #include "output/BundleWriter.h"
@@ -400,6 +401,45 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
   std::vector<std::pair<ShaderProfile, std::unique_ptr<ProfileEmitter>>> emitters;
   for (auto profile : options.backends) {
     emitters.emplace_back(profile, MakeProfileEmitter(profile));
+  }
+  // The fragment source pack: every fragment with a source file is read verbatim and stored in the
+  // bundle's fragment pool under its fragment id (0x40000000 | op), so the runtime assembler joins
+  // the compiled-in manifest with the text without ever reading files. A missing or unreadable
+  // source fails the build — the pack and the manifest cannot drift apart silently.
+  for (const auto& emitterEntry : emitters) {
+    if (emitterEntry.first != ShaderProfile::OpenGL &&
+        emitterEntry.first != ShaderProfile::OpenGLES) {
+      continue;
+    }
+    const std::string profileTag = ProfileTag(emitterEntry.first);
+    for (size_t index = 0; index < FragmentCount(); ++index) {
+      const FragmentDef* fragment = FragmentAt(index);
+      if (fragment == nullptr || fragment->sourceFile == nullptr) {
+        continue;
+      }
+      std::ifstream file(options.shaderDir + "/" + fragment->sourceFile, std::ios::binary);
+      if (!file.is_open()) {
+        RecordBuildError(
+            &report->diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
+            fragment->functionName, profileTag, -1, -1,
+            std::string("the fragment source ") + fragment->sourceFile + " cannot be read");
+        continue;
+      }
+      std::ostringstream buffer;
+      buffer << file.rdbuf();
+      const std::string text = buffer.str();
+      if (text.empty()) {
+        RecordBuildError(&report->diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
+                         fragment->functionName, profileTag, -1, -1,
+                         std::string("the fragment source ") + fragment->sourceFile + " is empty");
+        continue;
+      }
+      ComposedPayload payload;
+      payload.name = fragment->functionName;
+      payload.id = 0x40000000u | static_cast<uint32_t>(fragment->op);
+      payload.blob.assign(text.begin(), text.end());
+      report->composedByTag[profileTag].push_back(std::move(payload));
+    }
   }
   for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
     const Family& family = Families()[familyIndex];

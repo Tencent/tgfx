@@ -51,6 +51,10 @@ struct ParsedBundle {
   /// vertex stage and no variant semantics, so the one-fragment-per-variant invariants (and the
   /// closure checks) keep holding over fragEntries alone.
   std::unordered_map<uint32_t, ShaderStageBlob> composedEntries;
+  /// The fragment source pack, keyed by fragment id (0x40000000 | op): the verbatim GLSL of each
+  /// ops/ fragment the build read, joined at runtime with the compiled-in manifest. The assembler
+  /// consumes these; until then they only load and count.
+  std::unordered_map<uint32_t, ShaderStageBlob> fragmentSources;
 };
 
 }  // namespace tgfx

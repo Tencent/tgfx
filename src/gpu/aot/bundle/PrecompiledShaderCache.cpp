@@ -503,13 +503,17 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     return false;
   }
 
-  // The composed payloads share the fragment pool's storage but not its variant semantics: split
-  // them by the high id bit so the per-variant lookups and closure checks see exactly one
-  // fragment per variant, and the composed lookup has its own table.
+  // The composed payloads and the fragment sources share the fragment pool's storage but not its
+  // variant semantics: split them by the id bits so the per-variant lookups and closure checks see
+  // exactly one fragment per variant, and the composed and pack lookups have their own tables.
   std::unordered_map<HashKey, ShaderStageBlob> newComposedEntries;
+  std::unordered_map<HashKey, ShaderStageBlob> newFragmentSources;
   for (auto it = newFragEntries.begin(); it != newFragEntries.end();) {
     if ((it->first & 0x80000000u) != 0) {
       newComposedEntries.emplace(it->first, std::move(it->second));
+      it = newFragEntries.erase(it);
+    } else if ((it->first & 0x40000000u) != 0) {
+      newFragmentSources.emplace(it->first, std::move(it->second));
       it = newFragEntries.erase(it);
     } else {
       ++it;
@@ -524,6 +528,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   parsed.vertEntries = std::move(newVertEntries);
   parsed.fragEntries = std::move(newFragEntries);
   parsed.composedEntries = std::move(newComposedEntries);
+  parsed.fragmentSources = std::move(newFragmentSources);
   _bundle = ShareParsedBundle(sourceHash, size, std::move(parsed));
   {
     std::lock_guard<std::mutex> lock(_programMissMutex);
@@ -539,10 +544,10 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     _context->globalCache()->clearPrograms();
   }
   LOGI(
-      "PrecompiledShaderCache: Loaded %u vert + %u frag + %zu composed entries (format v%u, "
-      "profile=%s)",
-      vertPoolCount, fragPoolCount, _bundle->composedEntries.size(), formatVersion,
-      _bundle->profileTag.c_str());
+      "PrecompiledShaderCache: Loaded %u vert + %u frag + %zu composed + %zu fragment sources "
+      "(format v%u, profile=%s)",
+      vertPoolCount, fragPoolCount, _bundle->composedEntries.size(),
+      _bundle->fragmentSources.size(), formatVersion, _bundle->profileTag.c_str());
   return true;
 }
 
@@ -623,6 +628,17 @@ const ShaderStageBlob* PrecompiledShaderCache::findComposed(uint32_t composedId)
   }
   auto it = _bundle->composedEntries.find(composedId);
   if (it == _bundle->composedEntries.end()) {
+    return nullptr;
+  }
+  return &it->second;
+}
+
+const ShaderStageBlob* PrecompiledShaderCache::findFragmentSource(int op) const {
+  if (_bundle == nullptr) {
+    return nullptr;
+  }
+  auto it = _bundle->fragmentSources.find(0x40000000u | static_cast<uint32_t>(op));
+  if (it == _bundle->fragmentSources.end()) {
     return nullptr;
   }
   return &it->second;
