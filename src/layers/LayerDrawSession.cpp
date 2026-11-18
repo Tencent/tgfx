@@ -236,6 +236,7 @@ void LayerDrawSession::CollectSubtreeEffects(Layer* layer, const Matrix& localTo
 }
 
 void LayerDrawSession::collectPrecedingEffects() {
+  auto* hiddenBranch = BackgroundCapturer::HiddenBranch(request.captureRoot, request.target);
   std::vector<Layer*> path = {};
   for (auto* layer = request.target; layer != request.captureRoot; layer = layer->parent()) {
     path.push_back(layer);
@@ -244,6 +245,9 @@ void LayerDrawSession::collectPrecedingEffects() {
   auto localToOutput = rootToOutput;
   auto filterOutset = 0.0f;
   for (auto it = path.rbegin(); it != path.rend(); ++it) {
+    if (ancestor == hiddenBranch) {
+      break;
+    }
     filterOutset += FilterOutset(ancestor, localToOutput.getMaxScale());
     CollectLayerEffects(ancestor, localToOutput, filterOutset, LayerStylePosition::Below,
                         &precedingEffects);
@@ -488,7 +492,9 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
   }
   session->outputToGlobal = captureRootToGlobal;
   session->outputToGlobal.preConcat(session->outputToRoot);
-  auto outset = AncestorFilterOutset(request.target, request.captureRoot, rootToOutput);
+  auto outset = session->useSceneBounds
+                    ? AncestorFilterOutset(request.target, request.captureRoot, rootToOutput)
+                    : 0.0f;
   for (auto& effect : session->targetEffects) {
     effect.outputBounds.outset(outset, outset);
     effect.outset += outset;
