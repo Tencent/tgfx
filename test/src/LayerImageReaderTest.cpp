@@ -1472,4 +1472,31 @@ TGFX_TEST(LayerImageReaderTest, HiddenTargetsKeepTheirExportBackdrop) {
   }
 }
 
+TGFX_TEST(LayerImageReaderTest, OnlyPreceding3DSiblingsAreBackdropDependencies) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto displayList = MakeDisplayList(MakeExportSolid(Color::Red()));
+  auto sceneRoot = displayList->root()->shared_from_this();
+  auto glass = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
+  glass->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+  sceneRoot->addChild(glass);
+  auto reference = ReadTiled(context, glass, sceneRoot, {64, 64});
+  ASSERT_EQ(reference.error.code, LayerImageErrorCode::None) << reference.error.message;
+  auto sibling = MakeExportSolid(Color::Blue());
+  sibling->setPreserve3D(true);
+  sceneRoot->addChild(sibling);
+  auto output = ReadTiled(context, glass, sceneRoot, {64, 64});
+  EXPECT_EQ(output.error.code, LayerImageErrorCode::None) << output.error.message;
+  EXPECT_EQ(output.image.pixels, reference.image.pixels);
+  sceneRoot->setChildIndex(sibling, 1);
+  sibling->setMatrix(Matrix::MakeTrans(10000, 0));
+  output = ReadTiled(context, glass, sceneRoot, {64, 64});
+  EXPECT_EQ(output.error.code, LayerImageErrorCode::None) << output.error.message;
+  EXPECT_EQ(output.image.pixels, reference.image.pixels);
+  sibling->setMatrix(Matrix::I());
+  output = ReadTiled(context, glass, sceneRoot, {64, 64});
+  EXPECT_EQ(output.error.code, LayerImageErrorCode::UnsupportedContent);
+}
+
 }  // namespace tgfx
