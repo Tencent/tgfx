@@ -26,7 +26,6 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/gpu/GPULimits.h"
@@ -91,9 +90,7 @@ struct LayerDrawRequest {
   BlendMode blendMode = BlendMode::SrcOver;
   LayerSamplingMode samplingMode = LayerSamplingMode::CanvasDefault;
 
-  // CanvasDefault only: the canvas state the regular draw path has to preserve. outputOrigin of a
-  // draw target is ignored in this mode and the existing canvas matrix, clip and content stay
-  // untouched.
+  // CanvasDefault only: preserve the existing canvas matrix, clip and content.
   Matrix canvasMatrix = Matrix::I();
   Rect canvasDrawBounds = {};      // Local-space bounds clipped by the canvas clip.
   bool canvasRooted = false;       // Whether the target belongs to a root layer.
@@ -218,12 +215,10 @@ struct BatchPlanResult {
 };
 
 /**
- * Destination of one region draw. outputOrigin is the region's top-left corner in final output
- * pixels; clearBeforeDraw is true for a freshly allocated export surface.
+ * Destination of one region draw. clearBeforeDraw is true for a fresh export surface.
  */
 struct LayerDrawTarget {
   Canvas* canvas = nullptr;
-  Point outputOrigin = Point::Zero();
   bool clearBeforeDraw = false;
 };
 

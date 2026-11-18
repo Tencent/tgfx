@@ -271,8 +271,6 @@ DrawOutcome LayerImageReader::Impl::drawRegionList(Context* context,
     }
     LayerDrawTarget target = {};
     target.canvas = surface->getCanvas();
-    target.outputOrigin = Point::Make(static_cast<float>(region.renderRect.left),
-                                      static_cast<float>(region.renderRect.top));
     target.clearBeforeDraw = true;
     auto outcome = session->drawRegion(context, *batch, i, target, control);
     if (outcome == DrawOutcome::Cancelled) {

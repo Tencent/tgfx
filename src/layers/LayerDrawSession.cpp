@@ -726,23 +726,9 @@ std::unique_ptr<LayerDrawBatch> LayerDrawSession::prepareExportBatch(Context* co
   BackgroundRasterGeometry geometry = {};
   geometry.size = captureSize;
   geometry.surfaceScale = ExportBackgroundSurfaceScale;
-  Matrix sceneRootToSurface = Matrix::MakeTrans(-static_cast<float>(captureRect.left),
-                                                -static_cast<float>(captureRect.top));
-  sceneRootToSurface.preConcat(rootToOutput);
-  geometry.sceneRootToSurface = sceneRootToSurface;
-  Matrix imageToSceneRoot = Matrix::I();
-  if (!sceneRootToSurface.invert(&imageToSceneRoot)) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::InvalidRequest, DrawStage::Background, request.target,
-                    captureSize, "the background sampling matrix is not invertible");
-    }
-    return nullptr;
-  }
-  geometry.imageToSceneRoot = imageToSceneRoot;
-  auto coverage = imageToSceneRoot.mapRect(
-      Rect::MakeWH(static_cast<float>(captureSize.width), static_cast<float>(captureSize.height)));
-  coverage.roundOut();
-  geometry.sourceCoverage = coverage;
+  geometry.sceneRootToOutput = rootToOutput;
+  geometry.originX = captureRect.left;
+  geometry.originY = captureRect.top;
 
   auto bgSource = BackgroundSource::MakeWithGeometry(context, geometry, request.renderColorSpace);
   if (bgSource == nullptr) {
@@ -854,14 +840,13 @@ DrawOutcome LayerDrawSession::drawExportRegion(Context* context, LayerDrawBatch&
         Rect::MakeWH(static_cast<float>(surface->width()), static_cast<float>(surface->height())),
         false);
   }
-  auto matrix = Matrix::MakeTrans(-target.outputOrigin.x, -target.outputOrigin.y);
-  matrix.preConcat(request.targetLocalToOutput);
-  canvas->setMatrix(matrix);
+  const auto& region = batch.impl->regions[regionIndex];
+  canvas->setMatrixForTile(request.targetLocalToOutput, region.renderRect.left, region.renderRect.top);
 
   DrawArgs args(context);
   args.dstColorSpace = request.renderColorSpace;
   args.drawControl = control;
-  bool needsRegionBackground = batch.impl->regions[regionIndex].dependencies != nullptr;
+  bool needsRegionBackground = region.dependencies != nullptr;
   if (needsRegionBackground) {
     args.useSceneBounds = useSceneBounds;
     args.renderRects = &batch.impl->renderRects;
