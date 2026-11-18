@@ -310,6 +310,7 @@ class LayerDrawSession {
   Matrix outputToRoot = Matrix::I();
   Matrix outputToGlobal = Matrix::I();  // output pixels to the renderBounds space.
   PixelRect outputPixelBounds = {};
+  bool useSceneBounds = true;
   bool needsBackground = false;
   float backgroundOutset = 0.0f;  // In output pixels.
 

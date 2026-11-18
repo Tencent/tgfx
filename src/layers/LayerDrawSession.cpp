@@ -391,6 +391,8 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
   }
 
   session->outputPixelBounds = {0, 0, request.outputSize.width, request.outputSize.height};
+  session->useSceneBounds =
+      BackgroundCapturer::HiddenBranch(request.captureRoot, request.target) == nullptr;
 
   auto actualRoot = request.captureRoot->root();
   if (actualRoot != nullptr) {
@@ -786,6 +788,7 @@ DrawOutcome LayerDrawSession::drawExportRegion(Context* context, LayerDrawBatch&
   args.dstColorSpace = request.renderColorSpace;
   args.drawControl = control;
   if (!batch.impl->renderRects.empty()) {
+    args.useSceneBounds = useSceneBounds;
     args.renderRects = &batch.impl->renderRects;
   }
   BackgroundConsumer consumer(batch.impl->hasSnapshots ? &batch.impl->snapshots : nullptr, false);
