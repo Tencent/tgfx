@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/OffscreenRenderer.h"
+#include "core/utils/MathExtra.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/LayerDrawSession.h"
 #include "layers/LayerStyleSource.h"
@@ -87,7 +88,7 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
     if (args.drawControl != nullptr && ExceedsDeviceLimit(args.context, imageClip)) {
       args.drawControl->fail(
           DrawFailureCode::SurfaceLimit, DrawStage::Rendering, layer,
-          ISize::Make(static_cast<int>(imageClip.width()), static_cast<int>(imageClip.height())),
+          ISize::Make(FloatSaturateToInt(imageClip.width()), FloatSaturateToInt(imageClip.height())),
           "an intermediate backdrop surface exceeds the device texture limit");
       return {};
     }
