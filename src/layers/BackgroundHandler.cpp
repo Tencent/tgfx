@@ -347,17 +347,42 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
   if (args.unsupportedBackdropBounds != nullptr && !args.unsupportedBackdropBounds->empty() &&
-      args.drawControl != nullptr && capturePath != nullptr &&
-      capturePath->target->doContains(layer)) {
+      args.drawControl != nullptr && capturePath != nullptr) {
     auto inputBounds = style->filterBackground(bounds, contentScale);
     inputBounds.scale(1.0f / contentScale, 1.0f / contentScale);
-    auto sceneBounds = layer->getGlobalMatrix().mapRect(inputBounds);
-    for (const auto& unsupported : *args.unsupportedBackdropBounds) {
-      if (Rect::Intersects(sceneBounds, unsupported)) {
+    auto localToScene = layer->getGlobalMatrix().asMatrix();
+    auto sceneBounds = localToScene.mapRect(inputBounds);
+    auto& unsupported = *args.unsupportedBackdropBounds;
+    auto styleToScene = localToScene;
+    styleToScene.preScale(1.0f / contentScale, 1.0f / contentScale);
+    Matrix sceneToStyle;
+    auto invertible = styleToScene.invert(&sceneToStyle);
+    auto affectedOutput = Rect::MakeEmpty();
+    auto outsets = style->filterBackground(Rect::MakeEmpty(), contentScale);
+    auto outputBounds = style->filterBounds(bounds, contentScale);
+    for (const auto& dependency : unsupported) {
+      if (!Rect::Intersects(sceneBounds, dependency)) {
+        continue;
+      }
+      if (capturePath->target->doContains(layer)) {
         args.drawControl->fail(DrawFailureCode::UnsupportedContent, DrawStage::Background, layer,
                                {}, "the exported backdrop intersects unsupported 3D content");
         return;
       }
+      // An earlier style can carry the unsupported input into a later style's sampling area.
+      // Invert its sampling outsets to bound the affected output pixels, then restrict them to
+      // the style's actual output geometry.
+      if (invertible) {
+        auto affected = sceneToStyle.mapRect(dependency);
+        affected = Rect::MakeLTRB(affected.left - outsets.right, affected.top - outsets.bottom,
+                                  affected.right - outsets.left, affected.bottom - outsets.top);
+        if (affected.intersect(outputBounds)) {
+          affectedOutput.join(affected);
+        }
+      }
+    }
+    if (!affectedOutput.isEmpty()) {
+      unsupported.push_back(styleToScene.mapRect(affectedOutput));
     }
   }
   // Use the runtime canvas chain (capture canvas matrix · bgSource->surfaceToWorldMatrix) so
