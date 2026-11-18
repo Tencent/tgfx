@@ -34,7 +34,6 @@
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/layers/Layer.h"
-#include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
@@ -141,22 +140,21 @@ static float MaxAbsOutset(const Rect& rect) {
   return std::ceil(outset);
 }
 
-static float FilterOutset(Layer* layer, float scale) {
+static bool FitsLimit(const PixelRect& rect, int limitWidth, int limitHeight) {
+  return rect.width() > 0 && rect.height() > 0 && rect.width() <= limitWidth &&
+         rect.height() <= limitHeight;
+}
+
+}  // namespace
+
+float LayerDrawSession::FilterOutset(Layer* layer, float scale) {
   if (!std::isfinite(scale) || scale <= 0.0f) {
     return 0.0f;
   }
-  auto& filters = layer->filters();
-  auto bounds = Rect::MakeEmpty();
-  for (auto index = filters.size(); index > 0; --index) {
-    auto& filter = filters[index - 1];
-    if (filter != nullptr) {
-      bounds = filter->filterBounds(bounds, scale, MapDirection::Reverse);
-    }
-  }
-  return MaxAbsOutset(bounds);
+  return MaxAbsOutset(layer->mapOutputBoundsToInput(Rect::MakeEmpty(), scale));
 }
 
-static float AncestorFilterOutset(Layer* target, Layer* captureRoot) {
+float LayerDrawSession::AncestorFilterOutset(Layer* target, Layer* captureRoot) {
   auto outset = 0.0f;
   for (auto ancestor = target->parent(); ancestor != nullptr && ancestor != captureRoot;
        ancestor = ancestor->parent()) {
@@ -168,13 +166,6 @@ static float AncestorFilterOutset(Layer* target, Layer* captureRoot) {
   }
   return outset;
 }
-
-static bool FitsLimit(const PixelRect& rect, int limitWidth, int limitHeight) {
-  return rect.width() > 0 && rect.height() > 0 && rect.width() <= limitWidth &&
-         rect.height() <= limitHeight;
-}
-
-}  // namespace
 
 bool LayerDrawSession::IsSupported2DSubtree(Layer* layer, std::vector<Layer*>& activeMasks) {
   if (layer->canPreserve3D()) {

@@ -286,6 +286,8 @@ class LayerDrawSession {
  private:
   LayerDrawSession() = default;
 
+  static float FilterOutset(Layer* layer, float scale);
+  static float AncestorFilterOutset(Layer* target, Layer* captureRoot);
   static bool IsSupported2DSubtree(Layer* layer, std::vector<Layer*>& activeMasks);
   static bool IsSupportedAncestorChain(Layer* target, Layer* captureRoot);
   static void ScanBackgroundOutset(Layer* layer, const Matrix& localToRoot, float ancestorOutset,
