@@ -689,8 +689,9 @@ std::unique_ptr<LayerDrawBatch> LayerDrawSession::prepareExportBatch(Context* co
   cullRect.roundOut();
   cullRect.outset(1.0f, 1.0f);
   batch->impl->renderRects = {cullRect};
-  BackgroundCapturer::Run(request.captureRoot, args, std::move(bgSource), &batch->impl->snapshots,
-                          batch->impl->renderRects);
+  BackgroundCapturer::RunForTarget(request.captureRoot, request.target, request.alpha,
+                                   request.blendMode, args, std::move(bgSource),
+                                   &batch->impl->snapshots, batch->impl->renderRects);
   if (control != nullptr && control->failed()) {
     return nullptr;
   }
