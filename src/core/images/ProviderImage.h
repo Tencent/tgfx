@@ -54,6 +54,8 @@ class ProviderImage : public Image {
     return Type::Provider;
   }
 
+  ISize getRasterizedSize(float scale) const override;
+
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
