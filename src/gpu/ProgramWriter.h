@@ -79,11 +79,14 @@ class ProgramWriter {
   bool write(const ProgramInfo& info, RenderPass* renderPass, Program* program) const;
 
  protected:
-  /// The plan writer appends its named parameter block past the variant prefix before the base
-  /// fills the prefix, so both regions land in the one fragment buffer the upload carries.
+  /// The declared-member writers fill the blocks their emission declares: the plan's block and the
+  /// variant's prefix land in the one fragment buffer the upload carries.
   virtual void writeUniforms(const ProgramInfo& info, UniformData* vertexUniformData,
                              UniformData* fragmentUniformData) const;
-  bool writeSamplers(const ProgramInfo& info, Program* program, RenderPass* renderPass) const;
+  /// Binds the program's samplers. The declared routes walk the variant's texture list; a program
+  /// whose fragment declares its own sampler set binds the emit's table instead.
+  virtual bool writeSamplers(const ProgramInfo& info, Program* program,
+                             RenderPass* renderPass) const;
   /// Whether the draw carries everything the variant's writers read: the interpreter's modules
   /// need the compiled program the selection attached.
   bool carriesUniformContent(const ProgramInfo& info) const;

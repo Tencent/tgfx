@@ -44,6 +44,30 @@ int TFTypeToIndex(gfx::skcms_TFType type);
 bool ColorSpaceXformStepsSupported(const ColorSpaceXformSteps* steps);
 
 /**
+ * One color-space transform's parameter values, in the std140 packing every module's block spells:
+ * the flags bitmask, the transfer-function pairs (zero when the step is disabled, matching the
+ * flags bit that keeps them unread), the OOTF vectors, and the gamut matrix as three vec4 columns
+ * or its identity stand-in. One resolver feeds both the element-indexed module writers and the
+ * assembled chain's named members, so the two cannot pack a step differently.
+ */
+struct ColorSpaceXformValues {
+  int flags = 0;
+  float srcTF0[4] = {};
+  float srcTF1[4] = {};
+  int srcTFType = 0;
+  float srcOOTF[4] = {};
+  float colorXform[12] = {};
+  float dstOOTF[4] = {};
+  float dstTF0[4] = {};
+  float dstTF1[4] = {};
+  int dstTFType = 0;
+};
+
+/// Resolves one step set into the values above. A null step set resolves to nothing.
+void ResolveColorSpaceXformValues(const ColorSpaceXformSteps* colorSpaceXform,
+                                  ColorSpaceXformValues* out);
+
+/**
  * Uploads the uniforms of a color-space transform through one module's color-space block: the
  * caller names the module's field elements and the helper packs the steps into them. The fields
  * are addressed by element index through the variant's derived layout, so no name is composed per

@@ -30,10 +30,10 @@
 #include "gpu/UniformData.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/chain/ChainBodyEmitter.h"
-#include "gpu/aot/chain/ChainTextAssembler.h"
+#include "gpu/aot/chain/ChainProgramEmit.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
-#include "gpu/aot/plan/ChainPlanWriter.h"
+#include "gpu/aot/plan/ChainBindingWriter.h"
 #include "gpu/aot/plan/DrawPlan.h"
 #include "gpu/aot/select/PrecompiledDiagnostics.h"
 #include "gpu/aot/select/ProgramKey.h"
@@ -45,7 +45,6 @@
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/Layout.h"
-#include "gpu/shaders/contract/ChainPlan.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -70,6 +69,31 @@ bool AssembledChainEnabled() {
   return enabled;
 }
 }  // namespace
+
+// The assembled chain text spells the draw's composition, so a program's identity must carry it:
+// the generic interpreter text serves every shape of a variant, while the emitted text serves
+// exactly the shape it was emitted for. A specialized program is already separated by its spec
+// values, but a spec-less route (the export paths run with specialization off, for one) would
+// otherwise reuse one shape's program for another.
+static void AppendAssembledChainKey(Context* context, const ProgramInfo& info,
+                                    const DrawPlan& resolved, BytesKey* key) {
+  if (!AssembledChainEnabled() || resolved.sources.chain == nullptr) {
+    return;
+  }
+  if (strcmp(Families()[resolved.variant.family].name, "Chain") != 0) {
+    return;
+  }
+  auto cache = ContextCacheAccess::Cache(context);
+  if (SpecFormatForBackend(context->backend(), cache->payloadFormat()) != ShaderCodeFormat::GLSL) {
+    return;
+  }
+  const bool xpPass =
+      XpNeedsAdvancedMath(info.getXferFacts().shaderBlend(), static_cast<int>(info.getBlendMode()));
+  const ChainComposition composition = DescribeChainComposition(*resolved.sources.chain, xpPass);
+  const uint64_t structure = ChainCompositionKey(resolved.variant.id(), composition);
+  key->write(static_cast<uint32_t>(structure >> 32));
+  key->write(static_cast<uint32_t>(structure & 0xFFFFFFFFu));
+}
 
 // Which descriptor field carries the blob. Derived from the format rather than from the bundle's
 // payload field so the two can never disagree: a format that names a container reads binaryData,
@@ -232,7 +256,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   // not in the processor tree), so the generic form and every specialized form of one variant
   // are distinct programs under distinct keys.
   const auto& resolved = *programInfo->getPlan();
-  const BytesKey key = MakeProgramKey(context, *programInfo, resolved.variant.id(), resolved.spec);
+  BytesKey key = MakeProgramKey(context, *programInfo, resolved.variant.id(), resolved.spec);
+  AppendAssembledChainKey(context, *programInfo, resolved, &key);
   if (auto cached = context->globalCache()->findProgram(key)) {
     return cached;
   }
@@ -344,12 +369,11 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   } else {
     fragmentDesc.code = std::string(fragBlob->data.begin(), fragBlob->data.end());
   }
-  // The assembled executor: the JIT-style walk — declarations generated from the family's module
-  // declarations, code assembled from the pack's per-op entries, no interpreter, no spec
-  // constants, no extraction. Its own experiment switch; every decline keeps the paths below
-  // untouched.
-  bool composedAttempt = false;
-  ChainPlan plan = {};
+  // The assembled executor: the JIT-style walk — the emit declares exactly the members the
+  // composition reads, the body is the pack's per-op entries, and the writer walks the emit's own
+  // tables. Its own experiment switch; every decline keeps the paths below untouched.
+  bool assembledAttempt = false;
+  ChainBindings chainBindings = {};
   if (allowComposed && AssembledChainEnabled() && format == ShaderCodeFormat::GLSL &&
       strcmp(Families()[variant.family].name, "Chain") == 0) {
     const auto* assembledSources = programInfo->getSources();
@@ -359,23 +383,24 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
                                               static_cast<int>(programInfo->getBlendMode()));
       const ChainComposition composition =
           DescribeChainComposition(*assembledSources->chain, xpPass);
-      plan = BuildChainPlan(composition);
-      if (!plan.calls.empty() && AssembleChainFragmentGLSL(plan, composition, chainFamily, variant,
-                                                           cache, &fragmentDesc.code)) {
-        composedAttempt = true;
-        LOGI("AssembledChain: assembled entry for %s[variant=%u] (%zu bytes)", shaderName,
-             variantId, fragmentDesc.code.size());
+      if (EmitChainProgramGLSL(composition, chainFamily, variant, cache, &fragmentDesc.code,
+                               &chainBindings)) {
+        assembledAttempt = true;
+        LOGI("AssembledChain: assembled entry for %s[variant=%u] (%zu bytes, %zu blocks)",
+             shaderName, variantId, fragmentDesc.code.size(), chainBindings.fragment.size());
         // The vertex stage follows the same contract: the stored text's interface (attributes,
         // vertex block, geometry hook) stays, and the varying set bends to the composition's
         // leaves and resource reads.
         std::string assembledVs;
-        if (AssembleChainVertexGLSL(plan, std::string(vertBlob->data.begin(), vertBlob->data.end()),
+        if (AssembleChainVertexGLSL(chainBindings,
+                                    std::string(vertBlob->data.begin(), vertBlob->data.end()),
                                     &assembledVs)) {
           vertexDesc.code = std::move(assembledVs);
         }
       }
     }
   }
+  bool composedAttempt = false;
   // The composed executor: a specialized GLSL chain draw trades the interpreter loop for one
   // straight-line evaluation. The lookup runs first — the bundle's pre-composed payload for this
   // exact shape is the stored text the build produced by running the same two operations — and a
@@ -383,8 +408,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   // Every decline keeps the injector path below; the uniforms, the layout and the key are
   // unchanged either way, because the body reads the same pool through the same per-operator
   // functions.
-  const bool composedEligible = allowComposed && format == ShaderCodeFormat::GLSL &&
-                                ComposedChainEnabled() &&
+  const bool composedEligible = allowComposed && !assembledAttempt &&
+                                format == ShaderCodeFormat::GLSL && ComposedChainEnabled() &&
                                 strcmp(Families()[variant.family].name, "Chain") == 0;
   const auto* sources = programInfo->getSources();
   if (composedEligible && sources != nullptr && sources->chain != nullptr) {
@@ -416,7 +441,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   // table. A format without a registered injector serves the generic form.
   bool specInjected = false;
   std::vector<std::pair<std::string, double>> specConstants = {};
-  if (!composedAttempt && spec != nullptr && !spec->empty()) {
+  if (!composedAttempt && !assembledAttempt && spec != nullptr && !spec->empty()) {
     if (const auto* injector = FindSpecInjector(format)) {
       SpecInjection injection = {};
       if (injector->Apply(fragmentDesc.code, DeriveSpecFieldInfos(variant), *spec, &injection)) {
@@ -440,7 +465,11 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
       }
     }
   }
-  if (layout.fragmentBlockSize > 0) {
+  // The assembled text declares its own fragment block; every other route keeps the variant's
+  // derived one.
+  const uint32_t fragmentBlockSize =
+      assembledAttempt ? chainBindings.fragmentBlockSize : layout.fragmentBlockSize;
+  if (fragmentBlockSize > 0) {
     fragmentDesc.uniformSlots = {
         {std::string(FragmentUniformBlockName), static_cast<unsigned>(FRAGMENT_UBO_BINDING_POINT)}};
   }
@@ -457,7 +486,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   cache->recordAOTStage(PrecompiledAOTStage::VertexModuleCreated);
   auto fragmentShader = shaderCache->findOrCreateModule(fragmentDesc);
   if (fragmentShader == nullptr) {
-    if (specInjected || composedAttempt) {
+    if (specInjected || composedAttempt || assembledAttempt) {
       return FallbackToGeneric(context, programInfo, variant, "fragment module");
     }
     cache->recordFailure(AOTFailure::FragmentModuleCreationFailed,
@@ -542,18 +571,23 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
                                   ShaderVisibility::Vertex};
     descriptor.layout.uniformBlocks.push_back(vertexBinding);
   }
-  if (layout.fragmentBlockSize > 0) {
-    // The plan program's fragment block carries the variant prefix plus its named parameter
-    // members; the plan writer fills the appended region, the base writer the prefix.
-    const uint32_t planParamBytes = composedAttempt ? plan.paramBlockSize : 0;
-    fragmentUniformData =
-        std::unique_ptr<UniformData>(new UniformData(layout.fragmentBlockSize + planParamBytes));
+  if (fragmentBlockSize > 0) {
+    fragmentUniformData = std::unique_ptr<UniformData>(new UniformData(fragmentBlockSize));
     BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT,
                                     ShaderVisibility::Fragment};
     descriptor.layout.uniformBlocks.push_back(fragmentBinding);
   }
-  for (const auto& texture : layout.textures) {
-    descriptor.layout.textureSamplers.emplace_back(texture.name, texture.binding);
+  // The assembled text declares its own samplers in its own order, so the emit's table is the
+  // binding list; every other route declares the variant's.
+  if (assembledAttempt) {
+    for (size_t index = 0; index < chainBindings.samplers.size(); ++index) {
+      descriptor.layout.textureSamplers.emplace_back(chainBindings.samplers[index].name,
+                                                     static_cast<unsigned>(index));
+    }
+  } else {
+    for (const auto& texture : layout.textures) {
+      descriptor.layout.textureSamplers.emplace_back(texture.name, texture.binding);
+    }
   }
 
   descriptor.primitive = {programInfo->getCullMode(), FrontFace::CW};
@@ -562,7 +596,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
 
   auto pipeline = shaderCache->findOrCreatePipeline(descriptor);
   if (pipeline == nullptr) {
-    if (specInjected || composedAttempt) {
+    if (specInjected || composedAttempt || assembledAttempt) {
       return FallbackToGeneric(context, programInfo, variant, "pipeline");
     }
     // The same shader variant (identical vert/frag artifact) can create successfully for
@@ -580,9 +614,9 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
 
   auto program = std::make_shared<Program>(
       std::move(pipeline), std::move(vertexUniformData), std::move(fragmentUniformData),
-      composedAttempt ? std::unique_ptr<ProgramWriter>(
-                            new ChainPlanWriter(variant, plan, layout.fragmentBlockSize))
-                      : std::unique_ptr<ProgramWriter>(new ProgramWriter(variant)));
+      assembledAttempt
+          ? std::unique_ptr<ProgramWriter>(new ChainBindingWriter(variant, chainBindings))
+          : std::unique_ptr<ProgramWriter>(new ProgramWriter(variant)));
   program->setShaderName(shaderName);
   program->setExpectedTextureCount(static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));
   return program;

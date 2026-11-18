@@ -551,36 +551,71 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       fold("#if HAS_XP >= 1", true);
       fold("#if HAS_XP == 1", hasXp == 1);
       fold("#if HAS_XP == 2", hasXp == 2);
-      // Strip the folded directives themselves: a kept region loses its "#if 1" line, a dropped
-      // region (with its #else, if any) disappears whole, so the packed entry carries no
-      // conditional at all — the form was chosen when the entry was built.
+      // The assembled entry fetches its leaves itself (the tiled forms are outside its slice), so
+      // the tiled machinery the support file pulls in under NTEX > 0 is dead in this form.
+      fold("#if NTEX > 0", false);
+      // Resolve the folded directives: a kept region loses its "#if 1" line and a dropped one
+      // (with its #else, if any) disappears whole, together with every directive line that owned
+      // them — the packed entry must carry no unbalanced conditional at all, because the form was
+      // chosen when the entry was built and the driver would reject the leftovers. The remaining
+      // conditionals (the include guards) are copied verbatim.
       auto stripFolded = [&text] {
+        struct Frame {
+          bool keep = true;
+          /// Set for the frames the folding created: their directives are dropped, the guard
+          /// frames pass theirs through.
+          bool folded = false;
+        };
+        std::vector<Frame> frames;
         std::string out;
+        auto kept = [&frames] {
+          for (const auto& frame : frames) {
+            if (!frame.keep) {
+              return false;
+            }
+          }
+          return true;
+        };
         size_t cursor = 0;
         while (cursor < text.size()) {
           const auto lineEnd = text.find('\n', cursor);
           const std::string line = text.substr(
               cursor, lineEnd == std::string::npos ? std::string::npos : lineEnd - cursor + 1);
           cursor = lineEnd == std::string::npos ? text.size() : lineEnd + 1;
-          if (line == "#if 1\n") {
-            continue;  // keep the region, drop the directive
+          if (line == "#if 1\n" || line == "#if 0\n") {
+            frames.push_back({line == "#if 1\n", true});
+            continue;
           }
-          if (line == "#if 0\n") {
-            int depth = 1;
-            while (cursor < text.size() && depth > 0) {
-              const auto end2 = text.find('\n', cursor);
-              const std::string inner = text.substr(
-                  cursor, end2 == std::string::npos ? std::string::npos : end2 - cursor + 1);
-              cursor = end2 == std::string::npos ? text.size() : end2 + 1;
-              if (inner.rfind("#if", 0) == 0) {
-                ++depth;
-              } else if (inner.rfind("#endif", 0) == 0) {
-                --depth;
-              }
+          if (line.rfind("#if", 0) == 0) {
+            frames.push_back({true, false});
+            if (kept()) {
+              out += line;
             }
             continue;
           }
-          out += line;
+          if (line.rfind("#else", 0) == 0 || line.rfind("#elif", 0) == 0) {
+            if (frames.empty()) {
+              out += line;
+            } else if (frames.back().folded) {
+              frames.back().keep = false;
+            } else if (kept()) {
+              out += line;
+            }
+            continue;
+          }
+          if (line.rfind("#endif", 0) == 0) {
+            const bool folded = !frames.empty() && frames.back().folded;
+            if (!frames.empty()) {
+              frames.pop_back();
+            }
+            if (!folded && kept()) {
+              out += line;
+            }
+            continue;
+          }
+          if (kept()) {
+            out += line;
+          }
         }
         text = std::move(out);
       };

@@ -16,7 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "ColorSpaceXformHelper.h"
+#include <algorithm>
 #include <array>
+#include <iterator>
 #include "core/utils/Log.h"
 namespace tgfx {
 
@@ -54,9 +56,8 @@ bool ColorSpaceXformStepsSupported(const ColorSpaceXformSteps* steps) {
 
 namespace {
 
-// One color-space field: the addressing-neutral key the shared upload body writes through, so the
-// name mode (prefix or per-slot arrays) and the element mode (a module's derived layout) run one
-// and the same value packing.
+// One color-space field: the addressing-neutral key the element writer resolves to a module's
+// declaration index.
 enum class CSField {
   CSFlags,
   SrcTF0,
@@ -83,24 +84,20 @@ std::array<float, 12> PackColorXform(const ColorMatrix33& matrix) {
 
 // The element mode: one module's color-space block addressed by element index through the derived
 // layout. The disabled steps still write their identity placeholders when the module declares the
-// fields, matching the name mode's precompiled contract.
+// fields, matching the values' contract.
 struct ElementSink {
   SlotWriter* writer;
   const ColorSpaceXformHelper::FieldElements& fields;
 
   uint8_t indexOf(CSField field) const;
-  void optionalInt(CSField field, int value) const {
+  void intValue(CSField field, int value) const {
     writer->setIfPresent(indexOf(field), value);
   }
-  void optionalFloat4(CSField field, const float (&value)[4]) const {
+  void float4Value(CSField field, const float (&value)[4]) const {
     writer->setIfPresent(indexOf(field), value);
   }
-  void requiredFloat4(CSField field, const float (&value)[4]) const {
-    writer->setIfPresent(indexOf(field), value);
-  }
-  void colorXform(const ColorSpaceXformSteps* steps, bool gamut) const {
-    const auto& matrix = gamut ? steps->srcToDstMatrix : CSIdentityMatrix();
-    writer->setIfPresent(indexOf(CSField::ColorXform), PackColorXform(matrix));
+  void colorXformValue(const float (&value)[12]) const {
+    writer->setIfPresent(indexOf(CSField::ColorXform), value);
   }
 };
 
@@ -130,26 +127,25 @@ uint8_t ElementSink::indexOf(CSField field) const {
   return 0;
 }
 
-// The one upload body: the flags bitmask, each enabled step's real parameters (disabled steps
-// write identity placeholders their flags bit keeps unread), and the gamut matrix or its identity
-// stand-in.
-template <typename Sink>
-void UploadColorSpaceSteps(Sink& sink, const ColorSpaceXformSteps* colorSpaceXform) {
+}  // namespace
+
+void ResolveColorSpaceXformValues(const ColorSpaceXformSteps* colorSpaceXform,
+                                  ColorSpaceXformValues* out) {
+  if (colorSpaceXform == nullptr || out == nullptr) {
+    return;
+  }
   const auto flags = colorSpaceXform->flags;
-
-  static const float Zero4[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-  sink.optionalInt(CSField::CSFlags, static_cast<int>(flags.mask()));
-
+  out->flags = static_cast<int>(flags.mask());
   if (flags.linearize) {
-    float srcTF0[4] = {
+    const float srcTF0[4] = {
         colorSpaceXform->srcTransferFunction.g, colorSpaceXform->srcTransferFunction.a,
         colorSpaceXform->srcTransferFunction.b, colorSpaceXform->srcTransferFunction.c};
-    float srcTF1[4] = {colorSpaceXform->srcTransferFunction.d,
-                       colorSpaceXform->srcTransferFunction.e,
-                       colorSpaceXform->srcTransferFunction.f, 0.0f};
-    sink.requiredFloat4(CSField::SrcTF0, srcTF0);
-    sink.requiredFloat4(CSField::SrcTF1, srcTF1);
-    int srcType = TFTypeToIndex(
+    const float srcTF1[4] = {colorSpaceXform->srcTransferFunction.d,
+                             colorSpaceXform->srcTransferFunction.e,
+                             colorSpaceXform->srcTransferFunction.f, 0.0f};
+    std::copy(srcTF0, srcTF0 + 4, out->srcTF0);
+    std::copy(srcTF1, srcTF1 + 4, out->srcTF1);
+    const int srcType = TFTypeToIndex(
         gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
             &colorSpaceXform->srcTransferFunction)));
     if (srcType < 0) {
@@ -160,38 +156,30 @@ void UploadColorSpaceSteps(Sink& sink, const ColorSpaceXformSteps* colorSpaceXfo
           "ColorSpaceXformHelper: unsupported source transfer function; the draw reached the "
           "upload path without the matcher rejecting it");
     }
-    sink.optionalInt(CSField::SrcTFType, srcType < 0 ? 0 : srcType);
-  } else {
-    sink.optionalFloat4(CSField::SrcTF0, Zero4);
-    sink.optionalFloat4(CSField::SrcTF1, Zero4);
-    sink.optionalInt(CSField::SrcTFType, 0);
+    out->srcTFType = srcType < 0 ? 0 : srcType;
   }
-
   if (flags.srcOOTF) {
-    sink.requiredFloat4(CSField::SrcOOTF, colorSpaceXform->srcOOTF);
-  } else {
-    sink.optionalFloat4(CSField::SrcOOTF, Zero4);
+    std::copy(std::begin(colorSpaceXform->srcOOTF), std::end(colorSpaceXform->srcOOTF),
+              out->srcOOTF);
   }
-
-  sink.colorXform(colorSpaceXform, flags.gamutTransform);
-
+  const auto& matrix = flags.gamutTransform ? colorSpaceXform->srcToDstMatrix : CSIdentityMatrix();
+  const auto packed = PackColorXform(matrix);
+  std::copy(packed.begin(), packed.end(), out->colorXform);
   if (flags.dstOOTF) {
-    sink.requiredFloat4(CSField::DstOOTF, colorSpaceXform->dstOOTF);
-  } else {
-    sink.optionalFloat4(CSField::DstOOTF, Zero4);
+    std::copy(std::begin(colorSpaceXform->dstOOTF), std::end(colorSpaceXform->dstOOTF),
+              out->dstOOTF);
   }
-
   if (flags.encode) {
-    float dstTF0[4] = {colorSpaceXform->dstTransferFunctionInverse.g,
-                       colorSpaceXform->dstTransferFunctionInverse.a,
-                       colorSpaceXform->dstTransferFunctionInverse.b,
-                       colorSpaceXform->dstTransferFunctionInverse.c};
-    float dstTF1[4] = {colorSpaceXform->dstTransferFunctionInverse.d,
-                       colorSpaceXform->dstTransferFunctionInverse.e,
-                       colorSpaceXform->dstTransferFunctionInverse.f, 0.0f};
-    sink.requiredFloat4(CSField::DstTF0, dstTF0);
-    sink.requiredFloat4(CSField::DstTF1, dstTF1);
-    int dstType = TFTypeToIndex(
+    const float dstTF0[4] = {colorSpaceXform->dstTransferFunctionInverse.g,
+                             colorSpaceXform->dstTransferFunctionInverse.a,
+                             colorSpaceXform->dstTransferFunctionInverse.b,
+                             colorSpaceXform->dstTransferFunctionInverse.c};
+    const float dstTF1[4] = {colorSpaceXform->dstTransferFunctionInverse.d,
+                             colorSpaceXform->dstTransferFunctionInverse.e,
+                             colorSpaceXform->dstTransferFunctionInverse.f, 0.0f};
+    std::copy(dstTF0, dstTF0 + 4, out->dstTF0);
+    std::copy(dstTF1, dstTF1 + 4, out->dstTF1);
+    const int dstType = TFTypeToIndex(
         gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
             &colorSpaceXform->dstTransferFunctionInverse)));
     if (dstType < 0) {
@@ -199,22 +187,27 @@ void UploadColorSpaceSteps(Sink& sink, const ColorSpaceXformSteps* colorSpaceXfo
           "ColorSpaceXformHelper: unsupported destination transfer function; the draw reached "
           "the upload path without the matcher rejecting it");
     }
-    sink.optionalInt(CSField::DstTFType, dstType < 0 ? 0 : dstType);
-  } else {
-    sink.optionalFloat4(CSField::DstTF0, Zero4);
-    sink.optionalFloat4(CSField::DstTF1, Zero4);
-    sink.optionalInt(CSField::DstTFType, 0);
+    out->dstTFType = dstType < 0 ? 0 : dstType;
   }
 }
-
-}  // namespace
 
 void ColorSpaceXformHelper::setData(SlotWriter* writer, const FieldElements& fields,
                                     const ColorSpaceXformSteps* colorSpaceXform) {
   if (!colorSpaceXform) {
     return;
   }
+  ColorSpaceXformValues values = {};
+  ResolveColorSpaceXformValues(colorSpaceXform, &values);
   ElementSink sink = {writer, fields};
-  UploadColorSpaceSteps(sink, colorSpaceXform);
+  sink.intValue(CSField::CSFlags, values.flags);
+  sink.float4Value(CSField::SrcTF0, values.srcTF0);
+  sink.float4Value(CSField::SrcTF1, values.srcTF1);
+  sink.intValue(CSField::SrcTFType, values.srcTFType);
+  sink.float4Value(CSField::SrcOOTF, values.srcOOTF);
+  sink.colorXformValue(values.colorXform);
+  sink.float4Value(CSField::DstOOTF, values.dstOOTF);
+  sink.float4Value(CSField::DstTF0, values.dstTF0);
+  sink.float4Value(CSField::DstTF1, values.dstTF1);
+  sink.intValue(CSField::DstTFType, values.dstTFType);
 }
 }  // namespace tgfx
