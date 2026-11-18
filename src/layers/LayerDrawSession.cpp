@@ -373,10 +373,10 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
     return nullptr;
   }
   auto targetToRoot = request.target->getRelativeMatrix3D(request.captureRoot).asMatrix();
-  if (!targetToRoot.isFinite() || !targetToRoot.invertible()) {
+  if (!targetToRoot.isFinite()) {
     if (control != nullptr) {
       control->fail(DrawFailureCode::InvalidRequest, DrawStage::Validation, request.target, {},
-                    "the target to capture-root matrix is not invertible");
+                    "the target to capture-root matrix is not finite");
     }
     return nullptr;
   }
@@ -410,6 +410,48 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
                     "the tiled export does not support perspective, preserve-3D or cyclic masks");
     }
     return nullptr;
+  }
+
+  session->outputPixelBounds = {0, 0, request.outputSize.width, request.outputSize.height};
+
+  auto actualRoot = request.captureRoot->root();
+  if (actualRoot != nullptr) {
+    actualRoot->updateRenderBounds();
+    session->needsBackground = request.target->hasBackgroundStyle();
+    auto ancestorOutset = AncestorFilterOutset(request.target, request.captureRoot);
+    float outset = 0.0f;
+    bool needs = false;
+    ScanBackgroundOutset(request.target, targetToRoot, ancestorOutset, &outset, &needs);
+    session->needsBackground = session->needsBackground || needs;
+    session->backgroundOutset =
+        std::max(outset, request.target->maxBackgroundOutset + ancestorOutset);
+  } else {
+    float outset = 0.0f;
+    bool needs = false;
+    ScanBackgroundOutset(request.captureRoot, Matrix::I(), 0.0f, &outset, &needs);
+    session->needsBackground = needs;
+    session->backgroundOutset = outset;
+  }
+  if (!session->needsBackground && !targetToRoot.invertible()) {
+    // A collapsed scene placement can hide the target's background styles from the scene scan.
+    // Check its local content before deciding that drawing needs no backdrop mapping.
+    ScanBackgroundOutset(request.target, Matrix::I(), 0.0f, &session->backgroundOutset,
+                         &session->needsBackground);
+  }
+  if (!std::isfinite(session->backgroundOutset) || session->backgroundOutset < 0.0f) {
+    session->backgroundOutset = 0.0f;
+  }
+  // Layer::draw() returns before drawing anything for a zero alpha, so the export must not need a
+  // backdrop either: nothing is sampled and the delivered band stays the clear color.
+  if (request.alpha <= 0.0f) {
+    session->needsBackground = false;
+    session->backgroundOutset = 0.0f;
+  }
+  // The export never keeps a borrowed context beyond the lock it was created in; every later call
+  // receives the context it must use.
+  session->request.context = nullptr;
+  if (!session->needsBackground) {
+    return session;
   }
 
   Matrix rootToTarget = Matrix::I();
@@ -451,40 +493,6 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
   captureRootToGlobal.invert(&globalToCaptureRoot);
   session->globalToOutput = session->rootToOutput;
   session->globalToOutput.preConcat(globalToCaptureRoot);
-  session->outputPixelBounds = {0, 0, request.outputSize.width, request.outputSize.height};
-
-  auto actualRoot = request.captureRoot->root();
-  if (actualRoot != nullptr) {
-    // renderBounds are defined in the real root's space, so update them from there even when the
-    // requested capture root is a smaller subtree.
-    actualRoot->updateRenderBounds();
-    session->needsBackground = request.target->hasBackgroundStyle();
-    auto ancestorOutset = AncestorFilterOutset(request.target, request.captureRoot);
-    float outset = 0.0f;
-    bool needs = false;
-    ScanBackgroundOutset(request.target, targetToRoot, ancestorOutset, &outset, &needs);
-    session->needsBackground = session->needsBackground || needs;
-    session->backgroundOutset =
-        std::max(outset, request.target->maxBackgroundOutset + ancestorOutset);
-  } else {
-    float outset = 0.0f;
-    bool needs = false;
-    ScanBackgroundOutset(request.captureRoot, Matrix::I(), 0.0f, &outset, &needs);
-    session->needsBackground = needs;
-    session->backgroundOutset = outset;
-  }
-  if (!std::isfinite(session->backgroundOutset) || session->backgroundOutset < 0.0f) {
-    session->backgroundOutset = 0.0f;
-  }
-  // Layer::draw() returns before drawing anything for a zero alpha, so the export must not need a
-  // backdrop either: nothing is sampled and the delivered band stays the clear color.
-  if (request.alpha <= 0.0f) {
-    session->needsBackground = false;
-    session->backgroundOutset = 0.0f;
-  }
-  // The export never keeps a borrowed context beyond the lock it was created in; every later call
-  // receives the context it must use.
-  session->request.context = nullptr;
   return session;
 }
 
