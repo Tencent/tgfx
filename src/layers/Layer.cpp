@@ -1552,6 +1552,15 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
+  auto* capturer = args.backgroundHandler ? args.backgroundHandler->asCapturer() : nullptr;
+  if (capturer != nullptr && capturer->isExportAncestor(this) &&
+      std::none_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& style) {
+        return style->position() == LayerStylePosition::Below;
+      })) {
+    // Preparing an Above style would record children that paint after the export target.
+    drawContents(args, canvas, alpha, nullptr);
+    return;
+  }
   // Capture and consume passes share the same per-layer LayerStyleSource via the active handler,
   // so the content, contour and geometry intermediate renders happen once per snapshot map
   // instead of once per pass.
@@ -1586,9 +1595,9 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
   if (!drawChildren(args, canvas, alpha, stopChild)) {
     return;
   }
-  if (stopChild != nullptr) {
-    // Background-walk path: skip Above styles and foreground for this layer; the caller is only
-    // interested in the portion that contributes to the synthesized backdrop.
+  auto* capturer = args.backgroundHandler ? args.backgroundHandler->asCapturer() : nullptr;
+  if (stopChild != nullptr || (capturer != nullptr && capturer->isExportAncestor(this))) {
+    // Ancestor foreground and Above styles paint after the child whose backdrop is being read.
     return;
   }
   if (layerStyleSource) {
@@ -1757,6 +1766,10 @@ bool Layer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float 
 
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(child->getMatrixWithScrollRect().asMatrix());
+  auto* capturer = args.backgroundHandler ? args.backgroundHandler->asCapturer() : nullptr;
+  if (capturer != nullptr && capturer->drawExportTarget(args, canvas, child)) {
+    return true;
+  }
   ClipScrollRect(canvas, child->_scrollRect.get(), nullptr,
                  child->bitFields.allowsEdgeAntialiasing);
   auto blendMode = static_cast<BlendMode>(child->bitFields.blendMode);

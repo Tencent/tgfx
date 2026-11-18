@@ -179,6 +179,10 @@ class BackgroundCapturer : public BackgroundHandler {
   // Returns the outermost branch skipped by a normal traversal from captureRoot to target.
   static Layer* HiddenBranch(Layer* captureRoot, Layer* target);
 
+  bool isExportAncestor(const Layer* layer) const;
+  // Draws the exported target with the caller's attributes when reached from its scene parent.
+  bool drawExportTarget(const DrawArgs& args, Canvas* canvas, Layer* layer) const;
+
   // Exposes the snapshot map this capturer writes into, so per-fragment Sub3DCapturers spawned
   // by 3D subtrees can append their composed-backdrop entries to the same map under the same
   // (Layer, LayerStyle) keys that the consume pass will read back.
@@ -211,8 +215,14 @@ class BackgroundCapturer : public BackgroundHandler {
   BackgroundSnapshotMap* snapshots = nullptr;
   std::shared_ptr<BackgroundSource> bgSource = nullptr;
   std::vector<Rect> _renderRects;
-  // On the path to an exported layer, previous siblings supply its scene backdrop.
-  const std::unordered_map<const Layer*, int>* capturePath = nullptr;
+  struct ExportPath {
+    std::unordered_map<const Layer*, int> children;
+    Layer* target = nullptr;
+    float alpha = 1.0f;
+    BlendMode blendMode = BlendMode::SrcOver;
+    bool separateTarget = false;
+  };
+  const ExportPath* capturePath = nullptr;
   bool capturingHiddenTarget = false;
   int _forcedCaptureDepth = 0;
   std::optional<Matrix> _captureWorldMatrix = std::nullopt;

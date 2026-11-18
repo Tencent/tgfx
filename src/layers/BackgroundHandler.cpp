@@ -210,8 +210,8 @@ int BackgroundHandler::lastCaptureChildIndex(const Layer* parent) const {
 
 int BackgroundCapturer::lastCaptureChildIndex(const Layer* parent) const {
   if (capturePath != nullptr) {
-    auto next = capturePath->find(parent);
-    if (next != capturePath->end()) {
+    auto next = capturePath->children.find(parent);
+    if (next != capturePath->children.end()) {
       return next->second;
     }
   }
@@ -661,39 +661,56 @@ Layer* BackgroundCapturer::HiddenBranch(Layer* captureRoot, Layer* target) {
   return hiddenBranch;
 }
 
+bool BackgroundCapturer::isExportAncestor(const Layer* layer) const {
+  return capturePath != nullptr && capturePath->children.count(layer) != 0;
+}
+
+bool BackgroundCapturer::drawExportTarget(const DrawArgs& args, Canvas* canvas,
+                                          Layer* layer) const {
+  if (capturePath == nullptr || capturePath->target != layer) {
+    return false;
+  }
+  if (!capturePath->separateTarget) {
+    layer->drawLayer(args, canvas, capturePath->alpha, capturePath->blendMode);
+  }
+  return true;
+}
+
 void BackgroundCapturer::RunForTarget(Layer* captureRoot, Layer* target, float alpha,
                                       BlendMode blendMode, const DrawArgs& baseArgs,
                                       std::shared_ptr<BackgroundSource> bgSource,
                                       BackgroundSnapshotMap* snapshots,
                                       const std::vector<Rect>& renderRects) {
   auto* hiddenBranch = HiddenBranch(captureRoot, target);
-  if (hiddenBranch == nullptr && target != captureRoot) {
-    Run(captureRoot, baseArgs, std::move(bgSource), snapshots, renderRects);
-    return;
-  }
-
   auto* canvas = bgSource->getCanvas();
   BackgroundCapturer capturer(snapshots, std::move(bgSource));
   DrawArgs args = baseArgs;
   args.backgroundHandler = &capturer;
   args.renderRects = &renderRects;
   AutoCanvasRestore restore(canvas);
-  if (hiddenBranch != nullptr) {
-    // Draw exactly the visible scene preceding the outermost hidden ancestor. Its own siblings
-    // further down the hidden branch never painted into this backdrop.
-    std::unordered_map<const Layer*, int> path;
-    for (auto* child = hiddenBranch; child != captureRoot; child = child->parent()) {
-      auto* parent = child->parent();
-      path.emplace(parent, parent->getChildIndex(child->shared_from_this()));
-    }
-    capturer.capturePath = &path;
+  ExportPath path = {};
+  path.target = target;
+  path.alpha = alpha;
+  path.blendMode = blendMode;
+  path.separateTarget = hiddenBranch != nullptr || target->_scrollRect != nullptr;
+  for (auto* child = hiddenBranch != nullptr ? hiddenBranch : target; child != captureRoot;
+       child = child->parent()) {
+    auto* parent = child->parent();
+    path.children.emplace(parent, parent->getChildIndex(child->shared_from_this()));
+  }
+  capturer.capturePath = &path;
+  if (target != captureRoot) {
     {
       AutoCanvasRestore restoreScene(canvas);
       captureRoot->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
     }
-    capturer.capturePath = nullptr;
+    if (!path.separateTarget) {
+      return;
+    }
+    // Replay the target on the collected backdrop. Direct export ignores its own scroll clip,
+    // and does not make any siblings inside a hidden branch visible.
     canvas->concat(target->getRelativeMatrix3D(captureRoot).asMatrix());
-    // A hidden branch has no current scene render bounds or cached background outsets.
+    // Scene bounds and cached outsets may exclude part or all of this target.
     args.useSceneBounds = false;
     capturer.capturingHiddenTarget = true;
     capturer.beginForceDrawChildren();
