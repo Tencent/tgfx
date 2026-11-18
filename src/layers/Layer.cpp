@@ -898,7 +898,6 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   request.alpha = alpha;
   request.blendMode = blendMode;
   request.samplingMode = LayerSamplingMode::CanvasDefault;
-  request.hasCanvasState = true;
   request.canvasMatrix = canvas->getMatrix();
   request.canvasDrawBounds = clippedBounds;
   request.canvasRooted = _root != nullptr;

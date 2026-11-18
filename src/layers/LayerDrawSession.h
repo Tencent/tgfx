@@ -93,7 +93,6 @@ struct LayerDrawRequest {
   // CanvasDefault only: the canvas state the regular draw path has to preserve. outputOrigin of a
   // draw target is ignored in this mode and the existing canvas matrix, clip and content stay
   // untouched.
-  bool hasCanvasState = false;
   Matrix canvasMatrix = Matrix::I();
   Rect canvasDrawBounds = {};      // Local-space bounds clipped by the canvas clip.
   bool canvasRooted = false;       // Whether the target belongs to a root layer.
