@@ -70,13 +70,11 @@ TGFX_TEST_PRIVATE(ImageReaderTest, DrainsPendingFramesOnEveryTexture) {
                       auto stream = std::make_shared<FakeImageStream>(16, 16);
                       auto reader = ImageReader::MakeFrom(stream); ASSERT_TRUE(reader != nullptr);
 
-                      auto first = reader->acquireNextBuffer();
-                      ASSERT_TRUE(first != nullptr);
+                      auto first = reader->acquireNextBuffer(); ASSERT_TRUE(first != nullptr);
                       EXPECT_TRUE(TextureView::MakeFrom(context, first, false) != nullptr);
                       EXPECT_EQ(stream->drainCount, 1);
 
-                      auto second = reader->acquireNextBuffer();
-                      ASSERT_TRUE(second != nullptr);
+                      auto second = reader->acquireNextBuffer(); ASSERT_TRUE(second != nullptr);
                       EXPECT_TRUE(TextureView::MakeFrom(context, second, false) != nullptr);
                       EXPECT_EQ(stream->drainCount, 2);)
 }
@@ -94,17 +92,14 @@ TGFX_TEST_PRIVATE(ImageReaderTest, WaitsForTargetFrameTimestamp) {
                       // The producer never reports the target, so the reader is bounded by the wait
                       // limit instead of looping forever.
                       reader->setTargetFrameTimestamp(1000);
-                      auto first = reader->acquireNextBuffer();
-                      ASSERT_TRUE(first != nullptr);
+                      auto first = reader->acquireNextBuffer(); ASSERT_TRUE(first != nullptr);
                       EXPECT_TRUE(TextureView::MakeFrom(context, first, false) != nullptr);
                       EXPECT_EQ(stream->updateCount, 3);
 
                       // Once the producer reports the target the extra consumes stop immediately.
                       stream->updateCount = 0;
-                      stream->frameTimestamp = 1000;
-                      reader->setTargetFrameTimestamp(1000);
-                      auto second = reader->acquireNextBuffer();
-                      ASSERT_TRUE(second != nullptr);
+                      stream->frameTimestamp = 1000; reader->setTargetFrameTimestamp(1000);
+                      auto second = reader->acquireNextBuffer(); ASSERT_TRUE(second != nullptr);
                       EXPECT_TRUE(TextureView::MakeFrom(context, second, false) != nullptr);
                       EXPECT_EQ(stream->updateCount, 1);)
 }

@@ -130,8 +130,7 @@ std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t contentVersion, C
     // showing the previous one.
     auto target = targetTimestamp.load(std::memory_order_acquire);
     static constexpr int MAX_WAIT_FRAMES = 2;
-    for (int i = 0; i < MAX_WAIT_FRAMES && target > 0 &&
-                    stream->currentFrameTimestamp() < target;
+    for (int i = 0; i < MAX_WAIT_FRAMES && target > 0 && stream->currentFrameTimestamp() < target;
          i++) {
       if (!stream->onUpdateTexture(textureView)) {
         break;
