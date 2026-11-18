@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <string>
+#include "gpu/shaders/Family.h"
 #include "gpu/shaders/contract/ChainComposition.h"
 
 namespace tgfx {
@@ -27,28 +28,23 @@ namespace tgfx {
 class PrecompiledShaderCache;
 
 /**
- * Whether the composition's operators and structural facts are all inside the assembled slice's
- * vocabulary: the pointwise color operators, Blend, the inline expressions, the analytic coverage
- * operators and plain (non-tiled) texture leaves. The geometry check (the rect interface's
- * geometry coverage prelude) and the xfer's advanced-blend pass stay with the caller, which knows
- * the matched variant.
- */
-bool ChainCompositionAssembles(const ChainComposition& composition);
-
-/**
- * Assembles a complete fragment shader from the bundle's pack: the matched variant's interface
- * chunk (its own declaration prefix and designator sources, extracted by the build), the
- * generated loaders, the used fragments' texts and their dependencies, the leaf prefetches, the
- * straight-line body and the tail. The uniform block is the interpreter's own declaration, so the
- * writer and the upload path are unchanged; what disappears is everything the composition does
- * not use — the operator dispatch library, the spec constants, the gates and the executor loop.
- * @param composition  The shape to assemble (must pass ChainCompositionAssembles).
- * @param variantId    The matched variant whose interface chunk the pack carries.
+ * Assembles a complete fragment shader the way the old JIT's ProgramBuilder did: a single walk
+ * generates every declaration exactly once (the uniform block, the varyings and the samplers from
+ * the family's module declarations — the same walk the build's assembler and the runtime's layout
+ * derivation read), and the code is a set of per-op pack entries — the pure fragments, the
+ * generated loaders, the xfer support resolved by fact, the resource evaluators — each included at
+ * most once. Nothing is extracted from a stored variant text, so no definition can collide and no
+ * unused library can ride along; what the composition does not use does not exist.
+ * @param composition  The shape to assemble.
+ * @param family       The matched family (the module walk's input).
+ * @param variant      The matched variant (the walk's dim values).
  * @param cache        The loaded bundle's pack.
  * @param code         Receives the assembled text.
- * @return             False when a pack entry is missing (the caller keeps the other paths).
+ * @return             False when the shape is outside the slice or a pack entry is missing; the
+ *                     caller keeps its other paths.
  */
-bool AssembleChainFragmentGLSL(const ChainComposition& composition, uint32_t variantId,
-                               const PrecompiledShaderCache* cache, std::string* code);
+bool AssembleChainFragmentGLSL(const ChainComposition& composition, const Family& family,
+                               const Variant& variant, const PrecompiledShaderCache* cache,
+                               std::string* code);
 
 }  // namespace tgfx

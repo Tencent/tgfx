@@ -342,29 +342,24 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   } else {
     fragmentDesc.code = std::string(fragBlob->data.begin(), fragBlob->data.end());
   }
-  // The assembled executor: the slice put together from the bundle's pack — the matched variant's
-  // interface chunk, the generated loaders, the used fragments, the leaf prefetches and the tail,
-  // with no interpreter, no spec constants and no gates. Its own experiment switch; every decline
-  // (an unsupported operator or geometry, the xfer's advanced blend pass, a missing pack entry)
-  // keeps the paths below untouched.
+  // The assembled executor: the JIT-style walk — declarations generated from the family's module
+  // declarations, code assembled from the pack's per-op entries, no interpreter, no spec
+  // constants, no extraction. Its own experiment switch; every decline keeps the paths below
+  // untouched.
   bool composedAttempt = false;
   if (allowComposed && AssembledChainEnabled() && format == ShaderCodeFormat::GLSL &&
-      strcmp(Families()[variant.family].name, "Chain") == 0 && variant.geometry == 0) {
+      strcmp(Families()[variant.family].name, "Chain") == 0) {
     const auto* assembledSources = programInfo->getSources();
     if (assembledSources != nullptr && assembledSources->chain != nullptr) {
       const Family& chainFamily = Families()[variant.family];
-      const uint8_t xferSlot = static_cast<uint8_t>(2 + chainFamily.moduleCount);
-      const bool noXp = DimValueOf(chainFamily, variant, xferSlot, 0) == 0;
-      if (noXp) {
-        const bool xpPass = XpNeedsAdvancedMath(programInfo->getXferFacts().shaderBlend(),
-                                                static_cast<int>(programInfo->getBlendMode()));
-        const ChainComposition composition =
-            DescribeChainComposition(*assembledSources->chain, xpPass);
-        if (AssembleChainFragmentGLSL(composition, variantId, cache, &fragmentDesc.code)) {
-          composedAttempt = true;
-          LOGI("AssembledChain: assembled entry for %s[variant=%u] (%zu bytes)", shaderName,
-               variantId, fragmentDesc.code.size());
-        }
+      const bool xpPass = XpNeedsAdvancedMath(programInfo->getXferFacts().shaderBlend(),
+                                              static_cast<int>(programInfo->getBlendMode()));
+      const ChainComposition composition =
+          DescribeChainComposition(*assembledSources->chain, xpPass);
+      if (AssembleChainFragmentGLSL(composition, chainFamily, variant, cache, &fragmentDesc.code)) {
+        composedAttempt = true;
+        LOGI("AssembledChain: assembled entry for %s[variant=%u] (%zu bytes)", shaderName,
+             variantId, fragmentDesc.code.size());
       }
     }
   }

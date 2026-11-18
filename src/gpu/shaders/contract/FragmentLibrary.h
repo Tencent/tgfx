@@ -111,15 +111,23 @@ inline constexpr uint32_t FragmentPackDepAnalyticClipMath = 0x40000000u | 0x2000
 inline constexpr uint32_t FragmentPackDepTextureSwizzle = 0x40000000u | 0x2001u;
 inline constexpr uint32_t FragmentPackDepLeafFetch = 0x40000000u | 0x2002u;
 
-/// The per-variant interface chunk: the declaration prefix and the designator sources, extracted
-/// by the build from the variant's own emitted text (so every geometry and profile is covered
-/// without hand-written chunks). The runtime looks it up by the variant it matched.
-inline constexpr uint32_t FragmentPackChunkBase = 0x40000000u | 0x4000u;
-inline constexpr uint32_t FragmentPackChunkMask = 0x3FFFu;
+/// The xfer support, packed once per destination-color path with its conditionals resolved at
+/// build (an unresolved `#if HAS_XP` would self-mute at the driver): 1 reads the dst through the
+/// texture, 2 through framebuffer fetch.
+inline constexpr uint32_t FragmentPackXpDstTexture = 0x40000000u | 0x1010u;
+inline constexpr uint32_t FragmentPackXpFramebufferFetch = 0x40000000u | 0x1011u;
 
-inline uint32_t FragmentPackChunkId(uint32_t variantId) {
-  return FragmentPackChunkBase | (variantId & FragmentPackChunkMask);
-}
+/// The gradient evaluator, packed in two forms with its one `#if NTEX > 0` branch resolved at
+/// build (the driver rejects expression conditionals in the assembled text): the LUT form for a
+/// variant that declares leaf samplers, the simple form otherwise.
+inline constexpr uint32_t FragmentPackGradientLut = 0x40000000u | 0x1020u;
+inline constexpr uint32_t FragmentPackGradientSimple = 0x40000000u | 0x1021u;
+
+/// The plain leaf fetch, packed in two forms with its one `#if HAS_SUBSET` branch resolved at
+/// build (the driver rejects `#if` directives): the strict form for a variant that declares the
+/// per-quad subset varying, the plain form otherwise.
+inline constexpr uint32_t FragmentPackLeafFetchStrict = 0x40000000u | 0x1022u;
+inline constexpr uint32_t FragmentPackLeafFetchPlain = 0x40000000u | 0x1023u;
 
 /// The count of registered fragments (the full op coverage check walks it).
 size_t FragmentCount();

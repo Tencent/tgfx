@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BuildCommand.h"
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -393,42 +394,6 @@ bool LayoutMatchesReflection(const Layout& layout, const ReflectionResult& refle
 
 }  // namespace
 
-// The interface chunk of one emitted variant text: the declaration prefix (everything before the
-// generated loaders, which the pack carries separately) plus the three designator source
-// functions. Extracting from the variant's own text keeps every geometry and profile covered
-// without hand-written chunks, and the declarations stay byte-identical to the writer's
-// expectation.
-std::string ExtractInterfaceChunk(const std::string& text) {
-  const auto loadersAt = text.find("struct ColorMatrixData ");
-  if (loadersAt == std::string::npos) {
-    return {};
-  }
-  std::string chunk = text.substr(0, loadersAt);
-  const auto sourcesAt = text.find("vec4 chainGeomColorSource() {");
-  const auto opaqueAt = text.find("vec4 chainOpaqueGeomColorSource() {");
-  if (sourcesAt == std::string::npos || opaqueAt == std::string::npos) {
-    return {};
-  }
-  // Brace-match the opaque source function (the last of the three).
-  size_t depth = 0;
-  size_t end = std::string::npos;
-  for (size_t i = text.find('{', opaqueAt); i < text.size(); ++i) {
-    if (text[i] == '{') {
-      ++depth;
-    } else if (text[i] == '}') {
-      if (--depth == 0) {
-        end = i + 1;
-        break;
-      }
-    }
-  }
-  if (end == std::string::npos) {
-    return {};
-  }
-  chunk += "\n" + text.substr(sourcesAt, end - sourcesAt) + "\n";
-  return chunk;
-}
-
 void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compiler,
                               BuildReport* report) {
   if (options.shaderDir.empty()) {
@@ -463,23 +428,36 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       }
       std::ostringstream buffer;
       buffer << file.rdbuf();
-      const std::string text = buffer.str();
-      if (text.empty()) {
+      // The entry packs the fragment with its includes resolved: a raw file may carry #include
+      // lines (the resource evaluators, the xp blend table) that a driver cannot consume, and the
+      // shared sub-files' include guards keep the expanded copies from colliding.
+      std::string expandError;
+      const auto expanded = ExpandStageIncludes(buffer.str(), options.shaderDir, &expandError);
+      if (expanded.empty()) {
         RecordBuildError(&report->diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
                          fragment->functionName, profileTag, -1, -1,
-                         std::string("the fragment source ") + fragment->sourceFile + " is empty");
+                         std::string("the fragment source ") + fragment->sourceFile +
+                             " failed to expand: " + expandError);
         continue;
       }
       ComposedPayload payload;
       payload.name = fragment->functionName;
       payload.id = 0x40000000u | static_cast<uint32_t>(fragment->op);
-      payload.blob.assign(text.begin(), text.end());
+      // LF-normalized like every pack entry: the source files' CRLF would leave a stray \r on
+      // each preprocessor line.
+      std::string normalized = expanded;
+      normalized.erase(std::remove(normalized.begin(), normalized.end(), '\r'), normalized.end());
+      payload.blob.assign(normalized.begin(), normalized.end());
       report->composedByTag[profileTag].push_back(std::move(payload));
     }
     // The pack's non-op entries: the generated loaders (the chain-ops pragma's own expansion), the
     // interface chunk and tail template the assembler concatenates, and the shared dependency
     // files the op fragments call into.
-    auto addEntry = [&report, &profileTag](uint32_t id, const char* name, const std::string& text) {
+    auto addEntry = [&report, &profileTag](uint32_t id, const char* name, std::string text) {
+      // The pack serves driver-facing text: the source files' CRLF endings would leave a stray
+      // \r on every preprocessor line ("unexpected tokens following #if"), so the entries ship
+      // LF-normalized like the dialect text does.
+      text.erase(std::remove(text.begin(), text.end(), '\r'), text.end());
       if (text.empty()) {
         RecordBuildError(&report->diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
                          name, profileTag, -1, -1,
@@ -501,13 +479,87 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       buffer << file.rdbuf();
       return buffer.str();
     };
+    // A dependency entry packs its includes resolved, for the same reason the fragment sources do.
+    auto readExpanded = [&options](const char* path) {
+      const std::string raw = [&] {
+        std::ifstream file(std::string(options.shaderDir) + "/" + path, std::ios::binary);
+        if (!file.is_open()) {
+          return std::string();
+        }
+        std::ostringstream buffer;
+        buffer << file.rdbuf();
+        return buffer.str();
+      }();
+      if (raw.empty()) {
+        return raw;
+      }
+      std::string expandError;
+      return ExpandStageIncludes(raw, options.shaderDir, &expandError);
+    };
     addEntry(FragmentPackLoaders, "ChainLoaders", ExpandChainOpsPragma("#pragma tgfx_chain_ops\n"));
     addEntry(FragmentPackTail, "ChainTail", readFile("entry/ChainTail.glsl"));
     addEntry(FragmentPackDepAnalyticClipMath, "AnalyticClipMath",
-             readFile("coverage/analytic_clip_math.inc"));
+             readExpanded("coverage/analytic_clip_math.inc"));
     addEntry(FragmentPackDepTextureSwizzle, "TextureSwizzle",
-             readFile("source/texture_read_swizzle.inc"));
-    addEntry(FragmentPackDepLeafFetch, "ChainLeafFetch", readFile("entry/ChainLeafFetch.glsl"));
+             readExpanded("source/texture_read_swizzle.inc"));
+    auto readXp = [&options](int hasXp) {
+      const std::string raw = "#define HAS_XP " + std::to_string(hasXp) +
+                              "\n#define TGFX_DECLARED_CHAIN 1\n#include "
+                              "\"pipeline/chain/pointwise_xp_support.inc\"\n";
+      std::string expandError;
+      return ExpandStageIncludes(raw, options.shaderDir, &expandError);
+    };
+    addEntry(FragmentPackXpDstTexture, "XpDstTexture", readXp(1));
+    addEntry(FragmentPackXpFramebufferFetch, "XpFramebufferFetch", readXp(2));
+    // The packed pieces' `#if` branches, resolved textually into per-fact forms: the driver
+    // rejects `#if` directives in the assembled text, and the forms differ structurally.
+    auto resolveBranch = [](const std::string& text, const std::string& directive, bool keep) {
+      const auto begin = text.find(directive);
+      if (begin == std::string::npos) {
+        return text;
+      }
+      const auto contentStart = text.find('\n', begin) + 1;
+      int depth = 1;
+      size_t cursor = contentStart;
+      size_t endifAt = std::string::npos;
+      while (cursor < text.size()) {
+        const auto ifAt = text.find("#if", cursor);
+        const auto endAt = text.find("#endif", cursor);
+        if (endAt == std::string::npos) {
+          return text;
+        }
+        if (ifAt != std::string::npos && ifAt < endAt) {
+          ++depth;
+          cursor = ifAt + 3;
+        } else {
+          --depth;
+          if (depth == 0) {
+            endifAt = endAt;
+            break;
+          }
+          cursor = endAt + 6;
+        }
+      }
+      if (endifAt == std::string::npos) {
+        return text;
+      }
+      const auto endLine = text.find('\n', endifAt) + 1;
+      if (keep) {
+        return text.substr(0, begin) + text.substr(contentStart, endifAt - contentStart) +
+               text.substr(endLine);
+      }
+      return text.substr(0, begin) + text.substr(endLine);
+    };
+    const std::string gradientRaw = readExpanded("pipeline/chain/pointwise_gradient.inc");
+    addEntry(FragmentPackGradientLut, "GradientLut",
+             resolveBranch(gradientRaw, "#if NTEX > 0", true));
+    addEntry(FragmentPackGradientSimple, "GradientSimple",
+             resolveBranch(gradientRaw, "#if NTEX > 0", false));
+    const std::string leafFetchRaw = readExpanded("entry/ChainLeafFetch.glsl");
+    addEntry(FragmentPackLeafFetchStrict, "LeafFetchStrict",
+             resolveBranch(leafFetchRaw, "#if HAS_SUBSET", true));
+    addEntry(FragmentPackLeafFetchPlain, "LeafFetchPlain",
+             resolveBranch(leafFetchRaw, "#if HAS_SUBSET", false));
   }
   for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
     const Family& family = Families()[familyIndex];
@@ -739,25 +791,6 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
           const uint32_t chainVariantId =
               VariantIdOf(static_cast<uint16_t>(familyIndex), variant.ordinal);
           const std::string profileTag = ProfileTag(emitterEntry.first);
-          // The interface chunk: the variant's own declaration prefix plus its designator source
-          // functions, extracted from the emitted text so every geometry and profile is covered
-          // by construction. The runtime assembler concatenates it with the pack's fragments.
-          {
-            const std::string stored(stages->fragmentBlob.begin(), stages->fragmentBlob.end());
-            std::string chunk = ExtractInterfaceChunk(stored);
-            if (chunk.empty()) {
-              RecordBuildError(&report->diagnostics, Layer::Sources,
-                               DiagnosticCode::SourcesUnreadable, info.name, profileTag,
-                               static_cast<int>(variant.ordinal), static_cast<int>(variant.ordinal),
-                               "the interface chunk extraction found no declaration region");
-            } else {
-              ComposedPayload payload;
-              payload.name = "ChainChunk";
-              payload.id = FragmentPackChunkId(chainVariantId);
-              payload.blob.assign(chunk.begin(), chunk.end());
-              report->composedByTag[profileTag].push_back(std::move(payload));
-            }
-          }
           for (const auto& shape : ComposedShapeManifest()) {
             const uint8_t xferSlot = static_cast<uint8_t>(2 + family.moduleCount);
             if (shape.profile != DimValueOf(family, variant, 2, 0) ||
