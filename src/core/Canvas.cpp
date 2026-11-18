@@ -33,6 +33,7 @@
 #include "images/SubsetImage.h"
 #include "shapes/MatrixShape.h"
 #include "shapes/PathShape.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
@@ -912,10 +913,32 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
     if (matrix != nullptr) {
       concat(*matrix);
     }
-    if (paint != nullptr) {
-      saveLayer(paint);
+    if (paint == nullptr) {
+      picture->playback(this);
+      return;
     }
-    picture->playback(this);
+    auto drawMatrix = _matrix;
+    auto brush = paint->getBrush();
+    brush.shader = nullptr;
+    if (needsTileRebase()) {
+      // Keep the filter and its entire input in picture-local coordinates. An integral change
+      // of origin preserves the raster grid when this group is finally composited onto the tile.
+      auto anchor = getTileAnchor();
+      anchor.x = std::floor(anchor.x);
+      anchor.y = std::floor(anchor.y);
+      PictureRecorder recorder;
+      auto* recording = recorder.beginRecording();
+      auto offset = Matrix::MakeTrans(-anchor.x, -anchor.y);
+      recording->setMatrixForTile(offset, 0, 0);
+      picture->playback(recording);
+      picture = recorder.finishRecordingAsPicture();
+      if (!picture) {
+        return;
+      }
+      drawMatrix = getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y));
+      brush = brush.makeWithMatrix(offset);
+    }
+    drawLayer(std::move(picture), drawMatrix, *clipStack, brush, paint->getImageFilter());
     return;
   }
   auto drawMatrix = _matrix;

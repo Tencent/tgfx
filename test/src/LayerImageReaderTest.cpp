@@ -24,6 +24,7 @@
 #include "layers/DrawArgs.h"
 #include "layers/LayerDrawSession.h"
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Mesh.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Pixmap.h"
@@ -1583,6 +1584,57 @@ TGFX_TEST(LayerImageReaderTest, TinyTilePreservesRecordedGeometryAndClips) {
     layer.picture = recorder.finishRecordingAsPicture();
     ASSERT_TRUE(layer.picture != nullptr);
     CheckTinyTilePixel(scope.getContext(), &layer, Left);
+  }
+}
+
+TGFX_TEST(LayerImageReaderTest, ScaledFilteredPictureMatchesNearAndFarTiles) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int Width = 64;
+  constexpr int Height = 36;
+  const auto info = OutputInfo(Width, Height);
+  Paint fill;
+  fill.setColor(Color::Red());
+  Paint filter;
+  filter.setImageFilter(ImageFilter::Blur(2, 2));
+  const auto scale = Matrix::MakeScale(3);
+  for (bool clipSource : {false, true}) {
+    SCOPED_TRACE(clipSource);
+    std::vector<uint8_t> reference;
+    for (int left : {0, (1 << 24) + 16}) {
+      SCOPED_TRACE(left);
+      PictureRecorder recorder;
+      recorder.beginRecording()->drawRect(Rect::MakeXYWH(left + 8, 2, 8, 8), fill);
+      auto picture = recorder.finishRecordingAsPicture();
+      ASSERT_TRUE(picture != nullptr);
+      auto surface = Surface::Make(context, Width, Height);
+      ASSERT_TRUE(surface != nullptr);
+      auto* canvas = surface->getCanvas();
+      canvas->clear();
+      if (clipSource) {
+        // The scaled source starts at column 25. Only its blurred edge enters this clip.
+        canvas->clipRect(Rect::MakeWH(25, Height), false);
+      }
+      canvas->setMatrixForTile(Matrix::I(), 3 * left - 1, 0);
+      canvas->drawPicture(picture, &scale, &filter);
+      std::vector<uint8_t> pixels(info.byteSize());
+      ASSERT_TRUE(surface->readPixels(info, pixels.data()));
+      auto* row = pixels.data() + 18 * info.rowBytes();
+      if (left == 0) {
+        ASSERT_GT(row[23 * 4], 0);
+        ASSERT_GT(row[23 * 4 + 3], 0);
+        ASSERT_LT(row[23 * 4 + 3], 255);
+        if (clipSource) {
+          EXPECT_EQ(row[36 * 4 + 3], 0);
+        } else {
+          EXPECT_GT(row[36 * 4 + 3], row[23 * 4 + 3]);
+        }
+        reference = std::move(pixels);
+      } else {
+        EXPECT_EQ(pixels, reference);
+      }
+    }
   }
 }
 
