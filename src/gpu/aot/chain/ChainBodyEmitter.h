@@ -24,29 +24,26 @@
 namespace tgfx {
 
 /**
- * Emits the GLSL statements that replace the chain executor loop (the TGFX_COMPOSED_EXECUTOR
- * markers in pointwise_fragment_main.inc): one straight-line evaluation of the program's slots
- * where every instruction becomes a local vec4 whose inputs are earlier locals, the geometry
- * color or the coverage unit. The opcode dispatch, the selector reads and the result-register
- * array disappear from the compiled text, while the values still upload through the same data
- * pool — the emitted loads read it with literal offsets and the per-operator calls are the same
- * functions the interpreter dispatches to.
+ * The runtime adapter over the contract-layer emitter (gpu/shaders/contract/ChainComposition.h):
+ * it describes the selection's compiled program as a ChainComposition — the decoded structure the
+ * contract layer consumes — and delegates the spelling to the shared core, so the runtime and the
+ * build tool pre-composition cannot produce different bodies for the same shape.
  * @param program          The chain program the selection compiled for this draw.
  * @param xpNeedsBlendPass Whether the draw's xfer runs the loop's extra advanced-blend pass; the
  *                         body then spells that pass after the slot evaluations.
  * @return                 The replacement statements, or an empty string when a slot uses an
- *                         operator this emitter does not cover or reads a register no earlier slot
+ *                         operator the emitter does not cover or reads a register no earlier slot
  *                         wrote; the caller then keeps the interpreter's loop.
  */
 std::string EmitComposedChainBodyGLSL(const AOTProgram& program, bool xpNeedsBlendPass);
 
 /**
  * Splices an emitted body into a chain fragment text, replacing everything between the executor
- * markers (both included).
+ * pragmas (both included).
  * @param program          The chain program the selection compiled for this draw.
  * @param xpNeedsBlendPass Whether the draw's xfer runs the extra advanced-blend pass.
  * @param code             The fragment source to rewrite in place.
- * @return                 False when the markers are absent (a text the current build did not
+ * @return                 False when the pragmas are absent (a text the current build did not
  *                         produce) or the emitter declined the program; the text is untouched.
  */
 bool ComposeChainFragmentGLSL(const AOTProgram& program, bool xpNeedsBlendPass, std::string* code);

@@ -848,6 +848,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
             src/gpu/shaders/FamilyDomains.cpp
             src/gpu/shaders/Layout.cpp
             src/gpu/shaders/PrecompiledShader.*
+            src/gpu/shaders/contract/ChainComposition.cpp
             src/gpu/shaders/modules/*.h)
     add_library(tgfx_shader_declarations STATIC ${TGFX_SHADER_DECL_FILES})
     set_target_properties(tgfx_shader_declarations PROPERTIES PREFIX "")
