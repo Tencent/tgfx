@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <future>
 #include <vector>
 #include "layers/DrawArgs.h"
 #include "layers/LayerDrawSession.h"
@@ -64,6 +65,26 @@ class FailingFilter final : public LayerFilter {
   std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image>, float, const Rect&,
                                        Point*) override {
     return nullptr;
+  }
+};
+
+class InterruptSecondTileLayer final : public Layer {
+ public:
+  LayerImageReader* reader = nullptr;
+  bool cancel = false;
+  int drawCount = 0;
+
+ protected:
+  bool drawLayer(const DrawArgs& args, Canvas*, float, BlendMode) override {
+    if (++drawCount == 2) {
+      if (cancel) {
+        reader->requestCancel();
+      } else {
+        args.drawControl->fail(DrawFailureCode::RenderingFailure, DrawStage::Rendering, this, {},
+                               "test failure on the second tile");
+      }
+    }
+    return true;
   }
 };
 
@@ -740,6 +761,7 @@ TGFX_TEST(LayerImageReaderTest, EquivalentColorSpacesAcceptIndependentInstances)
     request.sceneRoot = root;
     request.outputSize = {8, 4};
     request.outputColorSpace = outputColorSpace;
+    request.clearColor = Color::Red();
     LayerImageReadOptions options = {};
     options.bandRows = 4;
     auto reader = LayerImageReader::Make(context, request, options);
@@ -753,9 +775,76 @@ TGFX_TEST(LayerImageReaderTest, EquivalentColorSpacesAcceptIndependentInstances)
     EXPECT_TRUE(result.lastBand);
     EXPECT_EQ(reader->rowsRead(), 4);
     EXPECT_TRUE(reader->isDone());
-    EXPECT_EQ(pixels, std::vector<uint8_t>(pixels.size(), 0));
+    // The sRGB red primary encoded in Display P3 is approximately (0.9175, 0.2003, 0.1386).
+    for (size_t i = 0; i < pixels.size(); i += 4) {
+      EXPECT_NEAR(pixels[i], 234, 1);
+      EXPECT_NEAR(pixels[i + 1], 51, 1);
+      EXPECT_NEAR(pixels[i + 2], 35, 1);
+      EXPECT_EQ(pixels[i + 3], 255);
+    }
   }
 }
+
+TGFX_TEST(LayerImageReaderTest, ReadsUnpremultipliedColor) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  LayerImageRequest request = {};
+  request.target = Layer::Make();
+  request.sceneRoot = request.target;
+  request.outputSize = {1, 1};
+  request.alphaType = AlphaType::Unpremultiplied;
+  request.clearColor = Color::FromRGBA(200, 120, 40, 128);
+  LayerImageReadOptions options = {};
+  options.bandRows = 1;
+  auto reader = LayerImageReader::Make(context, request, options);
+  ASSERT_TRUE(reader != nullptr);
+  uint8_t pixel[4] = {};
+  auto result = reader->readNextBand(context, Pixmap(reader->bandInfo(), pixel), sizeof(pixel));
+  ASSERT_EQ(result.code, LayerImageReadCode::BandReady) << result.error.message;
+  EXPECT_NEAR(pixel[0], 200, 1);
+  EXPECT_NEAR(pixel[1], 120, 1);
+  EXPECT_NEAR(pixel[2], 40, 1);
+  EXPECT_EQ(pixel[3], 128);
+}
+
+#if defined(TGFX_USE_THREADS) && !defined(TGFX_BUILD_FOR_WEB)
+TGFX_TEST(LayerImageReaderTest, RejectsAContextFromAnotherDevice) {
+  auto originalDevice = DevicePool::Make();
+  ASSERT_TRUE(originalDevice != nullptr);
+  // Native device pools cache by thread. Reader operations still run on the scene thread.
+  auto otherDevice = std::async(std::launch::async, DevicePool::Make).get();
+  ASSERT_TRUE(otherDevice != nullptr);
+  if (originalDevice->uniqueID() == otherDevice->uniqueID()) {
+    GTEST_SKIP() << "The backend returned the same device";
+  }
+  LayerImageRequest request = {};
+  request.target = Layer::Make();
+  request.sceneRoot = request.target;
+  request.outputSize = {1, 1};
+  LayerImageReadOptions options = {};
+  options.bandRows = 1;
+  std::unique_ptr<LayerImageReader> reader;
+  ImageInfo info = {};
+  {
+    ContextScope scope;
+    ASSERT_TRUE(scope.getContext() != nullptr);
+    reader = LayerImageReader::Make(scope.getContext(), request, options);
+    ASSERT_TRUE(reader != nullptr);
+    info = reader->bandInfo();
+  }
+  auto otherContext = otherDevice->lockContext();
+  ASSERT_TRUE(otherContext != nullptr);
+  std::vector<uint8_t> pixels(info.byteSize(), 0x7f);
+  auto result = reader->readNextBand(otherContext, Pixmap(info, pixels.data()), pixels.size());
+  otherDevice->unlock();
+  EXPECT_EQ(result.code, LayerImageReadCode::Failed);
+  EXPECT_EQ(result.error.code, LayerImageErrorCode::ContextMismatch);
+  EXPECT_EQ(result.error.stage, LayerImageStage::Rendering);
+  EXPECT_EQ(result.rowCount, 0);
+  EXPECT_EQ(pixels, std::vector<uint8_t>(pixels.size(), 0x7f));
+}
+#endif
 
 TGFX_TEST(LayerImageReaderTest, TileSizeDoesNotChangePixels) {
   ContextScope scope;
@@ -1034,6 +1123,50 @@ TGFX_TEST(LayerImageReaderTest, CancelledReaderStaysCancelled) {
   result = reader->readNextBand(context, Pixmap(info, pixels.data()), info.byteSize());
   EXPECT_EQ(result.code, LayerImageReadCode::Cancelled);
   EXPECT_FALSE(reader->isDone());
+}
+
+TGFX_TEST(LayerImageReaderTest, PartialBandWritesAreNeverPublished) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  for (bool cancel : {false, true}) {
+    auto root = std::make_shared<InterruptSecondTileLayer>();
+    root->cancel = cancel;
+    LayerImageRequest request = {};
+    request.target = root;
+    request.sceneRoot = root;
+    request.outputSize = {4, 1};
+    request.clearColor = Color::White();
+    LayerImageReadOptions options = {};
+    options.bandRows = 1;
+    options.tileSizeLimit = {4, 3};
+    auto reader = LayerImageReader::Make(context, request, options);
+    ASSERT_TRUE(reader != nullptr);
+    root->reader = reader.get();
+    auto info = reader->bandInfo();
+    std::vector<uint8_t> pixels(info.byteSize(), 0x7f);
+    auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
+    auto expected = cancel ? LayerImageReadCode::Cancelled : LayerImageReadCode::Failed;
+    ASSERT_EQ(result.code, expected);
+    if (!cancel) {
+      EXPECT_EQ(result.error.code, LayerImageErrorCode::DrawFailed);
+      EXPECT_EQ(result.error.stage, LayerImageStage::Rendering);
+    }
+    EXPECT_EQ(result.firstRow, 0);
+    EXPECT_EQ(result.rowCount, 0);
+    EXPECT_FALSE(result.lastBand);
+    EXPECT_EQ(reader->rowsRead(), 0);
+    EXPECT_FALSE(reader->isDone());
+    std::vector<uint8_t> partial(info.byteSize(), 0x7f);
+    std::fill_n(partial.begin(), 2 * info.bytesPerPixel(), 255);
+    EXPECT_EQ(pixels, partial);
+    pixels.assign(pixels.size(), 0x5a);
+    result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
+    EXPECT_EQ(result.code, expected);
+    EXPECT_EQ(result.rowCount, 0);
+    EXPECT_EQ(root->drawCount, 2);
+    EXPECT_EQ(pixels, std::vector<uint8_t>(pixels.size(), 0x5a));
+  }
 }
 
 TGFX_TEST(LayerImageReaderTest, RejectsPreserve3DContent) {
