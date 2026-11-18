@@ -633,7 +633,30 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
              resolveBranch(gradientRaw, "#if NTEX > 0", true));
     addEntry(FragmentPackGradientSimple, "GradientSimple",
              resolveBranch(gradientRaw, "#if NTEX > 0", false));
-    const std::string leafFetchRaw = readExpanded("entry/ChainLeafFetch.glsl");
+    std::string leafFetchRaw = readExpanded("entry/ChainLeafFetch.glsl");
+    // The tiled leaves' coordinate-varying picker references every leaf varying, which the plan
+    // program only declares for the leaves it samples; the tiled path stays on the interpreter, so
+    // the picker leaves the pack.
+    {
+      const auto pickerAt = leafFetchRaw.find("vec3 chainLeafCoordVarying(int leafIndex) {");
+      if (pickerAt != std::string::npos) {
+        size_t depth = 0;
+        size_t end = std::string::npos;
+        for (size_t i = leafFetchRaw.find('{', pickerAt); i < leafFetchRaw.size(); ++i) {
+          if (leafFetchRaw[i] == '{') {
+            ++depth;
+          } else if (leafFetchRaw[i] == '}') {
+            if (--depth == 0) {
+              end = i + 1;
+              break;
+            }
+          }
+        }
+        if (end != std::string::npos) {
+          leafFetchRaw.erase(pickerAt, end - pickerAt);
+        }
+      }
+    }
     addEntry(FragmentPackLeafFetchStrict, "LeafFetchStrict",
              resolveBranch(leafFetchRaw, "#if HAS_SUBSET", true));
     addEntry(FragmentPackLeafFetchPlain, "LeafFetchPlain",

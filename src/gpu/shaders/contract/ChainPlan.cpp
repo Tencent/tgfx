@@ -206,6 +206,7 @@ ChainPlan BuildChainPlan(const ChainComposition& composition) {
         call.args = {"chainLeafTex[" + std::to_string(slotIndex) + "]", "chainGeomColorSource()",
                      "chainUnitCoverageSource()", std::to_string(slot.selector & 0x1F)};
         plan.hasTexture = true;
+        plan.leafVaryings.insert(static_cast<int>(slotIndex));
         break;
       case ChainISA::TexModulate: {
         const int srcSlot = (slot.selector >> 16) & 0xF;
@@ -237,9 +238,11 @@ ChainPlan BuildChainPlan(const ChainComposition& composition) {
         break;
       case ChainISA::Gradient:
         call.args = {in0};
+        plan.needsSourceCoords = true;
         break;
       case ChainISA::PerlinNoise:
         call.args = {};
+        plan.needsSourceCoords = true;
         break;
       default:
         return {};

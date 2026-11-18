@@ -66,6 +66,10 @@ struct ChainPlan {
   std::vector<PlanParam> params;
   uint32_t paramBlockSize = 0;
   bool hasTexture = false;
+  /// The varying contract: the leaf coordinate varyings the composition reads and whether the
+  /// resource coordinates (gradient/noise) are read. Both stages declare exactly this set.
+  std::set<int> leafVaryings;
+  bool needsSourceCoords = false;
   /// The xfer's advanced blend pass: the epilogue reads result and coverageRootRegister through
   /// the xp source function and the XPBlendMode member.
   bool xpNeedsBlendPass = false;

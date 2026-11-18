@@ -138,7 +138,8 @@ struct GeneratedDeclarations {
   bool hasSubsetVarying = false;
 };
 
-GeneratedDeclarations GenerateDeclarations(const Family& family, const Variant& variant) {
+GeneratedDeclarations GenerateDeclarations(const Family& family, const Variant& variant,
+                                           const ChainPlan& plan) {
   GeneratedDeclarations out = {};
   out.uniformBlock = "layout(std140) uniform FragmentUniformBlock {\n";
   const auto modules = ModulesOf(family, variant);
@@ -156,14 +157,24 @@ GeneratedDeclarations GenerateDeclarations(const Family& family, const Variant& 
         // location qualifier), so the hole rule needs no spelling here — only the walk order.
         if (present) {
           const std::string name = VaryingNameOf(module, element);
-          out.varyings +=
-              std::string(" in ") + ShaderTypeGlslName(element.type) + " " + name + ";\n";
-          if (name == "vColor") {
-            out.colorVarying = name;
-          } else if (name == "vCoverage") {
-            out.coverageVarying = name;
-          } else if (name == "vTexSubset") {
-            out.hasSubsetVarying = true;
+          // The plan owns the varying contract: only the leaf coordinates the composition reads
+          // and the resource coordinates (gradient/noise), so both stages carry the same set.
+          bool keep = true;
+          if (name.rfind("TransformedCoords_", 0) == 0) {
+            keep = plan.leafVaryings.count(std::atoi(name.c_str() + 18)) != 0;
+          } else if (name == "SourceCoords") {
+            keep = plan.needsSourceCoords;
+          }
+          if (keep) {
+            out.varyings +=
+                std::string(" in ") + ShaderTypeGlslName(element.type) + " " + name + ";\n";
+            if (name == "vColor") {
+              out.colorVarying = name;
+            } else if (name == "vCoverage") {
+              out.coverageVarying = name;
+            } else if (name == "vTexSubset") {
+              out.hasSubsetVarying = true;
+            }
           }
         }
       } else if (present && element.kind == Element::Kind::Param) {
@@ -185,6 +196,54 @@ GeneratedDeclarations GenerateDeclarations(const Family& family, const Variant& 
 }
 
 }  // namespace
+
+bool AssembleChainVertexGLSL(const ChainPlan& plan, const std::string& storedVs,
+                             std::string* code) {
+  if (code == nullptr || storedVs.empty()) {
+    return false;
+  }
+  // The stored vertex text is the rect geometry's exact interface (attributes, the vertex block,
+  // the geometry hook); the plan supplies the varying contract: keep a varying line exactly when
+  // the composition reads it, and write those varyings in the Chain hook.
+  const std::string varyingHead = " out vec3 TransformedCoords_";
+  std::string out;
+  size_t cursor = 0;
+  while (cursor < storedVs.size()) {
+    const auto lineEnd = storedVs.find('\n', cursor);
+    const std::string line = storedVs.substr(
+        cursor, lineEnd == std::string::npos ? std::string::npos : lineEnd - cursor + 1);
+    cursor = lineEnd == std::string::npos ? storedVs.size() : lineEnd + 1;
+    if (line.rfind(varyingHead, 0) == 0) {
+      const int leaf = std::atoi(line.c_str() + varyingHead.size());
+      if (plan.leafVaryings.count(leaf) == 0) {
+        continue;
+      }
+    } else if (line.rfind(" out vec3 SourceCoords;", 0) == 0 && !plan.needsSourceCoords) {
+      continue;
+    }
+    out += line;
+  }
+  std::string hookBody;
+  for (int leaf : plan.leafVaryings) {
+    hookBody += "  TransformedCoords_" + std::to_string(leaf) + " = (CoordTransformMatrix_" +
+                std::to_string(leaf) + " * vec3(v.localCoord, 1.0)).xyz;\n";
+  }
+  if (plan.needsSourceCoords) {
+    hookBody += "  SourceCoords = (CoordTransformMatrix_0 * vec3(v.localCoord, 1.0)).xyz;\n";
+  }
+  const auto hookAt = out.find("void Chain_vertex(inout Vertex v) {");
+  if (hookAt == std::string::npos) {
+    return false;
+  }
+  const auto bodyAt = out.find('\n', hookAt) + 1;
+  const auto hookEnd = out.find("}\n", bodyAt);
+  if (hookEnd == std::string::npos) {
+    return false;
+  }
+  out = out.substr(0, bodyAt) + hookBody + out.substr(hookEnd);
+  *code = out;
+  return true;
+}
 
 bool AssembleChainFragmentGLSL(const ChainPlan& plan, const ChainComposition& composition,
                                const Family& family, const Variant& variant,
@@ -289,7 +348,7 @@ bool AssembleChainFragmentGLSL(const ChainPlan& plan, const ChainComposition& co
                 LeafName("SubsetClampOn", static_cast<int>(index)) + ", " + leaf + ");\n";
   }
   // The declarations come first: they pick the packed forms below.
-  auto declarations = GenerateDeclarations(family, variant);
+  auto declarations = GenerateDeclarations(family, variant, plan);
   // The plan's parameter members join the block past the prefix (their offsets start at the
   // prefix's fragment block size, which std140 rounds to the same boundary the driver computes).
   if (!plan.params.empty()) {

@@ -365,6 +365,14 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
         composedAttempt = true;
         LOGI("AssembledChain: assembled entry for %s[variant=%u] (%zu bytes)", shaderName,
              variantId, fragmentDesc.code.size());
+        // The vertex stage follows the same contract: the stored text's interface (attributes,
+        // vertex block, geometry hook) stays, and the varying set bends to the composition's
+        // leaves and resource reads.
+        std::string assembledVs;
+        if (AssembleChainVertexGLSL(plan, std::string(vertBlob->data.begin(), vertBlob->data.end()),
+                                    &assembledVs)) {
+          vertexDesc.code = std::move(assembledVs);
+        }
       }
     }
   }
