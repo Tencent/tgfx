@@ -30,6 +30,7 @@
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/ImageProvider.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/PictureRecorder.h"
@@ -626,6 +627,79 @@ TGFX_TEST(ImageRenderTest, RasterizedScaledProxySize) {
                       TPArgs tpArgs(context, 0, false, 0.5f, BackingFit::Exact);
                       auto proxy = raster->lockTextureProxy(tpArgs); ASSERT_TRUE(proxy != nullptr);
                       EXPECT_EQ(proxy->width(), 782); EXPECT_EQ(proxy->height(), 782));
+}
+
+namespace {
+class VariantOnlyProvider : public ImageProvider {
+ public:
+  VariantOnlyProvider(int width, int height, std::shared_ptr<Image> variant)
+      : _width(width), _height(height), variant(std::move(variant)) {
+  }
+
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
+  std::shared_ptr<Image> getImage(float) const override {
+    return variant;
+  }
+
+ private:
+  int _width = 0;
+  int _height = 0;
+  std::shared_ptr<Image> variant = nullptr;
+};
+}  // namespace
+
+TGFX_TEST(ImageRenderTest, RasterizedProviderVariant) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  // A provider reports a 10x10 logical image but only serves a lower-density 6x6 variant with four
+  // distinct quadrants. RasterizedImage has no content size of its own for this source, so it must
+  // fall back to the variant texture size (6) instead of the logical size (10); otherwise fpMatrix
+  // becomes 1 and only the top-left quadrant is sampled and stretched over the whole image.
+  constexpr int vw = 6;
+  constexpr int vh = 6;
+  constexpr uint32_t red = 0xFF0000FFu;
+  constexpr uint32_t green = 0xFF00FF00u;
+  constexpr uint32_t blue = 0xFFFF0000u;
+  constexpr uint32_t yellow = 0xFF00FFFFu;
+  std::vector<uint32_t> pixels(static_cast<size_t>(vw) * static_cast<size_t>(vh));
+  for (int y = 0; y < vh; y++) {
+    for (int x = 0; x < vw; x++) {
+      auto right = x >= vw / 2;
+      auto bottom = y >= vh / 2;
+      pixels[static_cast<size_t>(y) * static_cast<size_t>(vw) + static_cast<size_t>(x)] =
+          bottom ? (right ? yellow : blue) : (right ? green : red);
+    }
+  }
+  auto variantInfo = ImageInfo::Make(vw, vh, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  auto variantData = Data::MakeWithCopy(pixels.data(), pixels.size() * sizeof(uint32_t));
+  auto variant = Image::MakeFrom(variantInfo, std::move(variantData));
+  ASSERT_TRUE(variant != nullptr);
+  auto provider = std::make_shared<VariantOnlyProvider>(10, 10, std::move(variant));
+  auto image = Image::MakeFrom(provider);
+  ASSERT_TRUE(image != nullptr);
+  auto rasterized = image->makeRasterized();
+  ASSERT_TRUE(rasterized != nullptr);
+  auto surface = Surface::Make(context, 10, 10);
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->drawImage(rasterized);
+  context->flushAndSubmit();
+  auto info = ImageInfo::Make(10, 10, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  Buffer buffer(info.byteSize());
+  ASSERT_TRUE(surface->readPixels(info, buffer.data()));
+  auto result = reinterpret_cast<const uint32_t*>(buffer.data());
+  // Each quadrant center maps inside a single variant texel region, so the sampled color is exact.
+  EXPECT_EQ(result[2 * 10 + 2], red);
+  EXPECT_EQ(result[2 * 10 + 7], green);
+  EXPECT_EQ(result[7 * 10 + 2], blue);
+  EXPECT_EQ(result[7 * 10 + 7], yellow);
 }
 
 TGFX_TEST(ImageRenderTest, drawScaleImage) {

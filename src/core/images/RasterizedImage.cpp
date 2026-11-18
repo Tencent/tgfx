@@ -77,8 +77,14 @@ PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
   // larger than the content it carries, for example a hardware-decoded video buffer aligned by the
   // decoder, and the proxy reports that padded size once it is rewrapped from the resource cache.
   // Using the source size keeps the coordinate transform and the sampling clamp identical whether
-  // the proxy was freshly created or rewrapped, so the padding is never sampled.
+  // the proxy was freshly created or rewrapped, so the padding is never sampled. When the source
+  // reports no size (for example a provider that serves a lower-density variant whose texture does
+  // not match the logical size), fall back to the proxy size so the transform matches the texture
+  // that lockTextureProxy() actually produced.
   auto contentSize = source->getRasterizedSize(getCacheScale(args.drawScale));
+  if (contentSize.isEmpty()) {
+    contentSize = ISize::Make(textureProxy->width(), textureProxy->height());
+  }
   auto fpMatrix =
       Matrix::MakeScale(static_cast<float>(contentSize.width) / static_cast<float>(width()),
                         static_cast<float>(contentSize.height) / static_cast<float>(height()));

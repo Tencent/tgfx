@@ -372,9 +372,11 @@ class Image {
 
   /**
    * Returns the content size of the texture cached by lockTextureProxy() at the given rasterized
-   * scale. The cached texture may be larger than its content when it carries padding outside the
-   * content area, for example a hardware-decoded video buffer aligned by the decoder, so this size
-   * can be smaller than the texture itself. The default implementation returns the full image size.
+   * scale, or an empty size when the subclass has no size to report. A cached texture may carry
+   * padding outside its content, for example a hardware-decoded video buffer aligned by the
+   * decoder, so the reported content size can be smaller than the texture itself. The default
+   * implementation returns an empty size, meaning the caller should fall back to the texture proxy
+   * size instead of assuming the texture matches the logical image size.
    */
   virtual ISize getRasterizedSize(float scale) const;
 
