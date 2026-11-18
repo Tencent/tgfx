@@ -66,9 +66,6 @@ bool ResolveInput(int designator, const std::unordered_map<int, std::string>& re
 }  // namespace
 
 std::string EmitComposedChainBodyGLSL(const AOTProgram& program, bool xpNeedsBlendPass) {
-  if (xpNeedsBlendPass) {
-    return {};
-  }
   std::unordered_map<int, std::string> registers = {};
   std::string body = {};
   int nextLocal = 0;
@@ -150,9 +147,22 @@ std::string EmitComposedChainBodyGLSL(const AOTProgram& program, bool xpNeedsBle
                 data + ".radiiX, " + data + ".radiiY, " + data + ".antiAlias, " + data +
                 ".deviceToLocal);\n";
         break;
+      case AOTChainOp::Gradient:
+        // The gradient's parameters sit in the chain-wide block region, which the shared
+        // evaluator addresses itself; the literal op word satisfies its Packed.x check.
+        body += "  vec4 " + local + " = vec4(0.0);\n";
+        body += "  evalGradientSlot(ivec4(" +
+                std::to_string(static_cast<int>(AOTChainOp::Gradient)) + ", 0, 0, 0), " + in0 +
+                ", " + local + ");\n";
+        break;
+      case AOTChainOp::PerlinNoise:
+        body += "  vec4 " + local + " = vec4(0.0);\n";
+        body += "  evalNoiseSlot(ivec4(" +
+                std::to_string(static_cast<int>(AOTChainOp::PerlinNoise)) + ", 0, 0, 0), " +
+                dataAt + ", " + local + ");\n";
+        break;
       default:
-        // Gradient and PerlinNoise read chain-wide regions and lookup textures the straight-line
-        // form does not lower yet.
+        // An operator the emitter has not learned: decline so the caller keeps the interpreter.
         return {};
     }
     registers[slot.outRegister] = local;
@@ -165,6 +175,12 @@ std::string EmitComposedChainBodyGLSL(const AOTProgram& program, bool xpNeedsBle
     if (program.coverageRootRegister == slot.outRegister) {
       body += "  coverageRootRegister = " + local + ";\n";
     }
+  }
+  if (xpNeedsBlendPass) {
+    // The XferProcessor's advanced blend pass: the loop's extra iteration, spelled directly. The
+    // mode stays the XPBlendMode uniform exactly as the interpreter reads it.
+    body += "  chainXPSrc = chainXPSrcUnpremul(result, coverageRootRegister);\n";
+    body += "  xpBlended = xpBlendColors(chainXPSrc, chainXPDst, XPBlendMode);\n";
   }
   return body;
 }

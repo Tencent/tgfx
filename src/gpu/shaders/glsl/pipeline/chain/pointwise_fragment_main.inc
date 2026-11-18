@@ -222,6 +222,14 @@ vec4 chainOpaqueGeomColorSource() {
   (SPEC_CoverageRootIndex() >= 0 ? result * coverageRootRegister : result)
 #endif
 
+// The XferProcessor blend pass's source, as a function for the same reason as the designator
+// sources above: the macro's expansion differs per variant, and only the function's name survives
+// into the stored text. The interpreter's blend pass calls it too, so the runtime's uncalled
+// function pruning keeps it in every specialized text.
+vec4 chainXPSrcUnpremul(vec4 result, vec4 coverageRootRegister) {
+  return CHAIN_XP_SRC_UNPREMUL;
+}
+
 // One slot's register write-back, shared by the loop and the unrolled executor so the two forms
 // cannot disagree: bits 20-24 of the selector carry the result register + 1 (0 = dead
 // instruction, skip the write). The value is evaluated before the write, so a consumer may share
@@ -357,7 +365,7 @@ void chainMain() {
     for (int i = 0; i < passCount; ++i) {
 #if HAS_XP >= 1
       if (i == SPEC_SlotCount()) {
-        chainXPSrc = CHAIN_XP_SRC_UNPREMUL;
+        chainXPSrc = chainXPSrcUnpremul(result, coverageRootRegister);
       }
 #endif
       vec4 value = evalChainSlot(i);

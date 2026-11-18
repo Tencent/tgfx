@@ -113,11 +113,20 @@ TGFX_TEST(ChainBodyEmitterTest, CoverageOpsAssignTheEpilogueRegisters) {
   EXPECT_NE(body.find("coverageRootRegister = cg2;"), std::string::npos);
 }
 
-TGFX_TEST(ChainBodyEmitterTest, UnsupportedOperatorDeclines) {
+TGFX_TEST(ChainBodyEmitterTest, GradientAndNoiseCallTheSharedEvaluators) {
   AOTProgram program = MakeProgram({MakeSlot(AOTChainOp::Gradient, -3, -2, 0)}, 0);
-  EXPECT_TRUE(EmitComposedChainBodyGLSL(program, false).empty());
-  AOTProgram noise = MakeProgram({MakeSlot(AOTChainOp::PerlinNoise, -3, -2, 0)}, 0);
-  EXPECT_TRUE(EmitComposedChainBodyGLSL(noise, false).empty());
+  const std::string body = EmitComposedChainBodyGLSL(program, false);
+  EXPECT_NE(
+      body.find("evalGradientSlot(ivec4(" + std::to_string(static_cast<int>(AOTChainOp::Gradient)) +
+                ", 0, 0, 0), chainUnitCoverageSource(), cg0)"),
+      std::string::npos);
+  EXPECT_NE(body.find("result = cg0;"), std::string::npos);
+  AOTProgram noise = MakeProgram({MakeSlot(AOTChainOp::PerlinNoise, -2, -2, 0)}, 0);
+  const std::string noiseBody = EmitComposedChainBodyGLSL(noise, false);
+  EXPECT_NE(noiseBody.find("evalNoiseSlot(ivec4(" +
+                           std::to_string(static_cast<int>(AOTChainOp::PerlinNoise)) +
+                           ", 0, 0, 0), 0, cg0)"),
+            std::string::npos);
 }
 
 TGFX_TEST(ChainBodyEmitterTest, UnwrittenRegisterInputDeclines) {
@@ -125,9 +134,14 @@ TGFX_TEST(ChainBodyEmitterTest, UnwrittenRegisterInputDeclines) {
   EXPECT_TRUE(EmitComposedChainBodyGLSL(program, false).empty());
 }
 
-TGFX_TEST(ChainBodyEmitterTest, AdvancedXferBlendPassDeclines) {
+TGFX_TEST(ChainBodyEmitterTest, AdvancedXferBlendPassEmitsTheXPTail) {
   AOTProgram program = MakeProgram({MakeSlot(AOTChainOp::ConstColor, -4, -2, 0)}, 0);
-  EXPECT_TRUE(EmitComposedChainBodyGLSL(program, true).empty());
+  const std::string body = EmitComposedChainBodyGLSL(program, true);
+  EXPECT_NE(body.find("chainXPSrc = chainXPSrcUnpremul(result, coverageRootRegister);"),
+            std::string::npos);
+  EXPECT_NE(body.find("xpBlended = xpBlendColors(chainXPSrc, chainXPDst, XPBlendMode);"),
+            std::string::npos);
+  EXPECT_NE(body.find("result = cg0;"), std::string::npos);
 }
 
 TGFX_TEST(ChainBodyEmitterTest, DeadSlotsAreSkipped) {
@@ -162,7 +176,7 @@ TGFX_TEST(ChainBodyEmitterTest, SpliceWithoutMarkersLeavesTheTextUntouched) {
 }
 
 TGFX_TEST(ChainBodyEmitterTest, SpliceOfAnUnsupportedProgramLeavesTheTextUntouched) {
-  AOTProgram program = MakeProgram({MakeSlot(AOTChainOp::Gradient, -3, -2, 0)}, 0);
+  AOTProgram program = MakeProgram({MakeSlot(AOTChainOp::ColorMatrix, 5, -2, 0)}, 0);
   const std::string original =
       "#pragma tgfx_composed_executor_begin\nloop();\n#pragma tgfx_composed_executor_end\n";
   std::string code = original;

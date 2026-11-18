@@ -33,7 +33,7 @@ namespace tgfx {
  * functions the interpreter dispatches to.
  * @param program          The chain program the selection compiled for this draw.
  * @param xpNeedsBlendPass Whether the draw's xfer runs the loop's extra advanced-blend pass; the
- *                         composed form does not cover it yet.
+ *                         body then spells that pass after the slot evaluations.
  * @return                 The replacement statements, or an empty string when a slot uses an
  *                         operator this emitter does not cover or reads a register no earlier slot
  *                         wrote; the caller then keeps the interpreter's loop.
