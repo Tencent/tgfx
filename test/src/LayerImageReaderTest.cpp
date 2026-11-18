@@ -483,7 +483,9 @@ TGFX_TEST(LayerImageReaderTest, MaskedTargetWithAttributesMatchesSingleSurface) 
                                     reader->bandInfo().colorSpace());
     auto* bandPixels = output.pixels.data() + static_cast<size_t>(nextRow) * reference.rowBytes;
     auto result = reader->readNextBand(context, Pixmap(bandInfo, bandPixels), bandInfo.byteSize());
-    ASSERT_EQ(result.code, LayerImageReadCode::BandReady);
+    ASSERT_EQ(result.code, LayerImageReadCode::BandReady)
+        << "firstRow=" << result.firstRow << " error=" << static_cast<int>(result.error.code)
+        << " stage=" << static_cast<int>(result.error.stage) << " message=" << result.error.message;
     nextRow += result.rowCount;
   }
   EXPECT_TRUE(reader->isDone());

@@ -230,9 +230,12 @@ std::unique_ptr<BackgroundCapturer> BackgroundCapturer::buildSubCapturer(
   if (subSource == nullptr) {
     return nullptr;
   }
-  auto subRect = subSource->getBackgroundRect();
   auto clone = std::make_unique<BackgroundCapturer>(snapshots, std::move(subSource));
-  NarrowRenderRects(parentArgs, subRect, &clone->_renderRects);
+  // Tiled capture and consumption must traverse the same styles, including at offscreen edges.
+  if (parentArgs.drawControl == nullptr || parentArgs.renderRects == nullptr ||
+      parentArgs.renderRects->empty()) {
+    NarrowRenderRects(parentArgs, clone->bgSource->getBackgroundRect(), &clone->_renderRects);
+  }
   // Forced-capture state must propagate so pass-through subtrees still feed the parent bgSource.
   if (isForcedCapture()) {
     clone->beginForceDrawChildren();
