@@ -604,21 +604,6 @@ RegionPlanResult LayerDrawSession::planExportRegion(const PixelRect& core,
   if (needsBackground) {
     auto dependencies = std::make_shared<RegionDependencyPlan>();
     dependencies->needsBackground = true;
-    auto deviceLimit = limits.gpuLimits.maxTextureDimension2D;
-    if (deviceLimit <= 0 || captureRect.width() > deviceLimit ||
-        captureRect.height() > deviceLimit) {
-      if (core.width() <= 1 && core.height() <= 1) {
-        if (control != nullptr) {
-          control->fail(DrawFailureCode::SurfaceLimit, DrawStage::Planning, request.target,
-                        ISize::Make(captureRect.width(), captureRect.height()),
-                        "the background dependency needs a larger texture than the device allows");
-        }
-        result.code = RegionPlanCode::Failed;
-        return result;
-      }
-      result.code = RegionPlanCode::RequiresSubdivision;
-      return result;
-    }
     dependencies->captureRect = captureRect;
     result.region.dependencies = std::move(dependencies);
   }
