@@ -50,8 +50,28 @@ static constexpr float ExportBackgroundSurfaceScale = 1.0f;
 static constexpr int DefaultExportSurfaceLimit = 2048;
 
 static Rect ToRect(const PixelRect& rect) {
-  return Rect::MakeLTRB(static_cast<float>(rect.left), static_cast<float>(rect.top),
-                        static_cast<float>(rect.right), static_cast<float>(rect.bottom));
+  auto left = static_cast<float>(rect.left);
+  auto top = static_cast<float>(rect.top);
+  auto right = static_cast<float>(rect.right);
+  auto bottom = static_cast<float>(rect.bottom);
+  return Rect::MakeLTRB(
+      static_cast<double>(left) > rect.left ? std::nextafter(left, -INFINITY) : left,
+      static_cast<double>(top) > rect.top ? std::nextafter(top, -INFINITY) : top,
+      static_cast<double>(right) < rect.right ? std::nextafter(right, INFINITY) : right,
+      static_cast<double>(bottom) < rect.bottom ? std::nextafter(bottom, INFINITY) : bottom);
+}
+
+// An exactly representable origin avoids losing a pixel even for geometry submitted directly
+// in distant scene coordinates. If one pixel and its halo cannot fit from that origin, keep the
+// exact integer window and let the canvas rebase individual draws.
+static int AlignedOrigin(int start, int end, int coreSize, int limit) {
+  auto origin = static_cast<float>(start);
+  if (static_cast<double>(origin) > start) {
+    origin = std::nextafter(origin, -INFINITY);
+  }
+  auto aligned = static_cast<int>(origin);
+  auto minimumSize = static_cast<int64_t>(end) - aligned - (coreSize - 1);
+  return minimumSize <= limit ? aligned : start;
 }
 
 // Region planning maps output pixels through the capture-root matrices. Rect is float-based and
@@ -592,6 +612,10 @@ RegionPlanResult LayerDrawSession::planExportRegion(const PixelRect& core,
     return result;
   }
   auto renderRect = ToPixelRect(outputRect);
+  renderRect.left =
+      AlignedOrigin(renderRect.left, renderRect.right, core.width(), surfaceLimit.width);
+  renderRect.top =
+      AlignedOrigin(renderRect.top, renderRect.bottom, core.height(), surfaceLimit.height);
   if (!FitsLimit(renderRect, surfaceLimit.width, surfaceLimit.height)) {
     if (core.width() <= 1 && core.height() <= 1) {
       if (control != nullptr) {
@@ -841,7 +865,8 @@ DrawOutcome LayerDrawSession::drawExportRegion(Context* context, LayerDrawBatch&
         false);
   }
   const auto& region = batch.impl->regions[regionIndex];
-  canvas->setMatrixForTile(request.targetLocalToOutput, region.renderRect.left, region.renderRect.top);
+  canvas->setMatrixForTile(request.targetLocalToOutput, region.renderRect.left,
+                           region.renderRect.top);
 
   DrawArgs args(context);
   args.dstColorSpace = request.renderColorSpace;
