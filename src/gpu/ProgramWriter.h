@@ -64,6 +64,7 @@ inline AddressMode ToAddressMode(TileMode tileMode) {
 class ProgramWriter {
  public:
   explicit ProgramWriter(Variant variant);
+  virtual ~ProgramWriter() = default;
 
   /**
    * Uploads every uniform and binds the samplers of the program for the draw described by info.
@@ -77,9 +78,11 @@ class ProgramWriter {
    */
   bool write(const ProgramInfo& info, RenderPass* renderPass, Program* program) const;
 
- private:
-  void writeUniforms(const ProgramInfo& info, UniformData* vertexUniformData,
-                     UniformData* fragmentUniformData) const;
+ protected:
+  /// The plan writer appends its named parameter block past the variant prefix before the base
+  /// fills the prefix, so both regions land in the one fragment buffer the upload carries.
+  virtual void writeUniforms(const ProgramInfo& info, UniformData* vertexUniformData,
+                             UniformData* fragmentUniformData) const;
   bool writeSamplers(const ProgramInfo& info, Program* program, RenderPass* renderPass) const;
   /// Whether the draw carries everything the variant's writers read: the interpreter's modules
   /// need the compiled program the selection attached.

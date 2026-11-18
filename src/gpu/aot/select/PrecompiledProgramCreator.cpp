@@ -33,6 +33,7 @@
 #include "gpu/aot/chain/ChainTextAssembler.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
+#include "gpu/aot/plan/ChainPlanWriter.h"
 #include "gpu/aot/plan/DrawPlan.h"
 #include "gpu/aot/select/PrecompiledDiagnostics.h"
 #include "gpu/aot/select/ProgramKey.h"
@@ -44,6 +45,7 @@
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/Layout.h"
+#include "gpu/shaders/contract/ChainPlan.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -347,6 +349,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   // constants, no extraction. Its own experiment switch; every decline keeps the paths below
   // untouched.
   bool composedAttempt = false;
+  ChainPlan plan = {};
   if (allowComposed && AssembledChainEnabled() && format == ShaderCodeFormat::GLSL &&
       strcmp(Families()[variant.family].name, "Chain") == 0) {
     const auto* assembledSources = programInfo->getSources();
@@ -356,7 +359,9 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
                                               static_cast<int>(programInfo->getBlendMode()));
       const ChainComposition composition =
           DescribeChainComposition(*assembledSources->chain, xpPass);
-      if (AssembleChainFragmentGLSL(composition, chainFamily, variant, cache, &fragmentDesc.code)) {
+      plan = BuildChainPlan(composition);
+      if (!plan.calls.empty() && AssembleChainFragmentGLSL(plan, composition, chainFamily, variant,
+                                                           cache, &fragmentDesc.code)) {
         composedAttempt = true;
         LOGI("AssembledChain: assembled entry for %s[variant=%u] (%zu bytes)", shaderName,
              variantId, fragmentDesc.code.size());
@@ -530,7 +535,11 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
     descriptor.layout.uniformBlocks.push_back(vertexBinding);
   }
   if (layout.fragmentBlockSize > 0) {
-    fragmentUniformData = std::unique_ptr<UniformData>(new UniformData(layout.fragmentBlockSize));
+    // The plan program's fragment block carries the variant prefix plus its named parameter
+    // members; the plan writer fills the appended region, the base writer the prefix.
+    const uint32_t planParamBytes = composedAttempt ? plan.paramBlockSize : 0;
+    fragmentUniformData =
+        std::unique_ptr<UniformData>(new UniformData(layout.fragmentBlockSize + planParamBytes));
     BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT,
                                     ShaderVisibility::Fragment};
     descriptor.layout.uniformBlocks.push_back(fragmentBinding);
@@ -561,9 +570,11 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   cache->recordAOTStage(PrecompiledAOTStage::PipelineCreated,
                         MakeHitRecord(cache, programInfo, variant));
 
-  auto program = std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
-                                           std::move(fragmentUniformData),
-                                           std::make_unique<ProgramWriter>(variant));
+  auto program = std::make_shared<Program>(
+      std::move(pipeline), std::move(vertexUniformData), std::move(fragmentUniformData),
+      composedAttempt ? std::unique_ptr<ProgramWriter>(
+                            new ChainPlanWriter(variant, plan, layout.fragmentBlockSize))
+                      : std::unique_ptr<ProgramWriter>(new ProgramWriter(variant)));
   program->setShaderName(shaderName);
   program->setExpectedTextureCount(static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));
   return program;

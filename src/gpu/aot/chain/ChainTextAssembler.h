@@ -22,6 +22,7 @@
 #include <string>
 #include "gpu/shaders/Family.h"
 #include "gpu/shaders/contract/ChainComposition.h"
+#include "gpu/shaders/contract/ChainPlan.h"
 
 namespace tgfx {
 
@@ -43,8 +44,8 @@ class PrecompiledShaderCache;
  * @return             False when the shape is outside the slice or a pack entry is missing; the
  *                     caller keeps its other paths.
  */
-bool AssembleChainFragmentGLSL(const ChainComposition& composition, const Family& family,
-                               const Variant& variant, const PrecompiledShaderCache* cache,
-                               std::string* code);
+bool AssembleChainFragmentGLSL(const ChainPlan& plan, const ChainComposition& composition,
+                               const Family& family, const Variant& variant,
+                               const PrecompiledShaderCache* cache, std::string* code);
 
 }  // namespace tgfx

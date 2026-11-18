@@ -849,6 +849,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
             src/gpu/shaders/Layout.cpp
             src/gpu/shaders/PrecompiledShader.*
             src/gpu/shaders/contract/ChainComposition.cpp
+            src/gpu/shaders/contract/ChainPlan.cpp
             src/gpu/shaders/contract/FragmentLibrary.cpp
             src/gpu/shaders/contract/UniformAllocation.cpp
             src/gpu/shaders/modules/*.h)

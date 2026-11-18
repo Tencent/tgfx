@@ -27,6 +27,7 @@
 #include "gpu/shaders/Module.h"
 #include "gpu/shaders/contract/ChainISA.h"
 #include "gpu/shaders/contract/ChainOps.h"
+#include "gpu/shaders/contract/ChainPlan.h"
 #include "gpu/shaders/contract/FragmentLibrary.h"
 #include "gpu/shaders/modules/Chain.h"
 
@@ -81,6 +82,30 @@ bool ReplaceAll(std::string* text, const std::string& token, const std::string& 
 
 // Leaf-position uniforms carry a _<leaf> suffix past the first leaf, matching the declaration
 // walk's std140 members.
+// The std140 type spelling of a plan parameter (the offsets' companion: the same rules the
+// writer's accumulation follows).
+const char* GlslTypeOf(FragmentType type) {
+  switch (type) {
+    case FragmentType::Float:
+      return "float";
+    case FragmentType::Float2:
+      return "vec2";
+    case FragmentType::Float3:
+      return "vec3";
+    case FragmentType::Float4:
+      return "vec4";
+    case FragmentType::Int:
+      return "int";
+    case FragmentType::Int4:
+      return "ivec4";
+    case FragmentType::Matrix3:
+      return "mat3";
+    case FragmentType::Matrix4:
+      return "mat4";
+  }
+  return "vec4";
+}
+
 std::string LeafName(const char* base, int leaf) {
   return leaf == 0 ? std::string(base) : std::string(base) + "_" + std::to_string(leaf);
 }
@@ -161,9 +186,9 @@ GeneratedDeclarations GenerateDeclarations(const Family& family, const Variant& 
 
 }  // namespace
 
-bool AssembleChainFragmentGLSL(const ChainComposition& composition, const Family& family,
-                               const Variant& variant, const PrecompiledShaderCache* cache,
-                               std::string* code) {
+bool AssembleChainFragmentGLSL(const ChainPlan& plan, const ChainComposition& composition,
+                               const Family& family, const Variant& variant,
+                               const PrecompiledShaderCache* cache, std::string* code) {
   if (code == nullptr) {
     return false;
   }
@@ -203,21 +228,10 @@ bool AssembleChainFragmentGLSL(const ChainComposition& composition, const Family
   }
   // The used ops' pack entries, each at most once: the pure fragments, the resource evaluators
   // (already include-expanded), and the shared dependencies the coverage fragments call into.
-  std::set<int> usedOps = {};
-  bool needsTexture = false;
-  bool needsAnalytic = false;
-  for (const auto& slot : composition.slots) {
-    if (slot.op == ChainISA::None) {
-      continue;
-    }
-    usedOps.insert(slot.op);
-    if (slot.op == ChainISA::Texture || slot.op == ChainISA::TexModulate) {
-      needsTexture = true;
-    }
-    if (slot.op == ChainISA::LocalRectCoverage || slot.op == ChainISA::RRectCoverage) {
-      needsAnalytic = true;
-    }
-  }
+  const std::set<int>& usedOps = plan.usedOps;
+  bool needsTexture = plan.hasTexture;
+  bool needsAnalytic = usedOps.count(ChainISA::LocalRectCoverage) != 0 ||
+                       usedOps.count(ChainISA::RRectCoverage) != 0;
   std::string pieces;
   auto appendPiece = [&](uint32_t id) {
     const std::string text = PackText(cache, id);
@@ -275,10 +289,53 @@ bool AssembleChainFragmentGLSL(const ChainComposition& composition, const Family
                 LeafName("SubsetClampOn", static_cast<int>(index)) + ", " + leaf + ");\n";
   }
   // The declarations come first: they pick the packed forms below.
-  const auto declarations = GenerateDeclarations(family, variant);
-  // The straight-line body: the pure-mode statements, with the registers declared by the wrapper.
-  const std::string body = EmitComposedChainBodyGLSL(composition, /*pureOps=*/true);
-  if (body.empty()) {
+  auto declarations = GenerateDeclarations(family, variant);
+  // The plan's parameter members join the block past the prefix (their offsets start at the
+  // prefix's fragment block size, which std140 rounds to the same boundary the driver computes).
+  if (!plan.params.empty()) {
+    std::string paramMembers;
+    for (const auto& param : plan.params) {
+      paramMembers += std::string("  ") + GlslTypeOf(param.type) + " " + param.member + ";\n";
+    }
+    const auto closeAt = declarations.uniformBlock.rfind("};");
+    if (closeAt == std::string::npos) {
+      return false;
+    }
+    declarations.uniformBlock.insert(closeAt, paramMembers);
+  }
+  // The straight-line body: one call per slot, the arguments naming members, locals and literals.
+  std::string body;
+  for (const auto& call : plan.calls) {
+    const auto* def = FindFragment(call.op);
+    if (def == nullptr) {
+      return false;
+    }
+    if (call.op == ChainISA::InputOpaque) {
+      body += "  vec4 " + call.out + " = vec4(" + call.args[0] + ".rgb, 1.0);\n";
+    } else if (call.op == ChainISA::MulAlpha) {
+      body += "  vec4 " + call.out + " = " + call.args[0] + " * " + call.args[1] + ".a;\n";
+    } else {
+      std::string args;
+      for (size_t index = 0; index < call.args.size(); ++index) {
+        if (index != 0) {
+          args += ", ";
+        }
+        args += call.args[index];
+      }
+      body += "  vec4 " + call.out + " = " + def->functionName + "(" + args + ");\n";
+    }
+    if (!call.sink.empty()) {
+      body += "  " + call.sink + " = " + call.out + ";\n";
+    }
+    if (!call.post.empty()) {
+      body += "  " + call.post + "\n";
+    }
+  }
+  if (plan.xpNeedsBlendPass) {
+    body += "  chainXPSrc = chainXPSrcUnpremul(result, coverageRootRegister);\n";
+    body += "  xpBlended = xpBlendColors(chainXPSrc, chainXPDst, XPBlendMode);\n";
+  }
+  if (body.empty() && !composition.slots.empty()) {
     return false;
   }
   if (usedOps.count(ChainISA::Gradient) != 0) {
