@@ -173,7 +173,7 @@ static bool FitsLimit(const PixelRect& rect, int limitWidth, int limitHeight) {
 
 }  // namespace
 
-bool LayerDrawSession::IsSupported2DSubtree(Layer* layer) {
+bool LayerDrawSession::IsSupported2DSubtree(Layer* layer, std::vector<Layer*>& activeMasks) {
   if (layer->canPreserve3D()) {
     return false;
   }
@@ -185,15 +185,21 @@ bool LayerDrawSession::IsSupported2DSubtree(Layer* layer) {
     if (!child->visible() || child->alpha() <= 0 || child->maskOwner) {
       continue;
     }
-    if (!IsSupported2DSubtree(child.get())) {
+    if (!IsSupported2DSubtree(child.get(), activeMasks)) {
       return false;
     }
   }
-  auto mask = layer->mask();
-  if (mask != nullptr && !IsSupported2DSubtree(mask.get())) {
+  if (!layer->hasValidMask()) {
+    return true;
+  }
+  auto* mask = layer->mask().get();
+  if (std::find(activeMasks.begin(), activeMasks.end(), mask) != activeMasks.end()) {
     return false;
   }
-  return true;
+  activeMasks.push_back(mask);
+  auto supported = IsSupported2DSubtree(mask, activeMasks);
+  activeMasks.pop_back();
+  return supported;
 }
 
 bool LayerDrawSession::IsSupportedAncestorChain(Layer* target, Layer* captureRoot) {
@@ -402,11 +408,12 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
     }
     return nullptr;
   }
+  std::vector<Layer*> activeMasks = {};
   if (!IsSupportedAncestorChain(request.target, request.captureRoot) ||
-      !IsSupported2DSubtree(request.target)) {
+      !IsSupported2DSubtree(request.target, activeMasks)) {
     if (control != nullptr) {
       control->fail(DrawFailureCode::UnsupportedContent, DrawStage::Validation, request.target, {},
-                    "perspective or preserve-3D content is not supported by the tiled export");
+                    "the tiled export does not support perspective, preserve-3D or cyclic masks");
     }
     return nullptr;
   }

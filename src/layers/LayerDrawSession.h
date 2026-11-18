@@ -287,7 +287,7 @@ class LayerDrawSession {
  private:
   LayerDrawSession() = default;
 
-  static bool IsSupported2DSubtree(Layer* layer);
+  static bool IsSupported2DSubtree(Layer* layer, std::vector<Layer*>& activeMasks);
   static bool IsSupportedAncestorChain(Layer* target, Layer* captureRoot);
   static void ScanBackgroundOutset(Layer* layer, const Matrix& localToRoot, float ancestorOutset,
                                    float* maxOutset, bool* needsBackground);
