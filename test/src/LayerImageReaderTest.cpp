@@ -1519,4 +1519,37 @@ TGFX_TEST(LayerImageReaderTest, LaterSiblingFailureDoesNotInvalidateTargetBackdr
   EXPECT_EQ(output.image.pixels, reference.image.pixels);
 }
 
+TGFX_TEST(LayerImageReaderTest, TinyBackgroundBlurAtHighScaleFitsSmallTiles) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto root = Layer::Make();
+  auto background = MakeExportSolid(Color::Red());
+  root->addChild(background);
+  auto glass = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
+  glass->setWidth(1);
+  glass->setHeight(1);
+  glass->setLayerStyles({BackgroundBlurStyle::Make(1.0f / 1024, 1.0f / 1024)});
+  root->addChild(glass);
+  LayerImageRequest request = {};
+  request.target = root;
+  request.sceneRoot = root;
+  request.outputSize = {8, 8};
+  request.targetLocalToOutput = Matrix::MakeScale(1024);
+  request.targetLocalToOutput.postTranslate(-512, -512);
+  LayerImageReadOptions options = {};
+  options.bandRows = 8;
+  options.tileSizeLimit = {32, 32};
+  auto reader = LayerImageReader::Make(context, request, options);
+  ASSERT_TRUE(reader != nullptr);
+  auto info = reader->bandInfo();
+  std::vector<uint8_t> pixels(info.byteSize());
+  auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
+  ASSERT_EQ(result.code, LayerImageReadCode::BandReady) << result.error.message;
+  EXPECT_EQ(pixels[0], 255);
+  EXPECT_NEAR(pixels[1], 96, 1);
+  EXPECT_NEAR(pixels[2], 96, 1);
+  EXPECT_EQ(pixels[3], 255);
+}
+
 }  // namespace tgfx
