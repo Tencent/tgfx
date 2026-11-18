@@ -439,9 +439,8 @@ static std::shared_ptr<ImageFilter> MapFilterToUserSpace(const std::shared_ptr<I
       const auto shadowFilter = static_cast<const DropShadowImageFilter*>(filter.get());
       auto blurriness = MapShadowFilterBlurriness(matrix, shadowFilter->blurFilter);
       auto offset = MapFilterOffset(matrix, shadowFilter->dx, shadowFilter->dy);
-      return std::make_shared<DropShadowImageFilter>(offset.x, offset.y, blurriness.x,
-                                                     blurriness.y, shadowFilter->color,
-                                                     shadowFilter->shadowOnly);
+      return std::make_shared<DropShadowImageFilter>(offset.x, offset.y, blurriness.x, blurriness.y,
+                                                     shadowFilter->color, shadowFilter->shadowOnly);
     }
     case Types::ImageFilterType::InnerShadow: {
       const auto shadowFilter = static_cast<const InnerShadowImageFilter*>(filter.get());
