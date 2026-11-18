@@ -1470,6 +1470,77 @@ static void CheckTinyTilePixel(Context* context, Layer* layer, int left) {
   EXPECT_EQ(pixel[3], 255);
 }
 
+TGFX_TEST(LayerImageReaderTest, FarBackdropCaptureMatchesNearPixelGrid) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int CoreWidth = 16;
+  std::vector<uint8_t> reference;
+  for (int left : {32, (1 << 24) + 32}) {
+    SCOPED_TRACE(left);
+    auto scene = Layer::Make();
+    for (int offset : {4, 10}) {
+      auto stripe = SolidLayer::Make();
+      stripe->setColor(offset == 4 ? Color::Red() : Color::Blue());
+      stripe->setWidth(2);
+      stripe->setHeight(8);
+      stripe->setMatrix(Matrix::MakeTrans(static_cast<float>(left + offset), 0));
+      scene->addChild(stripe);
+    }
+    auto glass = SolidLayer::Make();
+    glass->setWidth(24);
+    glass->setHeight(8);
+    glass->setColor(Color::FromRGBA(255, 255, 255, 96));
+    glass->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
+    auto glassPlacement = Matrix::MakeTrans(static_cast<float>(left - 4), 0);
+    glass->setMatrix(glassPlacement);
+    scene->addChild(glass);
+
+    // Export only the glass. Color variations in the result must come from its sampled backdrop.
+    LayerDrawRequest request = {};
+    request.target = glass.get();
+    request.captureRoot = scene.get();
+    request.samplingMode = LayerSamplingMode::ExportFixed;
+    request.targetLocalToOutput = glassPlacement;
+    request.outputSize = {left + CoreWidth, 8};
+    request.clearColor = Color::Black();
+    DrawControl control = {};
+    auto session = LayerDrawSession::Prepare(context, request, &control);
+    ASSERT_TRUE(session != nullptr) << control.firstFailure.message;
+    // A one-pixel core plus the blur's two-pixel radius and one sampling pixel on each side
+    // fills a seven-pixel target. Neighboring cores exercise both odd and even tile origins.
+    LayerDrawLimits limits = {*context->gpu()->limits(), {7, 7}};
+    auto info = OutputInfo(1, 1);
+    std::vector<uint8_t> pixels(CoreWidth * info.byteSize());
+    for (int x = 0; x < CoreWidth; ++x) {
+      auto column = left + x;
+      auto plan = session->planRegion({column, 4, column + 1, 5}, limits, &control);
+      ASSERT_EQ(plan.code, RegionPlanCode::Ready) << control.firstFailure.message;
+      auto batchPlan = session->planBatch({plan.region}, limits, &control);
+      ASSERT_EQ(batchPlan.code, BatchPlanCode::Ready);
+      auto batch = session->prepareBatch(context, *batchPlan.plan, &control);
+      ASSERT_TRUE(batch != nullptr) << control.firstFailure.message;
+      const auto& rect = plan.region.renderRect;
+      auto surface = Surface::Make(context, rect.width(), rect.height());
+      ASSERT_TRUE(surface != nullptr);
+      LayerDrawTarget target = {};
+      target.canvas = surface->getCanvas();
+      target.clearBeforeDraw = true;
+      ASSERT_EQ(session->drawRegion(context, *batch, 0, target, &control), DrawOutcome::Success)
+          << control.firstFailure.message;
+      ASSERT_TRUE(surface->readPixels(info, pixels.data() + x * info.byteSize(), column - rect.left,
+                                      4 - rect.top));
+    }
+    EXPECT_GT(pixels[4 * 4], pixels[4 * 4 + 2]);
+    EXPECT_GT(pixels[10 * 4 + 2], pixels[10 * 4]);
+    if (reference.empty()) {
+      reference = pixels;
+    } else {
+      EXPECT_EQ(pixels, reference);
+    }
+  }
+}
+
 TGFX_TEST(LayerImageReaderTest, TinyTilePreservesFarPathCoordinates) {
   ContextScope scope;
   ASSERT_TRUE(scope.getContext() != nullptr);
