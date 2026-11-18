@@ -308,11 +308,11 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
     }
     return nullptr;
   }
-  // A middle ancestor would place renderBounds and the capture geometry in different coordinate
-  // spaces, so the export accepts only the real root or the detached target itself.
-  if (request.samplingMode == LayerSamplingMode::ExportFixed &&
-      request.captureRoot->root() != nullptr &&
-      request.captureRoot->root() != request.captureRoot) {
+  auto sceneRoot = request.target->root();
+  bool validCaptureRoot = sceneRoot != nullptr ? request.captureRoot == sceneRoot
+                                               : request.captureRoot == request.target ||
+                                                     !request.captureRoot->parent();
+  if (request.samplingMode == LayerSamplingMode::ExportFixed && !validCaptureRoot) {
     if (control != nullptr) {
       control->fail(DrawFailureCode::InvalidRequest, DrawStage::Validation, request.target, {},
                     "the scene root must be the real root of the target");
