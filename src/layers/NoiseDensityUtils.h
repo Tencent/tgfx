@@ -24,6 +24,10 @@
 
 namespace tgfx {
 
+// Creates the fractal noise shader shared by NoiseStyle and NoiseFilter. size is the noise cell
+// size in content units and scale converts content units to device pixels.
+std::shared_ptr<Shader> MakeNoiseShader(float size, float scale, float seed);
+
 int ComputeLinearBucket(float density, float slope, float intercept);
 
 // Slopes/intercepts are chosen so that at density=0 each band collapses to a single bucket

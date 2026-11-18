@@ -21,6 +21,7 @@
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
 #include "core/images/OrientImage.h"
+#include "core/images/ProviderImage.h"
 #include "core/images/RGBAAAImage.h"
 #include "core/images/RasterizedImage.h"
 #include "core/images/ScaledImage.h"
@@ -79,6 +80,10 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator
     image = image->makeRasterized();
   }
   return image;
+}
+
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageProvider> provider) {
+  return ProviderImage::Make(std::move(provider));
 }
 
 std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels) {

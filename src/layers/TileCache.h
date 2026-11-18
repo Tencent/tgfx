@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <unordered_map>
 #include "tgfx/core/Rect.h"
 

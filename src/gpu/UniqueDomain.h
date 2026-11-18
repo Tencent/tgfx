@@ -19,6 +19,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {

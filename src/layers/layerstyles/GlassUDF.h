@@ -31,6 +31,14 @@ namespace tgfx {
 constexpr int GlassUDFMaxTentRadius = 64;
 
 /**
+ * Computes the UDF core scale while preserving the device texture limit. The short-side texel floor
+ * is best-effort: for extreme aspect ratios the whole-shape limit wins, accepting a lower short-side
+ * resolution instead of requesting an unallocatable texture.
+ */
+float CalculateGlassUDFScale(float maxDimension, float minDimension, float maxAllowedDimension,
+                             float minShortSideTexels);
+
+/**
  * Everything GenerateGlassUDFTexture needs to build one UDF field. GlassStyle assembles this while
  * recording, where no GPU context exists yet, and the refraction filter turns it into a texture at
  * playback time.
