@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Canvas.h"
+#include <algorithm>
 #include <limits>
 #include "core/CanvasState.h"
 #include "core/ClipStack.h"
@@ -376,6 +377,13 @@ void Canvas::drawLine(const Point line[2], const Matrix& matrix, const ClipStack
   }
 }
 
+static Point RectTileAnchor(Point tileAnchor, const Rect& rect) {
+  // Use the nearest point inside the geometry so subtracting a distant tile origin cannot
+  // round both edges of a narrow rectangle to the same float.
+  return {std::clamp(tileAnchor.x, rect.left, rect.right),
+          std::clamp(tileAnchor.y, rect.top, rect.bottom)};
+}
+
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   if (rect.isEmpty()) {
     if (paint.getStyle() != PaintStyle::Stroke) {
@@ -388,7 +396,7 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   }
   SaveLayerForImageFilter(paint.getImageFilter());
   if (needsTileRebase()) {
-    auto anchor = getTileAnchor();
+    auto anchor = RectTileAnchor(getTileAnchor(), rect);
     drawContext->drawRect(rect.makeOffset(-anchor.x, -anchor.y),
                           getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y)), *clipStack,
                           paint.getBrush().makeWithMatrix(Matrix::MakeTrans(-anchor.x, -anchor.y)),
@@ -553,7 +561,7 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
   }
   SaveLayerForImageFilter(paint.getImageFilter());
   if (needsTileRebase()) {
-    auto anchor = getTileAnchor();
+    auto anchor = RectTileAnchor(getTileAnchor(), rRect.rect());
     auto local = rRect;
     local.offset(-anchor.x, -anchor.y);
     drawContext->drawRRect(local, getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y)),
