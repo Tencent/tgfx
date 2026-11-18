@@ -1439,26 +1439,17 @@ TGFX_TEST(LayerImageReaderTest, LargeTileOriginPreservesSinglePixelAlignment) {
   }
 }
 
-TGFX_TEST(LayerImageReaderTest, TinyTilePreservesFarPathCoordinates) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  constexpr int Left = 16779246;
-  auto shape = ShapeLayer::Make();
-  Path path = {};
-  path.addRect(Rect::MakeXYWH(Left, 0, 2, 3));
-  shape->setPath(path);
-  shape->setFillStyle(ShapeStyle::Make(Color::Red()));
+static void CheckTinyTilePixel(Context* context, Layer* layer, int left) {
   LayerDrawRequest request = {};
-  request.target = shape.get();
-  request.captureRoot = shape.get();
+  request.target = layer;
+  request.captureRoot = layer;
   request.samplingMode = LayerSamplingMode::ExportFixed;
-  request.outputSize = {Left + 4, 3};
+  request.outputSize = {left + 4, 3};
   DrawControl control = {};
   auto session = LayerDrawSession::Prepare(context, request, &control);
   ASSERT_TRUE(session != nullptr) << control.firstFailure.message;
   LayerDrawLimits limits = {*context->gpu()->limits(), {3, 3}};
-  auto plan = session->planRegion({Left, 1, Left + 1, 2}, limits, &control);
+  auto plan = session->planRegion({left, 1, left + 1, 2}, limits, &control);
   ASSERT_EQ(plan.code, RegionPlanCode::Ready) << control.firstFailure.message;
   auto batchPlan = session->planBatch({plan.region}, limits, &control);
   ASSERT_EQ(batchPlan.code, BatchPlanCode::Ready);
@@ -1474,9 +1465,51 @@ TGFX_TEST(LayerImageReaderTest, TinyTilePreservesFarPathCoordinates) {
   target.clearBeforeDraw = true;
   ASSERT_EQ(session->drawRegion(context, *batch, 0, target, &control), DrawOutcome::Success);
   uint8_t pixel[4] = {};
-  ASSERT_TRUE(surface->readPixels(OutputInfo(1, 1), pixel, Left - rect.left, 1 - rect.top));
+  ASSERT_TRUE(surface->readPixels(OutputInfo(1, 1), pixel, left - rect.left, 1 - rect.top));
   EXPECT_EQ(pixel[0], 255);
   EXPECT_EQ(pixel[3], 255);
+}
+
+TGFX_TEST(LayerImageReaderTest, TinyTilePreservesFarPathCoordinates) {
+  ContextScope scope;
+  ASSERT_TRUE(scope.getContext() != nullptr);
+  constexpr int Left = 16779246;
+  auto shape = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(Left, 0, 2, 3));
+  shape->setPath(path);
+  shape->setFillStyle(ShapeStyle::Make(Color::Red()));
+  CheckTinyTilePixel(scope.getContext(), shape.get(), Left);
+}
+
+TGFX_TEST(LayerImageReaderTest, TinyTilePreservesRecordedGeometryAndClips) {
+  class PictureTileLayer final : public Layer {
+   public:
+    std::shared_ptr<Picture> picture;
+    bool drawLayer(const DrawArgs&, Canvas* canvas, float, BlendMode) override {
+      canvas->drawPicture(picture);
+      return true;
+    }
+  };
+  ContextScope scope;
+  ASSERT_TRUE(scope.getContext() != nullptr);
+  constexpr int Left = 16779246;
+  for (bool translateRecording : {false, true}) {
+    SCOPED_TRACE(translateRecording);
+    PictureRecorder recorder;
+    auto* canvas = recorder.beginRecording();
+    canvas->clipRect(Rect::MakeXYWH(Left, 0, 2, 3));
+    if (translateRecording) {
+      canvas->translate(static_cast<float>(Left), 0);
+    }
+    Paint paint = {};
+    paint.setColor(Color::Red());
+    canvas->drawRect(Rect::MakeXYWH(translateRecording ? 0 : Left, 0, 2, 3), paint);
+    PictureTileLayer layer;
+    layer.picture = recorder.finishRecordingAsPicture();
+    ASSERT_TRUE(layer.picture != nullptr);
+    CheckTinyTilePixel(scope.getContext(), &layer, Left);
+  }
 }
 
 static std::shared_ptr<SolidLayer> MakeExportSolid(const Color& color) {
