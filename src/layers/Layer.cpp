@@ -208,8 +208,9 @@ static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Can
   }
 
   bool opaqueMode = args.opaqueContext != nullptr;
-  return Layer3DContext::Make(opaqueMode, args.context, validRenderRect, contentScale,
-                              args.dstColorSpace);
+  return Layer3DContext::Make(
+      opaqueMode, args.context, validRenderRect, contentScale, args.dstColorSpace,
+      args.backgroundHandler != nullptr ? args.backgroundHandler->styleSourceRects() : nullptr);
 }
 
 bool Layer::DefaultAllowsEdgeAntialiasing() {
@@ -954,7 +955,8 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       // rooted, or this layer's local bounds when orphan.
       Layer* captureRoot = _root ? _root : this;
       Rect captureRect = _root ? renderRect : clippedBounds;
-      BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), &snapshotMap, {captureRect});
+      BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), &snapshotMap, {captureRect},
+                              {captureRect});
       snapshotsPtr = &snapshotMap;
     }
   }
@@ -1448,6 +1450,7 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 
   auto drawArgs = args;
   drawArgs.renderFlags |= RenderFlags::DisableCache;
+  // The cache is reused across frames, so it records the whole subtree.
   drawArgs.renderRects = nullptr;
   // Cache content should be rendered to a regular texture, not to 3D compositor.
   drawArgs.render3DContext = nullptr;
@@ -1859,6 +1862,15 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
   DrawArgs drawArgs = args;
   drawArgs.render3DContext = nullptr;
+  // The cached sources are reused outside the rects that limit the capture's own draw calls, so a
+  // capture pass records them against the whole area it captured. Read that range from the pass
+  // before dropping its handler: a recording that deliberately clears renderRects keeps the
+  // complete range as well, because the range belongs to the pass rather than to DrawArgs.
+  if (auto* handler = args.backgroundHandler) {
+    if (auto* styleSourceRects = handler->styleSourceRects()) {
+      drawArgs.renderRects = styleSourceRects;
+    }
+  }
   // Layer style source content is an intermediate artifact — skip background capture / consume.
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
 
@@ -2338,17 +2350,21 @@ void Layer::propagateLayerState() {
   }
 }
 
-bool Layer::hasBackgroundStyle() {
-  if (!bitFields.dirtyDescendents) {
-    return maxBackgroundOutset > 0;
-  }
+bool Layer::hasOwnBackgroundStyle() const {
   for (const auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
     if (NeedsBackgroundSource(style->extraSourceType())) {
       return true;
     }
   }
-  return hasDescendantBackgroundStyle();
+  return false;
+}
+
+bool Layer::hasBackgroundStyle() {
+  if (!bitFields.dirtyDescendents) {
+    return maxBackgroundOutset > 0;
+  }
+  return hasOwnBackgroundStyle() || hasDescendantBackgroundStyle();
 }
 
 bool Layer::hasDescendantBackgroundStyle() {
