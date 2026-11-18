@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/chain/ChainTextAssembler.h"
+#include <atomic>
+#include <cstdlib>
+#include <fstream>
 #include <set>
 #include <vector>
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
@@ -147,6 +150,15 @@ bool AssembleChainFragmentRectGLSL(const ChainComposition& composition,
           "  vec4 clipRegister = vec4(0.0);\n"
           "  vec4 coverageRootRegister = vec4(0.0);\n" +
           body + tailText + "}\n";
+  // The dump aid: with TGFX_ASSEMBLED_DUMP pointing at a directory, every assembled text lands
+  // there as assembled_N.glsl for inspection. Read-only diagnostic, no effect on the pipeline.
+  if (const char* dumpDir = std::getenv("TGFX_ASSEMBLED_DUMP")) {
+    static std::atomic<int> dumpCount = {0};
+    const int index = dumpCount.fetch_add(1);
+    std::ofstream file(std::string(dumpDir) + "/assembled_" + std::to_string(index) + ".glsl",
+                       std::ios::binary);
+    file << *code;
+  }
   return true;
 }
 
