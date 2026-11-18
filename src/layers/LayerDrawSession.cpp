@@ -301,7 +301,7 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
     }
     return nullptr;
   }
-  if (!request.captureRoot->contains(request.target->shared_from_this())) {
+  if (!request.captureRoot->doContains(request.target)) {
     if (control != nullptr) {
       control->fail(DrawFailureCode::InvalidRequest, DrawStage::Validation, request.target, {},
                     "capture root does not contain the target");
