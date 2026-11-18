@@ -117,8 +117,10 @@ struct LayerImageRequest {
 struct LayerImageReadOptions {
   // Maximum number of rows returned by one successful read. Must be positive.
   int bandRows = 0;
-  // Upper bound for the drawing surface of one region, including its sampling margin. (0, 0)
-  // lets the device limit decide. Otherwise both dimensions must be positive.
+  // Upper bound for one region's drawing surface, including its sampling margin. With (0, 0),
+  // each dimension is capped at the smaller of 2048 pixels and the device's texture limit.
+  // For an explicit limit, both dimensions must be at least 3 pixels. The device limit still
+  // applies to each dimension.
   ISize tileSizeLimit = {0, 0};
 };
 
