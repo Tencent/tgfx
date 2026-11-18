@@ -442,10 +442,13 @@ TGFX_TEST(LayerImageReaderTest, MaskedTargetWithAttributesMatchesSingleSurface) 
   content->setBlendMode(BlendMode::Multiply);
   content->setMatrix(Matrix::MakeTrans(6, 4));
   auto displayList = MakeDisplayList(content);
+  auto backdrop = Color::FromRGBA(128, 128, 128, 255);
+  displayList->setBackgroundColor(backdrop);
   auto mask = ShapeLayer::Make();
   Path maskPath = {};
   maskPath.addRect(Rect::MakeXYWH(4, 6, 130, 96));
   mask->setPath(maskPath);
+  mask->setFillStyle(ShapeStyle::Make(Color::White()));
   displayList->root()->addChild(mask);
   content->setMask(mask);
 
@@ -459,6 +462,7 @@ TGFX_TEST(LayerImageReaderTest, MaskedTargetWithAttributesMatchesSingleSurface) 
   request.targetLocalToOutput = Matrix::MakeTrans(6, 4);
   request.alpha = 0.7f;
   request.blendMode = BlendMode::Multiply;
+  request.clearColor = backdrop;
   request.renderColorSpace = ColorSpace::SRGB();
   request.outputColorSpace = ColorSpace::SRGB();
   LayerImageReadOptions options = {};
@@ -483,6 +487,17 @@ TGFX_TEST(LayerImageReaderTest, MaskedTargetWithAttributesMatchesSingleSurface) 
     nextRow += result.rowCount;
   }
   EXPECT_TRUE(reader->isDone());
+  // The translated red stripe multiplies the gray backdrop through the opaque part of the mask.
+  const auto* inside = output.pixels.data() + 30 * output.rowBytes + 45 * 4;
+  EXPECT_NEAR(inside[0], 128, 1);
+  EXPECT_LT(inside[1], 128);
+  EXPECT_GT(inside[1], 0);
+  EXPECT_EQ(inside[1], inside[2]);
+  const auto* outside = output.pixels.data() + 30 * output.rowBytes + 145 * 4;
+  EXPECT_EQ(outside[0], 128);
+  EXPECT_EQ(outside[1], 128);
+  EXPECT_EQ(outside[2], 128);
+  EXPECT_EQ(outside[3], 255);
   EXPECT_EQ(CountDifferentPixels(reference, output, 0), 0);
 }
 
