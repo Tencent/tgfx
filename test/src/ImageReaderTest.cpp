@@ -37,6 +37,7 @@ class FakeImageStream : public ImageStream {
   int drainCount = 0;
   int64_t frameTimestamp = 0;
   int updateCount = 0;
+  bool providesFrameTimestamp = true;
 
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override {
@@ -50,6 +51,10 @@ class FakeImageStream : public ImageStream {
 
   void onDrainPendingFrames() override {
     drainCount++;
+  }
+
+  bool hasFrameTimestamp() const override {
+    return providesFrameTimestamp;
   }
 
   int64_t currentFrameTimestamp() override {
@@ -103,4 +108,21 @@ TGFX_TEST_PRIVATE(ImageReaderTest, WaitsForTargetFrameTimestamp) {
                       EXPECT_TRUE(TextureView::MakeFrom(context, second, false) != nullptr);
                       EXPECT_EQ(stream->updateCount, 1);)
 }
+/**
+ * A stream without frame timestamps cannot tell whether the target was reached, so the reader must
+ * not spend extra texture uploads waiting for it.
+ */
+TGFX_TEST_PRIVATE(ImageReaderTest, IgnoresTargetFrameTimestampWithoutTimestamps) {
+  TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
+                      ASSERT_TRUE(context != nullptr);
+                      auto stream = std::make_shared<FakeImageStream>(16, 16);
+                      stream->providesFrameTimestamp = false;
+                      auto reader = ImageReader::MakeFrom(stream); ASSERT_TRUE(reader != nullptr);
+
+                      reader->setTargetFrameTimestamp(1000);
+                      auto first = reader->acquireNextBuffer(); ASSERT_TRUE(first != nullptr);
+                      EXPECT_TRUE(TextureView::MakeFrom(context, first, false) != nullptr);
+                      EXPECT_EQ(stream->updateCount, 0);)
+}
+
 }  // namespace tgfx

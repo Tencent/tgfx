@@ -70,8 +70,18 @@ class ImageStream {
   virtual bool onUpdateTexture(std::shared_ptr<TextureView> textureView) = 0;
 
   /**
-   * Returns the presentation timestamp, in nanoseconds, of the frame held by the texture. The default
-   * implementation returns 0; only streams backed by a timestamped producer report a real value.
+   * Returns true when currentFrameTimestamp() reports a meaningful presentation time, so that
+   * ImageReader may wait for a target timestamp instead of only draining the queued frames. The
+   * default implementation returns false: a stream without timestamps cannot tell whether a target
+   * has been reached, so ImageReader ignores the target for it.
+   */
+  virtual bool hasFrameTimestamp() const {
+    return false;
+  }
+
+  /**
+   * Returns the presentation timestamp, in nanoseconds, of the frame held by the texture. Only valid
+   * when hasFrameTimestamp() returns true.
    */
   virtual int64_t currentFrameTimestamp() {
     return 0;

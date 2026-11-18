@@ -66,6 +66,10 @@ class SurfaceTexture : public ImageStream {
 
   void onDrainPendingFrames() override;
 
+  bool hasFrameTimestamp() const override {
+    return true;
+  }
+
   int64_t currentFrameTimestamp() override;
 
  private:

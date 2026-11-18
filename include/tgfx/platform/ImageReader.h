@@ -72,9 +72,9 @@ class ImageReader {
    * Sets the presentation timestamp, in nanoseconds, that the next generated texture must reach, so
    * the texture shows the frame the caller is drawing instead of an older one still sitting in the
    * producer's queue. readTexture() consumes the queued frames until the texture reaches it and
-   * waits for the producer when the frame is still being decoded. Passing 0 clears the request.
-   * Video sources that cannot queue frames ahead (every source except the Android
-   * SurfaceTextureReader) ignore it.
+   * waits for the producer when the frame is still being decoded. The request applies to that one
+   * texture generation and is then cleared; passing 0 clears it early. Streams that do not report a
+   * frame timestamp (ImageStream::hasFrameTimestamp() returns false) ignore it.
    */
   void setTargetFrameTimestamp(int64_t timestamp);
 

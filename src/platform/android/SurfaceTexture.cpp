@@ -303,6 +303,9 @@ void SurfaceTexture::onDrainPendingFrames() {
   // frame cap bounds a producer whose timestamp keeps advancing on every latch, so the loop still
   // ends even if it never reports no progress.
   // Unlike updateTexImage(), this path never waits for a new frame.
+  // Clear the flag before consuming: a frame that arrives while this loop runs sets it again, and
+  // clearing it afterwards would make the next updateTexImage() miss that frame.
+  frameAvailable = false;
   static constexpr int MAX_DRAIN_FRAMES = 8;
   jlong lastTimestamp = env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp);
   for (int i = 0; i < MAX_DRAIN_FRAMES; i++) {
@@ -317,7 +320,6 @@ void SurfaceTexture::onDrainPendingFrames() {
     }
     lastTimestamp = timestamp;
   }
-  frameAvailable = false;
 }
 
 unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
