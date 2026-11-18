@@ -249,7 +249,7 @@ class LayerDrawBatch {
  * Shared drawing session used by both the regular Layer::draw() path and the tiled export reader.
  * It fixes the request, the root mapping and the sampling rules once, plans output regions and
  * batches, prepares per-batch background snapshots, and replays the existing Layer drawing.
- * Methods other than requestCancel() must run on the thread that owns the scene.
+ * Session methods must run on the thread that owns the scene.
  */
 class LayerDrawSession {
  public:
