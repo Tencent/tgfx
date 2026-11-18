@@ -1499,4 +1499,24 @@ TGFX_TEST(LayerImageReaderTest, OnlyPreceding3DSiblingsAreBackdropDependencies) 
   EXPECT_EQ(output.error.code, LayerImageErrorCode::UnsupportedContent);
 }
 
+TGFX_TEST(LayerImageReaderTest, LaterSiblingFailureDoesNotInvalidateTargetBackdrop) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto displayList = MakeDisplayList(MakeExportSolid(Color::Red()));
+  auto sceneRoot = displayList->root()->shared_from_this();
+  auto glass = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
+  glass->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+  sceneRoot->addChild(glass);
+  auto reference = ReadTiled(context, glass, sceneRoot, {64, 64});
+  ASSERT_EQ(reference.error.code, LayerImageErrorCode::None) << reference.error.message;
+  auto sibling = MakeExportSolid(Color::Blue());
+  sibling->setFilters({std::make_shared<FailingFilter>()});
+  sibling->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+  sceneRoot->addChild(sibling);
+  auto output = ReadTiled(context, glass, sceneRoot, {64, 64});
+  EXPECT_EQ(output.error.code, LayerImageErrorCode::None) << output.error.message;
+  EXPECT_EQ(output.image.pixels, reference.image.pixels);
+}
+
 }  // namespace tgfx
