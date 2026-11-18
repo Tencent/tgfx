@@ -13,7 +13,12 @@
 #include "pipeline/chain/pointwise_gradient.inc"
 
 bool evalResourceSlot(ivec4 Packed, vec4 in0, int /*dataAt*/, out vec4 value) {
-  return evalGradientSlot(Packed, in0, value);
+  if (Packed.x != OP_GRADIENT) {
+    value = vec4(0.0);
+    return false;
+  }
+  value = evalGradientSlot(in0);
+  return true;
 }
 #elif RESOURCE_KIND == 2
 #if NTEX > 0
@@ -22,7 +27,12 @@ bool evalResourceSlot(ivec4 Packed, vec4 in0, int /*dataAt*/, out vec4 value) {
 #include "pipeline/chain/pointwise_noise.inc"
 
 bool evalResourceSlot(ivec4 Packed, vec4 in0, int dataAt, out vec4 value) {
-  return evalNoiseSlot(Packed, dataAt, value);
+  if (Packed.x != OP_PERLIN_NOISE) {
+    value = vec4(0.0);
+    return false;
+  }
+  value = evalNoiseSlot();
+  return true;
 }
 #else
 #if NTEX > 0

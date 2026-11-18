@@ -220,41 +220,46 @@ void UploadSlotData(SlotWriter* chainWriter, uint8_t dataElement, size_t index, 
   }
 }
 
-ChainISA::Float4 ToFloat4(const std::array<float, 4>& values) {
-  return {values[0], values[1], values[2], values[3]};
-}
-
 // Writes the chain's gradient parameter block into the pool's chain-wide region. The three
 // selectors stay runtime uniforms until the structural fields move to specialization constants.
-void UploadGradientParams(SlotWriter* chainWriter, size_t blockBase,
+void UploadGradientParams(SlotWriter* chainWriter, size_t /*blockBase*/,
                           const AOTGradientParameters& params) {
   chainWriter->setIfPresent(ChainField.gradientLayoutType, params.layoutType);
   chainWriter->setIfPresent(ChainField.gradientColorizerKind, params.colorizerKind);
   chainWriter->setIfPresent(ChainField.gradientIntervalCount, params.intervalCount);
-  ChainISA::GradientData data = {};
-  data.leftBorder = ToFloat4(params.leftBorder);
-  data.rightBorder = ToFloat4(params.rightBorder);
-  data.start = ToFloat4(params.start);
-  data.end = ToFloat4(params.end);
-  data.scale01 = ToFloat4(params.scale01);
-  data.bias01 = ToFloat4(params.bias01);
-  data.scale23 = ToFloat4(params.scale23);
-  data.bias23 = ToFloat4(params.bias23);
-  data.threshold = params.threshold;
-  data.bias = params.bias;
-  data.scale = params.scale;
-  data.thresholds1_7 = ToFloat4(params.thresholds1_7);
-  data.thresholds9_13 = ToFloat4(params.thresholds9_13);
+  // The named parameter block: the evaluator reads these members directly, so each field is
+  // written once by element index — no pool packing round trip.
+  constexpr uint8_t LeftBorder = UniformElementIndexOf(Chain, "Gradient_leftBorder");
+  constexpr uint8_t RightBorder = UniformElementIndexOf(Chain, "Gradient_rightBorder");
+  constexpr uint8_t Start = UniformElementIndexOf(Chain, "Gradient_start");
+  constexpr uint8_t End = UniformElementIndexOf(Chain, "Gradient_end");
+  constexpr uint8_t Scale01 = UniformElementIndexOf(Chain, "Gradient_scale01");
+  constexpr uint8_t Bias01 = UniformElementIndexOf(Chain, "Gradient_bias01");
+  constexpr uint8_t Scale23 = UniformElementIndexOf(Chain, "Gradient_scale23");
+  constexpr uint8_t Bias23 = UniformElementIndexOf(Chain, "Gradient_bias23");
+  constexpr uint8_t Threshold = UniformElementIndexOf(Chain, "Gradient_threshold");
+  constexpr uint8_t Bias = UniformElementIndexOf(Chain, "Gradient_bias");
+  constexpr uint8_t Scale = UniformElementIndexOf(Chain, "Gradient_scale");
+  constexpr uint8_t Thresholds1_7 = UniformElementIndexOf(Chain, "Gradient_thresholds1_7");
+  constexpr uint8_t Thresholds9_13 = UniformElementIndexOf(Chain, "Gradient_thresholds9_13");
+  constexpr uint8_t Scales = UniformElementIndexOf(Chain, "Gradient_scales");
+  constexpr uint8_t Biases = UniformElementIndexOf(Chain, "Gradient_biases");
+  chainWriter->setIfPresent(LeftBorder, params.leftBorder);
+  chainWriter->setIfPresent(RightBorder, params.rightBorder);
+  chainWriter->setIfPresent(Start, params.start);
+  chainWriter->setIfPresent(End, params.end);
+  chainWriter->setIfPresent(Scale01, params.scale01);
+  chainWriter->setIfPresent(Bias01, params.bias01);
+  chainWriter->setIfPresent(Scale23, params.scale23);
+  chainWriter->setIfPresent(Bias23, params.bias23);
+  chainWriter->setIfPresent(Threshold, params.threshold);
+  chainWriter->setIfPresent(Bias, params.bias);
+  chainWriter->setIfPresent(Scale, params.scale);
+  chainWriter->setIfPresent(Thresholds1_7, params.thresholds1_7);
+  chainWriter->setIfPresent(Thresholds9_13, params.thresholds9_13);
   for (size_t index = 0; index < 8; ++index) {
-    data.scales.v[index] = ToFloat4(params.scales[index]);
-    data.biases.v[index] = ToFloat4(params.biases[index]);
-  }
-  float words[ChainISA::GradientDataWords * 4] = {};
-  ChainISA::PackGradient(data, words);
-  for (size_t word = 0; word < static_cast<size_t>(ChainISA::GradientDataWords); ++word) {
-    const std::array<float, 4> word4 = {words[word * 4], words[word * 4 + 1], words[word * 4 + 2],
-                                        words[word * 4 + 3]};
-    chainWriter->setArrayElement(ChainField.chainData, blockBase + word, word4);
+    chainWriter->setArrayElementIfPresent(Scales, index, params.scales[index]);
+    chainWriter->setArrayElementIfPresent(Biases, index, params.biases[index]);
   }
 }
 
@@ -511,11 +516,11 @@ void BindChainProgram(const AOTProgram& program, SlotWriter* chainWriter, bool n
     }
     if (slots[index].op == AOTChainOp::PerlinNoise) {
       const auto& noise = slots[index].noise;
-      ChainISA::PerlinNoiseData data = {};
-      data.frequencyStitch = {noise.baseFrequencyX, noise.baseFrequencyY,
-                              static_cast<float>(noise.stitchWidth),
-                              static_cast<float>(noise.stitchHeight)};
-      UploadSlotData(chainWriter, ChainField.chainData, index, data, ChainISA::PackPerlinNoise);
+      constexpr uint8_t FrequencyStitch = UniformElementIndexOf(Chain, "Noise_frequencyStitch");
+      chainWriter->setIfPresent(FrequencyStitch,
+                                std::array<float, 4>{noise.baseFrequencyX, noise.baseFrequencyY,
+                                                     static_cast<float>(noise.stitchWidth),
+                                                     static_cast<float>(noise.stitchHeight)});
       int modeOctaves[] = {noise.noiseType, noise.numOctaves, noise.stitchTiles ? 1 : 0,
                            program.noiseSamplerBase};
       chainWriter->setIfPresent(ChainField.noiseModeOctaves, modeOctaves);

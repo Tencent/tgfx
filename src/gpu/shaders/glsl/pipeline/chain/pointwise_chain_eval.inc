@@ -41,13 +41,6 @@ vec4 chainXPDst = vec4(0.0);
 // transform is its own function: a text gate can only wrap a whole body, and a chain whose slots
 // carry no ColorSpaceXform never reaches the fallthrough that calls this. The gate is closed for
 // every libpag draw (the operator is unused there), and the stub's value is never observed.
-#pragma tgfx_spec_gate ColorSpace : (SPEC_UsedOps() & (1 << OP_COLOR_SPACE_XFORM)) != 0
-vec4 chainApplyColorSpaceXform(vec4 color) {
-  PM_APPLY_COLOR_SPACE_XFORM(color, ChainCSFlags, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType,
-                             ChainSrcOOTF, ChainColorXform, ChainDstOOTF, ChainDstTF0,
-                             ChainDstTF1, ChainDstTFType)
-  return color;
-}
 
 // OP_TEXTURE's modulation stage: only a chain whose slots carry a texture leaf reaches it, so a
 // chain without one closes the gate and the runtime splices the branch out of the text.

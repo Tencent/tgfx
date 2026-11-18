@@ -116,17 +116,11 @@ TGFX_TEST(ChainBodyEmitterTest, CoverageOpsAssignTheEpilogueRegisters) {
 TGFX_TEST(ChainBodyEmitterTest, GradientAndNoiseCallTheSharedEvaluators) {
   AOTProgram program = MakeProgram({MakeSlot(AOTChainOp::Gradient, -3, -2, 0)}, 0);
   const std::string body = EmitComposedChainBodyGLSL(program, false);
-  EXPECT_NE(
-      body.find("evalGradientSlot(ivec4(" + std::to_string(static_cast<int>(AOTChainOp::Gradient)) +
-                ", 0, 0, 0), chainUnitCoverageSource(), cg0)"),
-      std::string::npos);
+  EXPECT_NE(body.find("evalGradientSlot(chainUnitCoverageSource())"), std::string::npos);
   EXPECT_NE(body.find("result = cg0;"), std::string::npos);
   AOTProgram noise = MakeProgram({MakeSlot(AOTChainOp::PerlinNoise, -2, -2, 0)}, 0);
   const std::string noiseBody = EmitComposedChainBodyGLSL(noise, false);
-  EXPECT_NE(noiseBody.find("evalNoiseSlot(ivec4(" +
-                           std::to_string(static_cast<int>(AOTChainOp::PerlinNoise)) +
-                           ", 0, 0, 0), 0, cg0)"),
-            std::string::npos);
+  EXPECT_NE(noiseBody.find("vec4 cg0 = evalNoiseSlot();"), std::string::npos);
 }
 
 TGFX_TEST(ChainBodyEmitterTest, UnwrittenRegisterInputDeclines) {

@@ -1009,7 +1009,11 @@ if (TGFX_EMBED_SHADER_BUNDLES)
             set(TGFX_SHADER_TOOL_DEPENDS tgfx_host_shader_tool "${TGFX_SHADER_TOOL_COMMAND}")
         else ()
             set(TGFX_SHADER_TOOL_COMMAND shader_build_tool)
-            set(TGFX_SHADER_TOOL_DEPENDS shader_build_tool)
+            # The stamp rule needs the tool's binary FILE as a dependency, not just the target
+            # name: a target-level dependency only orders the build, it does not re-stamp when the
+            # tool relinks, so a tool change would keep serving the previous bundle until the
+            # stamp was deleted by hand.
+            set(TGFX_SHADER_TOOL_DEPENDS shader_build_tool "$<TARGET_FILE:shader_build_tool>")
         endif ()
         # A metallib only works on the platform it was compiled for (a macOS one fails to create a
         # pipeline on an iOS device or in the simulator), so an iOS build compiles it for its own

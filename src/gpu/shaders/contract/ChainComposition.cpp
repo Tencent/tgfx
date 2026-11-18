@@ -82,34 +82,55 @@ std::string EmitComposedChainBodyGLSL(const ChainComposition& composition, bool 
     if (!ResolveInput(slot.in0, registers, &in0) || !ResolveInput(slot.in1, registers, &in1)) {
       return {};
     }
-    const std::string dataAt =
-        std::to_string(slotIndex * static_cast<size_t>(ChainISA::PoolSlotWords));
+    const int wordAt = static_cast<int>(slotIndex) * ChainISA::PoolSlotWords;
+    const std::string dataAt = std::to_string(wordAt);
     const std::string local = "cg" + std::to_string(nextLocal);
     const std::string data = "cgData" + std::to_string(nextLocal);
     ++nextLocal;
     switch (slot.op) {
       case ChainISA::ConstColor:
-        body += "  ConstColorData " + data + " = chainLoadConstColor(" + dataAt + ");\n";
-        body += "  vec4 " + local + " = pmApplyConstColor(" + data + ".color, " + in0 + ", " +
-                std::to_string(slot.inputMode) + ");\n";
+        if (pureOps) {
+          body += "  vec4 " + local + " = pmApplyConstColor(ChainData[" + dataAt + "], " + in0 +
+                  ", " + std::to_string(slot.inputMode) + ");\n";
+        } else {
+          body += "  ConstColorData " + data + " = chainLoadConstColor(" + dataAt + ");\n";
+          body += "  vec4 " + local + " = pmApplyConstColor(" + data + ".color, " + in0 + ", " +
+                  std::to_string(slot.inputMode) + ");\n";
+        }
         break;
       case ChainISA::ColorMatrix:
-        body += "  ColorMatrixData " + data + " = chainLoadColorMatrix(" + dataAt + ");\n";
-        body += "  vec4 " + local + " = pmApplyColorMatrix(" + in0 + ", " + data + ".linear, " +
-                data + ".translate);\n";
+        if (pureOps) {
+          body += "  vec4 " + local + " = pmApplyColorMatrix(" + in0 + ", mat4(ChainData[" +
+                  std::to_string(wordAt) + "], ChainData[" + std::to_string(wordAt + 1) +
+                  "], ChainData[" + std::to_string(wordAt + 2) + "], ChainData[" +
+                  std::to_string(wordAt + 3) + "]), ChainData[" + std::to_string(wordAt + 4) +
+                  "]);\n";
+        } else {
+          body += "  ColorMatrixData " + data + " = chainLoadColorMatrix(" + dataAt + ");\n";
+          body += "  vec4 " + local + " = pmApplyColorMatrix(" + in0 + ", " + data + ".linear, " +
+                  data + ".translate);\n";
+        }
         break;
       case ChainISA::Luma:
-        body += "  LumaData " + data + " = chainLoadLuma(" + dataAt + ");\n";
-        body += "  vec4 " + local + " = pmApplyLuma(" + in0 + ", vec3(" + data + ".kr, " + data +
-                ".kg, " + data + ".kb));\n";
+        if (pureOps) {
+          body += "  vec4 " + local + " = pmApplyLuma(" + in0 + ", vec3(ChainData[" + dataAt +
+                  "].x, ChainData[" + std::to_string(wordAt + 1) + "].x, ChainData[" +
+                  std::to_string(wordAt + 2) + "].x));\n";
+        } else {
+          body += "  LumaData " + data + " = chainLoadLuma(" + dataAt + ");\n";
+          body += "  vec4 " + local + " = pmApplyLuma(" + in0 + ", vec3(" + data + ".kr, " + data +
+                  ".kg, " + data + ".kb));\n";
+        }
         break;
       case ChainISA::AlphaThreshold:
-        body += "  AlphaThresholdData " + data + " = chainLoadAlphaThreshold(" + dataAt + ");\n";
-        body +=
-            "  vec4 " + local + " = pmApplyAlphaThreshold(" + in0 + ", " + data + ".threshold);\n";
-        break;
-      case ChainISA::ColorSpaceXform:
-        body += "  vec4 " + local + " = chainApplyColorSpaceXform(" + in0 + ");\n";
+        if (pureOps) {
+          body += "  vec4 " + local + " = pmApplyAlphaThreshold(" + in0 + ", ChainData[" + dataAt +
+                  "].x);\n";
+        } else {
+          body += "  AlphaThresholdData " + data + " = chainLoadAlphaThreshold(" + dataAt + ");\n";
+          body += "  vec4 " + local + " = pmApplyAlphaThreshold(" + in0 + ", " + data +
+                  ".threshold);\n";
+        }
         break;
       case ChainISA::Blend:
         body += "  vec4 " + local + " = xpBlendColors(" + in0 + ", " + in1 + ", " +
@@ -143,52 +164,58 @@ std::string EmitComposedChainBodyGLSL(const ChainComposition& composition, bool 
       case ChainISA::InputOpaque:
         body += "  vec4 " + local + " = vec4(" + in0 + ".rgb, 1.0);\n";
         break;
+      case ChainISA::ColorSpaceXform:
+        // The transform's block is program-level and the wrapper reads its members directly, so
+        // the same call form serves both the wired and the assembled paths.
+        body += "  vec4 " + local + " = chainApplyColorSpaceXform(" + in0 + ");\n";
+        break;
       case ChainISA::MulAlpha:
         body += "  vec4 " + local + " = " + in0 + " * " + in1 + ".a;\n";
         break;
       case ChainISA::AARectCoverage:
-        body += "  AARectCoverageData " + data + " = chainLoadAARectCoverage(" + dataAt + ");\n";
         if (pureOps) {
-          body += "  vec4 " + local + " = tgfxOpAARectCoverage(" + in0 + ", " + data +
-                  ".rect, gl_FragCoord.xy);\n";
+          body += "  vec4 " + local + " = tgfxOpAARectCoverage(" + in0 + ", ChainData[" + dataAt +
+                  "], gl_FragCoord.xy);\n";
         } else {
+          body += "  AARectCoverageData " + data + " = chainLoadAARectCoverage(" + dataAt + ");\n";
           body += "  vec4 " + local + " = chainAARectCoverage(" + in0 + ", " + data + ".rect);\n";
         }
         break;
       case ChainISA::LocalRectCoverage:
-        body +=
-            "  LocalRectCoverageData " + data + " = chainLoadLocalRectCoverage(" + dataAt + ");\n";
         if (pureOps) {
-          body += "  vec4 " + local + " = tgfxOpLocalRectCoverage(" + in0 + ", " + data +
-                  ".rect, " + data + ".deviceToLocal, gl_FragCoord.xy);\n";
+          body += "  vec4 " + local + " = tgfxOpLocalRectCoverage(" + in0 + ", ChainData[" +
+                  dataAt + "], mat3(ChainData[" + std::to_string(wordAt + 1) + "].xyz, ChainData[" +
+                  std::to_string(wordAt + 2) + "].xyz, ChainData[" + std::to_string(wordAt + 3) +
+                  "].xyz), gl_FragCoord.xy);\n";
         } else {
+          body += "  LocalRectCoverageData " + data + " = chainLoadLocalRectCoverage(" + dataAt +
+                  ");\n";
           body += "  vec4 " + local + " = " + in0 + " * vec4(analyticLocalRectCoverage(" + data +
                   ".rect, " + data + ".deviceToLocal));\n";
         }
         break;
       case ChainISA::RRectCoverage:
-        body += "  RRectCoverageData " + data + " = chainLoadRRectCoverage(" + dataAt + ");\n";
         if (pureOps) {
-          body += "  vec4 " + local + " = tgfxOpRRectCoverage(" + in0 + ", " + data + ".rect, " +
-                  data + ".radiiX, " + data + ".radiiY, " + data + ".antiAlias, " + data +
-                  ".deviceToLocal, gl_FragCoord.xy);\n";
+          body += "  vec4 " + local + " = tgfxOpRRectCoverage(" + in0 + ", ChainData[" + dataAt +
+                  "], ChainData[" + std::to_string(wordAt + 1) + "], ChainData[" +
+                  std::to_string(wordAt + 2) + "], ChainData[" + std::to_string(wordAt + 6) +
+                  "].x, mat3(ChainData[" + std::to_string(wordAt + 3) + "].xyz, ChainData[" +
+                  std::to_string(wordAt + 4) + "].xyz, ChainData[" + std::to_string(wordAt + 5) +
+                  "].xyz), gl_FragCoord.xy);\n";
         } else {
+          body += "  RRectCoverageData " + data + " = chainLoadRRectCoverage(" + dataAt + ");\n";
           body += "  vec4 " + local + " = aotApplyRRectCoverage(" + in0 + ", " + data + ".rect, " +
                   data + ".radiiX, " + data + ".radiiY, " + data + ".antiAlias, " + data +
                   ".deviceToLocal);\n";
         }
         break;
       case ChainISA::Gradient:
-        // The gradient's parameters sit in the chain-wide block region, which the shared
-        // evaluator addresses itself; the literal op word satisfies its Packed.x check.
-        body += "  vec4 " + local + " = vec4(0.0);\n";
-        body += "  evalGradientSlot(ivec4(" + std::to_string(ChainISA::Gradient) + ", 0, 0, 0), " +
-                in0 + ", " + local + ");\n";
+        // The gradient reads its named parameter block directly, so one call form serves the
+        // interpreter-hosted splice and the assembled text alike.
+        body += "  vec4 " + local + " = evalGradientSlot(" + in0 + ");\n";
         break;
       case ChainISA::PerlinNoise:
-        body += "  vec4 " + local + " = vec4(0.0);\n";
-        body += "  evalNoiseSlot(ivec4(" + std::to_string(ChainISA::PerlinNoise) + ", 0, 0, 0), " +
-                dataAt + ", " + local + ");\n";
+        body += "  vec4 " + local + " = evalNoiseSlot();\n";
         break;
       default:
         // An operator the emitter has not learned: decline so the caller keeps the interpreter.

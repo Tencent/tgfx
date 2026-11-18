@@ -105,9 +105,10 @@ const FragmentDef* FragmentAt(size_t index);
 /// The pack's non-op entries, at fixed ids shared by the build and the runtime: the generated
 /// loaders (the chain-ops pragma's expansion), the tail template, and the shared dependency files
 /// the op fragments call into.
-inline constexpr uint32_t FragmentPackLoaders = 0x40000000u | 0x1000u;
 inline constexpr uint32_t FragmentPackTail = 0x40000000u | 0x1002u;
+
 inline constexpr uint32_t FragmentPackDepAnalyticClipMath = 0x40000000u | 0x2000u;
+inline constexpr uint32_t FragmentPackDepTextureSampling = 0x40000000u | 0x2008u;
 inline constexpr uint32_t FragmentPackDepTextureSwizzle = 0x40000000u | 0x2001u;
 inline constexpr uint32_t FragmentPackDepLeafFetch = 0x40000000u | 0x2002u;
 

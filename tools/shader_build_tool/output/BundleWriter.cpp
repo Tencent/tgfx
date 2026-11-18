@@ -260,4 +260,11 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   return true;
 }
 
+bool WriteBundle(const std::string& outPath, const std::string& profileTag,
+                 const std::vector<VariantData>& variants, bool compress,
+                 Diagnostics* diagnostics) {
+  return WriteBundle(outPath, profileTag, variants, std::vector<ComposedPayload>(), compress,
+                     diagnostics);
+}
+
 }  // namespace tgfx

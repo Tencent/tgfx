@@ -28,17 +28,13 @@ vec4 aotPerlinGradient(vec2 coord) {
 
 #include "source/perlin_noise_math.inc"
 
-// Evaluates an OP_PERLIN_NOISE slot; returns false for every other op.
-bool evalNoiseSlot(ivec4 Packed, int dataAt, out vec4 value) {
-  value = vec4(0.0);
-  if (Packed.x != OP_PERLIN_NOISE) {
-    return false;
-  }
-  PerlinNoiseData d = chainLoadPerlinNoise(dataAt);
+// Evaluates one noise source from its named parameter (the Chain module's
+// Noise_frequencyStitch member) and the shared octaves: no pool, no compare, no capacity macro.
+vec4 evalNoiseSlot() {
+  vec4 frequencyStitch = Noise_frequencyStitch;
   highp vec2 coord = SourceCoords.xy / SourceCoords.z;
-  value = aotPerlinNoise(coord, d.frequencyStitch.xy, d.frequencyStitch.zw, NoiseModeOctaves.x,
-                         NoiseModeOctaves.y, NoiseModeOctaves.z);
-  return true;
+  return aotPerlinNoise(coord, frequencyStitch.xy, frequencyStitch.zw, NoiseModeOctaves.x,
+                        NoiseModeOctaves.y, NoiseModeOctaves.z);
 }
 
 

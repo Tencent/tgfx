@@ -49,6 +49,7 @@
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/Layout.h"
 #include "gpu/shaders/PrecompiledShader.h"
+#include "gpu/shaders/contract/ChainISA.h"
 #include "gpu/shaders/contract/FragmentLibrary.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/contract/SpecContract.h"
@@ -444,9 +445,35 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       payload.name = fragment->functionName;
       payload.id = 0x40000000u | static_cast<uint32_t>(fragment->op);
       // LF-normalized like every pack entry: the source files' CRLF would leave a stray \r on
-      // each preprocessor line.
+      // each preprocessor line. The XP-coupled regions (the blend table's coverage composites,
+      // which only the xfer entries serve) drop out here: a fragment entry is unconditional.
       std::string normalized = expanded;
       normalized.erase(std::remove(normalized.begin(), normalized.end(), '\r'), normalized.end());
+      while (true) {
+        const auto at = normalized.find("#if HAS_XP >= 1");
+        if (at == std::string::npos) {
+          break;
+        }
+        const auto contentStart = normalized.find('\n', at) + 1;
+        int depth = 1;
+        size_t cursor = contentStart;
+        while (cursor < normalized.size() && depth > 0) {
+          const auto ifAt = normalized.find("#if", cursor);
+          const auto endAt = normalized.find("#endif", cursor);
+          if (endAt == std::string::npos) {
+            break;
+          }
+          if (ifAt != std::string::npos && ifAt < endAt) {
+            ++depth;
+            cursor = ifAt + 3;
+          } else {
+            --depth;
+            cursor = endAt + 6;
+          }
+        }
+        const auto endLine = normalized.find('\n', cursor);
+        normalized.erase(at, (endLine == std::string::npos ? normalized.size() : endLine + 1) - at);
+      }
       payload.blob.assign(normalized.begin(), normalized.end());
       report->composedByTag[profileTag].push_back(std::move(payload));
     }
@@ -496,18 +523,69 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       std::string expandError;
       return ExpandStageIncludes(raw, options.shaderDir, &expandError);
     };
-    addEntry(FragmentPackLoaders, "ChainLoaders", ExpandChainOpsPragma("#pragma tgfx_chain_ops\n"));
     addEntry(FragmentPackTail, "ChainTail", readFile("entry/ChainTail.glsl"));
     addEntry(FragmentPackDepAnalyticClipMath, "AnalyticClipMath",
              readExpanded("coverage/analytic_clip_math.inc"));
     addEntry(FragmentPackDepTextureSwizzle, "TextureSwizzle",
              readExpanded("source/texture_read_swizzle.inc"));
+    addEntry(FragmentPackDepTextureSampling, "TextureSampling",
+             readExpanded("source/texture_sampling.inc"));
     auto readXp = [&options](int hasXp) {
       const std::string raw = "#define HAS_XP " + std::to_string(hasXp) +
                               "\n#define TGFX_DECLARED_CHAIN 1\n#include "
                               "\"pipeline/chain/pointwise_xp_support.inc\"\n";
       std::string expandError;
-      return ExpandStageIncludes(raw, options.shaderDir, &expandError);
+      auto text = ExpandStageIncludes(raw, options.shaderDir, &expandError);
+      if (text.empty()) {
+        return text;
+      }
+      // The driver rejects expression conditionals, so each HAS_XP test folds to a constant for
+      // this form: the >= form holds for both, the == forms pick one.
+      auto fold = [&text](const std::string& token, bool keep) {
+        size_t offset = 0;
+        while ((offset = text.find(token, offset)) != std::string::npos) {
+          text.replace(offset, token.size(), keep ? "#if 1" : "#if 0");
+          offset += 5;
+        }
+      };
+      fold("#if HAS_XP >= 1", true);
+      fold("#if HAS_XP == 1", hasXp == 1);
+      fold("#if HAS_XP == 2", hasXp == 2);
+      // Strip the folded directives themselves: a kept region loses its "#if 1" line, a dropped
+      // region (with its #else, if any) disappears whole, so the packed entry carries no
+      // conditional at all — the form was chosen when the entry was built.
+      auto stripFolded = [&text] {
+        std::string out;
+        size_t cursor = 0;
+        while (cursor < text.size()) {
+          const auto lineEnd = text.find('\n', cursor);
+          const std::string line = text.substr(
+              cursor, lineEnd == std::string::npos ? std::string::npos : lineEnd - cursor + 1);
+          cursor = lineEnd == std::string::npos ? text.size() : lineEnd + 1;
+          if (line == "#if 1\n") {
+            continue;  // keep the region, drop the directive
+          }
+          if (line == "#if 0\n") {
+            int depth = 1;
+            while (cursor < text.size() && depth > 0) {
+              const auto end2 = text.find('\n', cursor);
+              const std::string inner = text.substr(
+                  cursor, end2 == std::string::npos ? std::string::npos : end2 - cursor + 1);
+              cursor = end2 == std::string::npos ? text.size() : end2 + 1;
+              if (inner.rfind("#if", 0) == 0) {
+                ++depth;
+              } else if (inner.rfind("#endif", 0) == 0) {
+                --depth;
+              }
+            }
+            continue;
+          }
+          out += line;
+        }
+        text = std::move(out);
+      };
+      stripFolded();
+      return text;
     };
     addEntry(FragmentPackXpDstTexture, "XpDstTexture", readXp(1));
     addEntry(FragmentPackXpFramebufferFetch, "XpFramebufferFetch", readXp(2));

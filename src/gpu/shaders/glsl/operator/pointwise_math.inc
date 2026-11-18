@@ -12,6 +12,10 @@
 
 #include "operator/transfer_function.inc"
 
+// The chain slot's straight-line form lives in ops/ColorSpaceXform.glsl (macro-free, the pack's
+// copy); the plain evaluator below still spells the stages through this apply macro.
+#include "ops/ColorSpaceXform.glsl"
+
 // ColorSpaceXform stage flags (the CSFlags / ChainCSFlags bit set), shared by both evaluators.
 #define CS_UNPREMUL 1
 #define CS_LINEARIZE 2
@@ -21,28 +25,6 @@
 #define CS_SRC_OOTF 32
 #define CS_DST_OOTF 64
 
-// Each operator's math is only reachable from a chain whose slots carry that operator: the
-// dispatch branch holds a constant `op` under specialization, so an absent operator's call sites
-// fold away and the runtime splices the body out. The bodies live in ops/ as pure fragments; the
-// gates stay here, on the interpreter's specialization surface.
-#pragma tgfx_spec_gate ColorMatrixMath : (SPEC_UsedOps() & (1 << OP_COLOR_MATRIX)) != 0
-#include "ops/ColorMatrix.glsl"
-
-#pragma tgfx_spec_gate LumaMath : (SPEC_UsedOps() & (1 << OP_LUMA)) != 0
-#include "ops/Luma.glsl"
-
-#pragma tgfx_spec_gate AlphaThresholdMath : (SPEC_UsedOps() & (1 << OP_ALPHA_THRESHOLD)) != 0
-#include "ops/AlphaThreshold.glsl"
-
-// 0 = Ignore (replace), 1 = ModulateRGBA, 2 = ModulateA.
-#pragma tgfx_spec_gate ConstColorMath : (SPEC_UsedOps() & (1 << OP_CONST_COLOR)) != 0
-#include "ops/ConstColor.glsl"
-
-// Premultiplied-in/premultiplied-out color space transform applied to the lvalue COLOR in place;
-// the flags select which stages run, in the fixed order unpremul, linearize, source OOTF, gamut,
-// destination OOTF, encode, premul. A macro rather than a function so each evaluator keeps
-// reading its own uniforms in place: an eleven-parameter function added about 150 bytes to every
-// chain variant. Keep comments out of the body, a line comment would swallow the continuation.
 #define PM_APPLY_COLOR_SPACE_XFORM(COLOR, FLAGS, SRC_TF0, SRC_TF1, SRC_TF_TYPE, SRC_OOTF, GAMUT, \
                                    DST_OOTF, DST_TF0, DST_TF1, DST_TF_TYPE)                      \
   if (((FLAGS) & CS_UNPREMUL) != 0) {                                                            \
@@ -70,4 +52,26 @@
     COLOR.rgb *= COLOR.a;                                                                        \
   }
 
+// Each operator's math is only reachable from a chain whose slots carry that operator: the
+// dispatch branch holds a constant `op` under specialization, so an absent operator's call sites
+// fold away and the runtime splices the body out. The bodies live in ops/ as pure fragments; the
+// gates stay here, on the interpreter's specialization surface.
+#pragma tgfx_spec_gate ColorMatrixMath : (SPEC_UsedOps() & (1 << OP_COLOR_MATRIX)) != 0
+#include "ops/ColorMatrix.glsl"
+
+#pragma tgfx_spec_gate LumaMath : (SPEC_UsedOps() & (1 << OP_LUMA)) != 0
+#include "ops/Luma.glsl"
+
+#pragma tgfx_spec_gate AlphaThresholdMath : (SPEC_UsedOps() & (1 << OP_ALPHA_THRESHOLD)) != 0
+#include "ops/AlphaThreshold.glsl"
+
+// 0 = Ignore (replace), 1 = ModulateRGBA, 2 = ModulateA.
+#pragma tgfx_spec_gate ConstColorMath : (SPEC_UsedOps() & (1 << OP_CONST_COLOR)) != 0
+#include "ops/ConstColor.glsl"
+
+// Premultiplied-in/premultiplied-out color space transform applied to the lvalue COLOR in place;
+// the flags select which stages run, in the fixed order unpremul, linearize, source OOTF, gamut,
+// destination OOTF, encode, premul. A macro rather than a function so each evaluator keeps
+// reading its own uniforms in place: an eleven-parameter function added about 150 bytes to every
+// chain variant. Keep comments out of the body, a line comment would swallow the continuation.
 #endif  // TGFX_POINTWISE_MATH_INC

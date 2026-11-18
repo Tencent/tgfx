@@ -39,4 +39,9 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
                  const std::vector<ComposedPayload>& composed, bool compress,
                  Diagnostics* diagnostics);
 
+/// The no-composed form: the plain variant bundle (the round-trip tests and any caller that
+/// writes variants only).
+bool WriteBundle(const std::string& outPath, const std::string& profileTag,
+                 const std::vector<VariantData>& variants, bool compress, Diagnostics* diagnostics);
+
 }  // namespace tgfx

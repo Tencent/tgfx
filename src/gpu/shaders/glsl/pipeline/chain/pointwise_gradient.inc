@@ -7,12 +7,9 @@
 #include "source/gradient_layout.inc"
 #include "source/gradient_colorize.inc"
 
-// Evaluates an OP_GRADIENT slot; returns false for every other op.
-bool evalGradientSlot(ivec4 Packed, vec4 in0, out vec4 value) {
-  value = vec4(0.0);
-  if (Packed.x != OP_GRADIENT) {
-    return false;
-  }
+// Evaluates one gradient from its named parameter block (the Chain module's Gradient_ members)
+// and the shared layout/colorizer fields: no pool, no operator compare, no capacity macro.
+vec4 evalGradientSlot(vec4 in0) {
   // Analytic gradient source. The layout math and border clamp are verbatim from the dedicated
   // gradient kernels; the colorizer kind selects between the single-interval mix, the
   // dual-interval scale/bias pair and the unrolled-binary tree, each byte-matching its
@@ -22,24 +19,22 @@ bool evalGradientSlot(ivec4 Packed, vec4 in0, out vec4 value) {
   // offset is the region base plus the block's fixed slot, not a per-slot index. The capacity
   // macro is emitted by the build from the Chain module's declared count, so the number exists
   // once — in the declaration the assembler sizes the pool from.
-  GradientData d = chainLoadGradient(CHAIN_SLOT_CAPACITY * TGFX_CHAIN_DATA_SLOT_WORDS +
-                                     TGFX_CHAIN_BLOCK_GRADIENT);
   highp vec2 gradientCoord = SourceCoords.xy / SourceCoords.z;
-  float gradT = gradientLayoutT(GradientLayoutType, d.bias, d.scale, gradientCoord);
+  float gradT = gradientLayoutT(GradientLayoutType, Gradient_bias, Gradient_scale, gradientCoord);
   vec4 gradColor;
   if (gradT <= 0.0) {
-    gradColor = d.leftBorder;
+    gradColor = Gradient_leftBorder;
   } else if (gradT >= 1.0) {
-    gradColor = d.rightBorder;
+    gradColor = Gradient_rightBorder;
   } else if (GradientColorizerKind == 0) {
     // Keep the same arithmetic order as GLSLSingleIntervalGradientColorizer on the JIT path.
-    gradColor = (1.0 - gradT) * d.start + gradT * d.end;
+    gradColor = (1.0 - gradT) * Gradient_start + gradT * Gradient_end;
   } else if (GradientColorizerKind == 1) {
-    vec4 gradScale = d.scale01;
-    vec4 gradBias = d.bias01;
-    if (gradT >= d.threshold) {
-      gradScale = d.scale23;
-      gradBias = d.bias23;
+    vec4 gradScale = Gradient_scale01;
+    vec4 gradBias = Gradient_bias01;
+    if (gradT >= Gradient_threshold) {
+      gradScale = Gradient_scale23;
+      gradBias = Gradient_bias23;
     }
     gradColor = vec4(gradT * gradScale + gradBias);
   } else if (GradientColorizerKind == 3) {
@@ -65,14 +60,13 @@ bool evalGradientSlot(ivec4 Packed, vec4 in0, out vec4 value) {
 #endif
   } else {
     gradColor = gradientColorizeUnrolled(
-        gradT, d.thresholds1_7, d.thresholds9_13, d.scales[0], d.biases[0], d.scales[1],
-        d.biases[1], d.scales[2], d.biases[2], d.scales[3], d.biases[3], d.scales[4],
-        d.biases[4], d.scales[5], d.biases[5], d.scales[6], d.biases[6], d.scales[7],
-        d.biases[7]);
+        gradT, Gradient_thresholds1_7, Gradient_thresholds9_13, Gradient_scales[0], Gradient_biases[0], Gradient_scales[1],
+        Gradient_biases[1], Gradient_scales[2], Gradient_biases[2], Gradient_scales[3], Gradient_biases[3], Gradient_scales[4],
+        Gradient_biases[4], Gradient_scales[5], Gradient_biases[5], Gradient_scales[6], Gradient_biases[6], Gradient_scales[7],
+        Gradient_biases[7]);
   }
   gradColor.rgb *= gradColor.a;
-  value = gradColor * in0.a;
-  return true;
+  return gradColor * in0.a;
 }
 
 
