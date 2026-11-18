@@ -130,6 +130,12 @@ inline constexpr uint32_t FragmentPackGradientSimple = 0x40000000u | 0x1021u;
 inline constexpr uint32_t FragmentPackLeafFetchStrict = 0x40000000u | 0x1022u;
 inline constexpr uint32_t FragmentPackLeafFetchPlain = 0x40000000u | 0x1023u;
 
+/// The Vulkan linking route's op library, one patched SPIR-V module per pure operator: the wrapper
+/// compiled from the same sources the text pack ships, its operator exported for linking and its
+/// entry stripped. The per-operator id is the base with the ChainISA value. The resource-coupled
+/// evaluators (Gradient, PerlinNoise, ColorSpaceXform) join once their pure split lands.
+inline constexpr uint32_t FragmentPackSPIRVOpBase = 0x80000000u;
+
 /// The count of registered fragments (the full op coverage check walks it).
 size_t FragmentCount();
 

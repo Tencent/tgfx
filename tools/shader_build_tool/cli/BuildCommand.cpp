@@ -33,6 +33,7 @@
 #include <vector>
 #include "cli/ReportWriter.h"
 #include "compile/ReflectionExtractor.h"
+#include "compile/SPIRVLibrary.h"
 #include "compile/ShaderCompiler.h"
 #include "compile/SpecCodegen.h"
 #include "compile/StageCache.h"
@@ -400,6 +401,23 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
   if (options.shaderDir.empty()) {
     return;
   }
+  // A dependency entry packs its includes resolved, for the same reason the fragment sources do.
+  auto readExpanded = [&options](const char* path) {
+    const std::string raw = [&] {
+      std::ifstream file(std::string(options.shaderDir) + "/" + path, std::ios::binary);
+      if (!file.is_open()) {
+        return std::string();
+      }
+      std::ostringstream buffer;
+      buffer << file.rdbuf();
+      return buffer.str();
+    }();
+    if (raw.empty()) {
+      return raw;
+    }
+    std::string expandError;
+    return ExpandStageIncludes(raw, options.shaderDir, &expandError);
+  };
   std::vector<std::pair<ShaderProfile, std::unique_ptr<ProfileEmitter>>> emitters;
   for (auto profile : options.backends) {
     emitters.emplace_back(profile, MakeProfileEmitter(profile));
@@ -505,23 +523,6 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       std::ostringstream buffer;
       buffer << file.rdbuf();
       return buffer.str();
-    };
-    // A dependency entry packs its includes resolved, for the same reason the fragment sources do.
-    auto readExpanded = [&options](const char* path) {
-      const std::string raw = [&] {
-        std::ifstream file(std::string(options.shaderDir) + "/" + path, std::ios::binary);
-        if (!file.is_open()) {
-          return std::string();
-        }
-        std::ostringstream buffer;
-        buffer << file.rdbuf();
-        return buffer.str();
-      }();
-      if (raw.empty()) {
-        return raw;
-      }
-      std::string expandError;
-      return ExpandStageIncludes(raw, options.shaderDir, &expandError);
     };
     addEntry(FragmentPackTail, "ChainTail", readFile("entry/ChainTail.glsl"));
     addEntry(FragmentPackDepAnalyticClipMath, "AnalyticClipMath",
@@ -697,6 +698,114 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
     addEntry(FragmentPackLeafFetchPlain, "LeafFetchPlain",
              resolveBranch(leafFetchRaw, "#if HAS_SUBSET", false));
   }
+  // The Vulkan linking route's op library: one patched SPIR-V module per pure operator, compiled
+  // from the same sources the text pack ships (a dummy entry forces glslang to emit the function;
+  // the surgery then strips the entry and exports the operator for linking).
+  for (const auto& emitterEntry : emitters) {
+    if (emitterEntry.first != ShaderProfile::Vulkan) {
+      continue;
+    }
+    const std::string profileTag = ProfileTag(emitterEntry.first);
+    struct SPIRVOpSource {
+      int op;
+      std::vector<const char*> includes;
+      const char* prelude;
+    };
+    const SPIRVOpSource spirvOpSources[] = {
+        {ChainISA::ConstColor, {"ops/ConstColor.glsl"}, ""},
+        {ChainISA::ColorMatrix, {"ops/ColorMatrix.glsl"}, ""},
+        {ChainISA::Luma, {"ops/Luma.glsl"}, ""},
+        {ChainISA::AlphaThreshold, {"ops/AlphaThreshold.glsl"}, ""},
+        {ChainISA::Blend, {"xp/xp_blend_colors.inc"}, "#define HAS_XP 1\n"},
+        {ChainISA::Texture, {"source/texture_sampling.inc", "ops/Texture.glsl"}, ""},
+        {ChainISA::TexModulate, {"source/texture_sampling.inc", "ops/TexModulate.glsl"}, ""},
+        {ChainISA::AARectCoverage, {"ops/AARectCoverage.glsl"}, ""},
+        {ChainISA::LocalRectCoverage,
+         {"coverage/analytic_clip_math.inc", "ops/LocalRectCoverage.glsl"},
+         ""},
+        {ChainISA::RRectCoverage,
+         {"coverage/analytic_clip_math.inc", "ops/RRectCoverage.glsl"},
+         ""},
+    };
+    auto defaultValueOf = [](FragmentType type) {
+      switch (type) {
+        case FragmentType::Float:
+          return "0.5";
+        case FragmentType::Float2:
+          return "vec2(1.0)";
+        case FragmentType::Float3:
+          return "vec3(1.0)";
+        case FragmentType::Int:
+          return "0";
+        case FragmentType::Int4:
+          return "ivec4(0)";
+        case FragmentType::Matrix3:
+          return "mat3(1.0)";
+        case FragmentType::Matrix4:
+          return "mat4(1.0)";
+        default:
+          return "vec4(1.0)";
+      }
+    };
+    for (const auto& source : spirvOpSources) {
+      const auto* def = FindFragment(source.op);
+      if (def == nullptr || def->functionName == nullptr) {
+        continue;
+      }
+      std::string text = "#version 450\n";
+      text += source.prelude;
+      for (const char* include : source.includes) {
+        text += readExpanded(include);
+      }
+      // The dummy call's arguments follow the table's marshalling: parameters by their declared
+      // type, the structural literal as a constant, the entry values as plain colors and the
+      // fragment coordinate as a vec2.
+      std::string call = def->functionName + std::string("(");
+      for (size_t argIndex = 0; argIndex < def->args.size(); ++argIndex) {
+        if (argIndex > 0) {
+          call += ", ";
+        }
+        const auto& arg = def->args[argIndex];
+        switch (arg.kind) {
+          case FragmentArgKind::Param:
+            call += defaultValueOf(def->params[arg.index].type);
+            break;
+          case FragmentArgKind::Literal:
+            call += "0";
+            break;
+          case FragmentArgKind::EntryValue:
+            if (arg.index == 3) {
+              call += "vec2(1.0)";
+            } else {
+              call += "vec4(1.0)";
+            }
+            break;
+          default:
+            call += "vec4(1.0)";
+            break;
+        }
+      }
+      call += ")";
+      text += "\nlayout(location = 0) out vec4 dummyOut;\nvoid main() {\n  dummyOut = " + call +
+              ";\n}\n";
+      std::string buildError;
+      auto patched =
+          CompileSPIRVLibraryModule(text, def->functionName, def->functionName, &buildError);
+      if (patched.empty()) {
+        RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
+                         def->functionName, profileTag, -1, -1,
+                         std::string("the SPIR-V op module did not build: ") + buildError);
+        continue;
+      }
+      ComposedPayload payload;
+      payload.name = def->functionName;
+      payload.id = FragmentPackSPIRVOpBase | static_cast<uint32_t>(source.op);
+      const auto* bytes = reinterpret_cast<const uint8_t*>(patched.data());
+      payload.blob.assign(bytes, bytes + patched.size() * sizeof(uint32_t));
+      report->composedByTag[profileTag].push_back(std::move(payload));
+    }
+  }
+
   for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
     const Family& family = Families()[familyIndex];
     const auto info = AssembledFamilyInfo(family);
