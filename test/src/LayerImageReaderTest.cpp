@@ -1387,4 +1387,45 @@ TGFX_TEST(LayerImageReaderTest, LargeOutputKeepsIntegerBounds) {
   EXPECT_EQ(first[3], 255);
 }
 
+TGFX_TEST(LayerImageReaderTest, LargeTileOriginPreservesSinglePixelAlignment) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  // With default tiles, the marker is at a core boundary and the halo starts at an odd pixel.
+  constexpr int MarkerX = 8201 * 2046;
+  for (bool translateRequest : {false, true}) {
+    SCOPED_TRACE(translateRequest);
+    auto root = Layer::Make();
+    auto marker = SolidLayer::Make();
+    marker->setWidth(1);
+    marker->setHeight(1);
+    marker->setColor(Color::Red());
+    auto translation = Matrix::MakeTrans(static_cast<float>(MarkerX), 0);
+    if (!translateRequest) {
+      marker->setMatrix(translation);
+    }
+    root->addChild(marker);
+    LayerImageRequest request = {};
+    request.target = root;
+    request.sceneRoot = root;
+    request.outputSize = {MarkerX + 2, 1};
+    if (translateRequest) {
+      request.targetLocalToOutput = translation;
+    }
+    LayerImageReadOptions options = {};
+    options.bandRows = 1;
+    auto reader = LayerImageReader::Make(context, request, options);
+    ASSERT_TRUE(reader != nullptr);
+    auto info = reader->bandInfo();
+    std::vector<uint8_t> pixels(info.byteSize());
+    auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
+    ASSERT_EQ(result.code, LayerImageReadCode::BandReady) << result.error.message;
+    const auto* center = pixels.data() + static_cast<size_t>(MarkerX) * 4;
+    EXPECT_EQ(center[-1], 0);
+    EXPECT_EQ(center[0], 255);
+    EXPECT_EQ(center[3], 255);
+    EXPECT_EQ(center[7], 0);
+  }
+}
+
 }  // namespace tgfx
