@@ -93,30 +93,6 @@ static PreciseRect ToPreciseRect(const PixelRect& rect) {
   return result;
 }
 
-static PreciseRect MapPreciseRect(const Matrix& matrix, const PreciseRect& rect) {
-  const double xs[] = {rect.left, rect.right};
-  const double ys[] = {rect.top, rect.bottom};
-  PreciseRect result = {};
-  for (int i = 0; i < 2; ++i) {
-    for (int j = 0; j < 2; ++j) {
-      auto x = xs[i];
-      auto y = ys[j];
-      auto mappedX = matrix.getScaleX() * x + matrix.getSkewX() * y + matrix.getTranslateX();
-      auto mappedY = matrix.getSkewY() * x + matrix.getScaleY() * y + matrix.getTranslateY();
-      if (i == 0 && j == 0) {
-        result.left = result.right = mappedX;
-        result.top = result.bottom = mappedY;
-        continue;
-      }
-      result.left = std::min(result.left, mappedX);
-      result.right = std::max(result.right, mappedX);
-      result.top = std::min(result.top, mappedY);
-      result.bottom = std::max(result.bottom, mappedY);
-    }
-  }
-  return result;
-}
-
 static bool IsSafePixelRect(const PreciseRect& rect) {
   constexpr double MaxPixelCoordinate = static_cast<double>(INT32_MAX >> 2);
   return rect.isFinite() && rect.left >= -MaxPixelCoordinate && rect.top >= -MaxPixelCoordinate &&
@@ -154,7 +130,8 @@ float LayerDrawSession::FilterOutset(Layer* layer, float scale) {
   return MaxAbsOutset(layer->mapOutputBoundsToInput(Rect::MakeEmpty(), scale));
 }
 
-float LayerDrawSession::AncestorFilterOutset(Layer* target, Layer* captureRoot) {
+float LayerDrawSession::AncestorFilterOutset(Layer* target, Layer* captureRoot,
+                                            const Matrix& rootToOutput) {
   auto outset = 0.0f;
   for (auto ancestor = target->parent(); ancestor != nullptr && ancestor != captureRoot;
        ancestor = ancestor->parent()) {
@@ -162,6 +139,7 @@ float LayerDrawSession::AncestorFilterOutset(Layer* target, Layer* captureRoot) 
       continue;
     }
     auto ancestorToRoot = ancestor->getRelativeMatrix3D(captureRoot).asMatrix();
+    ancestorToRoot.postConcat(rootToOutput);
     outset += FilterOutset(ancestor, ancestorToRoot.getMaxScale());
   }
   return outset;
@@ -210,10 +188,10 @@ bool LayerDrawSession::IsSupportedAncestorChain(Layer* target, Layer* captureRoo
   return false;
 }
 
-void LayerDrawSession::ScanBackgroundOutset(Layer* layer, const Matrix& localToRoot,
+void LayerDrawSession::ScanBackgroundOutset(Layer* layer, const Matrix& localToOutput,
                                             float ancestorOutset, float* maxOutset,
                                             bool* needsBackground) {
-  auto scale = localToRoot.getMaxScale();
+  auto scale = localToOutput.getMaxScale();
   if (!std::isfinite(scale) || scale <= 0.0f) {
     return;
   }
@@ -235,7 +213,7 @@ void LayerDrawSession::ScanBackgroundOutset(Layer* layer, const Matrix& localToR
     if (!child->visible() || child->alpha() <= 0 || child->maskOwner) {
       continue;
     }
-    auto childMatrix = localToRoot;
+    auto childMatrix = localToOutput;
     childMatrix.preConcat(child->getMatrixWithScrollRect().asMatrix());
     ScanBackgroundOutset(child.get(), childMatrix, filterOutset, maxOutset, needsBackground);
   }
@@ -417,35 +395,10 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
   auto actualRoot = request.captureRoot->root();
   if (actualRoot != nullptr) {
     actualRoot->updateRenderBounds();
-    session->needsBackground = request.target->hasBackgroundStyle();
-    auto ancestorOutset = AncestorFilterOutset(request.target, request.captureRoot);
-    float outset = 0.0f;
-    bool needs = false;
-    ScanBackgroundOutset(request.target, targetToRoot, ancestorOutset, &outset, &needs);
-    session->needsBackground = session->needsBackground || needs;
-    session->backgroundOutset =
-        std::max(outset, request.target->maxBackgroundOutset + ancestorOutset);
-  } else {
-    float outset = 0.0f;
-    bool needs = false;
-    ScanBackgroundOutset(request.captureRoot, Matrix::I(), 0.0f, &outset, &needs);
-    session->needsBackground = needs;
-    session->backgroundOutset = outset;
   }
-  if (!session->needsBackground && !targetToRoot.invertible()) {
-    // A collapsed scene placement can hide the target's background styles from the scene scan.
-    // Check its local content before deciding that drawing needs no backdrop mapping.
-    ScanBackgroundOutset(request.target, Matrix::I(), 0.0f, &session->backgroundOutset,
+  if (request.alpha > 0.0f) {
+    ScanBackgroundOutset(request.target, outputMatrix, 0.0f, &session->backgroundOutset,
                          &session->needsBackground);
-  }
-  if (!std::isfinite(session->backgroundOutset) || session->backgroundOutset < 0.0f) {
-    session->backgroundOutset = 0.0f;
-  }
-  // Layer::draw() returns before drawing anything for a zero alpha, so the export must not need a
-  // backdrop either: nothing is sampled and the delivered band stays the clear color.
-  if (request.alpha <= 0.0f) {
-    session->needsBackground = false;
-    session->backgroundOutset = 0.0f;
   }
   // The export never keeps a borrowed context beyond the lock it was created in; every later call
   // receives the context it must use.
@@ -489,10 +442,7 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
   }
   session->outputToGlobal = captureRootToGlobal;
   session->outputToGlobal.preConcat(session->outputToRoot);
-  Matrix globalToCaptureRoot = Matrix::I();
-  captureRootToGlobal.invert(&globalToCaptureRoot);
-  session->globalToOutput = session->rootToOutput;
-  session->globalToOutput.preConcat(globalToCaptureRoot);
+  session->backgroundOutset += AncestorFilterOutset(request.target, request.captureRoot, rootToOutput);
   return session;
 }
 
@@ -545,27 +495,9 @@ RegionPlanResult LayerDrawSession::planExportRegion(const PixelRect& core,
   PixelRect renderRect = {};
   PixelRect captureRect = {};
   if (needsBackground) {
-    auto globalInput = MapPreciseRect(outputToGlobal, ToPreciseRect(core));
-    if (!globalInput.isFinite()) {
-      if (control != nullptr) {
-        control->fail(DrawFailureCode::InvalidRequest, DrawStage::Planning, request.target, {},
-                      "the core region has nonfinite scene coordinates");
-      }
-      result.code = RegionPlanCode::Failed;
-      return result;
-    }
+    auto outputRect = ToPreciseRect(core);
     auto margin = static_cast<double>(backgroundOutset) + 1.0;
-    globalInput.outset(margin, margin);
-    globalInput.roundOut();
-    if (!globalInput.isFinite()) {
-      if (control != nullptr) {
-        control->fail(DrawFailureCode::SurfaceLimit, DrawStage::Planning, request.target, {},
-                      "the background dependency has nonfinite scene coordinates");
-      }
-      result.code = RegionPlanCode::Failed;
-      return result;
-    }
-    auto outputRect = MapPreciseRect(globalToOutput, globalInput);
+    outputRect.outset(margin, margin);
     outputRect.roundOut();
     if (!IsSafePixelRect(outputRect)) {
       if (control != nullptr) {

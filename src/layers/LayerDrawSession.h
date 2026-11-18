@@ -287,10 +287,10 @@ class LayerDrawSession {
   LayerDrawSession() = default;
 
   static float FilterOutset(Layer* layer, float scale);
-  static float AncestorFilterOutset(Layer* target, Layer* captureRoot);
+  static float AncestorFilterOutset(Layer* target, Layer* captureRoot, const Matrix& rootToOutput);
   static bool IsSupported2DSubtree(Layer* layer, std::vector<Layer*>& activeMasks);
   static bool IsSupportedAncestorChain(Layer* target, Layer* captureRoot);
-  static void ScanBackgroundOutset(Layer* layer, const Matrix& localToRoot, float ancestorOutset,
+  static void ScanBackgroundOutset(Layer* layer, const Matrix& localToOutput, float ancestorOutset,
                                    float* maxOutset, bool* needsBackground);
 
   RegionPlanResult planExportRegion(const PixelRect& core, const LayerDrawLimits& limits,
@@ -309,10 +309,9 @@ class LayerDrawSession {
   Matrix rootToOutput = Matrix::I();  // captureRoot-local to final output pixels.
   Matrix outputToRoot = Matrix::I();
   Matrix outputToGlobal = Matrix::I();  // output pixels to the renderBounds space.
-  Matrix globalToOutput = Matrix::I();
   PixelRect outputPixelBounds = {};
   bool needsBackground = false;
-  float backgroundOutset = 0.0f;  // In captureRoot-local units.
+  float backgroundOutset = 0.0f;  // In output pixels.
 
   // CanvasDefault state captured from the original canvas.
   bool canvasCanInvert = true;
