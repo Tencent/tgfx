@@ -300,7 +300,8 @@ void SurfaceTexture::onDrainPendingFrames() {
   // is called from ImageReader::readTexture), so updateTexImage() can rebind the external texture.
   // Each native updateTexImage() latches the next queued buffer, or re-latches the current one when
   // the queue is empty, in which case the frame timestamp stops advancing and the loop ends. The
-  // frame cap guards against streams with constant timestamps that would never report no progress.
+  // frame cap bounds a producer whose timestamp keeps advancing on every latch, so the loop still
+  // ends even if it never reports no progress.
   // Unlike updateTexImage(), this path never waits for a new frame.
   static constexpr int MAX_DRAIN_FRAMES = 8;
   jlong lastTimestamp = env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp);
