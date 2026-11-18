@@ -69,6 +69,16 @@ class ImageStream {
    */
   virtual bool onUpdateTexture(std::shared_ptr<TextureView> textureView) = 0;
 
+  /**
+   * Consumes any frames the producer has already delivered beyond the one most recently consumed,
+   * so the texture ends on the latest available frame. ImageReader calls this from readTexture()
+   * after a frame has been consumed, only when a sync-to-latest request is pending. The default
+   * implementation does nothing; only streams whose producer can queue several frames ahead (the
+   * Android SurfaceTexture) override it. Implementations must not block waiting for a new frame.
+   */
+  virtual void onDrainPendingFrames() {
+  }
+
  private:
   int _width = 0;
   int _height = 0;

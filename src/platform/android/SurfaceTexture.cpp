@@ -40,6 +40,7 @@ static jmethodID SurfaceTexture_detachFromGLContext;
 static jmethodID SurfaceTexture_release;
 static jmethodID SurfaceTexture_getDataSpace;
 static jmethodID SurfaceTexture_getTransformMatrix;
+static jmethodID SurfaceTexture_getTimestamp;
 static Global<jclass> SurfaceClass;
 static jmethodID Surface_Constructor;
 static Global<jclass> HandlerClass;
@@ -85,6 +86,7 @@ void SurfaceTexture::JNIInit(JNIEnv* env) {
   SurfaceTexture_detachFromGLContext =
       env->GetMethodID(SurfaceTextureClass.get(), "detachFromGLContext", "()V");
   SurfaceTexture_release = env->GetMethodID(SurfaceTextureClass.get(), "release", "()V");
+  SurfaceTexture_getTimestamp = env->GetMethodID(SurfaceTextureClass.get(), "getTimestamp", "()J");
   SurfaceTexture_getDataSpace = env->GetMethodID(SurfaceTextureClass.get(), "getDataSpace", "()I");
   if (SurfaceTexture_getDataSpace == nullptr) {
     env->ExceptionClear();
@@ -273,6 +275,37 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
 
 bool SurfaceTexture::onUpdateTexture(std::shared_ptr<TextureView>) {
   return updateTexImage();
+}
+
+void SurfaceTexture::onDrainPendingFrames() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env == nullptr) {
+    return;
+  }
+  // Latch the frames the producer already queued beyond the one just consumed, so the texture ends
+  // on the most recent decoded frame. This runs on the GPU thread with the GL context current (it
+  // is called from ImageReader::readTexture), so updateTexImage() can rebind the external texture.
+  // Each native updateTexImage() latches the next queued buffer, or re-latches the current one when
+  // the queue is empty, in which case the frame timestamp stops advancing and the loop ends. The
+  // frame cap guards against streams with constant timestamps that would never report no progress.
+  // Unlike updateTexImage(), this path never waits for a new frame.
+  static constexpr int MAX_DRAIN_FRAMES = 8;
+  jlong lastTimestamp = env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp);
+  for (int i = 0; i < MAX_DRAIN_FRAMES; i++) {
+    env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+      break;
+    }
+    jlong timestamp = env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp);
+    if (timestamp == lastTimestamp) {
+      break;
+    }
+    lastTimestamp = timestamp;
+  }
+  frameAvailable = false;
 }
 
 unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {

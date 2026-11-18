@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <mutex>
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/Rect.h"
@@ -67,6 +68,17 @@ class ImageReader {
    */
   std::shared_ptr<ImageBuffer> acquireNextBuffer();
 
+  /**
+   * Requests that the next generated texture skips any frames the video source has already queued
+   * beyond the one being consumed, so the texture ends on the most recent decoded frame. The
+   * request is honored once, when the next acquired ImageBuffer generates its texture, and is then
+   * cleared. It lets callers that detect a skipped frame (for example when the renderer's frame
+   * number jumps because decoding runs slower than playback) catch the texture up to the latest
+   * decoded frame instead of lagging behind by the queued backlog. Video sources that cannot queue
+   * frames ahead (every source except the Android SurfaceTextureReader) ignore the request.
+   */
+  void requestSyncToLatestFrame();
+
  protected:
   std::mutex locker = {};
   std::weak_ptr<ImageReader> weakThis;
@@ -78,6 +90,7 @@ class ImageReader {
   std::shared_ptr<TextureView> textureView = nullptr;
   uint64_t bufferVersion = 0;
   uint64_t textureVersion = 0;
+  std::atomic<bool> syncRequested = {false};
 
   static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<ImageStream> imageStream);
 

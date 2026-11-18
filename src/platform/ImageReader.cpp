@@ -91,6 +91,10 @@ std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {
   return std::make_shared<ImageReaderBuffer>(weakThis.lock(), bufferVersion);
 }
 
+void ImageReader::requestSyncToLatestFrame() {
+  syncRequested.store(true, std::memory_order_release);
+}
+
 bool ImageReader::checkExpired(uint64_t contentVersion) {
   std::lock_guard<std::mutex> autoLock(locker);
   return contentVersion != textureVersion && contentVersion < bufferVersion;
@@ -118,6 +122,9 @@ std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t contentVersion, C
   if (success) {
     textureView->removeUniqueKey();
     textureVersion = contentVersion;
+    if (syncRequested.exchange(false)) {
+      stream->onDrainPendingFrames();
+    }
   }
   return textureView;
 }

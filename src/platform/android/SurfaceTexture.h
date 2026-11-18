@@ -64,6 +64,8 @@ class SurfaceTexture : public ImageStream {
 
   bool onUpdateTexture(std::shared_ptr<TextureView> textureView) override;
 
+  void onDrainPendingFrames() override;
+
  private:
   std::mutex locker = {};
   std::condition_variable condition = {};
