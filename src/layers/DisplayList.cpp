@@ -1237,7 +1237,9 @@ void DisplayList::mergeCullRects(std::vector<Rect>* rects) {
 // too many groups stay apart, bounding them per captured rect keeps every rect inside its captured
 // rect and still drops the rects no style reaches. Only when even that exceeds the budget, or
 // covers more than the union does, the union is used, which may also span the gaps between captured
-// rects.
+// rects. A union that spans those gaps wider than the captured rects themselves is not worth it:
+// the capture then draws everything it would have drawn anyway, so the list is left empty and the
+// caller keeps the captured rects.
 std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprints,
                                               const std::vector<Rect>& captureRects) {
   auto narrowed = narrowCullRects(footprints, captureRects);
@@ -1254,6 +1256,11 @@ std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprint
   for (const auto& rect : narrowed) {
     unionRect.join(rect);
   }
+  auto captureArea = 0.0f;
+  for (const auto& rect : captureRects) {
+    captureArea += rect.width() * rect.height();
+  }
+  auto unionArea = unionRect.width() * unionRect.height();
   auto perCapture = std::vector<Rect>{};
   perCapture.reserve(captureRects.size());
   for (const auto& captureRect : captureRects) {
@@ -1274,16 +1281,16 @@ std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprint
   // A frame that repaints more captured rects than the per-layer loop can afford has no list to
   // give: bounding them per rect would already exceed the budget, so it falls back to the union.
   if (perCapture.size() > MAX_CULL_RECTS) {
-    return {unionRect};
+    return unionArea > captureArea ? std::vector<Rect>{} : std::vector<Rect>{unionRect};
   }
   auto perCaptureArea = 0.0f;
   for (const auto& rect : perCapture) {
     perCaptureArea += rect.width() * rect.height();
   }
-  if (perCaptureArea <= unionRect.width() * unionRect.height()) {
+  if (perCaptureArea <= unionArea) {
     return perCapture;
   }
-  return {unionRect};
+  return unionArea > captureArea ? std::vector<Rect>{} : std::vector<Rect>{unionRect};
 }
 
 // A style reads the captured background under the recording it resolves. The recording measures the

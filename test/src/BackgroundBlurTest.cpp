@@ -1810,6 +1810,33 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, BuildCullRectsBoundsEachCapture){TGFX_PRIV
       scattered.push_back(Rect::MakeXYWH(x, y, 2.0f, 2.0f));
     }
   }
+  // More captured rects than the per-layer loop can afford: the union spans the gaps between
+  // scattered rects, so it may cover more than the captured rects themselves. That is worse than
+  // drawing what the capture would have drawn, so the list comes back empty and the caller keeps
+  // its own rects.
+  std::vector<Rect> spread = {};
+  for (int i = 0; i < 40; ++i) {
+    spread.push_back(Rect::MakeXYWH(static_cast<float>(i) * 200.0f, 0.0f, 100.0f, 100.0f));
+  }
+  std::vector<Rect> spreadFootprints = spread;
+  EXPECT_TRUE(DisplayList::buildCullRects(spreadFootprints, spread).empty());
+
+  // The same count without gaps keeps the union no larger than the captured rects, so it is used
+  // even though bounding per captured rect would exceed the budget. The footprints sit apart, so
+  // they survive the merge and the fallback is the one that answers.
+  std::vector<Rect> row = {};
+  std::vector<Rect> rowFootprints = {};
+  auto rowArea = 0.0f;
+  for (int i = 0; i < 40; ++i) {
+    row.push_back(Rect::MakeXYWH(static_cast<float>(i) * 100.0f, 0.0f, 100.0f, 100.0f));
+    rowFootprints.push_back(
+        Rect::MakeXYWH(static_cast<float>(i) * 100.0f + 10.0f, 10.0f, 20.0f, 20.0f));
+    rowArea += 100.0f * 100.0f;
+  }
+  auto rowCull = DisplayList::buildCullRects(rowFootprints, row);
+  ASSERT_EQ(rowCull.size(), 1u);
+  EXPECT_LE(rowCull[0].width() * rowCull[0].height(), rowArea);
+
   auto overlapCull = DisplayList::buildCullRects(scattered, overlapping);
   ASSERT_EQ(overlapCull.size(), overlapping.size());
   auto uncovered = Rect::MakeLTRB(110, 110, 210, 210);
