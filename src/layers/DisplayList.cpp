@@ -1293,12 +1293,13 @@ std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprint
   return unionArea > captureArea ? std::vector<Rect>{} : std::vector<Rect>{unionRect};
 }
 
-// A style reads the captured background under the recording it resolves. The recording measures the
-// same geometry the layer bounds do, but it is rounded out to the layer's own pixels, which are no
-// larger than the captured ones since both follow the capture canvas scale, and the copy is then
-// rounded out to the captured pixels. Widening a footprint by one captured pixel and rounding it
-// out to that grid covers both roundings. A rotated layer reads no farther: the style resamples the
-// copy on its own grid inside its content bounds.
+// A style reads the captured background under the recording it resolves, and only where it shows:
+// within the blur reach of its visible region, which is what the footprint covers. The recording
+// measures the same geometry the layer bounds do, but it is rounded out to the layer's own pixels,
+// which are no larger than the captured ones since both follow the capture canvas scale, and the
+// copy is then rounded out to the captured pixels. Widening a footprint by one captured pixel and
+// rounding it out to that grid covers both roundings. A rotated layer reads no farther: the style
+// resamples the copy on its own grid inside its content bounds.
 static Rect RoundOutToCapturedPixels(const Rect& footprint, const Matrix& worldToPixel,
                                      const Matrix& pixelToWorld) {
   auto pixelRect = worldToPixel.mapRect(footprint);
@@ -1361,6 +1362,12 @@ std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprin
 // beyond it, and widening the footprint by that reach covers every style below it for good.
 // `clipped` tells whether this layer or an ancestor is cut, and `covered` whether a footprint above
 // already covers this layer.
+//
+// The culling is right only while a style reads no backdrop outside its footprint: the recording it
+// resolves has to stay inside the layer bounds up to its pixel rounding, and a cut layer may read
+// the reach beyond those bounds, which is why it is widened here. A shape measured wider than it
+// draws would break that, so the stroke measurement of rects, round rects and ovals stopped adding
+// a miter those shapes cannot reach.
 void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds, bool clipped,
                                               bool covered, std::vector<Rect>* footprints) {
   if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||

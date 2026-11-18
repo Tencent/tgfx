@@ -56,7 +56,7 @@ void MeasureContext::drawPath(const Path& path, const Matrix& matrix, const Clip
 // A rect, a round rect or an oval turns only through right angles or smoothly, so no miter join
 // reaches past half the stroke width. Canvas sends a stroked round rect here whenever its corners
 // are too tight for the dedicated path, and measuring it with the miter would make the recording
-// several stroke widths wider than the layer that drew it.
+// one and a half stroke widths wider on each side than the layer that drew it.
 static bool HasNoMiterReach(const Shape& shape) {
   if (!shape.isSimplePath()) {
     return false;
