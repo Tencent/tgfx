@@ -88,6 +88,15 @@ class BackgroundHandler {
     return nullptr;
   }
 
+  // Returns the rects the layer style sources are recorded against during this pass, or nullptr
+  // when they follow renderRects. Only a capture pass narrows its draw, but the sources it caches
+  // are reused outside those rects, so it records them against the whole captured area instead.
+  // Belongs to the pass rather than to DrawArgs so that a recording which deliberately clears
+  // renderRects to stay complete cannot inherit it by accident. Base class returns nullptr.
+  virtual const std::vector<Rect>* styleSourceRects() const {
+    return nullptr;
+  }
+
   // Returns the index of the last child in parent's children list that should be traversed
   // during the capture pass, or -1 if no children need traversal. BackgroundCapturer overrides
   // this to skip children after the last one with background styles.
@@ -126,8 +135,9 @@ class BackgroundHandler {
 
 class BackgroundCapturer : public BackgroundHandler {
  public:
-  BackgroundCapturer(BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source)
-      : snapshots(snapshots), bgSource(std::move(source)) {
+  BackgroundCapturer(BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source,
+                     const std::vector<Rect>* styleSourceRects)
+      : snapshots(snapshots), bgSource(std::move(source)), _styleSourceRects(styleSourceRects) {
   }
 
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
@@ -146,6 +156,10 @@ class BackgroundCapturer : public BackgroundHandler {
 
   const std::vector<Rect>* renderRects() const override {
     return _renderRects.empty() ? nullptr : &_renderRects;
+  }
+
+  const std::vector<Rect>* styleSourceRects() const override {
+    return _styleSourceRects;
   }
 
   int lastCaptureChildIndex(const Layer* parent) const override;
@@ -205,6 +219,7 @@ class BackgroundCapturer : public BackgroundHandler {
   BackgroundSnapshotMap* snapshots = nullptr;
   std::shared_ptr<BackgroundSource> bgSource = nullptr;
   std::vector<Rect> _renderRects;
+  const std::vector<Rect>* _styleSourceRects = nullptr;
   int _forcedCaptureDepth = 0;
   std::optional<Matrix> _captureWorldMatrix = std::nullopt;
 };

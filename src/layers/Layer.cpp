@@ -208,8 +208,9 @@ static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Can
   }
 
   bool opaqueMode = args.opaqueContext != nullptr;
-  return Layer3DContext::Make(opaqueMode, args.context, validRenderRect, contentScale,
-                              args.dstColorSpace);
+  return Layer3DContext::Make(
+      opaqueMode, args.context, validRenderRect, contentScale, args.dstColorSpace,
+      args.backgroundHandler != nullptr ? args.backgroundHandler->styleSourceRects() : nullptr);
 }
 
 bool Layer::DefaultAllowsEdgeAntialiasing() {
@@ -1449,11 +1450,8 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 
   auto drawArgs = args;
   drawArgs.renderFlags |= RenderFlags::DisableCache;
-  // The cache is reused across frames, so it records the whole subtree. Whatever narrowed the draw
-  // to a capture area has to go with it: the style sources would otherwise be recorded against that
-  // area and bake the missing content into the cache.
+  // The cache is reused across frames, so it records the whole subtree.
   drawArgs.renderRects = nullptr;
-  drawArgs.styleSourceRects = nullptr;
   // Cache content should be rendered to a regular texture, not to 3D compositor.
   drawArgs.render3DContext = nullptr;
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
@@ -1855,15 +1853,17 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
   DrawArgs drawArgs = args;
   drawArgs.render3DContext = nullptr;
+  // The cached sources are reused outside the rects that limit the capture's own draw calls, so a
+  // capture pass records them against the whole area it captured. Read that range from the pass
+  // before dropping its handler: a recording that deliberately clears renderRects keeps the
+  // complete range as well, because the range belongs to the pass rather than to DrawArgs.
+  if (auto* handler = args.backgroundHandler) {
+    if (auto* styleSourceRects = handler->styleSourceRects()) {
+      drawArgs.renderRects = styleSourceRects;
+    }
+  }
   // Layer style source content is an intermediate artifact — skip background capture / consume.
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
-  // The cached sources are reused outside the rects that limit the capture's own draw calls, so a
-  // capture pass records them against the whole area it captured. A full recording, which clears
-  // renderRects, must clear styleSourceRects as well or its content would be narrowed again.
-  DEBUG_ASSERT(args.styleSourceRects == nullptr || args.renderRects != nullptr);
-  if (args.styleSourceRects != nullptr) {
-    drawArgs.renderRects = args.styleSourceRects;
-  }
 
   // Record the geometry once for both buckets: neither the recording nor the shape depends on
   // drawArgs.excludeEffects, so both buckets would otherwise record the same raster. Keep it that

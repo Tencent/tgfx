@@ -66,9 +66,10 @@ class Compositor3DBackgroundSource : public BackgroundSource {
 
 Render3DContext::Render3DContext(std::shared_ptr<Context3DCompositor> compositor,
                                  const Rect& renderRect, float contentScale,
-                                 std::shared_ptr<ColorSpace> colorSpace)
+                                 std::shared_ptr<ColorSpace> colorSpace,
+                                 const std::vector<Rect>* styleSourceRects)
     : Layer3DContext(renderRect, contentScale, std::move(colorSpace)),
-      _compositor(std::move(compositor)) {
+      _compositor(std::move(compositor)), _styleSourceRects(styleSourceRects) {
 }
 
 void Render3DContext::emitNode(Layer* layer, const Rect& localBounds, const Matrix3D& transform,
@@ -235,7 +236,7 @@ std::shared_ptr<Image> Render3DContext::rasterLayer(
     leafSource =
         compositorSource->createFromSurface(surface.get(), worldBounds, localToWorld, info.density);
     if (leafSource != nullptr) {
-      leafCapturer = std::make_unique<BackgroundCapturer>(snapshots, leafSource);
+      leafCapturer = std::make_unique<BackgroundCapturer>(snapshots, leafSource, _styleSourceRects);
       leafArgs.backgroundHandler = leafCapturer.get();
     }
   }

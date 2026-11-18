@@ -1682,6 +1682,77 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullKeepsStyleSourceComplete){TGFX_
   context->flushAndSubmit();
 })}
 
+// A 3D context rasters each leaf onto its own surface, and a filtered leaf under it runs one more
+// capturer on top. Both inherit the range the capture records its layer style sources against, so a
+// shadow whose content lies outside the culled footprint still reaches the output.
+TGFX_TEST_PRIVATE(BackgroundBlurTest,
+                  ThreeDOffscreenKeepsTheStyleSourceComplete){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int SurfaceSize = 240;
+
+  auto makeChild = [](float x, float y) {
+    auto child = ShapeLayer::Make();
+    Path path;
+    path.addRect(Rect::MakeXYWH(0, 0, 40, 40));
+    child->setPath(path);
+    child->setFillStyle(ShapeStyle::Make(Color::Red()));
+    child->setMatrix(Matrix::MakeTrans(x, y));
+    return child;
+  };
+
+  auto render = [&](RenderMode mode, bool cull, bool withFarChild) {
+    auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
+    EXPECT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(mode);
+    CaptureCullScope cullScope(cull);
+
+    auto group = Layer::Make();
+    group->setPreserve3D(true);
+    auto projection = Matrix3D::I();
+    projection.setRowColumn(3, 2, -1.0f / 300.0f);
+    group->setMatrix3D(Matrix3D::MakeTranslate(120, 120, 0) *
+                       (projection * Matrix3D::MakeRotate({0, 1, 0}, 20)) *
+                       Matrix3D::MakeTranslate(-120, -120, 0));
+
+    auto filtered = Layer::Make();
+    filtered->setFilters({BlurFilter::Make(1, 1)});
+
+    auto shadowed = Layer::Make();
+    shadowed->setLayerStyles({DropShadowStyle::Make(0, 20, 0, 0, Color::Black())});
+    shadowed->addChild(makeChild(10, 10));
+    if (withFarChild) {
+      shadowed->addChild(makeChild(150, 10));
+    }
+    filtered->addChild(shadowed);
+
+    // Covers only the near child, so the footprint stays small and the far shadow is only reachable
+    // through the style source recording.
+    auto blur = ShapeLayer::Make();
+    Path blurPath;
+    blurPath.addRect(Rect::MakeXYWH(0, 0, 60, 60));
+    blur->setPath(blurPath);
+    blur->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 40)));
+    blur->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+    filtered->addChild(blur);
+
+    group->addChild(filtered);
+    displayList->root()->addChild(group);
+    displayList->render(surface.get());
+    return ReadSurfacePixels(surface.get());
+  };
+
+  auto reference = render(RenderMode::Tiled, false, true);
+  auto culled = render(RenderMode::Tiled, true, true);
+  auto withoutFarChild = render(RenderMode::Tiled, true, false);
+  ASSERT_FALSE(reference.empty());
+  ASSERT_GT(CountDifferentPixels(reference, withoutFarChild), 0u);
+  ExpectMatchingRenders(reference, culled);
+  context->flushAndSubmit();
+})}
+
 // The capture may only draw what it covers itself, so every footprint is clipped against each
 // captured rect rather than against their union: a footprint stretched over the gap between two
 // tiles must not pull in the layers under that gap.

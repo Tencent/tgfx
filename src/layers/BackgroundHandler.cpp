@@ -230,7 +230,10 @@ std::unique_ptr<BackgroundCapturer> BackgroundCapturer::buildSubCapturer(
     return nullptr;
   }
   auto subRect = subSource->getBackgroundRect();
-  auto clone = std::make_unique<BackgroundCapturer>(snapshots, std::move(subSource));
+  // The sources recorded here are cached in the shared map and may be reused by the consume pass
+  // outside this sub surface, so the sub capturer keeps the parent's recording range.
+  auto clone =
+      std::make_unique<BackgroundCapturer>(snapshots, std::move(subSource), _styleSourceRects);
   NarrowRenderRects(parentArgs, subRect, &clone->_renderRects);
   // Forced-capture state must propagate so pass-through subtrees still feed the parent bgSource.
   if (isForcedCapture()) {
@@ -585,12 +588,11 @@ void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
   }
 
   auto* bgCanvas = bgSource->getCanvas();
-  BackgroundCapturer capturer(snapshots, std::move(bgSource));
+  BackgroundCapturer capturer(snapshots, std::move(bgSource), &styleSourceRects);
   AutoCanvasRestore autoRestore(bgCanvas);
   DrawArgs captureArgs = baseArgs;
   captureArgs.backgroundHandler = &capturer;
   captureArgs.renderRects = &renderRects;
-  captureArgs.styleSourceRects = &styleSourceRects;
   captureRoot->drawLayer(captureArgs, bgCanvas, 1.0f, BlendMode::SrcOver);
 }
 
