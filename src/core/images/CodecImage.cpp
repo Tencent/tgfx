@@ -52,14 +52,21 @@ std::shared_ptr<Image> CodecImage::onMakeMipmapped(bool enabled) const {
   return image;
 }
 
-std::shared_ptr<TextureProxy> CodecImage::lockTextureProxy(const TPArgs& args) const {
-  auto tempGenerator = generator;
+ISize CodecImage::getRasterizedSize(float scale) const {
   auto codec = getCodec();
-  auto codecScale =
-      static_cast<float>(width()) * args.drawScale / static_cast<float>(codec->width());
+  auto codecScale = static_cast<float>(width()) * scale / static_cast<float>(codec->width());
   auto [scaleWidth, scaleHeight] = codec->getScaledDimensions(codecScale);
   if (scaleWidth < generator->width() && scaleHeight < generator->height()) {
-    tempGenerator = ScaledImageGenerator::MakeFrom(codec, scaleWidth, scaleHeight);
+    return ISize::Make(scaleWidth, scaleHeight);
+  }
+  return ISize::Make(generator->width(), generator->height());
+}
+
+std::shared_ptr<TextureProxy> CodecImage::lockTextureProxy(const TPArgs& args) const {
+  auto tempGenerator = generator;
+  auto size = getRasterizedSize(args.drawScale);
+  if (size.width < generator->width() && size.height < generator->height()) {
+    tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), size.width, size.height);
   }
   return args.context->proxyProvider()->createTextureProxy(tempGenerator, args.mipmapped,
                                                            args.renderFlags);

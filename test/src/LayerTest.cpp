@@ -7858,7 +7858,8 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleSourceSwapSharesOneRasterizedGeometry) {
       auto recording = source->groups[0]->geometry->image(); ASSERT_TRUE(recording != nullptr);
       EXPECT_TRUE(recording == source->groups[1]->geometry->image())
       << "control: both buckets start from the one geometry recording";
-      BackgroundSnapshotMap snapshots = {}; BackgroundCapturer capturer(&snapshots, nullptr);
+      BackgroundSnapshotMap snapshots = {};
+      BackgroundCapturer capturer(&snapshots, nullptr, nullptr);
       auto* cached = capturer.cacheLayerStyleSource(panel.get(), std::move(source));
       ASSERT_TRUE(cached != nullptr); ASSERT_TRUE(cached->groups[0] != nullptr);
       ASSERT_TRUE(cached->groups[1] != nullptr);

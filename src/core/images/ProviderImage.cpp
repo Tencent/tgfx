@@ -38,6 +38,13 @@ ProviderImage::ProviderImage(std::shared_ptr<ImageProvider> provider, bool mipma
   }
 }
 
+ISize ProviderImage::getRasterizedSize(float) const {
+  // The variant served for the draw scale carries its own pixel density, so its texture size does
+  // not match the logical size reported by width()/height(). Report no size so RasterizedImage
+  // falls back to the actual proxy (variant) size instead of the logical size.
+  return {};
+}
+
 std::shared_ptr<TextureProxy> ProviderImage::lockTextureProxy(const TPArgs& args) const {
   auto variant = resolveVariant(args.drawScale);
   if (variant == nullptr) {
