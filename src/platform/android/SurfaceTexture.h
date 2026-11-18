@@ -66,6 +66,8 @@ class SurfaceTexture : public ImageStream {
 
   void onDrainPendingFrames() override;
 
+  void onSyncToTimestamp(int64_t target) override;
+
   bool hasFrameTimestamp() const override {
     return true;
   }
@@ -80,6 +82,10 @@ class SurfaceTexture : public ImageStream {
   bool textureSizeResolved = false;
   ISize textureSize = {};
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
+
+  bool latchNextFrame(JNIEnv* env);
+
+  int64_t currentTimestamp(JNIEnv* env);
 
   static void JNIInit(JNIEnv* env);
 

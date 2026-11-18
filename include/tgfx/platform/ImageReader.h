@@ -71,10 +71,12 @@ class ImageReader {
   /**
    * Sets the presentation timestamp, in nanoseconds, that the next generated texture must reach, so
    * the texture shows the frame the caller is drawing instead of an older one still sitting in the
-   * producer's queue. readTexture() consumes the queued frames until the texture reaches it and
-   * waits for the producer when the frame is still being decoded. The request applies to that one
-   * texture generation and is then cleared; passing 0 clears it early. Streams that do not report a
-   * frame timestamp (ImageStream::hasFrameTimestamp() returns false) ignore it.
+   * producer's queue. readTexture() consumes the frames already queued and then asks the stream to
+   * catch up to the timestamp without blocking: if the frame has not been decoded yet the texture
+   * keeps its current frame and the next draw picks it up, so a stalled producer can never stall the
+   * render thread. The request applies to that one texture generation and is then cleared; passing 0
+   * clears it early. Streams that do not report a frame timestamp (ImageStream::hasFrameTimestamp()
+   * returns false) ignore it.
    */
   void setTargetFrameTimestamp(int64_t timestamp);
 

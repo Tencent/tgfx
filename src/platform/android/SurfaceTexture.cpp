@@ -288,6 +288,52 @@ int64_t SurfaceTexture::currentFrameTimestamp() {
       env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp));
 }
 
+bool SurfaceTexture::latchNextFrame(JNIEnv* env) {
+  env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return false;
+  }
+  return true;
+}
+
+int64_t SurfaceTexture::currentTimestamp(JNIEnv* env) {
+  return static_cast<int64_t>(
+      env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp));
+}
+
+void SurfaceTexture::onSyncToTimestamp(int64_t target) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env == nullptr) {
+    return;
+  }
+  // Catch up with the frames the producer already delivered, never waiting for a new one: a draw
+  // must not block on the decoder. When the budget or the queue runs out the texture keeps the
+  // newest frame that did arrive and the next draw tries again.
+  static constexpr int MAX_SYNC_FRAMES = 8;
+  static constexpr auto SYNC_BUDGET = std::chrono::milliseconds(4);
+  int64_t lastTimestamp = currentTimestamp(env);
+  auto deadline = std::chrono::steady_clock::now() + SYNC_BUDGET;
+  for (int i = 0; i < MAX_SYNC_FRAMES; i++) {
+    if (lastTimestamp >= target || std::chrono::steady_clock::now() >= deadline) {
+      break;
+    }
+    // Consume the flag right before latching: a frame that arrives from now on sets it again and is
+    // picked up by the next draw instead of being lost.
+    frameAvailable = false;
+    if (!latchNextFrame(env)) {
+      break;
+    }
+    int64_t timestamp = currentTimestamp(env);
+    if (timestamp == lastTimestamp) {
+      break;
+    }
+    lastTimestamp = timestamp;
+  }
+}
+
 void SurfaceTexture::onDrainPendingFrames() {
   std::lock_guard<std::mutex> autoLock(locker);
   JNIEnvironment environment;
@@ -303,18 +349,16 @@ void SurfaceTexture::onDrainPendingFrames() {
   // frame cap bounds a producer whose timestamp keeps advancing on every latch, so the loop still
   // ends even if it never reports no progress.
   // Unlike updateTexImage(), this path never waits for a new frame.
-  // Clear the flag before consuming: a frame that arrives while this loop runs sets it again, and
-  // clearing it afterwards would make the next updateTexImage() miss that frame.
-  frameAvailable = false;
   static constexpr int MAX_DRAIN_FRAMES = 8;
-  jlong lastTimestamp = env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp);
+  int64_t lastTimestamp = currentTimestamp(env);
   for (int i = 0; i < MAX_DRAIN_FRAMES; i++) {
-    env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
-    if (env->ExceptionCheck()) {
-      env->ExceptionClear();
+    // Consume the flag right before latching: clearing it after the loop would drop a frame that
+    // arrived while the loop was running and make the next updateTexImage() wait for nothing.
+    frameAvailable = false;
+    if (!latchNextFrame(env)) {
       break;
     }
-    jlong timestamp = env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp);
+    int64_t timestamp = currentTimestamp(env);
     if (timestamp == lastTimestamp) {
       break;
     }

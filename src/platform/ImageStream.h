@@ -88,6 +88,15 @@ class ImageStream {
   }
 
   /**
+   * Consumes the frames the producer has already delivered until the texture reaches the given
+   * presentation timestamp. Unlike onUpdateTexture(), implementations must never wait for a new
+   * frame: when the target is not available yet they return with the current frame still bound, and
+   * the next draw picks it up. The default implementation does nothing.
+   */
+  virtual void onSyncToTimestamp(int64_t /*target*/) {
+  }
+
+  /**
    * Consumes any frames the producer has already delivered beyond the one most recently consumed,
    * so the texture ends on the latest available frame. ImageReader calls this from readTexture()
    * after each frame has been consumed. The default implementation does nothing; only streams whose

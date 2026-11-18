@@ -38,6 +38,8 @@ class FakeImageStream : public ImageStream {
   int64_t frameTimestamp = 0;
   int updateCount = 0;
   bool providesFrameTimestamp = true;
+  int syncCount = 0;
+  int64_t syncTarget = 0;
 
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override {
@@ -59,6 +61,12 @@ class FakeImageStream : public ImageStream {
 
   int64_t currentFrameTimestamp() override {
     return frameTimestamp;
+  }
+
+  void onSyncToTimestamp(int64_t target) override {
+    syncCount++;
+    syncTarget = target;
+    frameTimestamp = target;
   }
 
  private:
@@ -85,29 +93,38 @@ TGFX_TEST_PRIVATE(ImageReaderTest, DrainsPendingFramesOnEveryTexture) {
 }
 
 /**
- * A target timestamp makes the texture wait for the frame being drawn: while the producer still
- * reports an older frame the reader keeps consuming, and it stops as soon as the target is reached.
+ * A target timestamp makes the reader ask the stream to catch up right after the drain. The call is
+ * non-blocking, applies to that one texture, and is skipped once the texture already reached it.
  */
-TGFX_TEST_PRIVATE(ImageReaderTest, WaitsForTargetFrameTimestamp) {
+TGFX_TEST_PRIVATE(ImageReaderTest, SyncsToTargetFrameTimestamp) {
   TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
                       ASSERT_TRUE(context != nullptr);
                       auto stream = std::make_shared<FakeImageStream>(16, 16);
                       auto reader = ImageReader::MakeFrom(stream); ASSERT_TRUE(reader != nullptr);
 
-                      // The producer never reports the target, so the reader is bounded by the wait
-                      // limit instead of looping forever.
                       reader->setTargetFrameTimestamp(1000);
                       auto first = reader->acquireNextBuffer(); ASSERT_TRUE(first != nullptr);
                       EXPECT_TRUE(TextureView::MakeFrom(context, first, false) != nullptr);
-                      EXPECT_EQ(stream->updateCount, 2);
+                      EXPECT_EQ(stream->syncCount, 1); EXPECT_EQ(stream->syncTarget, 1000);
 
-                      // Once the producer reports the target the extra consumes stop immediately.
-                      stream->updateCount = 0;
-                      stream->frameTimestamp = 1000; reader->setTargetFrameTimestamp(1000);
+                      // One-shot: the next texture does not sync again even though the frame
+                      // timestamp is still reported as older than the previous target.
+                      stream->frameTimestamp = 0;
                       auto second = reader->acquireNextBuffer(); ASSERT_TRUE(second != nullptr);
                       EXPECT_TRUE(TextureView::MakeFrom(context, second, false) != nullptr);
-                      EXPECT_EQ(stream->updateCount, 1);)
+                      EXPECT_EQ(stream->syncCount, 1);
+
+                      // A new request is honoured once the texture is behind the new target, and a
+                      // texture that already reached it is left alone.
+                      reader->setTargetFrameTimestamp(2000);
+                      auto third = reader->acquireNextBuffer(); ASSERT_TRUE(third != nullptr);
+                      EXPECT_TRUE(TextureView::MakeFrom(context, third, false) != nullptr);
+                      EXPECT_EQ(stream->syncCount, 2); reader->setTargetFrameTimestamp(2000);
+                      auto fourth = reader->acquireNextBuffer(); ASSERT_TRUE(fourth != nullptr);
+                      EXPECT_TRUE(TextureView::MakeFrom(context, fourth, false) != nullptr);
+                      EXPECT_EQ(stream->syncCount, 2);)
 }
+
 /**
  * A stream without frame timestamps cannot tell whether the target was reached, so the reader must
  * not spend extra texture uploads waiting for it.
@@ -122,7 +139,7 @@ TGFX_TEST_PRIVATE(ImageReaderTest, IgnoresTargetFrameTimestampWithoutTimestamps)
                       reader->setTargetFrameTimestamp(1000);
                       auto first = reader->acquireNextBuffer(); ASSERT_TRUE(first != nullptr);
                       EXPECT_TRUE(TextureView::MakeFrom(context, first, false) != nullptr);
-                      EXPECT_EQ(stream->updateCount, 0);)
+                      EXPECT_EQ(stream->syncCount, 0); EXPECT_EQ(stream->updateCount, 0);)
 }
 
 }  // namespace tgfx
