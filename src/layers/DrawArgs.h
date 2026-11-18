@@ -56,7 +56,8 @@ class DrawArgs {
   // World-space rects the layer style sources are recorded against, when they have to differ from
   // renderRects. A capture pass culls drawing to the area its background styles sample, but the
   // sources it caches are reused for the whole captured area, so they must cover the latter.
-  // nullptr means the sources follow renderRects.
+  // nullptr means the sources follow renderRects. Anything that clears renderRects to record a
+  // complete picture, such as the subtree cache, has to clear this too.
   const std::vector<Rect>* styleSourceRects = nullptr;
 
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
