@@ -531,13 +531,12 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
     return nullptr;
   }
   auto child = _children[static_cast<size_t>(index)];
+  if (_root) {
+    _root->invalidateRect(child->renderBounds);
+  }
   child->_parent = nullptr;
   child->onDetachFromRoot();
   _children.erase(_children.begin() + index);
-  if (_root) {
-    _root->invalidateRect(child->renderBounds);
-    child->renderBounds = {};
-  }
   invalidateDescendents();
   return child;
 }
@@ -623,12 +622,11 @@ void Layer::setChildren(const std::vector<std::shared_ptr<Layer>>& children) {
     auto it = newIndexMap.find(ptr);
     if (it == newIndexMap.end()) {
       nodesToMarkDirty.push_back(ptr);
-      ptr->_parent = nullptr;
-      ptr->onDetachFromRoot();
       if (_root) {
         _root->invalidateRect(ptr->renderBounds);
-        ptr->renderBounds = {};
       }
+      ptr->_parent = nullptr;
+      ptr->onDetachFromRoot();
     } else {
       retainedChildren.push_back(ptr);
       newPositions.push_back(it->second);
@@ -1000,6 +998,7 @@ void Layer::onAttachToRoot(RootLayer* rootLayer) {
 
 void Layer::onDetachFromRoot() {
   _root = nullptr;
+  renderBounds = {};
   for (auto& child : _children) {
     child->onDetachFromRoot();
   }
