@@ -46,9 +46,9 @@ class SurfaceTextureReader : public ImageReader {
   jobject createInputSurface() const;
 
   /**
-   * Notifies that the previously returned ImageBuffer is now available for texture generation.
-   * Otherwise, the previous ImageBuffer will remain blocked for texture generation until this method
-   * is called. This method should be invoked by the listener provided when creating the reader.
+   * Notifies that a new image frame has been rendered into the underlying SurfaceTexture. Until this
+   * method is called, acquireNextBuffer() returns nullptr. This method should be invoked by the
+   * listener provided when creating the reader.
    */
   void notifyFrameAvailable();
 
