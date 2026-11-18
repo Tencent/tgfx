@@ -21,6 +21,15 @@
 
 #include "coverage/analytic_clip_math.inc"
 
+// The pure op fragments the interpreter's branches call. The texture and modulation fragments
+// depend on the leaf readback helpers (source/texture_read_swizzle.inc, included by the entry
+// ahead of this file); the coverage fragments depend on the analytic cores above.
+#include "ops/Texture.glsl"
+#include "ops/TexModulate.glsl"
+#include "ops/AARectCoverage.glsl"
+#include "ops/LocalRectCoverage.glsl"
+#include "ops/RRectCoverage.glsl"
+
 #if HAS_XP >= 1
 // The operands of the XferProcessor's advanced blend pass (xp_blend_pass.inc), set by main()
 // before it evaluates slot SlotCount.
@@ -44,34 +53,8 @@ vec4 chainApplyColorSpaceXform(vec4 color) {
 // chain without one closes the gate and the runtime splices the branch out of the text.
 #pragma tgfx_spec_gate TextureSlot : (SPEC_UsedOps() & (1 << OP_TEXTURE)) != 0
 vec4 chainEvalTextureSlot(int slot, int selector) {
-  vec4 texColor = chainLeafTex[slot];
-  if ((selector & 2) != 0) {
-    // Alpha-only leaf (R8 on Metal returns (r,0,0,1)): splat .r into all channels so the alpha
-    // channel carries the mask value, matching the runtime TextureEffect alpha-only readback.
-    texColor = aotTextureAlphaOnly(texColor);
-    if ((selector & 8) != 0) {
-      // A two-child blend operand: the xfer emission feeds each child vec4(inputColor.rgb, 1.0),
-      // so the mask modulates by the geometry RGB with opaque alpha.
-      texColor = aotTextureModulate(texColor, vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0), true);
-    }
-    if ((selector & 16) != 0) {
-      // The color root: the runtime readback multiplies the mask by its FULL input color
-      // (sample.a * inputColor), one multiply over the premul geometry color — RGB and alpha
-      // in a single step (the bit0|bit3 pair applied the paint alpha to the RGB twice).
-      texColor = aotTextureModulate(texColor, TGFX_CHAIN_GEOM_COLOR, true);
-    }
-  }
-  if ((selector & 4) != 0) {
-    // Coverage-root leaf: modulated by the coverage unit's alpha, matching the runtime
-    // coverage-FP readback (tex * coverageIn.a).
-    texColor = aotTextureModulate(texColor, TGFX_CHAIN_UNIT_COVERAGE, false);
-  }
-  if ((selector & 1) != 0) {
-    // Color-source leaves are modulated by the geometry color's alpha, matching the runtime
-    // paint-alpha wrap. Mask and blend-operand leaves sample raw, as the runtime emits them.
-    texColor = aotTextureModulate(texColor, TGFX_CHAIN_GEOM_COLOR, false);
-  }
-  return texColor;
+  return tgfxOpTexture(chainLeafTex[slot], TGFX_CHAIN_GEOM_COLOR, TGFX_CHAIN_UNIT_COVERAGE,
+                       selector & 0x1F);
 }
 
 // A texture whose runtime input is a computed value splits into a raw sampling slot in the
@@ -84,11 +67,7 @@ vec4 chainEvalTextureSlot(int slot, int selector) {
 #pragma tgfx_spec_gate TexModulate : (SPEC_UsedOps() & (1 << OP_TEX_MODULATE)) != 0
 vec4 chainEvalTexModulate(int slot, int selector, vec4 in0) {
   int srcSlot = (selector >> 16) & 0xF;
-  vec4 tex = chainLeafTex[srcSlot];
-  if ((selector & 1) != 0) {
-    tex = aotTextureAlphaOnly(tex);
-  }
-  return aotTextureModulate(tex, in0, (selector & 1) != 0);
+  return tgfxOpTexModulate(chainLeafTex[srcSlot], in0, selector & 1);
 }
 
 // The blend site serves both a chain's Blend slots and the xfer's advanced blend pass (slot
@@ -112,13 +91,10 @@ vec4 chainEvalBlend(int slot, int selector, vec4 in0, vec4 in1) {
   return blendResult;
 }
 
-// Analytic AA-rect coverage (identical math to GLSLRectEffect): falloff from the fragment's
-// distance to the rect edges, evaluated in destination device coordinates via gl_FragCoord.
-// Shared by the interpreter's dispatch and the composed executor, so the formula exists once.
+// Analytic AA-rect coverage (identical math to GLSLRectEffect): the interpreter's dispatch and
+// the composed executor both go through the pure fragment, so the formula exists once.
 vec4 chainAARectCoverage(vec4 in0, vec4 rect) {
-  highp vec4 dists4 = clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - rect), 0.0, 1.0);
-  highp vec2 dists2 = dists4.xy + dists4.zw - 1.0;
-  return in0 * (dists2.x * dists2.y);
+  return tgfxOpAARectCoverage(in0, rect, gl_FragCoord.xy);
 }
 
 // Evaluates slot `slot`, reading its fields from the uniform arrays. OP_TEXTURE slots read the
@@ -193,11 +169,12 @@ vec4 evalChainSlot(int slot) {
     // Analytic AA-rect coverage in the clip's local space: map gl_FragCoord through the
     // device-to-local matrix, then the shared separable half-pixel ramp.
     LocalRectCoverageData d = chainLoadLocalRectCoverage(dataAt);
-    return in0 * vec4(analyticLocalRectCoverage(d.rect, d.deviceToLocal));
+    return tgfxOpLocalRectCoverage(in0, d.rect, d.deviceToLocal, gl_FragCoord.xy);
   }
   if (Packed.x == OP_RRECT_COVERAGE) {
     RRectCoverageData d = chainLoadRRectCoverage(dataAt);
-    return aotApplyRRectCoverage(in0, d.rect, d.radiiX, d.radiiY, d.antiAlias, d.deviceToLocal);
+    return tgfxOpRRectCoverage(in0, d.rect, d.radiiX, d.radiiY, d.antiAlias, d.deviceToLocal,
+                               gl_FragCoord.xy);
   }
   vec4 resourceValue = vec4(0.0);
   if (evalResourceSlot(Packed, in0, dataAt, resourceValue)) {

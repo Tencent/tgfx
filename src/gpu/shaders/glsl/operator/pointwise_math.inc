@@ -23,43 +23,20 @@
 
 // Each operator's math is only reachable from a chain whose slots carry that operator: the
 // dispatch branch holds a constant `op` under specialization, so an absent operator's call sites
-// fold away and the runtime splices the body out.
+// fold away and the runtime splices the body out. The bodies live in ops/ as pure fragments; the
+// gates stay here, on the interpreter's specialization surface.
 #pragma tgfx_spec_gate ColorMatrixMath : (SPEC_UsedOps() & (1 << OP_COLOR_MATRIX)) != 0
-vec4 pmApplyColorMatrix(vec4 color, mat4 matrix, vec4 vector) {
-  // Unpremultiply, apply matrix + vector, clamp, re-premultiply.
-  color = vec4(color.rgb / max(color.a, 9.9999997473787516e-05), color.a);
-  color = clamp(matrix * color + vector, 0.0, 1.0);
-  color.rgb *= color.a;
-  return color;
-}
+#include "ops/ColorMatrix.glsl"
 
 #pragma tgfx_spec_gate LumaMath : (SPEC_UsedOps() & (1 << OP_LUMA)) != 0
-vec4 pmApplyLuma(vec4 color, vec3 lumaCoefficients) {
-  return vec4(dot(color.rgb, lumaCoefficients));
-}
+#include "ops/Luma.glsl"
 
 #pragma tgfx_spec_gate AlphaThresholdMath : (SPEC_UsedOps() & (1 << OP_ALPHA_THRESHOLD)) != 0
-vec4 pmApplyAlphaThreshold(vec4 color, float threshold) {
-  vec4 result = vec4(0.0);
-  if (color.a > 0.0) {
-    result.rgb = color.rgb / color.a;
-    result.a = step(threshold, color.a);
-    result = clamp(result, 0.0, 1.0);
-  }
-  return result;
-}
+#include "ops/AlphaThreshold.glsl"
 
 // 0 = Ignore (replace), 1 = ModulateRGBA, 2 = ModulateA.
 #pragma tgfx_spec_gate ConstColorMath : (SPEC_UsedOps() & (1 << OP_CONST_COLOR)) != 0
-vec4 pmApplyConstColor(vec4 constColor, vec4 inputColor, int inputMode) {
-  if (inputMode == 1) {
-    return constColor * inputColor;
-  }
-  if (inputMode == 2) {
-    return constColor * inputColor.a;
-  }
-  return constColor;
-}
+#include "ops/ConstColor.glsl"
 
 // Premultiplied-in/premultiplied-out color space transform applied to the lvalue COLOR in place;
 // the flags select which stages run, in the fixed order unpremul, linearize, source OOTF, gamut,

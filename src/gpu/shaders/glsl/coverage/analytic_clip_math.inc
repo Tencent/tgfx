@@ -9,17 +9,24 @@
 #ifndef TGSL_ANALYTIC_CLIP_MATH_INCLUDED
 #define TGSL_ANALYTIC_CLIP_MATH_INCLUDED
 
-float analyticLocalRectCoverage(vec4 rect, mat3 deviceToLocal) {
-  highp vec3 hl = deviceToLocal * vec3(gl_FragCoord.xy, 1.0);
+// The coordinate-parameterized cores: the pure ops/ fragments pass the fragment position as a
+// value, while the wrappers below keep reading gl_FragCoord for the existing consumers, so both
+// spell one formula.
+float analyticLocalRectCoverageAt(vec4 rect, mat3 deviceToLocal, highp vec2 fragCoord) {
+  highp vec3 hl = deviceToLocal * vec3(fragCoord, 1.0);
   highp vec2 local = hl.xy / hl.z;
   highp vec4 dAA = clamp(vec4(local - rect.xy, rect.zw - local), -0.5, 0.5);
   highp vec2 aaCovXY = dAA.xy + dAA.zw;
   return aaCovXY.x * aaCovXY.y;
 }
 
-float analyticRRectCoverage(vec4 rect, vec4 radiiX, vec4 radiiY, float antiAlias,
-                            mat3 deviceToLocal) {
-  highp vec3 hl = deviceToLocal * vec3(gl_FragCoord.xy, 1.0);
+float analyticLocalRectCoverage(vec4 rect, mat3 deviceToLocal) {
+  return analyticLocalRectCoverageAt(rect, deviceToLocal, gl_FragCoord.xy);
+}
+
+float analyticRRectCoverageAt(vec4 rect, vec4 radiiX, vec4 radiiY, float antiAlias,
+                              mat3 deviceToLocal, highp vec2 fragCoord) {
+  highp vec3 hl = deviceToLocal * vec3(fragCoord, 1.0);
   highp vec2 local = hl.xy / hl.z;
   highp vec4 cornersX = vec4(rect.x, rect.z, rect.z, rect.x);
   highp vec4 cornersY = vec4(rect.y, rect.y, rect.w, rect.w);
@@ -52,6 +59,11 @@ float analyticRRectCoverage(vec4 rect, vec4 radiiX, vec4 radiiY, float antiAlias
   highp float aaCov = clamp(0.5 - dist, 0.0, 1.0);
   highp float nonAACov = step(dist, 0.0);
   return mix(nonAACov, aaCov, antiAlias);
+}
+
+float analyticRRectCoverage(vec4 rect, vec4 radiiX, vec4 radiiY, float antiAlias,
+                            mat3 deviceToLocal) {
+  return analyticRRectCoverageAt(rect, radiiX, radiiY, antiAlias, deviceToLocal, gl_FragCoord.xy);
 }
 
 // The rounded-rect instruction's math: only a chain carrying that operator calls it (the analytic
