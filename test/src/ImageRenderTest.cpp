@@ -22,11 +22,16 @@
 #include "core/images/TransformImage.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/ResourceCache.h"
+#include "gpu/TPArgs.h"
+#include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/ImageBuffer.h"
+#include "tgfx/core/ImageProvider.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/PictureRecorder.h"
@@ -594,6 +599,187 @@ TGFX_TEST(ImageRenderTest, RasterizedMipmapImage) {
       EXPECT_TRUE(mipmapKey == std::static_pointer_cast<RasterizedImage>(image)->getTextureKey());
       mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
       EXPECT_TRUE(mipmapTexture != nullptr));
+}
+
+TGFX_TEST(ImageRenderTest, RasterizedScaledProxySize) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  // GenMesh.png is 1563x1563, an odd size so that width * 0.5 is not an integer. The decoder rounds
+  // the downscaled cache texture to round(1563 * 0.5) = 782. getRasterizedSize() must report that
+  // same 782, and the wrapped proxy served from the resource cache on a later draw must keep the
+  // real texture size instead of a recomputed one, otherwise a cached draw would sample a different
+  // number of texels than the first draw.
+  auto image = MakeImage("resources/assets/GenMesh.png");
+  ASSERT_TRUE(image != nullptr);
+  image = image->makeRasterized();
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, 800, 800);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->setMatrix(Matrix::MakeScale(0.4f));
+  canvas->drawImage(image);
+  context->flushAndSubmit();
+  TGFX_PRIVATE_ACCESS(auto raster = std::static_pointer_cast<RasterizedImage>(image);
+                      auto scaledKey = raster->getTextureKey(0.5f);
+                      EXPECT_TRUE(context->resourceCache()->hasUniqueResource(scaledKey));
+                      auto contentSize = raster->source->getRasterizedSize(0.5f);
+                      EXPECT_EQ(contentSize.width, 782); EXPECT_EQ(contentSize.height, 782);
+                      TPArgs tpArgs(context, 0, false, 0.5f, BackingFit::Exact);
+                      auto proxy = raster->lockTextureProxy(tpArgs); ASSERT_TRUE(proxy != nullptr);
+                      EXPECT_EQ(proxy->width(), 782); EXPECT_EQ(proxy->height(), 782));
+}
+
+namespace {
+class VariantOnlyProvider : public ImageProvider {
+ public:
+  VariantOnlyProvider(int width, int height, std::shared_ptr<Image> variant)
+      : _width(width), _height(height), variant(std::move(variant)) {
+  }
+
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
+  std::shared_ptr<Image> getImage(float) const override {
+    return variant;
+  }
+
+ private:
+  int _width = 0;
+  int _height = 0;
+  std::shared_ptr<Image> variant = nullptr;
+};
+}  // namespace
+
+TGFX_TEST(ImageRenderTest, RasterizedProviderVariant) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  // A provider reports a 10x10 logical image but only serves a lower-density 6x6 variant with four
+  // distinct quadrants. RasterizedImage has no content size of its own for this source, so it must
+  // fall back to the variant texture size (6) instead of the logical size (10); otherwise fpMatrix
+  // becomes 1 and only the top-left quadrant is sampled and stretched over the whole image.
+  constexpr int vw = 6;
+  constexpr int vh = 6;
+  constexpr uint32_t red = 0xFF0000FFu;
+  constexpr uint32_t green = 0xFF00FF00u;
+  constexpr uint32_t blue = 0xFFFF0000u;
+  constexpr uint32_t yellow = 0xFF00FFFFu;
+  std::vector<uint32_t> pixels(static_cast<size_t>(vw) * static_cast<size_t>(vh));
+  for (int y = 0; y < vh; y++) {
+    for (int x = 0; x < vw; x++) {
+      auto right = x >= vw / 2;
+      auto bottom = y >= vh / 2;
+      pixels[static_cast<size_t>(y) * static_cast<size_t>(vw) + static_cast<size_t>(x)] =
+          bottom ? (right ? yellow : blue) : (right ? green : red);
+    }
+  }
+  auto variantInfo = ImageInfo::Make(vw, vh, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  auto variantData = Data::MakeWithCopy(pixels.data(), pixels.size() * sizeof(uint32_t));
+  auto variant = Image::MakeFrom(variantInfo, std::move(variantData));
+  ASSERT_TRUE(variant != nullptr);
+  auto provider = std::make_shared<VariantOnlyProvider>(10, 10, std::move(variant));
+  auto image = Image::MakeFrom(provider);
+  ASSERT_TRUE(image != nullptr);
+  auto rasterized = image->makeRasterized();
+  ASSERT_TRUE(rasterized != nullptr);
+  auto surface = Surface::Make(context, 10, 10);
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->drawImage(rasterized);
+  context->flushAndSubmit();
+  auto info = ImageInfo::Make(10, 10, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  Buffer buffer(info.byteSize());
+  ASSERT_TRUE(surface->readPixels(info, buffer.data()));
+  auto result = reinterpret_cast<const uint32_t*>(buffer.data());
+  // Each quadrant center maps inside a single variant texel region, so the sampled color is exact.
+  EXPECT_EQ(result[2 * 10 + 2], red);
+  EXPECT_EQ(result[2 * 10 + 7], green);
+  EXPECT_EQ(result[7 * 10 + 2], blue);
+  EXPECT_EQ(result[7 * 10 + 7], yellow);
+}
+
+namespace {
+// An ImageBuffer whose GPU texture is taller than its logical content: the extra rows are red
+// padding below the green content, mimicking a hardware-decoded buffer aligned by the decoder.
+class PaddedImageBuffer : public ImageBuffer {
+ public:
+  PaddedImageBuffer(int width, int height) : _width(width), _height(height) {
+  }
+
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return imageColorSpace;
+  }
+
+ protected:
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override {
+    auto bufferHeight = _height + PADDING;
+    std::vector<uint32_t> pixels(static_cast<size_t>(_width) * static_cast<size_t>(bufferHeight));
+    for (int y = 0; y < bufferHeight; y++) {
+      auto color = y < _height ? 0xFF00FF00u : 0xFFFF0000u;
+      for (int x = 0; x < _width; x++) {
+        pixels[static_cast<size_t>(y) * static_cast<size_t>(_width) + static_cast<size_t>(x)] =
+            color;
+      }
+    }
+    return TextureView::MakeRGBA(context, _width, bufferHeight, pixels.data(),
+                                 static_cast<size_t>(_width) * sizeof(uint32_t), mipmapped);
+  }
+
+ private:
+  static constexpr int PADDING = 8;
+  int _width = 0;
+  int _height = 0;
+  std::shared_ptr<ColorSpace> imageColorSpace = ColorSpace::SRGB();
+};
+}  // namespace
+
+TGFX_TEST(ImageRenderTest, RasterizedPaddedBuffer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  // The buffer reports 16x16 content but its texture is 16x24, the extra 8 rows being red padding.
+  // RasterizedImage must keep the content size (16) after the proxy is released and rewrapped from
+  // the cache at the full 24-row texture size, otherwise the draw stretches the content and samples
+  // the red padding.
+  constexpr int w = 16;
+  constexpr int h = 16;
+  auto buffer = std::make_shared<PaddedImageBuffer>(w, h);
+  auto image = Image::MakeFrom(buffer);
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, w, h);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  context->flushAndSubmit();
+  canvas->clear();
+  canvas->drawImage(image);
+  context->flushAndSubmit();
+  auto info = ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  Buffer readback(info.byteSize());
+  ASSERT_TRUE(surface->readPixels(info, readback.data()));
+  auto pixels = reinterpret_cast<const uint32_t*>(readback.data());
+  for (int y = 0; y < h; y++) {
+    for (int x = 0; x < w; x++) {
+      ASSERT_EQ(pixels[y * w + x], 0xFF00FF00u) << "mismatch at " << x << "," << y;
+    }
+  }
 }
 
 TGFX_TEST(ImageRenderTest, drawScaleImage) {

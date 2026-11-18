@@ -719,6 +719,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasBackgroundStyle();
 
+  bool hasOwnBackgroundStyle() const;
+
   bool hasDescendantBackgroundStyle();
 
   std::shared_ptr<BackgroundSource> createBackgroundSource(
