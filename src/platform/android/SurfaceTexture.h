@@ -66,6 +66,8 @@ class SurfaceTexture : public ImageStream {
 
   void onDrainPendingFrames() override;
 
+  int64_t currentFrameTimestamp() override;
+
  private:
   std::mutex locker = {};
   std::condition_variable condition = {};

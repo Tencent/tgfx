@@ -91,8 +91,8 @@ std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {
   return std::make_shared<ImageReaderBuffer>(weakThis.lock(), bufferVersion);
 }
 
-void ImageReader::requestSyncToLatestFrame() {
-  syncRequested.store(true, std::memory_order_release);
+void ImageReader::setTargetFrameTimestamp(int64_t timestamp) {
+  targetTimestamp.store(timestamp, std::memory_order_release);
 }
 
 bool ImageReader::checkExpired(uint64_t contentVersion) {
@@ -122,7 +122,20 @@ std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t contentVersion, C
   if (success) {
     textureView->removeUniqueKey();
     textureVersion = contentVersion;
-    if (syncRequested.exchange(false)) {
+    // updateTexImage() takes the oldest queued frame, so a producer that runs ahead would make this
+    // draw show the previous render. End on the frame written last instead.
+    stream->onDrainPendingFrames();
+    // The producer may still be decoding the frame this draw asked for, in which case the queue
+    // only held older frames. Wait for it so the texture matches the requested frame instead of
+    // showing the previous one.
+    auto target = targetTimestamp.load(std::memory_order_acquire);
+    static constexpr int MAX_WAIT_FRAMES = 2;
+    for (int i = 0; i < MAX_WAIT_FRAMES && target > 0 &&
+                    stream->currentFrameTimestamp() < target;
+         i++) {
+      if (!stream->onUpdateTexture(textureView)) {
+        break;
+      }
       stream->onDrainPendingFrames();
     }
   }

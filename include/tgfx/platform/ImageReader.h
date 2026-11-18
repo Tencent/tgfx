@@ -69,15 +69,14 @@ class ImageReader {
   std::shared_ptr<ImageBuffer> acquireNextBuffer();
 
   /**
-   * Requests that the next generated texture skips any frames the video source has already queued
-   * beyond the one being consumed, so the texture ends on the most recent decoded frame. The
-   * request is honored once, when the next acquired ImageBuffer generates its texture, and is then
-   * cleared. It lets callers that detect a skipped frame (for example when the renderer's frame
-   * number jumps because decoding runs slower than playback) catch the texture up to the latest
-   * decoded frame instead of lagging behind by the queued backlog. Video sources that cannot queue
-   * frames ahead (every source except the Android SurfaceTextureReader) ignore the request.
+   * Sets the presentation timestamp, in nanoseconds, that the next generated texture must reach, so
+   * the texture shows the frame the caller is drawing instead of an older one still sitting in the
+   * producer's queue. readTexture() consumes the queued frames until the texture reaches it and
+   * waits for the producer when the frame is still being decoded. Passing 0 clears the request.
+   * Video sources that cannot queue frames ahead (every source except the Android
+   * SurfaceTextureReader) ignore it.
    */
-  void requestSyncToLatestFrame();
+  void setTargetFrameTimestamp(int64_t timestamp);
 
  protected:
   std::mutex locker = {};
@@ -90,7 +89,7 @@ class ImageReader {
   std::shared_ptr<TextureView> textureView = nullptr;
   uint64_t bufferVersion = 0;
   uint64_t textureVersion = 0;
-  std::atomic<bool> syncRequested = {false};
+  std::atomic<int64_t> targetTimestamp = {0};
 
   static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<ImageStream> imageStream);
 

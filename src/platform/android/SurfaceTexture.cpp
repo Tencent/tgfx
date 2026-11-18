@@ -277,6 +277,17 @@ bool SurfaceTexture::onUpdateTexture(std::shared_ptr<TextureView>) {
   return updateTexImage();
 }
 
+int64_t SurfaceTexture::currentFrameTimestamp() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env == nullptr) {
+    return 0;
+  }
+  return static_cast<int64_t>(
+      env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp));
+}
+
 void SurfaceTexture::onDrainPendingFrames() {
   std::lock_guard<std::mutex> autoLock(locker);
   JNIEnvironment environment;

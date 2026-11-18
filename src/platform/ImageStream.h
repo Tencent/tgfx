@@ -76,6 +76,14 @@ class ImageStream {
    * implementation does nothing; only streams whose producer can queue several frames ahead (the
    * Android SurfaceTexture) override it. Implementations must not block waiting for a new frame.
    */
+  /**
+   * Returns the presentation timestamp, in nanoseconds, of the frame held by the texture. The default
+   * implementation returns 0; only streams backed by a timestamped producer report a real value.
+   */
+  virtual int64_t currentFrameTimestamp() {
+    return 0;
+  }
+
   virtual void onDrainPendingFrames() {
   }
 

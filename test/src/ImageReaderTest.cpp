@@ -35,6 +35,8 @@ class FakeImageStream : public ImageStream {
   }
 
   int drainCount = 0;
+  int64_t frameTimestamp = 0;
+  int updateCount = 0;
 
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override {
@@ -42,6 +44,7 @@ class FakeImageStream : public ImageStream {
   }
 
   bool onUpdateTexture(std::shared_ptr<TextureView>) override {
+    updateCount++;
     return true;
   }
 
@@ -49,36 +52,60 @@ class FakeImageStream : public ImageStream {
     drainCount++;
   }
 
+  int64_t currentFrameTimestamp() override {
+    return frameTimestamp;
+  }
+
  private:
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 };
 
 /**
- * onDrainPendingFrames() runs only after requestSyncToLatestFrame() and only once per request, so
- * the texture is caught up to the latest frame exactly when the caller asked for it.
+ * Every generated texture drains the frames the producer queued ahead of the one just consumed, so a
+ * draw never ends up showing the previous render.
  */
-TGFX_TEST_PRIVATE(ImageReaderTest, DrainsPendingFramesOnlyAfterSyncRequest) {
+TGFX_TEST_PRIVATE(ImageReaderTest, DrainsPendingFramesOnEveryTexture) {
   TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
                       ASSERT_TRUE(context != nullptr);
                       auto stream = std::make_shared<FakeImageStream>(16, 16);
                       auto reader = ImageReader::MakeFrom(stream); ASSERT_TRUE(reader != nullptr);
 
-                      // A normal draw without a sync request does not drain.
                       auto first = reader->acquireNextBuffer();
                       ASSERT_TRUE(first != nullptr);
                       EXPECT_TRUE(TextureView::MakeFrom(context, first, false) != nullptr);
-                      EXPECT_EQ(stream->drainCount, 0);
-
-                      // After requesting a sync, the next texture generation drains exactly once.
-                      reader->requestSyncToLatestFrame(); auto second = reader->acquireNextBuffer();
-                      ASSERT_TRUE(second != nullptr);
-                      EXPECT_TRUE(TextureView::MakeFrom(context, second, false) != nullptr);
                       EXPECT_EQ(stream->drainCount, 1);
 
-                      // The request is one-shot: a subsequent draw does not drain again.
-                      auto third = reader->acquireNextBuffer();
-                      ASSERT_TRUE(third != nullptr);
-                      EXPECT_TRUE(TextureView::MakeFrom(context, third, false) != nullptr);
-                      EXPECT_EQ(stream->drainCount, 1);)
+                      auto second = reader->acquireNextBuffer();
+                      ASSERT_TRUE(second != nullptr);
+                      EXPECT_TRUE(TextureView::MakeFrom(context, second, false) != nullptr);
+                      EXPECT_EQ(stream->drainCount, 2);)
+}
+
+/**
+ * A target timestamp makes the texture wait for the frame being drawn: while the producer still
+ * reports an older frame the reader keeps consuming, and it stops as soon as the target is reached.
+ */
+TGFX_TEST_PRIVATE(ImageReaderTest, WaitsForTargetFrameTimestamp) {
+  TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
+                      ASSERT_TRUE(context != nullptr);
+                      auto stream = std::make_shared<FakeImageStream>(16, 16);
+                      auto reader = ImageReader::MakeFrom(stream); ASSERT_TRUE(reader != nullptr);
+
+                      // The producer never reports the target, so the reader is bounded by the wait
+                      // limit instead of looping forever.
+                      reader->setTargetFrameTimestamp(1000);
+                      auto first = reader->acquireNextBuffer();
+                      ASSERT_TRUE(first != nullptr);
+                      EXPECT_TRUE(TextureView::MakeFrom(context, first, false) != nullptr);
+                      EXPECT_EQ(stream->updateCount, 3);
+
+                      // Once the producer reports the target the extra consumes stop immediately.
+                      stream->updateCount = 0;
+                      stream->frameTimestamp = 1000;
+                      reader->setTargetFrameTimestamp(1000);
+                      auto second = reader->acquireNextBuffer();
+                      ASSERT_TRUE(second != nullptr);
+                      EXPECT_TRUE(TextureView::MakeFrom(context, second, false) != nullptr);
+                      EXPECT_EQ(stream->updateCount, 1);)
 }
 }  // namespace tgfx
