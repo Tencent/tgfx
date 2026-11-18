@@ -70,13 +70,6 @@ class ImageStream {
   virtual bool onUpdateTexture(std::shared_ptr<TextureView> textureView) = 0;
 
   /**
-   * Consumes any frames the producer has already delivered beyond the one most recently consumed,
-   * so the texture ends on the latest available frame. ImageReader calls this from readTexture()
-   * after a frame has been consumed, only when a sync-to-latest request is pending. The default
-   * implementation does nothing; only streams whose producer can queue several frames ahead (the
-   * Android SurfaceTexture) override it. Implementations must not block waiting for a new frame.
-   */
-  /**
    * Returns the presentation timestamp, in nanoseconds, of the frame held by the texture. The default
    * implementation returns 0; only streams backed by a timestamped producer report a real value.
    */
@@ -84,6 +77,13 @@ class ImageStream {
     return 0;
   }
 
+  /**
+   * Consumes any frames the producer has already delivered beyond the one most recently consumed,
+   * so the texture ends on the latest available frame. ImageReader calls this from readTexture()
+   * after each frame has been consumed. The default implementation does nothing; only streams whose
+   * producer can queue several frames ahead (the Android SurfaceTexture) override it. Implementations
+   * must not block waiting for a new frame.
+   */
   virtual void onDrainPendingFrames() {
   }
 

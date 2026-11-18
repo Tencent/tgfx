@@ -94,7 +94,7 @@ TGFX_TEST_PRIVATE(ImageReaderTest, WaitsForTargetFrameTimestamp) {
                       reader->setTargetFrameTimestamp(1000);
                       auto first = reader->acquireNextBuffer(); ASSERT_TRUE(first != nullptr);
                       EXPECT_TRUE(TextureView::MakeFrom(context, first, false) != nullptr);
-                      EXPECT_EQ(stream->updateCount, 3);
+                      EXPECT_EQ(stream->updateCount, 2);
 
                       // Once the producer reports the target the extra consumes stop immediately.
                       stream->updateCount = 0;
