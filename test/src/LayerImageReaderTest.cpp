@@ -1550,6 +1550,66 @@ TGFX_TEST(LayerImageReaderTest, OnlyPreceding3DSiblingsAreBackdropDependencies) 
   EXPECT_EQ(output.error.code, LayerImageErrorCode::UnsupportedContent);
 }
 
+TGFX_TEST(LayerImageReaderTest, PrecedingBackdropBlurCanSample3DOutsideTargetInput) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto source = MakeExportSolid(Color::Blue());
+  source->setWidth(8);
+  source->setHeight(20);
+  source->setMatrix(Matrix::MakeTrans(16, 0));
+  source->setPreserve3D(true);
+  auto displayList = MakeDisplayList(source);
+  auto sceneRoot = displayList->root()->shared_from_this();
+  auto earlierGlass = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
+  earlierGlass->setWidth(40);
+  earlierGlass->setHeight(20);
+  earlierGlass->setMatrix(Matrix::MakeTrans(10, 0));
+  sceneRoot->addChild(earlierGlass);
+  auto target = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
+  target->setWidth(20);
+  target->setHeight(20);
+  target->setMatrix(Matrix::MakeTrans(30, 0));
+  target->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
+  sceneRoot->addChild(target);
+
+  // The target reads from x=28 onward, while the 3D source ends at x=24.
+  auto direct = ReadTiled(context, target, sceneRoot, {64, 64});
+  ASSERT_EQ(direct.error.code, LayerImageErrorCode::None) << direct.error.message;
+  // The preceding blur spreads that source to x=34, inside the target's input.
+  earlierGlass->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
+  auto indirect = ReadTiled(context, target, sceneRoot, {64, 64});
+  EXPECT_EQ(indirect.error.code, LayerImageErrorCode::UnsupportedContent);
+}
+
+TGFX_TEST(LayerImageReaderTest, PrecedingLayerFilterCanSpread3DIntoTargetInput) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto group = Layer::Make();
+  auto source = MakeExportSolid(Color::Blue());
+  source->setWidth(6);
+  source->setHeight(20);
+  source->setMatrix(Matrix::MakeTrans(24, 0));
+  source->setPreserve3D(true);
+  group->addChild(source);
+  auto displayList = MakeDisplayList(group);
+  auto sceneRoot = displayList->root()->shared_from_this();
+  auto target = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
+  target->setWidth(20);
+  target->setHeight(20);
+  target->setMatrix(Matrix::MakeTrans(38, 0));
+  target->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
+  sceneRoot->addChild(target);
+
+  // The target reads from x=36 onward. Filtering the 3D group extends its right edge from 30 to 42.
+  auto direct = ReadTiled(context, target, sceneRoot, {64, 64});
+  ASSERT_EQ(direct.error.code, LayerImageErrorCode::None) << direct.error.message;
+  group->setFilters({BlurFilter::Make(6, 6)});
+  auto indirect = ReadTiled(context, target, sceneRoot, {64, 64});
+  EXPECT_EQ(indirect.error.code, LayerImageErrorCode::UnsupportedContent);
+}
+
 TGFX_TEST(LayerImageReaderTest, LaterSiblingFailureDoesNotInvalidateTargetBackdrop) {
   ContextScope scope;
   auto context = scope.getContext();
