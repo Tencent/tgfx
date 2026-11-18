@@ -65,6 +65,11 @@ struct PreciseRect {
   double right = 0.0;
   double bottom = 0.0;
 
+  bool isFinite() const {
+    return std::isfinite(left) && std::isfinite(top) && std::isfinite(right) &&
+           std::isfinite(bottom);
+  }
+
   void outset(double dx, double dy) {
     left -= dx;
     top -= dy;
@@ -115,10 +120,8 @@ static PreciseRect MapPreciseRect(const Matrix& matrix, const PreciseRect& rect)
 
 static bool IsSafePixelRect(const PreciseRect& rect) {
   constexpr double MaxPixelCoordinate = static_cast<double>(INT32_MAX >> 2);
-  return std::isfinite(rect.left) && std::isfinite(rect.top) && std::isfinite(rect.right) &&
-         std::isfinite(rect.bottom) && rect.left >= -MaxPixelCoordinate &&
-         rect.top >= -MaxPixelCoordinate && rect.right <= MaxPixelCoordinate &&
-         rect.bottom <= MaxPixelCoordinate;
+  return rect.isFinite() && rect.left >= -MaxPixelCoordinate && rect.top >= -MaxPixelCoordinate &&
+         rect.right <= MaxPixelCoordinate && rect.bottom <= MaxPixelCoordinate;
 }
 
 static PixelRect ToPixelRect(const PreciseRect& rect) {
@@ -544,10 +547,10 @@ RegionPlanResult LayerDrawSession::planExportRegion(const PixelRect& core,
   PixelRect captureRect = {};
   if (needsBackground) {
     auto globalInput = MapPreciseRect(outputToGlobal, ToPreciseRect(core));
-    if (!IsSafePixelRect(globalInput)) {
+    if (!globalInput.isFinite()) {
       if (control != nullptr) {
         control->fail(DrawFailureCode::InvalidRequest, DrawStage::Planning, request.target, {},
-                      "the core region exceeds the supported pixel range");
+                      "the core region has nonfinite scene coordinates");
       }
       result.code = RegionPlanCode::Failed;
       return result;
@@ -555,10 +558,10 @@ RegionPlanResult LayerDrawSession::planExportRegion(const PixelRect& core,
     auto margin = static_cast<double>(backgroundOutset) + 1.0;
     globalInput.outset(margin, margin);
     globalInput.roundOut();
-    if (!IsSafePixelRect(globalInput)) {
+    if (!globalInput.isFinite()) {
       if (control != nullptr) {
         control->fail(DrawFailureCode::SurfaceLimit, DrawStage::Planning, request.target, {},
-                      "the background dependency exceeds the supported pixel range");
+                      "the background dependency has nonfinite scene coordinates");
       }
       result.code = RegionPlanCode::Failed;
       return result;
