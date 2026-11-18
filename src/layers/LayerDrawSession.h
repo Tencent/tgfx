@@ -60,42 +60,19 @@ struct PixelRect {
 };
 
 /**
- * Selects how background-sourced effects derive their sampling geometry.
- */
-enum class LayerSamplingMode {
-  // The default strategy of the regular Layer::draw() path.
-  CanvasDefault,
-  // One fixed sampling rule shared by the whole export, aligned to the global output grid.
-  ExportFixed
-};
-
-/**
- * Everything a shared drawing session needs to know about one target and its scene.
+ * The target, scene and output parameters for a tiled export.
  */
 struct LayerDrawRequest {
   Layer* target = nullptr;
   Layer* captureRoot = nullptr;  // Its lifetime is guaranteed by the caller.
 
-  // GPU context used for capture and effect surfaces. It may be null in CanvasDefault mode when
-  // the target is drawn on a picture-only canvas; ExportFixed requires a usable context.
-  Context* context = nullptr;
-
   Matrix targetLocalToOutput = Matrix::I();
-  // Size of the final output pixel grid. ExportFixed only; the regular canvas path keeps using the
-  // canvas state below. It stays integral so that a large output keeps its exact pixel bounds.
+  // Keep the final output size integral to preserve exact pixel bounds for large images.
   ISize outputSize = {};
   std::shared_ptr<ColorSpace> renderColorSpace = ColorSpace::SRGB();
   Color clearColor = Color::Transparent();
   float alpha = 1.0f;
   BlendMode blendMode = BlendMode::SrcOver;
-  LayerSamplingMode samplingMode = LayerSamplingMode::CanvasDefault;
-
-  // CanvasDefault only: preserve the existing canvas matrix, clip and content.
-  Matrix canvasMatrix = Matrix::I();
-  Rect canvasDrawBounds = {};      // Local-space bounds clipped by the canvas clip.
-  bool canvasRooted = false;       // Whether the target belongs to a root layer.
-  bool canvasCacheEnabled = true;  // Whether the draw may use the GPU context for effects.
-  std::shared_ptr<ColorSpace> canvasColorSpace = ColorSpace::SRGB();
 };
 
 /**
@@ -242,22 +219,20 @@ class LayerDrawBatch {
 };
 
 /**
- * Shared drawing session used by both the regular Layer::draw() path and the tiled export reader.
+ * Drawing session for the tiled export reader.
  * It fixes the request, the root mapping and the sampling rules once, plans output regions and
  * batches, prepares per-batch background snapshots, and replays the existing Layer drawing.
  * Session methods must run on the thread that owns the scene.
  */
 class LayerDrawSession {
  public:
-  // Validates the request and fixes the root mapping and sampling rules. For CanvasDefault the
-  // context may be null; ExportFixed requires a usable GPU context.
+  // Validates the request and fixes the root mapping and sampling rules. Requires a GPU context.
   static std::unique_ptr<LayerDrawSession> Prepare(Context* context,
                                                    const LayerDrawRequest& request,
                                                    DrawControl* control);
 
   // Derives the surface window and background dependency of one core region. It only describes
-  // CPU geometry and never allocates GPU pixels. CanvasDefault only returns a background-needed
-  // marker; its original floating-point canvas state remains authoritative.
+  // CPU geometry and never allocates GPU pixels.
   RegionPlanResult planRegion(const PixelRect& core, const LayerDrawLimits& limits,
                               DrawControl* control) const;
 
@@ -298,36 +273,14 @@ class LayerDrawSession {
                                     std::vector<BackgroundEffect>* effects);
   void collectPrecedingEffects();
 
-  RegionPlanResult planExportRegion(const PixelRect& core, const LayerDrawLimits& limits,
-                                    DrawControl* control) const;
-  RegionPlanResult planCanvasRegion(DrawControl* control) const;
-  std::unique_ptr<LayerDrawBatch> prepareExportBatch(Context* context,
-                                                     const LayerDrawBatchPlan& plan,
-                                                     DrawControl* control);
-  std::unique_ptr<LayerDrawBatch> prepareCanvasBatch(Context* context, DrawControl* control);
-  DrawOutcome drawExportRegion(Context* context, LayerDrawBatch& batch, size_t regionIndex,
-                               const LayerDrawTarget& target, DrawControl* control);
-  DrawOutcome drawCanvasRegion(LayerDrawBatch& batch, const LayerDrawTarget& target,
-                               DrawControl* control);
-
   LayerDrawRequest request = {};
   Matrix rootToOutput = Matrix::I();  // captureRoot-local to final output pixels.
   Matrix outputToRoot = Matrix::I();
   Matrix outputToGlobal = Matrix::I();  // output pixels to the renderBounds space.
   PixelRect outputPixelBounds = {};
   bool useSceneBounds = true;
-  bool needsBackground = false;
   std::vector<BackgroundEffect> targetEffects = {};
   std::vector<BackgroundEffect> precedingEffects = {};
-
-  // CanvasDefault state captured from the original canvas.
-  bool canvasCanInvert = true;
-  Rect canvasRenderRect = {};  // In captureRoot-local space.
-  std::vector<Rect> canvasRenderRects = {};
-  Rect canvasBackgroundDrawRect = {};  // In device pixels.
-  Matrix canvasBackgroundMatrix = Matrix::I();
-  bool canvasFullLayerBackground = false;
-  Rect canvasCaptureCullRect = {};  // In captureRoot-local space.
 };
 
 }  // namespace tgfx

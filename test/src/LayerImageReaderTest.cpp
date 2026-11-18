@@ -365,35 +365,6 @@ TGFX_TEST(LayerImageReaderTest, CanvasDefaultKeepsLargePictureCoordinates) {
   EXPECT_EQ(pixels[offset + 3], 255);
 }
 
-TGFX_TEST(LayerImageReaderTest, CanvasDefaultPlanningUsesFloatingPointState) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto content = ShapeLayer::Make();
-  Path path = {};
-  path.addRect(Rect::MakeWH(10, 10));
-  content->setPath(path);
-  content->setFillStyle(ShapeStyle::Make(Color::White()));
-  content->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
-  for (auto scale : {2.0f, 1073741824.0f}) {
-    LayerDrawRequest request = {};
-    request.target = content.get();
-    request.captureRoot = content.get();
-    request.context = context;
-    request.canvasMatrix = Matrix::MakeScale(scale);
-    request.canvasDrawBounds = Rect::MakeWH(10, 10);
-    auto session = LayerDrawSession::Prepare(context, request, nullptr);
-    ASSERT_TRUE(session != nullptr);
-    auto result = session->planRegion(PixelRect(), LayerDrawLimits(), nullptr);
-    ASSERT_EQ(result.code, RegionPlanCode::Ready);
-    EXPECT_TRUE(result.region.coreRect.isEmpty());
-    EXPECT_TRUE(result.region.renderRect.isEmpty());
-    ASSERT_TRUE(result.region.dependencies != nullptr);
-    EXPECT_TRUE(result.region.dependencies->needsBackground);
-    EXPECT_TRUE(result.region.dependencies->captureRect.isEmpty());
-  }
-}
-
 TGFX_TEST(LayerImageReaderTest, CanvasDrawPreservesAlphaModulationAboveOne) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -1244,8 +1215,6 @@ TGFX_TEST(LayerImageReaderTest, BackgroundCaptureIncludesAncestorFilterOutset) {
     LayerDrawRequest request = {};
     request.target = group;
     request.captureRoot = sceneRoot.get();
-    request.context = context;
-    request.samplingMode = LayerSamplingMode::ExportFixed;
     request.outputSize = {200, 200};
     DrawControl control = {};
     auto session = LayerDrawSession::Prepare(context, request, &control);
@@ -1446,7 +1415,6 @@ static void CheckTinyTilePixel(Context* context, Layer* layer, int left) {
   LayerDrawRequest request = {};
   request.target = layer;
   request.captureRoot = layer;
-  request.samplingMode = LayerSamplingMode::ExportFixed;
   request.outputSize = {left + 4, 3};
   DrawControl control = {};
   auto session = LayerDrawSession::Prepare(context, request, &control);
@@ -1503,7 +1471,6 @@ TGFX_TEST(LayerImageReaderTest, FarBackdropCaptureMatchesNearPixelGrid) {
     LayerDrawRequest request = {};
     request.target = glass.get();
     request.captureRoot = scene.get();
-    request.samplingMode = LayerSamplingMode::ExportFixed;
     request.targetLocalToOutput = glassPlacement;
     request.outputSize = {left + CoreWidth, 8};
     request.clearColor = Color::Black();

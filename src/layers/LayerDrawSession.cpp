@@ -26,7 +26,6 @@
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
-#include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/Canvas.h"
@@ -310,7 +309,6 @@ class LayerDrawBatch::Impl {
   std::vector<LayerRegionPlan> regions = {};
   std::vector<Rect> renderRects = {};
   BackgroundSnapshotMap snapshots = {};
-  bool needsBackground = false;
   bool hasSnapshots = false;
 };
 
@@ -358,50 +356,19 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
   bool validCaptureRoot = sceneRoot != nullptr ? request.captureRoot == sceneRoot
                                                : request.captureRoot == request.target ||
                                                      !request.captureRoot->parent();
-  if (request.samplingMode == LayerSamplingMode::ExportFixed && !validCaptureRoot) {
+  if (!validCaptureRoot) {
     if (control != nullptr) {
       control->fail(DrawFailureCode::InvalidRequest, DrawStage::Validation, request.target, {},
                     "the scene root must be the real root of the target");
     }
     return nullptr;
   }
-  if (request.samplingMode == LayerSamplingMode::ExportFixed &&
-      (!std::isfinite(request.alpha) || request.alpha < 0.0f || request.alpha > 1.0f)) {
+  if (!std::isfinite(request.alpha) || request.alpha < 0.0f || request.alpha > 1.0f) {
     if (control != nullptr) {
       control->fail(DrawFailureCode::InvalidRequest, DrawStage::Validation, request.target, {},
                     "alpha is not a finite value in [0, 1]");
     }
     return nullptr;
-  }
-
-  std::unique_ptr<LayerDrawSession> session(new LayerDrawSession());
-  session->request = request;
-
-  if (request.samplingMode == LayerSamplingMode::CanvasDefault) {
-    auto localToRoot = request.target->getGlobalMatrix();
-    Matrix3D rootToLocal = {};
-    session->canvasCanInvert = localToRoot.invert(&rootToLocal);
-    if (request.canvasRooted && session->canvasCanInvert) {
-      request.captureRoot->updateRenderBounds();
-      session->canvasRenderRect = localToRoot.mapRect(request.canvasDrawBounds);
-      session->canvasRenderRects = {session->canvasRenderRect};
-    }
-    session->needsBackground = session->canvasCanInvert && !request.target->canPreserve3D() &&
-                               request.target->hasBackgroundStyle();
-    if (session->needsBackground && request.context != nullptr) {
-      auto bounds = request.target->getBounds();
-      auto fullLayer = !(request.target->maxBackgroundOutset > 0.0f);
-      auto rectForDraw = fullLayer ? bounds : request.canvasDrawBounds;
-      session->canvasFullLayerBackground = rectForDraw == bounds;
-      session->canvasBackgroundDrawRect = request.canvasMatrix.mapRect(rectForDraw);
-      session->canvasBackgroundMatrix = request.canvasMatrix;
-      if (request.canvasRooted) {
-        session->canvasBackgroundMatrix.preConcat(rootToLocal.asMatrix());
-      }
-      session->canvasCaptureCullRect =
-          request.canvasRooted ? session->canvasRenderRect : request.canvasDrawBounds;
-    }
-    return session;
   }
 
   if (context == nullptr || context->gpu() == nullptr) {
@@ -458,6 +425,8 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
     return nullptr;
   }
 
+  std::unique_ptr<LayerDrawSession> session(new LayerDrawSession());
+  session->request = request;
   session->outputPixelBounds = {0, 0, request.outputSize.width, request.outputSize.height};
   session->useSceneBounds =
       request.target->_scrollRect == nullptr &&
@@ -469,12 +438,8 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
   }
   if (request.alpha > 0.0f) {
     CollectSubtreeEffects(request.target, outputMatrix, 0.0f, &session->targetEffects);
-    session->needsBackground = !session->targetEffects.empty();
   }
-  // The export never keeps a borrowed context beyond the lock it was created in; every later call
-  // receives the context it must use.
-  session->request.context = nullptr;
-  if (!session->needsBackground) {
+  if (session->targetEffects.empty()) {
     return session;
   }
 
@@ -526,30 +491,6 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
 
 RegionPlanResult LayerDrawSession::planRegion(const PixelRect& core, const LayerDrawLimits& limits,
                                               DrawControl* control) const {
-  if (request.samplingMode == LayerSamplingMode::CanvasDefault) {
-    return planCanvasRegion(control);
-  }
-  return planExportRegion(core, limits, control);
-}
-
-RegionPlanResult LayerDrawSession::planCanvasRegion(DrawControl* control) const {
-  RegionPlanResult result = {};
-  if (control != nullptr && control->cancelled()) {
-    result.code = RegionPlanCode::Cancelled;
-    return result;
-  }
-  result.code = RegionPlanCode::Ready;
-  if (needsBackground) {
-    auto dependencies = std::make_shared<RegionDependencyPlan>();
-    dependencies->needsBackground = true;
-    result.region.dependencies = std::move(dependencies);
-  }
-  return result;
-}
-
-RegionPlanResult LayerDrawSession::planExportRegion(const PixelRect& core,
-                                                    const LayerDrawLimits& limits,
-                                                    DrawControl* control) const {
   RegionPlanResult result = {};
   if (control != nullptr && control->cancelled()) {
     result.code = RegionPlanCode::Cancelled;
@@ -669,9 +610,8 @@ BatchPlanResult LayerDrawSession::planBatch(const std::vector<LayerRegionPlan>& 
     captureRect.bottom = std::max(captureRect.bottom, dependencyRect.bottom);
   }
   auto deviceLimit = limits.gpuLimits.maxTextureDimension2D;
-  if (request.samplingMode == LayerSamplingMode::ExportFixed && plan->needsBackground &&
-      (deviceLimit <= 0 || plan->captureRect.width() > deviceLimit ||
-       plan->captureRect.height() > deviceLimit)) {
+  if (plan->needsBackground && (deviceLimit <= 0 || plan->captureRect.width() > deviceLimit ||
+                                plan->captureRect.height() > deviceLimit)) {
     if (regions.size() <= 1) {
       if (control != nullptr) {
         control->fail(DrawFailureCode::SurfaceLimit, DrawStage::Planning, request.target,
@@ -692,43 +632,8 @@ BatchPlanResult LayerDrawSession::planBatch(const std::vector<LayerRegionPlan>& 
 std::unique_ptr<LayerDrawBatch> LayerDrawSession::prepareBatch(Context* context,
                                                                const LayerDrawBatchPlan& plan,
                                                                DrawControl* control) {
-  if (request.samplingMode == LayerSamplingMode::CanvasDefault) {
-    return prepareCanvasBatch(context, control);
-  }
-  return prepareExportBatch(context, plan, control);
-}
-
-std::unique_ptr<LayerDrawBatch> LayerDrawSession::prepareCanvasBatch(Context* context,
-                                                                     DrawControl* control) {
-  (void)context;
-  auto batch = std::unique_ptr<LayerDrawBatch>(new LayerDrawBatch());
-  batch->impl->needsBackground = needsBackground;
-  if (!needsBackground || request.context == nullptr) {
-    return batch;
-  }
-  auto bgSource = request.target->createBackgroundSource(
-      request.context, canvasBackgroundDrawRect, canvasBackgroundMatrix, canvasFullLayerBackground,
-      request.canvasColorSpace);
-  if (bgSource == nullptr) {
-    // The regular draw path keeps its existing behavior: the consumer then synthesizes the
-    // backdrop on the fly, or skips the style on a picture-only canvas.
-    return batch;
-  }
-  DrawArgs args(request.canvasCacheEnabled ? request.context : nullptr);
-  args.dstColorSpace = request.canvasColorSpace;
-  args.drawControl = control;
-  BackgroundCapturer::Run(request.captureRoot, args, std::move(bgSource), &batch->impl->snapshots,
-                          {canvasCaptureCullRect});
-  batch->impl->hasSnapshots = true;
-  return batch;
-}
-
-std::unique_ptr<LayerDrawBatch> LayerDrawSession::prepareExportBatch(Context* context,
-                                                                     const LayerDrawBatchPlan& plan,
-                                                                     DrawControl* control) {
   auto batch = std::unique_ptr<LayerDrawBatch>(new LayerDrawBatch());
   batch->impl->regions = plan.regions;
-  batch->impl->needsBackground = plan.needsBackground;
   // Style sources stay as lazy pictures: rasterizing a full-content recording would allocate a
   // texture the size of the whole layer, while every output region samples only its own part.
   batch->impl->snapshots.rasterizeStyleSources = false;
@@ -794,52 +699,6 @@ DrawOutcome LayerDrawSession::drawRegion(Context* context, LayerDrawBatch& batch
   if (control != nullptr && control->failed()) {
     return DrawOutcome::Failed;
   }
-  if (request.samplingMode == LayerSamplingMode::CanvasDefault) {
-    return drawCanvasRegion(batch, target, control);
-  }
-  return drawExportRegion(context, batch, regionIndex, target, control);
-}
-
-DrawOutcome LayerDrawSession::drawCanvasRegion(LayerDrawBatch& batch, const LayerDrawTarget& target,
-                                               DrawControl* control) {
-  if (target.canvas == nullptr) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::InvalidRequest, DrawStage::Rendering, request.target, {},
-                    "the draw target has no canvas");
-    }
-    return DrawOutcome::Failed;
-  }
-  auto canvas = target.canvas;
-  AutoCanvasRestore autoRestore(canvas);
-  DrawArgs args(request.canvasCacheEnabled ? request.context : nullptr);
-  args.dstColorSpace = request.canvasColorSpace;
-  args.drawControl = control;
-  if (!canvasRenderRects.empty()) {
-    args.renderRects = &canvasRenderRects;
-  }
-  BackgroundConsumer consumer(batch.impl->hasSnapshots ? &batch.impl->snapshots : nullptr, false);
-  args.backgroundHandler = batch.impl->needsBackground ? static_cast<BackgroundHandler*>(&consumer)
-                                                       : BackgroundHandler::NoOp();
-  if (request.target->canPreserve3D()) {
-    request.target->drawByStarting3DContext(args, canvas, request.target->getMatrixWithScrollRect(),
-                                            &Layer::drawLayer, request.alpha);
-  } else {
-    request.target->drawLayer(args, canvas, request.alpha, request.blendMode);
-  }
-  if (control != nullptr) {
-    if (control->failed()) {
-      return DrawOutcome::Failed;
-    }
-    if (control->cancelled()) {
-      return DrawOutcome::Cancelled;
-    }
-  }
-  return DrawOutcome::Success;
-}
-
-DrawOutcome LayerDrawSession::drawExportRegion(Context* context, LayerDrawBatch& batch,
-                                               size_t regionIndex, const LayerDrawTarget& target,
-                                               DrawControl* control) {
   if (target.canvas == nullptr || context == nullptr) {
     if (control != nullptr) {
       control->fail(DrawFailureCode::InvalidRequest, DrawStage::Rendering, request.target, {},

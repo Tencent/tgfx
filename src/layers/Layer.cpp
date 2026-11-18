@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -889,47 +890,58 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     return;
   }
 
-  auto surface = canvas->getSurface();
-  LayerDrawRequest request = {};
-  request.target = this;
-  request.captureRoot = _root ? _root : this;
-  request.alpha = alpha;
-  request.blendMode = blendMode;
-  request.samplingMode = LayerSamplingMode::CanvasDefault;
-  request.canvasMatrix = canvas->getMatrix();
-  request.canvasDrawBounds = clippedBounds;
-  request.canvasRooted = _root != nullptr;
-  request.canvasCacheEnabled = true;
-  request.canvasColorSpace = ColorSpace::SRGB();
-  request.renderColorSpace = ColorSpace::SRGB();
-  if (surface) {
-    request.canvasCacheEnabled = !(surface->renderFlags() & RenderFlags::DisableCache);
-    request.canvasColorSpace = surface->colorSpace();
-    request.renderColorSpace = request.canvasColorSpace;
-    request.context = surface->getContext();
+  DrawArgs args = {};
+  Context* context = nullptr;
+  if (auto surface = canvas->getSurface()) {
+    context = surface->getContext();
+    args.dstColorSpace = surface->colorSpace();
+    if (!(surface->renderFlags() & RenderFlags::DisableCache)) {
+      args.context = context;
+    }
   }
 
-  auto session = LayerDrawSession::Prepare(request.context, request, nullptr);
-  if (session == nullptr) {
-    return;
+  auto localToRoot = getGlobalMatrix();
+  Matrix3D rootToLocal = {};
+  bool canInvert = localToRoot.invert(&rootToLocal);
+  std::vector<Rect> renderRects = {};
+  if (_root && canInvert) {
+    _root->updateRenderBounds();
+    renderRects.push_back(localToRoot.mapRect(clippedBounds));
+    args.renderRects = &renderRects;
   }
-  LayerDrawLimits limits = {};
-  auto regionResult = session->planRegion(PixelRect(), limits, nullptr);
-  if (regionResult.code != RegionPlanCode::Ready) {
-    return;
+
+  bool preserve3D = canPreserve3D();
+  bool needsBackground = canInvert && !preserve3D && hasBackgroundStyle();
+  std::optional<BackgroundSnapshotMap> snapshots;
+  if (needsBackground && context != nullptr) {
+    auto rectForDraw = maxBackgroundOutset > 0.0f ? clippedBounds : bounds;
+    auto backgroundMatrix = canvas->getMatrix();
+    auto drawRect = backgroundMatrix.mapRect(rectForDraw);
+    if (_root) {
+      // Replay the backdrop in root coordinates while the direct draw stays in local coordinates.
+      backgroundMatrix.preConcat(rootToLocal.asMatrix());
+    }
+    if (auto source = createBackgroundSource(context, drawRect, backgroundMatrix,
+                                             rectForDraw == bounds, args.dstColorSpace)) {
+      if (!_root) {
+        renderRects.push_back(clippedBounds);
+      }
+      snapshots.emplace();
+      BackgroundCapturer::Run(_root ? _root : this, args, std::move(source), &*snapshots,
+                              renderRects);
+    }
   }
-  std::vector<LayerRegionPlan> regions = {regionResult.region};
-  auto batchResult = session->planBatch(regions, limits, nullptr);
-  if (batchResult.code != BatchPlanCode::Ready || batchResult.plan == nullptr) {
-    return;
+
+  AutoCanvasRestore autoRestore(canvas);
+  BackgroundConsumer consumer(snapshots ? &*snapshots : nullptr, false);
+  // Without a captured backdrop the consumer retains the regular canvas fallback.
+  args.backgroundHandler =
+      needsBackground ? static_cast<BackgroundHandler*>(&consumer) : BackgroundHandler::NoOp();
+  if (preserve3D) {
+    drawByStarting3DContext(args, canvas, getMatrixWithScrollRect(), &Layer::drawLayer, alpha);
+  } else {
+    drawLayer(args, canvas, alpha, blendMode);
   }
-  auto batch = session->prepareBatch(request.context, *batchResult.plan, nullptr);
-  if (batch == nullptr) {
-    return;
-  }
-  LayerDrawTarget target = {};
-  target.canvas = canvas;
-  session->drawRegion(request.context, *batch, 0, target, nullptr);
 }
 
 void Layer::invalidateContent() {

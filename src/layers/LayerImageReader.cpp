@@ -538,14 +538,12 @@ std::unique_ptr<LayerImageReader> LayerImageReader::Make(Context* context,
   LayerDrawRequest drawRequest = {};
   drawRequest.target = request.target.get();
   drawRequest.captureRoot = request.sceneRoot.get();
-  drawRequest.context = context;
   drawRequest.targetLocalToOutput = request.targetLocalToOutput;
   drawRequest.outputSize = request.outputSize;
   drawRequest.renderColorSpace = request.renderColorSpace;
   drawRequest.clearColor = request.clearColor;
   drawRequest.alpha = request.alpha;
   drawRequest.blendMode = request.blendMode;
-  drawRequest.samplingMode = LayerSamplingMode::ExportFixed;
   DrawControl control = {};
   auto session = LayerDrawSession::Prepare(context, drawRequest, &control);
   if (session == nullptr) {
