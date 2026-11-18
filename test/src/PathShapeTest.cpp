@@ -393,9 +393,9 @@ TGFX_TEST(PathShapeTest, inverseFillType) {
   shape = Shape::ApplyMatrix(firstShape, Matrix::MakeScale(2.0f));
   EXPECT_TRUE(shape->isInverseFillType());
   shape = Shape::ApplyStroke(firstShape, &stroke);
-  // A non-hairline stroke builds its own winding boundary, so the inverse rule of the input does
-  // not carry over.
-  EXPECT_FALSE(shape->isInverseFillType());
+  // The stroker preserves the inverse flag even though it replaces the outline with its own
+  // winding boundary.
+  EXPECT_TRUE(shape->isInverseFillType());
 }
 
 TGFX_TEST_PRIVATE(PathShapeTest, MergeShapeFillType) {
@@ -1429,6 +1429,20 @@ TGFX_TEST(PathShapeTest, StrokeShapeReportsWindingRule) {
   auto hairlined = Shape::ApplyStroke(shape, &hairline);
   ASSERT_TRUE(hairlined != nullptr);
   EXPECT_EQ(hairlined->fillType(), PathFillType::EvenOdd);
+}
+
+TGFX_TEST(PathShapeTest, StrokeShapePreservesInverseFillRule) {
+  Path path = {};
+  path.addRect(Rect::MakeLTRB(0, 0, 100, 100));
+  path.setFillType(PathFillType::InverseEvenOdd);
+  auto shape = Shape::MakeFrom(path);
+  ASSERT_TRUE(shape != nullptr);
+
+  Stroke stroke(10.0f);
+  auto stroked = Shape::ApplyStroke(shape, &stroke);
+  ASSERT_TRUE(stroked != nullptr);
+  EXPECT_EQ(stroked->getPath().getFillType(), PathFillType::InverseWinding);
+  EXPECT_EQ(stroked->fillType(), stroked->getPath().getFillType());
 }
 
 TGFX_TEST(PathShapeTest, DashEffectKeepsInputFillRule) {

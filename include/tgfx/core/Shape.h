@@ -37,9 +37,7 @@ class UniqueKey;
  * path in parallel during drawing and cache the rasterized form in the GPU for repeated drawing.
  * Shape is thread-safe and immutable once created.
  *
- * Queries such as fillType() and isInverseFillType() may compute paths when their answers cannot be
- * derived from existing metadata. Drawing may perform these queries during recording, so deferred
- * geometry does not guarantee that all path computations run asynchronously.
+ * fillType() and isInverseFillType() may need to compute the path.
  */
 class Shape {
  public:
@@ -131,17 +129,12 @@ class Shape {
   }
 
   /**
-   * Returns the fill type of the path returned by getPath(). This query may compute paths, including
-   * path operations and effects, when the resulting rule cannot be derived from existing metadata.
-   * Callers that already have a Path should query that Path's fill type directly.
+   * Returns the fill type of the path returned by getPath(). May compute the path.
    */
   virtual PathFillType fillType() const = 0;
 
   /**
-   * Returns true if the fill type is InverseWinding or InverseEvenOdd. The default implementation
-   * queries fillType(). Overrides may derive the inverse flag without computing the complete path,
-   * but must preserve the result of the actual operation, including its failure behavior. This
-   * query may still compute paths and is not guaranteed to be constant-time.
+   * Returns true if fillType() is InverseWinding or InverseEvenOdd. May compute the path.
    */
   virtual bool isInverseFillType() const;
 

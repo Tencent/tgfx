@@ -82,18 +82,14 @@ class Path {
 
   /**
    * Converts this path to an equivalent path that uses the winding fill rule, so that it fills the
-   * same area in formats that cannot record a fill rule. Paths that already use the winding rule
-   * are left as is; InverseEvenOdd becomes InverseWinding.
+   * same area in formats that cannot record a fill rule. InverseEvenOdd becomes InverseWinding.
+   * Every outermost contour of a converted path runs clockwise, so converted paths can be appended
+   * together and fill the same area as their union. Paths that already use the winding rule are
+   * left unchanged and carry no such guarantee. Reversed contours change where trims and dashes
+   * start.
    *
-   * Every outermost contour is normalized to clockwise, with the counters inside it running the
-   * opposite way. This matches the direction a stroker produces, so appending paths that went
-   * through this conversion fills the same area as their union without a boolean operation.
-   * Reversing a contour moves the point where a trim or dash starts on it.
-   *
-   * The filled area is preserved as long as the contours do not cross each other or themselves.
-   * Contours produced by addPath() with a boolean operation satisfy that condition.
-   * @return true if the conversion succeeded. On failure the path is left unchanged, keeping its
-   * even-odd rule, so callers must check the result.
+   * The contours must not cross each other or themselves; otherwise the filled area may change.
+   * @return true if the conversion succeeded. On failure the path is left unchanged.
    */
   bool toWinding();
 

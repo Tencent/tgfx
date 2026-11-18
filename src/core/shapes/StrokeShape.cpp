@@ -52,12 +52,12 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
 }
 
 PathFillType StrokeShape::fillType() const {
-  // A non-hairline stroke replaces the outline with its own winding boundary, so the inner rule no
-  // longer describes the result. A hairline stroke draws the outline itself and keeps its rule.
+  // A non-hairline stroke replaces the outline with its own winding boundary, but the stroker
+  // preserves the input's inverse flag. A hairline stroke draws the outline itself and keeps its rule.
   if (IsHairlineStroke(stroke)) {
     return shape->fillType();
   }
-  return PathFillType::Winding;
+  return shape->isInverseFillType() ? PathFillType::InverseWinding : PathFillType::Winding;
 }
 
 Rect StrokeShape::onGetBounds() const {

@@ -53,6 +53,8 @@ PathFillType MergeShape::fillType() const {
   return isInverseFillType() ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd;
 }
 
+// Deriving the inverse flag without building the path must still agree with onGetPath(), including
+// the empty result reported when a boolean operation fails.
 bool MergeShape::isInverseFillType() const {
   switch (pathOp) {
     case PathOp::Union:
