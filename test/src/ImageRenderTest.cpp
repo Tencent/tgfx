@@ -30,6 +30,7 @@
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageProvider.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
@@ -700,6 +701,85 @@ TGFX_TEST(ImageRenderTest, RasterizedProviderVariant) {
   EXPECT_EQ(result[2 * 10 + 7], green);
   EXPECT_EQ(result[7 * 10 + 2], blue);
   EXPECT_EQ(result[7 * 10 + 7], yellow);
+}
+
+namespace {
+// An ImageBuffer whose GPU texture is taller than its logical content: the extra rows are red
+// padding below the green content, mimicking a hardware-decoded buffer aligned by the decoder.
+class PaddedImageBuffer : public ImageBuffer {
+ public:
+  PaddedImageBuffer(int width, int height) : _width(width), _height(height) {
+  }
+
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return imageColorSpace;
+  }
+
+ protected:
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override {
+    auto bufferHeight = _height + kPadding;
+    std::vector<uint32_t> pixels(static_cast<size_t>(_width) * static_cast<size_t>(bufferHeight));
+    for (int y = 0; y < bufferHeight; y++) {
+      auto color = y < _height ? 0xFF00FF00u : 0xFFFF0000u;
+      for (int x = 0; x < _width; x++) {
+        pixels[static_cast<size_t>(y) * static_cast<size_t>(_width) + static_cast<size_t>(x)] =
+            color;
+      }
+    }
+    return TextureView::MakeRGBA(context, _width, bufferHeight, pixels.data(),
+                                 static_cast<size_t>(_width) * sizeof(uint32_t), mipmapped);
+  }
+
+ private:
+  static constexpr int kPadding = 8;
+  int _width = 0;
+  int _height = 0;
+  std::shared_ptr<ColorSpace> imageColorSpace = ColorSpace::SRGB();
+};
+}  // namespace
+
+TGFX_TEST(ImageRenderTest, RasterizedPaddedBuffer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  // The buffer reports 16x16 content but its texture is 16x24, the extra 8 rows being red padding.
+  // RasterizedImage must keep the content size (16) after the proxy is released and rewrapped from
+  // the cache at the full 24-row texture size, otherwise the draw stretches the content and samples
+  // the red padding.
+  constexpr int w = 16;
+  constexpr int h = 16;
+  auto buffer = std::make_shared<PaddedImageBuffer>(w, h);
+  auto image = Image::MakeFrom(buffer);
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, w, h);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  context->flushAndSubmit();
+  canvas->clear();
+  canvas->drawImage(image);
+  context->flushAndSubmit();
+  auto info = ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  Buffer readback(info.byteSize());
+  ASSERT_TRUE(surface->readPixels(info, readback.data()));
+  auto pixels = reinterpret_cast<const uint32_t*>(readback.data());
+  for (int y = 0; y < h; y++) {
+    for (int x = 0; x < w; x++) {
+      ASSERT_EQ(pixels[y * w + x], 0xFF00FF00u) << "mismatch at " << x << "," << y;
+    }
+  }
 }
 
 TGFX_TEST(ImageRenderTest, drawScaleImage) {

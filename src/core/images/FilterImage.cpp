@@ -113,6 +113,13 @@ std::shared_ptr<Image> FilterImage::onMakeScaled(int newWidth, int newHeight,
   return Image::onMakeScaled(newWidth, newHeight, sampling);
 }
 
+ISize FilterImage::getRasterizedSize(float) const {
+  // The filter renders into a target sized by the rounded-out bounds, which may not match the
+  // truncated logical size reported by width()/height(). Report no size so RasterizedImage falls
+  // back to the actual proxy size.
+  return {};
+}
+
 std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) const {
   return filter->lockTextureProxy(source, bounds, args);
 }
