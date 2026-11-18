@@ -21,10 +21,16 @@
 namespace tgfx {
 
 /**
- * Lets a test keep an unculled reference through the same render path a display list uses, by
- * switching the capture cull off before rendering. The library only reads it, and it lives outside
- * the public headers so the layout of DisplayList stays the same for the applications that use it.
+ * Returns whether a capture culls the layers its background styles do not sample. Always true
+ * outside the tests, which clear it to keep an unculled reference through the same render path a
+ * display list uses. Both live outside the public headers so the layout of DisplayList stays the
+ * same for the applications that use it.
  */
-extern bool CaptureCullingEnabledForTests;
+bool CaptureCullingEnabledForTests();
+
+/**
+ * Sets the capture cull switch. Only the tests call this.
+ */
+void SetCaptureCullingEnabledForTests(bool enabled);
 
 }  // namespace tgfx

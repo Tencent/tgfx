@@ -41,7 +41,15 @@ static constexpr int MAX_ATLAS_SIZE = 8192;
 // Number of rects the per-layer cull loop can afford.
 static constexpr size_t MAX_CULL_RECTS = 32;
 
-bool CaptureCullingEnabledForTests = true;
+static bool captureCullingEnabledForTests = true;
+
+bool CaptureCullingEnabledForTests() {
+  return captureCullingEnabledForTests;
+}
+
+void SetCaptureCullingEnabledForTests(bool enabled) {
+  captureCullingEnabledForTests = enabled;
+}
 
 class DrawTask {
  public:
@@ -1316,7 +1324,7 @@ static Rect RoundOutToCapturedPixels(const Rect& footprint, const Matrix& worldT
 // reach, and `pixelToWorld` maps a pixel of the captured background to the world.
 std::vector<Rect> DisplayList::computeCaptureCullRects(const std::vector<Rect>& worldRects,
                                                        const Matrix& pixelToWorld) const {
-  if (!CaptureCullingEnabledForTests) {
+  if (!captureCullingEnabledForTests) {
     return {};
   }
   Matrix worldToPixel = Matrix::I();

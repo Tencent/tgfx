@@ -47,12 +47,12 @@ static Rect SampledBounds(Rect bounds) {
 // process-wide test switch, so it has to be restored even when a check fails mid-case.
 class CaptureCullScope {
  public:
-  explicit CaptureCullScope(bool enabled) : previous(CaptureCullingEnabledForTests) {
-    CaptureCullingEnabledForTests = enabled;
+  explicit CaptureCullScope(bool enabled) : previous(CaptureCullingEnabledForTests()) {
+    SetCaptureCullingEnabledForTests(enabled);
   }
 
   ~CaptureCullScope() {
-    CaptureCullingEnabledForTests = previous;
+    SetCaptureCullingEnabledForTests(previous);
   }
 
  private:
