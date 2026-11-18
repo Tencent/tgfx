@@ -47,6 +47,10 @@ struct ParsedBundle {
   uint16_t payloadFormat = BundleFormat::Payload::Text;
   std::unordered_map<uint32_t, ShaderStageBlob> vertEntries;
   std::unordered_map<uint32_t, ShaderStageBlob> fragEntries;
+  /// The pre-composed payloads, split out of the fragment pool by the high id bit: they carry no
+  /// vertex stage and no variant semantics, so the one-fragment-per-variant invariants (and the
+  /// closure checks) keep holding over fragEntries alone.
+  std::unordered_map<uint32_t, ShaderStageBlob> composedEntries;
 };
 
 }  // namespace tgfx

@@ -239,6 +239,23 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
 
 namespace {
 
+// The specialization's flat values mapped onto the constant ids, mirroring the injector's value
+// walk: the master switch is values[0], then each field's words in declaration order.
+std::vector<std::pair<uint32_t, int32_t>> SpecIdValuesOf(const std::vector<SpecFieldInfo>& fields,
+                                                         const SpecValues& spec) {
+  std::vector<std::pair<uint32_t, int32_t>> idValues = {};
+  size_t next = 1;
+  for (const auto& field : fields) {
+    const auto words = field.arraySize == 1 ? 1u : field.arraySize * 4u;
+    for (uint32_t word = 0; word < words; ++word) {
+      const auto value = next < spec.values.size() ? spec.values[next] : 0;
+      ++next;
+      idValues.emplace_back(field.firstId + word, value);
+    }
+  }
+  return idValues;
+}
+
 // The one fallback: a specialization that failed to build must not drop the draw, and the generic
 // text of the same variant always built, so re-enter without values (this recursion carries no
 // spec and cannot loop). The caller caches the returned program under the specialization-bearing
@@ -249,7 +266,8 @@ std::shared_ptr<Program> FallbackToGeneric(Context* context, const ProgramInfo* 
       "PrecompiledProgramCreator: the specialized %s of %s[variant=%u] failed to build; falling "
       "back to the generic form",
       stage, Families()[variant.family].name, variant.id());
-  return PrecompiledProgramCreator::CreateProgramForVariant(context, programInfo, variant, nullptr);
+  return PrecompiledProgramCreator::CreateProgramForVariantInternal(context, programInfo, variant,
+                                                                    nullptr, false);
 }
 
 }  // namespace
@@ -257,6 +275,12 @@ std::shared_ptr<Program> FallbackToGeneric(Context* context, const ProgramInfo* 
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
     Context* context, const ProgramInfo* programInfo, const Variant& variant,
     const SpecValues* spec) {
+  return CreateProgramForVariantInternal(context, programInfo, variant, spec, true);
+}
+
+std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInternal(
+    Context* context, const ProgramInfo* programInfo, const Variant& variant,
+    const SpecValues* spec, bool allowComposed) {
   auto cache = ContextCacheAccess::Cache(context);
   // The callers hold their own resolved variant in hand (CreateProgram just ran the walk; the AOT
   // route derives its variant from the compiled program), so this entry starts past the match.
@@ -310,13 +334,48 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
   } else {
     fragmentDesc.code = std::string(fragBlob->data.begin(), fragBlob->data.end());
   }
+  // The composed executor: a specialized GLSL chain draw trades the interpreter loop for one
+  // straight-line evaluation. The lookup runs first — the bundle's pre-composed payload for this
+  // exact shape is the stored text the build produced by running the same two operations — and a
+  // miss with the switch on splices the same body here, so hit and miss serve byte-identical text.
+  // Every decline keeps the injector path below; the uniforms, the layout and the key are
+  // unchanged either way, because the body reads the same pool through the same per-operator
+  // functions.
+  bool composedAttempt = false;
+  const bool composedEligible = allowComposed && format == ShaderCodeFormat::GLSL &&
+                                ComposedChainEnabled() &&
+                                strcmp(Families()[variant.family].name, "Chain") == 0;
+  const auto* sources = programInfo->getSources();
+  if (composedEligible && sources != nullptr && sources->chain != nullptr) {
+    const bool xpNeedsBlendPass = XpNeedsAdvancedMath(
+        programInfo->getXferFacts().shaderBlend(), static_cast<int>(programInfo->getBlendMode()));
+    const ChainComposition composition =
+        DescribeChainComposition(*sources->chain, xpNeedsBlendPass);
+    const auto* composedBlob = cache->findComposed(ComposedFragmentId(variantId, composition));
+    if (composedBlob != nullptr) {
+      fragmentDesc.code = std::string(composedBlob->data.begin(), composedBlob->data.end());
+      composedAttempt = true;
+      LOGI("ComposedChain: precomposed payload for %s[variant=%u]", shaderName, variantId);
+    } else if (spec != nullptr && !spec->empty()) {
+      std::string attempted = std::string(fragBlob->data.begin(), fragBlob->data.end());
+      if (PrependChainSpecDefinesGLSL(&attempted,
+                                      SpecIdValuesOf(DeriveSpecFieldInfos(variant), *spec)) &&
+          ComposeChainFragmentGLSL(composition, &attempted)) {
+        fragmentDesc.code = std::move(attempted);
+        composedAttempt = true;
+        LOGI("ComposedChain: straight-line executor for %s[variant=%u] (key=0x%016llx)", shaderName,
+             variantId,
+             static_cast<unsigned long long>(ChainCompositionKey(variantId, composition)));
+      }
+    }
+  }
   // The format's injector decides where the values land: the driver-source formats rewrite the
   // generated TGFX_SPEC_<id> declarations (the driver's compiler then folds every accessor read
   // and the unrolled executor's guards), the container formats append the pipeline's constant
   // table. A format without a registered injector serves the generic form.
   bool specInjected = false;
   std::vector<std::pair<std::string, double>> specConstants = {};
-  if (spec != nullptr && !spec->empty()) {
+  if (!composedAttempt && spec != nullptr && !spec->empty()) {
     if (const auto* injector = FindSpecInjector(format)) {
       SpecInjection injection = {};
       if (injector->Apply(fragmentDesc.code, DeriveSpecFieldInfos(variant), *spec, &injection)) {
@@ -345,23 +404,6 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
         {std::string(FragmentUniformBlockName), static_cast<unsigned>(FRAGMENT_UBO_BINDING_POINT)}};
   }
 
-  // The composed executor: a specialized GLSL chain text whose slot structure the injection just
-  // fixed can trade the interpreter loop for one straight-line evaluation. It rewrites the text in
-  // place, so every decline (an unsupported operator, a missing marker, the generic form) simply
-  // keeps what the injector produced; the uniforms, the layout and the key are unchanged either
-  // way, because the body reads the same pool through the same per-operator functions.
-  if (specInjected && format == ShaderCodeFormat::GLSL && ComposedChainEnabled() &&
-      strcmp(Families()[variant.family].name, "Chain") == 0) {
-    const auto* sources = programInfo->getSources();
-    if (sources != nullptr && sources->chain != nullptr) {
-      const bool xpNeedsBlendPass = XpNeedsAdvancedMath(
-          programInfo->getXferFacts().shaderBlend(), static_cast<int>(programInfo->getBlendMode()));
-      if (ComposeChainFragmentGLSL(*sources->chain, xpNeedsBlendPass, &fragmentDesc.code)) {
-        LOGI("ComposedChain: straight-line executor for %s[variant=%u]", shaderName, variantId);
-      }
-    }
-  }
-
   auto* shaderCache = cache->shaderCache();
   auto vertexShader = shaderCache->findOrCreateModule(vertexDesc);
   if (vertexShader == nullptr) {
@@ -374,7 +416,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
   cache->recordAOTStage(PrecompiledAOTStage::VertexModuleCreated);
   auto fragmentShader = shaderCache->findOrCreateModule(fragmentDesc);
   if (fragmentShader == nullptr) {
-    if (specInjected) {
+    if (specInjected || composedAttempt) {
       return FallbackToGeneric(context, programInfo, variant, "fragment module");
     }
     cache->recordFailure(AOTFailure::FragmentModuleCreationFailed,
@@ -475,7 +517,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
 
   auto pipeline = shaderCache->findOrCreatePipeline(descriptor);
   if (pipeline == nullptr) {
-    if (specInjected) {
+    if (specInjected || composedAttempt) {
       return FallbackToGeneric(context, programInfo, variant, "pipeline");
     }
     // The same shader variant (identical vert/frag artifact) can create successfully for

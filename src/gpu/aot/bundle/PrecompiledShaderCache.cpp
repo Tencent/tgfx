@@ -503,6 +503,19 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     return false;
   }
 
+  // The composed payloads share the fragment pool's storage but not its variant semantics: split
+  // them by the high id bit so the per-variant lookups and closure checks see exactly one
+  // fragment per variant, and the composed lookup has its own table.
+  std::unordered_map<HashKey, ShaderStageBlob> newComposedEntries;
+  for (auto it = newFragEntries.begin(); it != newFragEntries.end();) {
+    if ((it->first & 0x80000000u) != 0) {
+      newComposedEntries.emplace(it->first, std::move(it->second));
+      it = newFragEntries.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
   ParsedBundle parsed;
   parsed.profileTag = std::move(profileTag);
   parsed.identityHash = sourceHash;
@@ -510,6 +523,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   parsed.payloadFormat = header.payloadFormat;
   parsed.vertEntries = std::move(newVertEntries);
   parsed.fragEntries = std::move(newFragEntries);
+  parsed.composedEntries = std::move(newComposedEntries);
   _bundle = ShareParsedBundle(sourceHash, size, std::move(parsed));
   {
     std::lock_guard<std::mutex> lock(_programMissMutex);
@@ -524,8 +538,11 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     // lookups to recreate their programs on every request).
     _context->globalCache()->clearPrograms();
   }
-  LOGI("PrecompiledShaderCache: Loaded %u vert + %u frag entries (format v%u, profile=%s)",
-       vertPoolCount, fragPoolCount, formatVersion, _bundle->profileTag.c_str());
+  LOGI(
+      "PrecompiledShaderCache: Loaded %u vert + %u frag + %zu composed entries (format v%u, "
+      "profile=%s)",
+      vertPoolCount, fragPoolCount, _bundle->composedEntries.size(), formatVersion,
+      _bundle->profileTag.c_str());
   return true;
 }
 
@@ -595,6 +612,17 @@ const ShaderStageBlob* PrecompiledShaderCache::findVertex(uint32_t variantId) co
   }
   auto it = _bundle->vertEntries.find(variantId);
   if (it == _bundle->vertEntries.end()) {
+    return nullptr;
+  }
+  return &it->second;
+}
+
+const ShaderStageBlob* PrecompiledShaderCache::findComposed(uint32_t composedId) const {
+  if (_bundle == nullptr) {
+    return nullptr;
+  }
+  auto it = _bundle->composedEntries.find(composedId);
+  if (it == _bundle->composedEntries.end()) {
     return nullptr;
   }
   return &it->second;

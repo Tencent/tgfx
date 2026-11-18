@@ -106,4 +106,13 @@ struct VariantData {
   StageReflectionData fragmentReflection;
 };
 
+/// One pre-composed fragment payload: the specialized, spliced text a chain shape produced at
+/// build time, stored in the fragment pool under its composed id (the high bit set) so the
+/// runtime looks it up with the pool's existing machinery.
+struct ComposedPayload {
+  std::string name;
+  uint32_t id = 0;
+  std::vector<uint8_t> blob;
+};
+
 }  // namespace tgfx

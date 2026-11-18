@@ -42,6 +42,7 @@
 #include "core/ShaderSources.h"
 #include "emit/Assembler.h"
 #include "emit/ChainOpsGLSL.h"
+#include "emit/ComposedShapes.h"
 #include "emit/ProfileEmitter.h"
 #include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/KernelContract.h"
@@ -617,6 +618,47 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         if (!stages) {
           continue;
         }
+        // The pre-composed payloads: for a GL-text chain variant, every manifest shape this
+        // variant hosts is spelled from the exact bytes the bundle stores, so the runtime's
+        // lookup serves a text byte-identical to what its own splice would have produced. The
+        // canonical proxy compile (defines + splice over the unconverted source) fails the build
+        // when the emitter's marshalling drifts, before any payload is stored.
+        if (std::string(family.name) == "Chain" &&
+            stages->payloadKind == BundleFormat::Payload::Text &&
+            (emitterEntry.first == ShaderProfile::OpenGL ||
+             emitterEntry.first == ShaderProfile::OpenGLES) &&
+            !stages->fragmentBlob.empty()) {
+          const uint32_t chainVariantId =
+              VariantIdOf(static_cast<uint16_t>(familyIndex), variant.ordinal);
+          const std::string profileTag = ProfileTag(emitterEntry.first);
+          for (const auto& shape : ComposedShapeManifest()) {
+            const uint8_t xferSlot = static_cast<uint8_t>(2 + family.moduleCount);
+            if (shape.profile != DimValueOf(family, variant, 2, 0) ||
+                shape.geometry != variant.geometry ||
+                DimValueOf(family, variant, xferSlot, 0) < shape.minHasXp) {
+              continue;
+            }
+            const auto idValues = ComposedSpecIdValues(family, variant, shape.composition);
+            // The payload must be the dialect text the bundle stores, not the canonical source:
+            // the canonical form still declares the spec constants as `layout(constant_id)`, and a
+            // prepended #define would rewrite that declaration into invalid code, while the stored
+            // form carries the idempotent macro blocks the runtime's own injection also expects.
+            std::string text(stages->fragmentBlob.begin(), stages->fragmentBlob.end());
+            if (!PrependChainSpecDefinesGLSL(&text, idValues) ||
+                !ComposeChainFragmentGLSL(shape.composition, &text)) {
+              RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
+                               info.name, profileTag, static_cast<int>(variant.ordinal),
+                               static_cast<int>(variant.ordinal),
+                               std::string("the composed shape ") + shape.name + " did not splice");
+              continue;
+            }
+            ComposedPayload payload;
+            payload.name = shape.name;
+            payload.id = ComposedFragmentId(chainVariantId, shape.composition);
+            payload.blob.assign(text.begin(), text.end());
+            report->composedByTag[profileTag].push_back(std::move(payload));
+          }
+        }
         VariantData variantData;
         variantData.shaderName = info.name;
         variantData.variantId = VariantIdOf(static_cast<uint16_t>(familyIndex), variant.ordinal);
@@ -730,11 +772,17 @@ int RunBuildCommand(const BuildOptions& options) {
     for (const auto& pair : byBackend) {
       std::string filename = "shader_bundle." + pair.first + ".bin";
       std::string path = options.outDir + "/" + filename;
-      if (!WriteBundle(path, pair.first, pair.second, options.compress, &report.diagnostics)) {
+      const auto composedIt = report.composedByTag.find(pair.first);
+      const std::vector<ComposedPayload> noComposed = {};
+      const auto& composed =
+          composedIt == report.composedByTag.end() ? noComposed : composedIt->second;
+      if (!WriteBundle(path, pair.first, pair.second, composed, options.compress,
+                       &report.diagnostics)) {
         PrintDiagnostics(report.diagnostics);
         return 1;
       }
-      std::cout << "Bundle written: " << filename << " (" << pair.second.size() << " entries)\n";
+      std::cout << "Bundle written: " << filename << " (" << pair.second.size() << " entries, "
+                << composed.size() << " composed)\n";
       stampEntries.push_back({pair.first, path});
     }
   }

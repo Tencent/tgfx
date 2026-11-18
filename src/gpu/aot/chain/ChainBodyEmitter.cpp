@@ -20,7 +20,6 @@
 #include "gpu/shaders/contract/ChainComposition.h"
 
 namespace tgfx {
-namespace {
 
 // The decoded program as the contract layer's shape description: one row per slot with the
 // selector precomputed by the one encoder-side definition (ChainSlotSelector), so the emitter and
@@ -44,10 +43,15 @@ ChainComposition DescribeChainComposition(const AOTProgram& program, bool xpNeed
   composition.coverageRootRegister = program.coverageRootRegister;
   composition.clipCoverageRegister = program.clipCoverageRegister;
   composition.xpNeedsBlendPass = xpNeedsBlendPass;
+  // The masks come off the one derivation the runtime's own specialization reads, so a described
+  // program and its live resolution can never disagree about a gate's value.
+  const auto masks = ChainFeatureMasksOf(program);
+  composition.usedOps = masks.usedOps;
+  composition.blendModes = masks.blendModes;
+  composition.textureFlags = masks.textureFlags;
+  composition.gradientKinds = masks.gradientKinds;
   return composition;
 }
-
-}  // namespace
 
 std::string EmitComposedChainBodyGLSL(const AOTProgram& program, bool xpNeedsBlendPass) {
   return EmitComposedChainBodyGLSL(DescribeChainComposition(program, xpNeedsBlendPass));

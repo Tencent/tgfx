@@ -85,7 +85,8 @@ struct PoolEntry {
 // the written size against BundleFormat::HeaderSize.
 
 bool WriteBundle(const std::string& outPath, const std::string& profileTag,
-                 const std::vector<VariantData>& variants, bool compress,
+                 const std::vector<VariantData>& variants,
+                 const std::vector<ComposedPayload>& composed, bool compress,
                  Diagnostics* diagnostics) {
   if (variants.empty()) {
     return true;
@@ -134,6 +135,21 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     PoolEntry frag;
     frag.variantId = v.variantId;
     addBlob(v.fragmentBlob, &frag);
+    fragPool.push_back(frag);
+  }
+
+  // The pre-composed payloads: fragment-pool entries under their composed ids. A composed id
+  // colliding with another (or a real variant id, which stays far below the high bit) is a
+  // caller bug, not a legal duplicate.
+  for (const auto& payload : composed) {
+    if (!seenIds.insert(payload.id).second) {
+      ReportWriteFailure(diagnostics, DiagnosticCode::OutputDuplicateKey, payload.name, profileTag,
+                         -1, -1, "two composed payloads carry the same bundle id");
+      return false;
+    }
+    PoolEntry frag;
+    frag.variantId = payload.id;
+    addBlob(payload.blob, &frag);
     fragPool.push_back(frag);
   }
 

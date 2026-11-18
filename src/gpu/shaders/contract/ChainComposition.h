@@ -18,7 +18,10 @@
 
 #pragma once
 
+#include <cstdint>
+#include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace tgfx {
@@ -56,6 +59,13 @@ struct ChainComposition {
   int coverageRootRegister = -1;
   int clipCoverageRegister = -1;
   bool xpNeedsBlendPass = false;
+  /// The feature masks the text gates read, carried as fields so the emitter's consumers and the
+  /// runtime's spec resolution derive them from one place: the adapter copies them off the decoded
+  /// program (ChainFeatureMasksOf), and a build-side manifest states them for a pre-composed shape.
+  uint32_t usedOps = 0;
+  uint32_t blendModes = 0;
+  uint32_t textureFlags = 0;
+  uint32_t gradientKinds = 0;
 };
 
 /**
@@ -82,5 +92,52 @@ std::string EmitComposedChainBodyGLSL(const ChainComposition& composition);
  *                     produce) or the emitter declined the composition; the text is untouched.
  */
 bool ComposeChainFragmentGLSL(const ChainComposition& composition, std::string* code);
+
+/**
+ * Serializes the composition deterministically: a version tag, then every slot's fields, the three
+ * epilogue registers, the blend-pass flag and the four feature masks. The serialization is the
+ * structure key's only input besides the variant id, so a field added to the description bumps the
+ * version tag and every stored product keyed on it.
+ */
+std::string SerializeChainComposition(const ChainComposition& composition);
+
+/**
+ * The lookup key of a composed fragment payload: a hash over the variant id and the composition's
+ * serialization. The runtime computes it from the live draw's decoded program; the build computed
+ * the same key when it stored the payload, so a hit means the stored text spells exactly this
+ * shape.
+ */
+uint64_t ChainCompositionKey(uint32_t variantId, const ChainComposition& composition);
+
+/**
+ * The composed payload's id inside the bundle's fragment pool: the high bit set (real variant ids
+ * are family << 20 | ordinal and stay far below it) plus the low 31 bits of the structure key.
+ * Composed entries reuse the pool's storage, bounds and identity hash unchanged.
+ */
+uint32_t ComposedFragmentId(uint32_t variantId, const ChainComposition& composition);
+
+/**
+ * Prepends one `#define TGFX_SPEC_<id> <value>` line per pair after the #version line, the same
+ * insertion the runtime specialization performs, so a pre-composed payload and a runtime-composed
+ * text differ only in where the same bytes were produced.
+ * @param code     The fragment source to rewrite in place.
+ * @param idValues The constant ids and their values, ascending by id.
+ * @return         False when the text carries no #version line to insert after.
+ */
+bool PrependChainSpecDefinesGLSL(std::string* code,
+                                 const std::vector<std::pair<uint32_t, int32_t>>& idValues);
+
+/**
+ * Derives the specialization values a composition implies, field-name keyed the way the chain
+ * module declares them: SlotCount, the SlotPacked array padded to the variant's slot capacity with
+ * the inactive record, the three register indices, the four feature masks and NeedsBlendMath (a
+ * Blend slot or the xfer's advanced blend pass). Values and texture identities are absent by
+ * construction; the runtime's own resolution over the same shape must agree bit for bit.
+ * @param composition   The shape to resolve.
+ * @param slotCapacity  The variant's SlotPacked capacity (16 or 32; the inactive tail pads to it).
+ * @return              The field name to its value sequence.
+ */
+std::map<std::string, std::vector<int32_t>> ResolveCompositionSpecValues(
+    const ChainComposition& composition, size_t slotCapacity);
 
 }  // namespace tgfx

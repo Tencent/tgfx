@@ -53,6 +53,17 @@ class PrecompiledProgramCreator {
                                                           const ProgramInfo* programInfo,
                                                           const Variant& variant,
                                                           const SpecValues* spec = nullptr);
+
+  /**
+   * The internal entry both paths share. The caller passes allowComposed=false to keep a failed
+   * composed attempt from being retried: the generic fallback must serve the interpreter text, not
+   * find and fail the same pre-composed payload again.
+   */
+  static std::shared_ptr<Program> CreateProgramForVariantInternal(Context* context,
+                                                                  const ProgramInfo* programInfo,
+                                                                  const Variant& variant,
+                                                                  const SpecValues* spec,
+                                                                  bool allowComposed);
 };
 
 }  // namespace tgfx

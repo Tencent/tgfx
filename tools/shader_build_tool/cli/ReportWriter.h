@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 #include "core/Diagnostics.h"
@@ -38,6 +39,9 @@ struct ShaderReport {
 struct BuildReport {
   std::vector<ShaderReport> shaders;
   std::vector<VariantData> variants;
+  /// The pre-composed fragment payloads, grouped by profile tag: produced in the compile loop and
+  /// written into the same backend's bundle as extra fragment-pool entries.
+  std::map<std::string, std::vector<ComposedPayload>> composedByTag;
   // The per-profile error ledger; the compile loop records through it and the report reads it.
   Diagnostics diagnostics;
 };

@@ -208,4 +208,106 @@ bool ComposeChainFragmentGLSL(const ChainComposition& composition, std::string* 
   return true;
 }
 
+std::string SerializeChainComposition(const ChainComposition& composition) {
+  std::string out = "ccv1|";
+  out += std::to_string(composition.slots.size()) + "|";
+  for (const auto& slot : composition.slots) {
+    out += std::to_string(slot.op) + "," + std::to_string(slot.in0) + "," +
+           std::to_string(slot.in1) + "," + std::to_string(slot.outRegister) + "," +
+           std::to_string(slot.selector) + "," + std::to_string(slot.blendMode) + "," +
+           (slot.multiplyInputAlpha ? "1" : "0") + "," + std::to_string(slot.inputMode) + ";";
+  }
+  out += "|" + std::to_string(composition.rootRegister) + "," +
+         std::to_string(composition.coverageRootRegister) + "," +
+         std::to_string(composition.clipCoverageRegister) + "," +
+         (composition.xpNeedsBlendPass ? "1" : "0");
+  out += "|" + std::to_string(composition.usedOps) + "," + std::to_string(composition.blendModes) +
+         "," + std::to_string(composition.textureFlags) + "," +
+         std::to_string(composition.gradientKinds);
+  return out;
+}
+
+uint64_t ChainCompositionKey(uint32_t variantId, const ChainComposition& composition) {
+  const std::string serialized = SerializeChainComposition(composition);
+  // FNV-1a over the variant id's four bytes then the serialization: every input byte changes the
+  // key, and the hash is stable across machines because the serialization is plain ASCII.
+  uint64_t hash = 1469598103934665603ull;
+  auto mix = [&hash](const void* data, size_t size) {
+    const auto* bytes = static_cast<const uint8_t*>(data);
+    for (size_t index = 0; index < size; ++index) {
+      hash ^= bytes[index];
+      hash *= 1099511628211ull;
+    }
+  };
+  mix(&variantId, sizeof(variantId));
+  mix(serialized.data(), serialized.size());
+  return hash;
+}
+
+uint32_t ComposedFragmentId(uint32_t variantId, const ChainComposition& composition) {
+  const uint64_t key = ChainCompositionKey(variantId, composition);
+  return 0x80000000u | static_cast<uint32_t>(key & 0x7FFFFFFFu);
+}
+
+bool PrependChainSpecDefinesGLSL(std::string* code,
+                                 const std::vector<std::pair<uint32_t, int32_t>>& idValues) {
+  if (code == nullptr) {
+    return false;
+  }
+  const auto versionPos = code->find("#version");
+  if (versionPos == std::string::npos) {
+    return false;
+  }
+  const auto versionEnd = code->find('\n', versionPos);
+  if (versionEnd == std::string::npos) {
+    return false;
+  }
+  std::string defines;
+  for (const auto& idValue : idValues) {
+    defines += "#define TGFX_SPEC_" + std::to_string(idValue.first) + " " +
+               std::to_string(idValue.second) + "\n";
+  }
+  code->insert(versionEnd + 1, defines);
+  return true;
+}
+
+std::map<std::string, std::vector<int32_t>> ResolveCompositionSpecValues(
+    const ChainComposition& composition, size_t slotCapacity) {
+  std::map<std::string, std::vector<int32_t>> values = {};
+  values["SlotCount"] = {static_cast<int32_t>(composition.slots.size())};
+  std::vector<int32_t> packed = {};
+  for (size_t index = 0; index < slotCapacity; ++index) {
+    if (index < composition.slots.size()) {
+      const auto& slot = composition.slots[index];
+      packed.push_back(slot.op);
+      packed.push_back(slot.in0);
+      packed.push_back(slot.in1);
+      packed.push_back(slot.selector);
+    } else {
+      // The inactive tail's record is the zeroed slot, the same value the runtime's resolution
+      // uploads: OP_NONE with no inputs and no selector.
+      packed.push_back(ChainISA::None);
+      packed.push_back(-2);
+      packed.push_back(-2);
+      packed.push_back(0);
+    }
+  }
+  values["SlotPacked"] = std::move(packed);
+  values["CoverageRootIndex"] = {static_cast<int32_t>(composition.coverageRootRegister)};
+  values["RootIndex"] = {static_cast<int32_t>(composition.rootRegister)};
+  values["ClipCoverageRegister"] = {static_cast<int32_t>(composition.clipCoverageRegister)};
+  values["UsedOps"] = {static_cast<int32_t>(composition.usedOps)};
+  values["BlendModes"] = {static_cast<int32_t>(composition.blendModes)};
+  values["TextureFlags"] = {static_cast<int32_t>(composition.textureFlags)};
+  values["GradientKinds"] = {static_cast<int32_t>(composition.gradientKinds)};
+  bool needsBlendMath = composition.xpNeedsBlendPass;
+  for (const auto& slot : composition.slots) {
+    if (slot.op == ChainISA::Blend) {
+      needsBlendMath = true;
+    }
+  }
+  values["NeedsBlendMath"] = {needsBlendMath ? 1 : 0};
+  return values;
+}
+
 }  // namespace tgfx

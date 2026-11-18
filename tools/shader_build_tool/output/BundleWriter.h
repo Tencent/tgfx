@@ -28,10 +28,15 @@ namespace tgfx {
 /// Writes the shader bundle file with separate vertex and fragment pools. Each entry is the
 /// variant id and its compiled bytes; the interface is not stored, because the runtime derives it
 /// from the declaration table the compile step has already checked the reflection against.
+/// The composed payloads join the fragment pool under their composed ids (the high bit set): they
+/// are specialized, pre-spliced texts the runtime looks up by structure key, reusing the pool's
+/// storage and every validation unchanged.
 /// When compress is true, the data pool is zstd-compressed (compressionType=2 in header).
 /// Failures are reported to diagnostics (output.write-failed, or output.duplicate-key when two
 /// variants collide on one stage key with different content).
 bool WriteBundle(const std::string& outPath, const std::string& profileTag,
-                 const std::vector<VariantData>& variants, bool compress, Diagnostics* diagnostics);
+                 const std::vector<VariantData>& variants,
+                 const std::vector<ComposedPayload>& composed, bool compress,
+                 Diagnostics* diagnostics);
 
 }  // namespace tgfx

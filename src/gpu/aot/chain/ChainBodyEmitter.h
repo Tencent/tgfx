@@ -20,8 +20,19 @@
 
 #include <string>
 #include "gpu/aot/ir/Program.h"
+#include "gpu/shaders/contract/ChainComposition.h"
 
 namespace tgfx {
+
+/**
+ * The runtime adapter: the selection's compiled program as the contract layer's shape description
+ * (the decoded structure with the selector precomputed and the feature masks copied off the one
+ * derivation the runtime's own specialization reads).
+ * @param program          The chain program the selection compiled for this draw.
+ * @param xpNeedsBlendPass Whether the draw's xfer runs the loop's extra advanced-blend pass.
+ * @return                 The composition the shared emitter and the structure key consume.
+ */
+ChainComposition DescribeChainComposition(const AOTProgram& program, bool xpNeedsBlendPass);
 
 /**
  * The runtime adapter over the contract-layer emitter (gpu/shaders/contract/ChainComposition.h):
