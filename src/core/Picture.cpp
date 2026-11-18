@@ -61,11 +61,138 @@ Rect Picture::getBounds() const {
   return totalBounds;
 }
 
+// Picture records carry float geometry and record-local matrices. When the destination canvas
+// carries a large tile origin, replay each operation through that canvas's coordinate handling
+// before handing it to the backend. This also keeps recorded clips on the same pixel grid.
+class TilePlaybackContext final : public DrawContext {
+ public:
+  explicit TilePlaybackContext(Canvas* destination)
+      : base(destination), canvas(base->drawContext, base->surface) {
+  }
+
+  void drawFill(const Brush& brush) override {
+    prepare(Matrix::I(), {});
+    canvas.drawPaint(MakePaint(brush));
+  }
+
+  void drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip, const Brush& brush,
+                const Stroke* stroke) override {
+    prepare(matrix, clip);
+    canvas.drawRect(rect, MakePaint(brush, stroke));
+  }
+
+  void drawRRect(const RRect& rect, const Matrix& matrix, const ClipStack& clip, const Brush& brush,
+                 const Stroke* stroke) override {
+    prepare(matrix, clip);
+    canvas.drawRRect(rect, MakePaint(brush, stroke));
+  }
+
+  void drawPath(const Path& path, const Matrix& matrix, const ClipStack& clip,
+                const Brush& brush) override {
+    prepare(matrix, clip);
+    canvas.drawPath(path, MakePaint(brush));
+  }
+
+  void drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix, const ClipStack& clip,
+                 const Brush& brush, const Stroke* stroke) override {
+    prepare(matrix, clip);
+    canvas.drawShape(std::move(shape), MakePaint(brush, stroke));
+  }
+
+  void drawMesh(std::shared_ptr<Mesh> mesh, const Matrix& matrix, const ClipStack& clip,
+                const Brush& brush) override {
+    prepare(matrix, clip);
+    canvas.drawMesh(std::move(mesh), MakePaint(brush));
+  }
+
+  void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                 const Matrix& matrix, const ClipStack& clip, const Brush& brush) override {
+    prepare(matrix, clip);
+    canvas.drawImage(std::move(image), brush, sampling, nullptr);
+  }
+
+  void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
+                     const SamplingOptions& sampling, const Matrix& matrix, const ClipStack& clip,
+                     const Brush& brush, SrcRectConstraint constraint,
+                     const Rect* strictRect) override {
+    prepare(matrix, clip);
+    canvas.drawImageRect(std::move(image), srcRect, dstRect, sampling, brush, constraint,
+                         strictRect);
+  }
+
+  void drawTextBlob(std::shared_ptr<TextBlob> blob, const Matrix& matrix, const ClipStack& clip,
+                    const Brush& brush, const Stroke* stroke) override {
+    prepare(matrix, clip);
+    canvas.drawTextBlob(std::move(blob), 0, 0, MakePaint(brush, stroke));
+  }
+
+  void drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,
+                   const ClipStack& clip) override {
+    prepare(matrix, clip);
+    canvas.drawPicture(std::move(picture));
+  }
+
+  void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
+                 const Matrix& matrix, const ClipStack& clip, const Brush& brush) override {
+    prepare(matrix, clip);
+    auto paint = MakePaint(brush);
+    paint.setImageFilter(std::move(filter));
+    canvas.drawPicture(std::move(picture), nullptr, &paint);
+  }
+
+ private:
+  Canvas* base;
+  Canvas canvas;
+
+  static Paint MakePaint(const Brush& brush, const Stroke* stroke = nullptr) {
+    Paint paint;
+    paint.setAntiAlias(brush.antiAlias);
+    paint.setColor(brush.color);
+    paint.setBlendMode(brush.blendMode);
+    paint.setShader(brush.shader);
+    paint.setColorFilter(brush.colorFilter);
+    paint.setMaskFilter(brush.maskFilter);
+    if (stroke != nullptr) {
+      paint.setStyle(PaintStyle::Stroke);
+      paint.setStroke(*stroke);
+    }
+    return paint;
+  }
+
+  void applyMatrix(const Matrix& matrix) {
+    canvas._matrix = base->_matrix;
+    canvas.tileTranslation = base->tileTranslation;
+    canvas.concat(matrix);
+  }
+
+  void prepare(const Matrix& matrix, const ClipStack& clip) {
+    *canvas.clipStack = *base->clipStack;
+    if (clip.state() == ClipState::Empty) {
+      canvas.clipRect(Rect::MakeEmpty(), false);
+    } else {
+      const auto& elements = clip.elements();
+      for (size_t i = clip.oldestValidIndex(); i < elements.size(); ++i) {
+        const auto& element = elements[i];
+        if (element.isValid()) {
+          applyMatrix(element.matrix());
+          canvas.clipPath(element.shape().asPath(), element.antiAlias());
+        }
+      }
+    }
+    applyMatrix(matrix);
+  }
+};
+
 void Picture::playback(Canvas* canvas, AbortCallback* callback) const {
   if (canvas == nullptr) {
     return;
   }
-  playback(canvas->drawContext, canvas->_matrix, *canvas->clipStack, callback);
+  if (canvas->tileTranslation) {
+    TilePlaybackContext context(canvas);
+    playback(&context, Matrix::I(), {}, callback);
+  } else {
+    playback(canvas->drawContext, canvas->_matrix, *canvas->clipStack, callback);
+  }
 }
 
 void Picture::playback(DrawContext* drawContext, const Matrix& matrix, const ClipStack& clip,
