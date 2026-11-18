@@ -71,9 +71,10 @@ class ImageStream {
 
   /**
    * Returns true if a new frame is ready to be consumed. Streams that deliver frames asynchronously
-   * (for example the Android SurfaceTexture backed by a hardware decoder) report false here until
-   * the producer has actually submitted a new frame, so consumers can skip the stale content
-   * instead of drawing the previous frame again.
+   * (for example the Android SurfaceTexture backed by a hardware decoder) report false until the
+   * frame-available notification for the next frame has been delivered, which may lag behind the
+   * producer's submission, so consumers can skip the stale content instead of drawing the previous
+   * frame again.
    */
   virtual bool hasNewFrame() const {
     return true;

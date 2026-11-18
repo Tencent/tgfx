@@ -62,9 +62,11 @@ class ImageReader {
 
   /**
    * Acquires the next ImageBuffer from the ImageReader after a new image frame has been rendered
-   * into the associated video source. Returns nullptr if no new image frame has been rendered into
-   * the video source since the texture was last updated. Note that the previously returned image
-   * buffers will immediately expire after the newly created ImageBuffer is drawn.
+   * into the associated video source. For video sources that can report frame availability
+   * (currently only the Android SurfaceTextureReader), returns nullptr if no new image frame has
+   * been rendered into the video source since the texture was last updated; all other video sources
+   * always return a new ImageBuffer. Note that the previously returned image buffers will
+   * immediately expire after the newly created ImageBuffer is drawn.
    */
   std::shared_ptr<ImageBuffer> acquireNextBuffer();
 
