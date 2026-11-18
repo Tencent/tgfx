@@ -1405,10 +1405,17 @@ TGFX_TEST(LayerImageReaderTest, LargeTileOriginPreservesSinglePixelAlignment) {
       marker->setMatrix(translation);
     }
     root->addChild(marker);
+    const float pathX = translateRequest ? 4.0f : static_cast<float>(MarkerX + 4);
+    auto shape = ShapeLayer::Make();
+    Path path = {};
+    path.addRect(Rect::MakeXYWH(pathX, 0.0f, 2.0f, 1.0f));
+    shape->setPath(path);
+    shape->setFillStyle(ShapeStyle::Make(Color::Blue()));
+    root->addChild(shape);
     LayerImageRequest request = {};
     request.target = root;
     request.sceneRoot = root;
-    request.outputSize = {MarkerX + 2, 1};
+    request.outputSize = {MarkerX + 8, 1};
     if (translateRequest) {
       request.targetLocalToOutput = translation;
     }
@@ -1425,7 +1432,51 @@ TGFX_TEST(LayerImageReaderTest, LargeTileOriginPreservesSinglePixelAlignment) {
     EXPECT_EQ(center[0], 255);
     EXPECT_EQ(center[3], 255);
     EXPECT_EQ(center[7], 0);
+    EXPECT_EQ(center[3 * 4 + 3], 0);
+    EXPECT_EQ(center[4 * 4 + 2], 255);
+    EXPECT_EQ(center[5 * 4 + 2], 255);
+    EXPECT_EQ(center[6 * 4 + 3], 0);
   }
+}
+
+TGFX_TEST(LayerImageReaderTest, TinyTilePreservesFarPathCoordinates) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int Left = 16779246;
+  auto shape = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(Left, 0, 2, 3));
+  shape->setPath(path);
+  shape->setFillStyle(ShapeStyle::Make(Color::Red()));
+  LayerDrawRequest request = {};
+  request.target = shape.get();
+  request.captureRoot = shape.get();
+  request.samplingMode = LayerSamplingMode::ExportFixed;
+  request.outputSize = {Left + 4, 3};
+  DrawControl control = {};
+  auto session = LayerDrawSession::Prepare(context, request, &control);
+  ASSERT_TRUE(session != nullptr) << control.firstFailure.message;
+  LayerDrawLimits limits = {*context->gpu()->limits(), {3, 3}};
+  auto plan = session->planRegion({Left, 1, Left + 1, 2}, limits, &control);
+  ASSERT_EQ(plan.code, RegionPlanCode::Ready) << control.firstFailure.message;
+  auto batchPlan = session->planBatch({plan.region}, limits, &control);
+  ASSERT_EQ(batchPlan.code, BatchPlanCode::Ready);
+  auto batch = session->prepareBatch(context, *batchPlan.plan, &control);
+  ASSERT_TRUE(batch != nullptr);
+  const auto& rect = plan.region.renderRect;
+  ASSERT_LE(rect.width(), 3);
+  ASSERT_LE(rect.height(), 3);
+  auto surface = Surface::Make(context, rect.width(), rect.height());
+  ASSERT_TRUE(surface != nullptr);
+  LayerDrawTarget target = {};
+  target.canvas = surface->getCanvas();
+  target.clearBeforeDraw = true;
+  ASSERT_EQ(session->drawRegion(context, *batch, 0, target, &control), DrawOutcome::Success);
+  uint8_t pixel[4] = {};
+  ASSERT_TRUE(surface->readPixels(OutputInfo(1, 1), pixel, Left - rect.left, 1 - rect.top));
+  EXPECT_EQ(pixel[0], 255);
+  EXPECT_EQ(pixel[3], 255);
 }
 
 static std::shared_ptr<SolidLayer> MakeExportSolid(const Color& color) {
