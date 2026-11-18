@@ -845,12 +845,27 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture) {
   if (picture == nullptr) {
     return;
   }
+  if (tileTranslation) {
+    picture->playback(this);
+    return;
+  }
   drawContext->drawPicture(std::move(picture), _matrix, *clipStack);
 }
 
 void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
                          const Paint* paint) {
   if (picture == nullptr) {
+    return;
+  }
+  if (tileTranslation) {
+    AutoCanvasRestore restore(this);
+    if (matrix != nullptr) {
+      concat(*matrix);
+    }
+    if (paint != nullptr) {
+      saveLayer(paint);
+    }
+    picture->playback(this);
     return;
   }
   auto drawMatrix = _matrix;

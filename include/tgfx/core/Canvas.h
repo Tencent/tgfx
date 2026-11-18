@@ -522,6 +522,7 @@ class Canvas {
   friend class LayerDrawSession;
   friend class BackgroundSource;
   friend class Picture;
+  friend class TilePlaybackContext;
   friend class PictureRecorder;
   friend class SVGExporter;
   friend class PDFDocumentImpl;
