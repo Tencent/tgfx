@@ -16,19 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/processors/RectBlurFragmentProcessor.h"
+#include "layers/processors/RectBlurFragmentProcessor.h"
 
 namespace tgfx {
-class GLSLRectBlurFragmentProcessor : public RectBlurFragmentProcessor {
- public:
-  GLSLRectBlurFragmentProcessor(const Point& halfSizeOverSigma, PMColor color,
-                                const Matrix& coordMatrix);
 
-  void emitCode(EmitArgs& args) const override;
+RectBlurFragmentProcessor::RectBlurFragmentProcessor(const Point& halfSizeOverSigma, PMColor color,
+                                                     const Matrix& coordMatrix)
+    : FragmentProcessor(ClassID()), halfSizeOverSigma(halfSizeOverSigma), color(color),
+      coordTransform(coordMatrix) {
+  addCoordTransform(&coordTransform);
+}
 
- private:
-  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
-};
+void RectBlurFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  // Geometry and color are uniforms, so they do not affect the program. The coord transform's
+  // perspective property decides whether the shader emits the perspective division, so it goes
+  // into the key.
+  const uint32_t flags = coordTransform.matrix.hasPerspective() ? 1 : 0;
+  bytesKey->write(flags);
+}
+
 }  // namespace tgfx

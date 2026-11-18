@@ -83,12 +83,14 @@ ElementWriter::ElementWriter(const std::string& name, Context* context,
                              XMLWriter* writer, ResourceStore* bucket, bool disableWarning,
                              const Matrix& matrix, const Brush& brush, const Stroke* stroke,
                              std::shared_ptr<ColorSpace> targetColorSpace,
-                             std::shared_ptr<ColorSpace> assignColorSpace)
+                             std::shared_ptr<ColorSpace> assignColorSpace,
+                             const std::optional<Rect>& bounds)
     : writer(writer), resourceStore(bucket), disableWarning(disableWarning),
       _targetColorSpace(std::move(targetColorSpace)),
       _assignColorSpace(std::move(assignColorSpace)) {
   generateWriteColorSpaceString();
-  Resources resource = addResources(brush, context, svgContext, pendings);
+  Resources resource =
+      addResources(brush, context, svgContext, pendings, matrix.getMaxScale(), bounds);
 
   writer->startElement(name);
 
@@ -1159,7 +1161,8 @@ void ElementWriter::addBlendColorFilterPrimitives(const ModeColorFilter* modeCol
 
 Resources ElementWriter::addResources(const Brush& brush, Context* context,
                                       SVGExportContext* svgContext,
-                                      std::vector<PendingImage>* pendings) {
+                                      std::vector<PendingImage>* pendings, float drawScale,
+                                      const std::optional<Rect>& bounds) {
   auto color = ConvertColorSpace(brush.color, _targetColorSpace);
   Resources resources(color);
 
@@ -1174,7 +1177,7 @@ Resources ElementWriter::addResources(const Brush& brush, Context* context,
     bool needsDefs = leaf == nullptr || Types::Get(leaf.get()) != Types::ShaderType::PerlinNoise;
     if (needsDefs) {
       ElementWriter defs("defs", writer);
-      addShaderResources(shader, context, &resources, pendings);
+      addShaderResources(shader, context, &resources, pendings, drawScale, bounds);
     } else {
       resources.filter = "pending";
     }
@@ -1209,15 +1212,51 @@ Resources ElementWriter::addResources(const Brush& brush, Context* context,
   }
 
   if (auto maskFilter = brush.maskFilter) {
-    addMaskResources(maskFilter, &resources, context, svgContext, pendings);
+    // The mask is referenced by this element, whose user space already includes the element's
+    // transform, so the mask content needs no further mapping.
+    addMaskResources(maskFilter, &resources, context, svgContext, pendings, Matrix::I(), bounds);
   }
 
   return resources;
 }
 
+// Rasterizes the shader over bounds and returns it as an image shader that places the image back
+// over bounds. drawScale is the scale at which the content is drawn; rendering at it keeps the
+// image from being magnified when drawn, which would blur it.
+static std::shared_ptr<Shader> RasterizeShader(const std::shared_ptr<Shader>& shader,
+                                               const Rect& bounds, float drawScale,
+                                               Context* context) {
+  auto width = static_cast<int>(std::ceil(bounds.width() * drawScale));
+  auto height = static_cast<int>(std::ceil(bounds.height() * drawScale));
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  auto surface = Surface::Make(context, width, height);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto* canvas = surface->getCanvas();
+  canvas->scale(static_cast<float>(width) / bounds.width(),
+                static_cast<float>(height) / bounds.height());
+  canvas->translate(-bounds.left, -bounds.top);
+  Paint paint = {};
+  paint.setShader(shader);
+  canvas->drawRect(bounds, paint);
+  auto image = surface->makeImageSnapshot();
+  if (image == nullptr) {
+    return nullptr;
+  }
+  auto imageMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
+  imageMatrix.preScale(bounds.width() / static_cast<float>(width),
+                       bounds.height() / static_cast<float>(height));
+  return Shader::MakeImageShader(std::move(image), TileMode::Decal, TileMode::Decal)
+      ->makeWithMatrix(imageMatrix);
+}
+
 void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
-                                       Resources* resources, std::vector<PendingImage>* pendings) {
-  auto [decomposedShader, matrix] = ShaderUtils::UnwrapMatrixShader(shader);
+                                       Resources* resources, std::vector<PendingImage>* pendings,
+                                       float drawScale, const std::optional<Rect>& bounds) {
+  auto [decomposedShader, shaderMatrix] = ShaderUtils::UnwrapMatrixShader(shader);
 
   auto type = Types::Get(decomposedShader.get());
   switch (type) {
@@ -1225,17 +1264,18 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
       addColorShaderResources(static_cast<const ColorShader*>(decomposedShader.get()), resources);
       break;
     case Types::ShaderType::Gradient:
-      addGradientShaderResources(static_cast<const GradientShader*>(decomposedShader.get()), matrix,
-                                 resources);
+      addGradientShaderResources(static_cast<const GradientShader*>(decomposedShader.get()),
+                                 shaderMatrix, resources);
       break;
     case Types::ShaderType::Image:
-      addImageShaderResources(static_cast<const ImageShader*>(decomposedShader.get()), matrix,
+      addImageShaderResources(static_cast<const ImageShader*>(decomposedShader.get()), shaderMatrix,
                               context, resources, pendings);
       break;
     case Types::ShaderType::ColorFilter: {
       auto colorFilterShader = static_cast<const ColorFilterShader*>(decomposedShader.get());
       // Process the inner shader (may set fill/gradient/pattern resources).
-      addShaderResources(colorFilterShader->shader, context, resources, pendings);
+      auto innerShader = colorFilterShader->shader->makeWithMatrix(shaderMatrix);
+      addShaderResources(innerShader, context, resources, pendings, drawScale, bounds);
       // Mark that filter primitives are needed. The actual <filter> element will be emitted
       // by addResources, which may combine it with a brush colorFilter.
       if (colorFilterShader->colorFilter) {
@@ -1249,12 +1289,18 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
       resources->filter = "pending";
       break;
     }
-    case Types::ShaderType::Custom:
-      // Custom shaders cannot be emitted as an SVG paint resource; they are consumed at the
-      // draw entry, before reaching paint conversion. This fallback paints with the brush color.
-      DEBUG_ASSERT(false);
-      reportUnsupportedElement("Custom shader was not consumed at draw entry");
+    case Types::ShaderType::Custom: {
+      // SVG has no equivalent for custom shaders, so the shader is rasterized over the drawn
+      // bounds and exported as an image fill.
+      auto imageShader =
+          bounds.has_value() ? RasterizeShader(shader, *bounds, drawScale, context) : nullptr;
+      if (imageShader == nullptr) {
+        reportUnsupportedElement("Unsupported custom shader");
+        break;
+      }
+      addShaderResources(imageShader, context, resources, pendings, drawScale, bounds);
       break;
+    }
     default:
       reportUnsupportedElement("Unsupported shader");
   }
@@ -1446,6 +1492,12 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, const Mat
   };
   std::string widthValue = transDimension(shader->tileModeX, imageWidth);
   std::string heightValue = transDimension(shader->tileModeY, imageHeight);
+  // Pattern content is positioned relative to the pattern tile's origin, so the tile starts at the
+  // image's mapped top-left corner; otherwise image content left of or above it is clipped.
+  auto imageBounds =
+      matrix.mapRect(Rect::MakeWH(static_cast<float>(imageWidth), static_cast<float>(imageHeight)));
+  auto imageMatrix = matrix;
+  imageMatrix.postTranslate(-imageBounds.left, -imageBounds.top);
 
   std::string patternID = resourceStore->addPattern();
   std::string imageID = resourceStore->addImage();
@@ -1456,14 +1508,14 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, const Mat
     pattern.addAttribute("patternContentUnits", "userSpaceOnUse");
     pattern.addAttribute("width", widthValue);
     pattern.addAttribute("height", heightValue);
-    pattern.addAttribute("x", 0);
-    pattern.addAttribute("y", 0);
+    pattern.addAttribute("x", imageBounds.left);
+    pattern.addAttribute("y", imageBounds.top);
 
     {
       ElementWriter useTag("use", writer);
       useTag.addAttribute("xlink:href", "#" + imageID);
-      if (!matrix.isIdentity()) {
-        useTag.addAttribute("transform", ToSVGTransform(matrix));
+      if (!imageMatrix.isIdentity()) {
+        useTag.addAttribute("transform", ToSVGTransform(imageMatrix));
       }
     }
   }
@@ -1546,8 +1598,16 @@ void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilt
       maskElement.addAttribute("width", "100%");
       maskElement.addAttribute("height", "100%");
 
-      addShaderMaskResources(maskShader->makeWithMatrix(contentMatrix), filterID, context,
-                             pendings);
+      // The shader is mapped into the user space of the element referencing the mask, so the
+      // bounds are mapped the same way.
+      std::optional<Rect> shaderBounds = std::nullopt;
+      if (bounds.has_value()) {
+        shaderBounds = matrix.mapRect(*bounds);
+      }
+      // The scale from that user space to the canvas is not known here, so the shader is
+      // rasterized at the resolution of the user space itself.
+      addShaderMaskResources(maskShader->makeWithMatrix(contentMatrix), filterID, context, pendings,
+                             1.0f, shaderBounds);
 
       resources->mask = "url(#" + maskID + ")";
       break;
@@ -1641,9 +1701,10 @@ void ElementWriter::addRenderImageMaskResources(const ImageShader* imageShader,
 
 void ElementWriter::addShaderMaskResources(const std::shared_ptr<Shader>& shader,
                                            const std::string& filterID, Context* context,
-                                           std::vector<PendingImage>* pendings) {
+                                           std::vector<PendingImage>* pendings, float drawScale,
+                                           const std::optional<Rect>& bounds) {
   Resources resources;
-  addShaderResources(shader, context, &resources, pendings);
+  addShaderResources(shader, context, &resources, pendings, drawScale, bounds);
 
   writer->startElement("rect");
   addAttribute("fill", resources.paintColor);

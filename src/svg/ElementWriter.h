@@ -58,12 +58,21 @@ class ElementWriter {
   ElementWriter(const std::string& name, const std::unique_ptr<XMLWriter>& writer,
                 ResourceStore* bucket, std::shared_ptr<ColorSpace> targetColorSpace = nullptr,
                 std::shared_ptr<ColorSpace> assignColorSpace = nullptr);
+  /**
+   * Writes the resources required by the brush and starts an element drawn with it.
+   * @param matrix the element's transform. Its maximum scale is the resolution at which shaders
+   * without an SVG equivalent are rasterized.
+   * @param bounds the bounding rect of the element's geometry in local coordinates, including the
+   * stroke. Shaders without an SVG equivalent are rasterized over it, and an inverted mask covers
+   * it. Without it, such shaders are not exported.
+   */
   ElementWriter(const std::string& name, Context* context, SVGExportContext* svgContext,
                 std::vector<PendingImage>* pendings, XMLWriter* writer, ResourceStore* bucket,
                 bool disableWarning, const Matrix& matrix, const Brush& brush,
                 const Stroke* stroke = nullptr,
                 std::shared_ptr<ColorSpace> targetColorSpace = nullptr,
-                std::shared_ptr<ColorSpace> assignColorSpace = nullptr);
+                std::shared_ptr<ColorSpace> assignColorSpace = nullptr,
+                const std::optional<Rect>& bounds = std::nullopt);
   ~ElementWriter();
 
   void addAttribute(const std::string& name, const std::string& val);
@@ -119,10 +128,12 @@ class ElementWriter {
 
  private:
   Resources addResources(const Brush& brush, Context* context, SVGExportContext* svgContext,
-                         std::vector<PendingImage>* pendings);
+                         std::vector<PendingImage>* pendings, float drawScale,
+                         const std::optional<Rect>& bounds);
 
   void addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
-                          Resources* resources, std::vector<PendingImage>* pendings = nullptr);
+                          Resources* resources, std::vector<PendingImage>* pendings,
+                          float drawScale, const std::optional<Rect>& bounds);
   void addShaderFilterPrimitives(const std::shared_ptr<Shader>& shader);
   void addPerlinNoisePrimitives(const Shader* noiseShader, const std::string& resultName = "");
   void addColorShaderResources(const ColorShader* shader, Resources* resources);
@@ -160,7 +171,8 @@ class ElementWriter {
                                    std::vector<PendingImage>* pendings = nullptr);
 
   void addShaderMaskResources(const std::shared_ptr<Shader>& shader, const std::string& filterID,
-                              Context* context, std::vector<PendingImage>* pendings = nullptr);
+                              Context* context, std::vector<PendingImage>* pendings,
+                              float drawScale, const std::optional<Rect>& bounds);
 
   void addFillAndStroke(const Brush& brush, const Stroke* stroke, const Resources& resources);
 
