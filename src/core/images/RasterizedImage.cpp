@@ -32,28 +32,17 @@ std::shared_ptr<Image> RasterizedImage::makeRasterized() const {
   return weakThis.lock();
 }
 
-std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& args) const {
-  auto proxyProvider = args.context->proxyProvider();
+float RasterizedImage::getCacheScale(float drawScale) const {
   // If the source has mipmaps, cache the texture at the original scale to stay consistent with the
   // mipmap branch in getTextureKey().
-  auto newScale = source->hasMipmaps() ? 1.0f : source->getRasterizedScale(args.drawScale);
+  return source->hasMipmaps() ? 1.0f : source->getRasterizedScale(drawScale);
+}
+
+std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& args) const {
+  auto proxyProvider = args.context->proxyProvider();
+  auto newScale = getCacheScale(args.drawScale);
   auto textureKey = getTextureKey(newScale);
-  // The cached texture view may be larger than the content it carries, for example a
-  // hardware-decoded video buffer aligned by the decoder. Report the content size in that case so
-  // the coordinate transform in asFragmentProcessor() does not stretch the content over the
-  // padding and the sampling clamps to the content instead of the whole padded texture. Only clamp
-  // at full scale: a downscaled cache texture is created at the rounded dimensions returned by
-  // getScaledDimensions() (round for most codecs, ceil for JPEG), so recomputing the size here with
-  // a truncating multiply would undershoot the real texture by one pixel and make a wrapped proxy
-  // disagree with the freshly created one. Pass 0 for that case to keep the proxy at its real size.
-  auto contentWidth = 0;
-  auto contentHeight = 0;
-  if (newScale == 1.0f) {
-    contentWidth = width();
-    contentHeight = height();
-  }
-  auto textureProxy =
-      proxyProvider->findOrWrapTextureProxy(textureKey, contentWidth, contentHeight);
+  auto textureProxy = proxyProvider->findOrWrapTextureProxy(textureKey);
   if (textureProxy != nullptr) {
     return textureProxy;
   }
@@ -84,14 +73,23 @@ PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
   if (textureProxy == nullptr) {
     return nullptr;
   }
+  // Derive the content size from the source instead of the proxy. A cached texture view can be
+  // larger than the content it carries, for example a hardware-decoded video buffer aligned by the
+  // decoder, and the proxy reports that padded size once it is rewrapped from the resource cache.
+  // Using the source size keeps the coordinate transform and the sampling clamp identical whether
+  // the proxy was freshly created or rewrapped, so the padding is never sampled.
+  auto contentSize = source->getRasterizedSize(getCacheScale(args.drawScale));
   auto fpMatrix =
-      Matrix::MakeScale(static_cast<float>(textureProxy->width()) / static_cast<float>(width()),
-                        static_cast<float>(textureProxy->height()) / static_cast<float>(height()));
+      Matrix::MakeScale(static_cast<float>(contentSize.width) / static_cast<float>(width()),
+                        static_cast<float>(contentSize.height) / static_cast<float>(height()));
   SamplingArgs newSamplingArgs = samplingArgs;
   if (samplingArgs.sampleArea) {
     Rect subset = *samplingArgs.sampleArea;
     fpMatrix.mapRect(&subset);
     newSamplingArgs.sampleArea = subset;
+  } else {
+    newSamplingArgs.sampleArea =
+        Rect::MakeWH(static_cast<float>(contentSize.width), static_cast<float>(contentSize.height));
   }
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);

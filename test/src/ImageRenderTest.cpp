@@ -604,9 +604,10 @@ TGFX_TEST(ImageRenderTest, RasterizedScaledProxySize) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   // GenMesh.png is 1563x1563, an odd size so that width * 0.5 is not an integer. The decoder rounds
-  // the downscaled cache texture to round(1563 * 0.5) = 782, while a truncating content-size clamp
-  // would report 781. A wrapped proxy that reused that truncated size would make a cached draw
-  // sample one fewer column and row than the first draw.
+  // the downscaled cache texture to round(1563 * 0.5) = 782. getRasterizedSize() must report that
+  // same 782, and the wrapped proxy served from the resource cache on a later draw must keep the
+  // real texture size instead of a recomputed one, otherwise a cached draw would sample a different
+  // number of texels than the first draw.
   auto image = MakeImage("resources/assets/GenMesh.png");
   ASSERT_TRUE(image != nullptr);
   image = image->makeRasterized();
@@ -620,6 +621,8 @@ TGFX_TEST(ImageRenderTest, RasterizedScaledProxySize) {
   TGFX_PRIVATE_ACCESS(auto raster = std::static_pointer_cast<RasterizedImage>(image);
                       auto scaledKey = raster->getTextureKey(0.5f);
                       EXPECT_TRUE(context->resourceCache()->hasUniqueResource(scaledKey));
+                      auto contentSize = raster->source->getRasterizedSize(0.5f);
+                      EXPECT_EQ(contentSize.width, 782); EXPECT_EQ(contentSize.height, 782);
                       TPArgs tpArgs(context, 0, false, 0.5f, BackingFit::Exact);
                       auto proxy = raster->lockTextureProxy(tpArgs); ASSERT_TRUE(proxy != nullptr);
                       EXPECT_EQ(proxy->width(), 782); EXPECT_EQ(proxy->height(), 782));

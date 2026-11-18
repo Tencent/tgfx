@@ -26,6 +26,7 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SamplingOptions.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ImageOrigin.h"
 #include "tgfx/platform/HardwareBuffer.h"
@@ -368,6 +369,14 @@ class Image {
    * lockTextureProxy method supports direct downscaling; otherwise, returns 1.0f.
    */
   virtual float getRasterizedScale(float drawScale) const;
+
+  /**
+   * Returns the content size of the texture cached by lockTextureProxy() at the given rasterized
+   * scale. The cached texture may be larger than its content when it carries padding outside the
+   * content area, for example a hardware-decoded video buffer aligned by the decoder, so this size
+   * can be smaller than the texture itself. The default implementation returns the full image size.
+   */
+  virtual ISize getRasterizedSize(float scale) const;
 
   /**
    * Returns a texture proxy for the entire Image. Note that the returned texture size may differ
