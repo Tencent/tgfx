@@ -112,6 +112,15 @@ vec4 chainEvalBlend(int slot, int selector, vec4 in0, vec4 in1) {
   return blendResult;
 }
 
+// Analytic AA-rect coverage (identical math to GLSLRectEffect): falloff from the fragment's
+// distance to the rect edges, evaluated in destination device coordinates via gl_FragCoord.
+// Shared by the interpreter's dispatch and the composed executor, so the formula exists once.
+vec4 chainAARectCoverage(vec4 in0, vec4 rect) {
+  highp vec4 dists4 = clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - rect), 0.0, 1.0);
+  highp vec2 dists2 = dists4.xy + dists4.zw - 1.0;
+  return in0 * (dists2.x * dists2.y);
+}
+
 // Evaluates slot `slot`, reading its fields from the uniform arrays. OP_TEXTURE slots read the
 // prefetched sample from chainLeafTex (fetched in main with statically bound samplers) and apply
 // the leaf modulation flags; every other op shares this single implementation so the op library
@@ -139,16 +148,16 @@ vec4 evalChainSlot(int slot) {
   if (Packed.x == OP_TEXTURE) {
     return chainEvalTextureSlot(slot, Packed.w);
   }
-  vec4 in0 = Packed.y == -1   ? TGFX_CHAIN_GEOM_COLOR
-             : Packed.y == -3 ? TGFX_CHAIN_UNIT_COVERAGE
+  vec4 in0 = Packed.y == -1   ? chainGeomColorSource()
+             : Packed.y == -3 ? chainUnitCoverageSource()
              : Packed.y == -4 ? vec4(1.0)
-             : Packed.y == -5 ? vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0)
+             : Packed.y == -5 ? chainOpaqueGeomColorSource()
              : Packed.y < 0   ? vec4(0.0)
                               : chainResults[Packed.y];
-  vec4 in1 = Packed.z == -1   ? TGFX_CHAIN_GEOM_COLOR
-             : Packed.z == -3 ? TGFX_CHAIN_UNIT_COVERAGE
+  vec4 in1 = Packed.z == -1   ? chainGeomColorSource()
+             : Packed.z == -3 ? chainUnitCoverageSource()
              : Packed.z == -4 ? vec4(1.0)
-             : Packed.z == -5 ? vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0)
+             : Packed.z == -5 ? chainOpaqueGeomColorSource()
              : Packed.z < 0   ? vec4(0.0)
                               : chainResults[Packed.z];
   if (Packed.x == OP_TEX_MODULATE) {
@@ -177,13 +186,8 @@ vec4 evalChainSlot(int slot) {
     return chainEvalBlend(slot, Packed.w, in0, in1);
   }
   if (Packed.x == OP_AARECT_COVERAGE) {
-    // Analytic AA-rect coverage (identical math to GLSLRectEffect): falloff from the fragment's
-    // distance to the rect edges, evaluated in destination device coordinates via gl_FragCoord.
     AARectCoverageData d = chainLoadAARectCoverage(dataAt);
-    highp vec4 dists4 =
-        clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - d.rect), 0.0, 1.0);
-    highp vec2 dists2 = dists4.xy + dists4.zw - 1.0;
-    return in0 * (dists2.x * dists2.y);
+    return chainAARectCoverage(in0, d.rect);
   }
   if (Packed.x == OP_LOCAL_RECT_COVERAGE) {
     // Analytic AA-rect coverage in the clip's local space: map gl_FragCoord through the

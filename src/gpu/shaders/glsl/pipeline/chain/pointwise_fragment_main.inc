@@ -189,6 +189,23 @@ vec4 chainGeomColor = vec4(0.0);
 #else
 #define TGFX_CHAIN_UNIT_COVERAGE vec4(1.0)
 #endif
+
+// The fixed designator sources as functions: the build expands the macros above per variant, so a
+// runtime-emitted body cannot spell them — a function's name survives the expansion while its body
+// carries the variant's form. The interpreter's designator arms call them too, so the runtime's
+// uncalled-function pruning keeps them in every specialized text (see ChainBodyEmitter).
+vec4 chainGeomColorSource() {
+  return TGFX_CHAIN_GEOM_COLOR;
+}
+
+vec4 chainUnitCoverageSource() {
+  return TGFX_CHAIN_UNIT_COVERAGE;
+}
+
+vec4 chainOpaqueGeomColorSource() {
+  return vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0);
+}
+
 // The spec accessors are read here and nowhere else in the chain family: the tool rejects
 // SPEC_ outside a file that declares itself a reader, so the specialization surface of this
 // family is this file plus the generated include.
@@ -322,6 +339,11 @@ void chainMain() {
   chainXPDst = xpReadDstColor();
   vec4 xpBlended = vec4(0.0);
 #endif
+  // The composed-executor splice markers: a specialized GLSL text whose slot structure is fully
+  // known replaces everything between the two pragmas with one straight-line evaluation (see
+  // ChainBodyEmitter). They are pragmas, not comments, because the emitter strips line comments —
+  // pragmas are the one directive that survives into the stored text and every driver ignores.
+#pragma tgfx_composed_executor_begin
   {
     // The executor: one loop over the slots, one dispatch copy. The unrolled form that emitted a
     // call site per slot let the binary backends inline a full dispatch copy into each; it
@@ -349,6 +371,7 @@ void chainMain() {
       }
     }
   }
+#pragma tgfx_composed_executor_end
 
   // The narrow clip slots chain from the scalar unit one (-4) instead of multiplying the color
   // root, so their product is the pure clip coverage (see ClipCoverageRegister above). The atlas

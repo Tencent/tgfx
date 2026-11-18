@@ -29,6 +29,7 @@
 #include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/aot/chain/ChainBodyEmitter.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/plan/DrawPlan.h"
@@ -51,6 +52,13 @@ namespace {
 /// How many times a draw that carried spec values fell back to the generic form. Non-zero is a
 /// bug signal (declaration drift), not a statistic to tolerate; debug builds assert on the first.
 std::atomic<uint64_t> specInjectionFailures = {0};
+
+/// Whether the composed chain executor is active: an experiment switch, off by default, so the
+/// interpreter loop stays the serving path until the pixel-parity data says otherwise.
+bool ComposedChainEnabled() {
+  static const bool enabled = std::getenv("TGFX_COMPOSED_CHAIN") != nullptr;
+  return enabled;
+}
 }  // namespace
 
 // Which descriptor field carries the blob. Derived from the format rather than from the bundle's
@@ -335,6 +343,23 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
   if (layout.fragmentBlockSize > 0) {
     fragmentDesc.uniformSlots = {
         {std::string(FragmentUniformBlockName), static_cast<unsigned>(FRAGMENT_UBO_BINDING_POINT)}};
+  }
+
+  // The composed executor: a specialized GLSL chain text whose slot structure the injection just
+  // fixed can trade the interpreter loop for one straight-line evaluation. It rewrites the text in
+  // place, so every decline (an unsupported operator, a missing marker, the generic form) simply
+  // keeps what the injector produced; the uniforms, the layout and the key are unchanged either
+  // way, because the body reads the same pool through the same per-operator functions.
+  if (specInjected && format == ShaderCodeFormat::GLSL && ComposedChainEnabled() &&
+      strcmp(Families()[variant.family].name, "Chain") == 0) {
+    const auto* sources = programInfo->getSources();
+    if (sources != nullptr && sources->chain != nullptr) {
+      const bool xpNeedsBlendPass = XpNeedsAdvancedMath(
+          programInfo->getXferFacts().shaderBlend(), static_cast<int>(programInfo->getBlendMode()));
+      if (ComposeChainFragmentGLSL(*sources->chain, xpNeedsBlendPass, &fragmentDesc.code)) {
+        LOGI("ComposedChain: straight-line executor for %s[variant=%u]", shaderName, variantId);
+      }
+    }
   }
 
   auto* shaderCache = cache->shaderCache();
