@@ -25,6 +25,7 @@
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
+#include "layers/CaptureCulling.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
@@ -39,6 +40,8 @@ static constexpr int FALLBACK_GRID_SIZE = 64;
 static constexpr int MAX_ATLAS_SIZE = 8192;
 // Number of rects the per-layer cull loop can afford.
 static constexpr size_t MAX_CULL_RECTS = 32;
+
+bool CaptureCullingEnabledForTests = true;
 
 class DrawTask {
  public:
@@ -1313,7 +1316,7 @@ static Rect RoundOutToCapturedPixels(const Rect& footprint, const Matrix& worldT
 // reach, and `pixelToWorld` maps a pixel of the captured background to the world.
 std::vector<Rect> DisplayList::computeCaptureCullRects(const std::vector<Rect>& worldRects,
                                                        const Matrix& pixelToWorld) const {
-  if (!_captureCullingEnabled) {
+  if (!CaptureCullingEnabledForTests) {
     return {};
   }
   Matrix worldToPixel = Matrix::I();

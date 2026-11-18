@@ -327,9 +327,6 @@ class DisplayList {
   int _subtreeCacheMaxSize = 0;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
-  // Every render mode culls its capture, so a direct/tiled comparison compares two culled captures.
-  // Tests switch this off to keep an unculled reference.
-  bool _captureCullingEnabled = true;
   bool hasZoomBlurTiles = false;
   int64_t lastZoomScaleInt = 1000;
   Point lastContentOffset = {};

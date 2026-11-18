@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <vector>
 #include "layers/BackgroundSnapshotMap.h"
+#include "layers/CaptureCulling.h"
 #include "layers/RootLayer.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/layers/DisplayList.h"
@@ -41,6 +42,22 @@ static Rect SampledBounds(Rect bounds) {
   bounds.roundOut();
   return bounds;
 }
+
+// Keeps an unculled reference available through the same render path: the capture cull is a
+// process-wide test switch, so it has to be restored even when a check fails mid-case.
+class CaptureCullScope {
+ public:
+  explicit CaptureCullScope(bool enabled) : previous(CaptureCullingEnabledForTests) {
+    CaptureCullingEnabledForTests = enabled;
+  }
+
+  ~CaptureCullScope() {
+    CaptureCullingEnabledForTests = previous;
+  }
+
+ private:
+  bool previous = true;
+};
 
 TGFX_TEST(BackgroundBlurTest, BackgroundBlur) {
   ContextScope scope;
@@ -1630,7 +1647,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureCullKeepsStyleSourceComplete){TGFX_
     EXPECT_TRUE(surface != nullptr);
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(mode);
-    displayList->_captureCullingEnabled = cull;
+    CaptureCullScope cullScope(cull);
 
     auto parent = Layer::Make();
     parent->setLayerStyles({DropShadowStyle::Make(0, 20, 0, 0, Color::Black())});
@@ -1894,7 +1911,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, NestedBlursMatchDirectRendering){TGFX_PRIV
     EXPECT_TRUE(surface != nullptr);
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(mode);
-    displayList->_captureCullingEnabled = cull;
+    CaptureCullScope cullScope(cull);
 
     auto back = SolidLayer::Make();
     back->setColor(Color::FromRGBA(20, 90, 180, 255));
@@ -1945,7 +1962,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest,
     EXPECT_TRUE(surface != nullptr);
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(mode);
-    displayList->_captureCullingEnabled = cull;
+    CaptureCullScope cullScope(cull);
     displayList->setTileSize(TileSize);
 
     // Content on both sides of the seam at (128, 128).
@@ -2000,7 +2017,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest,
     EXPECT_TRUE(surface != nullptr);
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(mode);
-    displayList->_captureCullingEnabled = cull;
+    CaptureCullScope cullScope(cull);
 
     auto back = SolidLayer::Make();
     back->setColor(Color::FromRGBA(20, 90, 180, 255));
@@ -2168,7 +2185,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, BlurDoesNotSampleOutsideItsBounds){TGFX_PR
     EXPECT_TRUE(surface != nullptr);
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(mode);
-    displayList->_captureCullingEnabled = cull;
+    CaptureCullScope cullScope(cull);
     displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
 
     // 6px wide bar ending right where the rounded footprint starts: outside what the style samples,
@@ -2234,7 +2251,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, FractionalBlurKeepsTheRoundedSample){TGFX_
     EXPECT_TRUE(surface != nullptr);
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(mode);
-    displayList->_captureCullingEnabled = cull;
+    CaptureCullScope cullScope(cull);
     displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
 
     if (withBar) {
@@ -2290,7 +2307,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, StrokedRoundShapeBlurStaysInsideItsBounds)
       EXPECT_TRUE(surface != nullptr);
       auto displayList = std::make_unique<DisplayList>();
       displayList->setRenderMode(mode);
-      displayList->_captureCullingEnabled = cull;
+      CaptureCullScope cullScope(cull);
       displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
 
       if (withBar) {
@@ -2411,7 +2428,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, TransformedBlurKeepsTheRoundedSample){TGFX
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(RenderMode::Tiled);
     displayList->setTileSize(64);
-    displayList->_captureCullingEnabled = cull;
+    CaptureCullScope cullScope(cull);
     displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
     for (const auto& bar : bars) {
       auto layer = ShapeLayer::Make();
@@ -2482,7 +2499,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, ClippedBlurKeepsTheBackdropPastTheClip){TG
     EXPECT_TRUE(surface != nullptr);
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(mode);
-    displayList->_captureCullingEnabled = cull;
+    CaptureCullScope cullScope(cull);
     displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
 
     if (withBar) {
@@ -2564,7 +2581,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CulledCaptureKeepsTheSampledLayers){TGFX_P
     EXPECT_TRUE(surface != nullptr);
     auto displayList = std::make_unique<DisplayList>();
     displayList->setRenderMode(mode);
-    displayList->_captureCullingEnabled = cull;
+    CaptureCullScope cullScope(cull);
     displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
 
     for (int i = 0; i < 4; ++i) {
@@ -2666,7 +2683,6 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintsFollowMovedLayers){TGFX_PRIVATE_
   auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
   auto reference = std::make_unique<DisplayList>();
   reference->setRenderMode(RenderMode::Direct);
-  reference->_captureCullingEnabled = false;
   addContent(reference.get());
   auto referenceBlur = ShapeLayer::Make();
   Path blurPath;
@@ -2676,7 +2692,10 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, FootprintsFollowMovedLayers){TGFX_PRIVATE_
   referenceBlur->setMatrix(Matrix::MakeTrans(150, 90));
   referenceBlur->setLayerStyles({BackgroundBlurStyle::Make(3, 3)});
   reference->root()->addChild(referenceBlur);
-  reference->render(surface.get());
+  {
+    CaptureCullScope cullScope(false);
+    reference->render(surface.get());
+  }
   auto expected = ReadSurfacePixels(surface.get());
 
   // Same list, rendered at the old position first, then moved over another block.
@@ -2738,10 +2757,12 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CulledCaptureSurvivesPanAndZoom){TGFX_PRIV
   auto reference = std::unique_ptr<DisplayList>();
   build(&reference);
   reference->setRenderMode(RenderMode::Direct);
-  reference->_captureCullingEnabled = false;
   reference->setZoomScale(1.5f);
   reference->setContentOffset(-30.0f, -10.0f);
-  reference->render(surface.get());
+  {
+    CaptureCullScope cullScope(false);
+    reference->render(surface.get());
+  }
   auto expected = ReadSurfacePixels(surface.get());
 
   // Same list: render once, then pan and zoom without touching any layer.
@@ -2867,7 +2888,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, ThreeDSubtreeCullsToItsStyles) {
       EXPECT_TRUE(surface != nullptr);
       auto displayList = std::make_unique<DisplayList>();
       displayList->setRenderMode(RenderMode::Tiled);
-      displayList->_captureCullingEnabled = cull;
+      CaptureCullScope cullScope(cull);
       displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
 
       Path blockPath;
