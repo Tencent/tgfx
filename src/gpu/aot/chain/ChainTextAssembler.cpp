@@ -29,10 +29,11 @@
 namespace tgfx {
 namespace {
 
-// The rect-entry slice's operator vocabulary: the pure pointwise color operators, Blend, the
-// inline expressions and the analytic coverage operators. Everything else (texture leaves,
-// gradients, noise, the macro-based color-space xform) keeps the interpreter's declarations.
-bool OpAssemblesRect(int op) {
+// The assembled slice's operator vocabulary: the pure pointwise color operators, Blend, the
+// inline expressions, the analytic coverage operators and plain texture leaves. Everything else
+// (tiled recipes, gradients, noise, the macro-based color-space xform) keeps the interpreter's
+// declarations until its entry material is packed too.
+bool OpAssembles(int op) {
   switch (op) {
     case ChainISA::None:
     case ChainISA::ConstColor:
@@ -45,14 +46,15 @@ bool OpAssemblesRect(int op) {
     case ChainISA::AARectCoverage:
     case ChainISA::LocalRectCoverage:
     case ChainISA::RRectCoverage:
+    case ChainISA::Texture:
+    case ChainISA::TexModulate:
       return true;
     default:
       return false;
   }
 }
 
-// The entry's text copied out (the blob's data is compressed-pool owned and this helper keeps the
-// lookup and the copy together); an empty result means the entry is absent.
+// The entry's text copied out; an empty result means the entry is absent.
 std::string PackText(const PrecompiledShaderCache* cache, uint32_t id) {
   const auto* blob = cache->findPackEntry(id);
   if (blob == nullptr) {
@@ -70,35 +72,48 @@ bool ReplaceAll(std::string* text, const std::string& token, const std::string& 
   return true;
 }
 
+// Leaf-position uniforms carry a _<leaf> suffix past the first leaf, matching the declaration
+// chunk's std140 members.
+std::string LeafName(const char* base, int leaf) {
+  return leaf == 0 ? std::string(base) : std::string(base) + "_" + std::to_string(leaf);
+}
+
 }  // namespace
 
-bool ChainCompositionAssemblesRect(const ChainComposition& composition) {
+bool ChainCompositionAssembles(const ChainComposition& composition) {
   if (composition.xpNeedsBlendPass) {
     return false;
   }
+  // Shader-tiled leaves need the tiling module's entry material, which the packed slice does not
+  // carry yet; they keep the interpreter's declarations.
+  if ((composition.textureFlags & 2) != 0) {
+    return false;
+  }
   for (const auto& slot : composition.slots) {
-    if (!OpAssemblesRect(slot.op)) {
+    if (!OpAssembles(slot.op)) {
       return false;
     }
   }
   return true;
 }
 
-bool AssembleChainFragmentRectGLSL(const ChainComposition& composition,
-                                   const PrecompiledShaderCache* cache, std::string* code) {
-  if (code == nullptr || !ChainCompositionAssemblesRect(composition)) {
+bool AssembleChainFragmentGLSL(const ChainComposition& composition, uint32_t variantId,
+                               const PrecompiledShaderCache* cache, std::string* code) {
+  if (code == nullptr || !ChainCompositionAssembles(composition)) {
     return false;
   }
-  const std::string entry = PackText(cache, FragmentPackEntryRect);
+  const std::string chunk = PackText(cache, FragmentPackChunkId(variantId));
   const std::string loaders = PackText(cache, FragmentPackLoaders);
   const std::string tail = PackText(cache, FragmentPackTail);
-  if (entry.empty() || loaders.empty() || tail.empty()) {
+  if (chunk.empty() || loaders.empty() || tail.empty()) {
     return false;
   }
-  // The used fragments in first-use order and the dependencies their files call into: the
-  // dependency texts come first so the fragment bodies resolve.
+  // The used fragments in first-use order and the dependency texts their files call into: the
+  // dependencies come first so the fragment bodies resolve.
   std::set<int> usedOps = {};
   bool needsAnalyticClipMath = false;
+  bool needsTextureSwizzle = false;
+  bool needsLeafFetch = false;
   for (const auto& slot : composition.slots) {
     if (slot.op == ChainISA::None) {
       continue;
@@ -107,14 +122,28 @@ bool AssembleChainFragmentRectGLSL(const ChainComposition& composition,
     if (slot.op == ChainISA::LocalRectCoverage || slot.op == ChainISA::RRectCoverage) {
       needsAnalyticClipMath = true;
     }
+    if (slot.op == ChainISA::Texture || slot.op == ChainISA::TexModulate) {
+      needsTextureSwizzle = true;
+      needsLeafFetch = true;
+    }
   }
   std::string fragments;
-  if (needsAnalyticClipMath) {
-    const std::string analytic = PackText(cache, FragmentPackDepAnalyticClipMath);
-    if (analytic.empty()) {
+  auto appendDep = [&](uint32_t id) {
+    const std::string text = PackText(cache, id);
+    if (text.empty()) {
       return false;
     }
-    fragments += analytic + "\n";
+    fragments += text + "\n";
+    return true;
+  };
+  if (needsTextureSwizzle && !appendDep(FragmentPackDepTextureSwizzle)) {
+    return false;
+  }
+  if (needsLeafFetch && !appendDep(FragmentPackDepLeafFetch)) {
+    return false;
+  }
+  if (needsAnalyticClipMath && !appendDep(FragmentPackDepAnalyticClipMath)) {
+    return false;
   }
   for (int op : usedOps) {
     const auto* def = FindFragment(op);
@@ -127,15 +156,26 @@ bool AssembleChainFragmentRectGLSL(const ChainComposition& composition,
     }
     fragments += text + "\n";
   }
-  // The straight-line body: the same statements the splice path emits, with the three registers
-  // declared by the wrapper main below.
-  const std::string body = EmitComposedChainBodyGLSL(composition);
+  // The leaf prefetches: plain fetches at the leaf positions, the same calls the interpreter's
+  // main emits for a non-tiled draw.
+  std::string prefetch;
+  for (size_t index = 0; index < composition.slots.size() && index < 4; ++index) {
+    if (composition.slots[index].op != ChainISA::Texture) {
+      continue;
+    }
+    const std::string leaf = std::to_string(index);
+    prefetch += "  chainLeafTex[" + leaf + "] = chainPlainLeafFetch(TextureSampler_" + leaf +
+                ", TransformedCoords_" + leaf + ", " + LeafName("Subset", static_cast<int>(index)) +
+                ", " + LeafName("AlphaStart", static_cast<int>(index)) + ", " +
+                LeafName("HasRgbaaa", static_cast<int>(index)) + ", " +
+                LeafName("SubsetClampOn", static_cast<int>(index)) + ", " + leaf + ");\n";
+  }
+  // The straight-line body: the pure-mode statements, with the registers declared by the wrapper.
+  const std::string body = EmitComposedChainBodyGLSL(composition, /*pureOps=*/true);
   if (body.empty()) {
     return false;
   }
-  // The tail's two placeholders are structural facts of this composition: the clip coverage and
-  // the final coverage before the clip folds in (the geometry's own coverage path — a coverage
-  // root replaces the varying, matching the interpreter's epilogue contract).
+  // The tail's two placeholders are structural facts of this composition.
   const std::string clip = composition.clipCoverageRegister >= 0 ? "clipRegister" : "vec4(1.0)";
   const std::string coverage =
       composition.coverageRootRegister >= 0 ? "coverageRootRegister" : "chainUnitCoverageSource()";
@@ -144,12 +184,14 @@ bool AssembleChainFragmentRectGLSL(const ChainComposition& composition,
       !ReplaceAll(&tailText, "__TGFX_FINAL_COVERAGE__", coverage)) {
     return false;
   }
-  *code = "#version 330\n" + entry + "\n" + loaders + "\n" + fragments +
+  // The chunk is the variant's own text prefix, so it begins with #version already.
+  *code = chunk + "\n" + loaders + "\n" + fragments +
           "\nvoid main() {\n"
           "  vec4 result = vec4(0.0);\n"
           "  vec4 clipRegister = vec4(0.0);\n"
-          "  vec4 coverageRootRegister = vec4(0.0);\n" +
-          body + tailText + "}\n";
+          "  vec4 coverageRootRegister = vec4(0.0);\n"
+          "  vec4 chainLeafTex[4];\n" +
+          prefetch + body + tailText + "}\n";
   // The dump aid: with TGFX_ASSEMBLED_DUMP pointing at a directory, every assembled text lands
   // there as assembled_N.glsl for inspection. Read-only diagnostic, no effect on the pipeline.
   if (const char* dumpDir = std::getenv("TGFX_ASSEMBLED_DUMP")) {

@@ -81,7 +81,10 @@ struct ChainComposition {
  *                     this emitter does not cover or reads a register no earlier slot wrote; the
  *                     caller then keeps the interpreter's loop.
  */
-std::string EmitComposedChainBodyGLSL(const ChainComposition& composition);
+/// @param pureOps  Emit the ops/ pure fragments' call forms (the assembled path, whose entry
+///                 supplies the leaf samples and the fragment coordinate) instead of the
+///                 interpreter-coupled shared functions the splice path lives with.
+std::string EmitComposedChainBodyGLSL(const ChainComposition& composition, bool pureOps = false);
 
 /**
  * Splices an emitted body into a chain fragment text, replacing everything between the executor

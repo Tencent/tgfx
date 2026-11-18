@@ -103,13 +103,23 @@ const FragmentDef* FindFragment(int op);
 const FragmentDef* FragmentAt(size_t index);
 
 /// The pack's non-op entries, at fixed ids shared by the build and the runtime: the generated
-/// loaders (the chain-ops pragma's expansion), the per-geometry interface chunks, the tail
-/// template, and the shared dependency files the op fragments call into.
+/// loaders (the chain-ops pragma's expansion), the tail template, and the shared dependency files
+/// the op fragments call into.
 inline constexpr uint32_t FragmentPackLoaders = 0x40000000u | 0x1000u;
-inline constexpr uint32_t FragmentPackEntryRect = 0x40000000u | 0x1001u;
 inline constexpr uint32_t FragmentPackTail = 0x40000000u | 0x1002u;
 inline constexpr uint32_t FragmentPackDepAnalyticClipMath = 0x40000000u | 0x2000u;
 inline constexpr uint32_t FragmentPackDepTextureSwizzle = 0x40000000u | 0x2001u;
+inline constexpr uint32_t FragmentPackDepLeafFetch = 0x40000000u | 0x2002u;
+
+/// The per-variant interface chunk: the declaration prefix and the designator sources, extracted
+/// by the build from the variant's own emitted text (so every geometry and profile is covered
+/// without hand-written chunks). The runtime looks it up by the variant it matched.
+inline constexpr uint32_t FragmentPackChunkBase = 0x40000000u | 0x4000u;
+inline constexpr uint32_t FragmentPackChunkMask = 0x3FFFu;
+
+inline uint32_t FragmentPackChunkId(uint32_t variantId) {
+  return FragmentPackChunkBase | (variantId & FragmentPackChunkMask);
+}
 
 /// The count of registered fragments (the full op coverage check walks it).
 size_t FragmentCount();

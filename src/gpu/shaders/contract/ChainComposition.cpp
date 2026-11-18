@@ -66,7 +66,7 @@ bool ResolveInput(int designator, const std::unordered_map<int, std::string>& re
 
 }  // namespace
 
-std::string EmitComposedChainBodyGLSL(const ChainComposition& composition) {
+std::string EmitComposedChainBodyGLSL(const ChainComposition& composition, bool pureOps) {
   std::unordered_map<int, std::string> registers = {};
   std::string body = {};
   int nextLocal = 0;
@@ -119,12 +119,26 @@ std::string EmitComposedChainBodyGLSL(const ChainComposition& composition) {
         }
         break;
       case ChainISA::Texture:
-        body += "  vec4 " + local + " = chainEvalTextureSlot(" + std::to_string(slotIndex) + ", " +
-                std::to_string(slot.selector) + ");\n";
+        if (pureOps) {
+          // The assembled text owns the prefetch: the leaf sample is already in chainLeafTex.
+          body += "  vec4 " + local + " = tgfxOpTexture(chainLeafTex[" + std::to_string(slotIndex) +
+                  "], chainGeomColorSource(), chainUnitCoverageSource(), " +
+                  std::to_string(slot.selector & 0x1F) + ");\n";
+        } else {
+          body += "  vec4 " + local + " = chainEvalTextureSlot(" + std::to_string(slotIndex) +
+                  ", " + std::to_string(slot.selector) + ");\n";
+        }
         break;
       case ChainISA::TexModulate:
-        body += "  vec4 " + local + " = chainEvalTexModulate(" + std::to_string(slotIndex) + ", " +
-                std::to_string(slot.selector) + ", " + in0 + ");\n";
+        if (pureOps) {
+          const int srcSlot = (slot.selector >> 16) & 0xF;
+          body += "  vec4 " + local + " = tgfxOpTexModulate(chainLeafTex[" +
+                  std::to_string(srcSlot) + "], " + in0 + ", " + std::to_string(slot.selector & 1) +
+                  ");\n";
+        } else {
+          body += "  vec4 " + local + " = chainEvalTexModulate(" + std::to_string(slotIndex) +
+                  ", " + std::to_string(slot.selector) + ", " + in0 + ");\n";
+        }
         break;
       case ChainISA::InputOpaque:
         body += "  vec4 " + local + " = vec4(" + in0 + ".rgb, 1.0);\n";
@@ -134,19 +148,35 @@ std::string EmitComposedChainBodyGLSL(const ChainComposition& composition) {
         break;
       case ChainISA::AARectCoverage:
         body += "  AARectCoverageData " + data + " = chainLoadAARectCoverage(" + dataAt + ");\n";
-        body += "  vec4 " + local + " = chainAARectCoverage(" + in0 + ", " + data + ".rect);\n";
+        if (pureOps) {
+          body += "  vec4 " + local + " = tgfxOpAARectCoverage(" + in0 + ", " + data +
+                  ".rect, gl_FragCoord.xy);\n";
+        } else {
+          body += "  vec4 " + local + " = chainAARectCoverage(" + in0 + ", " + data + ".rect);\n";
+        }
         break;
       case ChainISA::LocalRectCoverage:
         body +=
             "  LocalRectCoverageData " + data + " = chainLoadLocalRectCoverage(" + dataAt + ");\n";
-        body += "  vec4 " + local + " = " + in0 + " * vec4(analyticLocalRectCoverage(" + data +
-                ".rect, " + data + ".deviceToLocal));\n";
+        if (pureOps) {
+          body += "  vec4 " + local + " = tgfxOpLocalRectCoverage(" + in0 + ", " + data +
+                  ".rect, " + data + ".deviceToLocal, gl_FragCoord.xy);\n";
+        } else {
+          body += "  vec4 " + local + " = " + in0 + " * vec4(analyticLocalRectCoverage(" + data +
+                  ".rect, " + data + ".deviceToLocal));\n";
+        }
         break;
       case ChainISA::RRectCoverage:
         body += "  RRectCoverageData " + data + " = chainLoadRRectCoverage(" + dataAt + ");\n";
-        body += "  vec4 " + local + " = aotApplyRRectCoverage(" + in0 + ", " + data + ".rect, " +
-                data + ".radiiX, " + data + ".radiiY, " + data + ".antiAlias, " + data +
-                ".deviceToLocal);\n";
+        if (pureOps) {
+          body += "  vec4 " + local + " = tgfxOpRRectCoverage(" + in0 + ", " + data + ".rect, " +
+                  data + ".radiiX, " + data + ".radiiY, " + data + ".antiAlias, " + data +
+                  ".deviceToLocal, gl_FragCoord.xy);\n";
+        } else {
+          body += "  vec4 " + local + " = aotApplyRRectCoverage(" + in0 + ", " + data + ".rect, " +
+                  data + ".radiiX, " + data + ".radiiY, " + data + ".antiAlias, " + data +
+                  ".deviceToLocal);\n";
+        }
         break;
       case ChainISA::Gradient:
         // The gradient's parameters sit in the chain-wide block region, which the shared

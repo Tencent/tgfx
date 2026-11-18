@@ -393,6 +393,42 @@ bool LayoutMatchesReflection(const Layout& layout, const ReflectionResult& refle
 
 }  // namespace
 
+// The interface chunk of one emitted variant text: the declaration prefix (everything before the
+// generated loaders, which the pack carries separately) plus the three designator source
+// functions. Extracting from the variant's own text keeps every geometry and profile covered
+// without hand-written chunks, and the declarations stay byte-identical to the writer's
+// expectation.
+std::string ExtractInterfaceChunk(const std::string& text) {
+  const auto loadersAt = text.find("struct ColorMatrixData ");
+  if (loadersAt == std::string::npos) {
+    return {};
+  }
+  std::string chunk = text.substr(0, loadersAt);
+  const auto sourcesAt = text.find("vec4 chainGeomColorSource() {");
+  const auto opaqueAt = text.find("vec4 chainOpaqueGeomColorSource() {");
+  if (sourcesAt == std::string::npos || opaqueAt == std::string::npos) {
+    return {};
+  }
+  // Brace-match the opaque source function (the last of the three).
+  size_t depth = 0;
+  size_t end = std::string::npos;
+  for (size_t i = text.find('{', opaqueAt); i < text.size(); ++i) {
+    if (text[i] == '{') {
+      ++depth;
+    } else if (text[i] == '}') {
+      if (--depth == 0) {
+        end = i + 1;
+        break;
+      }
+    }
+  }
+  if (end == std::string::npos) {
+    return {};
+  }
+  chunk += "\n" + text.substr(sourcesAt, end - sourcesAt) + "\n";
+  return chunk;
+}
+
 void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compiler,
                               BuildReport* report) {
   if (options.shaderDir.empty()) {
@@ -466,12 +502,12 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       return buffer.str();
     };
     addEntry(FragmentPackLoaders, "ChainLoaders", ExpandChainOpsPragma("#pragma tgfx_chain_ops\n"));
-    addEntry(FragmentPackEntryRect, "ChainEntryRect", readFile("entry/ChainEntryRect.glsl"));
     addEntry(FragmentPackTail, "ChainTail", readFile("entry/ChainTail.glsl"));
     addEntry(FragmentPackDepAnalyticClipMath, "AnalyticClipMath",
              readFile("coverage/analytic_clip_math.inc"));
     addEntry(FragmentPackDepTextureSwizzle, "TextureSwizzle",
              readFile("source/texture_read_swizzle.inc"));
+    addEntry(FragmentPackDepLeafFetch, "ChainLeafFetch", readFile("entry/ChainLeafFetch.glsl"));
   }
   for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
     const Family& family = Families()[familyIndex];
@@ -703,6 +739,25 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
           const uint32_t chainVariantId =
               VariantIdOf(static_cast<uint16_t>(familyIndex), variant.ordinal);
           const std::string profileTag = ProfileTag(emitterEntry.first);
+          // The interface chunk: the variant's own declaration prefix plus its designator source
+          // functions, extracted from the emitted text so every geometry and profile is covered
+          // by construction. The runtime assembler concatenates it with the pack's fragments.
+          {
+            const std::string stored(stages->fragmentBlob.begin(), stages->fragmentBlob.end());
+            std::string chunk = ExtractInterfaceChunk(stored);
+            if (chunk.empty()) {
+              RecordBuildError(&report->diagnostics, Layer::Sources,
+                               DiagnosticCode::SourcesUnreadable, info.name, profileTag,
+                               static_cast<int>(variant.ordinal), static_cast<int>(variant.ordinal),
+                               "the interface chunk extraction found no declaration region");
+            } else {
+              ComposedPayload payload;
+              payload.name = "ChainChunk";
+              payload.id = FragmentPackChunkId(chainVariantId);
+              payload.blob.assign(chunk.begin(), chunk.end());
+              report->composedByTag[profileTag].push_back(std::move(payload));
+            }
+          }
           for (const auto& shape : ComposedShapeManifest()) {
             const uint8_t xferSlot = static_cast<uint8_t>(2 + family.moduleCount);
             if (shape.profile != DimValueOf(family, variant, 2, 0) ||
