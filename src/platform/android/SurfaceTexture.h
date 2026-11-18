@@ -80,10 +80,13 @@ class SurfaceTexture : public ImageStream {
   Global<jobject> surfaceTexture;
   bool frameAvailable = false;
   bool textureSizeResolved = false;
+  bool hasLatchedFrame = false;
+  bool lastLatchAdvanced = false;
+  int64_t lastLatchedTimestamp = 0;
   ISize textureSize = {};
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
-  bool latchNextFrame(JNIEnv* env);
+  bool latchTexture(JNIEnv* env);
 
   int64_t currentTimestamp(JNIEnv* env);
 

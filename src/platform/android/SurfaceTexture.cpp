@@ -288,12 +288,25 @@ int64_t SurfaceTexture::currentFrameTimestamp() {
       env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp));
 }
 
-bool SurfaceTexture::latchNextFrame(JNIEnv* env) {
+bool SurfaceTexture::latchTexture(JNIEnv* env) {
   env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
+    LOGE("NativeImageReader::onUpdateTexture(): failed to updateTexImage!");
     return false;
   }
+  if (SurfaceTexture_getDataSpace) {
+    jint dataSpace = env->CallIntMethod(surfaceTexture.get(), SurfaceTexture_getDataSpace);
+    jint standard =
+        env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getStandard, dataSpace);
+    jint transfer =
+        env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getTransfer, dataSpace);
+    _colorSpace = AndroidDataSpaceToColorSpace(standard, transfer);
+  }
+  auto timestamp = currentTimestamp(env);
+  lastLatchAdvanced = !hasLatchedFrame || timestamp != lastLatchedTimestamp;
+  hasLatchedFrame = true;
+  lastLatchedTimestamp = timestamp;
   return true;
 }
 
@@ -323,7 +336,7 @@ void SurfaceTexture::onSyncToTimestamp(int64_t target) {
     // Consume the flag right before latching: a frame that arrives from now on sets it again and is
     // picked up by the next draw instead of being lost.
     frameAvailable = false;
-    if (!latchNextFrame(env)) {
+    if (!latchTexture(env)) {
       break;
     }
     int64_t timestamp = currentTimestamp(env);
@@ -355,7 +368,7 @@ void SurfaceTexture::onDrainPendingFrames() {
     // Consume the flag right before latching: clearing it after the loop would drop a frame that
     // arrived while the loop was running and make the next updateTexImage() wait for nothing.
     frameAvailable = false;
-    if (!latchNextFrame(env)) {
+    if (!latchTexture(env)) {
       break;
     }
     int64_t timestamp = currentTimestamp(env);
@@ -391,33 +404,32 @@ unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
 
 bool SurfaceTexture::updateTexImage() {
   std::unique_lock<std::mutex> autoLock(locker);
-  if (!frameAvailable) {
-    static const auto TIMEOUT = std::chrono::seconds(1);
-    auto status = condition.wait_for(autoLock, TIMEOUT);
-    if (status == std::cv_status::timeout) {
-      LOGE("NativeImageReader::onUpdateTexture(): timeout when waiting for the frame available!");
-      return false;
-    }
-  }
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
     return false;
   }
-  frameAvailable = false;
-  env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
-  if (env->ExceptionCheck()) {
-    env->ExceptionClear();
-    LOGE("NativeImageReader::onUpdateTexture(): failed to updateTexImage!");
-    return false;
-  }
-  if (SurfaceTexture_getDataSpace) {
-    jint dataSpace = env->CallIntMethod(surfaceTexture.get(), SurfaceTexture_getDataSpace);
-    jint standard =
-        env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getStandard, dataSpace);
-    jint transfer =
-        env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getTransfer, dataSpace);
-    _colorSpace = AndroidDataSpaceToColorSpace(standard, transfer);
+  static const auto TIMEOUT = std::chrono::seconds(1);
+  // A frame-available callback may arrive for a frame that was already consumed by a drain, in
+  // which case the flag is set although the queue is empty and latching would only rebind the frame
+  // already on screen. Verify with the timestamp that the texture really advanced, and wait once
+  // more when it did not.
+  static constexpr int MAX_LATCH_ATTEMPTS = 2;
+  for (int attempt = 0; attempt < MAX_LATCH_ATTEMPTS; attempt++) {
+    if (!frameAvailable) {
+      auto status = condition.wait_for(autoLock, TIMEOUT);
+      if (status == std::cv_status::timeout) {
+        LOGE("NativeImageReader::onUpdateTexture(): timeout when waiting for the frame available!");
+        return false;
+      }
+    }
+    frameAvailable = false;
+    if (!latchTexture(env)) {
+      return false;
+    }
+    if (lastLatchAdvanced) {
+      break;
+    }
   }
   if (SurfaceTexture_getTransformMatrix != nullptr && !textureSizeResolved) {
     auto floatArray = env->NewFloatArray(16);
