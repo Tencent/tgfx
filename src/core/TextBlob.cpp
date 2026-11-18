@@ -123,6 +123,52 @@ std::shared_ptr<TextBlob> TextBlob::MakeFromRSXform(const GlyphID glyphIDs[],
 TextBlob::TextBlob(size_t runCount) : runCount(runCount) {
 }
 
+std::shared_ptr<TextBlob> TextBlob::makeOffset(float dx, float dy) const {
+  TextBlobBuilder builder;
+  auto* run = firstRun();
+  for (size_t i = 0; i < runCount; ++i, run = run->next()) {
+    size_t count = run->glyphCount;
+    TextBlobBuilder::RunBuffer buffer = {};
+    size_t xIndex = 0;
+    size_t yIndex = 1;
+    switch (run->positioning) {
+      case GlyphPositioning::Default:
+        buffer = builder.allocRun(run->font, count, run->offset.x + dx, run->offset.y + dy);
+        break;
+      case GlyphPositioning::Horizontal:
+        buffer = builder.allocRunPosH(run->font, count, run->offset.y + dy);
+        break;
+      case GlyphPositioning::Point:
+        buffer = builder.allocRunPos(run->font, count);
+        break;
+      case GlyphPositioning::RSXform:
+        xIndex = 2;
+        yIndex = 3;
+        buffer = builder.allocRunRSXform(run->font, count);
+        break;
+      case GlyphPositioning::Matrix:
+        xIndex = 2;
+        yIndex = 5;
+        buffer = builder.allocRunMatrix(run->font, count);
+        break;
+    }
+    memcpy(buffer.glyphs, run->glyphBuffer(), count * sizeof(GlyphID));
+    auto stride = ScalarsPerGlyph(run->positioning);
+    if (stride == 0) {
+      continue;
+    }
+    memcpy(buffer.positions, run->posBuffer(), count * stride * sizeof(float));
+    for (size_t j = 0; j < count; ++j) {
+      auto* pos = buffer.positions + j * stride;
+      pos[xIndex] += dx;
+      if (run->positioning != GlyphPositioning::Horizontal) {
+        pos[yIndex] += dy;
+      }
+    }
+  }
+  return builder.build();
+}
+
 TextBlob::TextBlob(size_t runCount, const Rect& bounds)
     : runCount(runCount), bounds(new Rect(bounds)) {
 }
