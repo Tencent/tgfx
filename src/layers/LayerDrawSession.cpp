@@ -94,7 +94,7 @@ static PreciseRect ToPreciseRect(const PixelRect& rect) {
 }
 
 static bool IsSafePixelRect(const PreciseRect& rect) {
-  constexpr double MaxPixelCoordinate = static_cast<double>(INT32_MAX >> 2);
+  constexpr double MaxPixelCoordinate = static_cast<double>(INT32_MAX / 2);
   return rect.isFinite() && rect.left >= -MaxPixelCoordinate && rect.top >= -MaxPixelCoordinate &&
          rect.right <= MaxPixelCoordinate && rect.bottom <= MaxPixelCoordinate;
 }
@@ -188,34 +188,78 @@ bool LayerDrawSession::IsSupportedAncestorChain(Layer* target, Layer* captureRoo
   return false;
 }
 
-void LayerDrawSession::ScanBackgroundOutset(Layer* layer, const Matrix& localToOutput,
-                                            float ancestorOutset, float* maxOutset,
-                                            bool* needsBackground) {
+void LayerDrawSession::CollectLayerEffects(Layer* layer, const Matrix& localToOutput,
+                                           float filterOutset, LayerStylePosition position,
+                                           std::vector<BackgroundEffect>* effects) {
+  for (const auto& style : layer->layerStyles()) {
+    if (style->position() != position || !NeedsBackgroundSource(style->extraSourceType())) {
+      continue;
+    }
+    auto localBounds = layer->getBounds();
+    if (localBounds.isEmpty()) {
+      continue;
+    }
+    auto bounds = localToOutput.mapRect(localBounds);
+    // Round coverage outwards when a float ULP exceeds one pixel at a distant placement.
+    if (std::max(std::abs(bounds.left), std::abs(bounds.right)) >= (1 << 24)) {
+      bounds.left = std::nextafter(bounds.left, -INFINITY);
+      bounds.right = std::nextafter(bounds.right, INFINITY);
+    }
+    if (std::max(std::abs(bounds.top), std::abs(bounds.bottom)) >= (1 << 24)) {
+      bounds.top = std::nextafter(bounds.top, -INFINITY);
+      bounds.bottom = std::nextafter(bounds.bottom, INFINITY);
+    }
+    bounds.outset(filterOutset, filterOutset);
+    auto dependency = style->filterBackground(Rect::MakeEmpty(), localToOutput.getMaxScale());
+    effects->push_back({bounds, filterOutset + MaxAbsOutset(dependency)});
+  }
+}
+
+void LayerDrawSession::CollectSubtreeEffects(Layer* layer, const Matrix& localToOutput,
+                                             float ancestorOutset,
+                                             std::vector<BackgroundEffect>* effects) {
   auto scale = localToOutput.getMaxScale();
   if (!std::isfinite(scale) || scale <= 0.0f) {
     return;
   }
-  // A background style reads the backdrop after every enclosing filter has spread it, so the input
-  // it needs covers the filter outsets of the whole ancestor chain, not only the style's own
-  // outset. Missing them truncates the capture and leaves band seams.
   auto filterOutset = ancestorOutset + FilterOutset(layer, scale);
-  float backOutset = 0.0f;
-  for (const auto& style : layer->layerStyles()) {
-    if (style == nullptr || !NeedsBackgroundSource(style->extraSourceType())) {
-      continue;
-    }
-    *needsBackground = true;
-    auto bounds = style->filterBackground(Rect::MakeEmpty(), scale);
-    backOutset = std::max(backOutset, filterOutset + MaxAbsOutset(bounds));
-  }
-  *maxOutset = std::max(*maxOutset, backOutset);
+  CollectLayerEffects(layer, localToOutput, filterOutset, LayerStylePosition::Below, effects);
   for (const auto& child : layer->children()) {
     if (!child->visible() || child->alpha() <= 0 || child->maskOwner) {
       continue;
     }
     auto childMatrix = localToOutput;
     childMatrix.preConcat(child->getMatrixWithScrollRect().asMatrix());
-    ScanBackgroundOutset(child.get(), childMatrix, filterOutset, maxOutset, needsBackground);
+    CollectSubtreeEffects(child.get(), childMatrix, filterOutset, effects);
+  }
+  CollectLayerEffects(layer, localToOutput, filterOutset, LayerStylePosition::Above, effects);
+}
+
+void LayerDrawSession::collectPrecedingEffects() {
+  std::vector<Layer*> path = {};
+  for (auto* layer = request.target; layer != request.captureRoot; layer = layer->parent()) {
+    path.push_back(layer);
+  }
+  auto* ancestor = request.captureRoot;
+  auto localToOutput = rootToOutput;
+  auto filterOutset = 0.0f;
+  for (auto it = path.rbegin(); it != path.rend(); ++it) {
+    filterOutset += FilterOutset(ancestor, localToOutput.getMaxScale());
+    CollectLayerEffects(ancestor, localToOutput, filterOutset, LayerStylePosition::Below,
+                        &precedingEffects);
+    for (const auto& sibling : ancestor->children()) {
+      if (sibling.get() == *it) {
+        break;
+      }
+      if (!sibling->visible() || sibling->alpha() <= 0 || sibling->maskOwner) {
+        continue;
+      }
+      auto siblingToOutput = localToOutput;
+      siblingToOutput.preConcat(sibling->getMatrixWithScrollRect().asMatrix());
+      CollectSubtreeEffects(sibling.get(), siblingToOutput, filterOutset, &precedingEffects);
+    }
+    ancestor = *it;
+    localToOutput.preConcat(ancestor->getMatrixWithScrollRect().asMatrix());
   }
 }
 
@@ -399,8 +443,8 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
     actualRoot->updateRenderBounds();
   }
   if (request.alpha > 0.0f) {
-    ScanBackgroundOutset(request.target, outputMatrix, 0.0f, &session->backgroundOutset,
-                         &session->needsBackground);
+    CollectSubtreeEffects(request.target, outputMatrix, 0.0f, &session->targetEffects);
+    session->needsBackground = !session->targetEffects.empty();
   }
   // The export never keeps a borrowed context beyond the lock it was created in; every later call
   // receives the context it must use.
@@ -444,7 +488,12 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
   }
   session->outputToGlobal = captureRootToGlobal;
   session->outputToGlobal.preConcat(session->outputToRoot);
-  session->backgroundOutset += AncestorFilterOutset(request.target, request.captureRoot, rootToOutput);
+  auto outset = AncestorFilterOutset(request.target, request.captureRoot, rootToOutput);
+  for (auto& effect : session->targetEffects) {
+    effect.outputBounds.outset(outset, outset);
+    effect.outset += outset;
+  }
+  session->collectPrecedingEffects();
   return session;
 }
 
@@ -494,30 +543,48 @@ RegionPlanResult LayerDrawSession::planExportRegion(const PixelRect& core,
   // inside the drawn surface: its input comes from the shared capture, and a nested offscreen
   // clipped exactly at the delivery edge would truncate that input. The capture region and the
   // drawn region therefore cover the same dependency window, while only the core is delivered.
-  PixelRect renderRect = {};
-  PixelRect captureRect = {};
-  if (needsBackground) {
-    auto outputRect = ToPreciseRect(core);
-    auto margin = static_cast<double>(backgroundOutset) + 1.0;
-    outputRect.outset(margin, margin);
-    outputRect.roundOut();
-    if (!IsSafePixelRect(outputRect)) {
-      if (control != nullptr) {
-        control->fail(DrawFailureCode::SurfaceLimit, DrawStage::Planning, request.target, {},
-                      "the background dependency exceeds the supported pixel range");
-      }
-      result.code = RegionPlanCode::Failed;
-      return result;
+  auto outputRect = ToPreciseRect(core);
+  outputRect.outset(1, 1);
+  bool requiresBackground = false;
+  for (const auto* effects : {&targetEffects, &precedingEffects}) {
+    if (effects == &precedingEffects && !requiresBackground) {
+      break;
     }
-    renderRect = ToPixelRect(outputRect);
-    captureRect = renderRect;
-  } else {
-    renderRect = core;
-    renderRect.left--;
-    renderRect.top--;
-    renderRect.right++;
-    renderRect.bottom++;
+    for (auto it = effects->rbegin(); it != effects->rend(); ++it) {
+      const auto& bounds = it->outputBounds;
+      if (outputRect.right <= bounds.left || outputRect.left >= bounds.right ||
+          outputRect.bottom <= bounds.top || outputRect.top >= bounds.bottom) {
+        continue;
+      }
+      // Each style reads earlier drawing, including the output of earlier backdrop styles.
+      // Limit secondary expansion to the part of the style visible to the later dependency.
+      if (!requiresBackground) {
+        outputRect.outset(it->outset, it->outset);
+      } else {
+        auto overlap = outputRect;
+        overlap.left = std::max(overlap.left, static_cast<double>(bounds.left));
+        overlap.top = std::max(overlap.top, static_cast<double>(bounds.top));
+        overlap.right = std::min(overlap.right, static_cast<double>(bounds.right));
+        overlap.bottom = std::min(overlap.bottom, static_cast<double>(bounds.bottom));
+        overlap.outset(it->outset, it->outset);
+        outputRect.left = std::min(outputRect.left, overlap.left);
+        outputRect.top = std::min(outputRect.top, overlap.top);
+        outputRect.right = std::max(outputRect.right, overlap.right);
+        outputRect.bottom = std::max(outputRect.bottom, overlap.bottom);
+      }
+      requiresBackground = true;
+    }
   }
+  outputRect.roundOut();
+  if (!IsSafePixelRect(outputRect)) {
+    if (control != nullptr) {
+      control->fail(DrawFailureCode::SurfaceLimit, DrawStage::Planning, request.target, {},
+                    "the region exceeds the supported pixel range");
+    }
+    result.code = RegionPlanCode::Failed;
+    return result;
+  }
+  auto renderRect = ToPixelRect(outputRect);
   if (!FitsLimit(renderRect, surfaceLimit.width, surfaceLimit.height)) {
     if (core.width() <= 1 && core.height() <= 1) {
       if (control != nullptr) {
@@ -534,10 +601,10 @@ RegionPlanResult LayerDrawSession::planExportRegion(const PixelRect& core,
   }
   result.region.coreRect = core;
   result.region.renderRect = renderRect;
-  if (needsBackground) {
+  if (requiresBackground) {
     auto dependencies = std::make_shared<RegionDependencyPlan>();
     dependencies->needsBackground = true;
-    dependencies->captureRect = captureRect;
+    dependencies->captureRect = renderRect;
     result.region.dependencies = std::move(dependencies);
   }
   result.code = RegionPlanCode::Ready;
@@ -787,13 +854,14 @@ DrawOutcome LayerDrawSession::drawExportRegion(Context* context, LayerDrawBatch&
   DrawArgs args(context);
   args.dstColorSpace = request.renderColorSpace;
   args.drawControl = control;
-  if (!batch.impl->renderRects.empty()) {
+  bool needsRegionBackground = batch.impl->regions[regionIndex].dependencies != nullptr;
+  if (needsRegionBackground) {
     args.useSceneBounds = useSceneBounds;
     args.renderRects = &batch.impl->renderRects;
   }
   BackgroundConsumer consumer(batch.impl->hasSnapshots ? &batch.impl->snapshots : nullptr, false);
-  args.backgroundHandler = batch.impl->needsBackground ? static_cast<BackgroundHandler*>(&consumer)
-                                                       : BackgroundHandler::NoOp();
+  args.backgroundHandler = needsRegionBackground ? static_cast<BackgroundHandler*>(&consumer)
+                                                 : BackgroundHandler::NoOp();
   // Layer::draw() returns before drawing for a zero alpha. Skipping the draw here keeps that
   // semantic, so a Clear or Src blend mode cannot erase the cleared output.
   if (request.alpha > 0.0f) {

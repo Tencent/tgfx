@@ -35,6 +35,7 @@ namespace tgfx {
 class Canvas;
 class Context;
 class Layer;
+enum class LayerStylePosition;
 
 /**
  * Integer rectangle in a final pixel grid. It is used for tiled output planning so that the float
@@ -290,8 +291,17 @@ class LayerDrawSession {
   static float AncestorFilterOutset(Layer* target, Layer* captureRoot, const Matrix& rootToOutput);
   static bool IsSupported2DSubtree(Layer* layer, std::vector<Layer*>& activeMasks);
   static bool IsSupportedAncestorChain(Layer* target, Layer* captureRoot);
-  static void ScanBackgroundOutset(Layer* layer, const Matrix& localToOutput, float ancestorOutset,
-                                   float* maxOutset, bool* needsBackground);
+  struct BackgroundEffect {
+    Rect outputBounds = {};
+    float outset = 0;
+  };
+
+  static void CollectLayerEffects(Layer* layer, const Matrix& localToOutput, float filterOutset,
+                                  LayerStylePosition position,
+                                  std::vector<BackgroundEffect>* effects);
+  static void CollectSubtreeEffects(Layer* layer, const Matrix& localToOutput, float ancestorOutset,
+                                    std::vector<BackgroundEffect>* effects);
+  void collectPrecedingEffects();
 
   RegionPlanResult planExportRegion(const PixelRect& core, const LayerDrawLimits& limits,
                                     DrawControl* control) const;
@@ -312,7 +322,8 @@ class LayerDrawSession {
   PixelRect outputPixelBounds = {};
   bool useSceneBounds = true;
   bool needsBackground = false;
-  float backgroundOutset = 0.0f;  // In output pixels.
+  std::vector<BackgroundEffect> targetEffects = {};
+  std::vector<BackgroundEffect> precedingEffects = {};
 
   // CanvasDefault state captured from the original canvas.
   bool canvasCanInvert = true;
