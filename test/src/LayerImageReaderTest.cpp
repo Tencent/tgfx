@@ -1530,8 +1530,9 @@ TGFX_TEST(LayerImageReaderTest, FarBackdropCaptureMatchesNearPixelGrid) {
       target.clearBeforeDraw = true;
       ASSERT_EQ(session->drawRegion(context, *batch, 0, target, &control), DrawOutcome::Success)
           << control.firstFailure.message;
-      ASSERT_TRUE(surface->readPixels(info, pixels.data() + x * info.byteSize(), column - rect.left,
-                                      4 - rect.top));
+      ASSERT_TRUE(surface->readPixels(info,
+                                      pixels.data() + static_cast<size_t>(x) * info.byteSize(),
+                                      column - rect.left, 4 - rect.top));
     }
     EXPECT_GT(pixels[4 * 4], pixels[4 * 4 + 2]);
     EXPECT_GT(pixels[10 * 4 + 2], pixels[10 * 4]);
@@ -1642,8 +1643,9 @@ TGFX_TEST(LayerImageReaderTest, TinyTilePreservesMeshImagesAndGlyphs) {
   ASSERT_TRUE(typeface != nullptr);
   Font font(typeface, 12);
   auto info = OutputInfo(3, 3);
-  for (auto primitive : {TilePrimitive::VertexMesh, TilePrimitive::ShapeMesh, TilePrimitive::ImageRect,
-                         TilePrimitive::Atlas, TilePrimitive::Glyphs, TilePrimitive::DefaultTextRun}) {
+  for (auto primitive :
+       {TilePrimitive::VertexMesh, TilePrimitive::ShapeMesh, TilePrimitive::ImageRect,
+        TilePrimitive::Atlas, TilePrimitive::Glyphs, TilePrimitive::DefaultTextRun}) {
     SCOPED_TRACE(static_cast<int>(primitive));
     std::vector<uint8_t> reference = {};
     for (int left : {0, 16779246}) {
