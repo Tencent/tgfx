@@ -440,6 +440,7 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
 
   session->outputPixelBounds = {0, 0, request.outputSize.width, request.outputSize.height};
   session->useSceneBounds =
+      request.target->_scrollRect == nullptr &&
       BackgroundCapturer::HiddenBranch(request.captureRoot, request.target) == nullptr;
 
   auto actualRoot = request.captureRoot->root();
