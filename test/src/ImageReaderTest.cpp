@@ -24,8 +24,8 @@
 namespace tgfx {
 // A controllable ImageStream used to drive the platform-independent ImageReader logic without a
 // real video source. hasNewFrame() and the texture-update result can both be forced to exercise
-// the frame-availability gate and the update-failure path. It only overrides protected virtuals,
-// so it compiles on toolchains without private test access.
+// the frame-availability gate and the update-failure path. The stream itself needs no private
+// access; the tests do, because ImageReader::MakeFrom() is private.
 class FakeImageStream : public ImageStream {
  public:
   FakeImageStream(int width, int height) : ImageStream(width, height) {
@@ -76,9 +76,9 @@ TGFX_TEST_PRIVATE(ImageReaderTest, AcquireReturnsNullWithoutNewFrame) {
       EXPECT_TRUE(firstTexture != nullptr);
 
       // No new frame has arrived: the gate returns nullptr and does not advance the buffer
-      // version, so the previously acquired buffer is still valid.
+      // version, so the previously acquired buffer stays the current content.
       stream->newFrame = false;
-      EXPECT_TRUE(reader->acquireNextBuffer() == nullptr); EXPECT_FALSE(firstBuffer->expired());)
+      EXPECT_TRUE(reader->acquireNextBuffer() == nullptr); EXPECT_EQ(reader->bufferVersion, 1u);)
 }
 
 /**
