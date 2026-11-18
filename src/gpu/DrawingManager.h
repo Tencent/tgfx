@@ -22,6 +22,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include "core/utils/TileProbe.h"
 #include "gpu/DrawingBuffer.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/tasks/AtlasUploadTask.h"
@@ -58,6 +59,32 @@ class DrawingManager {
   void markDrawn() {
     ++_drawCount;
   }
+
+  /**
+   * Returns how many render tasks recorded so far targeted a different render target than the task
+   * before them, which is what makes the GPU change passes when it encodes them. The value only
+   * grows, so callers measure a span by subtracting two readings.
+   */
+  uint32_t renderTargetSwitchCount() const {
+    return _renderTargetSwitches;
+  }
+
+#if TILE_PROBE_ENABLED
+  /**
+   * Render tasks recorded so far, by kind. switches mirrors renderTargetSwitchCount().
+   */
+  struct TaskProbe {
+    uint32_t ops = 0;
+    uint32_t runtime = 0;
+    uint32_t copies = 0;
+    uint32_t fills = 0;
+    uint32_t switches = 0;
+  };
+
+  const TaskProbe& taskProbe() const {
+    return _taskProbe;
+  }
+#endif
 
   BlockAllocator* drawingAllocator() {
     return &getDrawingBuffer()->drawingAllocator;
@@ -175,6 +202,19 @@ class DrawingManager {
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   std::unordered_map<TextureProxy*, AtlasUploadTask*> atlasTaskMap = {};
   uint64_t _drawCount = 0;
+  uint32_t _renderTargetSwitches = 0;
+  const RenderTargetProxy* _lastTaskTarget = nullptr;
+#if TILE_PROBE_ENABLED
+  TaskProbe _taskProbe = {};
+#endif
+
+  void trackRenderTarget(const RenderTargetProxy* target) {
+    if (target != _lastTaskTarget) {
+      ++_renderTargetSwitches;
+      TILE_PROBE(_taskProbe.switches = _renderTargetSwitches;)
+      _lastTaskTarget = target;
+    }
+  }
 
   DrawingBuffer* getDrawingBuffer() {
     return currentBuffer ? currentBuffer.get() : createDrawingBuffer();

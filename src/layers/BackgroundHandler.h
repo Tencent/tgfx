@@ -63,12 +63,16 @@ class BackgroundHandler {
     return nullptr;
   }
 
+  // The blur radius, in the pixels of the tile it is drawn into, at or below which a background
+  // blur is skipped. The off-centre weights of the gaussian sum to 1% at 0.3 and to 8% at 0.4, so
+  // 0.4 softens a hard edge by up to 21/255 while the sampled area is minified.
+  static constexpr float NegligibleBlurRadius = 0.4f;
+
   /**
-   * A background blur whose radius, measured in the pixels of the tile it is drawn into, is at or
-   * below this value changes no pixel by more than 1/255 (the neighbour weight of a gaussian with
-   * sigma 0.3 is 0.0038), so drawing it only costs passes and textures.
+   * Returns the blur radius of the style in the pixels of the tile it is drawn into, or 0 when the
+   * style is not a background blur.
    */
-  static constexpr float NegligibleBlurRadius = 0.3f;
+  static float BackgroundBlurRadius(const LayerStyle* style, float densityScale);
 
   /**
    * Debugging switch for comparing the picture and the cost with and without skipping negligible
@@ -77,11 +81,12 @@ class BackgroundHandler {
   static bool& SkipNegligibleBlurEnabled();
 
   /**
-   * Returns true if drawing the style at the given density would not change the picture, so the
-   * capture pass, the consume pass and the style source creation can all leave it out. The density
-   * must be the one the consumer draws with, which the capturer derives with
-   * consumerContentScale(). Every caller has to use this one function, because a style that is
-   * captured but not consumed (or the other way round) unbalances the snapshot queue.
+   * Returns true if the blur at the given density is small enough to leave out: it softens the tile
+   * by less than the minification already does, so the capture pass, the consume pass and the style
+   * source creation all skip it. The density must be the one the consumer draws with, which the
+   * capturer derives with consumerContentScale(). Every caller has to use this one function, because
+   * a style that is captured but not consumed (or the other way round) unbalances the snapshot
+   * queue.
    */
   static bool IsNegligibleBackgroundStyle(const LayerStyle* style, float densityScale);
 

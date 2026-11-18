@@ -28,6 +28,8 @@ option(TGFX_USE_WEBGPU "Use WebGPU as the GPU backend on web platform" OFF)
 option(TGFX_USE_QT "Enable building with the Qt framework." OFF)
 option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
+# 临时性能探针（瓦片预算 / capture / 逐层归因）。默认关闭，打开后各 tile 日志会打印到控制台。
+option(TGFX_TILE_PROBE "Print the temporary tile probe logs" OFF)
 option(TGFX_USE_VULKAN "Use Vulkan as the GPU backend" OFF)
 option(TGFX_USE_TEXT_GAMMA_CORRECTION "Enable gamma correction when rendering text" OFF)
 option(TGFX_ENABLE_STENCIL_COVER_PATH "Enable the stencil-and-cover GPU path renderer for non-antialiased fills" OFF)
@@ -764,6 +766,10 @@ endforeach ()
 
 if (TGFX_EXCLUDE_FILES)
     list(REMOVE_ITEM TGFX_FILES ${TGFX_EXCLUDE_FILES})
+endif ()
+
+if (TGFX_TILE_PROBE)
+    list(APPEND TGFX_DEFINES TILE_PROBE_ENABLED=1)
 endif ()
 
 add_library(tgfx STATIC ${TGFX_FILES})

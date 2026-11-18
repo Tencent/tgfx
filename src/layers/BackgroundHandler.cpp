@@ -20,6 +20,8 @@
 #include <algorithm>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/TileProbe.h"
+#include "gpu/DrawingManager.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
 #include "layers/DrawArgs.h"
@@ -34,6 +36,45 @@
 namespace tgfx {
 
 namespace {
+
+#if TILE_PROBE_ENABLED
+// Adds the draw calls and render tasks recorded during its lifetime to ConsumeProbe(), on every
+// exit of the scope it guards.
+class ConsumeProbeScope {
+ public:
+  explicit ConsumeProbeScope(Context* context) {
+    manager = context != nullptr ? context->drawingManager() : nullptr;
+    if (manager != nullptr) {
+      mark = manager->drawMark();
+      tasks = manager->taskProbe();
+    }
+  }
+
+  void setCounted() {
+    counted = true;
+  }
+
+  ~ConsumeProbeScope() {
+    if (manager == nullptr || !counted) {
+      return;
+    }
+    auto& total = ConsumeProbe();
+    const auto& now = manager->taskProbe();
+    total.styles++;
+    total.drawCalls += static_cast<uint32_t>(manager->drawMark() - mark);
+    total.ops += now.ops - tasks.ops;
+    total.runtime += now.runtime - tasks.runtime;
+    total.copies += now.copies - tasks.copies;
+    total.switches += now.switches - tasks.switches;
+  }
+
+ private:
+  DrawingManager* manager = nullptr;
+  uint64_t mark = 0;
+  DrawingManager::TaskProbe tasks = {};
+  bool counted = false;
+};
+#endif
 
 // A handler that does nothing for background-sourced styles. Used for intermediate artifacts and
 // 3D / contour paths where background styles must not produce output.
@@ -203,6 +244,14 @@ bool& BackgroundHandler::SkipNegligibleBlurEnabled() {
   return enabled;
 }
 
+float BackgroundHandler::BackgroundBlurRadius(const LayerStyle* style, float densityScale) {
+  if (style == nullptr || style->Type() != LayerStyleType::BackgroundBlur) {
+    return 0.0f;
+  }
+  auto* blur = static_cast<const BackgroundBlurStyle*>(style);
+  return std::max(blur->blurrinessX(), blur->blurrinessY()) * densityScale;
+}
+
 bool BackgroundHandler::IsNegligibleBackgroundStyle(const LayerStyle* style, float densityScale) {
   if (!SkipNegligibleBlurEnabled() || style == nullptr ||
       style->Type() != LayerStyleType::BackgroundBlur) {
@@ -213,8 +262,7 @@ bool BackgroundHandler::IsNegligibleBackgroundStyle(const LayerStyle* style, flo
   if (blur->blurrinessX() <= 0 && blur->blurrinessY() <= 0) {
     return false;
   }
-  auto radius = std::max(blur->blurrinessX(), blur->blurrinessY()) * densityScale;
-  return radius <= NegligibleBlurRadius;
+  return BackgroundBlurRadius(style, densityScale) <= NegligibleBlurRadius;
 }
 
 void BackgroundHandler::DispatchOrSkip(const DrawArgs& args, Canvas* canvas, Layer* layer,
@@ -374,6 +422,11 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
                        visibleLocal.top * contentScale - contentOffset.y,
                        visibleLocal.width() * contentScale, visibleLocal.height() * contentScale);
   }
+  TILE_PROBE(auto* probeManager =
+                 args.context != nullptr ? args.context->drawingManager() : nullptr;
+             auto probeMark = probeManager != nullptr ? probeManager->drawMark() : 0;
+             auto probeTasks = probeManager != nullptr ? probeManager->taskProbe()
+                                                       : DrawingManager::TaskProbe();)
   auto bgImage = bgSource->getBackgroundImage();
   if (bgImage == nullptr) {
     return;
@@ -406,6 +459,15 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   }
   snapshots->snapshots[BackgroundSnapshotKey{layer, style}].push_back(
       BackgroundSnapshotEntry{std::move(image), offset});
+  TILE_PROBE(if (probeManager != nullptr) {
+    auto& total = CaptureProbe();
+    auto& now = probeManager->taskProbe();
+    total.styles++;
+    total.drawCalls += static_cast<uint32_t>(probeManager->drawMark() - probeMark);
+    total.ops += now.ops - probeTasks.ops;
+    total.copies += now.copies - probeTasks.copies;
+    total.switches += now.switches - probeTasks.switches;
+  })
 }
 
 const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* layer) const {
@@ -476,6 +538,7 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
 void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
                                              float alpha, LayerStyle* style,
                                              const LayerStyleSource* source) {
+  TILE_PROBE(ConsumeProbeScope probeScope(args.context);)
   if (source == nullptr || FloatNearlyZero(source->contentScale)) {
     return;
   }
@@ -529,6 +592,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       return;
     }
   }
+  TILE_PROBE(probeScope.setCounted();)
   AutoCanvasRestore restoreCanvas(canvas);
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
   matrix.preTranslate(contentOffset.x, contentOffset.y);

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
+#include <chrono>
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -28,6 +29,43 @@
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
+#if TILE_PROBE_ENABLED
+namespace {
+// Times the encoding of the wrapped task and files it under the phase it was recorded in.
+class TimedRenderTask : public RenderTask {
+ public:
+  TimedRenderTask(BlockAllocator* allocator, PlacementPtr<RenderTask> inner, ProbePhase phase)
+      : RenderTask(allocator), inner(std::move(inner)), phase(phase) {
+  }
+
+  void execute(CommandEncoder* encoder) override {
+    auto start = std::chrono::steady_clock::now();
+    inner->execute(encoder);
+    auto elapsed =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start);
+    auto index = static_cast<size_t>(phase);
+    EncodeStats().taskMs[index] += elapsed.count();
+    EncodeStats().tasks[index]++;
+  }
+
+ private:
+  PlacementPtr<RenderTask> inner = nullptr;
+  ProbePhase phase = ProbePhase::Other;
+};
+}  // namespace
+
+template <typename T>
+static PlacementPtr<RenderTask> TrackRenderTask(BlockAllocator* allocator, PlacementPtr<T> task) {
+  return allocator->make<TimedRenderTask>(allocator, PlacementPtr<RenderTask>(std::move(task)),
+                                          CurrentProbePhase());
+}
+#else
+template <typename T>
+static PlacementPtr<RenderTask> TrackRenderTask(BlockAllocator*, PlacementPtr<T> task) {
+  return PlacementPtr<RenderTask>(std::move(task));
+}
+#endif
+
 DrawingManager::DrawingManager(Context* context) : context(context) {
 }
 
@@ -62,6 +100,8 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   if (renderTarget == nullptr || processor == nullptr) {
     return false;
   }
+  trackRenderTarget(renderTarget.get());
+  TILE_PROBE(++_taskProbe.fills;)
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
@@ -73,7 +113,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   auto textureProxy = renderTarget->asTextureProxy();
   auto task = allocator->make<OpsRenderTask>(allocator, std::move(renderTarget), std::move(drawOps),
                                              std::nullopt);
-  drawingBuffer->renderTasks.emplace_back(std::move(task));
+  drawingBuffer->renderTasks.emplace_back(TrackRenderTask(allocator, std::move(task)));
   addGenerateMipmapsTask(std::move(textureProxy));
   return true;
 }
@@ -94,12 +134,14 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
+  trackRenderTarget(renderTarget.get());
+  TILE_PROBE(++_taskProbe.ops;)
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
   auto task = allocator->make<OpsRenderTask>(allocator, std::move(renderTarget), std::move(drawOps),
                                              clearColor);
-  drawingBuffer->renderTasks.emplace_back(std::move(task));
+  drawingBuffer->renderTasks.emplace_back(TrackRenderTask(allocator, std::move(task)));
   addGenerateMipmapsTask(std::move(textureProxy));
 }
 
@@ -110,12 +152,14 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
+  trackRenderTarget(renderTarget.get());
+  TILE_PROBE(++_taskProbe.runtime;)
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
   auto task = allocator->make<RuntimeDrawTask>(allocator, std::move(renderTarget),
                                                std::move(inputs), std::move(effect), offset);
-  drawingBuffer->renderTasks.emplace_back(std::move(task));
+  drawingBuffer->renderTasks.emplace_back(TrackRenderTask(allocator, std::move(task)));
   addGenerateMipmapsTask(std::move(textureProxy));
 }
 
@@ -126,7 +170,7 @@ void DrawingManager::addGenerateMipmapsTask(std::shared_ptr<TextureProxy> textur
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task = allocator->make<GenerateMipmapsTask>(allocator, std::move(textureProxy));
-  drawingBuffer->renderTasks.emplace_back(std::move(task));
+  drawingBuffer->renderTasks.emplace_back(TrackRenderTask(allocator, std::move(task)));
 }
 
 void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
@@ -135,11 +179,13 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   if (source == nullptr || dest == nullptr) {
     return;
   }
+  trackRenderTarget(source.get());
+  TILE_PROBE(++_taskProbe.copies;)
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task = allocator->make<RenderTargetCopyTask>(allocator, std::move(source), std::move(dest),
                                                     srcX, srcY);
-  drawingBuffer->renderTasks.emplace_back(std::move(task));
+  drawingBuffer->renderTasks.emplace_back(TrackRenderTask(allocator, std::move(task)));
 }
 
 void DrawingManager::addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> source,
@@ -152,7 +198,7 @@ void DrawingManager::addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> so
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task =
       allocator->make<TransferPixelsTask>(allocator, std::move(source), srcRect, std::move(dest));
-  drawingBuffer->renderTasks.emplace_back(std::move(task));
+  drawingBuffer->renderTasks.emplace_back(TrackRenderTask(allocator, std::move(task)));
 }
 
 void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {

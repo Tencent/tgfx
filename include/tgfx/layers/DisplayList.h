@@ -19,6 +19,8 @@
 #pragma once
 
 #include <deque>
+#include <map>
+#include <tuple>
 #include <unordered_map>
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
@@ -29,6 +31,8 @@ class Tile;
 class TilePool;
 class BlankTileSet;
 class DrawTask;
+struct CapturePlan;
+struct TileBudgetClock;
 enum class TileType;
 struct BackgroundSnapshotMap;
 
@@ -233,6 +237,44 @@ class DisplayList {
   }
 
   /**
+   * Returns the CPU recording time, in milliseconds, that a tiled frame may spend before it stops
+   * starting optional tiles. A value of 0 disables the time limit.
+   */
+  float tileBudgetTimeMs() const {
+    return _tileBudgetTimeMs;
+  }
+
+  /**
+   * Returns the number of render target switches a tiled frame may record before it stops starting
+   * optional tiles. A value of 0 disables the switch limit.
+   */
+  int tileBudgetRTSwitches() const {
+    return _tileBudgetRTSwitches;
+  }
+
+  /**
+   * Sets the per-frame cost limit of tiled rendering. The cost is counted from the start of the
+   * frame and includes every tile and background capture drawn so far. Once either limit is
+   * exceeded, the optional tiles left in the frame are dropped and selected again by the next
+   * frame. Only tiles invalidated by dirty regions are always drawn. Every other tile is optional:
+   * grid tiles, the refinement and top-up tiles of the tree levels, and the coarsest tree level that
+   * covers cells nothing else covers. Cells whose tile is dropped keep showing the finest tile that
+   * covers them, or the background color when there is none. A coarsest-level tile is drawn only
+   * if an estimate of its cost, made before it is recorded, fits what is left of the frame, and is
+   * never forced: the grid tiles of the current zoom scale fill those cells once the viewport
+   * stops. A tile is never interrupted, so a single tile can exceed the limits. After a few frames
+   * in a row in which no other optional tile could be drawn, one is drawn anyway so that the
+   * screen keeps filling in. The limits only apply when tileUpdateMode() is not
+   * TileUpdateMode::Immediate. Passing 0 for both disables the budget.
+   * @param timeMs CPU recording time limit in milliseconds, or 0 for no time limit.
+   * @param rtSwitches render target switch limit, or 0 for no switch limit.
+   */
+  void setTileBudget(float timeMs, int rtSwitches) {
+    _tileBudgetTimeMs = timeMs;
+    _tileBudgetRTSwitches = rtSwitches;
+  }
+
+  /**
    * Returns the background color of the display list. The background is an infinite rectangle that
    * covers the entire display area and is drawn using the SrcOver blend mode during rendering.
    * It is only drawn in the DisplayList::render() path, not when calling Layer::draw() directly.
@@ -299,6 +341,11 @@ class DisplayList {
   int _tileSize = 256;
   TileUpdateMode _tileUpdateMode = TileUpdateMode::Immediate;
   int _maxTilesRefinedPerFrame = 5;
+  float _tileBudgetTimeMs = 5.0f;
+  int _tileBudgetRTSwitches = 250;
+  int budgetStarveFrames = 0;
+  // Last measured cost of a base tile by tree level: milliseconds and render target switches.
+  std::unordered_map<int, std::pair<double, double>> baseCosts = {};
   int _subtreeCacheMaxSize = 0;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
@@ -314,6 +361,9 @@ class DisplayList {
   std::unique_ptr<TilePool> tilePool = nullptr;
   std::unique_ptr<BlankTileSet> blankTiles = nullptr;
   std::vector<std::shared_ptr<Tile>> emptyTiles = {};
+  // Tree tiles whose content changed while on screen, by (level, tileY, tileX). They stay out of the
+  // pool and are shown scaled until the tile at their key is drawn again.
+  std::map<std::tuple<int, int, int>, std::shared_ptr<Tile>> staleTreeTiles = {};
   std::deque<std::vector<Rect>> lastDirtyRegions = {};
 
   std::vector<Rect> renderDirect(Surface* surface, bool autoClear) const;
@@ -327,24 +377,34 @@ class DisplayList {
   void checkTileCount(Surface* renderSurface);
 
   std::vector<DrawTask> invalidateTileCaches(const std::vector<Rect>& dirtyRegions,
+                                             const std::vector<Rect>& refinementRegions,
                                              const Rect& viewportRect);
 
   void invalidateCurrentGridTiles(const std::vector<Rect>& dirtyRegions, const Rect& viewportRect,
                                   std::vector<DrawTask>* tileTasks);
 
-  void invalidateTreeTiles(const std::vector<Rect>& dirtyRegions, const Rect& viewportRect,
+  void invalidateTreeTiles(const std::vector<Rect>& dirtyRegions,
+                           const std::vector<Rect>& refinementRegions, const Rect& viewportRect,
                            std::vector<DrawTask>* tileTasks);
 
   void invalidateBlankTiles(const std::vector<Rect>& dirtyRegions);
 
   void recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks);
 
+  void releaseStaleTile(int level, int tileX, int tileY);
+
+  void pruneStaleTiles(const Rect& viewportRect);
+
+  void recycleTileTask(const DrawTask& task);
+
   void recycleGridTiles();
 
   void recycleBlankTiles(const DrawTask& task);
 
-  std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
-                                           std::vector<Rect>* skippedRects);
+  bool selectTileTasks(const Surface* surface, std::vector<DrawTask>* tileTasks);
+
+  std::vector<DrawTask> assembleScreenTasks(const Surface* surface, std::vector<Rect>* skippedRects,
+                                            std::vector<Rect>* underlayRects);
 
   std::vector<std::shared_ptr<Tile>> getFreeTiles(const Surface* renderSurface, TileType type,
                                                   size_t tileCount);
@@ -360,18 +420,19 @@ class DisplayList {
 
   bool drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots) const;
 
-  void captureTileBackgrounds(Surface* surface, const std::vector<DrawTask>& tileTasks,
-                              float zoomScale,
-                              std::vector<std::unique_ptr<BackgroundSnapshotMap>>* captureMaps,
-                              std::vector<int>* taskCapture) const;
+  void planTileCaptures(const std::vector<DrawTask>& tileTasks, float zoomScale,
+                        std::vector<CapturePlan>* plans, std::vector<int>* taskPlan) const;
 
-  std::vector<Rect> drawTileTasks(
-      std::vector<DrawTask>& tileTasks,
-      const std::vector<std::unique_ptr<BackgroundSnapshotMap>>& captureMaps,
-      const std::vector<int>& taskCapture, Surface* surface, float zoomScale);
+  void prepareTileCapture(CapturePlan* plan) const;
+
+  void runTileCapture(Surface* surface, CapturePlan* plan) const;
+
+  std::vector<Rect> drawTileTasks(std::vector<DrawTask>& tileTasks, std::vector<CapturePlan>* plans,
+                                  const std::vector<int>& taskPlan, Surface* surface,
+                                  float zoomScale, const TileBudgetClock& budget);
 
   void drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
-                       Surface* surface, bool autoClear) const;
+                       std::vector<Rect> underlayRects, Surface* surface, bool autoClear) const;
 
   void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
 

@@ -28,6 +28,7 @@
 #include "compositing3d/Layer3DContext.h"
 #include "core/Matrix3DUtils.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/TileProbe.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
@@ -1156,6 +1157,7 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (FloatNearlyZero(contentScale)) {
     return true;
   }
+  TILE_PROBE(TileProbeBegin();)
   if (args.renderRects != nullptr && !args.renderRects->empty() && !renderBounds.isEmpty()) {
     bool anyHit = false;
     for (const auto& rect : *args.renderRects) {
@@ -1165,16 +1167,22 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
       }
     }
     if (!anyHit) {
+      TILE_PROBE(++TileContent().culled; TileProbeEnd();)
       return true;
     }
   }
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
   if (!prepareMask(args, canvas, &maskFilter)) {
+    TILE_PROBE(TileProbeEnd();)
     return true;
   }
+  TILE_PROBE(TileProbeSegment(&TileContent().maskUs);)
   bool needsMaskFilter = maskFilter != nullptr;
-  if (canUseSubtreeCache(args, blendMode) &&
-      drawWithSubtreeCache(args, canvas, alpha, blendMode, maskFilter)) {
+  auto cacheUsable = canUseSubtreeCache(args, blendMode);
+  TILE_PROBE(if (cacheUsable) { ++TileContent().cacheEligible; } TileProbeSegment(
+               &TileContent().cacheUs);)
+  if (cacheUsable && drawWithSubtreeCache(args, canvas, alpha, blendMode, maskFilter)) {
+    TILE_PROBE(++TileContent().cacheHits; TileProbeEnd();)
     return true;
   }
 
@@ -1189,12 +1197,19 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
                      (!_filters.empty() && !args.excludeEffects) || needsMaskFilter;
   }
   if (needsOffscreen) {
+    TILE_PROBE(++TileContent().offscreen;
+               if (blendMode != BlendMode::SrcOver) { ++TileContent().offBlend; }
+               if (!bitFields.passThroughBackground) { ++TileContent().offPassThrough; }
+               if (alpha < 1.0f && bitFields.allowsGroupOpacity) { ++TileContent().offGroupAlpha; }
+               if (!_filters.empty() && !args.excludeEffects) { ++TileContent().offFilter; }
+               if (needsMaskFilter) { ++TileContent().offMask; })
     // Content and children are rendered together in an offscreen buffer.
     drawOffscreen(args, canvas, alpha, blendMode, maskFilter);
   } else {
     // Content and children are rendered independently.
     drawDirectly(args, canvas, alpha);
   }
+  TILE_PROBE(TileProbeEnd();)
   return true;
 }
 
@@ -1220,6 +1235,7 @@ bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
   if (maskFilter) {
     *maskFilter = maskData.maskFilter;
   }
+  TILE_PROBE(if (maskData.maskFilter != nullptr) { ++TileContent().masks; })
   return true;
 }
 
@@ -1609,6 +1625,7 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
       sourcePtr = ownedSource.get();
     }
   }
+  TILE_PROBE(TileProbeSegment(&TileContent().sourceUs);)
   drawContents(args, canvas, alpha, sourcePtr);
 }
 
@@ -1618,10 +1635,30 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below);
   }
   auto content = getContent();
+  TILE_PROBE(if (_children.empty()) {
+    ++TileContent().leaves;
+    if (content == nullptr) {
+      ++TileContent().emptyLeaves;
+    }
+  } else {
+    auto& probe = TileContent();
+    ++probe.groups;
+    auto childCount = _children.size();
+    auto slot = childCount == 1   ? 0
+                : childCount <= 4 ? 1
+                : childCount <= 16 ? 2
+                : childCount <= 64 ? 3
+                                   : 4;
+    ++probe.childHist[slot];
+    if (content == nullptr && _layerStyles.empty() && !hasValidMask() && _filters.empty()) {
+      ++probe.pureGroups;
+    }
+  })
   bool hasForeground = false;
   if (content) {
     hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
   }
+  TILE_PROBE(TileProbeSegment(&TileContent().contentUs);)
   if (!drawChildren(args, canvas, alpha, stopChild)) {
     return;
   }
