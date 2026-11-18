@@ -24,9 +24,11 @@
 #include "layers/DrawArgs.h"
 #include "layers/LayerDrawSession.h"
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/Mesh.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/core/TextBlobBuilder.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
@@ -1580,6 +1582,90 @@ TGFX_TEST(LayerImageReaderTest, TinyTilePreservesRecordedGeometryAndClips) {
     layer.picture = recorder.finishRecordingAsPicture();
     ASSERT_TRUE(layer.picture != nullptr);
     CheckTinyTilePixel(scope.getContext(), &layer, Left);
+  }
+}
+
+enum class TilePrimitive { VertexMesh, ShapeMesh, ImageRect, Atlas, Glyphs, DefaultTextRun };
+
+static void DrawTilePrimitive(Canvas* canvas, TilePrimitive primitive, float left,
+                              const std::shared_ptr<Image>& image, const Font& font) {
+  Paint paint = {};
+  paint.setColor(Color::Red());
+  auto rect = Rect::MakeXYWH(left, 0.0f, 2.0f, 3.0f);
+  switch (primitive) {
+    case TilePrimitive::VertexMesh: {
+      Point points[] = {{rect.left, 0}, {rect.right, 0}, {rect.left, 3}, {rect.right, 3}};
+      canvas->drawMesh(Mesh::MakeCopy(MeshTopology::TriangleStrip, 4, points), paint);
+      break;
+    }
+    case TilePrimitive::ShapeMesh: {
+      Path path = {};
+      path.addRect(rect);
+      canvas->drawMesh(Mesh::MakeFromPath(std::move(path), false), paint);
+      break;
+    }
+    case TilePrimitive::ImageRect:
+      canvas->drawImageRect(image, rect, SamplingOptions(FilterMode::Nearest));
+      break;
+    case TilePrimitive::Atlas: {
+      auto matrix = Matrix::MakeTrans(left, 0);
+      auto source = Rect::MakeWH(1, 3);
+      canvas->drawAtlas(image, &matrix, &source, nullptr, 1, SamplingOptions(FilterMode::Nearest));
+      break;
+    }
+    case TilePrimitive::Glyphs: {
+      auto glyph = font.getGlyphID('H');
+      Point position = {left, 5};
+      canvas->drawGlyphs(&glyph, &position, 1, font, paint);
+      break;
+    }
+    case TilePrimitive::DefaultTextRun: {
+      TextBlobBuilder builder = {};
+      auto& run = builder.allocRun(font, 1, left, 5);
+      run.glyphs[0] = font.getGlyphID('H');
+      canvas->drawTextBlob(builder.build(), 0, 0, paint);
+      break;
+    }
+  }
+}
+
+TGFX_TEST(LayerImageReaderTest, TinyTilePreservesMeshImagesAndGlyphs) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto source = Surface::Make(context, 2, 3);
+  ASSERT_TRUE(source != nullptr);
+  source->getCanvas()->clear(Color::Red());
+  auto image = source->makeImageSnapshot();
+  ASSERT_TRUE(image != nullptr);
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 12);
+  auto info = OutputInfo(3, 3);
+  for (auto primitive : {TilePrimitive::VertexMesh, TilePrimitive::ShapeMesh, TilePrimitive::ImageRect,
+                         TilePrimitive::Atlas, TilePrimitive::Glyphs, TilePrimitive::DefaultTextRun}) {
+    SCOPED_TRACE(static_cast<int>(primitive));
+    std::vector<uint8_t> reference = {};
+    for (int left : {0, 16779246}) {
+      auto surface = Surface::Make(context, 3, 3);
+      ASSERT_TRUE(surface != nullptr);
+      auto* canvas = surface->getCanvas();
+      canvas->clear();
+      if (left == 0) {
+        canvas->translate(1, 0);
+      } else {
+        canvas->setMatrixForTile(Matrix::I(), left - 1, 0);
+      }
+      DrawTilePrimitive(canvas, primitive, static_cast<float>(left), image, font);
+      std::vector<uint8_t> pixels(info.byteSize());
+      ASSERT_TRUE(surface->readPixels(info, pixels.data()));
+      if (left == 0) {
+        EXPECT_NE(pixels, std::vector<uint8_t>(pixels.size(), 0));
+        reference = std::move(pixels);
+      } else {
+        EXPECT_EQ(pixels, reference);
+      }
+    }
   }
 }
 
