@@ -195,8 +195,10 @@ class LayerImageReader {
   bool isDone() const;
 
   /**
-   * Draws and reads the next band into the caller's buffer. The call is synchronous and returns
-   * after the whole band is written; it never hands CPU pixels to a background worker.
+   * Synchronously draws the next band into the caller's buffer. BandReady delivers rowCount
+   * complete rows. A subsequent call after the last band returns Done. A failed or cancelled
+   * read may have written part of the current band. Discard that band. Subsequent calls return
+   * the same failure or cancellation without writing to the buffer.
    *
    * The destination must be writable, have the template's width, format, alpha type and color
    * space, at least the required number of rows and a valid stride. destinationByteSize must
