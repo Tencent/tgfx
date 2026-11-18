@@ -76,8 +76,8 @@ struct LayerImageError {
  * the whole read sequence.
  */
 struct LayerImageRequest {
-  // The layer drawn with the existing Layer::draw() semantics. Its own matrix, alpha, blend mode,
-  // visible flag and scroll rect are not applied automatically; the fields below carry them.
+  // The layer to draw in its local coordinate space. The request supplies the output matrix,
+  // alpha and blend mode. Direct drawing ignores the target's visible flag and scroll rect.
   std::shared_ptr<Layer> target;
   // Keeps the background capture context alive and defines the scene the target belongs to. For
   // an attached target this must be the display list's root layer; for a detached target it may be
@@ -91,8 +91,9 @@ struct LayerImageRequest {
   // export scale and the crop translation.
   Matrix targetLocalToOutput = Matrix::I();
 
-  // Explicit drawing parameters matching Layer::draw(canvas, alpha, blendMode).
+  // Opacity passed to the target draw. Must be finite and in [0, 1].
   float alpha = 1.0f;
+  // Blend mode passed to the target draw.
   BlendMode blendMode = BlendMode::SrcOver;
 
   // Color space used for drawing and intermediate effects. Must not be null.
