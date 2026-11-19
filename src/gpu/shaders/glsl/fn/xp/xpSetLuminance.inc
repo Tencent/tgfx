@@ -1,5 +1,4 @@
 //@function xpSetLuminance
-//@requires xpLuminance
 #pragma tgfx_spec_reader
 #pragma tgfx_spec_gate BlendLuminance : SPEC_NeedsBlendMath() != 0
 vec3 xpSetLuminance(vec3 hueSat, float alpha, vec3 lumColor) {

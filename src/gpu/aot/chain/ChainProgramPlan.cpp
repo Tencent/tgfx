@@ -263,40 +263,17 @@ class PlanRegistry {
 // composition reaches the evaluator. The LUT branch indexes the leaf samplers, so it exists only on
 // a variant that declares them.
 void RegisterGradientMembers(PlanRegistry* registry, bool lutForm) {
-  registry->uniform("GradientLayoutType", FragmentType::Int, ChainBindingSource::GradientLayoutType,
-                    -1);
-  registry->uniform("GradientColorizerKind", FragmentType::Int,
-                    ChainBindingSource::GradientColorizerKind, -1);
-  if (lutForm) {
-    registry->uniform("GradientLUTLeaf", FragmentType::Int, ChainBindingSource::GradientLutLeaf,
-                      -1);
-  }
-  registry->uniform("Gradient_leftBorder", FragmentType::Float4,
-                    ChainBindingSource::GradientLeftBorder, -1);
-  registry->uniform("Gradient_rightBorder", FragmentType::Float4,
-                    ChainBindingSource::GradientRightBorder, -1);
-  registry->uniform("Gradient_start", FragmentType::Float4, ChainBindingSource::GradientStart, -1);
-  registry->uniform("Gradient_end", FragmentType::Float4, ChainBindingSource::GradientEnd, -1);
-  registry->uniform("Gradient_scale01", FragmentType::Float4, ChainBindingSource::GradientScale01,
-                    -1);
-  registry->uniform("Gradient_bias01", FragmentType::Float4, ChainBindingSource::GradientBias01,
-                    -1);
-  registry->uniform("Gradient_scale23", FragmentType::Float4, ChainBindingSource::GradientScale23,
-                    -1);
-  registry->uniform("Gradient_bias23", FragmentType::Float4, ChainBindingSource::GradientBias23,
-                    -1);
-  registry->uniform("Gradient_threshold", FragmentType::Float,
-                    ChainBindingSource::GradientThreshold, -1);
-  registry->uniform("Gradient_bias", FragmentType::Float, ChainBindingSource::GradientBias, -1);
-  registry->uniform("Gradient_scale", FragmentType::Float, ChainBindingSource::GradientScale, -1);
-  registry->uniform("Gradient_thresholds1_7", FragmentType::Float4,
-                    ChainBindingSource::GradientThresholds1_7, -1);
-  registry->uniform("Gradient_thresholds9_13", FragmentType::Float4,
-                    ChainBindingSource::GradientThresholds9_13, -1);
-  registry->uniform("Gradient_scales", FragmentType::Float4, ChainBindingSource::GradientScales, -1,
-                    -1, 8);
-  registry->uniform("Gradient_biases", FragmentType::Float4, ChainBindingSource::GradientBiases, -1,
-                    -1, 8);
+  // The members derive from the gradient entry's GLSL annotations: shader_build_tool --catalog writes
+  // ChainOpRegistry.inc, and this is the only place it is included. The assembled route needs the
+  // embedded bundles anyway, so a build without them registers nothing.
+#if defined(TGFX_EMBED_SHADER_BUNDLES)
+#define TGFX_REGISTER_evalGradientSlot
+#include "ChainOpRegistry.inc"
+#undef TGFX_REGISTER_evalGradientSlot
+#else
+  (void)registry;
+  (void)lutForm;
+#endif
 }
 
 void RegisterNoiseMembers(PlanRegistry* registry) {

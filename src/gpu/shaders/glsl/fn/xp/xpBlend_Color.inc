@@ -1,5 +1,4 @@
 //@function xpBlend_Color
-//@requires xpSetLuminance,xpSetSaturation
 vec4 xpBlend_Color(vec4 S, vec4 D, vec4 dstSrcAlpha, vec4 srcDstAlpha) {
   vec4 result;
   result.a = S.a + (1.0 - S.a) * D.a;

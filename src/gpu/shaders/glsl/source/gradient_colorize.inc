@@ -14,42 +14,6 @@
 #ifndef TGFX_GRADIENT_COLORIZE_INC
 #define TGFX_GRADIENT_COLORIZE_INC
 
-vec4 gradientColorizeUnrolled(float t, vec4 thresholds1_7, vec4 thresholds9_13, vec4 scale0_1,
-                              vec4 bias0_1, vec4 scale2_3, vec4 bias2_3, vec4 scale4_5,
-                              vec4 bias4_5, vec4 scale6_7, vec4 bias6_7, vec4 scale8_9,
-                              vec4 bias8_9, vec4 scale10_11, vec4 bias10_11, vec4 scale12_13,
-                              vec4 bias12_13, vec4 scale14_15, vec4 bias14_15) {
-  vec4 scale = scale0_1;
-  vec4 bias = bias0_1;
-  if (thresholds1_7.x > 0.0 && t >= thresholds1_7.x) {
-    scale = scale2_3;
-    bias = bias2_3;
-  }
-  if (thresholds1_7.y > 0.0 && t >= thresholds1_7.y) {
-    scale = scale4_5;
-    bias = bias4_5;
-  }
-  if (thresholds1_7.z > 0.0 && t >= thresholds1_7.z) {
-    scale = scale6_7;
-    bias = bias6_7;
-  }
-  if (thresholds1_7.w > 0.0 && t >= thresholds1_7.w) {
-    scale = scale8_9;
-    bias = bias8_9;
-  }
-  if (thresholds9_13.x > 0.0 && t >= thresholds9_13.x) {
-    scale = scale10_11;
-    bias = bias10_11;
-  }
-  if (thresholds9_13.y > 0.0 && t >= thresholds9_13.y) {
-    scale = scale12_13;
-    bias = bias12_13;
-  }
-  if (thresholds9_13.z > 0.0 && t >= thresholds9_13.z) {
-    scale = scale14_15;
-    bias = bias14_15;
-  }
-  return vec4(t * scale + bias);
-}
+#include "fn/gradient/colorize_unrolled.inc"
 
-#endif
+#endif  // TGFX_GRADIENT_COLORIZE_INC
