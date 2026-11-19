@@ -709,9 +709,9 @@ void DisplayList::captureTileBackgrounds(
     Surface* surface, const std::vector<DrawTask>& tileTasks, float zoomScale,
     std::vector<std::unique_ptr<BackgroundSnapshotMap>>* captureMaps,
     std::vector<int>* taskCapture) const {
-  // Each capture covers one cluster of tiles at a single raster scale, so a tile is captured with
-  // the density it is drawn with. That is what lets tree tiles take part: their scale is 2^-level,
-  // not the current zoom.
+  // Each capture serves all tiles of one raster scale, so a tile is captured with the density it
+  // is drawn with. That is what lets tree tiles take part: their scale is 2^-level, not the
+  // current zoom.
   captureMaps->clear();
   taskCapture->assign(tileTasks.size(), -1);
   if (_root->hasBackgroundStyle()) {
