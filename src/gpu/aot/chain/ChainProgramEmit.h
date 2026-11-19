@@ -36,7 +36,7 @@ class PrecompiledShaderCache;
  * @return       False when a pack entry the plan needs is missing.
  */
 bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShaderCache* cache,
-                           std::string* code, bool esProfile);
+                           std::string* code, bool esProfile, int blendMode);
 
 /**
  * Emits a complete chain fragment the way the JIT's ProgramBuilder did: the neutral walk plans the
@@ -55,7 +55,8 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
  */
 bool EmitChainProgramGLSL(const ChainComposition& composition, const Family& family,
                           const Variant& variant, const PrecompiledShaderCache* cache,
-                          std::string* code, ChainBindings* bindings, bool esProfile);
+                          std::string* code, ChainBindings* bindings, bool esProfile,
+                          int blendMode);
 
 /**
  * Assembles the vertex stage from the stored variant text and the emit's varying contract: the

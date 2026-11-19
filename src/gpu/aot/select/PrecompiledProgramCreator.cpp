@@ -91,6 +91,9 @@ static void AppendAssembledChainKey(Context* context, const ProgramInfo& info,
       payloadFormat != ShaderCodeFormat::METALLIB && payloadFormat != ShaderCodeFormat::MSL) {
     return;
   }
+  // The assembled text carries only the draw's blend mode, so the program identity must separate
+  // modes even when the rest of the shape agrees.
+  key->write(static_cast<uint32_t>(info.getBlendMode()));
   const bool xpPass =
       XpNeedsAdvancedMath(info.getXferFacts().shaderBlend(), static_cast<int>(info.getBlendMode()));
   const ChainComposition composition = DescribeChainComposition(*resolved.sources.chain, xpPass);
@@ -489,7 +492,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
           }
         }
       } else if (EmitChainProgramGLSL(composition, chainFamily, variant, cache, &fragmentDesc.code,
-                                      &chainBindings, cache->profileTag() == "opengles")) {
+                                      &chainBindings, cache->profileTag() == "opengles",
+                                      static_cast<int>(programInfo->getBlendMode()))) {
         assembledAttempt = true;
         LOGI("AssembledChain: assembled entry for %s[variant=%u] (%zu bytes, %zu blocks)",
              shaderName, variantId, fragmentDesc.code.size(), chainBindings.fragment.size());
