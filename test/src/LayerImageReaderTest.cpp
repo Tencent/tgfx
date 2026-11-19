@@ -207,45 +207,26 @@ struct ReadResult {
   int bandsRead = 0;
 };
 
-static ReadResult ReadTiled(Context* context, const std::shared_ptr<Layer>& target,
-                            const ISize& tileSizeLimit, Color clearColor = Color::Transparent()) {
+static ReadResult ReadAllBands(Context* context, LayerImageReader* reader, size_t rowBytes,
+                               uint8_t initialByte) {
   ReadResult output = {};
-  LayerImageRequest request = {};
-  request.target = target;
-  request.outputSize = {TestWidth, TestHeight};
-  request.targetLocalToOutput = Matrix::I();
-  request.renderColorSpace = ColorSpace::SRGB();
-  request.outputColorSpace = ColorSpace::SRGB();
-  request.colorType = ColorType::RGBA_8888;
-  request.alphaType = AlphaType::Premultiplied;
-  request.clearColor = clearColor;
-
-  LayerImageReadOptions options = {};
-  options.bandRows = 17;
-  options.tileSizeLimit = tileSizeLimit;
-  auto reader = LayerImageReader::Make(context, request, options, &output.error);
-  if (reader == nullptr) {
-    return output;
-  }
-  auto fullInfo = OutputInfo(TestWidth, TestHeight);
-  output.image.pixels.assign(fullInfo.byteSize(), 0);
-  output.image.width = TestWidth;
-  output.image.height = TestHeight;
-  output.image.rowBytes = fullInfo.rowBytes();
+  const auto outputSize = reader->outputSize();
+  const auto& templateInfo = reader->bandInfo();
+  output.image.pixels.assign(static_cast<size_t>(outputSize.height) * rowBytes, initialByte);
+  output.image.width = outputSize.width;
+  output.image.height = outputSize.height;
+  output.image.rowBytes = rowBytes;
   int nextRow = 0;
   for (;;) {
-    int remaining = TestHeight - nextRow;
+    int remaining = outputSize.height - nextRow;
     if (remaining <= 0) {
       break;
     }
-    auto rows = std::min(reader->bandInfo().height(), remaining);
-    auto bandInfo = ImageInfo::Make(TestWidth, rows, reader->bandInfo().colorType(),
-                                    reader->bandInfo().alphaType(), fullInfo.rowBytes(),
-                                    reader->bandInfo().colorSpace());
-    auto* bandPixels =
-        output.image.pixels.data() + static_cast<size_t>(nextRow) * fullInfo.rowBytes();
-    Pixmap pixmap(bandInfo, bandPixels);
-    auto result = reader->readNextBand(context, pixmap, bandInfo.byteSize());
+    auto rows = std::min(templateInfo.height(), remaining);
+    auto bandInfo = ImageInfo::Make(outputSize.width, rows, templateInfo.colorType(),
+                                    templateInfo.alphaType(), rowBytes, templateInfo.colorSpace());
+    auto* bandPixels = output.image.pixels.data() + static_cast<size_t>(nextRow) * rowBytes;
+    auto result = reader->readNextBand(context, Pixmap(bandInfo, bandPixels), bandInfo.byteSize());
     if (result.code == LayerImageReadCode::Failed) {
       output.error = result.error;
       output.image.pixels.clear();
@@ -267,10 +248,34 @@ static ReadResult ReadTiled(Context* context, const std::shared_ptr<Layer>& targ
       break;
     }
   }
-  if (nextRow != TestHeight || !reader->isDone() || reader->rowsRead() != TestHeight) {
+  if (nextRow != outputSize.height || !reader->isDone() ||
+      reader->rowsRead() != outputSize.height) {
     output.bandSequenceValid = false;
   }
   return output;
+}
+
+static ReadResult ReadTiled(Context* context, const std::shared_ptr<Layer>& target,
+                            const ISize& tileSizeLimit, Color clearColor = Color::Transparent()) {
+  ReadResult output = {};
+  LayerImageRequest request = {};
+  request.target = target;
+  request.outputSize = {TestWidth, TestHeight};
+  request.targetLocalToOutput = Matrix::I();
+  request.renderColorSpace = ColorSpace::SRGB();
+  request.outputColorSpace = ColorSpace::SRGB();
+  request.colorType = ColorType::RGBA_8888;
+  request.alphaType = AlphaType::Premultiplied;
+  request.clearColor = clearColor;
+
+  LayerImageReadOptions options = {};
+  options.bandRows = 17;
+  options.tileSizeLimit = tileSizeLimit;
+  auto reader = LayerImageReader::Make(context, request, options, &output.error);
+  if (reader == nullptr) {
+    return output;
+  }
+  return ReadAllBands(context, reader.get(), OutputInfo(TestWidth, TestHeight).rowBytes(), 0);
 }
 
 static int CountDifferentPixels(const PixelImage& a, const PixelImage& b, int tolerance) {
@@ -463,24 +468,10 @@ TGFX_TEST(LayerImageReaderTest, MaskedTargetWithAttributesMatchesSingleSurface) 
   options.tileSizeLimit = {48, 40};
   auto reader = LayerImageReader::Make(context, request, options);
   ASSERT_TRUE(reader != nullptr);
-  PixelImage output = {};
-  output.pixels.assign(reference.pixels.size(), 0);
-  output.width = TestWidth;
-  output.height = TestHeight;
-  output.rowBytes = reference.rowBytes;
-  int nextRow = 0;
-  while (nextRow < TestHeight) {
-    auto rows = std::min(reader->bandInfo().height(), TestHeight - nextRow);
-    auto bandInfo = ImageInfo::Make(TestWidth, rows, reader->bandInfo().colorType(),
-                                    reader->bandInfo().alphaType(), reference.rowBytes,
-                                    reader->bandInfo().colorSpace());
-    auto* bandPixels = output.pixels.data() + static_cast<size_t>(nextRow) * reference.rowBytes;
-    auto result = reader->readNextBand(context, Pixmap(bandInfo, bandPixels), bandInfo.byteSize());
-    ASSERT_EQ(result.code, LayerImageReadCode::BandReady)
-        << "firstRow=" << result.firstRow << " error=" << static_cast<int>(result.error);
-    nextRow += result.rowCount;
-  }
-  EXPECT_TRUE(reader->isDone());
+  auto read = ReadAllBands(context, reader.get(), reference.rowBytes, 0);
+  ASSERT_FALSE(read.image.pixels.empty()) << "error=" << static_cast<int>(read.error);
+  EXPECT_TRUE(read.bandSequenceValid);
+  const auto& output = read.image;
   // The translated red stripe multiplies the gray backdrop through the opaque part of the mask.
   const auto* inside = output.pixels.data() + 30 * output.rowBytes + 45 * 4;
   EXPECT_NEAR(inside[0], 128, 1);
@@ -556,25 +547,10 @@ TGFX_TEST(LayerImageReaderTest, ScaledOutputMatchesCanvasDraw) {
   options.tileSizeLimit = {24, 20};
   auto reader = LayerImageReader::Make(context, request, options);
   ASSERT_TRUE(reader != nullptr);
-  PixelImage output = {};
-  output.pixels.assign(referenceInfo.byteSize(), 0);
-  output.width = scaledWidth;
-  output.height = scaledHeight;
-  output.rowBytes = referenceInfo.rowBytes();
-  int nextRow = 0;
-  while (nextRow < scaledHeight) {
-    auto rows = std::min(reader->bandInfo().height(), scaledHeight - nextRow);
-    auto bandInfo = ImageInfo::Make(scaledWidth, rows, reader->bandInfo().colorType(),
-                                    reader->bandInfo().alphaType(), referenceInfo.rowBytes(),
-                                    reader->bandInfo().colorSpace());
-    auto* bandPixels =
-        output.pixels.data() + static_cast<size_t>(nextRow) * referenceInfo.rowBytes();
-    auto result = reader->readNextBand(context, Pixmap(bandInfo, bandPixels), bandInfo.byteSize());
-    ASSERT_EQ(result.code, LayerImageReadCode::BandReady);
-    nextRow += result.rowCount;
-  }
-  EXPECT_TRUE(reader->isDone());
-  EXPECT_EQ(CountDifferentPixels(reference, output, 0), 0);
+  auto output = ReadAllBands(context, reader.get(), referenceInfo.rowBytes(), 0);
+  ASSERT_FALSE(output.image.pixels.empty()) << "error=" << static_cast<int>(output.error);
+  EXPECT_TRUE(output.bandSequenceValid);
+  EXPECT_EQ(CountDifferentPixels(reference, output.image, 0), 0);
 }
 
 TGFX_TEST(LayerImageReaderTest, PictureCanvasMatchesDisplayList) {
@@ -631,26 +607,16 @@ TGFX_TEST(LayerImageReaderTest, PaddedStrideLeavesPaddingUntouched) {
   auto info = reader->bandInfo();
   auto padding = static_cast<size_t>(16);
   auto rowBytes = info.rowBytes() + padding;
-  std::vector<uint8_t> pixels(static_cast<size_t>(TestHeight) * rowBytes, 0xcc);
-  int nextRow = 0;
-  while (nextRow < TestHeight) {
-    auto rows = std::min(info.height(), TestHeight - nextRow);
-    auto bandInfo = ImageInfo::Make(TestWidth, rows, info.colorType(), info.alphaType(), rowBytes,
-                                    info.colorSpace());
-    auto* bandPixels = pixels.data() + static_cast<size_t>(nextRow) * rowBytes;
-    auto result = reader->readNextBand(context, Pixmap(bandInfo, bandPixels), bandInfo.byteSize());
-    ASSERT_EQ(result.code, LayerImageReadCode::BandReady);
-    nextRow += result.rowCount;
-  }
-  EXPECT_TRUE(reader->isDone());
+  auto output = ReadAllBands(context, reader.get(), rowBytes, 0xcc);
+  ASSERT_FALSE(output.image.pixels.empty()) << "error=" << static_cast<int>(output.error);
+  EXPECT_TRUE(output.bandSequenceValid);
   for (int y = 0; y < TestHeight; ++y) {
-    auto* row = pixels.data() + static_cast<size_t>(y) * rowBytes;
+    auto* row = output.image.pixels.data() + static_cast<size_t>(y) * rowBytes;
     for (size_t i = 0; i < padding; ++i) {
       EXPECT_EQ(row[info.rowBytes() + i], 0xcc);
     }
   }
-  PixelImage padded = {std::move(pixels), TestWidth, TestHeight, rowBytes};
-  EXPECT_EQ(CountDifferentPixels(reference, padded, 0), 0);
+  EXPECT_EQ(CountDifferentPixels(reference, output.image, 0), 0);
 }
 
 TGFX_TEST(LayerImageReaderTest, BgraOutputSwapsChannels) {
