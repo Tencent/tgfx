@@ -230,9 +230,13 @@ LayerChildRange BackgroundCapturer::childRange(const Layer* parent) const {
 
 void BackgroundCapturer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent,
                                    Layer* child, float alpha, bool forceDescendants) {
-  _forcedCaptureDepth += forceDescendants;
+  if (forceDescendants) {
+    ++_forcedCaptureDepth;
+  }
   BackgroundHandler::drawChild(args, canvas, parent, child, alpha, forceDescendants);
-  _forcedCaptureDepth -= forceDescendants;
+  if (forceDescendants) {
+    --_forcedCaptureDepth;
+  }
 }
 
 bool BackgroundCapturer::needsSurface(Layer* layer) const {
