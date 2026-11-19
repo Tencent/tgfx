@@ -52,4 +52,17 @@ std::vector<uint32_t> CompileSPIRVLibraryModule(const std::string& wrapperSource
                                                 const char* functionName, const char* shaderName,
                                                 std::string* error);
 
+/**
+ * Turns one compiled frame module into one that imports the named function: the stub's body
+ * disappears (its parameters stay), an Import linkage decoration goes on, and the Linkage
+ * capability rides along. The entry point and the remaining functions stay untouched — this is
+ * the frame's shape, an entry point that calls a body the runtime supplies.
+ * @param words         The compiled frame (its dummy entry calls the stub by name).
+ * @param functionName  The GLSL function to import; the body module exports this same string.
+ * @param error         Receives the failure reason.
+ * @return              The patched module, or empty on failure.
+ */
+std::vector<uint32_t> ImportSPIRVFunction(const std::vector<uint32_t>& words,
+                                          const char* functionName, std::string* error);
+
 }  // namespace tgfx

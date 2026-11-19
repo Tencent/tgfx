@@ -706,6 +706,116 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       continue;
     }
     const std::string profileTag = ProfileTag(emitterEntry.first);
+    // The linking route's frames: one precompiled module per rect-geometry Chain variant. The
+    // frame carries the entry the pipeline runs, the variant's varyings at their own locations,
+    // and an imported chainBody whose signature is the canonical parameter order the runtime
+    // body derives from the same layout (fragCoord first, then the declared varyings).
+    for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
+      const Family& family = Families()[familyIndex];
+      if (strcmp(family.name, "Chain") != 0) {
+        continue;
+      }
+      const auto frameVariants = EnumerateVariants(family, static_cast<uint16_t>(familyIndex));
+      for (const auto& frameVariant : frameVariants) {
+        if (frameVariant.geometry != 0) {
+          continue;  // the plan declines the declared geometries
+        }
+        std::vector<uint8_t> _frame_locations;
+        const Layout frameLayout = DeriveLayout(family, frameVariant);
+        // The varying declarations, in the layout's order: the type decides whether the frame
+        // can carry the contract at all (the runtime body declines the same way).
+        std::vector<std::pair<std::string, std::string>> frameVaryings;
+        bool frameTypesOk = true;
+        for (const auto& varying : frameLayout.varyings) {
+          const char* typeName = nullptr;
+          switch (varying.type) {
+            case ShaderType::Float:
+              typeName = "float";
+              break;
+            case ShaderType::Float2:
+              typeName = "vec2";
+              break;
+            case ShaderType::Float3:
+              typeName = "vec3";
+              break;
+            case ShaderType::Float4:
+              typeName = "vec4";
+              break;
+            case ShaderType::Int:
+              typeName = "int";
+              break;
+            case ShaderType::Int4:
+              typeName = "ivec4";
+              break;
+            default:
+              break;
+          }
+          if (typeName == nullptr) {
+            frameTypesOk = false;
+            break;
+          }
+          frameVaryings.emplace_back(typeName, varying.name);
+          _frame_locations.push_back(varying.location);
+        }
+        if (!frameTypesOk) {
+          continue;
+        }
+        const Layout::Texture* frameMask = nullptr;
+        for (const auto& texture : frameLayout.textures) {
+          if (texture.name == "MaskTextureSampler") {
+            frameMask = &texture;
+          }
+        }
+        std::string frame = "#version 450\n";
+        if (frameMask != nullptr) {
+          frame += "layout(set = " + std::to_string(TEXTURE_DESCRIPTOR_SET) +
+                   ", binding = " + std::to_string(frameMask->binding) +
+                   ") uniform sampler2D MaskTextureSampler;\n";
+        }
+        for (size_t varyingIndex = 0; varyingIndex < frameVaryings.size(); ++varyingIndex) {
+          frame += "layout(location = " + std::to_string(_frame_locations[varyingIndex]) + ") in ";
+          frame +=
+              frameVaryings[varyingIndex].first + " " + frameVaryings[varyingIndex].second + ";\n";
+        }
+        frame += "layout(location = 0) out vec4 fragColor;\n";
+        frame += "vec4 chainBody(vec2 pFragCoord";
+        if (frameMask != nullptr) {
+          frame += ", sampler2D pMaskSampler";
+        }
+        for (const auto& varying : frameVaryings) {
+          frame += ", " + varying.first + " p" + varying.second;
+        }
+        frame += ") { return vec4(0.0); }\n";
+        frame += "void main() { fragColor = chainBody(gl_FragCoord.xy";
+        if (frameMask != nullptr) {
+          frame += ", MaskTextureSampler";
+        }
+        for (const auto& varying : frameVaryings) {
+          frame += ", " + varying.second;
+        }
+        frame += "); }\n";
+        std::string frameError;
+        const auto frameCompiled =
+            CompileGLSL(frame, ShaderStageType::Fragment, "chainFrame", 0, false, &frameError);
+        std::string importError;
+        auto framePatched = frameCompiled.empty()
+                                ? std::vector<uint32_t>()
+                                : ImportSPIRVFunction(frameCompiled, "chainBody", &importError);
+        if (framePatched.empty()) {
+          RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
+                           "chainFrame", profileTag, -1, -1,
+                           std::string("the SPIR-V frame did not build: ") +
+                               (frameCompiled.empty() ? frameError : importError));
+          continue;
+        }
+        ComposedPayload framePayload;
+        framePayload.name = "ChainFrame_" + std::to_string(frameVariant.id());
+        framePayload.id = FragmentPackSPIRVFrameBase | frameVariant.id();
+        const auto* frameBytes = reinterpret_cast<const uint8_t*>(framePatched.data());
+        framePayload.blob.assign(frameBytes, frameBytes + framePatched.size() * sizeof(uint32_t));
+        report->composedByTag[profileTag].push_back(std::move(framePayload));
+      }
+    }
     struct SPIRVOpSource {
       int op;
       std::vector<const char*> includes;

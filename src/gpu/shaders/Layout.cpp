@@ -102,6 +102,7 @@ Layout DeriveLayout(const Family& family, const Variant& variant) {
         if (present) {
           Layout::Varying varying = {};
           varying.name = VaryingNameOf(module, element);
+          varying.type = element.type;
           varying.location = varyingOrdinal;
           layout.varyings.push_back(varying);
         }

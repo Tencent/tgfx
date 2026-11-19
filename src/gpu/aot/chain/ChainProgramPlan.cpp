@@ -382,19 +382,11 @@ bool PlanChainProgram(const ChainComposition& composition, const Family& family,
       return false;
     }
   }
-  // The printer reads these texts; the walk only declines a shape whose entries are missing.
-  if (ChainPackText(cache, FragmentPackTail).empty()) {
-    return false;
-  }
   // The xfer fact picks the resolved support entry: 1 reads the dst through the texture, 2 through
-  // framebuffer fetch; 0 carries none.
+  // framebuffer fetch; 0 carries none. The pack entries themselves are the GL printer's concern
+  // (it re-fetches them and declines when they are missing), so the walk stays backend-neutral.
   const int hasXp = XferDimValue(family, variant);
-  if (hasXp == 1 || hasXp == 2) {
-    const uint32_t entry = hasXp == 1 ? FragmentPackXpDstTexture : FragmentPackXpFramebufferFetch;
-    if (ChainPackText(cache, entry).empty()) {
-      return false;
-    }
-  } else if (hasXp != 0) {
+  if (hasXp != 0 && hasXp != 1 && hasXp != 2) {
     return false;
   }
 

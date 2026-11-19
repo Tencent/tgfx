@@ -125,6 +125,9 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   } else if (plan.hasXp == 2) {
     xpSupport = ChainPackText(cache, FragmentPackXpFramebufferFetch);
   }
+  if (plan.hasXp != 0 && xpSupport.empty()) {
+    return false;  // the xfer leg's support entry is missing; nothing to spell
+  }
   std::string pieces = {};
   auto appendPiece = [&](uint32_t id) {
     const std::string text = ChainPackText(cache, id);

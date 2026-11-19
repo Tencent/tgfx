@@ -782,6 +782,18 @@ target_include_directories(tgfx PRIVATE ${TGFX_INCLUDES} third_party/zstd/lib)
 if (TGFX_USE_VULKAN)
     target_include_directories(tgfx SYSTEM PRIVATE third_party/VulkanMemoryAllocator/include)
 endif ()
+if (TGFX_USE_VULKAN AND NOT TGFX_USE_WEBGPU)
+    # The Vulkan assembled path links precompiled op modules into a runtime-emitted body at draw
+    # time. The linker lives in the vendored SPIRV-Tools source (the prebuilt shaderc archives
+    # carry its optimizer but not the linker), so the tree is built here for the runtime. WebGPU
+    # builds already bring their own copy through Tint, hence the guard.
+    set(SPIRV_SKIP_TESTS ON CACHE BOOL "" FORCE)
+    set(SPIRV_SKIP_EXECUTABLES ON CACHE BOOL "" FORCE)
+    set(SPIRV-Headers_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc/third_party/spirv-headers")
+    add_subdirectory(third_party/shaderc/third_party/spirv-tools EXCLUDE_FROM_ALL)
+    target_link_libraries(tgfx PUBLIC SPIRV-Tools-link SPIRV-Tools-opt SPIRV-Tools)
+    target_include_directories(tgfx SYSTEM PUBLIC third_party/shaderc/third_party/spirv-tools/include)
+endif ()
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS} "$<TARGET_FILE:tgfx_zstd>")
 target_link_libraries(tgfx PUBLIC ${TGFX_SHARED_LIBS})
 set_target_properties(tgfx PROPERTIES PREFIX "")

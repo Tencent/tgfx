@@ -33,11 +33,13 @@ constexpr uint16_t kOpMemberName = 6;
 constexpr uint16_t kOpDecorate = 71;
 constexpr uint16_t kOpCapability = 17;
 constexpr uint16_t kOpFunction = 54;
+constexpr uint16_t kOpFunctionParameter = 55;
 constexpr uint16_t kOpFunctionCall = 57;
 constexpr uint16_t kOpFunctionEnd = 56;
 constexpr uint16_t kCapabilityLinkage = 5;
 constexpr uint16_t kDecorationLinkageAttributes = 41;
 constexpr uint16_t kLinkageTypeExport = 0;
+constexpr uint16_t kLinkageTypeImport = 1;
 
 struct Instruction {
   uint16_t opcode = 0;
@@ -62,6 +64,21 @@ std::vector<Instruction> Parse(const std::vector<uint32_t>& words) {
     offset += instruction.wordCount;
   }
   return instructions;
+}
+
+// The NUL-terminated literal string starting at an operand word.
+std::string LiteralStringAt(const std::vector<uint32_t>& words, size_t operandOffset) {
+  std::string text = {};
+  for (size_t i = operandOffset; i < words.size(); ++i) {
+    for (int shift = 0; shift < 4; ++shift) {
+      const char c = static_cast<char>((words[i] >> (shift * 8)) & 0xFFu);
+      if (c == '\0') {
+        return text;
+      }
+      text += c;
+    }
+  }
+  return text;
 }
 
 std::vector<uint32_t> EncodeStringWords(const std::string& text) {
@@ -214,6 +231,102 @@ std::vector<uint32_t> CompileSPIRVLibraryModule(const std::string& wrapperSource
     return {};
   }
   return patched;
+}
+
+std::vector<uint32_t> ImportSPIRVFunction(const std::vector<uint32_t>& words,
+                                          const char* functionName, std::string* error) {
+  if (error == nullptr || words.size() <= 5) {
+    if (error != nullptr) {
+      *error = "the module is too small to patch";
+    }
+    return {};
+  }
+  const auto instructions = Parse(words);
+  if (instructions.empty()) {
+    *error = "the module's instructions do not parse";
+    return {};
+  }
+  // The stub is named by glslang as "chainBody(...)" with its parameter types; the entry stays —
+  // this is the frame's shape, where main calls the imported body.
+  const std::string mangledPrefix = std::string(functionName) + "(";
+  uint32_t targetId = 0;
+  for (const auto& instruction : instructions) {
+    if (instruction.opcode != kOpName || instruction.wordCount < 3) {
+      continue;
+    }
+    const std::string name = LiteralStringAt(words, instruction.offset + 2);
+    if (name == functionName || name.rfind(mangledPrefix, 0) == 0) {
+      targetId = words[instruction.offset + 1];
+      break;
+    }
+  }
+  if (targetId == 0) {
+    *error = "the module does not declare the function to import";
+    return {};
+  }
+  // The stub's body: everything after its last parameter up to (excluding) OpFunctionEnd leaves,
+  // leaving a declaration with the same signature.
+  size_t bodyStart = 0;
+  size_t bodyEnd = 0;
+  for (const auto& instruction : instructions) {
+    if (instruction.opcode != kOpFunction || instruction.wordCount < 3 ||
+        words[instruction.offset + 2] != targetId) {
+      continue;
+    }
+    for (const auto& rest : instructions) {
+      if (rest.offset < instruction.offset) {
+        continue;
+      }
+      if (rest.opcode == kOpFunctionParameter) {
+        bodyStart = rest.offset + rest.wordCount;
+      }
+      if (rest.opcode == kOpFunctionEnd) {
+        bodyEnd = rest.offset;
+        break;
+      }
+    }
+    break;
+  }
+  if (bodyEnd == 0 || bodyStart == 0 || bodyStart > bodyEnd) {
+    *error = "the stub's body extent was not found";
+    return {};
+  }
+  std::vector<uint32_t> out = {};
+  out.reserve(words.size());
+  bool linkageCapabilityAdded = false;
+  bool importDecorationAdded = false;
+  for (const auto& instruction : instructions) {
+    if (instruction.offset >= bodyStart && instruction.offset < bodyEnd) {
+      continue;  // the stub's body
+    }
+    if (instruction.opcode == kOpCapability) {
+      AppendWords(&out, words, instruction.offset, instruction.wordCount);
+      if (!linkageCapabilityAdded) {
+        linkageCapabilityAdded = true;
+        const uint32_t linkage[] = {(2u << 16) | kOpCapability, kCapabilityLinkage};
+        out.insert(out.end(), linkage, linkage + 2);
+      }
+      continue;
+    }
+    if (!importDecorationAdded &&
+        (instruction.opcode == kOpDecorate || instruction.opcode == kOpTypeVoid)) {
+      importDecorationAdded = true;
+      const std::vector<uint32_t> nameWords = EncodeStringWords(functionName);
+      out.push_back(static_cast<uint32_t>((3 + nameWords.size() + 1) << 16 | kOpDecorate));
+      out.push_back(targetId);
+      out.push_back(kDecorationLinkageAttributes);
+      out.insert(out.end(), nameWords.begin(), nameWords.end());
+      out.push_back(kLinkageTypeImport);
+      // The decoration lands before the anchor instruction; the anchor still ships below.
+    }
+    AppendWords(&out, words, instruction.offset, instruction.wordCount);
+  }
+  if (!importDecorationAdded) {
+    *error = "the module has no annotation or type section to hold the import decoration";
+    return {};
+  }
+  out.insert(out.begin(), words.begin(), words.begin() + 5);
+  return out;
 }
 
 }  // namespace tgfx

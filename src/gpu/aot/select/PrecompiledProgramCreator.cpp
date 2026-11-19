@@ -31,6 +31,7 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/chain/ChainBodyEmitter.h"
 #include "gpu/aot/chain/ChainProgramEmit.h"
+#include "gpu/aot/chain/ChainSPIRVBody.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/plan/ChainBindingWriter.h"
@@ -84,7 +85,8 @@ static void AppendAssembledChainKey(Context* context, const ProgramInfo& info,
     return;
   }
   auto cache = ContextCacheAccess::Cache(context);
-  if (SpecFormatForBackend(context->backend(), cache->payloadFormat()) != ShaderCodeFormat::GLSL) {
+  const auto payloadFormat = SpecFormatForBackend(context->backend(), cache->payloadFormat());
+  if (payloadFormat != ShaderCodeFormat::GLSL && payloadFormat != ShaderCodeFormat::SPIRV) {
     return;
   }
   const bool xpPass =
@@ -374,7 +376,9 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   // tables. Its own experiment switch; every decline keeps the paths below untouched.
   bool assembledAttempt = false;
   ChainBindings chainBindings = {};
-  if (allowComposed && AssembledChainEnabled() && format == ShaderCodeFormat::GLSL &&
+  const bool assembledVulkan = format == ShaderCodeFormat::SPIRV;
+  if (allowComposed && AssembledChainEnabled() &&
+      (format == ShaderCodeFormat::GLSL || assembledVulkan) &&
       strcmp(Families()[variant.family].name, "Chain") == 0) {
     const auto* assembledSources = programInfo->getSources();
     if (assembledSources != nullptr && assembledSources->chain != nullptr) {
@@ -383,8 +387,71 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
                                               static_cast<int>(programInfo->getBlendMode()));
       const ChainComposition composition =
           DescribeChainComposition(*assembledSources->chain, xpPass);
-      if (EmitChainProgramGLSL(composition, chainFamily, variant, cache, &fragmentDesc.code,
-                               &chainBindings)) {
+      if (assembledVulkan) {
+        // The linking route: the precompiled frame's entry calls a body emitted here, linked
+        // with the op modules the plan reaches. Shapes outside the linkable slice keep the
+        // interpreter's precompiled payload.
+        const int hasXp = XferDimValue(chainFamily, variant);
+        if (ChainSPIRVBodySupported(composition, layout, hasXp)) {
+          ChainProgramPlan plan = {};
+          if (PlanChainProgram(composition, chainFamily, variant, cache, &plan)) {
+            std::vector<uint32_t> body = {};
+            std::string emitError;
+            if (EmitChainBodySPIRV(plan, layout, &body, &emitError)) {
+              std::vector<std::vector<uint32_t>> modules = {};
+              bool modulesOk = true;
+              const auto* frameEntry = cache->findComposed(FragmentPackSPIRVFrameBase | variantId);
+              if (frameEntry == nullptr) {
+                modulesOk = false;
+                LOGE("AssembledChain: no SPIR-V frame for variant %u", variantId);
+              } else {
+                std::vector<uint32_t> frameWords(frameEntry->data.size() / 4);
+                std::memcpy(frameWords.data(), frameEntry->data.data(),
+                            frameWords.size() * sizeof(uint32_t));
+                modules.push_back(std::move(frameWords));
+              }
+              if (modulesOk) {
+                modules.push_back(std::move(body));
+                for (int op : plan.usedOps) {
+                  if (op == ChainISA::InputOpaque || op == ChainISA::MulAlpha) {
+                    continue;  // the inline expressions need no module
+                  }
+                  const auto* opEntry =
+                      cache->findComposed(FragmentPackSPIRVOpBase | static_cast<uint32_t>(op));
+                  if (opEntry == nullptr) {
+                    modulesOk = false;
+                    LOGE("AssembledChain: no SPIR-V op module for %d", op);
+                    break;
+                  }
+                  std::vector<uint32_t> opWords(opEntry->data.size() / 4);
+                  std::memcpy(opWords.data(), opEntry->data.data(),
+                              opWords.size() * sizeof(uint32_t));
+                  modules.push_back(std::move(opWords));
+                }
+                std::vector<uint32_t> linked = {};
+                std::string linkError;
+                if (modulesOk && LinkChainSPIRV(modules, &linked, &linkError)) {
+                  assembledAttempt = true;
+                  chainBindings = plan.bindings;
+                  const auto* linkedBytes = reinterpret_cast<const uint8_t*>(linked.data());
+                  fragmentDesc.binaryData.assign(linkedBytes,
+                                                 linkedBytes + linked.size() * sizeof(uint32_t));
+                  fragmentDesc.code.clear();
+                  LOGI("AssembledChain: linked Vulkan entry for %s[variant=%u] (%zu modules)",
+                       shaderName, variantId, modules.size());
+                } else if (modulesOk) {
+                  LOGE("AssembledChain: Vulkan link declined for %s[variant=%u]: %s", shaderName,
+                       variantId, linkError.c_str());
+                }
+              }
+            } else {
+              LOGE("AssembledChain: Vulkan body declined for %s[variant=%u]: %s", shaderName,
+                   variantId, emitError.c_str());
+            }
+          }
+        }
+      } else if (EmitChainProgramGLSL(composition, chainFamily, variant, cache, &fragmentDesc.code,
+                                      &chainBindings)) {
         assembledAttempt = true;
         LOGI("AssembledChain: assembled entry for %s[variant=%u] (%zu bytes, %zu blocks)",
              shaderName, variantId, fragmentDesc.code.size(), chainBindings.fragment.size());

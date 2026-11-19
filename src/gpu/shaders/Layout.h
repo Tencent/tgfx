@@ -65,6 +65,7 @@ struct Layout {
   };
   struct Varying {
     std::string name;
+    ShaderType type = ShaderType::Float4;
     uint8_t location = 0;
   };
   struct Texture {
