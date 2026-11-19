@@ -1169,13 +1169,11 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       const bool mayRefine = tileTasks->empty();
       const bool gridComplete = missingGrids.empty();
       // Once the grid is complete, the budget tops up L+2, L+1 and then L itself. L+3 is left to
-      // pass 1. While the grid is incomplete there is no budget here, and only L+2 and L+1 are
-      // checked for pending work.
+      // pass 1.
       auto chainBudget = gridComplete ? std::max(_maxTilesRefinedPerFrame, 0) : 0;
-      const auto lowestLevel = gridComplete ? size_t{1} : size_t{2};
       if (mayRefine) {
         // coverages[0] is L and coverages[3] is L+3.
-        for (auto level = coverages.size() - 1; level >= lowestLevel && chainBudget > 0; --level) {
+        for (auto level = coverages.size() - 1; level >= 1 && chainBudget > 0; --level) {
           auto& coverage = coverages[level - 1];
           auto cells = CollectMissingTreeTiles(coverage, {renderRect}, _tileSize);
           if (cells.empty()) {
@@ -1189,12 +1187,15 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
         }
       }
       // Report the state left after this frame: a skipped frame still has to keep the loop alive,
-      // and a frame that filled everything has to stop it.
+      // and a frame that filled everything has to stop it. An incomplete grid has already kept the
+      // loop alive, so only a complete one needs the scan.
       bool chainPending = false;
-      for (auto level = coverages.size() - 1; level >= lowestLevel; --level) {
-        if (!CollectMissingTreeTiles(coverages[level - 1], {renderRect}, _tileSize).empty()) {
-          chainPending = true;
-          break;
+      if (gridComplete) {
+        for (auto level = coverages.size() - 1; level >= 1; --level) {
+          if (!CollectMissingTreeTiles(coverages[level - 1], {renderRect}, _tileSize).empty()) {
+            chainPending = true;
+            break;
+          }
         }
       }
       // Without a budget the chain can never progress, so it must not keep the loop running.
