@@ -125,7 +125,7 @@ void BlankTileSet::insert(const TileKey& key) {
     clearGrid();
     gridScaleInt = key.scaleInt;
   }
-  if (count >= _maxCount) {
+  if (count >= maxCount) {
     dropGroupForSpace();
   }
   auto& cells = key.type() == TileType::Grid ? gridCells : treeCells[key.level];

@@ -255,8 +255,8 @@ class BlankTileSet {
     return count;
   }
 
-  void setMaxCount(size_t maxCount) {
-    _maxCount = maxCount;
+  void setMaxCount(size_t limit) {
+    maxCount = limit;
   }
 
  private:
@@ -266,7 +266,7 @@ class BlankTileSet {
   CellSet gridCells = {};
   std::unordered_map<int32_t, CellSet> treeCells = {};
   size_t count = 0;
-  size_t _maxCount = std::numeric_limits<size_t>::max();
+  size_t maxCount = std::numeric_limits<size_t>::max();
 
   void dropGroupForSpace();
 };
