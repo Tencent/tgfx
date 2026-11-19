@@ -75,7 +75,7 @@ class Shape {
 
   /**
    * Merges multiple Shapes into a new Shape using the PathOp::Append operation. Returns nullptr if
-   * the shape vector is empty.
+   * the shape vector is empty or contains only nullptr.
    */
   static std::shared_ptr<Shape> Merge(const std::vector<std::shared_ptr<Shape>>& shapes);
 

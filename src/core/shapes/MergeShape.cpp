@@ -47,7 +47,9 @@ PathFillType MergeShape::fillType() const {
     auto firstType = first->fillType();
     if (PathRef::UnionsByConcatenation(firstType, first->getBounds(), second->fillType(),
                                        second->getBounds())) {
-      return firstType;
+      // Concatenation keeps the first operand's outline unchanged, including its rule. Reading it
+      // from the path avoids relying on the operand's reported rule matching its outline.
+      return first->getPath().getFillType();
     }
   }
   return isInverseFillType() ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd;
@@ -96,8 +98,13 @@ Path MergeShape::onGetPath(float resolutionScale) const {
   // than the outlines they contain - a text run reports its em box, whose neighbours nearly always
   // overlap while the glyph outlines do not. Deciding here from the tighter outline bounds would
   // concatenate where fillType() promised a boolean result, leaving the shape reporting one rule and
-  // handing out an outline read by another, so the same bounds decide it in both places.
-  if (!PathRef::AddPath(path, secondPath, pathOp, first->getBounds(), second->getBounds())) {
+  // handing out an outline read by another, so both places decide from the same reported inputs.
+  bool concatenate = false;
+  if (pathOp == PathOp::Union) {
+    concatenate = PathRef::UnionsByConcatenation(first->fillType(), first->getBounds(),
+                                                 second->fillType(), second->getBounds());
+  }
+  if (!PathRef::AddPath(path, secondPath, pathOp, concatenate)) {
     // A failed operation leaves the first operand behind, which is not the merge that was asked
     // for: reading it as the result would draw one side of the operation as if it were both. An
     // empty path is the only answer that is wrong in a visible way rather than a silent one, and

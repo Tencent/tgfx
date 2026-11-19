@@ -26,6 +26,7 @@
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/PathProvider.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
@@ -399,7 +400,8 @@ TGFX_TEST(PathShapeTest, inverseFillType) {
 }
 
 TGFX_TEST_PRIVATE(PathShapeTest, MergeShapeFillType) {
-  // MergeShape always produces EvenOdd fill type regardless of input fill types.
+  // These outlines overlap, so every operation runs the boolean path and the result is even-odd
+  // regardless of the input rules; a union of disjoint outlines concatenates and keeps their rule.
   Path rectPath;
   rectPath.addRect(Rect::MakeXYWH(0, 0, 100, 100));
   Path ovalPath;
@@ -617,10 +619,11 @@ TGFX_TEST(PathShapeTest, MergedUnionWithOverlappingBoundsIsResolved) {
 }
 
 static void ExpectRuleMatchesOutline(const std::shared_ptr<Shape>& shape, const char* name) {
-  // Only MergeShape and AppendShape can drift: every other shape answers fillType() from the very
-  // path it hands out. These two derive their rule from the operands, so the rule they report and
-  // the rule their outline carries are two separate computations that have to agree - the renderer
-  // reads the outline with the reported rule.
+  // MergeShape and AppendShape derive their rule from operands rather than from the outline they
+  // hand out, so the reported rule and the outline rule are separate computations that have to
+  // agree - the renderer reads the outline with the reported rule. EffectShape and ProviderShape
+  // derive their rule from operands as well and still have known deviations, which this helper
+  // does not assert.
   EXPECT_EQ(shape->getPath().getFillType(), shape->fillType()) << name;
 }
 
@@ -669,6 +672,45 @@ TGFX_TEST(PathShapeTest, ShapeFillTypeMatchesOutline) {
                            "append evenodd+empty");
   ExpectRuleMatchesOutline(Shape::Merge(inverseEmpty, rect, PathOp::Append), "append inverseEmpty");
   ExpectRuleMatchesOutline(Shape::Merge(rect, evenOddRect, PathOp::Append), "append rect+evenodd");
+
+  // Strokes replace the outline, so both regular and hairline strokes report the rule their outline
+  // carries.
+  Stroke stroke(10.0f);
+  ExpectRuleMatchesOutline(Shape::ApplyStroke(evenOddRect, &stroke), "stroked evenodd");
+  Stroke hairline(0.0f);
+  ExpectRuleMatchesOutline(Shape::ApplyStroke(evenOddRect, &hairline), "hairline evenodd stroke");
+
+  // Known deviations: EffectShape and ProviderShape report their operand's rule instead of the rule
+  // of the outline they hand out. Assert the deviation so this gap is explicit rather than implied.
+  auto provider = Shape::MakeFrom(PathProvider::Wrap(evenOddRect->getPath()));
+  ASSERT_TRUE(provider != nullptr);
+  EXPECT_NE(provider->getPath().getFillType(), provider->fillType());
+  auto trimmed = Shape::ApplyEffect(inverseRect, PathEffect::MakeTrim(0.5f, 0.5f));
+  ASSERT_TRUE(trimmed != nullptr);
+  EXPECT_NE(trimmed->getPath().getFillType(), trimmed->fillType());
+}
+
+static std::shared_ptr<Shape> MakeEvenOddProviderShape(int x) {
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(x, 0, 10, 10));
+  path.setFillType(PathFillType::EvenOdd);
+  return Shape::MakeFrom(PathProvider::Wrap(path));
+}
+
+TGFX_TEST(PathShapeTest, ProviderShapeUnionReportsOutlineRule) {
+  auto first = MakeEvenOddProviderShape(0);
+  auto second = MakeEvenOddProviderShape(100);
+  ASSERT_TRUE(first != nullptr);
+  ASSERT_TRUE(second != nullptr);
+  EXPECT_EQ(first->fillType(), PathFillType::Winding);
+  auto merged = Shape::Merge(first, second, PathOp::Union);
+  ASSERT_TRUE(merged != nullptr);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  EXPECT_EQ(merged->getPath().getFillType(), merged->fillType());
+}
+
+TGFX_TEST(PathShapeTest, MergeVectorWithOnlyNullptrReturnsNull) {
+  EXPECT_EQ(Shape::Merge({nullptr, nullptr}), nullptr);
 }
 
 TGFX_TEST_PRIVATE(PathShapeTest, ReverseShape) {
@@ -1428,7 +1470,8 @@ TGFX_TEST(PathShapeTest, StrokeShapeReportsWindingRule) {
   Stroke hairline(0.0f);
   auto hairlined = Shape::ApplyStroke(shape, &hairline);
   ASSERT_TRUE(hairlined != nullptr);
-  EXPECT_EQ(hairlined->fillType(), PathFillType::EvenOdd);
+  EXPECT_EQ(hairlined->fillType(), PathFillType::Winding);
+  EXPECT_EQ(hairlined->getPath().getFillType(), hairlined->fillType());
 }
 
 TGFX_TEST(PathShapeTest, StrokeShapePreservesInverseFillRule) {

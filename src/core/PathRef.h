@@ -46,11 +46,10 @@ class PathRef {
                                     PathFillType secondFillType, const Rect& secondBounds);
 
   /**
-   * Combines paths using the supplied conservative bounds to select the union fast path. Returns
-   * false on failure without changing destination. Bounds must be obtained before writing the path.
+   * Combines paths, concatenating their outlines when concatenate is true. Returns false on
+   * failure without changing destination.
    */
-  static bool AddPath(Path& destination, const Path& source, PathOp op, const Rect& bounds,
-                      const Rect& sourceBounds);
+  static bool AddPath(Path& destination, const Path& source, PathOp op, bool concatenate);
 
   PathRef() = default;
 

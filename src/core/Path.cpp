@@ -538,17 +538,19 @@ bool PathRef::UnionsByConcatenation(PathFillType firstFillType, const Rect& firs
 }
 
 bool Path::addPath(const Path& src, PathOp op) {
-  // The bounds are read before the destination is made writable, which drops its cached bounds:
-  // reading them after that would leave the cache holding the bounds from before the merge.
-  return PathRef::AddPath(*this, src, op, getBounds(), src.getBounds());
+  bool concatenate = false;
+  if (op == PathOp::Union && getFillType() == src.getFillType() && !isInverseFillType()) {
+    // The bounds are read before the destination is made writable, which drops its cached bounds:
+    // reading them after that would leave the cache holding the bounds from before the merge.
+    auto bounds = getBounds();
+    auto sourceBounds = src.getBounds();
+    concatenate = PathRef::UnionsByConcatenation(getFillType(), bounds, src.getFillType(),
+                                                 sourceBounds);
+  }
+  return PathRef::AddPath(*this, src, op, concatenate);
 }
 
-bool PathRef::AddPath(Path& destination, const Path& source, PathOp op, const Rect& bounds,
-                      const Rect& sourceBounds) {
-  // Testing disjoint bounds avoids paying for a boolean operation twice during mask accumulation.
-  auto unionConcatenates =
-      op == PathOp::Union &&
-      UnionsByConcatenation(destination.getFillType(), bounds, source.getFillType(), sourceBounds);
+bool PathRef::AddPath(Path& destination, const Path& source, PathOp op, bool concatenate) {
   auto& path = WriteAccess(destination);
   const auto& newPath = ReadAccess(source);
   if (op == PathOp::Append || op == PathOp::Extend) {
@@ -562,7 +564,7 @@ bool PathRef::AddPath(Path& destination, const Path& source, PathOp op, const Re
     }
     return true;
   }
-  if (unionConcatenates) {
+  if (concatenate) {
     // Appending onto an empty path reads the verb array behind its end, so the operand replaces it.
     if (path.isEmpty()) {
       path = newPath;

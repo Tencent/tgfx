@@ -745,7 +745,7 @@ TGFX_TEST(PathTest, ToWindingKeepsOrientationFarFromOrigin) {
   EXPECT_FALSE(path.contains(origin, origin)) << "counter filled in";
 }
 
-TGFX_TEST(PathTest, ToWindingLeavesCrossingContoursAlone) {
+TGFX_TEST(PathTest, ToWindingNormalizesSameDirectionCrossingContours) {
   // Contours that share area are neither nested nor disjoint. Real glyphs do this: two strokes of
   // one character overlap where they meet. Both stay outermost and are normalized to clockwise, so
   // their winding numbers add up in the intersection and fill it, matching the union of the two.
