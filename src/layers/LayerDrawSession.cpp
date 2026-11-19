@@ -187,16 +187,19 @@ bool LayerDrawSession::IsSupported2DScene(const Layer* layer,
 void LayerDrawSession::CollectLayerEffects(Layer* layer, const Matrix& localToOutput,
                                            float filterOutset, LayerStylePosition position,
                                            std::vector<BackgroundEffect>* effects) {
+  if (layer->layerStyles().empty()) {
+    return;
+  }
+  auto localBounds = layer->getBounds();
+  if (localBounds.isEmpty()) {
+    return;
+  }
+  auto bounds = localToOutput.mapRect(localBounds);
+  bounds.outset(filterOutset, filterOutset);
   for (const auto& style : layer->layerStyles()) {
     if (style->position() != position || !NeedsBackgroundSource(style->extraSourceType())) {
       continue;
     }
-    auto localBounds = layer->getBounds();
-    if (localBounds.isEmpty()) {
-      continue;
-    }
-    auto bounds = localToOutput.mapRect(localBounds);
-    bounds.outset(filterOutset, filterOutset);
     auto dependency = style->filterBackground(Rect::MakeEmpty(), localToOutput.getMaxScale());
     effects->push_back({bounds, filterOutset + MaxAbsOutset(dependency)});
   }
