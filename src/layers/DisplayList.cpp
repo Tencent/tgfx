@@ -1750,11 +1750,16 @@ std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBoun
 
 bool DisplayList::HasVisibleBackgroundStyle(const Layer* layer, const Rect& unionRect,
                                             const std::vector<Rect>& rects, float scale) {
-  if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
-      !Rect::Intersects(unionRect, layer->renderBounds)) {
+  if (layer->maxBackgroundOutset <= 0 || !Rect::Intersects(unionRect, layer->renderBounds)) {
     return false;
   }
-  auto layerScale = scale * layer->getMatrixWithScrollRect().asMatrix().getMaxScale();
+  // The root is drawn without its own visibility, alpha or matrix, so only its children apply them.
+  auto isRoot = layer->_parent == nullptr;
+  if (!isRoot && (!layer->bitFields.visible || layer->_alpha <= 0)) {
+    return false;
+  }
+  auto layerScale =
+      isRoot ? scale : scale * layer->getMatrixWithScrollRect().asMatrix().getMaxScale();
   for (const auto& style : layer->_layerStyles) {
     if (style == nullptr || (style->extraSourceType() &
                              static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {

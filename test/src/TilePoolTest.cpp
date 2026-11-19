@@ -687,4 +687,44 @@ TGFX_TEST(TilePoolTest, BackgroundBlurAtTheThresholdBoundary) {
   EXPECT_FALSE(BackgroundHandler::IsNegligibleBackgroundStyle(style.get(), 0.0666f));
 }
 
+// The root is drawn without its own alpha, visibility or matrix, so setting them must not make
+// the capture skip the background styles below it.
+TGFX_TEST(TilePoolTest, RootPropertiesDoNotSkipBackgroundCapture) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto render = [&](float rootAlpha, bool rootVisible, float rootScale) {
+    auto surface = Surface::Make(context, 256, 256);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(RenderMode::Tiled);
+    displayList->setBackgroundColor(Color::Black());
+    auto root = displayList->root();
+    for (int i = 0; i < 13; ++i) {
+      auto stripe = MakeSolid(10, 256, Color::White());
+      stripe->setMatrix(Matrix::MakeTrans(static_cast<float>(i * 20), 0));
+      root->addChild(stripe);
+    }
+    auto panel = ShapeLayer::Make();
+    Path path = {};
+    path.addRect(Rect::MakeXYWH(48, 48, 160, 160));
+    panel->setPath(path);
+    panel->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 40)));
+    panel->setLayerStyles({BackgroundBlurStyle::Make(8, 8)});
+    root->addChild(panel);
+    root->setAlpha(rootAlpha);
+    root->setVisible(rootVisible);
+    root->setMatrix(Matrix::MakeScale(rootScale));
+    displayList->render(surface.get());
+    SkipRun run = {};
+    auto info = ImageInfo::Make(256, 256, ColorType::RGBA_8888, AlphaType::Premultiplied);
+    run.pixels.resize(static_cast<size_t>(256 * 256 * 4));
+    EXPECT_TRUE(surface->readPixels(info, run.pixels.data(), 0, 0));
+    return run;
+  };
+  auto normal = render(1.0f, true, 1.0f);
+  EXPECT_EQ(MaxDifference(normal, render(0.0f, true, 1.0f)), 0);
+  EXPECT_EQ(MaxDifference(normal, render(1.0f, false, 1.0f)), 0);
+  EXPECT_EQ(MaxDifference(normal, render(1.0f, true, 0.01f)), 0);
+}
+
 }  // namespace tgfx
