@@ -400,6 +400,9 @@ class DisplayList {
   std::vector<Rect> computeCaptureCullRects(const std::vector<Rect>& worldRects,
                                             const Matrix& pixelToWorld) const;
 
+  static bool HasVisibleBackgroundStyle(const Layer* layer, const Rect& unionRect,
+                                        const std::vector<Rect>& rects, float scale);
+
   /**
    * Captures the backdrop the background styles sample. `renderRects` are in the surface pixels of
    * `viewMatrix`, which maps the layer space to those pixels; a tile passes its own raster scale so

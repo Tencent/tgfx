@@ -1746,6 +1746,39 @@ std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBoun
   return footprints;
 }
 
+bool DisplayList::HasVisibleBackgroundStyle(const Layer* layer, const Rect& unionRect,
+                                            const std::vector<Rect>& rects, float scale) {
+  if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
+      !Rect::Intersects(unionRect, layer->renderBounds)) {
+    return false;
+  }
+  auto layerScale = scale * layer->getMatrixWithScrollRect().asMatrix().getMaxScale();
+  for (const auto& style : layer->_layerStyles) {
+    if (style == nullptr || (style->extraSourceType() &
+                             static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
+      continue;
+    }
+    // The draw path leaves such a style out entirely, so nothing would read its snapshot.
+    if (BackgroundHandler::IsNegligibleBackgroundStyle(style.get(), layerScale)) {
+      continue;
+    }
+    // The union covers the gaps between scattered rects; the capture culls against each rect, so
+    // a layer that only touches a gap would produce nothing.
+    for (const auto& rect : rects) {
+      if (Rect::Intersects(rect, layer->renderBounds)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  for (const auto& child : layer->_children) {
+    if (HasVisibleBackgroundStyle(child.get(), unionRect, rects, layerScale)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     Surface* surface, const std::vector<Rect>& renderRects, const Matrix& viewMatrix) const {
   DEBUG_ASSERT(surface != nullptr);
@@ -1791,41 +1824,7 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   for (const auto& rect : worldRects) {
     unionRect.join(rect);
   }
-  auto hasVisibleBackgroundStyle = [](const Layer* layer, const Rect& unionRect,
-                                      const std::vector<Rect>& rects, float scale,
-                                      const auto& self) -> bool {
-    if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
-        !Rect::Intersects(unionRect, layer->renderBounds)) {
-      return false;
-    }
-    auto layerScale = scale * layer->getMatrixWithScrollRect().asMatrix().getMaxScale();
-    for (const auto& style : layer->_layerStyles) {
-      if (style == nullptr || (style->extraSourceType() &
-                               static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
-        continue;
-      }
-      // The draw path leaves such a style out entirely, so nothing would read its snapshot.
-      if (BackgroundHandler::IsNegligibleBackgroundStyle(style.get(), layerScale)) {
-        continue;
-      }
-      // The union covers the gaps between scattered rects; the capture culls against each rect, so
-      // a layer that only touches a gap would produce nothing.
-      for (const auto& rect : rects) {
-        if (Rect::Intersects(rect, layer->renderBounds)) {
-          return true;
-        }
-      }
-      return false;
-    }
-    for (const auto& child : layer->_children) {
-      if (self(child.get(), unionRect, rects, layerScale, self)) {
-        return true;
-      }
-    }
-    return false;
-  };
-  if (!hasVisibleBackgroundStyle(_root.get(), unionRect, worldRects, deviceScale,
-                                 hasVisibleBackgroundStyle)) {
+  if (!HasVisibleBackgroundStyle(_root.get(), unionRect, worldRects, deviceScale)) {
     return nullptr;
   }
   // Expand by the max blur outset so layers whose bounds sit just outside the dirty rects but
