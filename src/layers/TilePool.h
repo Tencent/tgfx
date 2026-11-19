@@ -83,7 +83,7 @@ enum class TileType { Grid, Tree };
  * The level stored in the keys of grid tiles. Real levels can be negative, so the sentinel has to
  * be a value that no zoom scale can produce.
  */
-constexpr int32_t kExactLevel = std::numeric_limits<int32_t>::min();
+static constexpr int32_t EXACT_LEVEL = std::numeric_limits<int32_t>::min();
 
 /**
  * Returns the tree level whose tiles cover (tileSize / 2, tileSize] screen pixels at the given
@@ -107,7 +107,7 @@ struct TileKey {
   int64_t scaleInt = 0;
 
   static TileKey MakeGrid(int tileX, int tileY, int64_t scaleInt) {
-    return {tileX, tileY, kExactLevel, scaleInt};
+    return {tileX, tileY, EXACT_LEVEL, scaleInt};
   }
 
   static TileKey MakeTree(int tileX, int tileY, int level) {

@@ -110,7 +110,7 @@ class DrawTask {
   }
 
   /**
-   * Returns the level of the tree tiles this task rasterizes, or kExactLevel if it rasterizes grid
+   * Returns the level of the tree tiles this task rasterizes, or EXACT_LEVEL if it rasterizes grid
    * tiles at the current zoom scale.
    */
   int treeLevel() const {
@@ -141,7 +141,7 @@ class DrawTask {
   Rect _strictRect = {};
   bool _identityScale = true;
   bool _coversTiles = false;
-  int _treeLevel = kExactLevel;
+  int _treeLevel = EXACT_LEVEL;
 
   void calculateRects(int tileSize, const Rect& drawRect, float scale) {
     DEBUG_ASSERT(!tiles.empty());
@@ -726,7 +726,7 @@ void DisplayList::captureTileBackgrounds(
     }
     for (const auto& levelEntry : levels) {
       auto level = levelEntry.first;
-      auto rasterScale = level == kExactLevel ? zoomScale : GetTileRasterScale(level);
+      auto rasterScale = level == EXACT_LEVEL ? zoomScale : GetTileRasterScale(level);
       if (FloatNearlyZero(rasterScale)) {
         continue;
       }
@@ -756,7 +756,7 @@ std::vector<Rect> DisplayList::drawTileTasks(
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   for (size_t taskIndex = 0; taskIndex < tileTasks.size(); ++taskIndex) {
     const auto& task = tileTasks[taskIndex];
-    auto isTreeTask = task.treeLevel() != kExactLevel;
+    auto isTreeTask = task.treeLevel() != EXACT_LEVEL;
     auto captureIndex = taskCapture[taskIndex];
     auto* snapshots =
         captureIndex >= 0 ? captureMaps[static_cast<size_t>(captureIndex)].get() : nullptr;
@@ -905,7 +905,7 @@ void DisplayList::invalidateTreeTiles(const std::vector<Rect>& dirtyRegions,
 void DisplayList::recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks) {
   for (auto& task : tileTasks) {
     for (auto& tile : task.getTiles()) {
-      auto key = task.treeLevel() == kExactLevel
+      auto key = task.treeLevel() == EXACT_LEVEL
                      ? TileKey::MakeGrid(tile->tileX, tile->tileY, _zoomScaleInt)
                      : TileKey::MakeTree(tile->tileX, tile->tileY, task.treeLevel());
       if (auto recycled = tilePool->erase(key)) {
@@ -923,7 +923,7 @@ void DisplayList::recycleGridTiles() {
 
 void DisplayList::recycleBlankTiles(const DrawTask& task) {
   for (auto& tile : task.getTiles()) {
-    auto key = task.treeLevel() == kExactLevel
+    auto key = task.treeLevel() == EXACT_LEVEL
                    ? TileKey::MakeGrid(tile->tileX, tile->tileY, _zoomScaleInt)
                    : TileKey::MakeTree(tile->tileX, tile->tileY, task.treeLevel());
     if (tilePool->erase(key) == nullptr) {
@@ -1402,7 +1402,7 @@ bool DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   AutoCanvasRestore autoRestore(canvas);
-  auto rasterScale = task.treeLevel() == kExactLevel
+  auto rasterScale = task.treeLevel() == EXACT_LEVEL
                          ? ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision)
                          : GetTileRasterScale(task.treeLevel());
   DEBUG_ASSERT(rasterScale != 0.0f);
