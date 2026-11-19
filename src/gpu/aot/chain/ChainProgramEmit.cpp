@@ -63,7 +63,7 @@ bool ReplaceAll(std::string* text, const std::string& token, const std::string& 
 }  // namespace
 
 bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShaderCache* cache,
-                           std::string* code) {
+                           std::string* code, bool esProfile) {
   if (cache == nullptr || code == nullptr) {
     return false;
   }
@@ -89,7 +89,34 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   for (const auto& sampler : plan.samplers) {
     declarations += " uniform sampler2D " + sampler.name + ";\n";
   }
-  declarations += "layout(location = 0) out vec4 fragColor;\n";
+  // The leaf fetch's index dispatch names all four leaf samplers statically (the driver folds the
+  // branch, not the text), so an assembly that samples any leaf declares the whole set.
+  bool needsLeafSamplers = false;
+  for (const auto& call : plan.calls) {
+    if (call.op == ChainISA::Texture || call.op == ChainISA::TexModulate) {
+      needsLeafSamplers = true;
+    }
+  }
+  if (needsLeafSamplers) {
+    for (int leafIndex = 0; leafIndex < 4; ++leafIndex) {
+      const std::string name = "TextureSampler_" + std::to_string(leafIndex);
+      bool declared = false;
+      for (const auto& sampler : plan.samplers) {
+        if (sampler.name == name) {
+          declared = true;
+        }
+      }
+      if (!declared) {
+        declarations += " uniform sampler2D " + name + ";\n";
+      }
+    }
+  }
+  if (esProfile) {
+    // ES 3.00 takes no location qualifier on the fragment output; the name binds it.
+    declarations += "out vec4 fragColor;\n";
+  } else {
+    declarations += "layout(location = 0) out vec4 fragColor;\n";
+  }
 
   // The source functions the body calls, each reading the members and varyings it declares. The
   // tail's final-coverage expression reads the unit coverage source whenever no coverage subtree
@@ -369,7 +396,10 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   const std::string blendPass =
       "  chainXPSrc = chainXPSrcUnpremul(result, coverageRootRegister);\n"
       "  xpBlended = xpBlendColors(chainXPSrc, chainXPDst, XPBlendMode);\n";
-  *code = "#version 330\n#define TGFX_DECLARED_CHAIN 1\n" + declarations + "\n" + sources + pieces +
+  const std::string versionLine =
+      esProfile ? "#version 300 es\nprecision highp float;\nprecision highp int;\n"
+                : "#version 330\n";
+  *code = versionLine + "#define TGFX_DECLARED_CHAIN 1\n" + declarations + "\n" + sources + pieces +
           "vec4 chainLeafTex[4];\n" + xpGlobals +
           "\nvoid main() {\n"
           "  vec4 result = vec4(0.0);\n"
@@ -382,7 +412,7 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
 
 bool EmitChainProgramGLSL(const ChainComposition& composition, const Family& family,
                           const Variant& variant, const PrecompiledShaderCache* cache,
-                          std::string* code, ChainBindings* bindings) {
+                          std::string* code, ChainBindings* bindings, bool esProfile) {
   if (code == nullptr || bindings == nullptr || cache == nullptr) {
     return false;
   }
@@ -390,7 +420,7 @@ bool EmitChainProgramGLSL(const ChainComposition& composition, const Family& fam
   if (!PlanChainProgram(composition, family, variant, cache, &plan)) {
     return false;
   }
-  if (!PrintChainProgramGLSL(plan, cache, code)) {
+  if (!PrintChainProgramGLSL(plan, cache, code, esProfile)) {
     return false;
   }
   *bindings = std::move(plan.bindings);
