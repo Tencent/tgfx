@@ -67,7 +67,9 @@ bool ComposedChainEnabled() {
 /// Whether the from-scratch assembled executor is active: its own experiment switch, off by
 /// default, ahead of the composed splice in the dispatch order.
 bool AssembledChainEnabled() {
-  static const bool enabled = std::getenv("TGFX_ASSEMBLED_CHAIN") != nullptr;
+  // The assembled route is the default; TGFX_NO_ASSEMBLED_CHAIN keeps the interpreter reachable for
+  // debugging a composition the emitter cannot spell.
+  static const bool enabled = std::getenv("TGFX_NO_ASSEMBLED_CHAIN") == nullptr;
   return enabled;
 }
 }  // namespace

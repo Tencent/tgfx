@@ -21,8 +21,7 @@ layout(set = TGFX_TEXTURE_SET, binding = XP_DST_TEX_BINDING) uniform sampler2D D
 #endif
 #endif
 
-// xpBlendColors comes from the including support file, which includes the blend table first; a
-// second include here only duplicated the whole table in every expanded text.
+#include "xp/xp_blend_colors.inc"
 
 #if HAS_XP == 1
 // The one signature the text route, the GL assembly and the Vulkan module all spell: every input
