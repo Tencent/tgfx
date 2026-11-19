@@ -18,6 +18,7 @@
 
 #include <memory>
 #include <utility>
+#include "core/MeasureContext.h"
 #include "core/utils/PictureUtils.h"
 #include "layers/GeometryShapeContext.h"
 #include "layers/LayerStyleSource.h"
@@ -34,9 +35,12 @@ std::shared_ptr<GeometryInputSource> GeometryInputSource::Make(
   }
   // Read the shape before the conversion consumes the picture, so both describe one recording.
   auto shape = GeometryShapeContext::Extract(picture, contentScale);
+  // Physical styles use the image extent as the geometry size. A text blob's conservative bounds
+  // can include unrelated glyphs in its font, so measure the same recording's drawn geometry.
+  auto bounds = MeasureContext::GetTightBounds(picture);
   Point offset = Point::Zero();
   auto image =
-      PictureUtils::ToImageWithOffset(std::move(picture), &offset, nullptr, std::move(colorSpace));
+      PictureUtils::ToImageWithOffset(std::move(picture), &offset, &bounds, std::move(colorSpace));
   if (image == nullptr) {
     return nullptr;
   }

@@ -99,7 +99,8 @@ class GeometryInputSource : public StyleInputSource {
  public:
   /**
    * Builds the source from a recorded picture: rasterizes it and reads the shape back from that
-   * same recording. Returns nullptr when the picture yields no raster.
+   * same recording. The raster bounds are measured from the drawn geometry, not a font-wide
+   * conservative box. Returns nullptr when the picture yields no raster.
    */
   static std::shared_ptr<GeometryInputSource> Make(std::shared_ptr<Picture> picture,
                                                    float contentScale,

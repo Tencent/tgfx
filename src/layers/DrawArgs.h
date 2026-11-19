@@ -68,6 +68,10 @@ class DrawArgs {
   // The opaque context to be used during opaque content/contour recording. Note: this could be nullptr.
   OpaqueContext* opaqueContext = nullptr;
 
+  // Whether nested contour recordings should use their drawn geometry instead of conservative
+  // bounds. Set only while recording a Geometry-sourced layer style.
+  bool useTightContourBounds = false;
+
   // Active background handler: BackgroundCapturer / BackgroundConsumer / NoOp(). Set to
   // BackgroundHandler::NoOp() on intermediate-artifact paths (mask prep, contour, subtree cache,
   // layer style source, 3D entry). nullptr falls back to NoOp in DispatchOrSkip.

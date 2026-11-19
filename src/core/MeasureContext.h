@@ -24,6 +24,13 @@
 namespace tgfx {
 class MeasureContext : public DrawContext {
  public:
+  explicit MeasureContext(bool useTightBounds = false) : useTightBounds(useTightBounds) {
+  }
+
+  // Measures the drawn glyphs and paths instead of font-wide conservative bounds. Used when
+  // recording extents define an effect's geometry, rather than just a culling rectangle.
+  static Rect GetTightBounds(const std::shared_ptr<Picture>& picture);
+
   Rect getBounds() const {
     return bounds;
   }
@@ -63,6 +70,7 @@ class MeasureContext : public DrawContext {
                  const Matrix& matrix, const ClipStack& clip, const Brush& brush) override;
 
  private:
+  bool useTightBounds = false;
   Rect bounds = {};
 
   void addLocalBounds(const Matrix& matrix, const ClipStack& clip, const Rect& localBounds,
