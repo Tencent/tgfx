@@ -816,204 +816,112 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         report->composedByTag[profileTag].push_back(std::move(framePayload));
       }
     }
-    struct SPIRVOpSource {
-      int op;
-      std::vector<const char*> includes;
-      const char* prelude;
-    };
-    const SPIRVOpSource spirvOpSources[] = {
-        {ChainISA::ConstColor, {"ops/ConstColor.glsl"}, ""},
-        {ChainISA::ColorMatrix, {"ops/ColorMatrix.glsl"}, ""},
-        {ChainISA::Luma, {"ops/Luma.glsl"}, ""},
-        {ChainISA::AlphaThreshold, {"ops/AlphaThreshold.glsl"}, ""},
-        {ChainISA::Blend, {"xp/xp_blend_colors.inc"}, "#define HAS_XP 1\n"},
-        {ChainISA::Texture, {"source/texture_sampling.inc", "ops/Texture.glsl"}, ""},
-        {ChainISA::TexModulate, {"source/texture_sampling.inc", "ops/TexModulate.glsl"}, ""},
-        {ChainISA::AARectCoverage, {"ops/AARectCoverage.glsl"}, ""},
-        {ChainISA::LocalRectCoverage,
-         {"coverage/analytic_clip_math.inc", "ops/LocalRectCoverage.glsl"},
-         ""},
-        {ChainISA::RRectCoverage,
-         {"coverage/analytic_clip_math.inc", "ops/RRectCoverage.glsl"},
-         ""},
-    };
-    auto defaultValueOf = [](FragmentType type) {
-      switch (type) {
-        case FragmentType::Float:
-          return "0.5";
-        case FragmentType::Float2:
-          return "vec2(1.0)";
-        case FragmentType::Float3:
-          return "vec3(1.0)";
-        case FragmentType::Int:
-          return "0";
-        case FragmentType::Int4:
-          return "ivec4(0)";
-        case FragmentType::Matrix3:
-          return "mat3(1.0)";
-        case FragmentType::Matrix4:
-          return "mat4(1.0)";
-        default:
-          return "vec4(1.0)";
-      }
-    };
-    for (const auto& source : spirvOpSources) {
-      const auto* def = FindFragment(source.op);
-      if (def == nullptr || def->functionName == nullptr) {
-        continue;
+    // The linker's operator library: one module per admitted table row, straight from the
+    // operator table — its includes, prelude and sampler declarations build the wrapper, the row's
+    // parameter list spells the dummy entry, and the compiled signature is reflected back against
+    // the row so a drift between the GLSL source and the table fails this build.
+    for (size_t rowIndex = 0; rowIndex < OpTable::RowCount(); ++rowIndex) {
+      const OpTable::Row& row = OpTable::Rows()[rowIndex];
+      if (!row.admitted) {
+        continue;  // only the linkable slice ships modules
       }
       std::string text = "#version 450\n";
-      text += source.prelude;
-      for (const char* include : source.includes) {
-        text += readExpanded(include);
+      if (row.prelude != nullptr) {
+        text += row.prelude;
       }
-      // The dummy call's arguments follow the table's marshalling: parameters by their declared
-      // type, the structural literal as a constant, the entry values as plain colors and the
-      // fragment coordinate as a vec2.
-      std::string call = def->functionName + std::string("(");
-      for (size_t argIndex = 0; argIndex < def->args.size(); ++argIndex) {
-        if (argIndex > 0) {
-          call += ", ";
-        }
-        const auto& arg = def->args[argIndex];
-        switch (arg.kind) {
-          case FragmentArgKind::Param:
-            call += defaultValueOf(def->params[arg.index].type);
-            break;
-          case FragmentArgKind::Literal:
-            call += "0";
-            break;
-          case FragmentArgKind::EntryValue:
-            if (arg.index == 3) {
-              call += "vec2(1.0)";
-            } else {
-              call += "vec4(1.0)";
-            }
-            break;
-          default:
-            call += "vec4(1.0)";
-            break;
-        }
-      }
-      call += ")";
-      text += "\nlayout(location = 0) out vec4 dummyOut;\nvoid main() {\n  dummyOut = " + call +
-              ";\n}\n";
-      std::string buildError;
-      auto patched =
-          CompileSPIRVLibraryModule(text, def->functionName, def->functionName, &buildError);
-      if (patched.empty()) {
-        RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
-                         def->functionName, profileTag, -1, -1,
-                         std::string("the SPIR-V op module did not build: ") + buildError);
-        continue;
-      }
-      ComposedPayload payload;
-      payload.name = def->functionName;
-      payload.id = FragmentPackSPIRVOpBase | static_cast<uint32_t>(source.op);
-      const auto* bytes = reinterpret_cast<const uint8_t*>(patched.data());
-      payload.blob.assign(bytes, bytes + patched.size() * sizeof(uint32_t));
-      report->composedByTag[profileTag].push_back(std::move(payload));
-    }
-    // The entry-coupled operators' pure forms: the same sources' pure branches, compiled with the
-    // form macro so only the parameter-taking entry ships. The leaf samplers the pure code samples
-    // live in these modules under the layout's fixed leaf bindings (leaf samplers always occupy
-    // the first bindings of the texture set, the mask following them).
-    struct SPIRVPureForm {
-      uint32_t id;
-      const char* functionName;
-      const char* prelude;
-      std::vector<const char*> includes;
-      bool useStrippedLeafFetch;
-      const char* prologue;
-      const char* call;
-      bool leafSamplers;
-    };
-    // Each entry compiles the same source the text pack ships — one math body, one signature —
-    // with the samplers it samples declared at the layout's fixed leaf bindings. The gradient's
-    // LUT branch is variant-gated by NTEX, so the wrapper declares the full leaf set.
-    const SPIRVPureForm pureForms[] = {
-        {ChainISA::Gradient,
-         "evalGradientSlot",
-         "#define NTEX 4\n",
-         {"pipeline/chain/pointwise_gradient.inc"},
-         false,
-         "",
-         "evalGradientSlot(vec4(1.0), vec3(1.0), 0, 0, 0, vec4(1.0), vec4(1.0), vec4(1.0), "
-         "vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), 0.0, 0.0, 0.0, vec4(1.0), "
-         "vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), "
-         "vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), "
-         "vec4(1.0))",
-         true},
-        {ChainISA::PerlinNoise,
-         "evalNoiseSlot",
-         "",
-         {"pipeline/chain/pointwise_noise.inc"},
-         false,
-         "",
-         "evalNoiseSlot(vec3(1.0), vec4(1.0), ivec4(0))",
-         true},
-        {ChainISA::ColorSpaceXform,
-         "chainApplyColorSpaceXform",
-         "",
-         {"ops/ColorSpaceXform.glsl"},
-         false,
-         "",
-         "chainApplyColorSpaceXform(vec4(1.0), 0, vec4(1.0), vec4(1.0), 0, vec4(1.0), mat3(1.0), "
-         "vec4(1.0), vec4(1.0), vec4(1.0), 0)",
-         false},
-        {FragmentPackSPIRVLeafFetch & ~FragmentPackSPIRVOpBase,
-         "chainLeafFetch",
-         "",
-         {},
-         true,
-         "",
-         "chainLeafFetch(vec3(1.0), vec4(1.0), vec2(1.0), 0, 0, 0, 0, mat3(1.0), 0, vec2(1.0), "
-         "0, vec4(1.0))",
-         true},
-        {0x3Eu,
-         "applyPorterDuffXP",
-         "#define HAS_XP 1\n#define TGFX_DECLARED_CHAIN 1\n"
-         "layout(set = 2, binding = 0) uniform sampler2D dummyDstTex;\n",
-         {"xp/xp_porter_duff.inc"},
-         false,
-         "",
-         "applyPorterDuffXP(vec4(1.0), vec4(1.0), vec2(1.0), vec2(1.0), vec2(1.0), 0, dummyDstTex)",
-         false},
-    };
-    for (const auto& form : pureForms) {
-      std::string text = "#version 450\n";
-      text += form.prelude;
-      if (form.leafSamplers) {
+      if (row.leafSamplers) {
         for (int sampler = 0; sampler < 4; ++sampler) {
           text += "layout(set = 2, binding = " + std::to_string(sampler) +
                   ") uniform sampler2D TextureSampler_" + std::to_string(sampler) + ";\n";
         }
       }
-      for (const char* include : form.includes) {
-        text += readExpanded(include);
-      }
-      if (form.useStrippedLeafFetch) {
-        text += readExpanded("source/texture_sampling.inc");
-        if (strippedLeafFetch.empty()) {
-          strippedLeafFetch = stripFetchHelpers(readExpanded("entry/ChainLeafFetch.glsl"));
+      for (size_t includeIndex = 0; includeIndex < row.includeCount; ++includeIndex) {
+        const char* include = row.includes[includeIndex];
+        if (strcmp(include, "entry/ChainLeafFetch.glsl") == 0) {
+          if (strippedLeafFetch.empty()) {
+            strippedLeafFetch = stripFetchHelpers(readExpanded(include));
+          }
+          text += strippedLeafFetch;
+        } else {
+          text += readExpanded(include);
         }
-        text += strippedLeafFetch;
       }
-      text += "\nlayout(location = 0) out vec4 dummyOut;\nvoid main() {\n";
-      text += form.prologue;
-      text += std::string("  dummyOut = ") + form.call + ";\n}\n";
+      text += "\nlayout(location = 0) out vec4 dummyOut;\nvoid main() {\n  dummyOut = ";
+      text += row.exportName;
+      text += "(";
+      for (size_t argument = 0; argument < row.argCount; ++argument) {
+        if (argument > 0) {
+          text += ", ";
+        }
+        switch (row.args[argument].type) {
+          case OpTable::Param::Float:
+            text += "0.0";
+            break;
+          case OpTable::Param::Int:
+            text += "0";
+            break;
+          case OpTable::Param::Vec2:
+            text += "vec2(1.0)";
+            break;
+          case OpTable::Param::Vec3:
+            text += "vec3(1.0)";
+            break;
+          case OpTable::Param::Vec4:
+            text += "vec4(1.0)";
+            break;
+          case OpTable::Param::Mat3:
+            text += "mat3(1.0)";
+            break;
+          case OpTable::Param::Mat4:
+            text += "mat4(1.0)";
+            break;
+          case OpTable::Param::IVec4:
+            text += "ivec4(0)";
+            break;
+          case OpTable::Param::SampledImage:
+            text += "dummyDstTex";
+            break;
+          case OpTable::Param::Vec4Array8:
+            text += "vec4(1.0)";
+            break;
+        }
+      }
+      text += ");\n}\n";
       std::string buildError;
-      auto patched =
-          CompileSPIRVLibraryModule(text, form.functionName, form.functionName, &buildError);
+      auto patched = CompileSPIRVLibraryModule(text, row.exportName, row.exportName, &buildError);
       if (patched.empty()) {
         RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
-                         form.functionName, profileTag, -1, -1,
-                         std::string("the SPIR-V pure-form module did not build: ") + buildError);
+                         row.exportName, profileTag, -1, -1,
+                         std::string("the SPIR-V operator module did not build: ") + buildError);
+        continue;
+      }
+      std::string reflectError;
+      const auto reflected = ReflectFunctionSignature(patched, row.exportName, &reflectError);
+      if (reflected.size() != row.argCount) {
+        RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
+                         row.exportName, profileTag, -1, -1,
+                         "the operator table declares " + std::to_string(row.argCount) +
+                             " parameters but the module compiled " +
+                             std::to_string(reflected.size()) +
+                             (reflectError.empty() ? std::string() : ": " + reflectError));
+        continue;
+      }
+      bool signatureMatches = true;
+      for (size_t argument = 0; argument < row.argCount; ++argument) {
+        if (reflected[argument] != row.args[argument].type) {
+          signatureMatches = false;
+          RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
+                           row.exportName, profileTag, -1, -1,
+                           "parameter " + std::to_string(argument) + " of " + row.exportName +
+                               " drifted from the operator table");
+        }
+      }
+      if (!signatureMatches) {
         continue;
       }
       ComposedPayload payload;
-      payload.name = form.functionName;
-      payload.id = FragmentPackSPIRVOpBase | form.id;
+      payload.name = row.exportName;
+      payload.id = FragmentPackSPIRVOpBase | static_cast<uint32_t>(row.id);
       const auto* bytes = reinterpret_cast<const uint8_t*>(patched.data());
       payload.blob.assign(bytes, bytes + patched.size() * sizeof(uint32_t));
       report->composedByTag[profileTag].push_back(std::move(payload));

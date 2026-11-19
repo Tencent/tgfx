@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "gpu/shaders/contract/OpTable.h"
 
 namespace tgfx {
 
@@ -64,5 +65,13 @@ std::vector<uint32_t> CompileSPIRVLibraryModule(const std::string& wrapperSource
  */
 std::vector<uint32_t> ImportSPIRVFunction(const std::vector<uint32_t>& words,
                                           const char* functionName, std::string* error);
+
+/**
+ * Reflects one exported function's compiled parameter types, in call order, in the operator
+ * table's vocabulary. The build compares the result with the table row, so a signature drift
+ * between the GLSL source and the table fails the build instead of the runtime link.
+ */
+std::vector<OpTable::Param> ReflectFunctionSignature(const std::vector<uint32_t>& words,
+                                                     const char* functionName, std::string* error);
 
 }  // namespace tgfx

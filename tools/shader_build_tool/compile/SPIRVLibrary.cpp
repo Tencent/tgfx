@@ -34,6 +34,15 @@ constexpr uint16_t kOpDecorate = 71;
 constexpr uint16_t kOpCapability = 17;
 constexpr uint16_t kOpFunction = 54;
 constexpr uint16_t kOpFunctionParameter = 55;
+constexpr uint16_t kOpTypeInt = 21;
+constexpr uint16_t kOpTypeFloat = 22;
+constexpr uint16_t kOpTypeVector = 23;
+constexpr uint16_t kOpTypeMatrix = 24;
+constexpr uint16_t kOpTypeImage = 25;
+constexpr uint16_t kOpTypeSampledImage = 27;
+constexpr uint16_t kOpTypeArray = 28;
+constexpr uint16_t kOpTypePointer = 32;
+constexpr uint16_t kOpTypeFunction = 33;
 constexpr uint16_t kOpFunctionCall = 57;
 constexpr uint16_t kOpFunctionEnd = 56;
 constexpr uint16_t kCapabilityLinkage = 5;
@@ -348,4 +357,127 @@ std::vector<uint32_t> ImportSPIRVFunction(const std::vector<uint32_t>& words,
   out.insert(out.begin(), words.begin(), words.begin() + 5);
   return out;
 }
+
+std::vector<OpTable::Param> ReflectFunctionSignature(const std::vector<uint32_t>& words,
+                                                     const char* functionName, std::string* error) {
+  if (error == nullptr) {
+    return {};
+  }
+  const auto instructions = Parse(words);
+  if (instructions.empty()) {
+    *error = "the module's instructions do not parse";
+    return {};
+  }
+  struct TypeInfo {
+    uint16_t opcode = 0;
+    std::vector<uint32_t> operands;
+  };
+  std::unordered_map<uint32_t, TypeInfo> types;
+  uint32_t targetId = 0;
+  for (const auto& instruction : instructions) {
+    const uint16_t opcode = instruction.opcode;
+    if (opcode == kOpTypeInt || opcode == kOpTypeFloat || opcode == kOpTypeVector ||
+        opcode == kOpTypeMatrix || opcode == kOpTypeImage || opcode == kOpTypeSampledImage ||
+        opcode == kOpTypeArray || opcode == kOpTypePointer || opcode == kOpTypeFunction) {
+      TypeInfo info = {};
+      info.opcode = opcode;
+      for (uint32_t word = 1; word < instruction.wordCount; ++word) {
+        info.operands.push_back(words[instruction.offset + word]);
+      }
+      types[info.operands[0]] = std::move(info);
+    } else if (opcode == kOpDecorate && instruction.wordCount >= 4 &&
+               words[instruction.offset + 2] == kDecorationLinkageAttributes) {
+      if (LiteralStringAt(words, instruction.offset + 3) == functionName) {
+        targetId = words[instruction.offset + 1];
+      }
+    }
+  }
+  if (targetId == 0) {
+    *error = "the module does not export the function";
+    return {};
+  }
+  uint32_t functionTypeId = 0;
+  for (const auto& instruction : instructions) {
+    if (instruction.opcode == kOpFunction && instruction.wordCount >= 5 &&
+        words[instruction.offset + 2] == targetId) {
+      functionTypeId = words[instruction.offset + 4];
+    }
+  }
+  const auto functionType = types.find(functionTypeId);
+  if (functionType == types.end() || functionType->second.opcode != kOpTypeFunction) {
+    *error = "the exported function's type is missing";
+    return {};
+  }
+  std::vector<OpTable::Param> reflected = {};
+  // operands[0] is the type's own id, [1] the return type, the rest the parameters (pointers).
+  for (size_t index = 2; index < functionType->second.operands.size(); ++index) {
+    uint32_t typeId = functionType->second.operands[index];
+    const auto pointer = types.find(typeId);
+    if (pointer != types.end() && pointer->second.opcode == kOpTypePointer) {
+      typeId = pointer->second.operands[2];
+    }
+    const auto type = types.find(typeId);
+    if (type == types.end()) {
+      *error = "a parameter type is not declared";
+      return {};
+    }
+    switch (type->second.opcode) {
+      case kOpTypeFloat:
+        reflected.push_back(OpTable::Param::Float);
+        break;
+      case kOpTypeInt:
+        reflected.push_back(OpTable::Param::Int);
+        break;
+      case kOpTypeVector: {
+        const uint32_t component = type->second.operands[1];
+        const uint32_t count = type->second.operands[2];
+        const auto componentType = types.find(component);
+        const bool isFloat =
+            componentType != types.end() && componentType->second.opcode == kOpTypeFloat;
+        if (!isFloat) {
+          if (count != 4) {
+            *error = "an unsupported integer vector parameter";
+            return {};
+          }
+          reflected.push_back(OpTable::Param::IVec4);
+          break;
+        }
+        if (count == 2) {
+          reflected.push_back(OpTable::Param::Vec2);
+        } else if (count == 3) {
+          reflected.push_back(OpTable::Param::Vec3);
+        } else if (count == 4) {
+          reflected.push_back(OpTable::Param::Vec4);
+        } else {
+          *error = "an unsupported vector parameter";
+          return {};
+        }
+        break;
+      }
+      case kOpTypeMatrix: {
+        const uint32_t column = type->second.operands[1];
+        const uint32_t count = type->second.operands[2];
+        if (count == 3) {
+          reflected.push_back(OpTable::Param::Mat3);
+        } else if (count == 4) {
+          reflected.push_back(OpTable::Param::Mat4);
+        } else {
+          *error = "an unsupported matrix parameter";
+          return {};
+        }
+        (void)column;
+        break;
+      }
+      case kOpTypeSampledImage:
+      case kOpTypeImage:
+        reflected.push_back(OpTable::Param::SampledImage);
+        break;
+      default:
+        *error = "an unsupported parameter type";
+        return {};
+    }
+  }
+  return reflected;
+}
+
 }  // namespace tgfx

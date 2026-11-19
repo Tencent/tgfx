@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 #include "gpu/shaders/Family.h"
+#include "gpu/shaders/contract/ChainBindings.h"
 #include "gpu/shaders/contract/ChainComposition.h"
 #include "gpu/shaders/contract/FragmentLibrary.h"
 
@@ -35,82 +36,8 @@ class PrecompiledShaderCache;
  * instruction a per-slot parameter belongs to; the index names the array element, the leaf or the
  * coordinate transform the member addresses.
  */
-enum class ChainBindingSource : uint8_t {
-  // The per-slot typed parameters of the pointwise operators.
-  SlotColorMatrixLinear,
-  SlotColorMatrixTranslate,
-  SlotLumaCoefficients,
-  SlotAlphaThreshold,
-  SlotConstColor,
-  SlotAARect,
-  SlotLocalRect,
-  SlotLocalRectMatrix,
-  SlotRRect,
-  SlotRRectRadiiX,
-  SlotRRectRadiiY,
-  SlotRRectAntiAlias,
-  SlotRRectMatrix,
-  // The geometry-facing switches.
-  GeometryColor,
-  GeometryHasCommonColor,
-  GeometryStroke,
-  GeometryAA,
-  GeometryCoverage,
-  // The output formula.
-  OutputSwizzle,
-  XpBlendMode,
-  DstTextureUpperLeft,
-  DstTextureCoordScale,
-  // The stored vertex stage's block.
-  VertexMatrix,
-  VertexTexSubsetMatrix,
-  RTAdjust,
-  CoordTransform,
-  // The gradient source's named block.
-  GradientLayoutType,
-  GradientColorizerKind,
-  GradientLutLeaf,
-  GradientLeftBorder,
-  GradientRightBorder,
-  GradientStart,
-  GradientEnd,
-  GradientScale01,
-  GradientBias01,
-  GradientScale23,
-  GradientBias23,
-  GradientThreshold,
-  GradientBias,
-  GradientScale,
-  GradientThresholds1_7,
-  GradientThresholds9_13,
-  GradientScales,
-  GradientBiases,
-  // The noise source.
-  NoiseFrequencyStitch,
-  NoiseModeOctaves,
-  // The color-space transform's block.
-  CSFlags,
-  CSTransferSrc0,
-  CSTransferSrc1,
-  CSTransferSrcType,
-  CSOotfSrc,
-  CSColorXform,
-  CSOotfDst,
-  CSTransferDst0,
-  CSTransferDst1,
-  CSTransferDstType,
-  // The sampler children.
-  LeafSubset,
-  LeafAlphaStart,
-  LeafHasRgbaaa,
-  LeafSubsetClampOn,
-  LeafReadSwizzles,
-  DeviceCoordMatrix,
-  HasMaskTexture,
-  DeviceMaskSubset,
-  DeviceLeafMask,
-  DeviceLeafCoordMatrix,
-};
+// ChainBindingSource lives in the contract area: the operator table and the build tool read it
+// too.
 
 /// One declared uniform member: its std140 placement and the reader the upload walks.
 struct ChainBinding {

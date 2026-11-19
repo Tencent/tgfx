@@ -26,6 +26,7 @@
 #include <cstring>
 #include <unordered_map>
 #include "gpu/shaders/contract/ChainISA.h"
+#include "gpu/shaders/contract/OpTable.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "spirv-tools/libspirv.hpp"
 #include "spirv-tools/linker.hpp"
@@ -226,36 +227,50 @@ constexpr int kLeafFetchOp = 0x3F;
 // destination through a texture.
 constexpr int kPorterDuffOp = 0x3E;
 
+// The ABI kinds the emitter speaks, mapped from the table's vocabulary.
+ParamKind ToParamKind(OpTable::Param param) {
+  switch (param) {
+    case OpTable::Param::Float:
+      return kFloat;
+    case OpTable::Param::Int:
+      return kInt;
+    case OpTable::Param::Vec2:
+      return kVec2;
+    case OpTable::Param::Vec3:
+      return kVec3;
+    case OpTable::Param::Vec4:
+      return kVec4;
+    case OpTable::Param::Mat3:
+      return kMat3;
+    case OpTable::Param::Mat4:
+      return kMat4;
+    case OpTable::Param::IVec4:
+      return kIVec4;
+    case OpTable::Param::Vec4Array8:
+      return kVec4Array8;
+    case OpTable::Param::SampledImage:
+      return kSampledImage;
+  }
+  return kFloat;
+}
+
+// The signatures are the operator table's parameter lists: one declaration serves the emitter,
+// the build tool and the reconciliation.
 const std::vector<OpSignature>& OpSignatures() {
-  static const std::vector<OpSignature> signatures = {
-      {ChainISA::ConstColor, "pmApplyConstColor", {kVec4, kVec4, kInt}},
-      {ChainISA::ColorMatrix, "pmApplyColorMatrix", {kVec4, kMat4, kVec4}},
-      {ChainISA::Luma, "pmApplyLuma", {kVec4, kVec3}},
-      {ChainISA::AlphaThreshold, "pmApplyAlphaThreshold", {kVec4, kFloat}},
-      {ChainISA::Blend, "xpBlendColors", {kVec4, kVec4, kInt}},
-      {ChainISA::Texture, "tgfxOpTexture", {kVec4, kVec4, kVec4, kInt}},
-      {ChainISA::TexModulate, "tgfxOpTexModulate", {kVec4, kVec4, kInt}},
-      {ChainISA::AARectCoverage, "tgfxOpAARectCoverage", {kVec4, kVec4, kVec2}},
-      {ChainISA::LocalRectCoverage, "tgfxOpLocalRectCoverage", {kVec4, kVec4, kMat3, kVec2}},
-      {ChainISA::RRectCoverage,
-       "tgfxOpRRectCoverage",
-       {kVec4, kVec4, kVec4, kVec4, kFloat, kMat3, kVec2}},
-      {ChainISA::Gradient,
-       "evalGradientSlot",
-       {kVec4, kVec3,  kInt,   kInt,   kInt,  kVec4, kVec4, kVec4, kVec4, kVec4, kVec4, kVec4,
-        kVec4, kFloat, kFloat, kFloat, kVec4, kVec4, kVec4, kVec4, kVec4, kVec4, kVec4, kVec4,
-        kVec4, kVec4,  kVec4,  kVec4,  kVec4, kVec4, kVec4, kVec4, kVec4, kVec4}},
-      {ChainISA::PerlinNoise, "evalNoiseSlot", {kVec3, kVec4, kIVec4}},
-      {ChainISA::ColorSpaceXform,
-       "chainApplyColorSpaceXform",
-       {kVec4, kInt, kVec4, kVec4, kInt, kVec4, kMat3, kVec4, kVec4, kVec4, kInt}},
-      {kLeafFetchOp,
-       "chainLeafFetch",
-       {kVec3, kVec4, kVec2, kInt, kInt, kInt, kInt, kMat3, kInt, kVec2, kInt, kVec4}},
-      {kPorterDuffOp,
-       "applyPorterDuffXP",
-       {kVec4, kVec4, kVec2, kVec2, kVec2, kInt, kSampledImage}},
-  };
+  static const std::vector<OpSignature> signatures = [] {
+    std::vector<OpSignature> derived = {};
+    for (size_t rowIndex = 0; rowIndex < OpTable::RowCount(); ++rowIndex) {
+      const OpTable::Row& row = OpTable::Rows()[rowIndex];
+      OpSignature signature = {};
+      signature.op = row.id;
+      signature.name = row.exportName;
+      for (size_t argument = 0; argument < row.argCount; ++argument) {
+        signature.params.push_back(ToParamKind(row.args[argument].type));
+      }
+      derived.push_back(std::move(signature));
+    }
+    return derived;
+  }();
   return signatures;
 }
 
@@ -595,25 +610,9 @@ bool ChainSPIRVBodySupported(const ChainComposition& composition, const Layout& 
     }
   }
   for (const auto& slot : composition.slots) {
-    switch (slot.op) {
-      case ChainISA::None:
-      case ChainISA::ConstColor:
-      case ChainISA::ColorMatrix:
-      case ChainISA::Luma:
-      case ChainISA::AlphaThreshold:
-      case ChainISA::Blend:
-      case ChainISA::InputOpaque:
-      case ChainISA::MulAlpha:
-      case ChainISA::AARectCoverage:
-      case ChainISA::LocalRectCoverage:
-      case ChainISA::RRectCoverage:
-      // Texture and Gradient stay out until their semantic differences (glass compositions
-      // rendering empty) are resolved; the modules and recipes are already in place.
-      case ChainISA::PerlinNoise:
-      case ChainISA::ColorSpaceXform:
-        break;
-      default:
-        return false;
+    const OpTable::Row* row = OpTable::FindRow(slot.op);
+    if (row == nullptr || !row->admitted) {
+      return false;
     }
   }
   return true;
@@ -1127,71 +1126,66 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     const auto& call = plan.calls[callIndex];
     const OpSignature* signature = FindSignature(call.op);
     std::vector<uint32_t> values = {};
-    if (call.op == ChainISA::Gradient) {
-      const int lutIndex = MemberIndexOf(plan, ChainBindingSource::GradientLutLeaf);
-      const int scalesMemberBase = MemberIndexOf(plan, ChainBindingSource::GradientScales);
-      const int biasesMemberBase = MemberIndexOf(plan, ChainBindingSource::GradientBiases);
-      values = {
-          ResolveArg(&state, plan, call.args[0], coverageId),
-          varyingValue("SourceCoords"),
-          memberValue(ChainBindingSource::GradientLayoutType),
-          memberValue(ChainBindingSource::GradientColorizerKind),
-          lutIndex < 0 ? IntConstant(&state, 0) : LoadMember(&state, plan, lutIndex),
-          memberValue(ChainBindingSource::GradientLeftBorder),
-          memberValue(ChainBindingSource::GradientRightBorder),
-          memberValue(ChainBindingSource::GradientStart),
-          memberValue(ChainBindingSource::GradientEnd),
-          memberValue(ChainBindingSource::GradientScale01),
-          memberValue(ChainBindingSource::GradientBias01),
-          memberValue(ChainBindingSource::GradientScale23),
-          memberValue(ChainBindingSource::GradientBias23),
-          memberValue(ChainBindingSource::GradientThreshold),
-          memberValue(ChainBindingSource::GradientBias),
-          memberValue(ChainBindingSource::GradientScale),
-          memberValue(ChainBindingSource::GradientThresholds1_7),
-          memberValue(ChainBindingSource::GradientThresholds9_13),
-          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 0) : 0,
-          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 1) : 0,
-          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 2) : 0,
-          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 3) : 0,
-          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 4) : 0,
-          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 5) : 0,
-          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 6) : 0,
-          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 7) : 0,
-          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 0) : 0,
-          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 1) : 0,
-          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 2) : 0,
-          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 3) : 0,
-          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 4) : 0,
-          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 5) : 0,
-          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 6) : 0,
-          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 7) : 0,
-      };
-    } else if (call.op == ChainISA::PerlinNoise) {
-      values = {
-          varyingValue("SourceCoords"),
-          memberValue(ChainBindingSource::NoiseFrequencyStitch),
-          memberValue(ChainBindingSource::NoiseModeOctaves),
-      };
-    } else if (call.op == ChainISA::ColorSpaceXform) {
-      values = {
-          ResolveArg(&state, plan, call.args[0], coverageId),
-          memberValue(ChainBindingSource::CSFlags),
-          memberValue(ChainBindingSource::CSTransferSrc0),
-          memberValue(ChainBindingSource::CSTransferSrc1),
-          memberValue(ChainBindingSource::CSTransferSrcType),
-          memberValue(ChainBindingSource::CSOotfSrc),
-          memberValue(ChainBindingSource::CSColorXform),
-          memberValue(ChainBindingSource::CSOotfDst),
-          memberValue(ChainBindingSource::CSTransferDst0),
-          memberValue(ChainBindingSource::CSTransferDst1),
-          memberValue(ChainBindingSource::CSTransferDstType),
-      };
-    } else {
+    const OpTable::Row* row = OpTable::FindRow(call.op);
+    if (row == nullptr) {
+      // The inline expressions (InputOpaque, MulAlpha) own no module: their arguments resolve
+      // directly and the result switch below spells the expression.
       for (const auto& arg : call.args) {
         values.push_back(arg.kind == ChainArgKind::LeafTex
                              ? leafFetchValue(arg.index)
                              : ResolveArg(&state, plan, arg, coverageId));
+      }
+    } else if (row->special != nullptr && row->special[0] != '\0') {
+      *error = "a special operator cannot ride a plan call";
+      return false;
+    } else {
+      for (size_t argument = 0; argument < row->argCount; ++argument) {
+        const OpTable::Arg& spec = row->args[argument];
+        uint32_t value = 0;
+        switch (spec.source) {
+          case OpTable::Source::CallArg: {
+            if (spec.a >= 0 && static_cast<size_t>(spec.a) < call.args.size()) {
+              const ChainArg& arg = call.args[static_cast<size_t>(spec.a)];
+              value = arg.kind == ChainArgKind::LeafTex ? leafFetchValue(arg.index)
+                                                        : ResolveArg(&state, plan, arg, coverageId);
+            }
+            break;
+          }
+          case OpTable::Source::Member:
+            value = memberValue(static_cast<ChainBindingSource>(spec.a));
+            break;
+          case OpTable::Source::MemberOrZero: {
+            const int memberIndex = MemberIndexOf(plan, static_cast<ChainBindingSource>(spec.a));
+            value =
+                memberIndex < 0 ? IntConstant(&state, 0) : LoadMember(&state, plan, memberIndex);
+            break;
+          }
+          case OpTable::Source::MemberIndexed:
+            value = indexedMember(static_cast<ChainBindingSource>(spec.a), spec.b);
+            break;
+          case OpTable::Source::ArrayElement: {
+            int memberIndex = -1;
+            for (size_t index = 0; index < plan.uniforms.size(); ++index) {
+              if (plan.uniforms[index].source == static_cast<ChainBindingSource>(spec.a)) {
+                memberIndex = static_cast<int>(index);
+              }
+            }
+            value = memberIndex < 0 ? 0 : ArrayElement(&state, plan, memberIndex, spec.b);
+            break;
+          }
+          case OpTable::Source::Varying:
+            value = varyingValue(spec.a == 0 ? "SourceCoords" : "vTexSubset");
+            break;
+          case OpTable::Source::Constant:
+            value = IntConstant(&state, spec.a);
+            break;
+          case OpTable::Source::FragCoord:
+            value = state.fragCoordId;
+            break;
+          case OpTable::Source::Special:
+            break;  // the row's dedicated recipe builds it
+        }
+        values.push_back(value);
       }
     }
     if (std::find(values.begin(), values.end(), 0u) != values.end()) {
