@@ -75,21 +75,9 @@ PathFillType AppendShape::fillType() const {
   return rule;
 }
 
+// The appended rule comes from the first nonempty or inverse outline, which fillType() reads.
 bool AppendShape::isInverseFillType() const {
-  size_t inverseIndex = 0;
-  while (inverseIndex < shapes.size() && !shapes[inverseIndex]->isInverseFillType()) {
-    ++inverseIndex;
-  }
-  if (inverseIndex == shapes.size()) {
-    return false;
-  }
-  // Bounds cannot distinguish an empty path from a nonempty degenerate contour.
-  for (size_t i = 0; i < inverseIndex; ++i) {
-    if (!shapes[i]->getPath().isEmpty()) {
-      return false;
-    }
-  }
-  return true;
+  return Shape::isInverseFillType();
 }
 
 Rect AppendShape::onGetBounds() const {

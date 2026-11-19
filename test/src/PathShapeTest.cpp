@@ -521,7 +521,7 @@ class RuleCountingShape : public Shape {
   int* pathCalls = nullptr;
 };
 
-TGFX_TEST(PathShapeTest, MergeInverseQueryDoesNotBuildPaths) {
+TGFX_TEST(PathShapeTest, MergeInverseQueryMatchesOutlineRule) {
   struct MergeCase {
     PathOp op;
     bool expected[4];
@@ -544,7 +544,8 @@ TGFX_TEST(PathShapeTest, MergeInverseQueryDoesNotBuildPaths) {
       ASSERT_NE(merged, nullptr);
       EXPECT_EQ(merged->isInverseFillType(), testCase.expected[i]);
       EXPECT_EQ(merged->isInverseFillType(), testCase.expected[i]);
-      EXPECT_EQ(pathCalls, 0);
+      // The query now reads operand outlines, but the cached path of each operand is built once.
+      EXPECT_LE(pathCalls, 2);
       EXPECT_EQ(merged->getPath().isInverseFillType(), testCase.expected[i]);
     }
   }
@@ -572,8 +573,9 @@ TGFX_TEST(PathShapeTest, AppendInverseQueryUsesOnlyNecessaryPaths) {
         bool expected = firstInverse || (emptyFirst && secondInverse);
         EXPECT_EQ(appended->isInverseFillType(), expected);
         EXPECT_EQ(appended->isInverseFillType(), expected);
-        EXPECT_EQ(firstCalls, !firstInverse && secondInverse ? 1 : 0);
-        EXPECT_EQ(secondCalls, 0);
+        // fillType() reads the first outline and stops there unless it is empty and non-inverse.
+        EXPECT_EQ(firstCalls, 1);
+        EXPECT_EQ(secondCalls, emptyFirst && !firstInverse ? 1 : 0);
         EXPECT_EQ(appended->getPath().isInverseFillType(), expected);
       }
     }
@@ -707,6 +709,69 @@ TGFX_TEST(PathShapeTest, ProviderShapeUnionReportsOutlineRule) {
   ASSERT_TRUE(merged != nullptr);
   EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
   EXPECT_EQ(merged->getPath().getFillType(), merged->fillType());
+}
+
+static std::shared_ptr<Shape> MakeInverseProviderShape(int x, bool empty) {
+  Path path = {};
+  if (!empty) {
+    path.addRect(Rect::MakeXYWH(x, 0, 10, 10));
+  }
+  path.setFillType(PathFillType::InverseWinding);
+  return Shape::MakeFrom(PathProvider::Wrap(path));
+}
+
+static void ExpectInverseProviderUnion(const std::shared_ptr<Shape>& first,
+                                       const std::shared_ptr<Shape>& second) {
+  auto merged = Shape::Merge(first, second, PathOp::Union);
+  ASSERT_TRUE(merged != nullptr);
+  EXPECT_TRUE(merged->isInverseFillType());
+  EXPECT_EQ(merged->fillType(), merged->getPath().getFillType());
+  EXPECT_TRUE(merged->getPath().isInverseFillType());
+  // The inverse operand already fills the plane outside its rect, so the disjoint rect adds no
+  // contour; concatenating it would wrongly leave a second hole in the result.
+  EXPECT_FALSE(Rect::Intersects(merged->getPath().getBounds(), Rect::MakeXYWH(100, 0, 10, 10)));
+}
+
+TGFX_TEST(PathShapeTest, InverseProviderUnionFallsBackToBoolean) {
+  auto inverse = MakeInverseProviderShape(0, false);
+  Path plainPath = {};
+  plainPath.addRect(Rect::MakeXYWH(100, 0, 10, 10));
+  auto plain = Shape::MakeFrom(plainPath);
+  ASSERT_TRUE(inverse != nullptr);
+  ASSERT_TRUE(plain != nullptr);
+  // PathProvider::Wrap does not override fillType(), so the operand reports Winding while its
+  // outline is inverse.
+  EXPECT_EQ(inverse->fillType(), PathFillType::Winding);
+  EXPECT_EQ(inverse->getPath().getFillType(), PathFillType::InverseWinding);
+  ExpectInverseProviderUnion(inverse, plain);
+  ExpectInverseProviderUnion(plain, inverse);
+}
+
+TGFX_TEST(PathShapeTest, InverseProviderAppendReportsInverseRule) {
+  auto inverseEmpty = MakeInverseProviderShape(0, true);
+  Path plainPath = {};
+  plainPath.addRect(Rect::MakeXYWH(100, 0, 10, 10));
+  auto plain = Shape::MakeFrom(plainPath);
+  ASSERT_TRUE(inverseEmpty != nullptr);
+  ASSERT_TRUE(plain != nullptr);
+  EXPECT_FALSE(inverseEmpty->isInverseFillType());
+  auto appended = Shape::Merge(inverseEmpty, plain);
+  ASSERT_TRUE(appended != nullptr);
+  EXPECT_TRUE(appended->isInverseFillType());
+  EXPECT_EQ(appended->fillType(), PathFillType::InverseWinding);
+  EXPECT_EQ(appended->getPath().getFillType(), appended->fillType());
+  EXPECT_TRUE(appended->getPath().isInverseFillType());
+}
+
+TGFX_TEST(PathShapeTest, InverseProviderStrokeReportsInverseRule) {
+  auto inverse = MakeInverseProviderShape(0, false);
+  ASSERT_TRUE(inverse != nullptr);
+  Stroke stroke(2.0f);
+  auto stroked = Shape::ApplyStroke(inverse, &stroke);
+  ASSERT_TRUE(stroked != nullptr);
+  EXPECT_EQ(stroked->fillType(), PathFillType::InverseWinding);
+  EXPECT_TRUE(stroked->isInverseFillType());
+  EXPECT_EQ(stroked->getPath().getFillType(), stroked->fillType());
 }
 
 TGFX_TEST(PathShapeTest, MergeVectorWithOnlyNullptrReturnsNull) {

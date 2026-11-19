@@ -89,7 +89,9 @@ class Path {
    * start.
    *
    * The contours must not cross each other or themselves; otherwise the filled area may change.
-   * @return true if the conversion succeeded. On failure the path is left unchanged.
+   * Contours produced by addPath() with a boolean operation do not cross.
+   * @return true if the conversion succeeded. On failure the path is left unchanged, so callers
+   * must check the result.
    */
   bool toWinding();
 

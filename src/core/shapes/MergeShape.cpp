@@ -39,37 +39,63 @@ std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_pt
   return std::make_shared<MergeShape>(std::move(first), std::move(second), pathOp);
 }
 
+bool MergeShape::unionConcatenates() const {
+  if (pathOp != PathOp::Union) {
+    return false;
+  }
+  // A text run reports its em box, which overlaps neighbours whose outlines do not, so both
+  // fillType() and onGetPath() decide from the reported bounds: deciding from tighter outline
+  // bounds here would concatenate where fillType() promised a boolean result. Reported rules are
+  // not reliable either, so the outlines have to confirm them before any concatenation.
+  auto firstType = first->fillType();
+  auto secondType = second->fillType();
+  if (!PathRef::UnionsByConcatenation(firstType, first->getBounds(), secondType,
+                                      second->getBounds())) {
+    return false;
+  }
+  auto firstPath = first->getPath();
+  auto secondPath = second->getPath();
+  return firstPath.getFillType() == firstType && secondPath.getFillType() == secondType &&
+         PathRef::UnionsByConcatenation(firstPath.getFillType(), firstPath.getBounds(),
+                                        secondPath.getFillType(), secondPath.getBounds());
+}
+
 PathFillType MergeShape::fillType() const {
   if (pathOp == PathOp::Append || pathOp == PathOp::Extend) {
     return getPath().getFillType();
   }
-  if (pathOp == PathOp::Union) {
-    auto firstType = first->fillType();
-    if (PathRef::UnionsByConcatenation(firstType, first->getBounds(), second->fillType(),
-                                       second->getBounds())) {
-      // Concatenation keeps the first operand's outline unchanged, including its rule. Reading it
-      // from the path avoids relying on the operand's reported rule matching its outline.
-      return first->getPath().getFillType();
-    }
+  if (unionConcatenates()) {
+    // Concatenation keeps the first operand's outline unchanged, including its rule.
+    return first->getPath().getFillType();
   }
-  return isInverseFillType() ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd;
-}
-
-// Deriving the inverse flag without building the path must still agree with onGetPath(), including
-// the empty result reported when a boolean operation fails.
-bool MergeShape::isInverseFillType() const {
+  // A boolean operation resolves both operands under the rules of the outlines it receives and
+  // writes an even-odd result, inverse only when the area outside that result stays filled.
+  auto firstInverse = first->getPath().isInverseFillType();
+  auto secondInverse = second->getPath().isInverseFillType();
+  bool inverse = false;
   switch (pathOp) {
     case PathOp::Union:
-      return first->isInverseFillType() || second->isInverseFillType();
+      inverse = firstInverse || secondInverse;
+      break;
     case PathOp::Intersect:
-      return first->isInverseFillType() && second->isInverseFillType();
+      inverse = firstInverse && secondInverse;
+      break;
     case PathOp::Difference:
-      return first->isInverseFillType() && !second->isInverseFillType();
+      inverse = firstInverse && !secondInverse;
+      break;
     case PathOp::XOR:
-      return first->isInverseFillType() != second->isInverseFillType();
+      inverse = firstInverse != secondInverse;
+      break;
     default:
-      return getPath().isInverseFillType();
+      break;
   }
+  return inverse ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd;
+}
+
+// Deriving the flag from fillType() keeps the two public queries in agreement with the outline,
+// including the empty result reported when a boolean operation fails.
+bool MergeShape::isInverseFillType() const {
+  return Shape::isInverseFillType();
 }
 
 Rect MergeShape::onGetBounds() const {
@@ -94,17 +120,8 @@ Rect MergeShape::onGetBounds() const {
 Path MergeShape::onGetPath(float resolutionScale) const {
   auto path = first->onGetPath(resolutionScale);
   auto secondPath = second->onGetPath(resolutionScale);
-  // fillType() decides a union from the bounds the two shapes report, and those bounds may be larger
-  // than the outlines they contain - a text run reports its em box, whose neighbours nearly always
-  // overlap while the glyph outlines do not. Deciding here from the tighter outline bounds would
-  // concatenate where fillType() promised a boolean result, leaving the shape reporting one rule and
-  // handing out an outline read by another, so both places decide from the same reported inputs.
-  bool concatenate = false;
-  if (pathOp == PathOp::Union) {
-    concatenate = PathRef::UnionsByConcatenation(first->fillType(), first->getBounds(),
-                                                 second->fillType(), second->getBounds());
-  }
-  if (!PathRef::AddPath(path, secondPath, pathOp, concatenate)) {
+  // fillType() and onGetPath() must agree on the fast path, so both use the shared decision.
+  if (!PathRef::AddPath(path, secondPath, pathOp, unionConcatenates())) {
     // A failed operation leaves the first operand behind, which is not the merge that was asked
     // for: reading it as the result would draw one side of the operation as if it were both. An
     // empty path is the only answer that is wrong in a visible way rather than a silent one, and
