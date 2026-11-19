@@ -58,15 +58,6 @@ const char* GlslTypeOf(FragmentType type) {
   return "vec4";
 }
 
-bool ReplaceAll(std::string* text, const std::string& token, const std::string& value) {
-  const auto position = text->find(token);
-  if (position == std::string::npos) {
-    return false;
-  }
-  text->replace(position, token.size(), value);
-  return true;
-}
-
 }  // namespace
 
 namespace {
@@ -484,13 +475,36 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   } else {
     output = "  fragColor = (result * finalCoverage);";
   }
-  std::string tailText = ChainPackText(cache, FragmentPackTail);
-  if (tailText.empty() || !ReplaceAll(&tailText, "__TGFX_CLIP_COVERAGE__", clip) ||
-      !ReplaceAll(&tailText, "__TGFX_FINAL_COVERAGE__", coverage) ||
-      !ReplaceAll(&tailText, "__TGFX_DEVICE_MASK__", deviceMaskText) ||
-      !ReplaceAll(&tailText, "__TGFX_OUTPUT__", output)) {
+  // The epilogue is a call: the tail form is a catalog function and the coverage left-fold stays
+  // here as plain statements, so no placeholder template survives.
+  const bool porterDuff = plan.hasXp != 0 && !plan.xpNeedsBlendPass;
+  const char* tailName = porterDuff ? "chainTail_porterDuff" : "chainTail_plain";
+  const char* tailSource = FindChainFunctionSource(tailName);
+  if (tailSource == nullptr) {
     return false;
   }
+  pieces += tailSource;
+  pieces.push_back('\n');
+  std::string tailText = "  vec4 finalCoverage = " + coverage + ";\n";
+  if (plan.hasMaskSampler) {
+    tailText += "  highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);\n";
+    if (plan.hasLeafSamplers) {
+      tailText += "  if (HasMaskTexture != 0) {\n";
+      tailText += "    finalCoverage *= texture(MaskTextureSampler, maskCoord.xy).r;\n  }\n";
+    } else {
+      tailText += "  finalCoverage *= texture(MaskTextureSampler, maskCoord.xy).r;\n";
+    }
+  }
+  tailText += "  finalCoverage *= " + clip + ";\n";
+  if (plan.hasXp != 0 && plan.xpNeedsBlendPass) {
+    tailText +=
+        "  fragColor = xpCompositeBlendPass(result, chainXPDst, finalCoverage, xpBlended);\n";
+  } else if (porterDuff) {
+    tailText += "  fragColor = chainTail_porterDuff(result, finalCoverage);\n";
+  } else {
+    tailText += "  fragColor = chainTail_plain(result, finalCoverage);\n";
+  }
+  tailText += "  if (OutputAlphaSwizzle != 0) {\n    fragColor = fragColor.aaaa;\n  }\n";
 
   std::string xpGlobals = {};
   std::string xpLocals = {};
