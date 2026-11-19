@@ -1415,7 +1415,9 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     writer.Inst(kOpINotEqual, {types.boolId, condition, swizzleValue, IntConstant(&state, 0)});
     const uint32_t aaaa = writer.NewId();
     writer.Inst(kOpVectorShuffle, {types.vec4, aaaa, outputSource, outputSource, 3, 3, 3, 3});
-    output = SelectVec4(&state, condition, outputSource, aaaa);
+    // The text route's semantic: a non-zero swizzle writes `fragColor.aaaa` (an alpha-only
+    // render target), everything else keeps the colour.
+    output = SelectVec4(&state, condition, aaaa, outputSource);
   }
   writer.Inst(kOpReturnValue, {output});
   writer.Inst(kOpFunctionEnd);
