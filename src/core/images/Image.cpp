@@ -143,6 +143,10 @@ float Image::getRasterizedScale(float) const {
   return 1.0f;
 }
 
+ISize Image::getRasterizedSize(float) const {
+  return ISize::Make(width(), height());
+}
+
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
   if (isFullyDecoded()) {
     return weakThis.lock();

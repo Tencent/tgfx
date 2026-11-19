@@ -48,6 +48,8 @@ class CodecImage : public GeneratorImage {
 
   float getRasterizedScale(float drawScale) const override;
 
+  ISize getRasterizedSize(float scale) const override;
+
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;
 

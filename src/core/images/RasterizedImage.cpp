@@ -62,14 +62,29 @@ PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
   if (textureProxy == nullptr) {
     return nullptr;
   }
+  // Derive the content size from the source instead of the proxy. A cached texture view can be
+  // larger than the content it carries, for example a hardware-decoded video buffer aligned by the
+  // decoder, and the proxy reports that padded size once it is rewrapped from the resource cache.
+  // Using the source size keeps the coordinate transform and the sampling clamp identical whether
+  // the proxy was freshly created or rewrapped, so the padding is never sampled. When the source
+  // reports no size, fall back to the proxy size so the transform matches the texture that
+  // lockTextureProxy() actually produced.
+  auto contentSize =
+      source->getRasterizedSize(hasMipmaps() ? 1.0f : source->getRasterizedScale(args.drawScale));
+  if (contentSize.isEmpty()) {
+    contentSize = ISize::Make(textureProxy->width(), textureProxy->height());
+  }
   auto fpMatrix =
-      Matrix::MakeScale(static_cast<float>(textureProxy->width()) / static_cast<float>(width()),
-                        static_cast<float>(textureProxy->height()) / static_cast<float>(height()));
+      Matrix::MakeScale(static_cast<float>(contentSize.width) / static_cast<float>(width()),
+                        static_cast<float>(contentSize.height) / static_cast<float>(height()));
   SamplingArgs newSamplingArgs = samplingArgs;
   if (samplingArgs.sampleArea) {
     Rect subset = *samplingArgs.sampleArea;
     fpMatrix.mapRect(&subset);
     newSamplingArgs.sampleArea = subset;
+  } else {
+    newSamplingArgs.sampleArea =
+        Rect::MakeWH(static_cast<float>(contentSize.width), static_cast<float>(contentSize.height));
   }
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);

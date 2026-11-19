@@ -46,14 +46,23 @@ std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
   return PixelImage::onMakeScaled(newWidth, newHeight, sampling);
 }
 
+ISize CodecImage::getRasterizedSize(float scale) const {
+  auto scaleWidth = static_cast<int>(roundf(static_cast<float>(width()) * scale));
+  auto scaleHeight = static_cast<int>(roundf(static_cast<float>(height()) * scale));
+  if (scaleWidth < generator->width() && scaleHeight < generator->height()) {
+    return ISize::Make(scaleWidth, scaleHeight);
+  }
+  return ISize::Make(generator->width(), generator->height());
+}
+
 std::shared_ptr<TextureProxy> CodecImage::lockTextureProxy(const TPArgs& args) const {
   auto tempGenerator = generator;
-  auto scaleWidth = static_cast<int>(roundf(static_cast<float>(width()) * args.drawScale));
-  auto scaleHeight = static_cast<int>(roundf(static_cast<float>(height()) * args.drawScale));
-  if (scaleWidth < generator->width() && scaleHeight < generator->height()) {
-    tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), scaleWidth, scaleHeight);
+  auto size = getRasterizedSize(args.drawScale);
+  if (size.width < generator->width() && size.height < generator->height()) {
+    tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), size.width, size.height);
   }
   return args.context->proxyProvider()->createTextureProxy(tempGenerator, args.mipmapped,
                                                            args.renderFlags);
 }
+
 }  // namespace tgfx

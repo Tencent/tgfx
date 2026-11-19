@@ -65,6 +65,8 @@ class SurfaceTexture : public ImageStream {
   std::condition_variable condition = {};
   Global<jobject> surfaceTexture;
   bool frameAvailable = false;
+  bool textureSizeResolved = false;
+  ISize textureSize = {};
 
   static void JNIInit(JNIEnv* env);
 

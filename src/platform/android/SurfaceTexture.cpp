@@ -35,6 +35,7 @@ static jfieldID SurfaceTexture_mEventHandler;
 static jmethodID SurfaceTexture_updateTexImage;
 static jmethodID SurfaceTexture_attachToGLContext;
 static jmethodID SurfaceTexture_detachFromGLContext;
+static jmethodID SurfaceTexture_getTransformMatrix;
 static jmethodID SurfaceTexture_release;
 static Global<jclass> SurfaceClass;
 static jmethodID Surface_Constructor;
@@ -77,6 +78,11 @@ void SurfaceTexture::JNIInit(JNIEnv* env) {
       env->GetMethodID(SurfaceTextureClass.get(), "attachToGLContext", "(I)V");
   SurfaceTexture_detachFromGLContext =
       env->GetMethodID(SurfaceTextureClass.get(), "detachFromGLContext", "()V");
+  SurfaceTexture_getTransformMatrix =
+      env->GetMethodID(SurfaceTextureClass.get(), "getTransformMatrix", "([F)V");
+  if (SurfaceTexture_getTransformMatrix == nullptr) {
+    env->ExceptionClear();
+  }
   SurfaceTexture_release = env->GetMethodID(SurfaceTextureClass.get(), "release", "()V");
   SurfaceClass = env->FindClass("android/view/Surface");
   Surface_Constructor =
@@ -182,6 +188,38 @@ void SurfaceTexture::notifyFrameAvailable() {
   condition.notify_all();
 }
 
+static ISize ComputeTextureSize(const float matrix[16], int width, int height) {
+  // SurfaceTexture.getTransformMatrix() returns a column-major 4x4 that maps normalized texture
+  // coordinates to the region the decoder actually produced inside its (possibly padded) buffer.
+  // We only recover the padded buffer size when that matrix is a pure crop plus vertical flip, the
+  // form the targeted decoders emit: matrix[0] > 0, matrix[5] < 0, and the off-diagonal terms are
+  // zero. Rotation, horizontal flip, or a missing vertical flip are rejected by the guard below.
+  // The scale and translation terms encode cropSize / bufferSize (the translation cancels the
+  // half-texel filtering shrink), so dividing the content size by them recovers the buffer size;
+  // this matches the real device matrices this fix was validated against. The recovery is only
+  // guaranteed for a crop anchored at the buffer origin. A crop offset from the origin recovers a
+  // size larger than the content but still wrong (for example content 720 inside a 768 buffer with
+  // an 8-pixel left crop recovers 751), and the final check below only rejects results smaller than
+  // the content, so it cannot catch that case. Non-origin crops are a known, unhandled limitation.
+  if (matrix[1] != 0 || matrix[4] != 0 || matrix[0] <= 0 || matrix[5] >= 0) {
+    return {};
+  }
+  auto denomX = matrix[0] + matrix[12] * 2;
+  auto scaleY = -matrix[5];
+  auto denomY = scaleY + (matrix[13] - scaleY) * 2;
+  if (denomX <= 0 || denomY <= 0) {
+    return {};
+  }
+  Size size = {static_cast<float>(width) / denomX, static_cast<float>(height) / denomY};
+  auto result = size.toRound();
+  // A valid padded buffer is never smaller than the content it carries, so a smaller result means
+  // the matrix was not the expected crop form; fall back instead of trusting it.
+  if (result.width < width || result.height < height) {
+    return {};
+  }
+  return result;
+}
+
 std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, bool) {
   auto textureID = makeExternalOESTexture(context);
   if (textureID == 0) {
@@ -192,15 +230,22 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
     gl->deleteTextures(1, &textureID);
     return nullptr;
   }
-  // Use the video content size (width()/height()) for the texture descriptor rather than the
-  // hardware buffer's aligned size. Hardware decoders may pad the output buffer to a larger
-  // aligned size (e.g. 720x1560 -> 720x1568), and the extra rows hold unstable padding. Since
-  // getTextureCoord() maps content coordinates to UVs by dividing by these dimensions, using the
-  // content size preserves the "texture pixel coord == content coord" invariant and excludes the
-  // padding rows from sampling. Do not switch this back to the buffer-aligned size, which caused
-  // the edge-flicker regression this restores.
-  GPUTextureDescriptor descriptor = {width(), height(), PixelFormat::RGBA_8888,
-                                     false,   1,        GPUTextureUsage::TEXTURE_BINDING};
+  // The descriptor must match the real size of the OES texture, otherwise getTextureCoord()
+  // converts pixel coordinates with a wrong base: hardware decoders pad the output buffer to an
+  // aligned size (e.g. 720x1560 -> 720x1568), and every pixel->UV conversion that relies on it
+  // would be scaled by contentSize / bufferSize. That shifted the whole video and, for RGBAAA
+  // sequences whose alpha plane is packed next to the color plane, displaced alpha against color
+  // and exposed the black background of the video as an outline around the content. The padding
+  // rows are kept out of the sampling by the subset clamp that needSubset() enables for external
+  // textures.
+  auto descriptorWidth = textureSize.isEmpty() ? width() : textureSize.width;
+  auto descriptorHeight = textureSize.isEmpty() ? height() : textureSize.height;
+  GPUTextureDescriptor descriptor = {descriptorWidth,
+                                     descriptorHeight,
+                                     PixelFormat::RGBA_8888,
+                                     false,
+                                     1,
+                                     GPUTextureUsage::TEXTURE_BINDING};
   auto texture = std::make_unique<GLTexture>(descriptor, GL_TEXTURE_EXTERNAL_OES, textureID);
   return Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
 }
@@ -253,6 +298,29 @@ bool SurfaceTexture::updateTexImage() {
     env->ExceptionClear();
     LOGE("NativeImageReader::onUpdateTexture(): failed to updateTexImage!");
     return false;
+  }
+  if (SurfaceTexture_getTransformMatrix != nullptr && !textureSizeResolved) {
+    auto floatArray = env->NewFloatArray(16);
+    if (floatArray == nullptr) {
+      env->ExceptionClear();
+    } else {
+      env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_getTransformMatrix, floatArray);
+      if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+      } else {
+        auto matrix = env->GetFloatArrayElements(floatArray, nullptr);
+        if (matrix != nullptr) {
+          // The content size is fixed for the lifetime of a SurfaceTexture, so the buffer padding
+          // never changes after the first frame; resolve the texture size once and reuse it.
+          textureSize = ComputeTextureSize(matrix, width(), height());
+          textureSizeResolved = true;
+          env->ReleaseFloatArrayElements(floatArray, matrix, JNI_ABORT);
+        } else {
+          env->ExceptionClear();
+        }
+      }
+      env->DeleteLocalRef(floatArray);
+    }
   }
   return true;
 }
