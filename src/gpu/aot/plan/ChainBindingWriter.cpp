@@ -702,6 +702,7 @@ void ChainBindingWriter::writeUniforms(const ProgramInfo& info, UniformData* ver
   }
   auto* fragmentBytes =
       fragmentUniformData != nullptr ? fragmentUniformData->writableBytes() : nullptr;
+
   if (fragmentBytes != nullptr) {
     const size_t size = fragmentUniformData->size();
     for (const auto& binding : bindings.fragment) {

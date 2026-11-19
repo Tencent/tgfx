@@ -25,6 +25,7 @@
 #if defined(TGFX_USE_VULKAN) || defined(TGFX_USE_METAL)
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <unordered_map>
 #include "gpu/shaders/contract/ChainISA.h"

@@ -461,8 +461,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
                       chainBindings = plan.bindings;
                       fragmentDesc.code = std::move(msl);
                       fragmentDesc.format = ShaderCodeFormat::MSL;
-                      LOGI("AssembledChain: translated Metal entry for %s[variant=%u]",
-                           shaderName, variantId);
+                      LOGI("AssembledChain: translated Metal entry for %s[variant=%u]", shaderName,
+                           variantId);
                     } else {
                       LOGE("AssembledChain: Metal translation declined for %s[variant=%u]: %s",
                            shaderName, variantId, mslError.c_str());
