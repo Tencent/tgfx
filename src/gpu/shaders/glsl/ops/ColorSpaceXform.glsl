@@ -4,6 +4,7 @@
 #ifndef TGFX_OPS_COLOR_SPACE_XFORM_INCLUDED
 #define TGFX_OPS_COLOR_SPACE_XFORM_INCLUDED
 
+#include "operator/transfer_function.inc"
 #include "fn/entry/color_space_xform.inc"
 
 #endif  // TGFX_OPS_COLOR_SPACE_XFORM_INCLUDED

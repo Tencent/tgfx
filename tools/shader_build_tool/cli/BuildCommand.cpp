@@ -927,7 +927,9 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
             text += "dummyDstTex";
             break;
           case OpTable::Param::Vec4Array8:
-            text += "vec4(1.0)";
+            text +=
+                "vec4[8](vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), "
+                "vec4(1.0), vec4(1.0))";
             break;
         }
       }

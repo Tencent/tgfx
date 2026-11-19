@@ -709,6 +709,8 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   writer.Inst(kOpTypeMatrix, {types.mat4, types.vec4, 4});
   // The function-parameter array carries no ArrayStride: glslang's parameter arrays are plain
   // Function-storage arrays, and a decoration would make the linked signatures differ.
+  // The function-parameter array type carries no ArrayStride (glslang does not decorate
+  // function-scope arrays), so it is its own declaration, distinct from the UBO's array type.
   types.vec4Array8 = writer.NewId();
   writer.Inst(kOpTypeArray, {types.vec4Array8, types.vec4, IntConstant(&state, 8)});
   // The sampled image the mask tail reads (declared always: an unused type is legal, the
@@ -1086,7 +1088,30 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   // spell each record as the value its pure parameter expects.
   auto memberValue = [&](ChainBindingSource source) -> uint32_t {
     const int index = MemberIndexOf(plan, source);
-    return index < 0 ? 0 : LoadMember(&state, plan, index);
+    if (index < 0) {
+      return 0;
+    }
+    const auto& member = plan.uniforms[static_cast<size_t>(index)];
+    if (member.count > 1) {
+      // An array member's value for a function parameter: the UBO's array type carries an
+      // ArrayStride the function parameter's type does not, so the whole-array load cannot be
+      // stored directly. Load each element and construct the composite in the parameter's type.
+      std::vector<uint32_t> elements = {};
+      for (uint16_t element = 0; element < member.count; ++element) {
+        elements.push_back(ArrayElement(&state, plan, index, element));
+      }
+      for (uint32_t element : elements) {
+        if (element == 0) {
+          return 0;
+        }
+      }
+      const uint32_t composite = writer.NewId();
+      std::vector<uint32_t> operands = {types.vec4Array8, composite};
+      operands.insert(operands.end(), elements.begin(), elements.end());
+      writer.Inst(kOpCompositeConstruct, operands);
+      return composite;
+    }
+    return LoadMember(&state, plan, index);
   };
   auto varyingValue = [&](const std::string& name) -> uint32_t {
     const auto found = state.varyingIds.find(name);

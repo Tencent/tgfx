@@ -454,6 +454,24 @@ std::vector<OpTable::Param> ReflectFunctionSignature(const std::vector<uint32_t>
         }
         break;
       }
+      case kOpTypeArray: {
+        // An array of float vec4s is the table's Vec4Array8 (the only array parameter form).
+        const uint32_t elementTypeId = type->second.operands[1];
+        const auto elementType = types.find(elementTypeId);
+        if (elementType != types.end() && elementType->second.opcode == kOpTypeVector) {
+          const uint32_t component = elementType->second.operands[1];
+          const uint32_t componentCount = elementType->second.operands[2];
+          const auto componentType = types.find(component);
+          const bool isFloat =
+              componentType != types.end() && componentType->second.opcode == kOpTypeFloat;
+          if (isFloat && componentCount == 4) {
+            reflected.push_back(OpTable::Param::Vec4Array8);
+            break;
+          }
+        }
+        *error = "an unsupported array parameter";
+        return {};
+      }
       case kOpTypeMatrix: {
         const uint32_t column = type->second.operands[1];
         const uint32_t count = type->second.operands[2];
