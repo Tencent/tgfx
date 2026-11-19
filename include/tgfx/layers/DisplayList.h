@@ -72,25 +72,26 @@ enum class RenderMode {
  */
 enum class TileUpdateMode {
   /**
-   * Missing tiles are rasterized at the current zoomScale within the same frame. No fallback tiles
-   * are used. This produces the highest visual fidelity but may cause frame drops during heavy zoom
-   * or pan. This is the default mode.
+   * Missing tiles are rasterized at the current zoomScale within the same frame. The coarser tree
+   * level fallback is not used. This produces the highest visual fidelity but may cause frame drops
+   * during heavy zoom or pan. This is the default mode.
    */
   Immediate,
 
   /**
-   * Missing tiles are filled with fallback tiles reused across zoom scales as a temporary stand-in
-   * (producing brief zoom blur). The tiles at the current zoomScale then fill in over the following
-   * frames to keep the frame rate stable. When no fallback covers a tile, it is rasterized at the
-   * current zoomScale within the same frame to keep the result correct.
+   * Missing tiles show the coarser tree level fallback, which stays valid across zoom scales, as a
+   * temporary stand-in (producing brief zoom blur). The tiles at the current zoomScale then fill in
+   * over the following frames, at most setMaxTilesRefinedPerFrame() per frame, to keep the frame
+   * rate stable. A tile no fallback covers yet is rasterized at the coarsest fallback level within
+   * the same frame, so the screen always shows content.
    */
   Smooth,
 
   /**
-   * The number of tiles rasterized per frame is capped by setMaxTilesRefinedPerFrame(). Tiles
-   * beyond the cap are filled with cached content from other zoom scales, or with the background
-   * color when no fallback is available. This keeps the frame rate stable during heavy zoom or
-   * pan at the cost of longer-lasting blur or background-colored regions.
+   * Same as Smooth, except that a tile no fallback covers yet is left as the background color
+   * instead of being rasterized in the same frame. Combined with the setMaxTilesRefinedPerFrame()
+   * cap this keeps the frame rate stable during heavy zoom or pan at the cost of longer-lasting
+   * blur or background-colored regions.
    */
   Fast
 };
