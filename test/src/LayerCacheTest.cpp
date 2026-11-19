@@ -545,6 +545,7 @@ TGFX_TEST_PRIVATE(LayerCacheTest, DirtyRegionTest) {
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 1024, 800);
   auto displayList = std::make_unique<DisplayList>();
+  displayList->showDirtyRegions(false);
   auto rootLayer = Layer::Make();
   displayList->root()->addChild(rootLayer);
 
