@@ -1,5 +1,6 @@
 //@function evalGradientSlot
 //@members Gradient_
+//@member-start 2
 //@member layoutType GradientLayoutType
 //@member colorizerKind GradientColorizerKind
 //@member lutLeaf GradientLUTLeaf

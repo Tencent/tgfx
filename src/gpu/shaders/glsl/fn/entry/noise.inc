@@ -1,4 +1,7 @@
 //@function evalNoiseSlot
+//@member-start 1
+//@members Noise_
+//@member modeOctaves NoiseModeOctaves
 vec4 evalNoiseSlot(vec3 sourceCoords, vec4 frequencyStitch, ivec4 modeOctaves) {
   if (modeOctaves.w == 0) {
     return noiseSample0(sourceCoords, frequencyStitch, modeOctaves);

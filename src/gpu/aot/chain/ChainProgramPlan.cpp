@@ -277,24 +277,26 @@ void RegisterGradientMembers(PlanRegistry* registry, bool lutForm) {
 }
 
 void RegisterNoiseMembers(PlanRegistry* registry) {
-  registry->uniform("Noise_frequencyStitch", FragmentType::Float4,
-                    ChainBindingSource::NoiseFrequencyStitch, -1);
-  registry->uniform("NoiseModeOctaves", FragmentType::Int4, ChainBindingSource::NoiseModeOctaves,
-                    -1);
+  // The members derive from the entry's GLSL annotations (see ChainOpRegistry.inc).
+#if defined(TGFX_EMBED_SHADER_BUNDLES)
+#define TGFX_REGISTER_evalNoiseSlot
+#include "ChainOpRegistry.inc"
+#undef TGFX_REGISTER_evalNoiseSlot
+#else
+  (void)registry;
+#endif
 }
 
 // The color-space transform's one chain-wide block, shared by every slot (the matcher admits one).
 void RegisterColorSpaceMembers(PlanRegistry* registry) {
-  registry->uniform("ChainCSFlags", FragmentType::Int, ChainBindingSource::CSFlags, -1);
-  registry->uniform("ChainSrcTF0", FragmentType::Float4, ChainBindingSource::CSTransferSrc0, -1);
-  registry->uniform("ChainSrcTF1", FragmentType::Float4, ChainBindingSource::CSTransferSrc1, -1);
-  registry->uniform("ChainSrcTFType", FragmentType::Int, ChainBindingSource::CSTransferSrcType, -1);
-  registry->uniform("ChainSrcOOTF", FragmentType::Float4, ChainBindingSource::CSOotfSrc, -1);
-  registry->uniform("ChainColorXform", FragmentType::Matrix3, ChainBindingSource::CSColorXform, -1);
-  registry->uniform("ChainDstOOTF", FragmentType::Float4, ChainBindingSource::CSOotfDst, -1);
-  registry->uniform("ChainDstTF0", FragmentType::Float4, ChainBindingSource::CSTransferDst0, -1);
-  registry->uniform("ChainDstTF1", FragmentType::Float4, ChainBindingSource::CSTransferDst1, -1);
-  registry->uniform("ChainDstTFType", FragmentType::Int, ChainBindingSource::CSTransferDstType, -1);
+  // The members derive from the entry's GLSL annotations (see ChainOpRegistry.inc).
+#if defined(TGFX_EMBED_SHADER_BUNDLES)
+#define TGFX_REGISTER_chainApplyColorSpaceXform
+#include "ChainOpRegistry.inc"
+#undef TGFX_REGISTER_chainApplyColorSpaceXform
+#else
+  (void)registry;
+#endif
 }
 
 // One leaf's declarations, registered as the leaf enters the plan: the sampler, the coordinate

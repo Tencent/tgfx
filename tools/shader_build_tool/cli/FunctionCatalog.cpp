@@ -40,6 +40,7 @@ struct CatalogEntry {
   std::vector<std::string>
   requires = {};
   std::string memberPrefix = {};
+  size_t memberStart = 2;
   std::vector<std::pair<std::string, std::string>> members = {};     // param -> member
   std::vector<std::pair<std::string, std::string>> sources = {};     // param -> enum override
   std::vector<std::pair<std::string, std::string>> conditions = {};  // param -> guard
@@ -111,6 +112,7 @@ bool ParseAnnotatedFunction(const std::string& text, CatalogEntry* entry, std::s
     const std::string sourceTag = "//@source ";
     const std::string whenTag = "//@when ";
     const std::string memberTag = "//@member ";
+    const std::string memberStartTag = "//@member-start ";
     const std::string requiresTag = "//@requires ";
     if (line.rfind(functionTag, 0) == 0) {
       if (!entry->name.empty()) {
@@ -131,6 +133,9 @@ bool ParseAnnotatedFunction(const std::string& text, CatalogEntry* entry, std::s
         auto& target = isSource ? entry->sources : entry->conditions;
         target.emplace_back(rest.substr(0, space), rest.substr(space + 1));
       }
+    } else if (line.rfind(memberStartTag, 0) == 0) {
+      entry->memberStart =
+          static_cast<size_t>(std::atoi(line.substr(memberStartTag.size()).c_str()));
     } else if (line.rfind(memberTag, 0) == 0) {
       const std::string rest = line.substr(memberTag.size());
       const auto space = rest.find(' ');
@@ -214,6 +219,9 @@ const char* FragmentTypeOf(const std::string& glslType) {
   }
   if (glslType == "ivec4") {
     return "Int4";
+  }
+  if (glslType == "mat3") {
+    return "Matrix3";
   }
   return nullptr;
 }
@@ -397,13 +405,13 @@ bool WriteFunctionCatalog(const std::string& shaderDir, const std::string& outPa
     }
     registry << "#if defined(TGFX_REGISTER_" << entry->name << ")\n";
     const auto params = SignatureParams(entry->source, entry->name);
-    if (params.size() < 3) {
+    if (params.size() < entry->memberStart) {
       continue;
     }
     const std::string prefix = entry->memberPrefix;
     std::vector<std::string> order = {};
     std::map<std::string, std::tuple<std::string, size_t, std::string, std::string>> members = {};
-    for (size_t index = 2; index < params.size(); ++index) {
+    for (size_t index = entry->memberStart; index < params.size(); ++index) {
       const std::string& paramName = params[index].second;
       std::string memberName = prefix + paramName;
       size_t count = 1;
