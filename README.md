@@ -281,7 +281,7 @@ backend, as the library's compile options do not propagate to the final link.
 
 The canvas object overloads of `WebGLDevice` / `WebGLWindow` and `WebGPUWindow` / `WebGPUDevice`
 additionally need the JS entry points that ship with the Web build (`createCanvasContext`,
-`createWebGPUSurface`, `importWebGPUDevice`). The WeChat mini-program binding exposes a smaller set
+`presentCanvasFrame`, `createWebGPUSurface`, `importWebGPUDevice`). The WeChat mini-program binding exposes a smaller set
 and does not provide them yet, so those overloads are not available in a mini-program build.
 
 To build a single-threaded WebGL version:

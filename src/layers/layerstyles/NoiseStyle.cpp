@@ -91,8 +91,7 @@ void NoiseStyle::invalidateNoise() {
 }
 
 std::shared_ptr<Shader> NoiseStyle::getNoiseShader(float contentScale) const {
-  auto freq = 1.0f / (_size * contentScale);
-  return Shader::MakeFractalNoise(freq, freq, 3, _seed);
+  return MakeNoiseShader(_size, contentScale, _seed);
 }
 
 // Draws a noise layer clipped to content alpha. The shader must already have color, density, and

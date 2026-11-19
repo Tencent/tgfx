@@ -382,22 +382,28 @@ class DisplayList {
   bool drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear, BackgroundSnapshotMap* snapshots) const;
 
-  /**
-   * Collects the world-space rect each visible background style actually samples, so a capture can
-   * cull layers that only touch the tile but lie under no background style. `worldBounds` limits
-   * the walk to the area being captured.
-   */
-  std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds,
-                                                const Matrix& viewMatrix) const;
+  std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
+
+  static void collectBackgroundFootprints(const Layer* layer, const Rect& bounds, bool clipped,
+                                          bool covered, std::vector<Rect>* footprints);
+
+  static std::vector<Rect> narrowCullRects(const std::vector<Rect>& footprints,
+                                           const std::vector<Rect>& captureRects);
+
+  static void mergeCullRects(std::vector<Rect>* rects);
+
+  static std::vector<Rect> buildCullRects(const std::vector<Rect>& footprints,
+                                          const std::vector<Rect>& captureRects);
+
+  std::vector<Rect> computeCaptureCullRects(const std::vector<Rect>& worldRects,
+                                            const Matrix& pixelToWorld) const;
 
   /**
-   * Captures the backdrop for background-sourced styles. `renderRects` are in the surface pixels of
-   * `viewMatrix`, which maps the layer space to those pixels; a tile passes its own raster scale so
-   * the snapshot density matches the tile it is drawn into.
+   * Captures the backdrop the background styles sample. `renderRects` are surface-space rects that
+   * size the capture; the layers drawn are culled to the footprints those styles sample inside it.
    */
   std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(
-      Surface* surface, const std::vector<Rect>& renderRects, const Matrix& viewMatrix,
-      const std::vector<Rect>& cullRects = {}) const;
+      Surface* surface, const std::vector<Rect>& renderRects) const;
 
   void updateMousePosition();
 };

@@ -73,6 +73,12 @@ void* WebGLBuffer::map(size_t offset, size_t size) {
   return nullptr;
 }
 
+void WebGLBuffer::insertReadbackFence() {
+  // The fence is never consumed because WebGL reads back buffer data via the synchronous
+  // getBufferSubData() in map(). Skipping it also prevents Chromium from discarding the
+  // shadow copy associated with the PBO, which triggers performance warnings on reuse.
+}
+
 void WebGLBuffer::unmap() {
   if (bufferData == nullptr) {
     return;

@@ -614,7 +614,9 @@ TGFX_TEST(LayerMaskTest, HighZoomWithMask) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto texture = context->gpu()->createTexture({1622, 1436, PixelFormat::RGBA_8888});
+  auto texture = context->gpu()->createTexture(
+      {1622, 1436, PixelFormat::RGBA_8888, false, 1,
+       TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT});
   ASSERT_TRUE(texture != nullptr);
   auto surface = Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
   auto displayList = std::make_unique<DisplayList>();
@@ -688,7 +690,9 @@ TGFX_TEST(LayerMaskTest, HighZoomWithMask) {
   backgroundBlurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
   rectLayer->addChild(backgroundBlurLayer);
   // Test Tiled mode
-  auto texture2 = context->gpu()->createTexture({1622, 1436, PixelFormat::RGBA_8888});
+  auto texture2 = context->gpu()->createTexture(
+      {1622, 1436, PixelFormat::RGBA_8888, false, 1,
+       TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT});
   ASSERT_TRUE(texture2 != nullptr);
   auto surface2 =
       Surface::MakeFrom(context, texture2->getBackendTexture(), ImageOrigin::BottomLeft);

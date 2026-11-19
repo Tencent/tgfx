@@ -42,7 +42,8 @@ class DrawArgs;
 class Render3DContext : public Layer3DContext {
  public:
   Render3DContext(std::shared_ptr<Context3DCompositor> compositor, const Rect& renderRect,
-                  float contentScale, std::shared_ptr<ColorSpace> colorSpace);
+                  float contentScale, std::shared_ptr<ColorSpace> colorSpace,
+                  const std::vector<Rect>* styleSourceRects);
 
   void finishAndDrawTo(const DrawArgs& args, Canvas* canvas) override;
 
@@ -100,6 +101,10 @@ class Render3DContext : public Layer3DContext {
                                 RasterInfo* info);
 
   std::shared_ptr<Context3DCompositor> _compositor = nullptr;
+  // Rects the capture pass records its layer style sources against, inherited by the per-fragment
+  // capturers so their cached sources stay as complete as the outer pass's. nullptr outside a
+  // capture, where sources follow renderRects.
+  const std::vector<Rect>* _styleSourceRects = nullptr;
   std::vector<PendingNode> _pendingNodes = {};
   // OR of hasBackgroundStyle across every collected node; gates outer-canvas priming and
   // capturer setup in finishAndDrawTo.

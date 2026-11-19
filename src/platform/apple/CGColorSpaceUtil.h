@@ -22,8 +22,10 @@
 #include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
-// Converts a tgfx ColorSpace to a CGColorSpaceRef via ICC profile data. Returns
-// kCGColorSpaceSRGB when the input is null or conversion fails. The caller must
-// release the returned CGColorSpaceRef with CFRelease().
+// Converts a tgfx ColorSpace to a CGColorSpaceRef. Well-known gamuts (sRGB, sRGB Linear and
+// Display P3) map to the named system color spaces so that the value stays recognizable to Core
+// Graphics and Core Animation; any other color space goes through ICC profile data. Returns
+// kCGColorSpaceSRGB when the input is null or conversion fails. The caller must release the
+// returned CGColorSpaceRef with CFRelease().
 CGColorSpaceRef CreateCGColorSpace(const std::shared_ptr<ColorSpace>& colorSpace);
 }  // namespace tgfx

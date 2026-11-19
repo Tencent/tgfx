@@ -20,9 +20,11 @@
 #ifdef __APPLE__
 #include <CommonCrypto/CommonCrypto.h>
 #endif
+#include <cctype>
 #include <fstream>
 #include <unordered_set>
 #include "base/TGFXTest.h"
+#include "core/utils/Log.h"
 #include "core/utils/MD5.h"
 #include "core/utils/USE.h"
 #pragma clang diagnostic push
@@ -43,7 +45,7 @@ namespace tgfx {
 
 static const std::string BASELINE_ROOT = ProjectPath::Absolute("test/baseline/");
 static const std::string BASELINE_VERSION_PATH = BASELINE_ROOT + "/version.json";
-static const std::string CACHE_DIR = BASELINE_ROOT + "/.cache/" + TGFX_BACKEND_NAME + "/";
+static const std::string CACHE_DIR = BASELINE_ROOT + ".cache/" + TGFX_BACKEND_NAME + "/";
 static const std::string CACHE_MD5_PATH = CACHE_DIR + "md5.json";
 static const std::string CACHE_VERSION_PATH = CACHE_DIR + "version.json";
 static const std::string GIT_HEAD_PATH = CACHE_DIR + "HEAD";
@@ -64,6 +66,8 @@ static nlohmann::json CacheMD5 = {};
 static nlohmann::json OutputMD5 = {};
 static std::mutex jsonLocker = {};
 static std::string currentVersion;
+static bool cacheAvailable = false;
+static int missingCacheFailures = 0;
 
 std::string DumpMD5(const void* bytes, size_t size) {
   auto digest = MD5::Calculate(bytes, size);
@@ -144,6 +148,18 @@ bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
   return Baseline::Compare(pixmap, key);
 }
 
+bool Baseline::CompareReference(const std::string& md5, const std::string& baselineVersion,
+                                const std::string& cacheVersion, const std::string& cacheMD5,
+                                bool cacheAvailable) {
+  if (baselineVersion.empty() || !cacheAvailable) {
+    return false;
+  }
+  if (cacheVersion.empty()) {
+    return true;
+  }
+  return baselineVersion != cacheVersion || (!cacheMD5.empty() && cacheMD5 == md5);
+}
+
 static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
                                  const std::function<void(bool)>& callback) {
 #ifdef UPDATE_BASELINE
@@ -152,14 +168,24 @@ static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
 #endif
   auto baselineVersion = GetJSONValue(BaselineVersion, key);
   auto cacheVersion = GetJSONValue(CacheVersion, key);
-  if (baselineVersion.empty() ||
-      (baselineVersion == cacheVersion && GetJSONValue(CacheMD5, key) != md5)) {
+  auto cacheMD5 = GetJSONValue(CacheMD5, key);
+  if (!Baseline::CompareReference(md5, baselineVersion, cacheVersion, cacheMD5, cacheAvailable)) {
+    if (cacheAvailable && (baselineVersion.empty() || cacheMD5.empty())) {
+      LOGE("Baseline::Compare() Missing reference for %s on %s.", key.c_str(), TGFX_BACKEND_NAME);
+    }
+    if (!cacheAvailable) {
+      missingCacheFailures++;
+    }
     SetJSONValue(OutputVersion, key, currentVersion);
     SetJSONValue(OutputMD5, key, md5);
     if (callback) {
       callback(false);
     }
     return false;
+  }
+  if (cacheVersion.empty()) {
+    LOGI("Baseline::Compare() %s on %s is not in the reference cache yet, skipping the comparison.",
+         key.c_str(), TGFX_BACKEND_NAME);
   }
   SetJSONValue(OutputVersion, key, baselineVersion);
   if (callback) {
@@ -232,6 +258,19 @@ bool Baseline::Compare(std::shared_ptr<Data> data, const std::string& key) {
   return CompareVersionAndMd5(md5, key, {});
 }
 
+static std::string GetBackendArgument() {
+  std::string argument = "USE_";
+  std::string backendName = TGFX_BACKEND_NAME;
+  for (auto& character : backendName) {
+    if (character == '-') {
+      argument += '_';
+    } else {
+      argument += static_cast<char>(std::toupper(static_cast<unsigned char>(character)));
+    }
+  }
+  return argument;
+}
+
 void Baseline::SetUp() {
   std::ifstream cacheMD5File(CACHE_MD5_PATH);
   if (cacheMD5File.is_open()) {
@@ -247,6 +286,13 @@ void Baseline::SetUp() {
   if (cacheVersionFile.is_open()) {
     cacheVersionFile >> CacheVersion;
     cacheVersionFile.close();
+  }
+  cacheAvailable = CacheVersion.is_object() && !CacheVersion.empty();
+  if (!cacheAvailable) {
+    LOGE(
+        "Baseline::SetUp() No reference cache found at %s, so every screenshot test will fail. "
+        "Run './update_baseline.sh %s' to create it.",
+        CACHE_DIR.c_str(), GetBackendArgument().c_str());
   }
   std::ifstream headFile(GIT_HEAD_PATH);
   if (headFile.is_open()) {
@@ -310,5 +356,15 @@ void Baseline::TearDown() {
   versionFile.close();
   RemoveEmptyFolder(OUT_ROOT);
 #endif
+}
+
+void Baseline::ReportMissingCache() {
+  if (cacheAvailable || missingCacheFailures == 0) {
+    return;
+  }
+  LOGE(
+      "Baseline: %d screenshot comparisons failed because the reference cache is missing. "
+      "Run './update_baseline.sh %s' and rerun the tests.",
+      missingCacheFailures, GetBackendArgument().c_str());
 }
 }  // namespace tgfx

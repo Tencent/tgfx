@@ -26,7 +26,7 @@ namespace tgfx {
 class WebGPUDrawableProxy : public RenderTargetProxy {
  public:
   WebGPUDrawableProxy(Context* context, int width, int height, WGPUSurface surface,
-                      WGPUTextureFormat format, PixelFormat pixelFormat);
+                      WGPUTextureFormat format, PixelFormat pixelFormat, bool presentSupported);
 
   ~WebGPUDrawableProxy() override;
 
@@ -55,6 +55,8 @@ class WebGPUDrawableProxy : public RenderTargetProxy {
   mutable WGPUTexture _surfaceTexture = nullptr;
   mutable WGPUTextureView _surfaceTextureView = nullptr;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
+  // Resolved at creation: whether the JS bundle can present a frame on this window's thread.
+  bool _presentSupported = false;
 };
 
 }  // namespace tgfx
