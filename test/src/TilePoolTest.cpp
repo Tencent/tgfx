@@ -624,7 +624,7 @@ TGFX_TEST(TilePoolTest, SkippingNegligibleBackgroundBlurKeepsThePicture) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
-  // sigma 4 at zoom 0.05 is 0.2 pixels of the tile, below the 0.3 threshold.
+  // sigma 4 at zoom 0.05 is 0.2 pixels of the tile, below the 0.4 threshold.
   auto on = RenderPanels(context, 0.05f, 4.0f, 40, true);
   auto off = RenderPanels(context, 0.05f, 4.0f, 40, false);
   // Every style in the frame is below the threshold, so the capture is elided; the picture changes by
