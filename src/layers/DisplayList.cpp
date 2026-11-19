@@ -900,7 +900,9 @@ void DisplayList::invalidateTreeTiles(const std::vector<Rect>& dirtyRegions,
     }
   }
   for (auto& key : dirtyKeys) {
-    emptyTiles.push_back(tilePool->erase(key));
+    if (auto recycled = tilePool->erase(key)) {
+      emptyTiles.push_back(std::move(recycled));
+    }
   }
 }
 
