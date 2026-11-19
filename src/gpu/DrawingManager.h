@@ -41,14 +41,14 @@ class DrawingManager {
    * and passes it to hasDrawnSince() to tell whether the tile produced any content.
    */
   uint64_t drawMark() const {
-    return _drawCount;
+    return drawCount;
   }
 
   /**
    * Returns true if an OpsCompositor of this context recorded a draw call after the given mark.
    */
   bool hasDrawnSince(uint64_t mark) const {
-    return _drawCount != mark;
+    return drawCount != mark;
   }
 
   /**
@@ -56,7 +56,7 @@ class DrawingManager {
    * obtains its OpsCompositor, which every draw path goes through.
    */
   void markDrawn() {
-    ++_drawCount;
+    ++drawCount;
   }
 
   BlockAllocator* drawingAllocator() {
@@ -174,7 +174,7 @@ class DrawingManager {
   std::deque<std::shared_ptr<DrawingBuffer>> bufferPool = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   std::unordered_map<TextureProxy*, AtlasUploadTask*> atlasTaskMap = {};
-  uint64_t _drawCount = 0;
+  uint64_t drawCount = 0;
 
   DrawingBuffer* getDrawingBuffer() {
     return currentBuffer ? currentBuffer.get() : createDrawingBuffer();
