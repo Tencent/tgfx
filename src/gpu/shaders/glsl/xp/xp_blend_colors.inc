@@ -16,272 +16,202 @@
 #ifndef TGFX_XP_BLEND_COLORS_INC
 #define TGFX_XP_BLEND_COLORS_INC
 
-float xpLuminance(vec3 c) {
-  return dot(vec3(0.3, 0.59, 0.11), c);
-}
+#include "fn/xp/xpLuminance.inc"
+#include "fn/xp/xpSaturation.inc"
+#include "fn/xp/xpSetLuminance.inc"
+#include "fn/xp/xpSetSaturation.inc"
+#include "fn/xp/xpBlend_Clear.inc"
+#include "fn/xp/xpBlend_Src.inc"
+#include "fn/xp/xpBlend_Dst.inc"
+#include "fn/xp/xpBlend_SrcOver.inc"
+#include "fn/xp/xpBlend_DstOver.inc"
+#include "fn/xp/xpBlend_SrcIn.inc"
+#include "fn/xp/xpBlend_DstIn.inc"
+#include "fn/xp/xpBlend_SrcOut.inc"
+#include "fn/xp/xpBlend_DstOut.inc"
+#include "fn/xp/xpBlend_SrcATop.inc"
+#include "fn/xp/xpBlend_DstATop.inc"
+#include "fn/xp/xpBlend_Xor.inc"
+#include "fn/xp/xpBlend_PlusLighter.inc"
+#include "fn/xp/xpBlend_Modulate.inc"
+#include "fn/xp/xpBlend_Screen.inc"
+#include "fn/xp/xpBlend_Overlay.inc"
+#include "fn/xp/xpBlend_Darken.inc"
+#include "fn/xp/xpBlend_Lighten.inc"
+#include "fn/xp/xpBlend_ColorDodge.inc"
+#include "fn/xp/xpBlend_ColorBurn.inc"
+#include "fn/xp/xpBlend_HardLight.inc"
+#include "fn/xp/xpBlend_SoftLight.inc"
+#include "fn/xp/xpBlend_Difference.inc"
+#include "fn/xp/xpBlend_Exclusion.inc"
+#include "fn/xp/xpBlend_Multiply.inc"
+#include "fn/xp/xpBlend_Hue.inc"
+#include "fn/xp/xpBlend_Saturation.inc"
+#include "fn/xp/xpBlend_Color.inc"
+#include "fn/xp/xpBlend_Luminosity.inc"
+#include "fn/xp/xpBlend_PlusDarker.inc"
+#include "fn/xp/xpBlend_Clear_coverage.inc"
+#include "fn/xp/xpBlend_Src_coverage.inc"
+#include "fn/xp/xpBlend_Dst_coverage.inc"
+#include "fn/xp/xpBlend_SrcOver_coverage.inc"
+#include "fn/xp/xpBlend_DstOver_coverage.inc"
+#include "fn/xp/xpBlend_SrcIn_coverage.inc"
+#include "fn/xp/xpBlend_DstIn_coverage.inc"
+#include "fn/xp/xpBlend_SrcOut_coverage.inc"
+#include "fn/xp/xpBlend_DstOut_coverage.inc"
+#include "fn/xp/xpBlend_SrcATop_coverage.inc"
+#include "fn/xp/xpBlend_DstATop_coverage.inc"
+#include "fn/xp/xpBlend_Xor_coverage.inc"
+#include "fn/xp/xpBlend_PlusLighter_coverage.inc"
+#include "fn/xp/xpBlend_Modulate_coverage.inc"
+#include "fn/xp/xpBlend_Screen_coverage.inc"
 
-float xpSaturation(vec3 c) {
-  return max(max(c.r, c.g), c.b) - min(min(c.r, c.g), c.b);
-}
-
-#pragma tgfx_spec_gate BlendLuminance : SPEC_NeedsBlendMath() != 0
-vec3 xpSetLuminance(vec3 hueSat, float alpha, vec3 lumColor) {
-  // Match GLSLBlend's set_luminance: subtract the colors before computing luminance so the
-  // floating-point reduction has the same rounding path on the runtime and precompiled routes.
-  float diff = xpLuminance(lumColor - hueSat);
-  vec3 outColor = hueSat + diff;
-  float outLum = xpLuminance(outColor);
-  float minComp = min(min(outColor.r, outColor.g), outColor.b);
-  float maxComp = max(max(outColor.r, outColor.g), outColor.b);
-  float lowDen = (outLum != minComp) ? (outLum - minComp) : 1.0;
-  vec3 lowClamped = vec3(outLum) + ((outColor - vec3(outLum)) * outLum) / vec3(lowDen);
-  outColor = mix(outColor, lowClamped, bvec3(minComp < 0.0 && outLum != minComp));
-  float highDen = (maxComp != outLum) ? (maxComp - outLum) : 1.0;
-  vec3 highClamped = vec3(outLum) + ((outColor - vec3(outLum)) * (alpha - outLum)) / vec3(highDen);
-  return mix(outColor, highClamped, bvec3(maxComp > alpha && maxComp != outLum));
-}
-
-#pragma tgfx_spec_gate BlendSaturation : SPEC_NeedsBlendMath() != 0
-vec3 xpSetSaturation(vec3 hueLumColor, vec3 satColor) {
-  // Component-wise rank form of the classic min/mid/max permutation tree: every channel maps to
-  // sat * (c - min) / (max - min), which is exactly the tree's mid-channel expression, while the
-  // min channel evaluates to 0.0 and the max channel is replaced with the constant sat the tree
-  // assigns to it. When max == min the tree returns all zeros; the sanitized denominator makes
-  // every lane compute sat * 0 = 0 instead.
-  float sat = xpSaturation(satColor);
-  float minComp = min(min(hueLumColor.r, hueLumColor.g), hueLumColor.b);
-  float maxComp = max(max(hueLumColor.r, hueLumColor.g), hueLumColor.b);
-  float denom = (maxComp > minComp) ? (maxComp - minComp) : 1.0;
-  vec3 ranked = (sat * (hueLumColor - vec3(minComp))) / vec3(denom);
-  return mix(ranked, vec3(sat), equal(hueLumColor, vec3(maxComp)));
-}
-
-// The switch is reachable only when a Blend slot's mode or the draw's advanced xfer mode runs it,
-// so a chain with neither closes the gate and the runtime hands the driver the stub.
-#pragma tgfx_spec_gate BlendSwitch : SPEC_NeedsBlendMath() != 0
 vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
-  // The coefficient modes (3-14) mirror the runtime's AppendCoeffBlend, whose Add/Subtract
-  // operations clamp the result to [0,1] (GLSLBlend.cpp). Porter-Duff is closed over in-range
-  // premultiplied inputs, so the clamp is a no-op for well-formed colors, but out-of-range leaf
-  // values (gradient stops accept unclamped floats) must not propagate unclamped into later
-  // operators: the runtime clamps at the blend while the chain would defer it.
-  vec4 result;
+  vec4 dstSrcAlpha = D * S.a;
+  vec4 srcDstAlpha = S * D.a;
   if (mode == 0) {
-    result = vec4(0.0);
-  } else if (mode == 1) {
-    result = S;
-  } else if (mode == 2) {
-    result = D;
-  } else if (mode == 3) {
-    result = clamp(S + D * (1.0 - S.a), 0.0, 1.0);
-  } else if (mode == 4) {
-    result = clamp(S * (1.0 - D.a) + D, 0.0, 1.0);
-  } else if (mode == 5) {
-    result = clamp(S * D.a, 0.0, 1.0);
-  } else if (mode == 6) {
-    result = clamp(D * S.a, 0.0, 1.0);
-  } else if (mode == 7) {
-    result = clamp(S * (1.0 - D.a), 0.0, 1.0);
-  } else if (mode == 8) {
-    result = clamp(D * (1.0 - S.a), 0.0, 1.0);
-  } else if (mode == 9) {
-    result = clamp(S * D.a + D * (1.0 - S.a), 0.0, 1.0);
-  } else if (mode == 10) {
-    result = clamp(S * (1.0 - D.a) + D * S.a, 0.0, 1.0);
-  } else if (mode == 11) {
-    result = clamp(S * (1.0 - D.a) + D * (1.0 - S.a), 0.0, 1.0);
-  } else if (mode == 12) {
-    result = clamp(S + D, 0.0, 1.0);
-  } else if (mode == 13) {
-    result = clamp(S * D, 0.0, 1.0);
-  } else if (mode == 14) {
-    result = clamp(S + D - S * D, 0.0, 1.0);
-  } else if (mode == 15 || mode == 20) {
-    // Overlay and HardLight share one branch: Overlay == HardLight with operands swapped.
-    // Two structurally-related branches in the if-chain miscompile under Chrome WebGPU (dawn
-    // swaps their bodies in large shaders), so they are fused with an operand pick instead.
-    // A is the branch-control operand (the backdrop for Overlay, the source for HardLight) and
-    // B the other side, making the math a literal translation of the runtime HardLight emission
-    // (fast multiply path when 2 * control < control.a); the mix keeps the selection branchless
-    // and equally dawn-safe.
-    result.a = S.a + (1.0 - S.a) * D.a;
-    vec3 pick = step(vec3(1.5), vec3(float(mode - 14)));
-    vec4 A = mix(D, S, pick.x);  // mode 15: A = D; mode 20: A = S
-    vec4 B = mix(S, D, pick.x);  // mode 15: B = S; mode 20: B = D
-    vec3 fast = 2.0 * A.rgb * B.rgb;
-    vec3 slow = vec3(A.a * B.a) - 2.0 * (vec3(A.a) - A.rgb) * (vec3(B.a) - B.rgb);
-    result.rgb = mix(slow, fast, lessThan(2.0 * A.rgb, vec3(A.a)));
-    result.rgb += A.rgb * (1.0 - B.a) + B.rgb * (1.0 - A.a);
-  } else if (mode == 16) {
-    result.a = S.a + (1.0 - S.a) * D.a;
-    result.rgb = min((1.0 - S.a) * D.rgb + S.rgb, (1.0 - D.a) * S.rgb + D.rgb);
-  } else if (mode == 17) {
-    result.a = S.a + (1.0 - S.a) * D.a;
-    result.rgb = max((1.0 - S.a) * D.rgb + S.rgb, (1.0 - D.a) * S.rgb + D.rgb);
-  } else if (mode == 18) {
-    result.a = S.a + (1.0 - S.a) * D.a;
-    vec3 d = vec3(S.a) - S.rgb;
-    vec3 dSafe = mix(vec3(1.0), d, notEqual(d, vec3(0.0)));
-    vec3 dd = min(vec3(D.a), D.rgb * vec3(S.a) / dSafe);
-    vec3 valElse = dd * vec3(S.a) + S.rgb * (1.0 - D.a) + D.rgb * (1.0 - S.a);
-    vec3 valZeroD = vec3(S.a * D.a) + S.rgb * (1.0 - D.a) + D.rgb * (1.0 - S.a);
-    vec3 val = mix(valElse, valZeroD, equal(d, vec3(0.0)));
-    result.rgb = mix(val, S.rgb * (1.0 - D.a), equal(D.rgb, vec3(0.0)));
-  } else if (mode == 19) {
-    result.a = S.a + (1.0 - S.a) * D.a;
-    vec3 sSafe = mix(vec3(1.0), S.rgb, notEqual(S.rgb, vec3(0.0)));
-    vec3 dd = max(vec3(0.0), vec3(D.a) - (vec3(D.a) - D.rgb) * vec3(S.a) / sSafe);
-    vec3 valElse = vec3(S.a) * dd + S.rgb * (1.0 - D.a) + D.rgb * (1.0 - S.a);
-    vec3 valSrc0 = D.rgb * (1.0 - S.a);
-    vec3 valFull = vec3(S.a * D.a) + S.rgb * (1.0 - D.a) + D.rgb * (1.0 - S.a);
-    vec3 val = mix(valElse, valSrc0, equal(S.rgb, vec3(0.0)));
-    result.rgb = mix(val, valFull, equal(D.rgb, vec3(D.a)));
-  } else if (mode == 21) {
-    result.a = S.a + (1.0 - S.a) * D.a;
-    if (D.a == 0.0) {
-      result.rgb = S.rgb;
-    } else {
-      vec3 sa2 = S.a - 2.0 * S.rgb;
-      vec3 arm1 = (D.rgb * D.rgb * sa2) / vec3(D.a) + (1.0 - D.a) * S.rgb + D.rgb * (1.0 - sa2);
-      vec3 DSqd = D.rgb * D.rgb;
-      vec3 DCub = DSqd * D.rgb;
-      float DaSqd = D.a * D.a;
-      float DaCub = DaSqd * D.a;
-      vec3 arm2 = (vec3(DaSqd) * (S.rgb - D.rgb * (3.0 * S.a - 6.0 * S.rgb - 1.0)) +
-                   12.0 * D.a * DSqd * sa2 - 16.0 * DCub * sa2 - vec3(DaCub) * S.rgb) /
-                  vec3(DaSqd);
-      vec3 arm3 = D.rgb * (sa2 + 1.0) + S.rgb - sqrt(vec3(D.a) * D.rgb) * sa2 - vec3(D.a) * S.rgb;
-      vec3 val = mix(arm3, arm2, lessThanEqual(4.0 * D.rgb, vec3(D.a)));
-      result.rgb = mix(val, arm1, lessThanEqual(2.0 * S.rgb, vec3(S.a)));
-    }
-  } else if (mode == 22) {
-    result.a = S.a + (1.0 - S.a) * D.a;
-    result.rgb = S.rgb + D.rgb - 2.0 * min(S.rgb * D.a, D.rgb * S.a);
-  } else if (mode == 23) {
-    result.a = S.a + (1.0 - S.a) * D.a;
-    result.rgb = D.rgb + S.rgb - 2.0 * D.rgb * S.rgb;
-  } else if (mode == 24) {
-    result.a = S.a + (1.0 - S.a) * D.a;
-    result.rgb = (1.0 - S.a) * D.rgb + (1.0 - D.a) * S.rgb + S.rgb * D.rgb;
-  } else if (mode >= 25 && mode <= 28) {
-    // Hue (25), Saturation (26), Color (27), Luminosity (28). The four modes differ only in the
-    // operands they feed set_saturation / set_luminance (GLSLBlend.cpp), so the operands are
-    // selected first and each helper has a single call site. A GPU compiler inlines every call
-    // site; one call per helper instead of one per mode keeps a single copy of the HSL math in
-    // every kernel that includes this file. The selected operands are the very expressions the
-    // per-mode branches passed, so each mode computes the same values as before.
-    result.a = S.a + (1.0 - S.a) * D.a;
-    vec4 dstSrcAlpha = D * S.a;
-    vec4 srcDstAlpha = S * D.a;
-    vec3 hueSat = vec3(0.0);
-    float lumAlpha = 0.0;
-    vec3 lumColor = vec3(0.0);
-    if (mode <= 26) {
-      vec3 hueColor = mode == 25 ? S.rgb * D.a : dstSrcAlpha.rgb;
-      vec3 satColor = mode == 25 ? dstSrcAlpha.rgb : S.rgb * D.a;
-      hueSat = xpSetSaturation(hueColor, satColor);
-      lumAlpha = dstSrcAlpha.a;
-      lumColor = dstSrcAlpha.rgb;
-    } else {
-      hueSat = mode == 27 ? srcDstAlpha.rgb : D.rgb * S.a;
-      lumAlpha = srcDstAlpha.a;
-      lumColor = mode == 27 ? D.rgb * S.a : srcDstAlpha.rgb;
-    }
-    result.rgb = xpSetLuminance(hueSat, lumAlpha, lumColor);
-    result.rgb += (1.0 - S.a) * D.rgb + (1.0 - D.a) * S.rgb;
-  } else if (mode == 29) {
-    result.a = S.a + (1.0 - S.a) * D.a;
-    result.rgb = clamp(1.0 + S.rgb + D.rgb - D.a - S.a, 0.0, 1.0);
-    result.rgb *= (result.a > 0.0) ? 1.0 : 0.0;
-  } else {
-    result = S;
+    return xpBlend_Clear(S, D, dstSrcAlpha, srcDstAlpha);
   }
-  return result;
+  if (mode == 1) {
+    return xpBlend_Src(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 2) {
+    return xpBlend_Dst(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 3) {
+    return xpBlend_SrcOver(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 4) {
+    return xpBlend_DstOver(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 5) {
+    return xpBlend_SrcIn(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 6) {
+    return xpBlend_DstIn(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 7) {
+    return xpBlend_SrcOut(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 8) {
+    return xpBlend_DstOut(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 9) {
+    return xpBlend_SrcATop(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 10) {
+    return xpBlend_DstATop(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 11) {
+    return xpBlend_Xor(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 12) {
+    return xpBlend_PlusLighter(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 13) {
+    return xpBlend_Modulate(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 14) {
+    return xpBlend_Screen(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 15) {
+    return xpBlend_Overlay(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 16) {
+    return xpBlend_Darken(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 17) {
+    return xpBlend_Lighten(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 18) {
+    return xpBlend_ColorDodge(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 19) {
+    return xpBlend_ColorBurn(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 20) {
+    return xpBlend_HardLight(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 21) {
+    return xpBlend_SoftLight(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 22) {
+    return xpBlend_Difference(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 23) {
+    return xpBlend_Exclusion(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 24) {
+    return xpBlend_Multiply(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 25) {
+    return xpBlend_Hue(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 26) {
+    return xpBlend_Saturation(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 27) {
+    return xpBlend_Color(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 28) {
+    return xpBlend_Luminosity(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  if (mode == 29) {
+    return xpBlend_PlusDarker(S, D, dstSrcAlpha, srcDstAlpha);
+  }
+  return S;
 }
 
-// Coverage application for the XferProcessor path. Modes 0-14 (Clear..Screen) are coefficient
-// modes: the runtime bakes the coverage into the BlendFormula table (GLSLBlend.cpp Coeffs[1]) and
-// emits mode-specific forms like S*C + D*(1-C.a) for Src, which differ from the generic
-// C*blend(S,D) + (1-C)*D whenever the coverage alpha does not equal its rgb or S.a < 1. These
-// branches mirror that table exactly (primary/secondary outputs and src/dst factors, final
-// clamp included); advanced modes keep the generic form, matching the runtime's
-// HandleBlendModes + coverage wrapper. Per mode:
-//    0 clear:     D*One - C*D
-//    1 src:       primary=S*C; dst factor OneMinusSrc1Alpha on secondary=C
-//    2 dst
-//    3 src-over:  primary=S*C; dst factor OneMinusSrcAlpha on primary
-//    4 dst-over:  src factor OneMinusDstAlpha on primary
-//    5 src-in:    src factor DstAlpha on primary; dst factor OneMinusSrc1Alpha on secondary=C
-//    6 dst-in:    D*One - (1-S.a)*C*D
-//    7 src-out:   src factor OneMinusDstAlpha on primary; dst factor OneMinusSrc1Alpha on
-//                 secondary
-//    8 dst-out:   dst factor OneMinusSrcAlpha on primary
-//    9 src-atop
-//   10 dst-atop:  secondary=(1-S.a)*C; dst factor OneMinusSrc1 (vec4)
-//   11 xor
-//   12 plus
-//   13 modulate:  D*One - (vec4(1.0)-S)*C*D
-//   14 screen:    dst factor OneMinusSrcColor (vec4) on primary
-//
-// The body is a macro over S, D, C and mode in scope; ADVANCED_BLEND is the advanced modes' blend
-// expression, reached only after every coefficient mode has returned. It has two expansions:
-// xpBlendWithCoverage below blends there with xpBlendColors, while xpCompositeBlendPass
-// (xp_blend_pass.inc) takes the blend its kernel's evaluation loop already computed, so that
-// kernel inlines xpBlendColors once. A kernel without the blend pass compiles the same function
-// as before; splitting it into separate coefficient and advanced functions instead measured 4%
-// slower desktop GL cold compiles for every dst-reading kernel.
 #define XP_FIRST_ADVANCED_MODE 15
 #define XP_COMPOSITE_WITH_COVERAGE(ADVANCED_BLEND) \
   if (mode == 0) { \
-    return clamp(D - C * D, 0.0, 1.0); \
+    return xpBlend_Clear_coverage(S, D, C); \
   } \
   if (mode == 1) { \
-    return clamp(S * C + D * (1.0 - C.a), 0.0, 1.0); \
+    return xpBlend_Src_coverage(S, D, C); \
   } \
   if (mode == 2) { \
-    return clamp(D, 0.0, 1.0); \
+    return xpBlend_Dst_coverage(S, D, C); \
   } \
   if (mode == 3) { \
-    return clamp(S * C + D * (1.0 - (S * C).a), 0.0, 1.0); \
+    return xpBlend_SrcOver_coverage(S, D, C); \
   } \
   if (mode == 4) { \
-    return clamp(S * C * (1.0 - D.a) + D, 0.0, 1.0); \
+    return xpBlend_DstOver_coverage(S, D, C); \
   } \
   if (mode == 5) { \
-    return clamp(S * C * D.a + D * (1.0 - C.a), 0.0, 1.0); \
+    return xpBlend_SrcIn_coverage(S, D, C); \
   } \
   if (mode == 6) { \
-    return clamp(D - (1.0 - S.a) * C * D, 0.0, 1.0); \
+    return xpBlend_DstIn_coverage(S, D, C); \
   } \
   if (mode == 7) { \
-    return clamp(S * C * (1.0 - D.a) + D * (1.0 - C.a), 0.0, 1.0); \
+    return xpBlend_SrcOut_coverage(S, D, C); \
   } \
   if (mode == 8) { \
-    return clamp(D * (1.0 - (S * C).a), 0.0, 1.0); \
+    return xpBlend_DstOut_coverage(S, D, C); \
   } \
   if (mode == 9) { \
-    return clamp(S * C * D.a + D * (1.0 - (S * C).a), 0.0, 1.0); \
+    return xpBlend_SrcATop_coverage(S, D, C); \
   } \
   if (mode == 10) { \
-    return clamp(S * C * (1.0 - D.a) + D * (vec4(1.0) - (1.0 - S.a) * C), 0.0, 1.0); \
+    return xpBlend_DstATop_coverage(S, D, C); \
   } \
   if (mode == 11) { \
-    return clamp(S * C * (1.0 - D.a) + D * (1.0 - (S * C).a), 0.0, 1.0); \
+    return xpBlend_Xor_coverage(S, D, C); \
   } \
   if (mode == 12) { \
-    return clamp(S * C + D, 0.0, 1.0); \
+    return xpBlend_PlusLighter_coverage(S, D, C); \
   } \
   if (mode == 13) { \
-    return clamp(D - (vec4(1.0) - S) * C * D, 0.0, 1.0); \
+    return xpBlend_Modulate_coverage(S, D, C); \
   } \
   if (mode == 14) { \
-    return clamp(S * C + D * (vec4(1.0) - S * C), 0.0, 1.0); \
+    return xpBlend_Screen_coverage(S, D, C); \
   } \
   vec4 blended = ADVANCED_BLEND; \
   return C * blended + (vec4(1.0) - C) * D;
 
-// Only the dst-reading XferProcessor routes (applyPorterDuffXP, both modes) call this, so it is
-// absent from the HAS_XP == 0 variants.
 #if HAS_XP >= 1
 vec4 xpBlendWithCoverage(vec4 S, vec4 D, vec4 C, int mode) {
   XP_COMPOSITE_WITH_COVERAGE(xpBlendColors(S, D, mode))
