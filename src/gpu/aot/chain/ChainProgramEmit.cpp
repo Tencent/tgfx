@@ -17,6 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/chain/ChainProgramEmit.h"
+
+// The scanned function catalog (shader_build_tool --catalog). Builds that do not generate it fall
+// back to the pack entries.
+#if __has_include("ChainFunctionCatalog.h")
+#include "ChainFunctionCatalog.h"
+#define TGFX_HAS_CHAIN_CATALOG 1
+#endif
 #include <atomic>
 #include <cstdlib>
 #include <fstream>
@@ -185,6 +192,13 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
     if (def == nullptr || def->sourceFile == nullptr) {
       continue;
     }
+#if defined(TGFX_HAS_CHAIN_CATALOG)
+    if (const char* catalogued = FindChainFunctionSource(def->functionName)) {
+      pieces += catalogued;
+      pieces.push_back('\n');
+      continue;
+    }
+#endif
     if (!appendPiece(0x40000000u | static_cast<uint32_t>(op))) {
       return false;
     }

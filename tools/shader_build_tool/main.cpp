@@ -40,6 +40,14 @@ int main(int argc, char** argv) {
     // rejected": scripts can tell a usage mistake from a real build failure.
     return 2;
   }
+  if (!options.catalogPath.empty()) {
+    std::string catalogError;
+    if (!tgfx::WriteFunctionCatalog(options.shaderDir, options.catalogPath, &catalogError)) {
+      std::cerr << "ERROR: " << catalogError << "\n";
+      return 1;
+    }
+    return 0;
+  }
   std::string targetError;
   if (!tgfx::SetMetalTarget(options.metalSdk, options.metalMinOS, &targetError)) {
     std::cerr << "ERROR: " << targetError << "\n";

@@ -297,7 +297,9 @@ void PrintUsage() {
 
 bool ParseArgs(int argc, char** argv, BuildOptions* options) {
   for (int i = 1; i < argc; i++) {
-    if (std::strcmp(argv[i], "--shader-dir") == 0 && i + 1 < argc) {
+    if (std::strcmp(argv[i], "--catalog") == 0 && i + 1 < argc) {
+      options->catalogPath = argv[++i];
+    } else if (std::strcmp(argv[i], "--shader-dir") == 0 && i + 1 < argc) {
       options->shaderDir = argv[++i];
     } else if (std::strcmp(argv[i], "--out-dir") == 0 && i + 1 < argc) {
       options->outDir = argv[++i];
