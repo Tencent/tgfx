@@ -1825,6 +1825,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   bool needsContentShape = false;
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
+    if (NeedsBackgroundSource(layerStyle->extraSourceType()) &&
+        !drawsBackgroundStyle(layerStyle.get())) {
+      continue;
+    }
     if (DeclaresGeometry(layerStyle.get())) {
       bucketNeedsGeometry[index] = true;
     } else {
@@ -1973,7 +1977,9 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       continue;
     }
     if (NeedsBackgroundSource(layerStyle->extraSourceType())) {
-      BackgroundHandler::DispatchOrSkip(args, canvas, this, alpha, layerStyle.get(), source);
+      if (drawsBackgroundStyle(layerStyle.get())) {
+        BackgroundHandler::DispatchOrSkip(args, canvas, this, alpha, layerStyle.get(), source);
+      }
       continue;
     }
     drawLayerStyleDefault(args, canvas, alpha, layerStyle.get(), source);
@@ -2242,6 +2248,15 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       renderBounds.join(child->renderBounds);
     }
   }
+  bitFields.contentOpaque = content == nullptr || content->isFullyOpaque();
+  bitFields.childrenOpaque = true;
+  for (const auto& child : _children) {
+    if (child->bitFields.visible && child->_alpha > 0 && child->maskOwner == nullptr &&
+        !child->isSubtreeOpaque()) {
+      bitFields.childrenOpaque = false;
+      break;
+    }
+  }
   auto backOutset = 0.f;
   // maxBackgroundOutset includes every background dependency, while minBackgroundOutset only
   // includes resolution-insensitive effects such as blur. Each LayerStyle classifies its own
@@ -2250,7 +2265,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   if (!renderBounds.isEmpty()) {
     for (auto& style : _layerStyles) {
       DEBUG_ASSERT(style != nullptr);
-      if (!NeedsBackgroundSource(style->extraSourceType())) {
+      if (!drawsBackgroundStyle(style.get())) {
         continue;
       }
       auto bounds = style->filterBackground(Rect::MakeEmpty(), contentScale);
@@ -2311,7 +2326,7 @@ void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer
 void Layer::updateBackgroundBounds(float contentScale, const std::vector<Rect>& sourceRects) {
   for (auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
-    if (NeedsBackgroundSource(style->extraSourceType())) {
+    if (drawsBackgroundStyle(style.get())) {
       _root->invalidateBackground(renderBounds, style.get(), contentScale, sourceRects);
     }
   }
@@ -2347,7 +2362,7 @@ void Layer::propagateLayerState() {
 bool Layer::hasOwnBackgroundStyle() const {
   for (const auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
-    if (NeedsBackgroundSource(style->extraSourceType())) {
+    if (drawsBackgroundStyle(style.get())) {
       return true;
     }
   }
@@ -2368,6 +2383,27 @@ bool Layer::hasDescendantBackgroundStyle() {
     }
   }
   return false;
+}
+
+bool Layer::isSubtreeOpaque() const {
+  auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
+  const bool maskComposesOffscreen =
+      hasValidMask() && maskType != LayerMaskType::Alpha && maskType != LayerMaskType::Contour;
+  return _alpha >= 1.0f && static_cast<BlendMode>(bitFields.blendMode) == BlendMode::SrcOver &&
+         _filters.empty() && !maskComposesOffscreen && !canPreserve3D() &&
+         bitFields.contentOpaque && bitFields.childrenOpaque;
+}
+
+bool Layer::drawsBackgroundStyle(const LayerStyle* style) const {
+  if (style == nullptr || !NeedsBackgroundSource(style->extraSourceType())) {
+    return false;
+  }
+  if (style->position() == LayerStylePosition::Below &&
+      style->contentSource() == LayerStyleContentSource::All && style->excludeChildEffects() &&
+      bitFields.contentOpaque && bitFields.childrenOpaque) {
+    return false;
+  }
+  return true;
 }
 
 std::shared_ptr<BackgroundSource> Layer::createBackgroundSource(

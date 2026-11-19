@@ -69,6 +69,15 @@ class LayerContent {
   virtual bool contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const = 0;
 
   /**
+   * Returns whether every pixel the content paints is fully opaque: each painted entry draws an
+   * opaque color or opaque shader with SrcOver. Entries no paint captured and painters with alpha 0
+   * paint nothing and do not count.
+   */
+  virtual bool isFullyOpaque() const {
+    return false;
+  }
+
+  /**
    * Returns true if any part of the content uses a blend mode other than SrcOver.
    */
   virtual bool hasBlendMode() const {

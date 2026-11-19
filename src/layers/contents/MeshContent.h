@@ -25,6 +25,11 @@ namespace tgfx {
 
 class MeshContent : public DrawContent {
  public:
+  // Vertex colors may carry their own alpha, which the paint does not describe.
+  bool isFullyOpaque() const override {
+    return false;
+  }
+
   MeshContent(std::shared_ptr<Mesh> mesh, const LayerPaint* paint);
 
   Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;

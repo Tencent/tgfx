@@ -3020,4 +3020,77 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, ThreeDSubtreeCullsToItsStyles) {
   })
 }
 
+// A background blur under fully opaque content, its own fill and its children, is hidden by that
+// content, so the layer stops depending on the background altogether.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, OpaqueContentHidesBackgroundBlur) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto surface = Surface::Make(context, 240, 200);
+    DisplayList displayList;
+    displayList.setBackgroundColor(Color::White());
+    // Direct rendering draws every frame, so the subtree cache gets built once the tree is static.
+    displayList.setRenderMode(RenderMode::Direct);
+    displayList.setSubtreeCacheMaxSize(2048);
+    Path stripes;
+    for (int x = 0; x < 240; x += 6) {
+      stripes.addRect(Rect::MakeXYWH(static_cast<float>(x), 0.0f, 3.0f, 200.0f));
+    }
+    auto stripeLayer = ShapeLayer::Make();
+    stripeLayer->setPath(stripes);
+    stripeLayer->setFillStyle(ShapeStyle::Make(Color::Black()));
+    displayList.root()->addChild(stripeLayer);
+
+    auto container = Layer::Make();
+    container->setMatrix(Matrix::MakeTrans(20, 20));
+    displayList.root()->addChild(container);
+    auto card = SolidLayer::Make();
+    card->setColor(Color::FromRGBA(30, 120, 220, 255));
+    card->setWidth(160);
+    card->setHeight(120);
+    auto blur = BackgroundBlurStyle::Make(6, 6);
+    blur->setExcludeChildEffects(true);
+    card->setLayerStyles({blur});
+    container->addChild(card);
+    Path childPath;
+    childPath.addRect(Rect::MakeXYWH(20, 20, 60, 40));
+    auto child = ShapeLayer::Make();
+    child->setPath(childPath);
+    child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 220, 0, 255)));
+    card->addChild(child);
+    for (int i = 0; i < 3; ++i) {
+      displayList.render(surface.get());
+    }
+    EXPECT_FALSE(card->drawsBackgroundStyle(blur.get()));
+    EXPECT_FALSE(card->hasBackgroundStyle());
+    EXPECT_FALSE(container->hasBackgroundStyle());
+    // Nothing samples the background, so the container caches like any other static subtree.
+    EXPECT_TRUE(container->subtreeCache != nullptr);
+    auto inside = surface->getColor(130, 110);
+    EXPECT_NEAR(inside.red, 30.0f / 255.0f, 2.0f / 255.0f);
+    EXPECT_NEAR(inside.blue, 220.0f / 255.0f, 2.0f / 255.0f);
+
+    // A child that lets the backdrop through brings the blur back.
+    child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 220, 0, 200)));
+    displayList.render(surface.get());
+    EXPECT_TRUE(card->drawsBackgroundStyle(blur.get()));
+    EXPECT_TRUE(container->hasBackgroundStyle());
+
+    // So does a fill that is not fully opaque.
+    child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 220, 0, 255)));
+    card->setColor(Color::FromRGBA(30, 120, 220, 252));
+    displayList.render(surface.get());
+    EXPECT_TRUE(card->drawsBackgroundStyle(blur.get()));
+
+    // And a mask that includes the children's effects, which opaque content does not cover.
+    card->setColor(Color::FromRGBA(30, 120, 220, 255));
+    displayList.render(surface.get());
+    EXPECT_FALSE(card->drawsBackgroundStyle(blur.get()));
+    blur->setExcludeChildEffects(false);
+    EXPECT_TRUE(card->drawsBackgroundStyle(blur.get()));
+    context->flushAndSubmit();
+  });
+}
+
 }  // namespace tgfx

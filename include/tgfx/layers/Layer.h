@@ -721,6 +721,16 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasOwnBackgroundStyle() const;
 
+  // Whether everything the subtree paints, apart from layer styles and filters, is fully opaque and
+  // composited in place. Reads the layer's own compositing state live and the content and children
+  // as of the last render bounds update.
+  bool isSubtreeOpaque() const;
+
+  // Whether the style needs the background and its output can show. A background style drawn below
+  // the layer's content and masked by that same content, children's effects excluded, is hidden
+  // entirely when the content is fully opaque, so it is treated as absent.
+  bool drawsBackgroundStyle(const LayerStyle* style) const;
+
   bool hasDescendantBackgroundStyle();
 
   std::shared_ptr<BackgroundSource> createBackgroundSource(
@@ -763,6 +773,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool hasBlendMode : 1;
     bool matrix3DIsAffine : 1;  // Whether the matrix3D is equivalent to a 2D affine matrix
     bool staticSubtree : 1;  // Whether the subtree (content, children, filters, styles) is static.
+    // Whether the layer's own content paints only fully opaque pixels.
+    bool contentOpaque : 1;
+    // Whether every visible child paints only fully opaque pixels, see isSubtreeOpaque().
+    bool childrenOpaque : 1;
     uint8_t blendMode : 5;
     uint8_t maskType : 3;
   } bitFields = {};
