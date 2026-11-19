@@ -891,6 +891,50 @@ std::vector<DrawTask> DisplayList::getThrottleFallbackTasks(
   return tasks;
 }
 
+// Returns whether every cell of `tile` that holds content is also drawn by a cache at another
+// scale, so recycling the tile loses nothing that no other scale can show. The cells match the ones
+// getFallbackDrawTasks() looks at, and the live caches are read so a tile already handed out no
+// longer counts as a backup.
+static bool HasScaleBackup(const Tile& tile, float scale, int tileSize, const Rect& renderBounds,
+                           const std::vector<std::pair<float, TileCache*>>& sortedCaches) {
+  if (sortedCaches.size() < 2) {
+    return false;
+  }
+  auto tileStartX = tile.tileX * tileSize;
+  auto tileStartY = tile.tileY * tileSize;
+  auto gridCount = std::max(tileSize / FALLBACK_GRID_SIZE, 1);
+  auto gridSize = tileSize / gridCount;
+  auto scaledBounds = renderBounds;
+  scaledBounds.scale(scale, scale);
+  scaledBounds.roundOut();
+  for (int gridX = 0; gridX < gridCount; ++gridX) {
+    for (int gridY = 0; gridY < gridCount; ++gridY) {
+      auto gridStartX = tileStartX + gridX * gridSize;
+      auto gridStartY = tileStartY + gridY * gridSize;
+      auto cell = Rect::MakeXYWH(gridStartX, gridStartY, gridSize, gridSize);
+      if (!cell.intersect(scaledBounds)) {
+        continue;
+      }
+      bool covered = false;
+      for (auto& [otherScale, otherCache] : sortedCaches) {
+        if (otherScale == scale || otherCache->empty()) {
+          continue;
+        }
+        auto zoomed = cell;
+        zoomed.scale(otherScale / scale, otherScale / scale);
+        if (!otherCache->getTilesUnderRect(zoomed, true).empty()) {
+          covered = true;
+          break;
+        }
+      }
+      if (!covered) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
     const Surface* renderSurface, size_t tileCount,
     const std::vector<std::pair<float, TileCache*>>& sortedCaches) {
@@ -910,7 +954,14 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
   emptyTiles.clear();
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
-  // Reverse iterate through sorted caches to get the farest tiles first.
+  // Order the caches the farthest scale first, and the tiles farthest from the viewport center
+  // first inside a cache, as the recycling has always done.
+  struct CacheCandidates {
+    float scale = 0.0f;
+    TileCache* cache = nullptr;
+    std::vector<std::shared_ptr<Tile>> tiles = {};
+  };
+  std::vector<CacheCandidates> candidates = {};
   for (size_t i = 0, j = sortedCaches.size(); i < j;) {
     auto& [scaleS, tileCacheS] = sortedCaches.at(i);
     auto& [scaleL, tileCacheL] = sortedCaches.at(j - 1);
@@ -927,10 +978,27 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
     auto centerY = static_cast<float>(renderSurface->height()) * 0.5f - _contentOffset.y;
     centerX *= scale / currentZoomScale;
     centerY *= scale / currentZoomScale;
-    auto reusableTiles = tileCache->getReusableTiles(centerX, centerY);
-    for (auto& tile : reusableTiles) {
-      tileCache->removeTile(tile->tileX, tile->tileY);
-      tiles.push_back(std::move(tile));
+    candidates.push_back({scale, tileCache, tileCache->getReusableTiles(centerX, centerY)});
+  }
+  // A tile another scale can draw again is redundant, so it goes before the tiles that are the only
+  // copy of their content. The second pass still takes those when the pool needs more: a tile is
+  // worthless when there is no tile left to draw the missing area with.
+  for (bool backedOnly : {true, false}) {
+    for (auto& candidate : candidates) {
+      for (auto& tile : candidate.tiles) {
+        if (tile == nullptr) {
+          continue;
+        }
+        if (backedOnly &&
+            !HasScaleBackup(*tile, candidate.scale, _tileSize, _root->renderBounds, sortedCaches)) {
+          continue;
+        }
+        candidate.cache->removeTile(tile->tileX, tile->tileY);
+        tiles.push_back(std::move(tile));
+        if (tiles.size() >= tileCount) {
+          break;
+        }
+      }
       if (tiles.size() >= tileCount) {
         break;
       }
