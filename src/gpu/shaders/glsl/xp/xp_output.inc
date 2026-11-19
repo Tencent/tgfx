@@ -21,7 +21,9 @@
   fragColor = xpCompositeBlendPass(TGFX_XP_SRC_UNPREMUL, TGFX_XP_DST_COLOR, TGFX_XP_COVERAGE,
                                    TGFX_XP_BLENDED);
 #elif HAS_XP
-  fragColor = applyPorterDuffXP(TGFX_XP_SRC_UNPREMUL, TGFX_XP_COVERAGE);
+  fragColor = applyPorterDuffXP(TGFX_XP_SRC_UNPREMUL, TGFX_XP_COVERAGE, gl_FragCoord.xy,
+                                DstTextureUpperLeft, DstTextureCoordScale, XPBlendMode,
+                                DstTextureSampler);
 #else
   fragColor = TGFX_XP_SRC_COLOR;
 #endif

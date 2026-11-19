@@ -22,6 +22,7 @@
 #include <climits>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <vector>
 #include "core/utils/Log.h"
 #include "gpu/ContextInternal.h"
@@ -425,6 +426,9 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
                 if (wantsLeafFetch) {
                   moduleOps.push_back(FragmentPackSPIRVLeafFetch & ~FragmentPackSPIRVOpBase);
                 }
+                if (hasXp == 1) {
+                  moduleOps.push_back(FragmentPackSPIRVPortDuff & ~FragmentPackSPIRVOpBase);
+                }
                 for (uint32_t op : moduleOps) {
                   if (op == ChainISA::InputOpaque || op == ChainISA::MulAlpha) {
                     continue;  // the inline expressions need no module
@@ -678,9 +682,16 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
       }
     }
     for (const auto& sampler : chainBindings.samplers) {
-      const unsigned binding = sampler.source == ChainSamplerSource::Leaf
-                                   ? static_cast<unsigned>(sampler.index)
-                                   : leafCount;
+      unsigned binding = static_cast<unsigned>(sampler.index);
+      if (sampler.source != ChainSamplerSource::Leaf) {
+        // The mask and the destination sampler sit where the variant's layout puts them.
+        binding = leafCount;
+        for (const auto& texture : layout.textures) {
+          if (texture.name == sampler.name) {
+            binding = texture.binding;
+          }
+        }
+      }
       descriptor.layout.textureSamplers.emplace_back(sampler.name, binding);
     }
     for (const auto& texture : layout.textures) {

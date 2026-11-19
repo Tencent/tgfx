@@ -138,6 +138,10 @@ inline constexpr uint32_t FragmentPackSPIRVOpBase = 0x80000000u;
 /// needs a prefetched leaf.
 inline constexpr uint32_t FragmentPackSPIRVLeafFetch = FragmentPackSPIRVOpBase | 0x3Fu;
 
+/// The porter-duff composite the xfer tail imports when the draw reads the destination through a
+/// texture (hasXp == 1).
+inline constexpr uint32_t FragmentPackSPIRVPortDuff = FragmentPackSPIRVOpBase | 0x3Eu;
+
 /// The Vulkan linking route's frames, one precompiled SPIR-V module per variant: the entry point
 /// the pipeline runs, its varying inputs in the variant's own locations, and the imported
 /// `chainBody` call the runtime body plugs into. The per-variant id is the base with the variant id.

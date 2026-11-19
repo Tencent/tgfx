@@ -970,6 +970,15 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
          "chainLeafFetch(vec3(1.0), vec4(1.0), vec2(1.0), 0, 0, 0, 0, mat3(1.0), 0, vec2(1.0), "
          "0, vec4(1.0))",
          true},
+        {0x3Eu,
+         "applyPorterDuffXP",
+         "#define HAS_XP 1\n#define TGFX_DECLARED_CHAIN 1\n"
+         "layout(set = 2, binding = 0) uniform sampler2D dummyDstTex;\n",
+         {"xp/xp_porter_duff.inc"},
+         false,
+         "",
+         "applyPorterDuffXP(vec4(1.0), vec4(1.0), vec2(1.0), vec2(1.0), vec2(1.0), 0, dummyDstTex)",
+         false},
     };
     for (const auto& form : pureForms) {
       std::string text = "#version 450\n";

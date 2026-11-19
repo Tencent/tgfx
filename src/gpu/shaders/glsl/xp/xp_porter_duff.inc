@@ -24,7 +24,10 @@ layout(set = TGFX_TEXTURE_SET, binding = XP_DST_TEX_BINDING) uniform sampler2D D
 #include "xp/xp_blend_colors.inc"
 
 #if HAS_XP == 1
-vec4 applyPorterDuffXP(vec4 srcColor, vec4 coverage) {
+// The one signature the text route, the GL assembly and the Vulkan module all spell: every input
+// — the destination sampler included — arrives as an argument.
+vec4 applyPorterDuffXP(vec4 srcColor, vec4 coverage, vec2 fragCoord, vec2 dstUpperLeft,
+                       vec2 dstCoordScale, int blendMode, sampler2D dstTex) {
   // Zero-coverage discard, emitted whenever a dst texture sampler is bound. It is not optional:
   // the dst texture is either a copy
   // of the target taken before the draw or the target itself read without a barrier between the
@@ -44,9 +47,9 @@ vec4 applyPorterDuffXP(vec4 srcColor, vec4 coverage) {
   if (coverage.r <= 0.0 && coverage.g <= 0.0 && coverage.b <= 0.0) {
     discard;
   }
-  highp vec2 dstCoord = (gl_FragCoord.xy - DstTextureUpperLeft) * DstTextureCoordScale;
-  vec4 dstColor = texture(DstTextureSampler, dstCoord);
-  return xpBlendWithCoverage(srcColor, dstColor, coverage, XPBlendMode);
+  highp vec2 dstCoord = (fragCoord - dstUpperLeft) * dstCoordScale;
+  vec4 dstColor = texture(dstTex, dstCoord);
+  return xpBlendWithCoverage(srcColor, dstColor, coverage, blendMode);
 }
 #endif
 

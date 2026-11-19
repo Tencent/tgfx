@@ -346,7 +346,9 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   if (plan.hasXp != 0 && plan.xpNeedsBlendPass) {
     output = "  fragColor = xpCompositeBlendPass(result, chainXPDst, finalCoverage, xpBlended);";
   } else if (plan.hasXp != 0) {
-    output = "  fragColor = applyPorterDuffXP(result, finalCoverage);";
+    output =
+        "  fragColor = applyPorterDuffXP(result, finalCoverage, gl_FragCoord.xy, "
+        "DstTextureUpperLeft, DstTextureCoordScale, XPBlendMode, DstTextureSampler);";
   } else {
     output = "  fragColor = (result * finalCoverage);";
   }

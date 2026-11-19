@@ -53,6 +53,12 @@ bool LinkChainSPIRV(const std::vector<std::vector<uint32_t>>& modules, std::vect
                     std::string* error);
 
 /**
+ * Validates one SPIR-V module against Vulkan 1.0. The runtime uses it on the linked result before
+ * handing it to the pipeline; the diagnostic path uses it per module.
+ */
+bool ValidateSPIRVModule(const std::vector<uint32_t>& words, std::string* error);
+
+/**
  * The route's coverage gate: true when every operator the composition uses has a linkable module
  * and the variant carries no feature the body does not spell yet (the xfer legs, the device mask
  * and the texture leaves still run through the interpreter).

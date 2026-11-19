@@ -27,6 +27,7 @@
 #include <unordered_map>
 #include "gpu/shaders/contract/ChainISA.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
+#include "spirv-tools/libspirv.hpp"
 #include "spirv-tools/linker.hpp"
 
 namespace tgfx {
@@ -77,7 +78,9 @@ enum : uint16_t {
 };
 enum : uint32_t {
   kDecorationBlock = 2,
+  kDecorationColMajor = 5,
   kDecorationArrayStride = 6,
+  kDecorationMatrixStride = 7,
   kDecorationBinding = 33,
   kDecorationDescriptorSet = 34,
   kDecorationOffset = 35,
@@ -135,6 +138,7 @@ struct Writer {
 struct Types {
   uint32_t voidId = 0;
   uint32_t boolId = 0;
+  uint32_t boolVec4 = 0;
   uint32_t intId = 0;
   uint32_t floatId = 0;
   uint32_t vec2 = 0;
@@ -204,7 +208,8 @@ enum ParamKind : uint8_t {
   kMat3,
   kMat4,
   kIVec4,
-  kVec4Array8
+  kVec4Array8,
+  kSampledImage
 };
 
 struct OpSignature {
@@ -216,6 +221,10 @@ struct OpSignature {
 // The leaf fetch has no ChainISA value of its own: the body imports it whenever a texture slot
 // needs a prefetched leaf, and the bundle carries it under this pseudo-op id.
 constexpr int kLeafFetchOp = 0x3F;
+
+// The porter-duff composite's module id: the xfer tail imports it when the draw reads the
+// destination through a texture.
+constexpr int kPorterDuffOp = 0x3E;
 
 const std::vector<OpSignature>& OpSignatures() {
   static const std::vector<OpSignature> signatures = {
@@ -243,6 +252,9 @@ const std::vector<OpSignature>& OpSignatures() {
       {kLeafFetchOp,
        "chainLeafFetch",
        {kVec3, kVec4, kVec2, kInt, kInt, kInt, kInt, kMat3, kInt, kVec2, kInt, kVec4}},
+      {kPorterDuffOp,
+       "applyPorterDuffXP",
+       {kVec4, kVec4, kVec2, kVec2, kVec2, kInt, kSampledImage}},
   };
   return signatures;
 }
@@ -276,6 +288,8 @@ uint32_t ParamTypeId(const Types& types, ParamKind kind) {
       return types.ivec4;
     case kVec4Array8:
       return types.vec4Array8;
+    case kSampledImage:
+      return types.sampledImage;
   }
   return types.floatId;
 }
@@ -310,7 +324,20 @@ struct BodyState {
   std::unordered_map<uint32_t, uint32_t> functionPointers = {};
   std::unordered_map<uint32_t, uint32_t> uniformConstantPointers = {};
   std::unordered_map<uint64_t, uint32_t> arrayTypes = {};
+  // Identical function signatures share one OpTypeFunction: non-aggregate types must be unique.
+  std::vector<std::pair<std::vector<uint32_t>, uint32_t>> functionTypes = {};
 };
+
+// A vec4 select with a broadcast condition: SPIR-V 1.0 requires the condition's component count
+// to equal the result's, so the scalar becomes a bool vector instead of riding along as-is.
+uint32_t SelectVec4(BodyState* state, uint32_t condition, uint32_t trueValue, uint32_t falseValue) {
+  const uint32_t conditionVector = state->writer.NewId();
+  state->writer.Inst(kOpCompositeConstruct, {state->types.boolVec4, conditionVector, condition,
+                                             condition, condition, condition});
+  const uint32_t id = state->writer.NewId();
+  state->writer.Inst(kOpSelect, {state->types.vec4, id, conditionVector, trueValue, falseValue});
+  return id;
+}
 
 uint32_t PtrTo(BodyState* state, uint32_t pointee) {
   const auto found = state->functionPointers.find(pointee);
@@ -415,7 +442,9 @@ uint32_t LoadMember(BodyState* state, const ChainProgramPlan& plan, int memberIn
   }
   if (member.count > 1) {
     // An array member: the whole array value is what the evaluator parameters carry.
-    const uint32_t stride = member.type == FragmentType::Matrix3 ? 48u : 16u;
+    const uint32_t stride = member.type == FragmentType::Matrix3
+                                ? 48u
+                                : (member.type == FragmentType::Matrix4 ? 64u : 16u);
     typeId = ArrayTypeOf(state, typeId, member.count, stride);
   }
   const uint32_t pointerType = state->writer.NewId();
@@ -496,8 +525,7 @@ uint32_t GeomColor(BodyState* state, const ChainProgramPlan& plan) {
   const uint32_t condition = state->writer.NewId();
   state->writer.Inst(kOpINotEqual,
                      {state->types.boolId, condition, hasColorId, IntConstant(state, 0)});
-  const uint32_t picked = state->writer.NewId();
-  state->writer.Inst(kOpSelect, {state->types.vec4, picked, condition, colorId, vColor->second});
+  const uint32_t picked = SelectVec4(state, condition, colorId, vColor->second);
   state->geomColorId = picked;
   return picked;
 }
@@ -552,11 +580,17 @@ uint32_t ResolveArg(BodyState* state, const ChainProgramPlan& plan, const ChainA
 }  // namespace
 
 bool ChainSPIRVBodySupported(const ChainComposition& composition, const Layout& layout, int hasXp) {
-  if (hasXp != 0) {
-    return false;
+  if (hasXp != 0 && hasXp != 1) {
+    return false;  // the framebuffer-fetch blend pass needs the frame's subpass input
   }
-  for (const auto& texture : layout.textures) {
-    if (texture.name == "DstTextureSampler") {
+  if (hasXp == 1) {
+    bool hasDstSampler = false;
+    for (const auto& texture : layout.textures) {
+      if (texture.name == "DstTextureSampler") {
+        hasDstSampler = true;
+      }
+    }
+    if (!hasDstSampler) {
       return false;
     }
   }
@@ -573,10 +607,33 @@ bool ChainSPIRVBodySupported(const ChainComposition& composition, const Layout& 
       case ChainISA::AARectCoverage:
       case ChainISA::LocalRectCoverage:
       case ChainISA::RRectCoverage:
+      // Texture and Gradient stay out until their semantic differences (glass compositions
+      // rendering empty) are resolved; the modules and recipes are already in place.
+      case ChainISA::PerlinNoise:
+      case ChainISA::ColorSpaceXform:
         break;
       default:
         return false;
     }
+  }
+  return true;
+}
+
+// The runtime's own gate: every module and the linked result are validated before a pipeline is
+// built from them, so a malformed emission falls back to the interpreter instead of reaching the
+// driver.
+bool ValidateSPIRVModule(const std::vector<uint32_t>& words, std::string* error) {
+  spvtools::SpirvTools tools(SPV_ENV_VULKAN_1_0);
+  std::string diagnostic = {};
+  tools.SetMessageConsumer(
+      [&diagnostic](spv_message_level_t, const char*, const spv_position_t&, const char* message) {
+        if (message != nullptr) {
+          diagnostic = message;
+        }
+      });
+  if (!tools.Validate(words)) {
+    *error = diagnostic.empty() ? "the module failed validation" : diagnostic;
+    return false;
   }
   return true;
 }
@@ -605,7 +662,7 @@ bool LinkChainSPIRV(const std::vector<std::vector<uint32_t>>& modules, std::vect
     *error = diagnostic.empty() ? "the modules did not link" : diagnostic;
     return false;
   }
-  return true;
+  return ValidateSPIRVModule(*out, error);
 }
 
 bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
@@ -626,6 +683,8 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   writer.Inst(kOpTypeVoid, {types.voidId});
   types.boolId = writer.NewId();
   writer.Inst(kOpTypeBool, {types.boolId});
+  types.boolVec4 = writer.NewId();
+  writer.Inst(kOpTypeVector, {types.boolVec4, types.boolId, 4});
   types.intId = writer.NewId();
   writer.Inst(kOpTypeInt, {types.intId, 32, 1});
   types.floatId = writer.NewId();
@@ -699,7 +758,9 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
       return false;
     }
     if (member.count > 1) {
-      const uint32_t stride = member.type == FragmentType::Matrix3 ? 48u : 16u;
+      const uint32_t stride = member.type == FragmentType::Matrix3
+                                  ? 48u
+                                  : (member.type == FragmentType::Matrix4 ? 64u : 16u);
       typeId = ArrayTypeOf(&state, typeId, member.count, stride);
     }
     memberTypes.push_back(typeId);
@@ -714,6 +775,15 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   for (size_t index = 0; index < plan.uniforms.size(); ++index) {
     writer.Inst(kOpMemberDecorate, {state.structId, static_cast<uint32_t>(index), kDecorationOffset,
                                     plan.uniforms[index].offset});
+    if (plan.uniforms[index].type == FragmentType::Matrix3 ||
+        plan.uniforms[index].type == FragmentType::Matrix4) {
+      // The writer stores a mat3 as three 16-byte columns (std140), which is exactly the layout
+      // the validator wants spelled out for a Block member.
+      writer.Inst(kOpMemberDecorate,
+                  {state.structId, static_cast<uint32_t>(index), kDecorationMatrixStride, 16});
+      writer.Inst(kOpMemberDecorate,
+                  {state.structId, static_cast<uint32_t>(index), kDecorationColMajor});
+    }
   }
   writer.Sink(&writer.decl);
   const uint32_t uboPointer = writer.NewId();
@@ -743,6 +813,24 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     writer.Inst(kOpDecorate, {maskSamplerVar, kDecorationBinding, maskSamplerBinding});
     writer.Sink(&writer.decl);
   }
+  // The destination sampler for the porter-duff tail: the body owns the variable (the module
+  // takes it as a parameter), at the layout's own binding.
+  uint32_t dstSamplerVar = 0;
+  if (plan.hasXp == 1) {
+    uint32_t dstBinding = 0;
+    for (const auto& texture : layout.textures) {
+      if (texture.name == "DstTextureSampler") {
+        dstBinding = texture.binding;
+      }
+    }
+    const uint32_t samplerPointer = UniformConstantPtrTo(&state, types.sampledImage);
+    dstSamplerVar = writer.NewId();
+    writer.Inst(kOpVariable, {samplerPointer, dstSamplerVar, kStorageUniformConstant});
+    writer.Sink(&writer.ann);
+    writer.Inst(kOpDecorate, {dstSamplerVar, kDecorationDescriptorSet, TEXTURE_DESCRIPTOR_SET});
+    writer.Inst(kOpDecorate, {dstSamplerVar, kDecorationBinding, dstBinding});
+    writer.Sink(&writer.decl);
+  }
   // The template constants the epilogue and the designators use.
   state.whiteId = writer.NewId();
   const uint32_t oneFloat = FloatConstant(&state, 1.0f);
@@ -770,28 +858,46 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   if (needsLeafFetch) {
     importOps.push_back(kLeafFetchOp);
   }
+  if (plan.hasXp == 1) {
+    importOps.push_back(kPorterDuffOp);
+  }
   for (int importOp : importOps) {
     const OpSignature* signature = FindSignature(importOp);
     if (signature == nullptr) {
       continue;
     }
+    auto paramPointer = [&](ParamKind kind) {
+      // Opaque parameters live behind a UniformConstant pointer (glslang's convention).
+      return kind == kSampledImage ? UniformConstantPtrTo(&state, ParamTypeId(types, kind))
+                                   : PtrTo(&state, ParamTypeId(types, kind));
+    };
     std::vector<uint32_t> operands = {types.vec4};
     for (ParamKind kind : signature->params) {
-      operands.push_back(PtrTo(&state, ParamTypeId(types, kind)));
+      operands.push_back(paramPointer(kind));
     }
-    const uint32_t functionType = writer.NewId();
-    writer.Inst(kOpTypeFunction, [&] {
-      std::vector<uint32_t> functionOperands = {functionType};
-      functionOperands.insert(functionOperands.end(), operands.begin(), operands.end());
-      return functionOperands;
-    }());
+    uint32_t functionType = 0;
+    for (const auto& cached : state.functionTypes) {
+      if (cached.first == operands) {
+        functionType = cached.second;
+        break;
+      }
+    }
+    if (functionType == 0) {
+      functionType = writer.NewId();
+      writer.Inst(kOpTypeFunction, [&] {
+        std::vector<uint32_t> functionOperands = {functionType};
+        functionOperands.insert(functionOperands.end(), operands.begin(), operands.end());
+        return functionOperands;
+      }());
+      state.functionTypes.emplace_back(operands, functionType);
+    }
     const uint32_t functionId = writer.NewId();
     state.opFunctions[importOp] = functionId;
     writer.Sink(&writer.func);
     writer.Inst(kOpFunction, {types.vec4, functionId, 0, functionType});
     for (ParamKind kind : signature->params) {
       const uint32_t parameterId = writer.NewId();
-      writer.Inst(kOpFunctionParameter, {PtrTo(&state, ParamTypeId(types, kind)), parameterId});
+      writer.Inst(kOpFunctionParameter, {paramPointer(kind), parameterId});
     }
     writer.Inst(kOpFunctionEnd);
     writer.Sink(&writer.ann);
@@ -858,6 +964,9 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     // evaluators' records), so the temporaries follow the signature, not the plan.
     argumentVariables[callIndex].resize(signature->params.size(), 0);
     for (size_t argIndex = 0; argIndex < signature->params.size(); ++argIndex) {
+      if (signature->params[argIndex] == kSampledImage) {
+        continue;  // the sampler travels as its variable, not a Function temporary
+      }
       const uint32_t pointerType = PtrTo(&state, ParamTypeId(types, signature->params[argIndex]));
       const uint32_t variableId = writer.NewId();
       writer.Inst(kOpVariable, {pointerType, variableId, kStorageFunction});
@@ -893,6 +1002,24 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     const uint32_t pointerType = PtrTo(&state, types.vec4);
     maskCoverageVar = writer.NewId();
     writer.Inst(kOpVariable, {pointerType, maskCoverageVar, kStorageFunction});
+  }
+  // The porter-duff call's value temporaries (the sampler slot stays empty: it travels as the
+  // variable itself).
+  std::vector<uint32_t> xpArgumentVars = {};
+  if (plan.hasXp == 1) {
+    const OpSignature* xpSignature = FindSignature(kPorterDuffOp);
+    for (size_t paramIndex = 0; xpSignature != nullptr && paramIndex < xpSignature->params.size();
+         ++paramIndex) {
+      if (xpSignature->params[paramIndex] == kSampledImage) {
+        xpArgumentVars.push_back(0);
+        continue;
+      }
+      const uint32_t pointerType =
+          PtrTo(&state, ParamTypeId(types, xpSignature->params[paramIndex]));
+      const uint32_t variableId = writer.NewId();
+      writer.Inst(kOpVariable, {pointerType, variableId, kStorageFunction});
+      xpArgumentVars.push_back(variableId);
+    }
   }
   // The pointer parameters become values once, after the variables.
   std::vector<uint32_t> parameterValues = {};
@@ -1176,10 +1303,9 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
       return false;
     }
     const uint32_t one = FloatConstant(&state, 1.0f);
-    const uint32_t fragY = writer.NewId();
-    writer.Inst(kOpCompositeExtract, {types.floatId, fragY, state.fragCoordId, 1});
+    // vec3(fragCoord.xy, 1.0): the vec2 plus the one, no extra component.
     const uint32_t coord3 = writer.NewId();
-    writer.Inst(kOpCompositeConstruct, {types.vec3, coord3, state.fragCoordId, fragY, one});
+    writer.Inst(kOpCompositeConstruct, {types.vec3, coord3, state.fragCoordId, one});
     const uint32_t transformed = writer.NewId();
     writer.Inst(kOpMatrixTimesVector, {types.vec3, transformed, matrix, coord3});
     const uint32_t maskCoord = writer.NewId();
@@ -1205,6 +1331,42 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   writer.Inst(kOpFMul, {types.vec4, withClip, coverage, clip});
   const uint32_t clipped = writer.NewId();
   writer.Inst(kOpFMul, {types.vec4, clipped, rootFound->second, withClip});
+  // The xfer tail: the porter-duff composite over the destination texture, before the alpha
+  // swizzle (the text route's order).
+  uint32_t outputSource = clipped;
+  if (plan.hasXp == 1) {
+    const int upperLeftIndex = MemberIndexOf(plan, ChainBindingSource::DstTextureUpperLeft);
+    const int scaleIndex = MemberIndexOf(plan, ChainBindingSource::DstTextureCoordScale);
+    const int modeIndex = MemberIndexOf(plan, ChainBindingSource::XpBlendMode);
+    if (upperLeftIndex < 0 || scaleIndex < 0 || modeIndex < 0 || dstSamplerVar == 0 ||
+        xpArgumentVars.size() < 6) {
+      *error = "the xfer tail has no destination records";
+      return false;
+    }
+    const uint32_t values[6] = {rootFound->second,
+                                withClip,
+                                state.fragCoordId,
+                                LoadMember(&state, plan, upperLeftIndex),
+                                LoadMember(&state, plan, scaleIndex),
+                                LoadMember(&state, plan, modeIndex)};
+    for (size_t index = 0; index < 6; ++index) {
+      if (values[index] == 0 || xpArgumentVars[index] == 0) {
+        *error = "an xfer tail argument could not be read";
+        return false;
+      }
+      writer.Inst(kOpStore, {xpArgumentVars[index], values[index]});
+    }
+    const uint32_t xpResult = writer.NewId();
+    std::vector<uint32_t> operands = {types.vec4, xpResult, state.opFunctions[kPorterDuffOp]};
+    for (uint32_t argument : xpArgumentVars) {
+      if (argument != 0) {
+        operands.push_back(argument);  // the sampler's slot carries the variable below
+      }
+    }
+    operands.push_back(dstSamplerVar);
+    writer.Inst(kOpFunctionCall, operands);
+    outputSource = xpResult;
+  }
   // The alpha swizzle: OutputAlphaSwizzle != 0 selects .aaaa.
   const int swizzleIndex = MemberIndexOf(plan, ChainBindingSource::OutputSwizzle);
   uint32_t output = clipped;
@@ -1217,9 +1379,8 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     const uint32_t condition = writer.NewId();
     writer.Inst(kOpINotEqual, {types.boolId, condition, swizzleValue, IntConstant(&state, 0)});
     const uint32_t aaaa = writer.NewId();
-    writer.Inst(kOpVectorShuffle, {types.vec4, aaaa, clipped, clipped, 3, 3, 3, 3});
-    output = writer.NewId();
-    writer.Inst(kOpSelect, {types.vec4, output, condition, clipped, aaaa});
+    writer.Inst(kOpVectorShuffle, {types.vec4, aaaa, outputSource, outputSource, 3, 3, 3, 3});
+    output = SelectVec4(&state, condition, outputSource, aaaa);
   }
   writer.Inst(kOpReturnValue, {output});
   writer.Inst(kOpFunctionEnd);
@@ -1240,6 +1401,13 @@ bool ChainSPIRVBodySupported(const ChainComposition&, const Layout&, int) {
 
 bool LinkChainSPIRV(const std::vector<std::vector<uint32_t>>&, std::vector<uint32_t>*,
                     std::string* error) {
+  if (error != nullptr) {
+    *error = "the Vulkan linking route is not part of this build";
+  }
+  return false;
+}
+
+bool ValidateSPIRVModule(const std::vector<uint32_t>&, std::string* error) {
   if (error != nullptr) {
     *error = "the Vulkan linking route is not part of this build";
   }
