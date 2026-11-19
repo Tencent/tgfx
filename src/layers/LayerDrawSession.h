@@ -132,6 +132,9 @@ struct LayerDrawBatch {
  */
 class LayerDrawSession {
  public:
+  // Validates the request and the scene it draws from, then records the ancestor scroll rects and
+  // masks that clip the target and the background-sourced effects its regions may depend on. On
+  // failure it reports the error through control and returns nullptr.
   static std::unique_ptr<LayerDrawSession> Prepare(const LayerDrawRequest& request,
                                                    DrawControl& control);
 
