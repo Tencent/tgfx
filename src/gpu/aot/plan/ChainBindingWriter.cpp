@@ -736,15 +736,22 @@ bool ChainBindingWriter::writeSamplers(const ProgramInfo& info, Program* program
     ResolveSampler(bindings.samplers[index], chain, info, &resolved);
     auto view = resolved.proxy != nullptr ? resolved.proxy->getTextureView() : nullptr;
     if (view == nullptr) {
-      renderPass->setTexture(static_cast<unsigned>(index), cache->getOrCreateDummyTexture(),
-                             cache->getOrCreateDummySampler());
+      renderPass->setTexture(program->getTextureBinding(static_cast<unsigned>(index)),
+                             cache->getOrCreateDummyTexture(), cache->getOrCreateDummySampler());
       continue;
     }
     const auto& state = resolved.state;
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                  state.minFilterMode, state.magFilterMode, state.mipmapMode);
-    renderPass->setTexture(static_cast<unsigned>(index), view->getTexture(),
-                           gpu->createSampler(descriptor));
+    renderPass->setTexture(program->getTextureBinding(static_cast<unsigned>(index)),
+                           view->getTexture(), gpu->createSampler(descriptor));
+  }
+  // The modules statically reference every sampler the variant declares (the leaf fetch's index
+  // dispatch), so the slots the composition leaves unused still need a valid binding at draw.
+  for (unsigned index = static_cast<unsigned>(bindings.samplers.size());
+       index < program->textureSlotCount(); ++index) {
+    renderPass->setTexture(program->getTextureBinding(index), cache->getOrCreateDummyTexture(),
+                           cache->getOrCreateDummySampler());
   }
   return true;
 }

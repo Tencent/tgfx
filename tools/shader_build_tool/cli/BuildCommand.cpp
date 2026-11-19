@@ -401,6 +401,34 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
   if (options.shaderDir.empty()) {
     return;
   }
+  // The leaf fetch's shared text without the two interpreter-only helpers (the named block and
+  // the varying picker); the text pack and the Vulkan op wrapper consume the same stripped copy.
+  std::string strippedLeafFetch = {};
+  auto stripFetchHelpers = [](std::string text) {
+    for (const char* signature : {"vec3 chainLeafCoordVarying(int leafIndex) {",
+                                  "highp vec2 chainLeafCoord(vec3 coord, int leafIndex) {"}) {
+      const auto functionAt = text.find(signature);
+      if (functionAt == std::string::npos) {
+        continue;
+      }
+      size_t depth = 0;
+      size_t end = std::string::npos;
+      for (size_t i = text.find('{', functionAt); i < text.size(); ++i) {
+        if (text[i] == '{') {
+          ++depth;
+        } else if (text[i] == '}') {
+          if (--depth == 0) {
+            end = i + 1;
+            break;
+          }
+        }
+      }
+      if (end != std::string::npos) {
+        text.erase(functionAt, end - functionAt);
+      }
+    }
+    return text;
+  };
   // A dependency entry packs its includes resolved, for the same reason the fragment sources do.
   auto readExpanded = [&options](const char* path) {
     const std::string raw = [&] {
@@ -432,6 +460,47 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       continue;
     }
     const std::string profileTag = ProfileTag(emitterEntry.first);
+    // The packed pieces' `#if` branches, resolved textually into per-fact forms: the driver
+    // rejects `#if` directives in the assembled text, and the forms differ structurally.
+    // The packed pieces' `#if` branches, resolved textually into per-fact forms: the driver
+    // rejects `#if` directives in the assembled text, and the forms differ structurally.
+    auto resolveBranch = [](const std::string& text, const std::string& directive, bool keep) {
+      const auto begin = text.find(directive);
+      if (begin == std::string::npos) {
+        return text;
+      }
+      const auto contentStart = text.find('\n', begin) + 1;
+      int depth = 1;
+      size_t cursor = contentStart;
+      size_t endifAt = std::string::npos;
+      while (cursor < text.size()) {
+        const auto ifAt = text.find("#if", cursor);
+        const auto endAt = text.find("#endif", cursor);
+        if (endAt == std::string::npos) {
+          return text;
+        }
+        if (ifAt != std::string::npos && ifAt < endAt) {
+          ++depth;
+          cursor = ifAt + 3;
+        } else {
+          --depth;
+          if (depth == 0) {
+            endifAt = endAt;
+            break;
+          }
+          cursor = endAt + 6;
+        }
+      }
+      if (endifAt == std::string::npos) {
+        return text;
+      }
+      const auto endLine = text.find('\n', endifAt) + 1;
+      if (keep) {
+        return text.substr(0, begin) + text.substr(contentStart, endifAt - contentStart) +
+               text.substr(endLine);
+      }
+      return text.substr(0, begin) + text.substr(endLine);
+    };
     for (size_t index = 0; index < FragmentCount(); ++index) {
       const FragmentDef* fragment = FragmentAt(index);
       if (fragment == nullptr || fragment->sourceFile == nullptr) {
@@ -495,6 +564,7 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       payload.blob.assign(normalized.begin(), normalized.end());
       report->composedByTag[profileTag].push_back(std::move(payload));
     }
+
     // The pack's non-op entries: the generated loaders (the chain-ops pragma's own expansion), the
     // interface chunk and tail template the assembler concatenates, and the shared dependency
     // files the op fragments call into.
@@ -625,78 +695,14 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
     };
     addEntry(FragmentPackXpDstTexture, "XpDstTexture", readXp(1));
     addEntry(FragmentPackXpFramebufferFetch, "XpFramebufferFetch", readXp(2));
-    // The packed pieces' `#if` branches, resolved textually into per-fact forms: the driver
-    // rejects `#if` directives in the assembled text, and the forms differ structurally.
-    auto resolveBranch = [](const std::string& text, const std::string& directive, bool keep) {
-      const auto begin = text.find(directive);
-      if (begin == std::string::npos) {
-        return text;
-      }
-      const auto contentStart = text.find('\n', begin) + 1;
-      int depth = 1;
-      size_t cursor = contentStart;
-      size_t endifAt = std::string::npos;
-      while (cursor < text.size()) {
-        const auto ifAt = text.find("#if", cursor);
-        const auto endAt = text.find("#endif", cursor);
-        if (endAt == std::string::npos) {
-          return text;
-        }
-        if (ifAt != std::string::npos && ifAt < endAt) {
-          ++depth;
-          cursor = ifAt + 3;
-        } else {
-          --depth;
-          if (depth == 0) {
-            endifAt = endAt;
-            break;
-          }
-          cursor = endAt + 6;
-        }
-      }
-      if (endifAt == std::string::npos) {
-        return text;
-      }
-      const auto endLine = text.find('\n', endifAt) + 1;
-      if (keep) {
-        return text.substr(0, begin) + text.substr(contentStart, endifAt - contentStart) +
-               text.substr(endLine);
-      }
-      return text.substr(0, begin) + text.substr(endLine);
-    };
     const std::string gradientRaw = readExpanded("pipeline/chain/pointwise_gradient.inc");
     addEntry(FragmentPackGradientLut, "GradientLut",
              resolveBranch(gradientRaw, "#if NTEX > 0", true));
     addEntry(FragmentPackGradientSimple, "GradientSimple",
              resolveBranch(gradientRaw, "#if NTEX > 0", false));
-    std::string leafFetchRaw = readExpanded("entry/ChainLeafFetch.glsl");
-    // The tiled leaves' coordinate-varying picker references every leaf varying, which the plan
-    // program only declares for the leaves it samples; the tiled path stays on the interpreter, so
-    // the picker leaves the pack.
-    {
-      const auto pickerAt = leafFetchRaw.find("vec3 chainLeafCoordVarying(int leafIndex) {");
-      if (pickerAt != std::string::npos) {
-        size_t depth = 0;
-        size_t end = std::string::npos;
-        for (size_t i = leafFetchRaw.find('{', pickerAt); i < leafFetchRaw.size(); ++i) {
-          if (leafFetchRaw[i] == '{') {
-            ++depth;
-          } else if (leafFetchRaw[i] == '}') {
-            if (--depth == 0) {
-              end = i + 1;
-              break;
-            }
-          }
-        }
-        if (end != std::string::npos) {
-          leafFetchRaw.erase(pickerAt, end - pickerAt);
-        }
-      }
-    }
-    addEntry(FragmentPackLeafFetchStrict, "LeafFetchStrict",
-             resolveBranch(leafFetchRaw, "#if HAS_SUBSET", true));
-    addEntry(FragmentPackLeafFetchPlain, "LeafFetchPlain",
-             resolveBranch(leafFetchRaw, "#if HAS_SUBSET", false));
+    std::string leafFetchRaw = stripFetchHelpers(readExpanded("entry/ChainLeafFetch.glsl"));
+    strippedLeafFetch = leafFetchRaw;
+    addEntry(FragmentPackLeafFetchPlain, "LeafFetchPlain", leafFetchRaw);
   }
   // The Vulkan linking route's op library: one patched SPIR-V module per pure operator, compiled
   // from the same sources the text pack ships (a dummy entry forces glslang to emit the function;
@@ -779,17 +785,11 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         }
         frame += "layout(location = 0) out vec4 fragColor;\n";
         frame += "vec4 chainBody(vec2 pFragCoord";
-        if (frameMask != nullptr) {
-          frame += ", sampler2D pMaskSampler";
-        }
         for (const auto& varying : frameVaryings) {
           frame += ", " + varying.first + " p" + varying.second;
         }
         frame += ") { return vec4(0.0); }\n";
         frame += "void main() { fragColor = chainBody(gl_FragCoord.xy";
-        if (frameMask != nullptr) {
-          frame += ", MaskTextureSampler";
-        }
         for (const auto& varying : frameVaryings) {
           frame += ", " + varying.second;
         }
@@ -910,6 +910,101 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       ComposedPayload payload;
       payload.name = def->functionName;
       payload.id = FragmentPackSPIRVOpBase | static_cast<uint32_t>(source.op);
+      const auto* bytes = reinterpret_cast<const uint8_t*>(patched.data());
+      payload.blob.assign(bytes, bytes + patched.size() * sizeof(uint32_t));
+      report->composedByTag[profileTag].push_back(std::move(payload));
+    }
+    // The entry-coupled operators' pure forms: the same sources' pure branches, compiled with the
+    // form macro so only the parameter-taking entry ships. The leaf samplers the pure code samples
+    // live in these modules under the layout's fixed leaf bindings (leaf samplers always occupy
+    // the first bindings of the texture set, the mask following them).
+    struct SPIRVPureForm {
+      uint32_t id;
+      const char* functionName;
+      const char* prelude;
+      std::vector<const char*> includes;
+      bool useStrippedLeafFetch;
+      const char* prologue;
+      const char* call;
+      bool leafSamplers;
+    };
+    // Each entry compiles the same source the text pack ships — one math body, one signature —
+    // with the samplers it samples declared at the layout's fixed leaf bindings. The gradient's
+    // LUT branch is variant-gated by NTEX, so the wrapper declares the full leaf set.
+    const SPIRVPureForm pureForms[] = {
+        {ChainISA::Gradient,
+         "evalGradientSlot",
+         "#define NTEX 4\n",
+         {"pipeline/chain/pointwise_gradient.inc"},
+         false,
+         "",
+         "evalGradientSlot(vec4(1.0), vec3(1.0), 0, 0, 0, vec4(1.0), vec4(1.0), vec4(1.0), "
+         "vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), 0.0, 0.0, 0.0, vec4(1.0), "
+         "vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), "
+         "vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), "
+         "vec4(1.0))",
+         true},
+        {ChainISA::PerlinNoise,
+         "evalNoiseSlot",
+         "",
+         {"pipeline/chain/pointwise_noise.inc"},
+         false,
+         "",
+         "evalNoiseSlot(vec3(1.0), vec4(1.0), ivec4(0))",
+         true},
+        {ChainISA::ColorSpaceXform,
+         "chainApplyColorSpaceXform",
+         "",
+         {"ops/ColorSpaceXform.glsl"},
+         false,
+         "",
+         "chainApplyColorSpaceXform(vec4(1.0), 0, vec4(1.0), vec4(1.0), 0, vec4(1.0), mat3(1.0), "
+         "vec4(1.0), vec4(1.0), vec4(1.0), 0)",
+         false},
+        {FragmentPackSPIRVLeafFetch & ~FragmentPackSPIRVOpBase,
+         "chainLeafFetch",
+         "",
+         {},
+         true,
+         "",
+         "chainLeafFetch(vec3(1.0), vec4(1.0), vec2(1.0), 0, 0, 0, 0, mat3(1.0), 0, vec2(1.0), "
+         "0, vec4(1.0))",
+         true},
+    };
+    for (const auto& form : pureForms) {
+      std::string text = "#version 450\n";
+      text += form.prelude;
+      if (form.leafSamplers) {
+        for (int sampler = 0; sampler < 4; ++sampler) {
+          text += "layout(set = 2, binding = " + std::to_string(sampler) +
+                  ") uniform sampler2D TextureSampler_" + std::to_string(sampler) + ";\n";
+        }
+      }
+      for (const char* include : form.includes) {
+        text += readExpanded(include);
+      }
+      if (form.useStrippedLeafFetch) {
+        text += readExpanded("source/texture_sampling.inc");
+        if (strippedLeafFetch.empty()) {
+          strippedLeafFetch = stripFetchHelpers(readExpanded("entry/ChainLeafFetch.glsl"));
+        }
+        text += strippedLeafFetch;
+      }
+      text += "\nlayout(location = 0) out vec4 dummyOut;\nvoid main() {\n";
+      text += form.prologue;
+      text += std::string("  dummyOut = ") + form.call + ";\n}\n";
+      std::string buildError;
+      auto patched =
+          CompileSPIRVLibraryModule(text, form.functionName, form.functionName, &buildError);
+      if (patched.empty()) {
+        RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
+                         form.functionName, profileTag, -1, -1,
+                         std::string("the SPIR-V pure-form module did not build: ") + buildError);
+        continue;
+      }
+      ComposedPayload payload;
+      payload.name = form.functionName;
+      payload.id = FragmentPackSPIRVOpBase | form.id;
       const auto* bytes = reinterpret_cast<const uint8_t*>(patched.data());
       payload.blob.assign(bytes, bytes + patched.size() * sizeof(uint32_t));
       report->composedByTag[profileTag].push_back(std::move(payload));

@@ -264,45 +264,63 @@ std::vector<uint32_t> ImportSPIRVFunction(const std::vector<uint32_t>& words,
     *error = "the module does not declare the function to import";
     return {};
   }
-  // The stub's body: everything after its last parameter up to (excluding) OpFunctionEnd leaves,
-  // leaving a declaration with the same signature.
+  // The stubbed function's extent: header through OpFunctionEnd, its body dropped. The whole
+  // declaration (header, parameters, end) is replayed before any definition, because glslang may
+  // emit the stub after main and SPIR-V requires declarations first.
+  size_t functionStart = 0;
+  size_t functionEnd = 0;
   size_t bodyStart = 0;
-  size_t bodyEnd = 0;
   for (const auto& instruction : instructions) {
-    if (instruction.opcode != kOpFunction || instruction.wordCount < 3 ||
-        words[instruction.offset + 2] != targetId) {
+    if (instruction.opcode == kOpFunction && instruction.wordCount >= 3 &&
+        words[instruction.offset + 2] == targetId) {
+      functionStart = instruction.offset;
+      bodyStart = instruction.offset + instruction.wordCount;
+      break;
+    }
+  }
+  if (functionStart == 0) {
+    *error = "the stub's function was not found";
+    return {};
+  }
+  for (const auto& instruction : instructions) {
+    if (instruction.offset < functionStart) {
       continue;
     }
-    for (const auto& rest : instructions) {
-      if (rest.offset < instruction.offset) {
-        continue;
-      }
-      if (rest.opcode == kOpFunctionParameter) {
-        bodyStart = rest.offset + rest.wordCount;
-      }
-      if (rest.opcode == kOpFunctionEnd) {
-        bodyEnd = rest.offset;
-        break;
-      }
+    if (instruction.opcode == kOpFunctionParameter) {
+      bodyStart = instruction.offset + instruction.wordCount;
     }
-    break;
+    if (instruction.opcode == kOpFunctionEnd) {
+      functionEnd = instruction.offset + instruction.wordCount;
+      break;
+    }
   }
-  if (bodyEnd == 0 || bodyStart == 0 || bodyStart > bodyEnd) {
+  if (functionEnd == 0 || bodyStart > functionEnd) {
     *error = "the stub's body extent was not found";
     return {};
   }
+  std::vector<uint32_t> declaration(words.begin() + static_cast<std::ptrdiff_t>(functionStart),
+                                    words.begin() + static_cast<std::ptrdiff_t>(functionEnd));
   std::vector<uint32_t> out = {};
   out.reserve(words.size());
   bool linkageCapabilityAdded = false;
   bool importDecorationAdded = false;
+  bool declarationEmitted = false;
+  auto flushDeclaration = [&]() {
+    if (!declarationEmitted) {
+      out.insert(out.end(), declaration.begin(), declaration.end());
+      declarationEmitted = true;
+    }
+  };
   for (const auto& instruction : instructions) {
-    if (instruction.offset >= bodyStart && instruction.offset < bodyEnd) {
-      continue;  // the stub's body
+    // Drop the stub entirely (its declaration is replayed before the first function).
+    if (instruction.offset >= functionStart && instruction.offset < functionEnd) {
+      continue;
     }
     if (instruction.opcode == kOpCapability) {
       AppendWords(&out, words, instruction.offset, instruction.wordCount);
       if (!linkageCapabilityAdded) {
         linkageCapabilityAdded = true;
+        // OpCapability carries the capability as its one operand: two words.
         const uint32_t linkage[] = {(2u << 16) | kOpCapability, kCapabilityLinkage};
         out.insert(out.end(), linkage, linkage + 2);
       }
@@ -317,7 +335,9 @@ std::vector<uint32_t> ImportSPIRVFunction(const std::vector<uint32_t>& words,
       out.push_back(kDecorationLinkageAttributes);
       out.insert(out.end(), nameWords.begin(), nameWords.end());
       out.push_back(kLinkageTypeImport);
-      // The decoration lands before the anchor instruction; the anchor still ships below.
+    }
+    if (instruction.opcode == kOpFunction) {
+      flushDeclaration();
     }
     AppendWords(&out, words, instruction.offset, instruction.wordCount);
   }
@@ -328,5 +348,4 @@ std::vector<uint32_t> ImportSPIRVFunction(const std::vector<uint32_t>& words,
   out.insert(out.begin(), words.begin(), words.begin() + 5);
   return out;
 }
-
 }  // namespace tgfx

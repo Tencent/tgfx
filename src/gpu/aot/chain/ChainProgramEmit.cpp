@@ -22,6 +22,7 @@
 #include <fstream>
 #include <unordered_map>
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/aot/chain/ChainProgramPlan.h"
 #include "gpu/shaders/contract/ChainISA.h"
 #include "gpu/shaders/contract/FragmentLibrary.h"
 
@@ -167,7 +168,7 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
     }
   }
   if (needsTexture) {
-    if (!appendPiece(plan.hasSubset ? FragmentPackLeafFetchStrict : FragmentPackLeafFetchPlain)) {
+    if (!appendPiece(FragmentPackLeafFetchPlain)) {
       return false;
     }
   }
@@ -176,11 +177,15 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   std::string prefetch = {};
   for (int leaf : plan.leafSlots) {
     const std::string suffix = std::to_string(leaf);
-    prefetch += "  chainLeafTex[" + suffix + "] = chainPlainLeafFetch(TextureSampler_" + suffix +
-                ", TransformedCoords_" + suffix + ", " + ChainLeafMemberName("Subset", leaf) +
-                ", " + ChainLeafMemberName("AlphaStart", leaf) + ", " +
+    const bool applyQuad = plan.hasSubset && leaf == 0;
+    prefetch += "  chainLeafTex[" + suffix + "] = chainLeafFetch(TransformedCoords_" + suffix +
+                ", " + ChainLeafMemberName("Subset", leaf) + ", " +
+                ChainLeafMemberName("AlphaStart", leaf) + ", " +
                 ChainLeafMemberName("HasRgbaaa", leaf) + ", " +
-                ChainLeafMemberName("SubsetClampOn", leaf) + ", " + suffix + ");\n";
+                ChainLeafMemberName("SubsetClampOn", leaf) + ", " + suffix +
+                ", DeviceLeafMask, DeviceLeafCoordMatrix[" + suffix + "], LeafReadSwizzles[" +
+                suffix + "], gl_FragCoord.xy, " + (applyQuad ? "1" : "0") + ", " +
+                (applyQuad ? "vTexSubset" : "vec4(0.0)") + ");\n";
   }
 
   // The straight-line body: one local per call, the registers an argument names spelled by the
@@ -265,13 +270,41 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
                spellArg(a[5]) + ", " + spellArg(a[6]) + ")";
         break;
       case ChainISA::ColorSpaceXform:
-        expr = "chainApplyColorSpaceXform(" + spellArg(a[0]) + ")";
+        expr = "chainApplyColorSpaceXform(" + spellArg(a[0]) +
+               ", ChainCSFlags, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType, ChainSrcOOTF, "
+               "ChainColorXform, ChainDstOOTF, ChainDstTF0, ChainDstTF1, ChainDstTFType)";
         break;
-      case ChainISA::Gradient:
-        expr = "evalGradientSlot(" + spellArg(a[0]) + ")";
+      case ChainISA::Gradient: {
+        // The evaluator's full parameter table: the block members in declaration order. The LUT
+        // leaf exists only on the LUT form's block; the plain form passes 0.
+        bool hasLutLeaf = false;
+        for (const auto& member : plan.uniforms) {
+          if (member.source == ChainBindingSource::GradientLutLeaf) {
+            hasLutLeaf = true;
+          }
+        }
+        std::string args = spellArg(a[0]) + ", SourceCoords, GradientLayoutType, " +
+                           "GradientColorizerKind, " +
+                           (hasLutLeaf ? std::string("GradientLUTLeaf") : std::string("0"));
+        for (const char* member :
+             {"Gradient_leftBorder", "Gradient_rightBorder", "Gradient_start", "Gradient_end",
+              "Gradient_scale01", "Gradient_bias01", "Gradient_scale23", "Gradient_bias23",
+              "Gradient_threshold", "Gradient_bias", "Gradient_scale", "Gradient_thresholds1_7",
+              "Gradient_thresholds9_13"}) {
+          args += ", ";
+          args += member;
+        }
+        for (int stop = 0; stop < 8; ++stop) {
+          args += ", Gradient_scales[" + std::to_string(stop) + "]";
+        }
+        for (int stop = 0; stop < 8; ++stop) {
+          args += ", Gradient_biases[" + std::to_string(stop) + "]";
+        }
+        expr = "evalGradientSlot(" + args + ")";
         break;
+      }
       case ChainISA::PerlinNoise:
-        expr = "evalNoiseSlot()";
+        expr = "evalNoiseSlot(SourceCoords, Noise_frequencyStitch, NoiseModeOctaves)";
         break;
       default:
         return false;

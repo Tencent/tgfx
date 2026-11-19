@@ -249,21 +249,33 @@ void chainMain() {
   // used recipe set off. The leaf index, the loop bound and the tiled test are uniform across the
   // draw, so every texture read stays in uniform control flow.
 #if NTEX > 0
+#if HAS_SUBSET
+#define CHAIN_QUAD_SUBSET_APPLY 1
+#define CHAIN_QUAD_SUBSET vTexSubset
+#else
+#define CHAIN_QUAD_SUBSET_APPLY 0
+#define CHAIN_QUAD_SUBSET vec4(0.0)
+#endif
   if (SPEC_SlotPacked(0).x == OP_TEXTURE && !chainLeafIsTiled(0)) {
-    chainLeafTex[0] = chainPlainLeafFetch(TextureSampler_0, TransformedCoords_0, Subset,
-                                          AlphaStart, HasRgbaaa, SubsetClampOn, 0);
+    chainLeafTex[0] = chainLeafFetch(TransformedCoords_0, Subset, AlphaStart, HasRgbaaa,
+                                     SubsetClampOn, 0, DeviceLeafMask, DeviceLeafCoordMatrix[0],
+                                     LeafReadSwizzles[0], gl_FragCoord.xy, CHAIN_QUAD_SUBSET_APPLY,
+                                     CHAIN_QUAD_SUBSET);
   }
   if (SPEC_SlotPacked(1).x == OP_TEXTURE && !chainLeafIsTiled(1)) {
-    chainLeafTex[1] = chainPlainLeafFetch(TextureSampler_1, TransformedCoords_1, Subset_1,
-                                          AlphaStart_1, HasRgbaaa_1, SubsetClampOn_1, 1);
+    chainLeafTex[1] = chainLeafFetch(TransformedCoords_1, Subset_1, AlphaStart_1, HasRgbaaa_1,
+                                     SubsetClampOn_1, 1, DeviceLeafMask, DeviceLeafCoordMatrix[1],
+                                     LeafReadSwizzles[1], gl_FragCoord.xy, 0, vec4(0.0));
   }
   if (SPEC_SlotPacked(2).x == OP_TEXTURE && !chainLeafIsTiled(2)) {
-    chainLeafTex[2] = chainPlainLeafFetch(TextureSampler_2, TransformedCoords_2, Subset_2,
-                                          AlphaStart_2, HasRgbaaa_2, SubsetClampOn_2, 2);
+    chainLeafTex[2] = chainLeafFetch(TransformedCoords_2, Subset_2, AlphaStart_2, HasRgbaaa_2,
+                                     SubsetClampOn_2, 2, DeviceLeafMask, DeviceLeafCoordMatrix[2],
+                                     LeafReadSwizzles[2], gl_FragCoord.xy, 0, vec4(0.0));
   }
   if (SPEC_SlotPacked(3).x == OP_TEXTURE && !chainLeafIsTiled(3)) {
-    chainLeafTex[3] = chainPlainLeafFetch(TextureSampler_3, TransformedCoords_3, Subset_3,
-                                          AlphaStart_3, HasRgbaaa_3, SubsetClampOn_3, 3);
+    chainLeafTex[3] = chainLeafFetch(TransformedCoords_3, Subset_3, AlphaStart_3, HasRgbaaa_3,
+                                     SubsetClampOn_3, 3, DeviceLeafMask, DeviceLeafCoordMatrix[3],
+                                     LeafReadSwizzles[3], gl_FragCoord.xy, 0, vec4(0.0));
   }
   int recipeCount = min(SPEC_SlotCount(), CHAIN_TILED_RECIPES);
   for (int recipe = 0; recipe < recipeCount; ++recipe) {

@@ -175,7 +175,9 @@ vec4 evalChainSlot(int slot) {
   }
   // OP_COLOR_SPACE_XFORM (the registered exception: its parameters are the program-level block,
   // not per-slot registers, so it does not ride the shared dispatch)
-  return chainApplyColorSpaceXform(in0);
+  return chainApplyColorSpaceXform(in0, ChainCSFlags, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType,
+                                   ChainSrcOOTF, ChainColorXform, ChainDstOOTF, ChainDstTF0,
+                                   ChainDstTF1, ChainDstTFType);
 }
 
 

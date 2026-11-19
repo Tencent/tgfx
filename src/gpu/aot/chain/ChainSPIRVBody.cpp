@@ -22,6 +22,7 @@
 // below, so the creator's Vulkan branch collapses to its fallback.
 #if defined(TGFX_USE_VULKAN)
 
+#include <algorithm>
 #include <cstring>
 #include <unordered_map>
 #include "gpu/shaders/contract/ChainISA.h"
@@ -68,6 +69,9 @@ enum : uint16_t {
   kOpFMul = 133,
   kOpINotEqual = 171,
   kOpSelect = 169,
+  kOpSelectionMerge = 247,
+  kOpBranch = 249,
+  kOpBranchConditional = 250,
   kOpLabel = 248,
   kOpReturnValue = 254,
 };
@@ -139,6 +143,7 @@ struct Types {
   uint32_t ivec4 = 0;
   uint32_t mat3 = 0;
   uint32_t mat4 = 0;
+  uint32_t vec4Array8 = 0;
   uint32_t image = 0;
   uint32_t samplerType = 0;
   uint32_t sampledImage = 0;
@@ -190,13 +195,27 @@ uint32_t MemberTypeId(const Types& types, FragmentType type, bool* ok) {
 
 // The operator signatures the pointwise slice links: parameter type kinds in call order, the
 // result is always vec4. The names are the export strings the build's op modules carry.
-enum ParamKind : uint8_t { kFloat = 0, kInt, kVec2, kVec3, kVec4, kMat3, kMat4 };
+enum ParamKind : uint8_t {
+  kFloat = 0,
+  kInt,
+  kVec2,
+  kVec3,
+  kVec4,
+  kMat3,
+  kMat4,
+  kIVec4,
+  kVec4Array8
+};
 
 struct OpSignature {
   int op = 0;
   const char* name = nullptr;
   std::vector<ParamKind> params = {};
 };
+
+// The leaf fetch has no ChainISA value of its own: the body imports it whenever a texture slot
+// needs a prefetched leaf, and the bundle carries it under this pseudo-op id.
+constexpr int kLeafFetchOp = 0x3F;
 
 const std::vector<OpSignature>& OpSignatures() {
   static const std::vector<OpSignature> signatures = {
@@ -205,11 +224,25 @@ const std::vector<OpSignature>& OpSignatures() {
       {ChainISA::Luma, "pmApplyLuma", {kVec4, kVec3}},
       {ChainISA::AlphaThreshold, "pmApplyAlphaThreshold", {kVec4, kFloat}},
       {ChainISA::Blend, "xpBlendColors", {kVec4, kVec4, kInt}},
+      {ChainISA::Texture, "tgfxOpTexture", {kVec4, kVec4, kVec4, kInt}},
+      {ChainISA::TexModulate, "tgfxOpTexModulate", {kVec4, kVec4, kInt}},
       {ChainISA::AARectCoverage, "tgfxOpAARectCoverage", {kVec4, kVec4, kVec2}},
       {ChainISA::LocalRectCoverage, "tgfxOpLocalRectCoverage", {kVec4, kVec4, kMat3, kVec2}},
       {ChainISA::RRectCoverage,
        "tgfxOpRRectCoverage",
        {kVec4, kVec4, kVec4, kVec4, kFloat, kMat3, kVec2}},
+      {ChainISA::Gradient,
+       "evalGradientSlot",
+       {kVec4, kVec3,  kInt,   kInt,   kInt,  kVec4, kVec4, kVec4, kVec4, kVec4, kVec4, kVec4,
+        kVec4, kFloat, kFloat, kFloat, kVec4, kVec4, kVec4, kVec4, kVec4, kVec4, kVec4, kVec4,
+        kVec4, kVec4,  kVec4,  kVec4,  kVec4, kVec4, kVec4, kVec4, kVec4, kVec4}},
+      {ChainISA::PerlinNoise, "evalNoiseSlot", {kVec3, kVec4, kIVec4}},
+      {ChainISA::ColorSpaceXform,
+       "chainApplyColorSpaceXform",
+       {kVec4, kInt, kVec4, kVec4, kInt, kVec4, kMat3, kVec4, kVec4, kVec4, kInt}},
+      {kLeafFetchOp,
+       "chainLeafFetch",
+       {kVec3, kVec4, kVec2, kInt, kInt, kInt, kInt, kMat3, kInt, kVec2, kInt, kVec4}},
   };
   return signatures;
 }
@@ -239,6 +272,10 @@ uint32_t ParamTypeId(const Types& types, ParamKind kind) {
       return types.mat3;
     case kMat4:
       return types.mat4;
+    case kIVec4:
+      return types.ivec4;
+    case kVec4Array8:
+      return types.vec4Array8;
   }
   return types.floatId;
 }
@@ -246,6 +283,7 @@ uint32_t ParamTypeId(const Types& types, ParamKind kind) {
 // One planned call resolved into the module's ids.
 struct BodyState {
   Writer writer = {};
+  const Layout* layout = nullptr;
   Types types = {};
   // The chainBody parameter ids in the frame's declared order: fragCoord first, then the
   // variant's varyings.
@@ -271,6 +309,7 @@ struct BodyState {
   // function's parameters as pointers to Function storage, and the linked modules keep that ABI.
   std::unordered_map<uint32_t, uint32_t> functionPointers = {};
   std::unordered_map<uint32_t, uint32_t> uniformConstantPointers = {};
+  std::unordered_map<uint64_t, uint32_t> arrayTypes = {};
 };
 
 uint32_t PtrTo(BodyState* state, uint32_t pointee) {
@@ -343,6 +382,25 @@ uint32_t Splat4(BodyState* state, uint32_t scalar) {
   return id;
 }
 
+// One array type per (element, count): the stride follows the element's std140 size (vec4 rows
+// occupy 16 bytes, mat3 rows 48).
+uint32_t ArrayTypeOf(BodyState* state, uint32_t elementType, uint32_t count, uint32_t stride) {
+  const uint64_t key = (static_cast<uint64_t>(elementType) << 32) | count;
+  const auto found = state->arrayTypes.find(key);
+  if (found != state->arrayTypes.end()) {
+    return found->second;
+  }
+  auto* sink = state->writer.sink;
+  state->writer.Sink(&state->writer.decl);
+  const uint32_t id = state->writer.NewId();
+  state->writer.Inst(kOpTypeArray, {id, elementType, IntConstant(state, static_cast<int>(count))});
+  state->writer.Sink(&state->writer.ann);
+  state->writer.Inst(kOpDecorate, {id, kDecorationArrayStride, stride});
+  state->writer.Sink(sink);
+  state->arrayTypes[key] = id;
+  return id;
+}
+
 // The loaded value of one plan uniform member (cached per member).
 uint32_t LoadMember(BodyState* state, const ChainProgramPlan& plan, int memberIndex) {
   const auto found = state->memberLoads.find(memberIndex);
@@ -356,8 +414,9 @@ uint32_t LoadMember(BodyState* state, const ChainProgramPlan& plan, int memberIn
     return 0;
   }
   if (member.count > 1) {
-    // Array members are not part of the v1 slice; the gate keeps them out.
-    return 0;
+    // An array member: the whole array value is what the evaluator parameters carry.
+    const uint32_t stride = member.type == FragmentType::Matrix3 ? 48u : 16u;
+    typeId = ArrayTypeOf(state, typeId, member.count, stride);
   }
   const uint32_t pointerType = state->writer.NewId();
   {
@@ -374,6 +433,40 @@ uint32_t LoadMember(BodyState* state, const ChainProgramPlan& plan, int memberIn
   state->writer.Inst(kOpLoad, {typeId, valueId, chainId});
   state->memberLoads[memberIndex] = valueId;
   return valueId;
+}
+
+// One element of an array-typed member (OpAccessChain + OpLoad).
+uint32_t ArrayElement(BodyState* state, const ChainProgramPlan& plan, int memberIndex,
+                      int element) {
+  const auto& member = plan.uniforms[static_cast<size_t>(memberIndex)];
+  bool ok = true;
+  const uint32_t elementType = MemberTypeId(state->types, member.type, &ok);
+  if (!ok) {
+    return 0;
+  }
+  const uint32_t pointerType = state->writer.NewId();
+  {
+    auto* sink = state->writer.sink;
+    state->writer.Sink(&state->writer.decl);
+    state->writer.Inst(kOpTypePointer, {pointerType, kStorageUniform, elementType});
+    state->writer.Sink(sink);
+  }
+  const uint32_t chainId = state->writer.NewId();
+  state->writer.Inst(kOpAccessChain,
+                     {pointerType, chainId, state->uboId, IntConstant(state, memberIndex),
+                      IntConstant(state, element)});
+  const uint32_t valueId = state->writer.NewId();
+  state->writer.Inst(kOpLoad, {elementType, valueId, chainId});
+  return valueId;
+}
+
+// One component of an integer vector value. OpCompositeExtract's index is a literal operand,
+// not an id reference.
+uint32_t ComponentOf(BodyState* state, uint32_t value, int component) {
+  const uint32_t id = state->writer.NewId();
+  state->writer.Inst(kOpCompositeExtract,
+                     {state->types.intId, id, value, static_cast<uint32_t>(component)});
+  return id;
 }
 
 // The member index of one binding source, or -1.
@@ -549,6 +642,10 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   writer.Inst(kOpTypeMatrix, {types.mat3, types.vec3, 3});
   types.mat4 = writer.NewId();
   writer.Inst(kOpTypeMatrix, {types.mat4, types.vec4, 4});
+  // The function-parameter array carries no ArrayStride: glslang's parameter arrays are plain
+  // Function-storage arrays, and a decoration would make the linked signatures differ.
+  types.vec4Array8 = writer.NewId();
+  writer.Inst(kOpTypeArray, {types.vec4Array8, types.vec4, IntConstant(&state, 8)});
   // The sampled image the mask tail reads (declared always: an unused type is legal, the
   // parameter itself only exists on mask variants).
   types.image = writer.NewId();
@@ -566,17 +663,12 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   // The device mask's sampler travels as a parameter when the variant carries one; the runtime
   // gate stays inside the body (HasMaskTexture) so one program serves masked and phantom draws.
   bool hasMaskSampler = false;
+  uint32_t maskSamplerBinding = 0;
   for (const auto& texture : layout.textures) {
     if (texture.name == "MaskTextureSampler") {
       hasMaskSampler = true;
-      break;
+      maskSamplerBinding = texture.binding;
     }
-  }
-  uint32_t maskSamplerPointer = 0;
-  if (hasMaskSampler) {
-    maskSamplerPointer = writer.NewId();
-    parameterPointees.push_back(types.sampledImage);
-    parameterIds.push_back(maskSamplerPointer);
   }
   for (const auto& varying : layout.varyings) {
     bool ok = true;
@@ -590,11 +682,10 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     parameterPointees.push_back(typeId);
     parameterIds.push_back(id);
   }
-  for (size_t index = 0; index < parameterPointees.size(); ++index) {
-    const bool samplerParameter = hasMaskSampler && index == 1;
-    parameterTypes.push_back(samplerParameter
-                                 ? UniformConstantPtrTo(&state, parameterPointees[index])
-                                 : PtrTo(&state, parameterPointees[index]));
+  for (uint32_t pointee : parameterPointees) {
+    // Every parameter is a Function pointer: the sampler no longer travels as one (the body
+    // declares its own mask variable), so no UniformConstant case remains here.
+    parameterTypes.push_back(PtrTo(&state, pointee));
   }
 
   // The struct: the plan's own members, at the plan's own offsets.
@@ -603,9 +694,13 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   for (const auto& member : plan.uniforms) {
     bool ok = true;
     uint32_t typeId = MemberTypeId(types, member.type, &ok);
-    if (!ok || member.count > 1) {
+    if (!ok) {
       *error = "the plan declares a member the body cannot carry";
       return false;
+    }
+    if (member.count > 1) {
+      const uint32_t stride = member.type == FragmentType::Matrix3 ? 48u : 16u;
+      typeId = ArrayTypeOf(&state, typeId, member.count, stride);
     }
     memberTypes.push_back(typeId);
   }
@@ -631,6 +726,23 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   writer.Inst(kOpDecorate, {state.uboId, kDecorationBinding, FRAGMENT_UBO_BINDING_POINT});
   writer.Sink(&writer.decl);
 
+  // The mask sampler is the body's own variable (the frame declares none): the tail samples it
+  // inside the HasMaskTexture branch, so a draw without a mask never touches the descriptor.
+  uint32_t maskSamplerVar = 0;
+  if (hasMaskSampler) {
+    for (const auto& texture : layout.textures) {
+      if (texture.name == "MaskTextureSampler") {
+        maskSamplerBinding = texture.binding;
+      }
+    }
+    const uint32_t samplerPointer = UniformConstantPtrTo(&state, types.sampledImage);
+    maskSamplerVar = writer.NewId();
+    writer.Inst(kOpVariable, {samplerPointer, maskSamplerVar, kStorageUniformConstant});
+    writer.Sink(&writer.ann);
+    writer.Inst(kOpDecorate, {maskSamplerVar, kDecorationDescriptorSet, TEXTURE_DESCRIPTOR_SET});
+    writer.Inst(kOpDecorate, {maskSamplerVar, kDecorationBinding, maskSamplerBinding});
+    writer.Sink(&writer.decl);
+  }
   // The template constants the epilogue and the designators use.
   state.whiteId = writer.NewId();
   const uint32_t oneFloat = FloatConstant(&state, 1.0f);
@@ -644,12 +756,23 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
 
   // The imported operators the composition reaches.
   std::unordered_map<int, uint32_t> opTypeIds = {};
+  std::vector<int> importOps = {};
+  bool needsLeafFetch = false;
   for (const auto& call : plan.calls) {
-    const OpSignature* signature = FindSignature(call.op);
-    if (signature == nullptr) {
-      continue;  // the inline expressions need no import
+    if (FindSignature(call.op) != nullptr && opTypeIds.count(call.op) == 0) {
+      opTypeIds[call.op] = 0;
+      importOps.push_back(call.op);
     }
-    if (opTypeIds.count(call.op) != 0) {
+    if (call.op == ChainISA::Texture || call.op == ChainISA::TexModulate) {
+      needsLeafFetch = true;
+    }
+  }
+  if (needsLeafFetch) {
+    importOps.push_back(kLeafFetchOp);
+  }
+  for (int importOp : importOps) {
+    const OpSignature* signature = FindSignature(importOp);
+    if (signature == nullptr) {
       continue;
     }
     std::vector<uint32_t> operands = {types.vec4};
@@ -663,8 +786,7 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
       return functionOperands;
     }());
     const uint32_t functionId = writer.NewId();
-    opTypeIds[call.op] = functionType;
-    state.opFunctions[call.op] = functionId;
+    state.opFunctions[importOp] = functionId;
     writer.Sink(&writer.func);
     writer.Inst(kOpFunction, {types.vec4, functionId, 0, functionType});
     for (ParamKind kind : signature->params) {
@@ -732,14 +854,45 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     if (signature == nullptr) {
       continue;
     }
-    argumentVariables[callIndex].resize(call.args.size(), 0);
-    for (size_t argIndex = 0; argIndex < call.args.size() && argIndex < signature->params.size();
-         ++argIndex) {
+    // The recipes may supply more parameters than the plan's argument list carries (the
+    // evaluators' records), so the temporaries follow the signature, not the plan.
+    argumentVariables[callIndex].resize(signature->params.size(), 0);
+    for (size_t argIndex = 0; argIndex < signature->params.size(); ++argIndex) {
       const uint32_t pointerType = PtrTo(&state, ParamTypeId(types, signature->params[argIndex]));
       const uint32_t variableId = writer.NewId();
       writer.Inst(kOpVariable, {pointerType, variableId, kStorageFunction});
       argumentVariables[callIndex][argIndex] = variableId;
     }
+  }
+  // The leaf fetch's own argument temporaries, one set per leaf the plan samples.
+  std::unordered_map<int, std::vector<uint32_t>> leafArgumentVars = {};
+  std::unordered_map<int, uint32_t> leafValues = {};
+  const OpSignature* leafSignature = FindSignature(kLeafFetchOp);
+  if (needsLeafFetch && leafSignature != nullptr) {
+    for (const auto& call : plan.calls) {
+      for (const auto& arg : call.args) {
+        if (arg.kind != ChainArgKind::LeafTex || leafArgumentVars.count(arg.index) != 0) {
+          continue;
+        }
+        std::vector<uint32_t> vars(leafSignature->params.size(), 0);
+        for (size_t paramIndex = 0; paramIndex < leafSignature->params.size(); ++paramIndex) {
+          const uint32_t pointerType =
+              PtrTo(&state, ParamTypeId(types, leafSignature->params[paramIndex]));
+          const uint32_t variableId = writer.NewId();
+          writer.Inst(kOpVariable, {pointerType, variableId, kStorageFunction});
+          vars[paramIndex] = variableId;
+        }
+        leafArgumentVars[arg.index] = std::move(vars);
+      }
+    }
+  }
+  // The mask tail's coverage temporary: the gated multiply writes through it, so the sample can
+  // sit inside a branch (an unbound mask descriptor must never be sampled).
+  uint32_t maskCoverageVar = 0;
+  if (hasMaskSampler) {
+    const uint32_t pointerType = PtrTo(&state, types.vec4);
+    maskCoverageVar = writer.NewId();
+    writer.Inst(kOpVariable, {pointerType, maskCoverageVar, kStorageFunction});
   }
   // The pointer parameters become values once, after the variables.
   std::vector<uint32_t> parameterValues = {};
@@ -747,11 +900,7 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     parameterValues.push_back(LoadFrom(&state, parameterIds[index], parameterPointees[index]));
   }
   state.fragCoordId = parameterValues[0];
-  uint32_t maskSamplerId = 0;
   size_t valueCursor = 1;
-  if (hasMaskSampler) {
-    maskSamplerId = parameterValues[valueCursor++];
-  }
   for (const auto& varying : layout.varyings) {
     state.varyingIds[varying.name] = parameterValues[valueCursor++];
   }
@@ -766,23 +915,171 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     return FloatConstant(&state, 1.0f);
   }());
 
+  // The entry-coupled evaluators read their records from the plan's named block; these helpers
+  // spell each record as the value its pure parameter expects.
+  auto memberValue = [&](ChainBindingSource source) -> uint32_t {
+    const int index = MemberIndexOf(plan, source);
+    return index < 0 ? 0 : LoadMember(&state, plan, index);
+  };
+  auto varyingValue = [&](const std::string& name) -> uint32_t {
+    const auto found = state.varyingIds.find(name);
+    return found == state.varyingIds.end() ? 0 : found->second;
+  };
+  // One leaf's record, found by its index field (the leaf records share their source with the
+  // leaf-0 instance and differ by index).
+  auto indexedMember = [&](ChainBindingSource source, int index) -> uint32_t {
+    for (size_t memberIndex = 0; memberIndex < plan.uniforms.size(); ++memberIndex) {
+      if (plan.uniforms[memberIndex].source == source &&
+          plan.uniforms[memberIndex].index == index) {
+        return LoadMember(&state, plan, static_cast<int>(memberIndex));
+      }
+    }
+    return 0;
+  };
+  // One leaf's fetch, cached: the pure fetch takes every device-mask fact and the leaf's own
+  // records as values (the samplers live in the fetch module under the layout's leaf bindings).
+  std::string recipeError = {};
+  auto leafFetchValue = [&](int leaf) -> uint32_t {
+    const auto cached = leafValues.find(leaf);
+    if (cached != leafValues.end()) {
+      return cached->second;
+    }
+    const auto vars = leafArgumentVars.find(leaf);
+    const OpSignature* signature = FindSignature(kLeafFetchOp);
+    if (vars == leafArgumentVars.end() || signature == nullptr) {
+      return 0;
+    }
+    int matrixMember = -1;
+    int swizzleMember = -1;
+    for (size_t memberIndex = 0; memberIndex < plan.uniforms.size(); ++memberIndex) {
+      if (plan.uniforms[memberIndex].source == ChainBindingSource::DeviceLeafCoordMatrix) {
+        matrixMember = static_cast<int>(memberIndex);
+      }
+      if (plan.uniforms[memberIndex].source == ChainBindingSource::LeafReadSwizzles) {
+        swizzleMember = static_cast<int>(memberIndex);
+      }
+    }
+    if (matrixMember < 0 || swizzleMember < 0) {
+      return 0;
+    }
+    const bool applyQuad = plan.hasSubset && leaf == 0;
+    std::vector<uint32_t> values = {
+        varyingValue("TransformedCoords_" + std::to_string(leaf)),
+        indexedMember(ChainBindingSource::LeafSubset, leaf),
+        indexedMember(ChainBindingSource::LeafAlphaStart, leaf),
+        indexedMember(ChainBindingSource::LeafHasRgbaaa, leaf),
+        indexedMember(ChainBindingSource::LeafSubsetClampOn, leaf),
+        IntConstant(&state, leaf),
+        memberValue(ChainBindingSource::DeviceLeafMask),
+        ArrayElement(&state, plan, matrixMember, leaf),
+        ComponentOf(&state, LoadMember(&state, plan, swizzleMember), leaf),
+        state.fragCoordId,
+        IntConstant(&state, applyQuad ? 1 : 0),
+        applyQuad ? varyingValue("vTexSubset") : state.blackId,
+    };
+    for (size_t parameter = 0; parameter < values.size(); ++parameter) {
+      if (values[parameter] == 0) {
+        recipeError = "leaf fetch parameter " + std::to_string(parameter) + " of leaf " +
+                      std::to_string(leaf);
+        return 0;
+      }
+    }
+    for (size_t parameter = 0; parameter < values.size() && parameter < vars->second.size();
+         ++parameter) {
+      writer.Inst(kOpStore, {vars->second[parameter], values[parameter]});
+    }
+    const uint32_t result = writer.NewId();
+    std::vector<uint32_t> operands = {types.vec4, result, state.opFunctions[kLeafFetchOp]};
+    operands.insert(operands.end(), vars->second.begin(), vars->second.end());
+    writer.Inst(kOpFunctionCall, operands);
+    leafValues[leaf] = result;
+    return result;
+  };
   // The call sequence.
   for (size_t callIndex = 0; callIndex < plan.calls.size(); ++callIndex) {
     const auto& call = plan.calls[callIndex];
     const OpSignature* signature = FindSignature(call.op);
-    std::vector<uint32_t> arguments = {};
-    for (size_t argIndex = 0; argIndex < call.args.size(); ++argIndex) {
-      const uint32_t value = ResolveArg(&state, plan, call.args[argIndex], coverageId);
-      if (value == 0) {
-        *error = "an argument could not be resolved";
-        return false;
+    std::vector<uint32_t> values = {};
+    if (call.op == ChainISA::Gradient) {
+      const int lutIndex = MemberIndexOf(plan, ChainBindingSource::GradientLutLeaf);
+      const int scalesMemberBase = MemberIndexOf(plan, ChainBindingSource::GradientScales);
+      const int biasesMemberBase = MemberIndexOf(plan, ChainBindingSource::GradientBiases);
+      values = {
+          ResolveArg(&state, plan, call.args[0], coverageId),
+          varyingValue("SourceCoords"),
+          memberValue(ChainBindingSource::GradientLayoutType),
+          memberValue(ChainBindingSource::GradientColorizerKind),
+          lutIndex < 0 ? IntConstant(&state, 0) : LoadMember(&state, plan, lutIndex),
+          memberValue(ChainBindingSource::GradientLeftBorder),
+          memberValue(ChainBindingSource::GradientRightBorder),
+          memberValue(ChainBindingSource::GradientStart),
+          memberValue(ChainBindingSource::GradientEnd),
+          memberValue(ChainBindingSource::GradientScale01),
+          memberValue(ChainBindingSource::GradientBias01),
+          memberValue(ChainBindingSource::GradientScale23),
+          memberValue(ChainBindingSource::GradientBias23),
+          memberValue(ChainBindingSource::GradientThreshold),
+          memberValue(ChainBindingSource::GradientBias),
+          memberValue(ChainBindingSource::GradientScale),
+          memberValue(ChainBindingSource::GradientThresholds1_7),
+          memberValue(ChainBindingSource::GradientThresholds9_13),
+          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 0) : 0,
+          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 1) : 0,
+          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 2) : 0,
+          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 3) : 0,
+          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 4) : 0,
+          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 5) : 0,
+          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 6) : 0,
+          scalesMemberBase >= 0 ? ArrayElement(&state, plan, scalesMemberBase, 7) : 0,
+          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 0) : 0,
+          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 1) : 0,
+          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 2) : 0,
+          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 3) : 0,
+          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 4) : 0,
+          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 5) : 0,
+          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 6) : 0,
+          biasesMemberBase >= 0 ? ArrayElement(&state, plan, biasesMemberBase, 7) : 0,
+      };
+    } else if (call.op == ChainISA::PerlinNoise) {
+      values = {
+          varyingValue("SourceCoords"),
+          memberValue(ChainBindingSource::NoiseFrequencyStitch),
+          memberValue(ChainBindingSource::NoiseModeOctaves),
+      };
+    } else if (call.op == ChainISA::ColorSpaceXform) {
+      values = {
+          ResolveArg(&state, plan, call.args[0], coverageId),
+          memberValue(ChainBindingSource::CSFlags),
+          memberValue(ChainBindingSource::CSTransferSrc0),
+          memberValue(ChainBindingSource::CSTransferSrc1),
+          memberValue(ChainBindingSource::CSTransferSrcType),
+          memberValue(ChainBindingSource::CSOotfSrc),
+          memberValue(ChainBindingSource::CSColorXform),
+          memberValue(ChainBindingSource::CSOotfDst),
+          memberValue(ChainBindingSource::CSTransferDst0),
+          memberValue(ChainBindingSource::CSTransferDst1),
+          memberValue(ChainBindingSource::CSTransferDstType),
+      };
+    } else {
+      for (const auto& arg : call.args) {
+        values.push_back(arg.kind == ChainArgKind::LeafTex
+                             ? leafFetchValue(arg.index)
+                             : ResolveArg(&state, plan, arg, coverageId));
       }
+    }
+    if (std::find(values.begin(), values.end(), 0u) != values.end()) {
+      *error = "an argument could not be resolved for op " + std::to_string(call.op) +
+               (recipeError.empty() ? std::string() : ": " + recipeError);
+      return false;
+    }
+    std::vector<uint32_t> arguments = {};
+    for (size_t argIndex = 0; argIndex < values.size(); ++argIndex) {
       if (signature != nullptr && argIndex < signature->params.size() &&
           argumentVariables[callIndex][argIndex] != 0) {
-        writer.Inst(kOpStore, {argumentVariables[callIndex][argIndex], value});
+        writer.Inst(kOpStore, {argumentVariables[callIndex][argIndex], values[argIndex]});
         arguments.push_back(argumentVariables[callIndex][argIndex]);
       } else {
-        arguments.push_back(value);
+        arguments.push_back(values[argIndex]);
       }
     }
     uint32_t result = 0;
@@ -802,7 +1099,7 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
       default: {
         const auto found = state.opFunctions.find(call.op);
         if (found == state.opFunctions.end()) {
-          *error = "a call has no linked operator";
+          *error = "a call has no linked operator for op " + std::to_string(call.op);
           return false;
         }
         result = writer.NewId();
@@ -853,6 +1150,26 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
       *error = "the mask tail has no coordinate matrix member";
       return false;
     }
+    // The sample sits inside a branch: a draw without a mask leaves the descriptor unbound, and
+    // sampling it would fault. The leaf-bearing profiles gate on HasMaskTexture at run time; the
+    // leaf-free mask profiles carry the multiply unconditionally.
+    uint32_t thenLabel = 0;
+    uint32_t mergeLabel = 0;
+    if (maskIndex >= 0) {
+      const uint32_t hasValue = LoadMember(&state, plan, maskIndex);
+      if (hasValue == 0) {
+        *error = "the HasMaskTexture member could not be read";
+        return false;
+      }
+      const uint32_t condition = writer.NewId();
+      writer.Inst(kOpINotEqual, {types.boolId, condition, hasValue, IntConstant(&state, 0)});
+      writer.Inst(kOpStore, {maskCoverageVar, coverage});
+      thenLabel = writer.NewId();
+      mergeLabel = writer.NewId();
+      writer.Inst(kOpSelectionMerge, {mergeLabel, 0});
+      writer.Inst(kOpBranchConditional, {condition, thenLabel, mergeLabel});
+      writer.Inst(kOpLabel, {thenLabel});
+    }
     const uint32_t matrix = LoadMember(&state, plan, matrixIndex);
     if (matrix == 0) {
       *error = "the mask matrix member could not be read";
@@ -867,25 +1184,19 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     writer.Inst(kOpMatrixTimesVector, {types.vec3, transformed, matrix, coord3});
     const uint32_t maskCoord = writer.NewId();
     writer.Inst(kOpVectorShuffle, {types.vec2, maskCoord, transformed, transformed, 0, 1});
+    const uint32_t maskSampler = LoadFrom(&state, maskSamplerVar, types.sampledImage);
     const uint32_t sampled = writer.NewId();
-    writer.Inst(kOpImageSampleImplicitLod, {types.vec4, sampled, maskSamplerId, maskCoord});
+    writer.Inst(kOpImageSampleImplicitLod, {types.vec4, sampled, maskSampler, maskCoord});
     const uint32_t maskValue = writer.NewId();
     writer.Inst(kOpCompositeExtract, {types.floatId, maskValue, sampled, 0});
     const uint32_t maskSplat = Splat4(&state, maskValue);
     const uint32_t multiplied = writer.NewId();
     writer.Inst(kOpFMul, {types.vec4, multiplied, maskSplat, coverage});
     if (maskIndex >= 0) {
-      // The leaf-bearing profiles gate the multiply at run time: HasMaskTexture != 0.
-      const uint32_t hasValue = LoadMember(&state, plan, maskIndex);
-      if (hasValue == 0) {
-        *error = "the HasMaskTexture member could not be read";
-        return false;
-      }
-      const uint32_t condition = writer.NewId();
-      writer.Inst(kOpINotEqual, {types.boolId, condition, hasValue, IntConstant(&state, 0)});
-      const uint32_t picked = writer.NewId();
-      writer.Inst(kOpSelect, {types.vec4, picked, condition, multiplied, coverage});
-      coverage = picked;
+      writer.Inst(kOpStore, {maskCoverageVar, multiplied});
+      writer.Inst(kOpBranch, {mergeLabel});
+      writer.Inst(kOpLabel, {mergeLabel});
+      coverage = LoadFrom(&state, maskCoverageVar, types.vec4);
     } else {
       coverage = multiplied;
     }

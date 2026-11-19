@@ -412,7 +412,20 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
               }
               if (modulesOk) {
                 modules.push_back(std::move(body));
-                for (int op : plan.usedOps) {
+                std::vector<uint32_t> moduleOps = {};
+                for (int usedOp : plan.usedOps) {
+                  moduleOps.push_back(static_cast<uint32_t>(usedOp));
+                }
+                bool wantsLeafFetch = false;
+                for (uint32_t op : moduleOps) {
+                  if (op == ChainISA::Texture || op == ChainISA::TexModulate) {
+                    wantsLeafFetch = true;
+                  }
+                }
+                if (wantsLeafFetch) {
+                  moduleOps.push_back(FragmentPackSPIRVLeafFetch & ~FragmentPackSPIRVOpBase);
+                }
+                for (uint32_t op : moduleOps) {
                   if (op == ChainISA::InputOpaque || op == ChainISA::MulAlpha) {
                     continue;  // the inline expressions need no module
                   }
@@ -646,10 +659,37 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   }
   // The assembled text declares its own samplers in its own order, so the emit's table is the
   // binding list; every other route declares the variant's.
-  if (assembledAttempt) {
+  if (assembledAttempt && !assembledVulkan) {
+    // The GL text declares its samplers in the plan's order, so the emit's table is the binding
+    // list.
     for (size_t index = 0; index < chainBindings.samplers.size(); ++index) {
       descriptor.layout.textureSamplers.emplace_back(chainBindings.samplers[index].name,
                                                      static_cast<unsigned>(index));
+    }
+  } else if (assembledAttempt && assembledVulkan) {
+    // The Vulkan modules declare every leaf sampler (the fetch's index dispatch reads them
+    // statically) and the mask, so the descriptor carries the plan's used samplers first — at
+    // their real bindings, in slot order — and appends the variant's remaining textures for
+    // coverage; the writer binds only the first block, through the program's slot map.
+    unsigned leafCount = 0;
+    for (const auto& texture : layout.textures) {
+      if (texture.name.rfind("TextureSampler_", 0) == 0) {
+        ++leafCount;
+      }
+    }
+    for (const auto& sampler : chainBindings.samplers) {
+      const unsigned binding = sampler.source == ChainSamplerSource::Leaf
+                                   ? static_cast<unsigned>(sampler.index)
+                                   : leafCount;
+      descriptor.layout.textureSamplers.emplace_back(sampler.name, binding);
+    }
+    for (const auto& texture : layout.textures) {
+      const bool listed = std::any_of(
+          descriptor.layout.textureSamplers.begin(), descriptor.layout.textureSamplers.end(),
+          [&](const BindingEntry& entry) { return entry.name == texture.name; });
+      if (!listed) {
+        descriptor.layout.textureSamplers.emplace_back(texture.name, texture.binding);
+      }
     }
   } else {
     for (const auto& texture : layout.textures) {
@@ -685,7 +725,14 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
           ? std::unique_ptr<ProgramWriter>(new ChainBindingWriter(variant, chainBindings))
           : std::unique_ptr<ProgramWriter>(new ProgramWriter(variant)));
   program->setShaderName(shaderName);
-  program->setExpectedTextureCount(static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));
+  std::vector<unsigned> textureSlotBindings = {};
+  for (const auto& entry : descriptor.layout.textureSamplers) {
+    textureSlotBindings.push_back(entry.binding);
+  }
+  program->setTextureSlotBindings(std::move(textureSlotBindings));
+  program->setExpectedTextureCount(
+      assembledAttempt ? static_cast<uint32_t>(chainBindings.samplers.size())
+                       : static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));
   return program;
 }
 

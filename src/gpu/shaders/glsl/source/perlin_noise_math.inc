@@ -1,8 +1,11 @@
+// The Perlin noise math, verbatim from the runtime kernel: every input — including the two
+// lookup samplers — arrives as a parameter, so the same bytes serve the interpreter's variant
+// text, the GL assembly and the Vulkan op module.
 #ifndef TGFX_PERLIN_NOISE_MATH_INC
 #define TGFX_PERLIN_NOISE_MATH_INC
 
-vec4 aotPerlinNoise(vec2 coord, vec2 frequency, vec2 stitchSize, int noiseType,
-                    int numOctaves, int stitchTiles) {
+vec4 aotPerlinNoise(vec2 coord, vec2 frequency, vec2 stitchSize, int noiseType, int numOctaves,
+                    int stitchTiles, sampler2D permTex, sampler2D gradTex) {
   highp vec2 noiseVec = coord * frequency + vec2(0.0078125);
   vec4 color = vec4(0.0);
   highp vec2 stitch = stitchSize;
@@ -17,23 +20,23 @@ vec4 aotPerlinNoise(vec2 coord, vec2 frequency, vec2 stitchSize, int noiseType,
       floorVal -= step(stitch.xyxy, floorVal) * stitch.xyxy;
     }
     floorVal = mod(floorVal, 256.0);
-    highp float permX = aotPerlinPermutation(vec2((floorVal.x + 0.5) / 256.0, 0.5)).r;
-    highp float permZ = aotPerlinPermutation(vec2((floorVal.z + 0.5) / 256.0, 0.5)).r;
+    highp float permX = texture(permTex, vec2((floorVal.x + 0.5) / 256.0, 0.5)).r;
+    highp float permZ = texture(permTex, vec2((floorVal.z + 0.5) / 256.0, 0.5)).r;
     highp vec2 latticeIdx = floor(vec2(permX, permZ) * 255.0 + 0.5);
     highp vec4 bcoords = mod(latticeIdx.xyxy + floorVal.yyww, 256.0);
     vec4 noiseResult;
     float chanCoords[4] = float[4](0.125, 0.375, 0.625, 0.875);
     for (int ch = 0; ch < 4; ++ch) {
-      vec4 lattice = aotPerlinGradient(vec2((bcoords.x + 0.5) / 256.0, chanCoords[ch]));
+      vec4 lattice = texture(gradTex, vec2((bcoords.x + 0.5) / 256.0, chanCoords[ch]));
       float u = dot((lattice.ga + lattice.rb * 0.00390625) * 2.0 - vec2(1.0), fractVal);
-      lattice = aotPerlinGradient(vec2((bcoords.y + 0.5) / 256.0, chanCoords[ch]));
+      lattice = texture(gradTex, vec2((bcoords.y + 0.5) / 256.0, chanCoords[ch]));
       float v = dot((lattice.ga + lattice.rb * 0.00390625) * 2.0 - vec2(1.0),
                     fractVal - vec2(1.0, 0.0));
       float a = mix(u, v, noiseSmooth.x);
-      lattice = aotPerlinGradient(vec2((bcoords.w + 0.5) / 256.0, chanCoords[ch]));
+      lattice = texture(gradTex, vec2((bcoords.w + 0.5) / 256.0, chanCoords[ch]));
       v = dot((lattice.ga + lattice.rb * 0.00390625) * 2.0 - vec2(1.0),
               fractVal - vec2(1.0, 1.0));
-      lattice = aotPerlinGradient(vec2((bcoords.z + 0.5) / 256.0, chanCoords[ch]));
+      lattice = texture(gradTex, vec2((bcoords.z + 0.5) / 256.0, chanCoords[ch]));
       u = dot((lattice.ga + lattice.rb * 0.00390625) * 2.0 - vec2(1.0),
               fractVal - vec2(0.0, 1.0));
       float b = mix(u, v, noiseSmooth.x);
@@ -55,4 +58,4 @@ vec4 aotPerlinNoise(vec2 coord, vec2 frequency, vec2 stitchSize, int noiseType,
   return vec4(color.rgb * color.aaa, color.a);
 }
 
-#endif
+#endif  // TGFX_PERLIN_NOISE_MATH_INC

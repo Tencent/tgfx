@@ -1,7 +1,7 @@
-// The plain leaf fetch helpers, shared verbatim by the interpreter's assembly and the composed
-// text's prefetch: the sample position (perspective divide + device-space switch), the clamped
-// sample with the RGBAAA second-area read, and the coordinate varying pick. Packed into the
-// bundle's fragment pack so the assembler can emit prefetches without the tiling machinery.
+// The leaf fetch helpers, shared by the interpreter's assembly, the composed text's prefetch and
+// the Vulkan op module: the plain fetch's sample position (perspective divide + device-space
+// switch), the clamped sample with the RGBAAA second-area read, and the tiled path's
+// coordinate-varying picker.
 #ifndef TGSL_CHAIN_LEAF_FETCH_INCLUDED
 #define TGSL_CHAIN_LEAF_FETCH_INCLUDED
 
@@ -10,7 +10,8 @@
 // tiled/subset math then runs on the divided coordinate, matching the runtime's
 // emitPerspTextCoord ordering. A device-space leaf samples at the fragment's destination position,
 // like the runtime DeviceSpaceTextureEffect; its Subset is unbounded, so the plain clamp is a no-op
-// for it.
+// for it. This form reads the interpreter's named block directly — the tiled path is the last
+// consumer that does.
 highp vec2 chainLeafCoord(vec3 coord, int leafIndex) {
   highp vec2 uv = coord.xy / coord.z;
   // The shift amount is unsigned: in the tiled-leaf loop leafIndex is not a constant, and WGSL
@@ -22,35 +23,8 @@ highp vec2 chainLeafCoord(vec3 coord, int leafIndex) {
   return uv;
 }
 
-// Plain leaf fetch: clamps to the leaf's Subset rect (full bounds = no-op). An RGBAAA leaf (always
-// a plain one) reads its alpha from the second area at leafAlphaStart past the clamped
-// coordinate, as GLSLTextureEffect::emitDefaultTextureCode does. main() calls this once per leaf
-// with the leaf's own sampler: the body is short, and statically bound per-leaf reads keep the
-// common draw's sampling as direct as it can be.
-vec4 chainPlainLeafFetch(sampler2D texSampler, vec3 coord, vec4 leafSubset,
-                         vec2 leafAlphaStart, int leafHasRgbaaa, int leafClampOn, int leafIndex) {
-  highp vec2 uv = chainLeafCoord(coord, leafIndex);
-  int readSwizzle = LeafReadSwizzles[leafIndex];
-#if HAS_SUBSET
-  // A strict draw's per-quad subset clamps leaf 0 ahead of its Subset uniform, the order of the
-  // runtime TextureEffect's extra subset (leafIndex is a constant at each call site).
-  if (leafIndex == 0) {
-    uv = aotTextureClamp(uv, vTexSubset, true);
-  }
-#endif
-  // Gated like the fill pipeline's Subset clamp: a leaf the binder's subset rule does not clamp
-  // (wrap-tiled, device-space) must read its sampler unclamped.
-  highp vec2 finalCoord = aotTextureClamp(uv, leafSubset, leafClampOn != 0);
-  vec4 color = aotTextureRead(texSampler, finalCoord, readSwizzle);
-  if (leafHasRgbaaa != 0) {
-    vec4 alpha = aotTextureRead(texSampler, finalCoord + leafAlphaStart, readSwizzle);
-    color = aotTextureDecodeRGBAAA(color, alpha);
-  }
-  return color;
-}
-
 // The coordinate varying of leaf leafIndex, picked with compile-time branches so the varyings stay
-// exactly what the vertex stage and the reflection expect.
+// exactly what the vertex stage and the reflection expect. Interpreter-only (the tiled path).
 vec3 chainLeafCoordVarying(int leafIndex) {
   if (leafIndex == 0) {
     return TransformedCoords_0;
@@ -62,6 +36,54 @@ vec3 chainLeafCoordVarying(int leafIndex) {
     return TransformedCoords_2;
   }
   return TransformedCoords_3;
+}
+
+// The plain leaf fetch: clamps to the leaf's Subset rect (full bounds = no-op), then reads through
+// the leaf's own sampler (the file-scope leaf bindings every consumer declares). An RGBAAA leaf
+// (always a plain one) reads its alpha from the second area at leafAlphaStart past the clamped
+// coordinate, as GLSLTextureEffect::emitDefaultTextureCode does. Every fact arrives as an explicit
+// argument — one spelling shared by the interpreter's variant text, the GL assembly and the Vulkan
+// body — with the quad subset as a runtime flag so one form serves strict and plain draws alike.
+vec4 chainLeafFetch(vec3 coord, vec4 leafSubset, vec2 leafAlphaStart, int leafHasRgbaaa,
+                    int leafClampOn, int leafIndex, int deviceLeafMask, mat3 leafMatrix,
+                    int readSwizzle, vec2 fragCoord, int applyQuadSubset, vec4 quadSubset) {
+  highp vec2 uv = coord.xy / coord.z;
+  if (((deviceLeafMask >> uint(leafIndex)) & 1) != 0) {
+    highp vec3 deviceCoord = leafMatrix * vec3(fragCoord, 1.0);
+    uv = deviceCoord.xy;
+  }
+  if (applyQuadSubset != 0) {
+    // A strict draw's per-quad subset clamps leaf 0 ahead of its Subset uniform, the order of the
+    // runtime TextureEffect's extra subset.
+    uv = aotTextureClamp(uv, quadSubset, true);
+  }
+  // Gated like the fill pipeline's Subset clamp: a leaf the binder's subset rule does not clamp
+  // (wrap-tiled, device-space) must read its sampler unclamped.
+  highp vec2 finalCoord = aotTextureClamp(uv, leafSubset, leafClampOn != 0);
+  vec4 color;
+  if (leafIndex == 0) {
+    color = aotTextureRead(TextureSampler_0, finalCoord, readSwizzle);
+  } else if (leafIndex == 1) {
+    color = aotTextureRead(TextureSampler_1, finalCoord, readSwizzle);
+  } else if (leafIndex == 2) {
+    color = aotTextureRead(TextureSampler_2, finalCoord, readSwizzle);
+  } else {
+    color = aotTextureRead(TextureSampler_3, finalCoord, readSwizzle);
+  }
+  if (leafHasRgbaaa != 0) {
+    vec4 alpha;
+    if (leafIndex == 0) {
+      alpha = aotTextureRead(TextureSampler_0, finalCoord + leafAlphaStart, readSwizzle);
+    } else if (leafIndex == 1) {
+      alpha = aotTextureRead(TextureSampler_1, finalCoord + leafAlphaStart, readSwizzle);
+    } else if (leafIndex == 2) {
+      alpha = aotTextureRead(TextureSampler_2, finalCoord + leafAlphaStart, readSwizzle);
+    } else {
+      alpha = aotTextureRead(TextureSampler_3, finalCoord + leafAlphaStart, readSwizzle);
+    }
+    color = aotTextureDecodeRGBAAA(color, alpha);
+  }
+  return color;
 }
 
 #endif  // TGSL_CHAIN_LEAF_FETCH_INCLUDED

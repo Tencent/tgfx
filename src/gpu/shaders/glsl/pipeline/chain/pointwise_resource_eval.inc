@@ -10,6 +10,7 @@
 #if NTEX > 0
 #include "pipeline/chain/pointwise_tiled3.inc"
 #endif
+#include "pipeline/chain/pointwise_source_coords.inc"
 #include "pipeline/chain/pointwise_gradient.inc"
 
 bool evalResourceSlot(ivec4 Packed, vec4 in0, int /*dataAt*/, out vec4 value) {
@@ -17,13 +18,26 @@ bool evalResourceSlot(ivec4 Packed, vec4 in0, int /*dataAt*/, out vec4 value) {
     value = vec4(0.0);
     return false;
   }
-  value = evalGradientSlot(in0);
+  int chainLutLeaf = 0;
+#if NTEX > 0
+  chainLutLeaf = GradientLUTLeaf;
+#endif
+  value = evalGradientSlot(
+      in0, SourceCoords, GradientLayoutType, GradientColorizerKind, chainLutLeaf,
+      Gradient_leftBorder, Gradient_rightBorder, Gradient_start, Gradient_end, Gradient_scale01,
+      Gradient_bias01, Gradient_scale23, Gradient_bias23, Gradient_threshold, Gradient_bias,
+      Gradient_scale, Gradient_thresholds1_7, Gradient_thresholds9_13, Gradient_scales[0],
+      Gradient_biases[0], Gradient_scales[1], Gradient_biases[1], Gradient_scales[2],
+      Gradient_biases[2], Gradient_scales[3], Gradient_biases[3], Gradient_scales[4],
+      Gradient_biases[4], Gradient_scales[5], Gradient_biases[5], Gradient_scales[6],
+      Gradient_biases[6], Gradient_scales[7], Gradient_biases[7]);
   return true;
 }
 #elif RESOURCE_KIND == 2
 #if NTEX > 0
 #include "pipeline/chain/pointwise_tiled2.inc"
 #endif
+#include "pipeline/chain/pointwise_source_coords.inc"
 #include "pipeline/chain/pointwise_noise.inc"
 
 bool evalResourceSlot(ivec4 Packed, vec4 in0, int dataAt, out vec4 value) {
@@ -31,7 +45,7 @@ bool evalResourceSlot(ivec4 Packed, vec4 in0, int dataAt, out vec4 value) {
     value = vec4(0.0);
     return false;
   }
-  value = evalNoiseSlot();
+  value = evalNoiseSlot(SourceCoords, Noise_frequencyStitch, NoiseModeOctaves);
   return true;
 }
 #else

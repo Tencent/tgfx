@@ -124,10 +124,8 @@ inline constexpr uint32_t FragmentPackXpFramebufferFetch = 0x40000000u | 0x1011u
 inline constexpr uint32_t FragmentPackGradientLut = 0x40000000u | 0x1020u;
 inline constexpr uint32_t FragmentPackGradientSimple = 0x40000000u | 0x1021u;
 
-/// The plain leaf fetch, packed in two forms with its one `#if HAS_SUBSET` branch resolved at
-/// build (the driver rejects `#if` directives): the strict form for a variant that declares the
-/// per-quad subset varying, the plain form otherwise.
-inline constexpr uint32_t FragmentPackLeafFetchStrict = 0x40000000u | 0x1022u;
+/// The leaf fetch: one parameter-only form serves strict and plain draws alike (the per-quad
+/// subset arrives as a runtime flag).
 inline constexpr uint32_t FragmentPackLeafFetchPlain = 0x40000000u | 0x1023u;
 
 /// The Vulkan linking route's op library, one patched SPIR-V module per pure operator: the wrapper
@@ -135,6 +133,10 @@ inline constexpr uint32_t FragmentPackLeafFetchPlain = 0x40000000u | 0x1023u;
 /// entry stripped. The per-operator id is the base with the ChainISA value. The resource-coupled
 /// evaluators (Gradient, PerlinNoise, ColorSpaceXform) join once their pure split lands.
 inline constexpr uint32_t FragmentPackSPIRVOpBase = 0x80000000u;
+
+/// The leaf fetch has no ChainISA value of its own: the body imports it whenever a texture slot
+/// needs a prefetched leaf.
+inline constexpr uint32_t FragmentPackSPIRVLeafFetch = FragmentPackSPIRVOpBase | 0x3Fu;
 
 /// The Vulkan linking route's frames, one precompiled SPIR-V module per variant: the entry point
 /// the pipeline runs, its varying inputs in the variant's own locations, and the imported

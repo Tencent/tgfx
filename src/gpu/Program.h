@@ -66,6 +66,29 @@ class Program {
     return expectedTextureCountValue;
   }
 
+  /**
+   * The descriptor binding one texture slot maps to. The assembled Vulkan modules declare their
+   * samplers at the variant's own bindings (the leaf index, the mask after the leaves), which are
+   * not the slot order the writer walks, so the program carries the mapping; slots without an
+   * entry keep their own index (the GL convention, where the two coincide).
+   */
+  unsigned getTextureBinding(unsigned index) const {
+    return index < textureSlotBindings.size() ? textureSlotBindings[index] : index;
+  }
+
+  void setTextureSlotBindings(std::vector<unsigned> bindings) {
+    textureSlotBindings = std::move(bindings);
+  }
+
+  /**
+   * How many texture slots the program's descriptor declares overall — the writer binds every
+   * one of them (the unused with dummy textures), because statically referenced bindings must be
+   * valid at draw even when a branch never runs.
+   */
+  unsigned textureSlotCount() const {
+    return static_cast<unsigned>(textureSlotBindings.size());
+  }
+
   void setExpectedTextureCount(uint32_t count) {
     expectedTextureCountValue = count;
   }
@@ -79,6 +102,7 @@ class Program {
   std::unique_ptr<ProgramWriter> writerValue = nullptr;
   std::string shaderNameValue = {};
   uint32_t expectedTextureCountValue = 0;
+  std::vector<unsigned> textureSlotBindings = {};
 
   friend class GlobalCache;
 };
