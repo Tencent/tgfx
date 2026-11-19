@@ -18,7 +18,6 @@
 
 #include "gpu/DrawingManager.h"
 #include "layers/BackgroundHandler.h"
-#include "layers/TileCluster.h"
 #include "layers/TilePool.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -652,40 +651,4 @@ TGFX_TEST(TilePoolTest, BackgroundBlurAtTheThresholdBoundary) {
   EXPECT_FALSE(skippedWhenDisabled);
 }
 
-TGFX_TEST(TilePoolTest, ClusterTileRectsGroupsCompactTilesOnly) {
-  auto tile = [](int x, int y) {
-    return Rect::MakeXYWH(static_cast<float>(x * 256), static_cast<float>(y * 256), 256.0f, 256.0f);
-  };
-
-  // Two tiles side by side: the union is exactly the sum, so they share one capture.
-  auto sideBySide = ClusterTileRects({tile(0, 0), tile(1, 0)});
-  ASSERT_EQ(sideBySide.size(), 1u);
-  EXPECT_EQ(sideBySide[0].indices.size(), 2u);
-  EXPECT_EQ(sideBySide[0].bounds, Rect::MakeXYWH(0.0f, 0.0f, 512.0f, 256.0f));
-
-  // A 2x2 block: also exactly the sum.
-  auto block = ClusterTileRects({tile(0, 0), tile(1, 0), tile(0, 1), tile(1, 1)});
-  ASSERT_EQ(block.size(), 1u);
-  EXPECT_EQ(block[0].indices.size(), 4u);
-
-  // Diagonal neighbours: the union is twice the sum, still within the threshold.
-  auto diagonal = ClusterTileRects({tile(0, 0), tile(1, 1)});
-  ASSERT_EQ(diagonal.size(), 1u);
-  EXPECT_EQ(diagonal[0].indices.size(), 2u);
-
-  // Far apart: eight times the sum, so they must not share a capture.
-  auto apart = ClusterTileRects({tile(0, 0), tile(3, 3)});
-  ASSERT_EQ(apart.size(), 2u);
-  EXPECT_EQ(apart[0].indices.size(), 1u);
-  EXPECT_EQ(apart[1].indices.size(), 1u);
-  // Indices point back into the input list in order.
-  EXPECT_EQ(apart[0].indices[0], 0u);
-  EXPECT_EQ(apart[1].indices[0], 1u);
-
-  // Empty rects are dropped, not turned into clusters.
-  auto withEmpty = ClusterTileRects({Rect::MakeEmpty(), tile(0, 0), Rect::MakeEmpty()});
-  ASSERT_EQ(withEmpty.size(), 1u);
-  EXPECT_EQ(withEmpty[0].indices[0], 1u);
-  EXPECT_EQ(ClusterTileRects({}).size(), 0u);
-}
 }  // namespace tgfx

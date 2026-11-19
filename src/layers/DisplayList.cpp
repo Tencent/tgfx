@@ -36,7 +36,6 @@
 #include "layers/CaptureCulling.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
-#include "layers/TileCluster.h"
 #include "layers/TilePool.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
@@ -742,22 +741,14 @@ void DisplayList::captureTileBackgrounds(
       for (auto index : levelEntry.second) {
         levelRects.push_back(tileTasks[index].tileRect());
       }
-      auto clusters = ClusterTileRects(levelRects);
-      auto viewMatrix = Matrix::MakeScale(rasterScale);
-      for (const auto& cluster : clusters) {
-        std::vector<Rect> clusterRects = {};
-        clusterRects.reserve(cluster.indices.size());
-        for (auto index : cluster.indices) {
-          clusterRects.push_back(levelRects[index]);
-        }
-        // The capture sizes the surfaces by the cluster and lets the capturer cull the layers
-        // no background style samples inside it.
-        auto map = captureBackgrounds(surface, clusterRects, viewMatrix);
-        auto captureIndex = static_cast<int>(captureMaps->size());
-        captureMaps->push_back(std::move(map));
-        for (auto offset : cluster.indices) {
-          (*taskCapture)[levelEntry.second[offset]] = captureIndex;
-        }
+      // One capture serves every tile of this level: the capturer culls the layers no background
+      // style samples inside the rects it covers, so a capture spanning more than the tiles that
+      // need it costs the surface, not the drawing.
+      auto map = captureBackgrounds(surface, levelRects, Matrix::MakeScale(rasterScale));
+      auto captureIndex = static_cast<int>(captureMaps->size());
+      captureMaps->push_back(std::move(map));
+      for (auto index : levelEntry.second) {
+        (*taskCapture)[index] = captureIndex;
       }
     }
   }
