@@ -27,6 +27,7 @@
 #include "compositing3d/Context3DCompositor.h"
 #include "compositing3d/Layer3DContext.h"
 #include "core/Matrix3DUtils.h"
+#include "core/MeasureContext.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -1322,7 +1323,8 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
 }
 
 std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float contentScale,
-                                                     Point* offset, bool* contourMatchesContent) {
+                                                     Point* offset, bool* contourMatchesContent,
+                                                     bool useTightBounds) {
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
@@ -1334,6 +1336,7 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
   contourArgs.opaqueContext = &opaqueContext;
   // Contour recording is an intermediate artifact — skip background capture / consume.
   contourArgs.backgroundHandler = BackgroundHandler::NoOp();
+  contourArgs.useTightContourBounds = useTightBounds;
   // Detach from any active 3D rendering context: the contour image we are about to record is the
   // merged self + descendants outline used as a layerStyle / mask source, not a node within the
   // 3D BSP. Without this clear, drawContourInternal's "skip children when rasterizing a
@@ -1344,8 +1347,9 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
   }
   auto picture = opaqueContext.finishRecordingAsPicture();
   auto imageOffset = Point::Zero();
-  auto image = PictureUtils::ToImageWithOffset(std::move(picture), &imageOffset, nullptr,
-                                               args.dstColorSpace);
+  auto bounds = useTightBounds ? MeasureContext::GetTightBounds(picture) : Rect::MakeEmpty();
+  auto image = PictureUtils::ToImageWithOffset(
+      std::move(picture), &imageOffset, useTightBounds ? &bounds : nullptr, args.dstColorSpace);
   if (offset) {
     *offset = imageOffset;
   }
@@ -1695,7 +1699,8 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
     auto contentScale = canvas->getMatrix().getMaxScale();
     auto offset = Point::Zero();
     bool contourMatchesContent = true;
-    auto image = getContentContourImage(args, contentScale, &offset, &contourMatchesContent);
+    auto image = getContentContourImage(args, contentScale, &offset, &contourMatchesContent,
+                                        args.useTightContourBounds);
     if (image == nullptr) {
       return allMatch;
     }
@@ -1899,13 +1904,17 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     if (needContour[i]) {
       std::shared_ptr<Image> image = nullptr;
       Point offset = {};
-      image = getContentContourImage(drawArgs, contentScale, &offset, &allContourMatch);
+      image = getContentContourImage(drawArgs, contentScale, &offset, &allContourMatch,
+                                     bucketNeedsGeometry[i]);
       if (image == nullptr) {
         bucketUsable = false;
       } else {
         auto contourSource = std::make_shared<ContourInputSource>(image, offset);
-        if (allContourMatch) {
-          // The contour also answers as content: both roles wrap the same recording.
+        if (allContourMatch && !bucketNeedsGeometry[i]) {
+          // Tight geometry and ordinary content have different extents. Reusing the tight contour
+          // would let adding a Geometry style resize the content consumed by sibling styles.
+          // Ordinary contour bounds describe the content too, so both roles can share one
+          // recording.
           group->content = std::make_shared<StyleInputSource>(image, offset);
           needContent[i] = false;
         }
@@ -1946,7 +1955,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
         // recording reads drawArgs.excludeEffects, so it must stay inside the loop.
         std::shared_ptr<Image> image = nullptr;
         Point offset = {};
-        image = getContentContourImage(drawArgs, contentScale, &offset, nullptr);
+        image = getContentContourImage(drawArgs, contentScale, &offset, nullptr, true);
         if (image != nullptr) {
           group->contour = std::make_shared<ContourInputSource>(image, offset);
           bucketUsable = true;
