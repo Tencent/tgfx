@@ -20,22 +20,29 @@
 
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 
-// Coordinates and lengths use layer-local units.
+// Procedural frequency, radius, and anchor coordinates use layer-local units.
 struct TextureGrainParams {
   float frequencyX = 0.04f;
   float frequencyY = 0.04f;
   float radius = 8.0f;
   uint32_t seed = 0;
   Point nodeCenter = Point::Zero();
+  // Position of the input image origin in full layer-local content space.
   Point sourceOrigin = Point::Zero();
+  // Source image crop in source-image coordinates.
+  Rect sourceRect = {};
+  // Ratio from source-image coordinates to cropped intermediate texture texels.
+  Point sourceScale = {1.0f, 1.0f};
+  // Source-image pixels per layer-local unit.
   float pixelsPerLocalUnit = 1.0f;
   bool clipToShape = false;
 };
 
-// pixelsPerLocalUnit must be finite and positive.
+// Non-finite pixelsPerLocalUnit is normalized to 1 by TextureImageFilter.
 TextureGrainParams MakeTextureGrainParams(float sizeX, float sizeY, float radius,
                                           const Point& nodeCenter, uint32_t seed = 0,
                                           const Point& sourceOrigin = Point::Zero(),
@@ -46,9 +53,13 @@ class TextureImageFilter : public ImageFilter {
  public:
   explicit TextureImageFilter(const TextureGrainParams& params);
 
+  const TextureGrainParams& getParams() const {
+    return params;
+  }
+
  protected:
   Type type() const override {
-    return Type::Runtime;
+    return Type::Texture;
   }
 
   Rect onFilterBounds(const Rect& rect, MapDirection mapDirection) const override;

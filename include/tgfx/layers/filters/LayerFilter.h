@@ -45,10 +45,15 @@ class LayerFilter : public LayerProperty {
    * positioned within the layer.
    * @param offset If non-null, receives the (x, y) translation of the filtered image relative to
    * the input image origin.
+   * @param imageOrigin Position of the current input image origin relative to the full content
+   * bounds, in layer-local units. The value changes with clipped or tiled inputs; applying it
+   * restores coordinates in the stable full-content space. Zero means the input starts at the full
+   * content origin.
    * @return The filtered image, or nullptr on failure.
    */
   std::shared_ptr<Image> filterImage(std::shared_ptr<Image> input, float scale,
-                                     const Rect& contentBounds, Point* offset = nullptr);
+                                     const Rect& contentBounds, Point* offset = nullptr,
+                                     const Point& imageOrigin = Point::Zero());
 
   /**
    * Returns the bounds of the layer filter after applying it to the scaled layer bounds.
@@ -86,6 +91,16 @@ class LayerFilter : public LayerProperty {
    */
   virtual std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
                                                const Rect& contentBounds, Point* offset) = 0;
+
+  /**
+   * Extended filter hook for filters that need the input image origin relative to the full content
+   * bounds. Existing filters can continue implementing the four-parameter overload.
+   */
+  virtual std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
+                                               const Rect& contentBounds, Point* offset,
+                                               const Point&) {
+    return onFilterImage(std::move(input), scale, contentBounds, offset);
+  }
 
   /**
    * Marks this filter as dirty and drops any cached state.

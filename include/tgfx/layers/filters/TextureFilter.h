@@ -19,25 +19,44 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include "tgfx/layers/filters/LayerFilter.h"
 
 namespace tgfx {
 
 /**
- * Add with Layer::setFilters(). Sizes and radius are in layer-local units.
+ * Displaces rendered layer content with a deterministic procedural texture.
+ *
+ * Add with Layer::setFilters(). Sizes and radius are in layer-local units. Larger sizes produce
+ * coarser grain. A zero size or zero radius makes the filter an identity operation.
  */
 class TextureFilter : public LayerFilter {
  public:
   /**
-   * @param sizeX Horizontal size; positive.
-   * @param sizeY Vertical size; positive.
-   * @param radius Displacement radius; non-negative.
+   * Finite values are clamped to their documented ranges.
+   * @param sizeX Horizontal size in [0, 100]; zero disables the texture.
+   * @param sizeY Vertical size in [0, 100]; zero disables the texture.
+   * @param radius Displacement radius in [0, 100].
    * @param seed Texture pattern selector.
    * @param clipToShape Preserve the input alpha.
+   * @return nullptr if any numeric parameter is NaN or infinite.
    */
   static std::shared_ptr<TextureFilter> Make(float sizeX, float sizeY, float radius,
-                                             uint32_t seed = 0, bool clipToShape = false);
+                                             uint32_t seed = 0, bool clipToShape = true);
 
+  /**
+   * Maps a full uint32 texture seed to [1, 16777215], the positive range that SVG's
+   * feTurbulence seed attribute can preserve exactly in its floating-point representation.
+   */
+  static uint32_t ToSVGSeed(uint32_t seed);
+
+  /**
+   * Returns the 255-entry, space-separated feFuncA tableValues string used by SVG serializers for
+   * clipToShape. The first entry is 0 and the remaining entries are 1.
+   */
+  static const std::string& SVGClipAlphaTable();
+
+  // Property setters clamp finite values to [0, 100] and ignore NaN or infinite values.
   float sizeX() const {
     return _sizeX;
   }
@@ -78,15 +97,18 @@ class TextureFilter : public LayerFilter {
 
   std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
                                        const Rect& contentBounds, Point* offset) override;
+  std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
+                                       const Rect& contentBounds, Point* offset,
+                                       const Point& imageOrigin) override;
 
  private:
   TextureFilter(float sizeX, float sizeY, float radius, uint32_t seed, bool clipToShape);
 
-  float _sizeX = 4.0f;
-  float _sizeY = 4.0f;
-  float _radius = 4.0f;
+  float _sizeX = 25.0f;
+  float _sizeY = 25.0f;
+  float _radius = 20.0f;
   uint32_t _seed = 0;
-  bool _clipToShape = false;
+  bool _clipToShape = true;
 };
 
 }  // namespace tgfx

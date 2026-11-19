@@ -26,6 +26,8 @@
 #include <utility>
 #include <vector>
 #include "core/utils/Types.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/DisplayList.h"
@@ -113,6 +115,28 @@ bool HasRenderedContent(const RenderedScene& scene) {
     }
   }
   return differingPixels > 16;
+}
+
+std::shared_ptr<Image> MakeSplitImage(int size) {
+  auto info = ImageInfo::Make(size, size, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  std::vector<uint8_t> pixels(static_cast<size_t>(size) * static_cast<size_t>(size) * 4);
+  const uint8_t colors[4][4] = {{255, 0, 0, 255},
+                                {0, 0, 255, 255},
+                                {0, 255, 0, 255},
+                                {235, 190, 45, 255}};
+  auto half = size / 2;
+  for (int y = 0; y < size; ++y) {
+    for (int x = 0; x < size; ++x) {
+      const auto* color = colors[(y >= half ? 2 : 0) + (x >= half ? 1 : 0)];
+      auto offset =
+          (static_cast<size_t>(y) * static_cast<size_t>(size) + static_cast<size_t>(x)) * 4;
+      for (size_t channel = 0; channel < 4; ++channel) {
+        pixels[offset + channel] = color[channel];
+      }
+    }
+  }
+  auto data = Data::MakeWithCopy(pixels.data(), pixels.size());
+  return Image::MakeFrom(info, std::move(data));
 }
 
 int MaxAlphaDifference(const RenderedScene& first, const RenderedScene& second) {
@@ -335,19 +359,33 @@ TGFX_TEST(TextureLayerIntegrationTest, PublicFilterContract) {
   filter->setSeed(0xF1234567U);
   EXPECT_EQ(filter->seed(), 0xF1234567U);
 
-  filter->setSizeX(0.0f);
+  filter->setSizeX(101.0f);
+  filter->setRadius(1000.0f);
   filter->setSizeY(std::numeric_limits<float>::infinity());
   filter->setRadius(-1.0f);
-  filter->setRadius(std::numeric_limits<float>::quiet_NaN());
-  EXPECT_EQ(filter->sizeX(), 32.0f);
+  EXPECT_EQ(filter->sizeX(), 100.0f);
   EXPECT_EQ(filter->sizeY(), 24.0f);
-  EXPECT_EQ(filter->radius(), 16.0f);
+  EXPECT_EQ(filter->radius(), 0.0f);
+  filter->setRadius(std::numeric_limits<float>::quiet_NaN());
+  EXPECT_EQ(filter->radius(), 0.0f);
+
+  auto clamped = TextureFilter::Make(-1.0f, 101.0f, -1.0f);
+  ASSERT_TRUE(clamped != nullptr);
+  EXPECT_EQ(clamped->sizeX(), 0.0f);
+  EXPECT_EQ(clamped->sizeY(), 100.0f);
+  EXPECT_EQ(clamped->radius(), 0.0f);
+
+  auto srcRect = Rect::MakeXYWH(10.0f, 20.0f, 100.0f, 80.0f);
+  auto zeroSize = TextureFilter::Make(0.0f, 25.0f, 20.0f);
+  ASSERT_TRUE(zeroSize != nullptr);
+  EXPECT_EQ(zeroSize->filterBounds(srcRect, 1.0f), srcRect);
 
   auto zeroRadius = TextureFilter::Make(25.0f, 25.0f, 0.0f);
   ASSERT_TRUE(zeroRadius != nullptr);
-  auto srcRect = Rect::MakeXYWH(10.0f, 20.0f, 100.0f, 80.0f);
   EXPECT_EQ(zeroRadius->filterBounds(srcRect, 1.0f), srcRect);
 
+  filter->setRadius(16.0f);
+  EXPECT_EQ(filter->radius(), 16.0f);
   auto bounds = filter->filterBounds(srcRect, 1.0f);
   auto expandedBounds = filter->filterBounds(srcRect, 2.0f);
   EXPECT_EQ(filter->filterBounds(srcRect, 2.0f, MapDirection::Reverse), expandedBounds);
@@ -359,9 +397,10 @@ TGFX_TEST(TextureLayerIntegrationTest, PublicFilterContract) {
   filter->setClipToShape(true);
   EXPECT_EQ(filter->filterBounds(srcRect, 2.0f), expandedBounds);
 
-  EXPECT_TRUE(TextureFilter::Make(-1.0f, 10.0f, 4.0f) == nullptr);
-  EXPECT_TRUE(TextureFilter::Make(10.0f, 10.0f, -1.0f) == nullptr);
   EXPECT_TRUE(TextureFilter::Make(std::numeric_limits<float>::quiet_NaN(), 10.0f, 4.0f) == nullptr);
+  EXPECT_TRUE(TextureFilter::Make(10.0f, std::numeric_limits<float>::infinity(), 4.0f) == nullptr);
+  EXPECT_TRUE(TextureFilter::Make(10.0f, 10.0f, std::numeric_limits<float>::quiet_NaN()) ==
+              nullptr);
 }
 
 TGFX_TEST(TextureLayerIntegrationTest, LayerTypeCompatibility) {
@@ -456,6 +495,52 @@ TGFX_TEST(TextureLayerIntegrationTest, ContentOriginAnchorStability) {
   EXPECT_LE(difference.max, 8);
 }
 
+TGFX_TEST(TextureLayerIntegrationTest, FilterChainAnchorStability) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto makeLayer = [](bool offsetPath) {
+    auto layer = ShapeLayer::Make();
+    Path path = {};
+    path.addRect(Rect::MakeXYWH(offsetPath ? 60.0f : 0.0f, 0.0f, 120.0f, 90.0f));
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
+    layer->setMatrix(Matrix::MakeTrans(offsetPath ? 0.0f : 60.0f, 70.0f));
+    return layer;
+  };
+  auto makeFilters = [](bool shadowFirst) {
+    auto shadow = DropShadowFilter::Make(18.0f, 18.0f, 8.0f, 8.0f, Color::FromRGBA(0, 0, 0, 180));
+    auto texture = TextureFilter::Make(16.0f, 12.0f, 8.0f, 3491, false);
+    if (shadowFirst) {
+      return std::vector<std::shared_ptr<LayerFilter>>{shadow, texture};
+    }
+    return std::vector<std::shared_ptr<LayerFilter>>{texture, shadow};
+  };
+  auto render = [&](bool offsetPath, bool shadowFirst) {
+    constexpr int size = 320;
+    auto surface = Surface::Make(context, size, size);
+    if (surface == nullptr) {
+      return RenderedScene{};
+    }
+    DisplayList displayList;
+    auto layer = makeLayer(offsetPath);
+    layer->setFilters(makeFilters(shadowFirst));
+    displayList.root()->addChild(layer);
+    displayList.render(surface.get());
+    return ReadScene(surface);
+  };
+
+  for (auto shadowFirst : {false, true}) {
+    auto offsetContent = render(true, shadowFirst);
+    auto transformedContent = render(false, shadowFirst);
+    auto difference = CompareScenes(offsetContent, transformedContent);
+    EXPECT_LE(difference.mean, 0.1) << "shadowFirst=" << shadowFirst;
+    EXPECT_LE(difference.fractionOverFour, 0.0005) << "shadowFirst=" << shadowFirst;
+    EXPECT_LE(difference.max, 8) << "shadowFirst=" << shadowFirst;
+  }
+}
+
 TGFX_TEST(TextureLayerIntegrationTest, RenderModesAndCacheInvalidation) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -509,6 +594,116 @@ TGFX_TEST(TextureLayerIntegrationTest, RenderModesAndCacheInvalidation) {
     auto difference = CompareScenes(mutated, fresh);
     EXPECT_LE(difference.mean, 0.1);
     EXPECT_LE(difference.max, 8);
+  }
+
+  for (const auto mode : modes) {
+    auto zero = render(mode, 0.0f, true);
+    auto fresh = render(mode, 24.0f, false);
+    auto difference = CompareScenes(zero, fresh);
+    EXPECT_LE(difference.mean, 0.1);
+    EXPECT_LE(difference.max, 8);
+  }
+}
+
+TGFX_TEST(TextureLayerIntegrationTest, TiledTextureAcrossZoomAndPartialRefresh) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+
+  auto render = [&](RenderMode mode, float zoom, bool refresh) {
+    auto surface = Surface::Make(context, 640, 640);
+    if (!surface) {
+      return RenderedScene{};
+    }
+    DisplayList displayList;
+    displayList.setRenderMode(mode);
+    displayList.setBackgroundColor(Color::White());
+    displayList.setZoomScale(zoom);
+    if (mode == RenderMode::Tiled) {
+      displayList.setTileSize(128);
+      displayList.setMaxTileCount(64);
+    }
+    auto layer = ImageLayer::Make();
+    layer->setImage(image);
+    auto matrix = Matrix::MakeScale(520.0f / static_cast<float>(image->width()));
+    matrix.postTranslate(23.0f, 31.0f);
+    layer->setMatrix(matrix);
+    layer->setFilters({TextureFilter::Make(18.0f, 14.0f, 9.0f, 3491, false)});
+    displayList.root()->addChild(layer);
+    auto marker = SolidLayer::Make();
+    marker->setWidth(24.0f);
+    marker->setHeight(20.0f);
+    marker->setMatrix(Matrix::MakeTrans(186.0f, 172.0f));
+    marker->setColor(Color::FromRGBA(220, 40, 50));
+    displayList.root()->addChild(marker);
+    displayList.render(surface.get());
+    if (refresh) {
+      marker->setColor(Color::FromRGBA(40, 180, 60));
+      displayList.render(surface.get());
+    }
+    return ReadScene(surface);
+  };
+
+  for (auto zoom : {0.5f, 1.0f, 2.0f}) {
+    SCOPED_TRACE(zoom);
+    auto direct = render(RenderMode::Direct, zoom, false);
+    auto tiled = render(RenderMode::Tiled, zoom, false);
+    auto refreshedDirect = render(RenderMode::Direct, zoom, true);
+    auto refreshedTiled = render(RenderMode::Tiled, zoom, true);
+    EXPECT_TRUE(HasRenderedContent(direct));
+    EXPECT_LE(CompareScenes(direct, tiled).mean, 0.1);
+    EXPECT_GT(CompareScenes(tiled, refreshedTiled).mean, 0.001);
+    EXPECT_LE(CompareScenes(refreshedDirect, refreshedTiled).mean, 0.1);
+  }
+}
+
+TGFX_TEST(TextureLayerIntegrationTest, ExtremeZoomPreservesContent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto render = [&](RenderMode mode, float zoom, bool filtered) {
+    auto surface = Surface::Make(context, 128, 128);
+    if (surface == nullptr) {
+      return RenderedScene{};
+    }
+    DisplayList displayList;
+    displayList.setRenderMode(mode);
+    displayList.setBackgroundColor(Color::White());
+    displayList.setZoomScale(zoom);
+    displayList.setContentOffset(64.0f, 64.0f);
+    if (mode == RenderMode::Tiled) {
+      displayList.setTileSize(64);
+      displayList.setMaxTileCount(16);
+    }
+    auto image = MakeSplitImage(520);
+    if (image == nullptr) {
+      return RenderedScene{};
+    }
+    auto layer = ImageLayer::Make();
+    layer->setImage(std::move(image));
+    if (filtered) {
+      layer->setFilters({TextureFilter::Make(10.0f, 10.0f, 10.0f, 3491, false)});
+    }
+    displayList.root()->addChild(layer);
+    displayList.render(surface.get());
+    return ReadScene(surface);
+  };
+
+  // 512 source pixels per local unit also covers 25600% on a Retina display.
+  for (auto zoom : {1.0f, 8.0f, 64.0f, 256.0f, 512.0f}) {
+    SCOPED_TRACE(zoom);
+    auto direct = render(RenderMode::Direct, zoom, true);
+    auto unfiltered = render(RenderMode::Direct, zoom, false);
+    EXPECT_TRUE(HasRenderedContent(direct));
+    EXPECT_GT(CompareScenes(direct, unfiltered).mean, 0.01);
+    for (auto mode : {RenderMode::Partial, RenderMode::Tiled}) {
+      auto filtered = render(mode, zoom, true);
+      EXPECT_TRUE(HasRenderedContent(filtered));
+      EXPECT_LE(CompareScenes(direct, filtered).max, 1);
+    }
   }
 }
 

@@ -1112,7 +1112,8 @@ LayerContent* Layer::getContent() {
 }
 
 std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float contentScale,
-                                           const Rect& contentBounds, Point* offset) {
+                                           const Rect& contentBounds, const Point& imageOrigin,
+                                           Point* offset) {
   if (!image || _filters.empty()) {
     return image;
   }
@@ -1121,11 +1122,12 @@ std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float c
   // before being passed to the next filter, otherwise geometry-anchored filters would sample in a
   // stale coordinate system.
   Rect currentContentBounds = contentBounds;
+  Point currentImageOrigin = imageOrigin;
   for (const auto& layerFilter : _filters) {
     DEBUG_ASSERT(layerFilter != nullptr);
     Point filterOffset = {};
     image = layerFilter->filterImage(std::move(image), contentScale, currentContentBounds,
-                                     &filterOffset);
+                                     &filterOffset, currentImageOrigin);
     if (!image) {
       return nullptr;
     }
@@ -1133,6 +1135,7 @@ std::shared_ptr<Image> Layer::applyFilters(std::shared_ptr<Image> image, float c
       offset->offset(filterOffset.x, filterOffset.y);
     }
     currentContentBounds.offset(-filterOffset.x, -filterOffset.y);
+    currentImageOrigin.offset(filterOffset.x / contentScale, filterOffset.y / contentScale);
   }
   return image;
 }
@@ -1483,9 +1486,10 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
   if (!_filters.empty()) {
     Point filterOffset = {};
     auto contentBounds = mapContentBoundsToImage(contentScale, pictureBounds);
+    Point imageOrigin = {-contentBounds.left / contentScale, -contentBounds.top / contentScale};
     contentBounds.offset(-(contentBounds.left + pictureBounds.left),
                          -(contentBounds.top + pictureBounds.top));
-    image = applyFilters(std::move(image), contentScale, contentBounds, &filterOffset);
+    image = applyFilters(std::move(image), contentScale, contentBounds, imageOrigin, &filterOffset);
     offset += filterOffset;
   }
 

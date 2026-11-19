@@ -24,7 +24,7 @@
 #include "tgfx/core/YUVColorSpace.h"
 
 namespace tgfx {
-// Use when uploading a 3x4 matrix to a Float4 shader uniform.
+// Returns 12 floats for a Float3x3 uniform: three rows padded to Float4 alignment.
 std::array<float, 12> GetYUVColorConversionMatrix(YUVColorSpace yuvColorSpace);
 
 std::shared_ptr<ColorSpace> MakeColorSpaceFromYUVColorSpace(YUVColorSpace yuvColorSpace);

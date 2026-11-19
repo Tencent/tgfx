@@ -32,6 +32,7 @@
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Paint.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/YUVColorSpace.h"
 #include "tgfx/core/YUVData.h"
@@ -157,6 +158,40 @@ TestImage MakeOpaqueRectangle() {
   return image;
 }
 
+constexpr int LargePatternCellSize = 128;
+
+std::array<uint8_t, 3> LargePatternColorAt(int x, int y) {
+  auto cellX = x / LargePatternCellSize;
+  auto cellY = y / LargePatternCellSize;
+  switch ((cellX + cellY) % 4) {
+    case 0:
+      return {220, 40, 50};
+    case 1:
+      return {40, 120, 210};
+    case 2:
+      return {40, 180, 80};
+    default:
+      return {235, 190, 45};
+  }
+}
+
+std::shared_ptr<Image> MakeLargePatternImage(int width, int height) {
+  PictureRecorder recorder;
+  auto* canvas = recorder.beginRecording();
+  Paint paint = {};
+  for (int y = 0; y < height; y += LargePatternCellSize) {
+    for (int x = 0; x < width; x += LargePatternCellSize) {
+      auto color = LargePatternColorAt(x, y);
+      paint.setColor(Color::FromRGBA(color[0], color[1], color[2]));
+      canvas->drawRect(Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
+                                      static_cast<float>(LargePatternCellSize),
+                                      static_cast<float>(LargePatternCellSize)),
+                       paint);
+    }
+  }
+  return Image::MakeFrom(recorder.finishRecordingAsPicture(), width, height);
+}
+
 std::shared_ptr<Image> MakeImage(const TestImage& image) {
   auto info =
       ImageInfo::Make(image.width, image.height, ColorType::RGBA_8888, AlphaType::Premultiplied);
@@ -280,20 +315,35 @@ TestImage EvaluateReference(const TestImage& source, const TextureGrainParams& p
 
 TestImage RenderImageOnGPU(Context* context, const std::shared_ptr<Image>& image, int width,
                            int height, const Paint* paint = nullptr, float left = 0.0f,
-                           float top = 0.0f) {
+                           float top = 0.0f, const SamplingOptions& sampling = SamplingOptions()) {
   TestImage result = {width, height, {}};
   result.pixels.resize(static_cast<size_t>(result.width) * static_cast<size_t>(result.height) * 4);
   auto surface = Surface::Make(context, width, height, false, 1, false, 0, image->colorSpace());
   if (surface == nullptr) {
     return result;
   }
-  surface->getCanvas()->drawImage(image, left, top, paint);
+  surface->getCanvas()->drawImage(image, left, top, sampling, paint);
   auto info = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
   if (!surface->readPixels(info, result.pixels.data())) {
     result.pixels.assign(result.pixels.size(), 0);
   }
   return result;
 }
+
+struct ScopedClampToBorder {
+  GPUFeatures* features;
+  bool original;
+
+  ScopedClampToBorder(Context* context, bool value)
+      : features(const_cast<GPUFeatures*>(context->gpu()->features())),
+        original(features->clampToBorder) {
+    features->clampToBorder = value;
+  }
+
+  ~ScopedClampToBorder() {
+    features->clampToBorder = original;
+  }
+};
 
 TestImage RenderOnGPU(Context* context, const std::shared_ptr<Image>& sourceImage,
                       const TestImage& expected, const std::shared_ptr<ImageFilter>& filter,
@@ -592,6 +642,67 @@ TGFX_TEST(TextureImageFilterTest, RadiusZeroIsIdentity) {
   EXPECT_EQ(Compare(gpu, unfiltered).maxDifference, 0);
 }
 
+TGFX_TEST(TextureImageFilterTest, ZeroTextureSizeIsIdentity) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto source = MakeOpaqueMotif();
+  auto sourceImage = MakeImage(source);
+  auto unfiltered = RenderImageOnGPU(context, sourceImage, source.width, source.height);
+  for (const auto& size :
+       {Point::Make(0.0f, 25.0f), Point::Make(25.0f, 0.0f), Point::Make(0.0f, 0.0f)}) {
+    auto params = MakeTextureGrainParams(size.x, size.y, 20.0f, Point::Make(160.0f, 120.0f), 3491);
+    auto filter = std::make_shared<TextureImageFilter>(params);
+    auto bounds = filter->filterBounds(
+        Rect::MakeWH(static_cast<float>(source.width), static_cast<float>(source.height)));
+    EXPECT_EQ(bounds,
+              Rect::MakeWH(static_cast<float>(source.width), static_cast<float>(source.height)));
+    auto gpu = RenderOnGPU(context, sourceImage, unfiltered, filter, bounds);
+    EXPECT_EQ(Compare(gpu, unfiltered).maxDifference, 0);
+  }
+}
+
+TGFX_TEST(TextureImageFilterTest, NearestSamplingHasNoCoverageBlend) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  TestImage source = {8, 8, {}};
+  source.pixels.resize(8 * 8 * 4);
+  for (int y = 0; y < source.height; ++y) {
+    for (int x = 0; x < source.width; ++x) {
+      SetPremultipliedPixel(&source, x, y, 255, 0, 0, 255);
+    }
+  }
+
+  auto params = MakeTextureGrainParams(2.0f, 2.0f, 3.0f, Point::Make(4.0f, 4.0f), 3491);
+  auto filter = std::make_shared<TextureImageFilter>(params);
+  auto sourceImage = MakeImage(source);
+  Point offset = {};
+  auto filtered = sourceImage->makeWithFilter(filter, &offset);
+  ASSERT_TRUE(filtered != nullptr);
+
+  ScopedClampToBorder guard(context, false);
+  auto nearest = RenderImageOnGPU(context, filtered, filtered->width(), filtered->height(), nullptr,
+                                  0.0f, 0.0f, SamplingOptions(FilterMode::Nearest));
+  auto linear = RenderImageOnGPU(context, filtered, filtered->width(), filtered->height(), nullptr,
+                                 0.0f, 0.0f, SamplingOptions(FilterMode::Linear));
+
+  auto partialAlphaCount = [](const TestImage& image) {
+    int count = 0;
+    for (int y = 0; y < image.height; ++y) {
+      for (int x = 0; x < image.width; ++x) {
+        auto alpha = PixelAt(image, x, y)[3];
+        count += alpha > 0 && alpha < 255;
+      }
+    }
+    return count;
+  };
+  EXPECT_EQ(partialAlphaCount(nearest), 0);
+  EXPECT_GT(partialAlphaCount(linear), 0);
+}
+
 TGFX_TEST(TextureImageFilterTest, NoiseFixedVectors) {
   const auto& table = TextureGrainGradientTable();
   auto value = TextureGrainSignedFBM(table.data(), 12.25f, -3.5f, 3491);
@@ -804,6 +915,120 @@ TGFX_TEST(TextureImageFilterTest, MaxParametersComplexImageClipPair) {
       CountAlphaOutsideSourceBounds(unclipped.first, unclipped.second, source.width, source.height),
       0);
   EXPECT_GT(Compare(clipped.first, unclipped.first).meanDifference, 0.1);
+}
+
+TGFX_TEST(TextureImageFilterTest, LocalCropMatchesFullRender) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto source = MakeOpaqueMotif();
+  auto sourceImage = MakeImage(source);
+  ASSERT_TRUE(sourceImage != nullptr);
+  auto params = MakeTextureGrainParams(18.0f, 18.0f, 30.0f, Point::Make(160.0f, 120.0f), 3491);
+  auto filter = std::make_shared<TextureImageFilter>(params);
+  auto sourceBounds =
+      Rect::MakeWH(static_cast<float>(source.width), static_cast<float>(source.height));
+  auto fullBounds = filter->filterBounds(sourceBounds);
+  TestImage fullBlank = {static_cast<int>(fullBounds.width()),
+                         static_cast<int>(fullBounds.height()),
+                         {}};
+  fullBlank.pixels.resize(static_cast<size_t>(fullBlank.width) *
+                          static_cast<size_t>(fullBlank.height) * 4);
+  auto full = RenderOnGPU(context, source, fullBlank, filter, fullBounds);
+  ASSERT_EQ(full.width, fullBlank.width);
+
+  Rect cropRect = Rect::MakeXYWH(80.0f, 60.0f, 160.0f, 120.0f);
+  Point cropOffset = {};
+  auto croppedImage = sourceImage->makeWithFilter(filter, &cropOffset, &cropRect);
+  ASSERT_TRUE(croppedImage != nullptr);
+  EXPECT_EQ(croppedImage->width(), static_cast<int>(cropRect.width()));
+  EXPECT_EQ(croppedImage->height(), static_cast<int>(cropRect.height()));
+  EXPECT_EQ(cropOffset.x, cropRect.left);
+  EXPECT_EQ(cropOffset.y, cropRect.top);
+  auto cropped =
+      RenderImageOnGPU(context, croppedImage, croppedImage->width(), croppedImage->height());
+
+  const auto expectedWidth = static_cast<int>(cropRect.width());
+  const auto expectedHeight = static_cast<int>(cropRect.height());
+  TestImage expected = {expectedWidth, expectedHeight, {}};
+  expected.pixels.resize(static_cast<size_t>(expectedWidth) * static_cast<size_t>(expectedHeight) *
+                         4);
+  auto fullLeft = static_cast<int>(cropRect.left - fullBounds.left);
+  auto fullTop = static_cast<int>(cropRect.top - fullBounds.top);
+  for (int y = 0; y < expected.height; ++y) {
+    for (int x = 0; x < expected.width; ++x) {
+      auto pixel = PixelAt(full, fullLeft + x, fullTop + y);
+      auto offset =
+          (static_cast<size_t>(y) * static_cast<size_t>(expected.width) + static_cast<size_t>(x)) *
+          4;
+      expected.pixels[offset] = pixel[0];
+      expected.pixels[offset + 1] = pixel[1];
+      expected.pixels[offset + 2] = pixel[2];
+      expected.pixels[offset + 3] = pixel[3];
+    }
+  }
+
+  auto metrics = Compare(cropped, expected);
+  EXPECT_LE(metrics.meanDifference, 0.1);
+  EXPECT_LE(metrics.fractionOverFour, 0.0001);
+  EXPECT_LE(metrics.maxDifference, 8);
+}
+
+TGFX_TEST(TextureImageFilterTest, OversizedSourceLocalCrop) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto side = std::max(context->gpu()->limits()->maxTextureDimension2D + 128, 4096);
+  auto image = MakeLargePatternImage(side, side);
+  ASSERT_TRUE(image != nullptr);
+  auto params = MakeTextureGrainParams(18.0f, 14.0f, 9.0f, Point::Make(260.0f, 260.0f), 3491);
+  auto filter = std::make_shared<TextureImageFilter>(params);
+  auto crop = Rect::MakeXYWH(512.0f, 768.0f, 2300.0f, 256.0f);
+  Point offset = {};
+  auto filtered = image->makeWithFilter(filter, &offset, &crop);
+  ASSERT_TRUE(filtered != nullptr);
+  EXPECT_EQ(offset.x, crop.left);
+  EXPECT_EQ(offset.y, crop.top);
+
+  auto verifyPattern = [&](const TestImage& result) {
+    int maxDifference = 0;
+    int samples = 0;
+    auto firstCellX =
+        static_cast<int>(std::floor(crop.left / LargePatternCellSize)) * LargePatternCellSize +
+        LargePatternCellSize / 2;
+    auto firstCellY =
+        static_cast<int>(std::floor(crop.top / LargePatternCellSize)) * LargePatternCellSize +
+        LargePatternCellSize / 2;
+    if (firstCellX < static_cast<int>(crop.left)) {
+      firstCellX += LargePatternCellSize;
+    }
+    if (firstCellY < static_cast<int>(crop.top)) {
+      firstCellY += LargePatternCellSize;
+    }
+    for (int sourceY = firstCellY; sourceY < static_cast<int>(crop.bottom);
+         sourceY += LargePatternCellSize) {
+      for (int sourceX = firstCellX; sourceX < static_cast<int>(crop.right);
+           sourceX += LargePatternCellSize) {
+        auto outputX = sourceX - static_cast<int>(crop.left);
+        auto outputY = sourceY - static_cast<int>(crop.top);
+        auto expected = LargePatternColorAt(sourceX, sourceY);
+        auto actual = PixelAt(result, outputX, outputY);
+        for (size_t channel = 0; channel < 3; ++channel) {
+          maxDifference = std::max(maxDifference, std::abs(actual[channel] - expected[channel]));
+        }
+        samples++;
+      }
+    }
+    EXPECT_GT(samples, 0);
+    EXPECT_LE(maxDifference, 2);
+  };
+
+  auto linear = RenderImageOnGPU(context, filtered, filtered->width(), filtered->height());
+  verifyPattern(linear);
+  auto nearest = RenderImageOnGPU(context, filtered, filtered->width(), filtered->height(), nullptr,
+                                  0.0f, 0.0f, SamplingOptions(FilterMode::Nearest));
+  verifyPattern(nearest);
 }
 
 }  // namespace tgfx

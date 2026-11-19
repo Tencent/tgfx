@@ -82,7 +82,9 @@ void InnerShadowStyle::setSpread(float spread) {
     return;
   }
   _spread = spread;
-  invalidateStyle();
+  // Spread does not affect the cached ImageFilter. Only trigger a redraw to regenerate the
+  // spread shape image.
+  invalidateTransform();
 }
 
 InnerShadowStyle::InnerShadowStyle(float offsetX, float offsetY, float blurrinessX,
@@ -285,7 +287,7 @@ std::shared_ptr<ImageFilter> InnerShadowStyle::getShadowFilter(float scale) {
 void InnerShadowStyle::invalidateFilter() {
   shadowFilter = nullptr;
   currentScale = 0.0f;
-  invalidateStyle();
+  invalidateTransform();
 }
 
 }  // namespace tgfx

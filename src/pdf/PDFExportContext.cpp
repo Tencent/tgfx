@@ -831,6 +831,10 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
       drawBlurLayer(picture, imageFilter, matrix, clip, brush);
       return;
     }
+    if (Types::Get(imageFilter.get()) != Types::ImageFilterType::Texture) {
+      picture->playback(this, matrix, clip);
+      return;
+    }
     auto pictureBounds = picture->getBounds();
     if (!pictureBounds.isEmpty()) {
       auto imageMatrix = Matrix::MakeTrans(-pictureBounds.left, -pictureBounds.top);

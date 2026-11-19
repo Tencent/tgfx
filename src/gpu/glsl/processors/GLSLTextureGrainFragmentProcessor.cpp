@@ -106,22 +106,31 @@ static void AppendNoiseFunctions(FragmentShaderBuilder* fragBuilder, SamplerHand
 static void AppendSourceSamplingFunction(FragmentShaderBuilder* fragBuilder,
                                          const std::vector<SamplerHandle>& sourceSamplers,
                                          const std::string& samplingInfoName,
+                                         const std::string& sourceRectName,
+                                         const std::string& sizesName,
                                          const std::string& colorMatrixName,
                                          const std::string& functionName, bool useHardwareDecal,
-                                         const YUVTextureView* yuvTexture) {
-  auto needsCoverage = !useHardwareDecal || yuvTexture != nullptr;
+                                         bool snapNearest, const YUVTextureView* yuvTexture) {
+  auto needsCoverage = !useHardwareDecal || yuvTexture != nullptr || snapNearest;
   std::string coverageCode;
+  coverageCode = "  highp vec2 texturePosition = (sourcePosition - " + sourceRectName + ".xy) * " +
+                 sizesName + ".yz;\n";
   if (needsCoverage) {
-    coverageCode = "  highp vec2 textureSize = " + samplingInfoName +
-                   ".zw;\n"
-                   "  highp float coverageX = min(clamp(sourcePosition.x + 0.5, 0.0, 1.0), "
-                   "clamp(textureSize.x - sourcePosition.x + 0.5, 0.0, 1.0));\n"
-                   "  highp float coverageY = min(clamp(sourcePosition.y + 0.5, 0.0, 1.0), "
-                   "clamp(textureSize.y - sourcePosition.y + 0.5, 0.0, 1.0));\n"
-                   "  highp float coverage = coverageX * coverageY;\n"
-                   "  if (coverage <= 0.0) {\n"
-                   "    return vec4(0.0);\n"
-                   "  }\n";
+    if (snapNearest) {
+      coverageCode += "  highp vec2 borderPosition = floor(texturePosition) + 0.5;\n";
+    } else {
+      coverageCode += "  highp vec2 borderPosition = texturePosition;\n";
+    }
+    coverageCode += "  highp vec2 contentSize = " + sourceRectName + ".zw * " + sizesName +
+                    ".yz;\n"
+                    "  highp float coverageX = min(clamp(borderPosition.x + 0.5, 0.0, 1.0), "
+                    "clamp(contentSize.x - borderPosition.x + 0.5, 0.0, 1.0));\n"
+                    "  highp float coverageY = min(clamp(borderPosition.y + 0.5, 0.0, 1.0), "
+                    "clamp(contentSize.y - borderPosition.y + 0.5, 0.0, 1.0));\n"
+                    "  highp float coverage = coverageX * coverageY;\n"
+                    "  if (coverage <= 0.0) {\n"
+                    "    return vec4(0.0);\n"
+                    "  }\n";
   }
   std::string samplingCode;
   if (yuvTexture == nullptr) {
@@ -151,10 +160,7 @@ static void AppendSourceSamplingFunction(FragmentShaderBuilder* fragBuilder,
     samplingCode = std::move(yuvCode);
   }
   fragBuilder->addFunction("highp vec4 " + functionName + "(highp vec2 sourcePosition) {\n" +
-                           coverageCode +
-                           "  highp vec2 texturePosition = sourcePosition;\n"
-                           "  if (" +
-                           samplingInfoName +
+                           coverageCode + "  if (" + samplingInfoName +
                            ".x > 0.5) {\n"
                            "    texturePosition /= " +
                            samplingInfoName +
@@ -184,11 +190,19 @@ void GLSLTextureGrainFragmentProcessor::emitCode(EmitArgs& args) const {
                                                   ShaderStage::Fragment);
   auto samplingInfo = args.uniformHandler->addUniform("TextureGrainSamplingInfo",
                                                       UniformFormat::Float4, ShaderStage::Fragment);
+  auto sourceRect = args.uniformHandler->addUniform("TextureGrainSourceRect", UniformFormat::Float4,
+                                                    ShaderStage::Fragment);
 
   auto sourceSamplerCount = this->sourceSamplerCount();
   const auto& textureSamplers = *args.textureSamplers;
+  if (sourceSamplerCount == 0) {
+    fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
+    return;
+  }
   auto gradientSampler = textureSamplers[sourceSamplerCount];
   auto yuvTexture = getYUVTexture();
+  auto snapNearest = sampling.minFilterMode == FilterMode::Nearest &&
+                     sampling.magFilterMode == FilterMode::Nearest;
   std::string colorMatrixName;
   if (yuvTexture != nullptr) {
     colorMatrixName = args.uniformHandler->addUniform(
@@ -204,8 +218,9 @@ void GLSLTextureGrainFragmentProcessor::emitCode(EmitArgs& args) const {
   for (size_t index = 0; index < sourceSamplerCount; ++index) {
     sourceSamplers.push_back(textureSamplers[index]);
   }
-  AppendSourceSamplingFunction(fragBuilder, sourceSamplers, samplingInfo, colorMatrixName,
-                               sampleSourceName, useHardwareDecal, yuvTexture);
+  AppendSourceSamplingFunction(fragBuilder, sourceSamplers, samplingInfo, sourceRect, sizes,
+                               colorMatrixName, sampleSourceName, useHardwareDecal, snapNearest,
+                               yuvTexture);
 
   auto sourceCoord = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
   fragBuilder->codeAppendf("highp vec2 sourcePoint = %s;", sourceCoord.c_str());
@@ -218,7 +233,7 @@ void GLSLTextureGrainFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("highp vec2 grainOffset = %s.z * grainNoise;", common.c_str());
   if (!params.clipToShape) {
     fragBuilder->codeAppendf("vec4 displacedColor = %s(sourcePoint + grainOffset);",
-                             sampleSourceName.c_str());
+                             sampleSourceName.c_str(), sourceRect.c_str());
     if (sourceProxy->isAlphaOnly()) {
       fragBuilder->codeAppendf("%s = displacedColor.a * %s;", args.outputColor.c_str(),
                                args.inputColor.c_str());
@@ -229,9 +244,10 @@ void GLSLTextureGrainFragmentProcessor::emitCode(EmitArgs& args) const {
     return;
   }
 
-  fragBuilder->codeAppendf("vec4 originalColor = %s(sourcePoint);", sampleSourceName.c_str());
+  fragBuilder->codeAppendf("vec4 originalColor = %s(sourcePoint);", sampleSourceName.c_str(),
+                           sourceRect.c_str());
   fragBuilder->codeAppendf("vec4 displacedColor = %s(sourcePoint + grainOffset);",
-                           sampleSourceName.c_str());
+                           sampleSourceName.c_str(), sourceRect.c_str());
   fragBuilder->codeAppend("vec4 clippedColor = originalColor;");
   fragBuilder->codeAppend("if (originalColor.a > 0.0 && displacedColor.a >= (1.0 / 255.0)) {");
   fragBuilder->codeAppend(
@@ -261,9 +277,12 @@ void GLSLTextureGrainFragmentProcessor::onSetData(UniformData*,
                            params.sourceOrigin.y};
   fragmentUniformData->setData("TextureGrainGeometry", geometryData);
 
-  float sizeData[4] = {params.pixelsPerLocalUnit, static_cast<float>(sourceProxy->width()),
-                       static_cast<float>(sourceProxy->height()), 0.0f};
+  float sizeData[4] = {params.pixelsPerLocalUnit, params.sourceScale.x, params.sourceScale.y, 0.0f};
   fragmentUniformData->setData("TextureGrainSizes", sizeData);
+
+  float sourceRectData[4] = {params.sourceRect.left, params.sourceRect.top,
+                             params.sourceRect.width(), params.sourceRect.height()};
+  fragmentUniformData->setData("TextureGrainSourceRect", sourceRectData);
 
   auto sourceView = sourceProxy->getTextureView();
   auto normalized =

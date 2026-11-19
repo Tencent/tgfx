@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/filters/TextureFilter.h"
+#include <algorithm>
 #include <cmath>
 #include "core/filters/TextureImageFilter.h"
 #include "core/images/FilterImage.h"
@@ -25,22 +26,43 @@ namespace tgfx {
 
 namespace {
 
-bool IsValidSize(float value) {
-  return std::isfinite(value) && value > 0.0f;
-}
+constexpr float MaxTextureParameter = 100.0f;
 
-bool IsValidRadius(float value) {
-  return std::isfinite(value) && value >= 0.0f;
+float NormalizeParameter(float value) {
+  return std::clamp(value, 0.0f, MaxTextureParameter);
 }
 
 }  // namespace
 
+uint32_t TextureFilter::ToSVGSeed(uint32_t seed) {
+  seed ^= seed >> 16;
+  seed *= 0x7feb352dU;
+  seed ^= seed >> 15;
+  seed *= 0x846ca68bU;
+  seed ^= seed >> 16;
+  return 1U + seed % 16777215U;
+}
+
+const std::string& TextureFilter::SVGClipAlphaTable() {
+  static const std::string table = [] {
+    std::string result = "0";
+    result.reserve(512);
+    for (int index = 1; index < 255; index++) {
+      result += " 1";
+    }
+    return result;
+  }();
+  return table;
+}
+
 std::shared_ptr<TextureFilter> TextureFilter::Make(float sizeX, float sizeY, float radius,
                                                    uint32_t seed, bool clipToShape) {
-  if (!IsValidSize(sizeX) || !IsValidSize(sizeY) || !IsValidRadius(radius)) {
+  if (!std::isfinite(sizeX) || !std::isfinite(sizeY) || !std::isfinite(radius)) {
     return nullptr;
   }
-  return std::shared_ptr<TextureFilter>(new TextureFilter(sizeX, sizeY, radius, seed, clipToShape));
+  return std::shared_ptr<TextureFilter>(
+      new TextureFilter(NormalizeParameter(sizeX), NormalizeParameter(sizeY),
+                        NormalizeParameter(radius), seed, clipToShape));
 }
 
 TextureFilter::TextureFilter(float sizeX, float sizeY, float radius, uint32_t seed,
@@ -49,25 +71,31 @@ TextureFilter::TextureFilter(float sizeX, float sizeY, float radius, uint32_t se
 }
 
 void TextureFilter::setSizeX(float value) {
-  if (_sizeX == value || !IsValidSize(value)) {
+  if (!std::isfinite(value)) {
     return;
   }
+  value = NormalizeParameter(value);
+  if (_sizeX == value) return;
   _sizeX = value;
   invalidateFilter();
 }
 
 void TextureFilter::setSizeY(float value) {
-  if (_sizeY == value || !IsValidSize(value)) {
+  if (!std::isfinite(value)) {
     return;
   }
+  value = NormalizeParameter(value);
+  if (_sizeY == value) return;
   _sizeY = value;
   invalidateFilter();
 }
 
 void TextureFilter::setRadius(float value) {
-  if (_radius == value || !IsValidRadius(value)) {
+  if (!std::isfinite(value)) {
     return;
   }
+  value = NormalizeParameter(value);
+  if (_radius == value) return;
   _radius = value;
   invalidateFilter();
 }
@@ -100,14 +128,19 @@ Rect TextureFilter::filterBounds(const Rect& srcRect, float contentScale, MapDir
 
 std::shared_ptr<Image> TextureFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
                                                     const Rect& contentBounds, Point* offset) {
+  return onFilterImage(std::move(input), scale, contentBounds, offset, Point::Zero());
+}
+
+std::shared_ptr<Image> TextureFilter::onFilterImage(std::shared_ptr<Image> input, float scale,
+                                                    const Rect& contentBounds, Point* offset,
+                                                    const Point& imageOrigin) {
   if (input == nullptr || !std::isfinite(scale) || scale <= 0.0f) {
     return input;
   }
   auto localBounds = Rect::MakeLTRB(contentBounds.left / scale, contentBounds.top / scale,
                                     contentBounds.right / scale, contentBounds.bottom / scale);
-  auto center = Point::Make(localBounds.centerX(), localBounds.centerY());
-  auto sourceOrigin = Point::Make(localBounds.left, localBounds.top);
-  auto params = MakeTextureGrainParams(_sizeX, _sizeY, _radius, center, _seed, sourceOrigin, scale,
+  auto center = Point::Make(localBounds.width() * 0.5f, localBounds.height() * 0.5f);
+  auto params = MakeTextureGrainParams(_sizeX, _sizeY, _radius, center, _seed, imageOrigin, scale,
                                        _clipToShape);
   auto filter = std::make_shared<TextureImageFilter>(params);
   return FilterImage::MakeFrom(std::move(input), std::move(filter), offset, nullptr);

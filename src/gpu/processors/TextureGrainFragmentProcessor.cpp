@@ -54,6 +54,10 @@ void TextureGrainFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) co
       flags |= 64;
     }
   }
+  if (sampling.minFilterMode == FilterMode::Nearest &&
+      sampling.magFilterMode == FilterMode::Nearest) {
+    flags |= 128;
+  }
   bytesKey->write(flags);
 }
 
@@ -63,7 +67,12 @@ size_t TextureGrainFragmentProcessor::onCountTextureSamplers() const {
 
 std::shared_ptr<Texture> TextureGrainFragmentProcessor::onTextureAt(size_t index) const {
   auto textureView = getTextureView();
-  if (index < sourceSamplerCount()) {
+  if (textureView == nullptr) {
+    return index == 0 ? (gradientView == nullptr ? nullptr : gradientView->getTexture()) : nullptr;
+  }
+  auto sourceCount =
+      textureView->isYUV() ? reinterpret_cast<YUVTextureView*>(textureView)->textureCount() : 1;
+  if (index < sourceCount) {
     if (textureView->isYUV()) {
       return reinterpret_cast<YUVTextureView*>(textureView)->getTextureAt(index);
     }
@@ -73,7 +82,13 @@ std::shared_ptr<Texture> TextureGrainFragmentProcessor::onTextureAt(size_t index
 }
 
 SamplerState TextureGrainFragmentProcessor::onSamplerStateAt(size_t index) const {
-  if (index < sourceSamplerCount()) {
+  auto textureView = getTextureView();
+  auto sourceCount =
+      textureView == nullptr
+          ? 0
+          : (textureView->isYUV() ? reinterpret_cast<YUVTextureView*>(textureView)->textureCount()
+                                  : 1);
+  if (index < sourceCount) {
     auto tileMode = useHardwareDecal ? TileMode::Decal : TileMode::Clamp;
     return SamplerState(tileMode, tileMode, sampling);
   }

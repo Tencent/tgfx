@@ -174,7 +174,7 @@ void GlassStyle::setRefraction(float value) {
     return;
   }
   _refraction = value;
-  invalidateStyle();
+  invalidateTransform();
 }
 
 void GlassStyle::setDepth(float value) {
@@ -182,7 +182,7 @@ void GlassStyle::setDepth(float value) {
     return;
   }
   _depth = value;
-  invalidateStyle();
+  invalidateTransform();
 }
 
 void GlassStyle::setFrost(float value) {
@@ -200,7 +200,7 @@ void GlassStyle::setDispersion(float value) {
     return;
   }
   _dispersion = value;
-  invalidateStyle();
+  invalidateTransform();
 }
 
 void GlassStyle::setSplay(float value) {
@@ -208,7 +208,7 @@ void GlassStyle::setSplay(float value) {
     return;
   }
   _splay = value;
-  invalidateStyle();
+  invalidateTransform();
 }
 
 void GlassStyle::setLightAngle(float degrees) {
@@ -216,7 +216,7 @@ void GlassStyle::setLightAngle(float degrees) {
     return;
   }
   _lightAngle = degrees;
-  invalidateStyle();
+  invalidateTransform();
 }
 
 void GlassStyle::setLightIntensity(float value) {
@@ -224,7 +224,7 @@ void GlassStyle::setLightIntensity(float value) {
     return;
   }
   _lightIntensity = value;
-  invalidateStyle();
+  invalidateTransform();
 }
 
 Rect GlassStyle::filterBackgroundSoft(const Rect& srcRect, float contentScale) {
@@ -746,7 +746,7 @@ std::shared_ptr<ImageFilter> GlassStyle::getFrostFilter(float contentScale) {
 
 void GlassStyle::invalidateFrostFilter() {
   frostFilter = nullptr;
-  invalidateStyle();
+  invalidateTransform();
 }
 
 GlassRefractionParams GlassStyle::makeBaseRefractionParams(float halfW, float halfH,

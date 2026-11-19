@@ -142,7 +142,7 @@ class ImageFilter {
   Rect filterBounds(const Rect& rect, MapDirection mapDirection = MapDirection::Forward) const;
 
  protected:
-  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime, Blend };
+  enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime, Blend, Texture };
 
   /**
    * Returns the type of this image filter.

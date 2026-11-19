@@ -80,7 +80,7 @@ void DropShadowStyle::setShowBehindLayer(bool showBehindLayer) {
     return;
   }
   _showBehindLayer = showBehindLayer;
-  invalidateStyle();
+  invalidateTransform();
 }
 
 void DropShadowStyle::setSpread(float spread) {
@@ -88,7 +88,9 @@ void DropShadowStyle::setSpread(float spread) {
     return;
   }
   _spread = spread;
-  invalidateStyle();
+  // Spread does not affect the cached ImageFilter. Only trigger a redraw to regenerate the
+  // spread shape image.
+  invalidateTransform();
 }
 
 DropShadowStyle::DropShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
@@ -243,7 +245,7 @@ std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {
 
 void DropShadowStyle::invalidateFilter() {
   shadowFilter = nullptr;
-  invalidateStyle();
+  invalidateTransform();
 }
 
 }  // namespace tgfx

@@ -420,13 +420,11 @@ bool ElementWriter::writeFilterPrimitives(const std::shared_ptr<ImageFilter>& im
     }
     case Types::ImageFilterType::Blend: {
       const auto blendFilter = static_cast<const BlendImageFilter*>(imageFilter.get());
-      if (!addBlendImageFilter(blendFilter, "", bound ? &*bound : nullptr, context, pendings)) {
-        return false;
-      }
+      addBlendImageFilter(blendFilter, "", bound ? &*bound : nullptr, context, pendings);
       break;
     }
     default:
-      reportUnsupportedElement("Rasterizing unsupported image filter");
+      reportUnsupportedElement("Unsupported image filter");
       return false;
   }
   return true;
@@ -967,24 +965,24 @@ std::string ElementWriter::emitShaderAsPrimitive(const Shader* shader, const Mat
   }
 }
 
-bool ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
+void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
                                         const std::string& inputResult, const Rect* filterBounds,
                                         Context* context, std::vector<PendingImage>* pendings) {
   if (!filter->shader) {
     reportUnsupportedElement("Missing shader in BlendImageFilter");
-    return false;
+    return;
   }
   auto sourceRef = inputResult.empty() ? std::string("SourceGraphic") : inputResult;
   if (filter->blendMode == BlendMode::DstIn) {
     if (Types::Get(filter->shader.get()) != Types::ShaderType::Image) {
       reportUnsupportedElement("Unsupported DstIn shader type in BlendImageFilter");
-      return false;
+      return;
     }
     const auto imageShader = static_cast<const ImageShader*>(filter->shader.get());
     auto dataUri = SVGExportContext::EncodeImageToDataUri(imageShader->image, context, pendings);
     if (!dataUri) {
       reportUnsupportedElement("Failed to encode DstIn image shader in BlendImageFilter");
-      return false;
+      return;
     }
     {
       ElementWriter imageElement("feImage", writer);
@@ -1003,12 +1001,12 @@ bool ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       compositeElement.addAttribute("in2", "blendMask");
       compositeElement.addAttribute("operator", "in");
     }
-    return true;
+    return;
   }
   auto blendModeString = ToSVGBlendMode(filter->blendMode);
   if (blendModeString.empty()) {
     reportUnsupportedElement("Unsupported blend mode in BlendImageFilter");
-    return false;
+    return;
   }
   // Unwrap MatrixShader to get the actual shader type and accumulated matrix.
   auto [blendShader, shaderMatrix] = ShaderUtils::UnwrapMatrixShader(filter->shader);
@@ -1025,7 +1023,7 @@ bool ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
         emitShaderAsPrimitive(innerShader.get(), innerMatrix, filterBounds, context, pendings);
     if (shaderResult.empty()) {
       reportUnsupportedElement("Unsupported inner shader in ColorFilterShader BlendImageFilter");
-      return false;
+      return;
     }
     // Step 2: Apply the color filter on top of the inner shader output.
     std::string finalResult = shaderResult;
@@ -1033,7 +1031,7 @@ bool ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       auto cfResult = resourceStore->addFilterResult();
       if (!addColorFilterPrimitives(colorFilterShader->colorFilter, shaderResult, cfResult)) {
         reportUnsupportedElement("Unsupported color filter in ColorFilterShader BlendImageFilter");
-        return false;
+        return;
       }
       finalResult = cfResult;
     }
@@ -1042,7 +1040,7 @@ bool ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
     blendElement.addAttribute("in", finalResult);
     blendElement.addAttribute("in2", sourceRef);
     blendElement.addAttribute("mode", blendModeString);
-    return true;
+    return;
   }
   // Color, PerlinNoise, Gradient, Image shaders share the same pattern:
   // emit shader as filter primitive, then blend with source.
@@ -1050,13 +1048,12 @@ bool ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
       emitShaderAsPrimitive(blendShader.get(), shaderMatrix, filterBounds, context, pendings);
   if (resultName.empty()) {
     reportUnsupportedElement("Unsupported shader type in BlendImageFilter");
-    return false;
+    return;
   }
   ElementWriter blendElement("feBlend", writer);
   blendElement.addAttribute("in", resultName);
   blendElement.addAttribute("in2", sourceRef);
   blendElement.addAttribute("mode", blendModeString);
-  return true;
 }
 
 bool ElementWriter::addColorFilterPrimitives(const std::shared_ptr<ColorFilter>& colorFilter,

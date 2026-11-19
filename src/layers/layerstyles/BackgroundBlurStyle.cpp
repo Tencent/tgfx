@@ -33,7 +33,7 @@ void BackgroundBlurStyle::setBlurrinessX(float blurriness) {
     return;
   }
   _blurrinessX = blurriness;
-  invalidateStyle();
+  invalidateTransform();
 }
 
 void BackgroundBlurStyle::setBlurrinessY(float blurriness) {
@@ -41,7 +41,7 @@ void BackgroundBlurStyle::setBlurrinessY(float blurriness) {
     return;
   }
   _blurrinessY = blurriness;
-  invalidateStyle();
+  invalidateTransform();
 }
 
 void BackgroundBlurStyle::setTileMode(TileMode tileMode) {
@@ -49,7 +49,7 @@ void BackgroundBlurStyle::setTileMode(TileMode tileMode) {
     return;
   }
   _tileMode = tileMode;
-  invalidateStyle();
+  invalidateTransform();
 }
 
 Rect BackgroundBlurStyle::filterBackgroundSoft(const Rect& srcRect, float contentScale) {

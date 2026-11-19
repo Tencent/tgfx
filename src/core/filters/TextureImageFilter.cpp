@@ -17,11 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/filters/TextureImageFilter.h"
+#include <algorithm>
 #include <cmath>
 #include "core/images/TextureImage.h"
+#include "core/utils/EffectTextureLimits.h"
 #include "core/utils/TextureGrainNoise.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/processors/TextureGrainFragmentProcessor.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/resources/Resource.h"
 #include "gpu/resources/TextureView.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -44,6 +49,69 @@ std::shared_ptr<TextureProxy> MakeTextureProxy(Context* context,
   }
   auto textureImageImpl = std::static_pointer_cast<TextureImage>(textureImage);
   return textureImageImpl->getTextureProxy();
+}
+
+Rect MakeSourceCrop(const Rect& drawRect, const Matrix* uvMatrix, float outset) {
+  auto crop = drawRect;
+  if (uvMatrix != nullptr) {
+    crop = uvMatrix->mapRect(crop);
+  }
+  crop.outset(outset, outset);
+  crop.roundOut();
+  return crop;
+}
+
+std::shared_ptr<TextureProxy> MakeCroppedTextureProxy(const std::shared_ptr<Image>& source,
+                                                      const FPArgs& args,
+                                                      const SamplingOptions& sampling, Rect* crop,
+                                                      const Point& sourceScale) {
+  auto scaledCrop = *crop;
+  scaledCrop.scale(sourceScale.x, sourceScale.y);
+  scaledCrop.roundOut();
+  // Align the raster grid before clipping so adjacent tiles share source samples at this scale.
+  *crop = scaledCrop;
+  crop->scale(1.0f / sourceScale.x, 1.0f / sourceScale.y);
+  auto renderTarget = RenderTargetProxy::Make(
+      args.context, static_cast<int>(scaledCrop.width()), static_cast<int>(scaledCrop.height()),
+      source->isAlphaOnly(), 1, false, ImageOrigin::TopLeft, BackingFit::Exact);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  FPArgs sourceArgs(args.context, args.renderFlags,
+                    Rect::MakeWH(renderTarget->width(), renderTarget->height()),
+                    std::max(sourceScale.x, sourceScale.y));
+  auto sourceMatrix = Matrix::MakeTrans(crop->left, crop->top);
+  sourceMatrix.preScale(1.0f / sourceScale.x, 1.0f / sourceScale.y);
+  auto sourceFP = FragmentProcessor::Make(source, sourceArgs, TileMode::Decal, TileMode::Decal,
+                                          sampling, SrcRectConstraint::Fast, &sourceMatrix);
+  if (!args.context->drawingManager()->fillRTWithFP(renderTarget, std::move(sourceFP),
+                                                    args.renderFlags)) {
+    return nullptr;
+  }
+  return renderTarget->asTextureProxy();
+}
+
+Point ComputeSourceScale(const Rect& crop, int sizeLimit) {
+  auto safeLimit = std::max(1.0f, static_cast<float>(sizeLimit) - 2.0f);
+  auto maxDimension = std::max(crop.width(), crop.height());
+  auto scale = maxDimension > safeLimit ? safeLimit / maxDimension : 1.0f;
+  return Point::Make(scale, scale);
+}
+
+std::shared_ptr<TextureView> GetTextureGrainGradientView(Context* context) {
+  static const UniqueKey GradientViewKey = UniqueKey::Make();
+  auto gradientView = Resource::Find<TextureView>(context, GradientViewKey);
+  if (gradientView != nullptr) {
+    return gradientView;
+  }
+  const auto& table = TextureGrainGradientTable();
+  gradientView =
+      TextureView::MakeRGBA(context, TextureGrainTableSize, TextureGrainTableSize, table.data(),
+                            static_cast<size_t>(TextureGrainTableSize) * 4);
+  if (gradientView != nullptr) {
+    gradientView->assignUniqueKey(GradientViewKey);
+  }
+  return gradientView;
 }
 
 }  // namespace
@@ -73,6 +141,9 @@ TextureImageFilter::TextureImageFilter(const TextureGrainParams& params) : param
 }
 
 Rect TextureImageFilter::onFilterBounds(const Rect& rect, MapDirection) const {
+  if (params.frequencyX <= 0.0f || params.frequencyY <= 0.0f) {
+    return rect;
+  }
   auto maximumDisplacement = MaximumDisplacement(params);
   if (maximumDisplacement <= 0.0f) {
     return rect;
@@ -87,18 +158,34 @@ PlacementPtr<FragmentProcessor> TextureImageFilter::asFragmentProcessor(
   if (source == nullptr || args.context == nullptr) {
     return nullptr;
   }
-  if (params.radius == 0.0f) {
+  if (params.radius == 0.0f || params.frequencyX <= 0.0f || params.frequencyY <= 0.0f) {
     return FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
   }
+  auto crop = MakeSourceCrop(args.drawRect, uvMatrix, MaximumDisplacement(params) + 3.0f);
+  if (crop.isEmpty()) {
+    return nullptr;
+  }
 
-  auto sourceProxy = MakeTextureProxy(args.context, source);
+  auto sizeLimit = ResolveEffectTextureDimension(
+      args.context->gpu()->limits()->maxTextureDimension2D, TextureFilterTextureDimension);
+  auto grainParams = params;
+  std::shared_ptr<TextureProxy> sourceProxy;
+  if (source->width() <= sizeLimit && source->height() <= sizeLimit) {
+    sourceProxy = MakeTextureProxy(args.context, source);
+    grainParams.sourceRect = Rect::MakeWH(source->width(), source->height());
+  } else {
+    if (!crop.intersect(Rect::MakeWH(source->width(), source->height()))) {
+      return nullptr;
+    }
+    crop.roundOut();
+    grainParams.sourceScale = ComputeSourceScale(crop, sizeLimit);
+    sourceProxy = MakeCroppedTextureProxy(source, args, sampling, &crop, grainParams.sourceScale);
+    grainParams.sourceRect = crop;
+  }
   if (sourceProxy == nullptr) {
     return nullptr;
   }
-  const auto& table = TextureGrainGradientTable();
-  auto gradientView =
-      TextureView::MakeRGBA(args.context, TextureGrainTableSize, TextureGrainTableSize,
-                            table.data(), static_cast<size_t>(TextureGrainTableSize) * 4);
+  auto gradientView = GetTextureGrainGradientView(args.context);
   if (gradientView == nullptr) {
     return nullptr;
   }
@@ -107,7 +194,7 @@ PlacementPtr<FragmentProcessor> TextureImageFilter::asFragmentProcessor(
   auto useHardwareDecal = args.context->gpu()->features()->clampToBorder;
   return TextureGrainFragmentProcessor::Make(args.context->drawingAllocator(),
                                              std::move(sourceProxy), std::move(gradientView),
-                                             params, sampling, useHardwareDecal, coordMatrix);
+                                             grainParams, sampling, useHardwareDecal, coordMatrix);
 }
 
 }  // namespace tgfx
