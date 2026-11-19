@@ -1749,9 +1749,9 @@ TGFX_TEST(PDFExportTest, TextureFilterFallback) {
   EXPECT_NE(bytes.find("/Subtype /Image"), std::string::npos);
   EXPECT_TRUE(HasImageLargerThan(data, 160, 110));
 
-  class RasterizationFailTextureFilter : public TextureImageFilter {
+  class EmptyBoundsTextureFilter : public TextureImageFilter {
    public:
-    RasterizationFailTextureFilter()
+    EmptyBoundsTextureFilter()
         : TextureImageFilter(
               MakeTextureGrainParams(16.0f, 12.0f, 8.0f, Point::Make(90.0f, 65.0f), 3491)) {
     }
@@ -1763,7 +1763,7 @@ TGFX_TEST(PDFExportTest, TextureFilterFallback) {
   };
 
   Paint failurePaint = {};
-  failurePaint.setImageFilter(std::make_shared<RasterizationFailTextureFilter>());
+  failurePaint.setImageFilter(std::make_shared<EmptyBoundsTextureFilter>());
   auto failureData = renderPDF(180.0f, 130.0f, [&](Canvas* canvas) {
     canvas->drawPicture(picture, nullptr, &failurePaint);
   });
@@ -1773,6 +1773,39 @@ TGFX_TEST(PDFExportTest, TextureFilterFallback) {
   ASSERT_TRUE(fallbackData != nullptr);
   EXPECT_EQ(failureData->size(), fallbackData->size());
   EXPECT_EQ(std::memcmp(failureData->data(), fallbackData->data(), failureData->size()), 0);
+
+  auto composeFilter = ImageFilter::Compose(
+      {std::make_shared<TextureImageFilter>(params), ImageFilter::Blur(2.0f, 2.0f)});
+  Paint composePaint = {};
+  composePaint.setImageFilter(std::move(composeFilter));
+  auto composeData = renderPDF(180.0f, 130.0f, [&](Canvas* canvas) {
+    canvas->drawPicture(picture, nullptr, &composePaint);
+  });
+  ASSERT_TRUE(composeData != nullptr);
+  EXPECT_TRUE(HasImageLargerThan(composeData, 160, 110));
+
+  PictureRecorder oversizedRecorder;
+  auto* oversizedCanvas = oversizedRecorder.beginRecording();
+  Paint oversizedPaint = {};
+  oversizedPaint.setColor(Color::Blue());
+  oversizedCanvas->drawRect(Rect::MakeXYWH(10.0f, 10.0f, 40.0f, 30.0f), oversizedPaint);
+  oversizedPaint.setColor(Color::Transparent());
+  oversizedCanvas->drawRect(Rect::MakeXYWH(40000.0f, 40000.0f, 10.0f, 10.0f), oversizedPaint);
+  auto oversizedPicture = oversizedRecorder.finishRecordingAsPicture();
+  ASSERT_TRUE(oversizedPicture != nullptr);
+  Paint oversizedTexturePaint = {};
+  oversizedTexturePaint.setImageFilter(std::make_shared<TextureImageFilter>(params));
+  auto oversizedFiltered = renderPDF(180.0f, 130.0f, [&](Canvas* canvas) {
+    canvas->drawPicture(oversizedPicture, nullptr, &oversizedTexturePaint);
+  });
+  auto oversizedFallback =
+      renderPDF(180.0f, 130.0f, [&](Canvas* canvas) { canvas->drawPicture(oversizedPicture); });
+  ASSERT_TRUE(oversizedFiltered != nullptr);
+  ASSERT_TRUE(oversizedFallback != nullptr);
+  EXPECT_EQ(oversizedFiltered->size(), oversizedFallback->size());
+  EXPECT_EQ(
+      std::memcmp(oversizedFiltered->data(), oversizedFallback->data(), oversizedFiltered->size()),
+      0);
 }
 
 TGFX_TEST(PDFExportTest, TextLayerStyleAlignment) {

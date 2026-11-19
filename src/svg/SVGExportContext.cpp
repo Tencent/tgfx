@@ -26,6 +26,7 @@
 #include "core/codecs/png/PngCodec.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
+#include "core/filters/TextureImageFilter.h"
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
 #include "core/images/PictureImage.h"
@@ -282,28 +283,20 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
                                  brush.color.alpha);
       return;
     }
-    auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace,
-                                              _pendingImages);
-    if (modifyImage == nullptr) {
-      // The registered readback holds the converted full-size pixels, matching the geometry below.
-      applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
-      exportPendingImage(_pendingImages->back().token, image->width(), image->height(), matrix,
-                         brush);
-      return;
-    }
-    auto pendingCount = _pendingImages->size();
-    Bitmap bitmap = ImageExportToBitmap(context, modifyImage, _pendingImages);
-    if (!bitmap.isEmpty()) {
-      applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
-      exportPixmap(Pixmap(bitmap), matrix, brush);
-    } else if (_pendingImages->size() > pendingCount) {
-      applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
-      exportPendingImage(_pendingImages->back().token, modifyImage->width(), modifyImage->height(),
-                         matrix, brush);
-    }
+    exportImageAsRaster(image, matrix, clip, brush);
   } else if (type == Types::ImageType::Filter) {
     const auto filterImage = static_cast<const FilterImage*>(image.get());
     auto filter = filterImage->filter;
+
+    if (ContainsTextureImageFilter(filter) && !IsUniformPositiveScaleTranslate(matrix)) {
+      if (exportImageAsRaster(image, matrix, clip, brush)) {
+        return;
+      }
+      auto sourceMatrix = matrix;
+      sourceMatrix.preTranslate(-filterImage->bounds.left, -filterImage->bounds.top);
+      drawImage(filterImage->source, sampling, sourceMatrix, clip, brush);
+      return;
+    }
 
     // BackgroundBlurStyle lowers to (BlendMode::Src + FilterImage<Blur> + ShaderMaskFilter).
     // Output as <foreignObject> with backdrop-filter:blur() for native SVG backdrop blur.
@@ -501,22 +494,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     }
     drawImage(subsetImage->source, sampling, matrix, clip, brush);
   } else {
-    auto modifyImage = ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace,
-                                              _pendingImages);
-    if (modifyImage == nullptr) {
-      // The registered readback holds the converted full-size pixels, matching the geometry below.
-      exportPendingImage(_pendingImages->back().token, image->width(), image->height(), matrix,
-                         brush);
-      return;
-    }
-    auto pendingCount = _pendingImages->size();
-    Bitmap bitmap = ImageExportToBitmap(context, modifyImage, _pendingImages);
-    if (!bitmap.isEmpty()) {
-      exportPixmap(Pixmap(bitmap), matrix, brush);
-    } else if (_pendingImages->size() > pendingCount) {
-      exportPendingImage(_pendingImages->back().token, modifyImage->width(), modifyImage->height(),
-                         matrix, brush);
-    }
+    exportImageAsRaster(image, matrix, clip, brush);
   }
 }
 
@@ -824,8 +802,30 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
                                  std::shared_ptr<ImageFilter> imageFilter, const Matrix& matrix,
                                  const ClipStack& clip, const Brush& brush) {
   DEBUG_ASSERT(picture != nullptr);
-  std::vector<std::string> filterIDs;
   auto pictureBounds = picture->getBounds();
+  if (ContainsTextureImageFilter(imageFilter) && !IsUniformPositiveScaleTranslate(matrix)) {
+    if (!pictureBounds.isEmpty()) {
+      auto imageMatrix = Matrix::MakeTrans(-pictureBounds.left, -pictureBounds.top);
+      auto image =
+          Image::MakeFrom(picture, FloatCeilToInt(pictureBounds.width()),
+                          FloatCeilToInt(pictureBounds.height()), &imageMatrix, _targetColorSpace);
+      if (image != nullptr) {
+        Point filterOffset = {};
+        auto filtered = image->makeWithFilter(imageFilter, &filterOffset);
+        if (filtered != nullptr) {
+          auto drawMatrix = matrix;
+          drawMatrix.preTranslate(pictureBounds.left + filterOffset.x,
+                                  pictureBounds.top + filterOffset.y);
+          if (exportImageAsRaster(std::move(filtered), drawMatrix, clip, brush)) {
+            return;
+          }
+        }
+      }
+    }
+    picture->playback(this, matrix, clip);
+    return;
+  }
+  std::vector<std::string> filterIDs;
   if (imageFilter) {
     ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                        _assignColorSpace);
@@ -988,6 +988,36 @@ Bitmap SVGExportContext::ImageExportToBitmap(Context* context, const std::shared
   readback->unlockPixels(context);
   bitmap.unlockPixels();
   return bitmap;
+}
+
+bool SVGExportContext::exportImageAsRaster(const std::shared_ptr<Image>& image,
+                                           const Matrix& matrix, const ClipStack& clip,
+                                           const Brush& brush) {
+  auto pendingCount = _pendingImages == nullptr ? 0u : _pendingImages->size();
+  auto modifyImage =
+      ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace, _pendingImages);
+  if (modifyImage == nullptr) {
+    if (_pendingImages != nullptr && _pendingImages->size() > pendingCount) {
+      applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
+      exportPendingImage(_pendingImages->back().token, image->width(), image->height(), matrix,
+                         brush);
+      return true;
+    }
+    return false;
+  }
+  Bitmap bitmap = ImageExportToBitmap(context, modifyImage, _pendingImages);
+  if (!bitmap.isEmpty()) {
+    applyClip(clip, matrix.mapRect(Rect::MakeWH(modifyImage->width(), modifyImage->height())));
+    exportPixmap(Pixmap(bitmap), matrix, brush);
+    return true;
+  }
+  if (_pendingImages != nullptr && _pendingImages->size() > pendingCount) {
+    applyClip(clip, matrix.mapRect(Rect::MakeWH(modifyImage->width(), modifyImage->height())));
+    exportPendingImage(_pendingImages->back().token, modifyImage->width(), modifyImage->height(),
+                       matrix, brush);
+    return true;
+  }
+  return false;
 }
 
 std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr<Image>& image) {

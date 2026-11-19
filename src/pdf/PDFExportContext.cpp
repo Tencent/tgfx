@@ -30,6 +30,7 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
+#include "core/filters/TextureImageFilter.h"
 #include "core/images/FilterImage.h"
 #include "core/images/PictureImage.h"
 #include "core/shaders/ColorShader.h"
@@ -831,7 +832,7 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
       drawBlurLayer(picture, imageFilter, matrix, clip, brush);
       return;
     }
-    if (Types::Get(imageFilter.get()) != Types::ImageFilterType::Texture) {
+    if (!ContainsTextureImageFilter(imageFilter)) {
       picture->playback(this, matrix, clip);
       return;
     }
@@ -844,7 +845,7 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
       if (image != nullptr) {
         Point filterOffset = {};
         auto filtered = image->makeWithFilter(imageFilter, &filterOffset);
-        if (filtered != nullptr) {
+        if (filtered != nullptr && PDFBitmap::CanSerialize(filtered, document->context())) {
           auto drawMatrix = matrix;
           drawMatrix.preTranslate(pictureBounds.left + filterOffset.x,
                                   pictureBounds.top + filterOffset.y);

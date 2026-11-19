@@ -19,9 +19,11 @@
 #include "core/filters/TextureImageFilter.h"
 #include <algorithm>
 #include <cmath>
+#include "core/filters/ComposeImageFilter.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/EffectTextureLimits.h"
 #include "core/utils/TextureGrainNoise.h"
+#include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/processors/TextureGrainFragmentProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -35,23 +37,21 @@ namespace tgfx {
 namespace {
 
 // A quantized stored gradient has magnitude at most about 1.008. Its dot with a unit-square offset
-// is therefore at most sqrt(2) * 1.008. The three FBM weights sum to 1 + 0.5 + 0.25 = 1.75,
-// keeping the displacement magnitude below 2.5. Keep this in sync with the octave weights and
-// gradient encoding used by TextureGrainNoise.
-constexpr float TextureGrainDisplacementScale = 2.5f;
-constexpr float MaximumTextureGrainOctaveScale = 4.0f;
-
-float MaximumDisplacement(const TextureGrainParams& params) {
-  return std::abs(params.radius) * params.pixelsPerLocalUnit * TextureGrainDisplacementScale;
-}
+// is therefore at most sqrt(2) * 1.008. The FBM weights sum to about 1.75, keeping the
+// displacement magnitude below 2.5.
+constexpr float QuantizedGradientMagnitudeBound = 1.008f;
+constexpr float FractionDiagonalMagnitudeBound = 1.41421356f;
+static_assert(QuantizedGradientMagnitudeBound * FractionDiagonalMagnitudeBound *
+                  TextureGrainWeightSum() <
+              TextureGrainDisplacementScale);
 
 bool HasRepresentableGrainCoordinates(const TextureGrainParams& params, const Rect& sourceBounds) {
   auto checkAxis = [](float low, float high, float origin, float center, float frequency) {
     auto lowGrain = (origin + low - center) * frequency;
     auto highGrain = (origin + high - center) * frequency;
     return std::isfinite(lowGrain) && std::isfinite(highGrain) &&
-           std::isfinite(lowGrain * MaximumTextureGrainOctaveScale) &&
-           std::isfinite(highGrain * MaximumTextureGrainOctaveScale);
+           std::isfinite(lowGrain * TextureGrainMaximumOctaveScale()) &&
+           std::isfinite(highGrain * TextureGrainMaximumOctaveScale());
   };
   auto localLeft = sourceBounds.left / params.pixelsPerLocalUnit;
   auto localRight = sourceBounds.right / params.pixelsPerLocalUnit;
@@ -161,6 +161,37 @@ TextureGrainParams MakeTextureGrainParams(float sizeX, float sizeY, float radius
   return params;
 }
 
+float TextureGrainMaximumDisplacement(const TextureGrainParams& params) {
+  return std::abs(params.radius) * params.pixelsPerLocalUnit * TextureGrainDisplacementScale;
+}
+
+bool IsTextureGrainIdentity(const TextureGrainParams& params, const Rect& sourceBounds) {
+  auto maximumDisplacement = TextureGrainMaximumDisplacement(params);
+  return params.radius == 0.0f || params.frequencyX <= 0.0f || params.frequencyY <= 0.0f ||
+         !std::isfinite(maximumDisplacement) ||
+         !HasRepresentableGrainCoordinates(params, sourceBounds);
+}
+
+bool ContainsTextureImageFilter(const std::shared_ptr<ImageFilter>& filter) {
+  if (filter == nullptr) {
+    return false;
+  }
+  auto type = Types::Get(filter.get());
+  if (type == Types::ImageFilterType::Texture) {
+    return true;
+  }
+  if (type != Types::ImageFilterType::Compose) {
+    return false;
+  }
+  const auto composeFilter = static_cast<const ComposeImageFilter*>(filter.get());
+  for (const auto& child : composeFilter->filters) {
+    if (ContainsTextureImageFilter(child)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 TextureImageFilter::TextureImageFilter(const TextureGrainParams& params) : params(params) {
   if (!std::isfinite(this->params.pixelsPerLocalUnit) || this->params.pixelsPerLocalUnit <= 0.0f) {
     this->params.pixelsPerLocalUnit = 1.0f;
@@ -168,15 +199,10 @@ TextureImageFilter::TextureImageFilter(const TextureGrainParams& params) : param
 }
 
 Rect TextureImageFilter::onFilterBounds(const Rect& rect, MapDirection) const {
-  if (params.frequencyX <= 0.0f || params.frequencyY <= 0.0f ||
-      !HasRepresentableGrainCoordinates(params, rect)) {
+  if (IsTextureGrainIdentity(params, rect)) {
     return rect;
   }
-  auto maximumDisplacement = MaximumDisplacement(params);
-  if (!std::isfinite(maximumDisplacement) || maximumDisplacement <= 0.0f) {
-    return rect;
-  }
-  auto outset = maximumDisplacement + 2.0f;
+  auto outset = TextureGrainMaximumDisplacement(params) + 2.0f;
   return rect.makeOutset(outset, outset);
 }
 
@@ -188,13 +214,11 @@ PlacementPtr<FragmentProcessor> TextureImageFilter::asFragmentProcessor(
   }
   auto sourceBounds =
       Rect::MakeWH(static_cast<float>(source->width()), static_cast<float>(source->height()));
-  auto maximumDisplacement = MaximumDisplacement(params);
-  if (params.radius == 0.0f || params.frequencyX <= 0.0f || params.frequencyY <= 0.0f ||
-      !std::isfinite(maximumDisplacement) ||
-      !HasRepresentableGrainCoordinates(params, sourceBounds)) {
+  if (IsTextureGrainIdentity(params, sourceBounds)) {
     return FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
   }
-  auto crop = MakeSourceCrop(args.drawRect, uvMatrix, maximumDisplacement + 3.0f);
+  auto crop =
+      MakeSourceCrop(args.drawRect, uvMatrix, TextureGrainMaximumDisplacement(params) + 3.0f);
   if (crop.isEmpty()) {
     return nullptr;
   }

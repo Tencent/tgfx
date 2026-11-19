@@ -697,6 +697,9 @@ TGFX_TEST(TextureImageFilterTest, NearestSamplingHasNoCoverageBlend) {
 }
 
 TGFX_TEST(TextureImageFilterTest, NoiseFixedVectors) {
+  EXPECT_EQ(TextureGrainOctaveCount, 3);
+  EXPECT_FLOAT_EQ(TextureGrainWeightSum(), 1.75f);
+  EXPECT_FLOAT_EQ(TextureGrainMaximumOctaveScale(), 4.0f);
   const auto& table = TextureGrainGradientTable();
   auto value = TextureGrainSignedFBM(table.data(), 12.25f, -3.5f, 3491);
   auto offset0 = TextureGrainSeedOffset(3491, 0);

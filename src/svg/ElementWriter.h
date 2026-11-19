@@ -189,12 +189,14 @@ class ElementWriter {
                                 const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                 Context* context, bool preserveSoftAlpha = false,
                                 const std::optional<Rect>& bound = std::nullopt,
-                                std::vector<PendingImage>* pendings = nullptr);
+                                std::vector<PendingImage>* pendings = nullptr,
+                                float textureUserScale = 1.0f);
   bool writeFilterPrimitives(const std::shared_ptr<ImageFilter>& imageFilter,
                              ElementWriter& filterElement,
                              const std::shared_ptr<SVGCustomWriter>& exportWriter,
                              const std::optional<Rect>& bound, Context* context,
-                             bool preserveSoftAlpha, std::vector<PendingImage>* pendings = nullptr);
+                             bool preserveSoftAlpha, std::vector<PendingImage>* pendings = nullptr,
+                             float textureUserScale = 1.0f);
   void callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                ElementWriter& filterElement);

@@ -17,11 +17,24 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLTextureGrainFragmentProcessor.h"
+#include <iomanip>
+#include <limits>
+#include <sstream>
 #include <string>
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/TextureGrainNoise.h"
 
 namespace tgfx {
+
+namespace {
+
+std::string FloatLiteral(float value) {
+  std::ostringstream stream;
+  stream << std::setprecision(std::numeric_limits<float>::max_digits10) << value;
+  return stream.str();
+}
+
+}  // namespace
 
 PlacementPtr<TextureGrainFragmentProcessor> TextureGrainFragmentProcessor::Make(
     BlockAllocator* allocator, std::shared_ptr<TextureProxy> source,
@@ -45,10 +58,26 @@ GLSLTextureGrainFragmentProcessor::GLSLTextureGrainFragmentProcessor(
 static void AppendNoiseFunctions(FragmentShaderBuilder* fragBuilder, SamplerHandle gradientSampler,
                                  const std::string& gradientName, const std::string& noiseName,
                                  const std::string& fbmName) {
+  static_assert(TextureGrainOctaveCount == 3);
   auto tableSize = std::to_string(TextureGrainTableSize);
   auto tableSizeFloat = tableSize + ".0";
   auto lookup = fragBuilder->getTextureLookupExpression(
       gradientSampler, "(wrapped + vec2(0.5)) / " + tableSizeFloat);
+  std::string fbmExpression;
+  float weight = 1.0f;
+  float scale = 1.0f;
+  for (int octave = 0; octave < TextureGrainOctaveCount; ++octave) {
+    if (!fbmExpression.empty()) {
+      fbmExpression += " + ";
+    }
+    fbmExpression += FloatLiteral(weight) + " * " + noiseName + "(position";
+    if (octave > 0) {
+      fbmExpression += " * " + FloatLiteral(scale);
+    }
+    fbmExpression += ", offset" + std::to_string(octave) + ")";
+    weight *= TextureGrainPersistence;
+    scale *= TextureGrainOctaveScale;
+  }
   fragBuilder->addFunction(
       "highp vec4 " + gradientName +
       "(highp vec2 cell) {\n"
@@ -97,9 +126,8 @@ static void AppendNoiseFunctions(FragmentShaderBuilder* fragBuilder, SamplerHand
       "(highp vec2 position, highp vec2 offset0, highp vec2 offset1, "
       "highp vec2 offset2) {\n"
       "  return " +
-      noiseName + "(position, offset0) + 0.5 * " + noiseName +
-      "(position * 2.0, offset1) + 0.25 * " + noiseName +
-      "(position * 4.0, offset2);\n"
+      fbmExpression +
+      ";\n"
       "}\n");
 }
 

@@ -17,8 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/filters/LayerFilter.h"
+#include "tgfx/layers/filters/TextureFilter.h"
 
 namespace tgfx {
+
+std::shared_ptr<Image> LayerFilter::filterImage(std::shared_ptr<Image> input, float scale,
+                                                const Rect& contentBounds, Point* offset) {
+  return filterImage(std::move(input), scale, contentBounds, offset, Point::Zero());
+}
 
 std::shared_ptr<Image> LayerFilter::filterImage(std::shared_ptr<Image> input, float scale,
                                                 const Rect& contentBounds, Point* offset,
@@ -26,7 +32,11 @@ std::shared_ptr<Image> LayerFilter::filterImage(std::shared_ptr<Image> input, fl
   if (!input) {
     return nullptr;
   }
-  return onFilterImage(std::move(input), scale, contentBounds, offset, imageOrigin);
+  if (type() == Type::TextureFilter) {
+    return static_cast<TextureFilter*>(this)->onFilterImage(std::move(input), scale, contentBounds,
+                                                            offset, imageOrigin);
+  }
+  return onFilterImage(std::move(input), scale, contentBounds, offset);
 }
 
 Rect LayerFilter::filterBounds(const Rect& srcRect, float, MapDirection) {

@@ -49,6 +49,12 @@ TextureGrainParams MakeTextureGrainParams(float sizeX, float sizeY, float radius
                                           float pixelsPerLocalUnit = 1.0f,
                                           bool clipToShape = false);
 
+float TextureGrainMaximumDisplacement(const TextureGrainParams& params);
+
+bool IsTextureGrainIdentity(const TextureGrainParams& params, const Rect& sourceBounds);
+
+bool ContainsTextureImageFilter(const std::shared_ptr<ImageFilter>& filter);
+
 class TextureImageFilter : public ImageFilter {
  public:
   explicit TextureImageFilter(const TextureGrainParams& params);

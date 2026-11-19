@@ -1570,6 +1570,49 @@ TGFX_TEST(SVGExportTest, TextureFilterDrawLayerNativeSVG) {
   EXPECT_EQ(svg.find("<image"), std::string::npos);
 }
 
+TGFX_TEST(SVGExportTest, TextureFilterUserSpaceTransforms) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  PictureRecorder recorder;
+  auto* recordingCanvas = recorder.beginRecording();
+  Paint paint = {};
+  paint.setColor(Color::Blue());
+  recordingCanvas->drawRect(Rect::MakeWH(80.0f, 50.0f), paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  auto exportPicture = [&](const Matrix& matrix, const TextureGrainParams& params) {
+    auto SVGStream = MemoryWriteStream::Make();
+    auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(240, 160));
+    Paint texturePaint = {};
+    texturePaint.setImageFilter(std::make_shared<TextureImageFilter>(params));
+    exporter->getCanvas()->setMatrix(matrix);
+    exporter->getCanvas()->drawPicture(picture, nullptr, &texturePaint);
+    exporter->close();
+    return SVGStream->readString();
+  };
+
+  auto params = MakeTextureGrainParams(16.0f, 12.0f, 8.0f, Point::Make(40.0f, 25.0f), 3491);
+  auto scaled = exportPicture(Matrix::MakeScale(2.0f), params);
+  EXPECT_NE(scaled.find("baseFrequency=\"0.0312 0.0417\""), std::string::npos) << scaled;
+  EXPECT_NE(scaled.find("scale=\"32\""), std::string::npos) << scaled;
+
+  for (auto matrix : {Matrix::MakeRotate(30.0f), Matrix::MakeScale(2.0f, 1.0f)}) {
+    auto rasterized = exportPicture(matrix, params);
+    EXPECT_NE(rasterized.find("<image"), std::string::npos) << rasterized;
+    EXPECT_EQ(rasterized.find("<feTurbulence"), std::string::npos) << rasterized;
+  }
+
+  auto extremeParams =
+      MakeTextureGrainParams(1.0e-37f, 1.0e-37f, 8.0f, Point::Make(40.0f, 25.0f), 3491);
+  auto identity = exportPicture(Matrix::I(), extremeParams);
+  EXPECT_NE(identity.find("<feOffset"), std::string::npos);
+  EXPECT_EQ(identity.find("<feTurbulence"), std::string::npos);
+  EXPECT_EQ(identity.find("inf"), std::string::npos);
+}
+
 TGFX_TEST(SVGExportTest, FilterImageWithBlendMode) {
   // When a raster ImageLayer carries both a BlurFilter and a non-SrcOver BlendMode, filter and
   // mix-blend-mode must share the same <g>; otherwise the filter's isolation group would erase

@@ -25,6 +25,28 @@
 namespace tgfx {
 
 static constexpr int TextureGrainTableSize = 256;
+constexpr int TextureGrainOctaveCount = 3;
+constexpr float TextureGrainPersistence = 0.5f;
+constexpr float TextureGrainOctaveScale = 2.0f;
+constexpr float TextureGrainDisplacementScale = 2.5f;
+
+constexpr float TextureGrainWeightSum() {
+  float sum = 0.0f;
+  float weight = 1.0f;
+  for (int octave = 0; octave < TextureGrainOctaveCount; ++octave) {
+    sum += weight;
+    weight *= TextureGrainPersistence;
+  }
+  return sum;
+}
+
+constexpr float TextureGrainMaximumOctaveScale() {
+  float scale = 1.0f;
+  for (int octave = 1; octave < TextureGrainOctaveCount; ++octave) {
+    scale *= TextureGrainOctaveScale;
+  }
+  return scale;
+}
 
 const std::vector<uint8_t>& TextureGrainGradientTable();
 

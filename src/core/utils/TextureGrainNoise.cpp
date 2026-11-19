@@ -144,14 +144,14 @@ Point TextureGrainSignedFBM(const uint8_t* gradientTable, float x, float y, uint
   Point result = Point::Zero();
   float weight = 1.0f;
   float scale = 1.0f;
-  for (int octave = 0; octave < 3; ++octave) {
+  for (int octave = 0; octave < TextureGrainOctaveCount; ++octave) {
     auto offset = TextureGrainSeedOffset(seed, octave);
     auto offsetX = static_cast<int>(offset.x);
     auto offsetY = static_cast<int>(offset.y);
     auto noise = GradientNoise(gradientTable, x * scale, y * scale, offsetX, offsetY);
     result += noise * weight;
-    scale *= 2.0f;
-    weight *= 0.5f;
+    scale *= TextureGrainOctaveScale;
+    weight *= TextureGrainPersistence;
   }
   return result;
 }

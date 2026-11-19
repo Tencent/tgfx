@@ -27,7 +27,8 @@ namespace tgfx {
  * Displaces rendered layer content with a deterministic procedural texture.
  *
  * Add with Layer::setFilters(). Sizes and radius are in layer-local units. Larger sizes produce
- * coarser grain. A zero size or zero radius makes the filter an identity operation.
+ * coarser grain. A zero size or zero radius makes the filter an identity operation. Numeric
+ * combinations whose shader coordinates cannot be represented are also rendered as identity.
  */
 class TextureFilter : public LayerFilter {
  public:
@@ -85,7 +86,7 @@ class TextureFilter : public LayerFilter {
                                        const Rect& contentBounds, Point* offset) override;
   std::shared_ptr<Image> onFilterImage(std::shared_ptr<Image> input, float scale,
                                        const Rect& contentBounds, Point* offset,
-                                       const Point& imageOrigin) override;
+                                       const Point& imageOrigin);
 
  private:
   TextureFilter(float sizeX, float sizeY, float radius, uint32_t seed, bool clipToShape);
@@ -95,6 +96,8 @@ class TextureFilter : public LayerFilter {
   float _radius = 20.0f;
   uint32_t _seed = 0;
   bool _clipToShape = true;
+
+  friend class LayerFilter;
 };
 
 }  // namespace tgfx
