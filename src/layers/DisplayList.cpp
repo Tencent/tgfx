@@ -1065,7 +1065,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     }
     // This frame draws the last missing grid tiles, so nothing else is left to drive the loop; keep
     // it alive for the frame that tops up the fallback levels.
-    if (!missingGrids.empty() && dirtyGrids.size() == missingGrids.size()) {
+    if (useFallback && !missingGrids.empty() && dirtyGrids.size() == missingGrids.size()) {
       hasZoomBlurTiles = true;
     }
     // Takes free tiles for the given cells of a tree level and queues them for rasterization.
