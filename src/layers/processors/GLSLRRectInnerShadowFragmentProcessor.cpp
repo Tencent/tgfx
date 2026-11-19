@@ -71,8 +71,8 @@ void GLSLRRectInnerShadowFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = %s * coverage;", args.outputColor.c_str(), colorName.c_str());
   // Only the input alpha is consumed; the shadow color comes from the uniform.
   fragBuilder->codeAppendf("%s *= %s.a;", args.outputColor.c_str(), args.inputColor.c_str());
-  // The blurred coverage changes gradually from 1 to 0, which can quantize into visible bands on an
-  // 8-bit target. Dithering would hide them.
+  // TODO: Add dithering. The blurred coverage changes gradually from 1 to 0, which can quantize
+  // into visible bands on an 8-bit target.
 }
 
 void GLSLRRectInnerShadowFragmentProcessor::onSetData(UniformData*,
