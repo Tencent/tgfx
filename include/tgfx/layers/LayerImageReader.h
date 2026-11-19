@@ -173,7 +173,8 @@ enum class LayerImageReadCode {
  */
 struct LayerImageReadResult {
   LayerImageReadCode code = LayerImageReadCode::Failed;
-  // First row covered by the delivered band.
+  // First row covered by the delivered band. For any other code it is the first row not yet
+  // delivered, which equals rowsRead().
   int firstRow = 0;
   // Number of delivered rows, counting from index 0 of the destination buffer.
   int rowCount = 0;
