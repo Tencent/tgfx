@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <chrono>
+#include <limits>
 #include "platform/ImageStream.h"
 #include "tgfx/platform/android/Global.h"
 
@@ -83,8 +85,17 @@ class SurfaceTexture : public ImageStream {
   bool hasLatchedFrame = false;
   bool lastLatchAdvanced = false;
   int64_t lastLatchedTimestamp = 0;
+  bool hasDrawnFrame = false;
+  int64_t lastDrawnTimestamp = 0;
   ISize textureSize = {};
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
+
+  using TimePoint = std::chrono::steady_clock::time_point;
+
+  // A target that means "no target": latch until the queue runs dry.
+  static constexpr int64_t NO_TARGET = std::numeric_limits<int64_t>::max();
+
+  void latchQueuedFrames(int64_t target, TimePoint deadline);
 
   bool latchTexture(JNIEnv* env);
 

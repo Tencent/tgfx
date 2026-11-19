@@ -125,14 +125,15 @@ std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t contentVersion, C
   if (success) {
     textureView->removeUniqueKey();
     textureVersion = contentVersion;
-    // updateTexImage() takes the oldest queued frame, so a producer that runs ahead would make this
-    // draw show the previous render. End on the frame written last instead.
-    stream->onDrainPendingFrames();
-    // The producer may still be decoding the frame this draw asked for, in which case the queue only
-    // held older frames. Catch up without blocking: when the frame has not arrived yet the texture
-    // keeps the current one and the next draw picks it up.
-    if (target > 0 && stream->hasFrameTimestamp() && stream->currentFrameTimestamp() < target) {
+    if (target > 0 && stream->hasFrameTimestamp()) {
+      // Latch only until the frame the caller asked for: going past it would show a frame ahead of
+      // the requested one and consume buffers the next draw still needs. The catch-up never blocks,
+      // so a target that has not been decoded yet leaves the current frame on screen.
       stream->onSyncToTimestamp(target);
+    } else {
+      // No target: end on the frame the producer wrote last, since updateTexImage() takes the oldest
+      // queued one and a producer that runs ahead would otherwise show the previous render.
+      stream->onDrainPendingFrames();
     }
   }
   return textureView;

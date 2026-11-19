@@ -114,15 +114,12 @@ TGFX_TEST_PRIVATE(ImageReaderTest, SyncsToTargetFrameTimestamp) {
                       EXPECT_TRUE(TextureView::MakeFrom(context, second, false) != nullptr);
                       EXPECT_EQ(stream->syncCount, 1);
 
-                      // A new request is honoured once the texture is behind the new target, and a
-                      // texture that already reached it is left alone.
+                      // A new request is forwarded to the stream again; whether more frames are
+                      // needed is decided there, from the timestamp it reports.
                       reader->setTargetFrameTimestamp(2000);
                       auto third = reader->acquireNextBuffer(); ASSERT_TRUE(third != nullptr);
                       EXPECT_TRUE(TextureView::MakeFrom(context, third, false) != nullptr);
-                      EXPECT_EQ(stream->syncCount, 2); reader->setTargetFrameTimestamp(2000);
-                      auto fourth = reader->acquireNextBuffer(); ASSERT_TRUE(fourth != nullptr);
-                      EXPECT_TRUE(TextureView::MakeFrom(context, fourth, false) != nullptr);
-                      EXPECT_EQ(stream->syncCount, 2);)
+                      EXPECT_EQ(stream->syncCount, 2); EXPECT_EQ(stream->syncTarget, 2000);)
 }
 
 /**
@@ -130,16 +127,24 @@ TGFX_TEST_PRIVATE(ImageReaderTest, SyncsToTargetFrameTimestamp) {
  * not spend extra texture uploads waiting for it.
  */
 TGFX_TEST_PRIVATE(ImageReaderTest, IgnoresTargetFrameTimestampWithoutTimestamps) {
-  TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
-                      ASSERT_TRUE(context != nullptr);
-                      auto stream = std::make_shared<FakeImageStream>(16, 16);
-                      stream->providesFrameTimestamp = false;
-                      auto reader = ImageReader::MakeFrom(stream); ASSERT_TRUE(reader != nullptr);
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_TRUE(context != nullptr);
+      auto stream = std::make_shared<FakeImageStream>(16, 16);
+      stream->providesFrameTimestamp = false; auto reader = ImageReader::MakeFrom(stream);
+      ASSERT_TRUE(reader != nullptr);
 
-                      reader->setTargetFrameTimestamp(1000);
-                      auto first = reader->acquireNextBuffer(); ASSERT_TRUE(first != nullptr);
-                      EXPECT_TRUE(TextureView::MakeFrom(context, first, false) != nullptr);
-                      EXPECT_EQ(stream->syncCount, 0); EXPECT_EQ(stream->updateCount, 0);)
+      reader->setTargetFrameTimestamp(1000); auto first = reader->acquireNextBuffer();
+      ASSERT_TRUE(first != nullptr);
+      EXPECT_TRUE(TextureView::MakeFrom(context, first, false) != nullptr);
+      EXPECT_EQ(stream->syncCount, 0);
+
+      // The second texture goes through onUpdateTexture(), so a non-zero count here
+      // would mean the stream kept uploading while chasing a target it cannot report
+      // progress for.
+      auto second = reader->acquireNextBuffer();
+      ASSERT_TRUE(second != nullptr);
+      EXPECT_TRUE(TextureView::MakeFrom(context, second, false) != nullptr);
+      EXPECT_EQ(stream->updateCount, 1); EXPECT_EQ(stream->syncCount, 0);)
 }
 
 }  // namespace tgfx

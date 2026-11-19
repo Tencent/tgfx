@@ -284,8 +284,7 @@ int64_t SurfaceTexture::currentFrameTimestamp() {
   if (env == nullptr) {
     return 0;
   }
-  return static_cast<int64_t>(
-      env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp));
+  return currentTimestamp(env);
 }
 
 bool SurfaceTexture::latchTexture(JNIEnv* env) {
@@ -315,68 +314,41 @@ int64_t SurfaceTexture::currentTimestamp(JNIEnv* env) {
       env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp));
 }
 
-void SurfaceTexture::onSyncToTimestamp(int64_t target) {
+void SurfaceTexture::latchQueuedFrames(int64_t target, TimePoint deadline) {
   std::lock_guard<std::mutex> autoLock(locker);
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
     return;
   }
-  // Catch up with the frames the producer already delivered, never waiting for a new one: a draw
-  // must not block on the decoder. When the budget or the queue runs out the texture keeps the
-  // newest frame that did arrive and the next draw tries again.
-  static constexpr int MAX_SYNC_FRAMES = 8;
-  static constexpr auto SYNC_BUDGET = std::chrono::milliseconds(4);
-  int64_t lastTimestamp = currentTimestamp(env);
-  auto deadline = std::chrono::steady_clock::now() + SYNC_BUDGET;
-  for (int i = 0; i < MAX_SYNC_FRAMES; i++) {
-    if (lastTimestamp >= target || std::chrono::steady_clock::now() >= deadline) {
+  // Latch the frames the producer already queued beyond the one just consumed, stopping at the
+  // requested presentation time or when the queue runs dry, whichever comes first. This runs on the
+  // GPU thread with the GL context current (it is called from ImageReader::readTexture), so the
+  // external texture can be rebound. Unlike updateTexImage(), this path never waits for a new frame.
+  static constexpr int MAX_LATCH_FRAMES = 8;
+  for (int i = 0; i < MAX_LATCH_FRAMES; i++) {
+    if (target != NO_TARGET && lastLatchedTimestamp >= target) {
+      break;
+    }
+    if (std::chrono::steady_clock::now() >= deadline) {
       break;
     }
     // Consume the flag right before latching: a frame that arrives from now on sets it again and is
     // picked up by the next draw instead of being lost.
     frameAvailable = false;
-    if (!latchTexture(env)) {
+    if (!latchTexture(env) || !lastLatchAdvanced) {
       break;
     }
-    int64_t timestamp = currentTimestamp(env);
-    if (timestamp == lastTimestamp) {
-      break;
-    }
-    lastTimestamp = timestamp;
   }
 }
 
 void SurfaceTexture::onDrainPendingFrames() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  JNIEnvironment environment;
-  auto env = environment.current();
-  if (env == nullptr) {
-    return;
-  }
-  // Latch the frames the producer already queued beyond the one just consumed, so the texture ends
-  // on the most recent decoded frame. This runs on the GPU thread with the GL context current (it
-  // is called from ImageReader::readTexture), so updateTexImage() can rebind the external texture.
-  // Each native updateTexImage() latches the next queued buffer, or re-latches the current one when
-  // the queue is empty, in which case the frame timestamp stops advancing and the loop ends. The
-  // frame cap bounds a producer whose timestamp keeps advancing on every latch, so the loop still
-  // ends even if it never reports no progress.
-  // Unlike updateTexImage(), this path never waits for a new frame.
-  static constexpr int MAX_DRAIN_FRAMES = 8;
-  int64_t lastTimestamp = currentTimestamp(env);
-  for (int i = 0; i < MAX_DRAIN_FRAMES; i++) {
-    // Consume the flag right before latching: clearing it after the loop would drop a frame that
-    // arrived while the loop was running and make the next updateTexImage() wait for nothing.
-    frameAvailable = false;
-    if (!latchTexture(env)) {
-      break;
-    }
-    int64_t timestamp = currentTimestamp(env);
-    if (timestamp == lastTimestamp) {
-      break;
-    }
-    lastTimestamp = timestamp;
-  }
+  latchQueuedFrames(NO_TARGET, TimePoint::max());
+}
+
+void SurfaceTexture::onSyncToTimestamp(int64_t target) {
+  static constexpr auto SYNC_BUDGET = std::chrono::milliseconds(4);
+  latchQueuedFrames(target, std::chrono::steady_clock::now() + SYNC_BUDGET);
 }
 
 unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
@@ -409,28 +381,25 @@ bool SurfaceTexture::updateTexImage() {
   if (env == nullptr) {
     return false;
   }
-  static const auto TIMEOUT = std::chrono::seconds(1);
-  // A frame-available callback may arrive for a frame that was already consumed by a drain, in
-  // which case the flag is set although the queue is empty and latching would only rebind the frame
-  // already on screen. Verify with the timestamp that the texture really advanced, and wait once
-  // more when it did not.
-  static constexpr int MAX_LATCH_ATTEMPTS = 2;
-  for (int attempt = 0; attempt < MAX_LATCH_ATTEMPTS; attempt++) {
-    if (!frameAvailable) {
-      auto status = condition.wait_for(autoLock, TIMEOUT);
-      if (status == std::cv_status::timeout) {
-        LOGE("NativeImageReader::onUpdateTexture(): timeout when waiting for the frame available!");
-        return false;
-      }
-    }
-    frameAvailable = false;
-    if (!latchTexture(env)) {
+  // A drain may already have latched a frame that no draw has used yet. Waiting for another one
+  // would block a draw that already has newer content available.
+  if (hasDrawnFrame && lastLatchedTimestamp > lastDrawnTimestamp) {
+    lastDrawnTimestamp = lastLatchedTimestamp;
+    return true;
+  }
+  if (!frameAvailable) {
+    static const auto TIMEOUT = std::chrono::seconds(1);
+    if (condition.wait_for(autoLock, TIMEOUT) == std::cv_status::timeout) {
+      LOGE("NativeImageReader::onUpdateTexture(): timeout when waiting for the frame available!");
       return false;
     }
-    if (lastLatchAdvanced) {
-      break;
-    }
   }
+  frameAvailable = false;
+  if (!latchTexture(env)) {
+    return false;
+  }
+  hasDrawnFrame = true;
+  lastDrawnTimestamp = lastLatchedTimestamp;
   if (SurfaceTexture_getTransformMatrix != nullptr && !textureSizeResolved) {
     auto floatArray = env->NewFloatArray(16);
     if (floatArray == nullptr) {
