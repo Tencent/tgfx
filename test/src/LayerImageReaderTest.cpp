@@ -649,16 +649,7 @@ TGFX_TEST(LayerImageReaderTest, PaddedStrideLeavesPaddingUntouched) {
       EXPECT_EQ(row[info.rowBytes() + i], 0xcc);
     }
   }
-  PixelImage padded = {};
-  padded.pixels.assign(pixels.size(), 0);
-  padded.width = TestWidth;
-  padded.height = TestHeight;
-  padded.rowBytes = rowBytes;
-  for (int y = 0; y < TestHeight; ++y) {
-    std::copy_n(pixels.data() + static_cast<size_t>(y) * rowBytes,
-                static_cast<size_t>(TestWidth) * 4,
-                padded.pixels.data() + static_cast<size_t>(y) * rowBytes);
-  }
+  PixelImage padded = {std::move(pixels), TestWidth, TestHeight, rowBytes};
   EXPECT_EQ(CountDifferentPixels(reference, padded, 0), 0);
 }
 
