@@ -337,8 +337,8 @@ static TreeLevelCoverage* FindFinestCoverage(std::vector<TreeLevelCoverage>* cov
   return nullptr;
 }
 
-// Returns the tiles of a level that are neither cached nor blank under any of the given rects, each
-// listed once, in the zoomed display list grid.
+// Returns the tiles of a level that are neither cached nor blank under any of the given zoomed
+// rects, each listed once, in the raster grid of that level.
 static std::vector<std::pair<int, int>> CollectMissingTreeTiles(const TreeLevelCoverage& coverage,
                                                                 const std::vector<Rect>& zoomRects,
                                                                 int tileSize) {
