@@ -33,13 +33,12 @@ namespace tgfx {
 class TextureFilter : public LayerFilter {
  public:
   /**
-   * Finite values are clamped to their documented ranges.
-   * @param sizeX Horizontal size in [0, 100]; zero disables the texture.
-   * @param sizeY Vertical size in [0, 100]; zero disables the texture.
-   * @param radius Displacement radius in [0, 100].
+   * @param sizeX Non-negative horizontal size; zero disables the texture.
+   * @param sizeY Non-negative vertical size; zero disables the texture.
+   * @param radius Non-negative displacement radius; zero disables the texture.
    * @param seed Texture pattern selector.
    * @param clipToShape Preserve the input alpha.
-   * @return nullptr if any numeric parameter is NaN or infinite.
+   * @return nullptr if any numeric parameter is negative, NaN, or infinite.
    */
   static std::shared_ptr<TextureFilter> Make(float sizeX, float sizeY, float radius,
                                              uint32_t seed = 0, bool clipToShape = true);
@@ -56,7 +55,7 @@ class TextureFilter : public LayerFilter {
    */
   static const std::string& SVGClipAlphaTable();
 
-  // Property setters clamp finite values to [0, 100] and ignore NaN or infinite values.
+  // Property setters ignore negative, NaN, or infinite values.
   float sizeX() const {
     return _sizeX;
   }

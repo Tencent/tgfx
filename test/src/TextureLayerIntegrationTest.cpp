@@ -363,17 +363,20 @@ TGFX_TEST(TextureLayerIntegrationTest, PublicFilterContract) {
   filter->setRadius(1000.0f);
   filter->setSizeY(std::numeric_limits<float>::infinity());
   filter->setRadius(-1.0f);
-  EXPECT_EQ(filter->sizeX(), 100.0f);
+  EXPECT_EQ(filter->sizeX(), 101.0f);
   EXPECT_EQ(filter->sizeY(), 24.0f);
-  EXPECT_EQ(filter->radius(), 0.0f);
+  EXPECT_EQ(filter->radius(), 1000.0f);
   filter->setRadius(std::numeric_limits<float>::quiet_NaN());
-  EXPECT_EQ(filter->radius(), 0.0f);
+  EXPECT_EQ(filter->radius(), 1000.0f);
 
-  auto clamped = TextureFilter::Make(-1.0f, 101.0f, -1.0f);
-  ASSERT_TRUE(clamped != nullptr);
-  EXPECT_EQ(clamped->sizeX(), 0.0f);
-  EXPECT_EQ(clamped->sizeY(), 100.0f);
-  EXPECT_EQ(clamped->radius(), 0.0f);
+  EXPECT_TRUE(TextureFilter::Make(-1.0f, 101.0f, 20.0f) == nullptr);
+  EXPECT_TRUE(TextureFilter::Make(25.0f, -1.0f, 20.0f) == nullptr);
+  EXPECT_TRUE(TextureFilter::Make(25.0f, 25.0f, -1.0f) == nullptr);
+  auto large = TextureFilter::Make(101.0f, 1000.0f, 1000.0f);
+  ASSERT_TRUE(large != nullptr);
+  EXPECT_EQ(large->sizeX(), 101.0f);
+  EXPECT_EQ(large->sizeY(), 1000.0f);
+  EXPECT_EQ(large->radius(), 1000.0f);
 
   auto srcRect = Rect::MakeXYWH(10.0f, 20.0f, 100.0f, 80.0f);
   auto zeroSize = TextureFilter::Make(0.0f, 25.0f, 20.0f);

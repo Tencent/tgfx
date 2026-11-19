@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/filters/TextureFilter.h"
-#include <algorithm>
 #include <cmath>
 #include "core/filters/TextureImageFilter.h"
 #include "core/images/FilterImage.h"
@@ -26,10 +25,8 @@ namespace tgfx {
 
 namespace {
 
-constexpr float MaxTextureParameter = 100.0f;
-
-float NormalizeParameter(float value) {
-  return std::clamp(value, 0.0f, MaxTextureParameter);
+bool IsValidParameter(float value) {
+  return std::isfinite(value) && value >= 0.0f;
 }
 
 }  // namespace
@@ -57,12 +54,10 @@ const std::string& TextureFilter::SVGClipAlphaTable() {
 
 std::shared_ptr<TextureFilter> TextureFilter::Make(float sizeX, float sizeY, float radius,
                                                    uint32_t seed, bool clipToShape) {
-  if (!std::isfinite(sizeX) || !std::isfinite(sizeY) || !std::isfinite(radius)) {
+  if (!IsValidParameter(sizeX) || !IsValidParameter(sizeY) || !IsValidParameter(radius)) {
     return nullptr;
   }
-  return std::shared_ptr<TextureFilter>(
-      new TextureFilter(NormalizeParameter(sizeX), NormalizeParameter(sizeY),
-                        NormalizeParameter(radius), seed, clipToShape));
+  return std::shared_ptr<TextureFilter>(new TextureFilter(sizeX, sizeY, radius, seed, clipToShape));
 }
 
 TextureFilter::TextureFilter(float sizeX, float sizeY, float radius, uint32_t seed,
@@ -71,30 +66,27 @@ TextureFilter::TextureFilter(float sizeX, float sizeY, float radius, uint32_t se
 }
 
 void TextureFilter::setSizeX(float value) {
-  if (!std::isfinite(value)) {
+  if (!IsValidParameter(value)) {
     return;
   }
-  value = NormalizeParameter(value);
   if (_sizeX == value) return;
   _sizeX = value;
   invalidateFilter();
 }
 
 void TextureFilter::setSizeY(float value) {
-  if (!std::isfinite(value)) {
+  if (!IsValidParameter(value)) {
     return;
   }
-  value = NormalizeParameter(value);
   if (_sizeY == value) return;
   _sizeY = value;
   invalidateFilter();
 }
 
 void TextureFilter::setRadius(float value) {
-  if (!std::isfinite(value)) {
+  if (!IsValidParameter(value)) {
     return;
   }
-  value = NormalizeParameter(value);
   if (_radius == value) return;
   _radius = value;
   invalidateFilter();
