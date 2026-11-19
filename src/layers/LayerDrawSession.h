@@ -152,12 +152,12 @@ class LayerDrawSession {
   // outlive the current context lock.
   std::optional<LayerDrawBatch> prepareBatch(Context* context,
                                              const std::optional<PixelRect>& captureRect,
-                                             DrawControl& control);
+                                             DrawControl& control) const;
 
   // Draws one region of the batch on the given target, applying the fixed output matrix, the
   // target window and the scene clear color.
   DrawOutcome drawRegion(const LayerRegionPlan& region, LayerDrawBatch& batch, Canvas* canvas,
-                         DrawControl& control);
+                         DrawControl& control) const;
 
   // Resolves the effective surface limit from the device limit and the optional output limit.
   static ISize ResolveSurfaceLimit(const LayerDrawLimits& limits);
@@ -168,7 +168,7 @@ class LayerDrawSession {
   static float FilterOutset(Layer* layer, float scale);
   static float AncestorFilterOutset(Layer* target, Layer* captureRoot, const Matrix& rootToOutput);
   static bool IsSupported2DScene(const Layer* layer, std::vector<const Layer*>& activeMasks);
-  bool drawClippedTarget(const DrawArgs& args, Canvas* canvas, const Rect& bounds);
+  bool drawClippedTarget(const DrawArgs& args, Canvas* canvas, const Rect& bounds) const;
   struct BackgroundEffect {
     Rect outputBounds = {};
     float outset = 0;

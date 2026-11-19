@@ -483,7 +483,7 @@ BatchPlanResult LayerDrawSession::planBatch(const std::vector<LayerRegionPlan>& 
 }
 
 std::optional<LayerDrawBatch> LayerDrawSession::prepareBatch(
-    Context* context, const std::optional<PixelRect>& captureRect, DrawControl& control) {
+    Context* context, const std::optional<PixelRect>& captureRect, DrawControl& control) const {
   LayerDrawBatch batch;
   if (!captureRect) {
     return batch;
@@ -518,7 +518,8 @@ std::optional<LayerDrawBatch> LayerDrawSession::prepareBatch(
   return batch;
 }
 
-bool LayerDrawSession::drawClippedTarget(const DrawArgs& args, Canvas* canvas, const Rect& bounds) {
+bool LayerDrawSession::drawClippedTarget(const DrawArgs& args, Canvas* canvas,
+                                         const Rect& bounds) const {
   auto saveCount = canvas->getSaveCount();
   AutoCanvasRestore restore(canvas);
   std::shared_ptr<Shader> coverage;
@@ -553,7 +554,7 @@ bool LayerDrawSession::drawClippedTarget(const DrawArgs& args, Canvas* canvas, c
 }
 
 DrawOutcome LayerDrawSession::drawRegion(const LayerRegionPlan& region, LayerDrawBatch& batch,
-                                         Canvas* canvas, DrawControl& control) {
+                                         Canvas* canvas, DrawControl& control) const {
   if (control.cancelled()) {
     return DrawOutcome::Cancelled;
   }
