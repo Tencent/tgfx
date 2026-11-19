@@ -20,6 +20,7 @@
 #include <utility>
 #include "gpu/resources/TextureView.h"
 #include "platform/ImageStream.h"
+#include "platform/android/SurfaceTextureFrameState.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/platform/ImageReader.h"
 #include "utils/TestUtils.h"
@@ -145,6 +146,66 @@ static void ExpectFrameID(Context* context, const std::shared_ptr<TextureView>& 
 }
 
 }  // namespace
+
+TGFX_TEST(SurfaceTextureFrameStateTest, SeekKeepsRecoveryWhileNotReady) {
+  SurfaceTextureFrameState state;
+  state.onLatched(5000);
+  state.onSeeked();
+  EXPECT_FALSE(state.hasLatchedFrame());
+  EXPECT_EQ(state.readStatus(0, true), ImageReaderStatus::NotReady);
+  state.onLatched(5000);
+  EXPECT_EQ(state.readStatus(0), ImageReaderStatus::Pending);
+  state.onLatched(0);
+  EXPECT_EQ(state.readStatus(0), ImageReaderStatus::Ready);
+  EXPECT_EQ(state.lastLatchedTimestamp(), 0);
+  EXPECT_TRUE(state.lastLatchAdvanced());
+}
+
+TGFX_TEST(SurfaceTextureFrameStateTest, MismatchedSeekRetryDoesNotConsumeFrames) {
+  SurfaceTextureFrameState state;
+  state.onSeeked();
+  int latchCount = 0;
+  while (state.readStatus(10) == ImageReaderStatus::Pending && latchCount < 8) {
+    state.onLatched(20 + latchCount);
+    latchCount++;
+  }
+  EXPECT_EQ(latchCount, 8);
+  EXPECT_EQ(state.readStatus(10, true), ImageReaderStatus::Mismatched);
+  for (int retry = 0; retry < 3; retry++) {
+    EXPECT_EQ(state.readStatus(10), ImageReaderStatus::Mismatched);
+  }
+  EXPECT_EQ(latchCount, 8);
+  state.onSeeked();
+  state.onLatched(10);
+  EXPECT_EQ(state.readStatus(10), ImageReaderStatus::Ready);
+}
+
+TGFX_TEST(SurfaceTextureFrameStateTest, RestartedTimelineStopsAtOvershotFrame) {
+  SurfaceTextureFrameState state;
+  state.onLatched(5000);
+  state.onSeeked();
+  state.onLatched(5000);
+  EXPECT_EQ(state.readStatus(10), ImageReaderStatus::Pending);
+  state.onLatched(20);
+  EXPECT_EQ(state.readStatus(10), ImageReaderStatus::Mismatched);
+  EXPECT_EQ(state.lastLatchedTimestamp(), 20);
+}
+
+TGFX_TEST(SurfaceTextureFrameStateTest, ForwardSeekAndZeroTimestampRemainValid) {
+  SurfaceTextureFrameState state;
+  state.onSeeked();
+  EXPECT_EQ(state.readStatus(2000, true), ImageReaderStatus::NotReady);
+  state.onLatched(1000);
+  EXPECT_EQ(state.readStatus(2000, true), ImageReaderStatus::NotReady);
+  state.onLatched(2000);
+  EXPECT_EQ(state.readStatus(2000), ImageReaderStatus::Ready);
+  state.onSeeked();
+  state.onLatched(0);
+  EXPECT_EQ(state.readStatus(0), ImageReaderStatus::Ready);
+  state.onLatched(0);
+  EXPECT_FALSE(state.lastLatchAdvanced());
+  EXPECT_EQ(state.readStatus(-1, true), ImageReaderStatus::Ready);
+}
 
 TGFX_TEST_PRIVATE(ImageReaderTest, BasicStreamDoesNotNeedTargetFrameImplementation) {
   TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();

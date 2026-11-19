@@ -99,7 +99,10 @@ class ImageReader {
    * read returns no texture while reporting NotReady, Mismatched, Failed, or Expired. This prevents
    * resource caches from treating unrelated pixels as this buffer's content. The caller decides
    * whether to retry, retain its previous output, or request the latest frame instead. An incomplete
-   * read remains retryable until another buffer is acquired or the producer seeks.
+   * read remains retryable until another buffer is acquired or the producer seeks. A timestamped
+   * stream may immediately report Mismatched again after passing the target; retrying does not seek
+   * the producer. To recover an earlier target, reposition the producer, notifySeeked(), and acquire
+   * a new buffer.
    * @param frame Optional target, waiting deadline, and delivery state for this buffer. Passing
    * nullptr requests the latest available frame without waiting. Do not reuse a frame request for
    * different buffers. Streams without timestamps report Unsupported for a nonnegative target.

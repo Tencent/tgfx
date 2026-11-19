@@ -247,7 +247,7 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
 }
 
 bool SurfaceTexture::onUpdateTexture(std::shared_ptr<TextureView>) {
-  return updateTexImage(-1, 0) == ImageReaderStatus::Ready;
+  return updateTexImage(-1, 0).status == ImageReaderStatus::Ready;
 }
 
 ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
@@ -260,13 +260,13 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
       return {};
     }
   }
-  auto status = updateTexImage(target, deadline);
+  auto result = updateTexImage(target, deadline);
   if (textureView != nullptr) {
-    return {std::move(textureView), status, hasLatchedFrame ? lastLatchedTimestamp : -1};
+    return {std::move(textureView), result.status, result.timestamp};
   }
-  if (!hasLatchedFrame || status == ImageReaderStatus::Failed) {
+  if (result.timestamp < 0 || result.status == ImageReaderStatus::Failed) {
     releaseExternalOESTexture(context, textureID);
-    return {nullptr, status, -1};
+    return {nullptr, result.status, -1};
   }
   // The descriptor must match the real size of the OES texture, otherwise getTextureCoord()
   // converts pixel coordinates with a wrong base: hardware decoders pad the output buffer to an
@@ -276,8 +276,8 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
   // and exposed the black background of the video as an outline around the content. The padding
   // rows are kept out of the sampling by the subset clamp that needSubset() enables for external
   // textures.
-  auto descriptorWidth = textureSize.isEmpty() ? width() : textureSize.width;
-  auto descriptorHeight = textureSize.isEmpty() ? height() : textureSize.height;
+  auto descriptorWidth = result.textureSize.isEmpty() ? width() : result.textureSize.width;
+  auto descriptorHeight = result.textureSize.isEmpty() ? height() : result.textureSize.height;
   TextureDescriptor descriptor = {descriptorWidth,
                                   descriptorHeight,
                                   PixelFormat::RGBA_8888,
@@ -288,7 +288,7 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
   auto texture = gpu->makeResource<GLTexture>(
       descriptor, static_cast<unsigned>(GL_TEXTURE_EXTERNAL_OES), textureID);
   textureView = Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
-  return {std::move(textureView), status, lastLatchedTimestamp};
+  return {std::move(textureView), result.status, result.timestamp};
 }
 
 bool SurfaceTexture::latchTexture(JNIEnv* env) {
@@ -306,10 +306,7 @@ bool SurfaceTexture::latchTexture(JNIEnv* env) {
         env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getTransfer, dataSpace);
     _colorSpace = AndroidDataSpaceToColorSpace(standard, transfer);
   }
-  auto timestamp = currentTimestamp(env);
-  lastLatchAdvanced = !hasLatchedFrame || timestamp != lastLatchedTimestamp;
-  hasLatchedFrame = true;
-  lastLatchedTimestamp = timestamp;
+  frameState.onLatched(currentTimestamp(env));
   return true;
 }
 
@@ -320,10 +317,7 @@ int64_t SurfaceTexture::currentTimestamp(JNIEnv* env) {
 
 void SurfaceTexture::onSeeked() {
   std::lock_guard<std::mutex> autoLock(locker);
-  hasLatchedFrame = false;
-  lastLatchAdvanced = false;
-  lastLatchedTimestamp = 0;
-  seekPending = true;
+  frameState.onSeeked();
 }
 
 unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
@@ -363,29 +357,29 @@ void SurfaceTexture::releaseExternalOESTexture(Context* context, unsigned textur
   gl->deleteTextures(1, &textureID);
 }
 
-ImageReaderStatus SurfaceTexture::updateTexImage(int64_t target, int64_t deadline) {
+SurfaceTexture::FrameUpdateResult SurfaceTexture::updateTexImage(int64_t target, int64_t deadline) {
   std::unique_lock<std::mutex> autoLock(locker);
+  auto snapshot = [this](ImageReaderStatus status) {
+    return FrameUpdateResult{status, frameState.lastLatchedTimestamp(), textureSize};
+  };
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
-    return ImageReaderStatus::Failed;
+    return snapshot(ImageReaderStatus::Failed);
   }
   // Notifications can be coalesced, so an advancing latch also permits polling the queue. Only an
-  // empty queue waits for another notification, always using the caller's remaining wall-clock
+  // empty queue waits for another notification, always using the caller's remaining monotonic
   // budget. A producer that continuously queues frames is bounded independently of that budget.
   static constexpr int MAX_LATCH_FRAMES = 8;
   int latchCount = 0;
   while (latchCount < MAX_LATCH_FRAMES) {
-    if (hasLatchedFrame && target >= 0 && lastLatchedTimestamp == target) {
-      seekPending = false;
-      return ImageReaderStatus::Ready;
+    auto status = frameState.readStatus(target);
+    if (status != ImageReaderStatus::Pending) {
+      return snapshot(status);
     }
-    if (hasLatchedFrame && target >= 0 && lastLatchedTimestamp > target && !seekPending) {
-      return ImageReaderStatus::Mismatched;
-    }
-    if (!frameAvailable && (!hasLatchedFrame || !lastLatchAdvanced)) {
+    if (!frameAvailable && (!frameState.hasLatchedFrame() || !frameState.lastLatchAdvanced())) {
       auto remaining = deadline - Clock::Now();
-      if (target < 0 && hasLatchedFrame) {
+      if (target < 0 && frameState.hasLatchedFrame()) {
         break;
       }
       if (remaining <= 0) {
@@ -396,20 +390,12 @@ ImageReaderStatus SurfaceTexture::updateTexImage(int64_t target, int64_t deadlin
     }
     frameAvailable = false;
     if (!latchTexture(env)) {
-      return ImageReaderStatus::Failed;
+      return snapshot(ImageReaderStatus::Failed);
     }
     latchCount++;
     resolveTextureSize(env);
   }
-  if (!hasLatchedFrame) {
-    return ImageReaderStatus::NotReady;
-  }
-  if (target < 0 || lastLatchedTimestamp == target) {
-    seekPending = false;
-    return ImageReaderStatus::Ready;
-  }
-  return lastLatchedTimestamp > target ? ImageReaderStatus::Mismatched
-                                       : ImageReaderStatus::NotReady;
+  return snapshot(frameState.readStatus(target, true));
 }
 
 void SurfaceTexture::resolveTextureSize(JNIEnv* env) {

@@ -20,6 +20,7 @@
 
 #include <condition_variable>
 #include "platform/ImageStream.h"
+#include "platform/android/SurfaceTextureFrameState.h"
 #include "tgfx/platform/android/Global.h"
 
 namespace tgfx {
@@ -77,10 +78,7 @@ class SurfaceTexture : public ImageStream {
   Global<jobject> surfaceTexture;
   bool frameAvailable = false;
   bool textureSizeResolved = false;
-  bool hasLatchedFrame = false;
-  bool lastLatchAdvanced = false;
-  int64_t lastLatchedTimestamp = 0;
-  bool seekPending = false;
+  SurfaceTextureFrameState frameState = {};
   ISize textureSize = {};
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
@@ -96,7 +94,13 @@ class SurfaceTexture : public ImageStream {
 
   void releaseExternalOESTexture(Context* context, unsigned textureID);
 
-  ImageReaderStatus updateTexImage(int64_t target, int64_t deadline);
+  struct FrameUpdateResult {
+    ImageReaderStatus status = ImageReaderStatus::Failed;
+    int64_t timestamp = -1;
+    ISize textureSize = {};
+  };
+
+  FrameUpdateResult updateTexImage(int64_t target, int64_t deadline);
 
   void resolveTextureSize(JNIEnv* env);
 

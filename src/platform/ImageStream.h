@@ -33,7 +33,8 @@ class Context;
 /**
  * ImageStream represents a writable pixel buffer that can continuously generate ImageBuffer
  * objects, which can be directly accessed by The ImageReader class. ImageStream is an abstract
- * class. Use its subclasses instead.
+ * class. Use its subclasses instead. ImageReader serializes callbacks only within one reader;
+ * implementations shared by multiple readers must synchronize their own mutable state.
  */
 class ImageStream {
  public:
@@ -59,7 +60,10 @@ class ImageStream {
   ImageStream(int width, int height) : _width(width), _height(height) {
   }
 
-  /** Creates a texture using the stream's native pixel source. */
+  /**
+   * Creates a texture using the stream's native pixel source. The mipmapped parameter specifies
+   * whether the created texture view must allocate mip map levels, when supported by the source.
+   */
   virtual std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) = 0;
 
   /** Updates an existing texture using the stream's native pixel source. */
