@@ -469,33 +469,7 @@ TGFX_TEST(TextureLayerIntegrationTest, LayerTypeCompatibility) {
   }
 }
 
-TGFX_TEST(TextureLayerIntegrationTest, ContentOriginAnchorStability) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto makeLayer = [](bool offsetPath) {
-    auto layer = ShapeLayer::Make();
-    Path path = {};
-    path.addRect(Rect::MakeXYWH(offsetPath ? 60.0f : 0.0f, 0.0f, 120.0f, 90.0f));
-    layer->setPath(path);
-    layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
-    layer->setMatrix(Matrix::MakeTrans(offsetPath ? 0.0f : 60.0f, 70.0f));
-    return std::static_pointer_cast<Layer>(layer);
-  };
-  auto filter = [] { return TextureFilter::Make(16.0f, 12.0f, 8.0f, 3491, false); };
-
-  auto offsetContent = RenderLayerScene(
-      context, [makeLayer] { return makeLayer(true); }, filter());
-  auto transformedContent = RenderLayerScene(
-      context, [makeLayer] { return makeLayer(false); }, filter());
-  auto difference = CompareScenes(offsetContent, transformedContent);
-  EXPECT_LE(difference.mean, 0.1);
-  EXPECT_LE(difference.fractionOverFour, 0.0005);
-  EXPECT_LE(difference.max, 8);
-}
-
-TGFX_TEST(TextureLayerIntegrationTest, FilterChainAnchorStability) {
+TGFX_TEST(TextureLayerIntegrationTest, AnchorStabilityAcrossContentOriginAndFilterChain) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -509,15 +483,18 @@ TGFX_TEST(TextureLayerIntegrationTest, FilterChainAnchorStability) {
     layer->setMatrix(Matrix::MakeTrans(offsetPath ? 0.0f : 60.0f, 70.0f));
     return layer;
   };
-  auto makeFilters = [](bool shadowFirst) {
-    auto shadow = DropShadowFilter::Make(18.0f, 18.0f, 8.0f, 8.0f, Color::FromRGBA(0, 0, 0, 180));
+  auto makeFilters = [](int chainMode) {
     auto texture = TextureFilter::Make(16.0f, 12.0f, 8.0f, 3491, false);
-    if (shadowFirst) {
+    if (chainMode < 0) {
+      return std::vector<std::shared_ptr<LayerFilter>>{texture};
+    }
+    auto shadow = DropShadowFilter::Make(18.0f, 18.0f, 8.0f, 8.0f, Color::FromRGBA(0, 0, 0, 180));
+    if (chainMode == 1) {
       return std::vector<std::shared_ptr<LayerFilter>>{shadow, texture};
     }
     return std::vector<std::shared_ptr<LayerFilter>>{texture, shadow};
   };
-  auto render = [&](bool offsetPath, bool shadowFirst) {
+  auto render = [&](bool offsetPath, int chainMode) {
     constexpr int size = 320;
     auto surface = Surface::Make(context, size, size);
     if (surface == nullptr) {
@@ -525,19 +502,19 @@ TGFX_TEST(TextureLayerIntegrationTest, FilterChainAnchorStability) {
     }
     DisplayList displayList;
     auto layer = makeLayer(offsetPath);
-    layer->setFilters(makeFilters(shadowFirst));
+    layer->setFilters(makeFilters(chainMode));
     displayList.root()->addChild(layer);
     displayList.render(surface.get());
     return ReadScene(surface);
   };
 
-  for (auto shadowFirst : {false, true}) {
-    auto offsetContent = render(true, shadowFirst);
-    auto transformedContent = render(false, shadowFirst);
+  for (auto chainMode : {-1, 0, 1}) {
+    auto offsetContent = render(true, chainMode);
+    auto transformedContent = render(false, chainMode);
     auto difference = CompareScenes(offsetContent, transformedContent);
-    EXPECT_LE(difference.mean, 0.1) << "shadowFirst=" << shadowFirst;
-    EXPECT_LE(difference.fractionOverFour, 0.0005) << "shadowFirst=" << shadowFirst;
-    EXPECT_LE(difference.max, 8) << "shadowFirst=" << shadowFirst;
+    EXPECT_LE(difference.mean, 0.1) << "chainMode=" << chainMode;
+    EXPECT_LE(difference.fractionOverFour, 0.0005) << "chainMode=" << chainMode;
+    EXPECT_LE(difference.max, 8) << "chainMode=" << chainMode;
   }
 }
 

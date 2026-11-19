@@ -1485,35 +1485,38 @@ TGFX_TEST(SVGExportTest, TextureFilterNativeSVG) {
   EXPECT_NE(svg.find("<clipPath"), std::string::npos);
 }
 
-TGFX_TEST(SVGExportTest, TextureFilterScaledNativeSVG) {
+TGFX_TEST(SVGExportTest, TextureFilterLayerParametersNativeSVG) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(240, 160));
-  auto displayList = std::make_unique<DisplayList>();
-  auto layer = ShapeLayer::Make();
-  layer->setMatrix(Matrix::MakeScale(2.0f));
-  layer->setPath([] {
+  auto exportLayer = [&](const Rect& viewport, const Matrix& matrix, const Rect& rect,
+                         const Color& color, float sizeX, float sizeY) {
+    auto SVGStream = MemoryWriteStream::Make();
+    auto exporter = SVGExporter::Make(SVGStream, context, viewport);
+    auto displayList = std::make_unique<DisplayList>();
+    auto layer = ShapeLayer::Make();
+    layer->setMatrix(matrix);
     Path path = {};
-    path.addRect(Rect::MakeWH(100.0f, 60.0f));
-    return path;
-  }());
-  layer->setFillStyle(ShapeStyle::Make(Color::Blue()));
-  layer->setFilters({TextureFilter::Make(16.0f, 12.0f, 8.0f, 3491, false)});
-  displayList->root()->addChild(layer);
-  displayList->root()->draw(exporter->getCanvas());
-  exporter->close();
+    path.addRect(rect);
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(color));
+    layer->setFilters({TextureFilter::Make(sizeX, sizeY, 8.0f, 3491, false)});
+    displayList->root()->addChild(layer);
+    displayList->root()->draw(exporter->getCanvas());
+    exporter->close();
+    return SVGStream->readString();
+  };
 
-  auto svg = SVGStream->readString();
+  auto scaled = exportLayer(Rect::MakeWH(240, 160), Matrix::MakeScale(2.0f),
+                            Rect::MakeWH(100.0f, 60.0f), Color::Blue(), 16.0f, 12.0f);
   const std::string frequencyPrefix = "baseFrequency=\"";
-  auto frequencyStart = svg.find(frequencyPrefix);
+  auto frequencyStart = scaled.find(frequencyPrefix);
   ASSERT_NE(frequencyStart, std::string::npos);
   frequencyStart += frequencyPrefix.size();
-  auto frequencyEnd = svg.find('"', frequencyStart);
+  auto frequencyEnd = scaled.find('"', frequencyStart);
   ASSERT_NE(frequencyEnd, std::string::npos);
-  auto frequencyValue = svg.substr(frequencyStart, frequencyEnd - frequencyStart);
+  auto frequencyValue = scaled.substr(frequencyStart, frequencyEnd - frequencyStart);
   char* parseEnd = nullptr;
   auto frequencyX = std::strtof(frequencyValue.c_str(), &parseEnd);
   ASSERT_NE(parseEnd, frequencyValue.c_str());
@@ -1521,36 +1524,16 @@ TGFX_TEST(SVGExportTest, TextureFilterScaledNativeSVG) {
   // SVG numeric attributes are serialized to four decimal places.
   EXPECT_NEAR(frequencyX, 0.0312f, 1e-5f);
   EXPECT_NEAR(frequencyY, 0.0417f, 1e-5f);
-  EXPECT_NE(svg.find("scale=\"32\""), std::string::npos);
-  EXPECT_NE(svg.find("data-pagx-size-x=\"16\""), std::string::npos);
-  EXPECT_NE(svg.find("data-pagx-size-y=\"12\""), std::string::npos);
-}
+  EXPECT_NE(scaled.find("scale=\"32\""), std::string::npos);
+  EXPECT_NE(scaled.find("data-pagx-size-x=\"16\""), std::string::npos);
+  EXPECT_NE(scaled.find("data-pagx-size-y=\"12\""), std::string::npos);
 
-TGFX_TEST(SVGExportTest, TextureFilterZeroSizeNativeSVG) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(80, 60));
-  auto displayList = std::make_unique<DisplayList>();
-  auto layer = ShapeLayer::Make();
-  layer->setPath([] {
-    Path path = {};
-    path.addRect(Rect::MakeWH(80.0f, 60.0f));
-    return path;
-  }());
-  layer->setFillStyle(ShapeStyle::Make(Color::Green()));
-  layer->setFilters({TextureFilter::Make(0.0f, 25.0f, 20.0f, 3491, false)});
-  displayList->root()->addChild(layer);
-  displayList->root()->draw(exporter->getCanvas());
-  exporter->close();
-
-  auto svg = SVGStream->readString();
-  EXPECT_NE(svg.find("<feOffset"), std::string::npos);
-  EXPECT_EQ(svg.find("<feTurbulence"), std::string::npos);
-  EXPECT_EQ(svg.find("<feDisplacementMap"), std::string::npos);
-  EXPECT_EQ(svg.find("inf"), std::string::npos);
+  auto zeroSize = exportLayer(Rect::MakeWH(80, 60), Matrix::I(), Rect::MakeWH(80.0f, 60.0f),
+                              Color::Green(), 0.0f, 25.0f);
+  EXPECT_NE(zeroSize.find("<feOffset"), std::string::npos);
+  EXPECT_EQ(zeroSize.find("<feTurbulence"), std::string::npos);
+  EXPECT_EQ(zeroSize.find("<feDisplacementMap"), std::string::npos);
+  EXPECT_EQ(zeroSize.find("inf"), std::string::npos);
 }
 
 TGFX_TEST(SVGExportTest, TextureFilterDrawLayerNativeSVG) {

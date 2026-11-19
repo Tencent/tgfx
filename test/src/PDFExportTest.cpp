@@ -1696,10 +1696,21 @@ TGFX_TEST(PDFExportTest, NoiseEffects) {
   EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/NoiseEffects"));
 }
 
-TGFX_TEST(PDFExportTest, TextureFilterRasterFallback) {
+TGFX_TEST(PDFExportTest, TextureFilterFallback) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+
+  auto renderPDF = [&](float width, float height, const auto& draw) {
+    auto PDFStream = MemoryWriteStream::Make();
+    auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
+    auto canvas = document->beginPage(width, height);
+    draw(canvas);
+    document->endPage();
+    document->close();
+    PDFStream->flush();
+    return PDFStream->readData();
+  };
 
   auto root = Layer::Make();
   auto layer = ShapeLayer::Make();
@@ -1709,27 +1720,12 @@ TGFX_TEST(PDFExportTest, TextureFilterRasterFallback) {
   layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
   layer->setFilters({TextureFilter::Make(16.0f, 16.0f, 8.0f, 3491, false)});
   root->addChild(layer);
-
-  auto PDFStream = MemoryWriteStream::Make();
-  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto canvas = document->beginPage(200.0f, 160.0f);
-  root->draw(canvas);
-  document->endPage();
-  document->close();
-  PDFStream->flush();
-
-  auto data = PDFStream->readData();
+  auto data = renderPDF(200.0f, 160.0f, [&](Canvas* canvas) { root->draw(canvas); });
   ASSERT_TRUE(data != nullptr);
   auto bytes = std::string(reinterpret_cast<const char*>(data->data()), data->size());
   EXPECT_FALSE(bytes.empty());
   EXPECT_NE(bytes.find("/Subtype /Image"), std::string::npos);
   EXPECT_TRUE(HasImageLargerThan(data, 120, 90));
-}
-
-TGFX_TEST(PDFExportTest, TextureFilterDrawLayerFallback) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
 
   PictureRecorder recorder;
   auto* recordingCanvas = recorder.beginRecording();
@@ -1745,18 +1741,10 @@ TGFX_TEST(PDFExportTest, TextureFilterDrawLayerFallback) {
   auto params = MakeTextureGrainParams(16.0f, 12.0f, 8.0f, Point::Make(90.0f, 65.0f), 3491);
   Paint paint = {};
   paint.setImageFilter(std::make_shared<TextureImageFilter>(params));
-
-  auto PDFStream = MemoryWriteStream::Make();
-  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
-  auto canvas = document->beginPage(180.0f, 130.0f);
-  canvas->drawPicture(picture, nullptr, &paint);
-  document->endPage();
-  document->close();
-  PDFStream->flush();
-
-  auto data = PDFStream->readData();
+  data = renderPDF(180.0f, 130.0f,
+                   [&](Canvas* canvas) { canvas->drawPicture(picture, nullptr, &paint); });
   ASSERT_TRUE(data != nullptr);
-  auto bytes = std::string(reinterpret_cast<const char*>(data->data()), data->size());
+  bytes = std::string(reinterpret_cast<const char*>(data->data()), data->size());
   EXPECT_FALSE(bytes.empty());
   EXPECT_NE(bytes.find("/Subtype /Image"), std::string::npos);
   EXPECT_TRUE(HasImageLargerThan(data, 160, 110));

@@ -620,39 +620,17 @@ TGFX_TEST(TextureImageFilterTest, OpaqueAndTranslucentReference) {
       0);
 }
 
-TGFX_TEST(TextureImageFilterTest, RadiusZeroIsIdentity) {
+TGFX_TEST(TextureImageFilterTest, ZeroParametersAreIdentity) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  TextureGrainParams params = {};
-  params.radius = 0.0f;
-  params.nodeCenter = Point::Make(160.0f, 120.0f);
   auto source = MakeOpaqueMotif();
-  auto filter = std::make_shared<TextureImageFilter>(params);
-  auto bounds = filter->filterBounds(
-      Rect::MakeWH(static_cast<float>(source.width), static_cast<float>(source.height)));
-  EXPECT_EQ(bounds,
-            Rect::MakeWH(static_cast<float>(source.width), static_cast<float>(source.height)));
-
   auto sourceImage = MakeImage(source);
   auto unfiltered = RenderImageOnGPU(context, sourceImage, source.width, source.height);
   EXPECT_EQ(PixelAt(unfiltered, 20, 40)[3], 255);
-  auto gpu = RenderOnGPU(context, sourceImage, unfiltered, filter, bounds);
-  EXPECT_EQ(Compare(gpu, unfiltered).maxDifference, 0);
-}
 
-TGFX_TEST(TextureImageFilterTest, ZeroTextureSizeIsIdentity) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto source = MakeOpaqueMotif();
-  auto sourceImage = MakeImage(source);
-  auto unfiltered = RenderImageOnGPU(context, sourceImage, source.width, source.height);
-  for (const auto& size :
-       {Point::Make(0.0f, 25.0f), Point::Make(25.0f, 0.0f), Point::Make(0.0f, 0.0f)}) {
-    auto params = MakeTextureGrainParams(size.x, size.y, 20.0f, Point::Make(160.0f, 120.0f), 3491);
+  auto verifyIdentity = [&](const TextureGrainParams& params) {
     auto filter = std::make_shared<TextureImageFilter>(params);
     auto bounds = filter->filterBounds(
         Rect::MakeWH(static_cast<float>(source.width), static_cast<float>(source.height)));
@@ -660,6 +638,17 @@ TGFX_TEST(TextureImageFilterTest, ZeroTextureSizeIsIdentity) {
               Rect::MakeWH(static_cast<float>(source.width), static_cast<float>(source.height)));
     auto gpu = RenderOnGPU(context, sourceImage, unfiltered, filter, bounds);
     EXPECT_EQ(Compare(gpu, unfiltered).maxDifference, 0);
+  };
+
+  TextureGrainParams zeroRadius = {};
+  zeroRadius.radius = 0.0f;
+  zeroRadius.nodeCenter = Point::Make(160.0f, 120.0f);
+  verifyIdentity(zeroRadius);
+
+  for (const auto& size :
+       {Point::Make(0.0f, 25.0f), Point::Make(25.0f, 0.0f), Point::Make(0.0f, 0.0f)}) {
+    auto params = MakeTextureGrainParams(size.x, size.y, 20.0f, Point::Make(160.0f, 120.0f), 3491);
+    verifyIdentity(params);
   }
 }
 
@@ -834,7 +823,7 @@ TGFX_TEST(TextureImageFilterTest, ClipPreservesTransparentHoles) {
   ExpectPremultiplied(clipped.gpu);
 }
 
-TGFX_TEST(TextureImageFilterTest, YUVFormatsRenderThroughTextureGrain) {
+TGFX_TEST(TextureImageFilterTest, YUVInputUsesDeclaredColorSpace) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -854,12 +843,6 @@ TGFX_TEST(TextureImageFilterTest, YUVFormatsRenderThroughTextureGrain) {
     EXPECT_EQ(PixelAt(filtered, expected.width / 2, expected.height / 2)[3], 255);
     ExpectPremultiplied(filtered);
   }
-}
-
-TGFX_TEST(TextureImageFilterTest, YUVColorSpaceChangesConversion) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
 
   auto bt601 = MakeTestYUVImage(false, YUVColorSpace::BT601_LIMITED);
   auto bt709 = MakeTestYUVImage(false, YUVColorSpace::BT709_LIMITED);
