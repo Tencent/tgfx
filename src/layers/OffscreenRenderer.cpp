@@ -192,9 +192,15 @@ OffscreenResult OffscreenRenderer::RenderContentOnSurface(
   OffscreenResult result;
   result.image = surface->makeImageSnapshot();
   if (result.image == nullptr) {
+    if (args.drawControl != nullptr) {
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
+    }
     return {};
   }
   if (!localToSurface.invert(&result.imageMatrix)) {
+    if (args.drawControl != nullptr) {
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
+    }
     return {};
   }
   return result;
@@ -278,9 +284,15 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnSurface(
   OffscreenResult result;
   result.image = surface->makeImageSnapshot();
   if (result.image == nullptr) {
+    if (args.drawControl != nullptr) {
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
+    }
     return {};
   }
   if (!localToSurface.invert(&result.imageMatrix)) {
+    if (args.drawControl != nullptr) {
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
+    }
     return {};
   }
   return result;
