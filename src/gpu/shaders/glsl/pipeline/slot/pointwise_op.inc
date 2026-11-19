@@ -63,7 +63,7 @@ vec4 applyPointwiseOp(int slot, vec4 color) {
     result = xpBlendColors(blendSrc, blendDst, blendMode);
   } else {  // OP_COLOR_SPACE_XFORM
     vec4 csColor = color;
-    PM_APPLY_COLOR_SPACE_XFORM(csColor, ChainCSFlags, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType,
+    PM_APPLY_COLOR_SPACE_XFORM(csColor, ChainFlags, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType,
                                ChainSrcOOTF, ChainColorXform, ChainDstOOTF, ChainDstTF0,
                                ChainDstTF1, ChainDstTFType)
     result = csColor;

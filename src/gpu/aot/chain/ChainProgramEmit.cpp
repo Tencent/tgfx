@@ -394,7 +394,7 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
         break;
       case ChainISA::ColorSpaceXform:
         expr = "chainApplyColorSpaceXform(" + spellArg(a[0]) +
-               ", ChainCSFlags, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType, ChainSrcOOTF, "
+               ", ChainFlags, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType, ChainSrcOOTF, "
                "ChainColorXform, ChainDstOOTF, ChainDstTF0, ChainDstTF1, ChainDstTFType)";
         break;
       case ChainISA::Gradient: {
@@ -408,26 +408,21 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
         }
         std::string args = spellArg(a[0]) + ", SourceCoords, GradientLayoutType, " +
                            "GradientColorizerKind, " +
-                           (hasLutLeaf ? std::string("GradientLUTLeaf") : std::string("0"));
+                           (hasLutLeaf ? std::string("GradientLutLeaf") : std::string("0"));
         for (const char* member :
-             {"Gradient_leftBorder", "Gradient_rightBorder", "Gradient_start", "Gradient_end",
-              "Gradient_scale01", "Gradient_bias01", "Gradient_scale23", "Gradient_bias23",
-              "Gradient_threshold", "Gradient_bias", "Gradient_scale", "Gradient_thresholds1_7",
-              "Gradient_thresholds9_13"}) {
+             {"GradientLeftBorder", "GradientRightBorder", "GradientStart", "GradientEnd",
+              "GradientScale01", "GradientBias01", "GradientScale23", "GradientBias23",
+              "GradientThreshold", "GradientBias", "GradientScale", "GradientThresholds1_7",
+              "GradientThresholds9_13"}) {
           args += ", ";
           args += member;
         }
-        for (int stop = 0; stop < 8; ++stop) {
-          args += ", Gradient_scales[" + std::to_string(stop) + "]";
-        }
-        for (int stop = 0; stop < 8; ++stop) {
-          args += ", Gradient_biases[" + std::to_string(stop) + "]";
-        }
+        args += ", GradientScales, GradientBiases";
         expr = "evalGradientSlot(" + args + ")";
         break;
       }
       case ChainISA::PerlinNoise:
-        expr = "evalNoiseSlot(SourceCoords, Noise_frequencyStitch, NoiseModeOctaves)";
+        expr = "evalNoiseSlot(SourceCoords, NoiseFrequencyStitch, NoiseModeOctaves)";
         break;
       default:
         return false;

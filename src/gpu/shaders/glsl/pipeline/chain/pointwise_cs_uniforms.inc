@@ -6,7 +6,7 @@
 #ifndef TGSL_POINTWISE_CS_UNIFORMS_INCLUDED
 #define TGSL_POINTWISE_CS_UNIFORMS_INCLUDED
 
-int ChainCSFlags;
+int ChainFlags;
 vec4 ChainSrcTF0;
 vec4 ChainSrcTF1;
 int ChainSrcTFType;

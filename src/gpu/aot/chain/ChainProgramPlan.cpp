@@ -270,6 +270,7 @@ void RegisterGradientMembers(PlanRegistry* registry, bool lutForm) {
 #define TGFX_REGISTER_evalGradientSlot
 #include "ChainOpRegistry.inc"
 #undef TGFX_REGISTER_evalGradientSlot
+  (void)lutForm;
 #else
   (void)registry;
   (void)lutForm;
@@ -284,6 +285,7 @@ void RegisterNoiseMembers(PlanRegistry* registry) {
 #undef TGFX_REGISTER_evalNoiseSlot
 #else
   (void)registry;
+  (void)lutForm;
 #endif
 }
 

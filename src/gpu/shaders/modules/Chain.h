@@ -92,7 +92,7 @@ inline constexpr Element ChainElements[] = {
     // chain-wide region shared by every profile.
     {Element::Kind::Param, ShaderType::Float4, "Subset"},
     {Element::Kind::Param, ShaderType::Int, "SubsetClampOn"},
-    {Element::Kind::Param, ShaderType::Int, "ChainCSFlags"},
+    {Element::Kind::Param, ShaderType::Int, "ChainFlags"},
     {Element::Kind::Param, ShaderType::Float4, "ChainSrcTF0"},
     {Element::Kind::Param, ShaderType::Float4, "ChainSrcTF1"},
     {Element::Kind::Param, ShaderType::Int, "ChainSrcTFType"},
@@ -132,7 +132,7 @@ inline constexpr Element ChainElements[] = {
     {Element::Kind::Param, ShaderType::Int, "GradientLayoutType", 1, 0, ChainGradientMask},
     {Element::Kind::Param, ShaderType::Int, "GradientColorizerKind", 1, 0, ChainGradientMask},
     {Element::Kind::Param, ShaderType::Int, "GradientIntervalCount", 1, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Int, "GradientLUTLeaf", 1, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Int, "GradientLutLeaf", 1, 0, ChainGradientMask},
     {Element::Kind::Param, ShaderType::Int4, "TiledRecipeModes", 3, 0, ChainGradientMask},
     {Element::Kind::Param, ShaderType::Float4, "TiledRecipeSubsets", 3, 0, ChainGradientMask},
     {Element::Kind::Param, ShaderType::Float4, "TiledRecipeClamps", 3, 0, ChainGradientMask},
@@ -185,23 +185,23 @@ inline constexpr Element ChainElements[] = {
     // upload writes each field once by element index and the pool's packed copy retires. Present
     // on the gradient profiles only (the colorizer thresholds/scales/biases feed the unrolled
     // binary colorizer; the layout pair rides the shared layout/colorizer ints above).
-    {Element::Kind::Param, ShaderType::Float4, "Gradient_leftBorder", 1, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Float4, "Gradient_rightBorder", 1, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Float4, "Gradient_start", 1, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Float4, "Gradient_end", 1, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Float4, "Gradient_scale01", 1, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Float4, "Gradient_bias01", 1, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Float4, "Gradient_scale23", 1, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Float4, "Gradient_bias23", 1, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Float, "Gradient_threshold", 1, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Float, "Gradient_bias", 1, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Float, "Gradient_scale", 1, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Float4, "Gradient_thresholds1_7", 1, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Float4, "Gradient_thresholds9_13", 1, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Float4, "Gradient_scales", 8, 0, ChainGradientMask},
-    {Element::Kind::Param, ShaderType::Float4, "Gradient_biases", 8, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float4, "GradientLeftBorder", 1, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float4, "GradientRightBorder", 1, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float4, "GradientStart", 1, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float4, "GradientEnd", 1, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float4, "GradientScale01", 1, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float4, "GradientBias01", 1, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float4, "GradientScale23", 1, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float4, "GradientBias23", 1, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float, "GradientThreshold", 1, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float, "GradientBias", 1, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float, "GradientScale", 1, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float4, "GradientThresholds1_7", 1, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float4, "GradientThresholds9_13", 1, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float4, "GradientScales", 8, 0, ChainGradientMask},
+    {Element::Kind::Param, ShaderType::Float4, "GradientBiases", 8, 0, ChainGradientMask},
     // The noise source's frequency/stitch pair (the octaves element already exists above).
-    {Element::Kind::Param, ShaderType::Float4, "Noise_frequencyStitch", 1, 0, ChainNoiseMask},
+    {Element::Kind::Param, ShaderType::Float4, "NoiseFrequencyStitch", 1, 0, ChainNoiseMask},
 };
 
 inline constexpr Module Chain = {

@@ -8,7 +8,7 @@
 // Resource ops (gradient and noise sources) are not evaluated here: a slot that none of the core
 // ops below claim goes to the kernel entry's evalResourceSlot(), which dispatches to the resource
 // modules the entry includes, and only then falls through to OP_COLOR_SPACE_XFORM. The
-// ColorSpaceXform parameters are shared chain-wide (ChainCSFlags & friends): the matcher
+// ColorSpaceXform parameters are shared chain-wide (ChainFlags & friends): the matcher
 // guarantees at most one slot per chain uses them.
 
 #ifndef TGSL_POINTWISE_CHAIN_EVAL_INCLUDED
@@ -175,7 +175,7 @@ vec4 evalChainSlot(int slot) {
   }
   // OP_COLOR_SPACE_XFORM (the registered exception: its parameters are the program-level block,
   // not per-slot registers, so it does not ride the shared dispatch)
-  return chainApplyColorSpaceXform(in0, ChainCSFlags, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType,
+  return chainApplyColorSpaceXform(in0, ChainFlags, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType,
                                    ChainSrcOOTF, ChainColorXform, ChainDstOOTF, ChainDstTF0,
                                    ChainDstTF1, ChainDstTFType);
 }

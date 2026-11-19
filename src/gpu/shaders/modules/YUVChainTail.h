@@ -44,7 +44,7 @@ inline constexpr Element YUVChainTailElements[] = {
     {Element::Kind::Param, ShaderType::Int, "SlotCount"},
     {Element::Kind::Param, ShaderType::Int4, "SlotPacked", YUVChainTailSlotCapacity},
     // The program-level color-space block (at most one ColorSpaceXform per tail).
-    {Element::Kind::Param, ShaderType::Int, "ChainCSFlags"},
+    {Element::Kind::Param, ShaderType::Int, "ChainFlags"},
     {Element::Kind::Param, ShaderType::Float4, "ChainSrcTF0"},
     {Element::Kind::Param, ShaderType::Float4, "ChainSrcTF1"},
     {Element::Kind::Param, ShaderType::Int, "ChainSrcTFType"},

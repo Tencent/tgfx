@@ -250,16 +250,16 @@ inline constexpr const char* kPerlinNoiseIncludes[] = {"pipeline/chain/pointwise
 // ---- ColorSpaceXform -----------------------------------------------------------------------
 inline constexpr Arg kColorSpaceXformArgs[] = {
     {Param::Vec4, Source::CallArg, 0},
-    {Param::Int, Source::Member, ChainBindingSource::CSFlags},
-    {Param::Vec4, Source::Member, ChainBindingSource::CSTransferSrc0},
-    {Param::Vec4, Source::Member, ChainBindingSource::CSTransferSrc1},
-    {Param::Int, Source::Member, ChainBindingSource::CSTransferSrcType},
-    {Param::Vec4, Source::Member, ChainBindingSource::CSOotfSrc},
-    {Param::Mat3, Source::Member, ChainBindingSource::CSColorXform},
-    {Param::Vec4, Source::Member, ChainBindingSource::CSOotfDst},
-    {Param::Vec4, Source::Member, ChainBindingSource::CSTransferDst0},
-    {Param::Vec4, Source::Member, ChainBindingSource::CSTransferDst1},
-    {Param::Int, Source::Member, ChainBindingSource::CSTransferDstType},
+    {Param::Int, Source::Member, ChainBindingSource::ChainFlags},
+    {Param::Vec4, Source::Member, ChainBindingSource::ChainSrcTF0},
+    {Param::Vec4, Source::Member, ChainBindingSource::ChainSrcTF1},
+    {Param::Int, Source::Member, ChainBindingSource::ChainSrcTFType},
+    {Param::Vec4, Source::Member, ChainBindingSource::ChainSrcOOTF},
+    {Param::Mat3, Source::Member, ChainBindingSource::ChainColorXform},
+    {Param::Vec4, Source::Member, ChainBindingSource::ChainDstOOTF},
+    {Param::Vec4, Source::Member, ChainBindingSource::ChainDstTF0},
+    {Param::Vec4, Source::Member, ChainBindingSource::ChainDstTF1},
+    {Param::Int, Source::Member, ChainBindingSource::ChainDstTFType},
 };
 inline constexpr const char* kColorSpaceXformIncludes[] = {"ops/ColorSpaceXform.glsl"};
 

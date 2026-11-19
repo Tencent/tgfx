@@ -39,8 +39,7 @@ struct CatalogEntry {
   std::string source = {};
   std::vector<std::string>
   requires = {};
-  std::string memberPrefix = {};
-  size_t memberStart = 2;
+  std::string opPrefix = {};
   std::vector<std::pair<std::string, std::string>> members = {};     // param -> member
   std::vector<std::pair<std::string, std::string>> sources = {};     // param -> enum override
   std::vector<std::pair<std::string, std::string>> conditions = {};  // param -> guard
@@ -68,6 +67,12 @@ std::string CompactFunctionSource(const std::string& text) {
       continue;
     }
     if (c == '/' && next == '*') {
+      // /*@in*/ is a parameter annotation the signature parser reads, not a comment.
+      if (text.compare(i, 7, "/*@in*/") == 0) {
+        out += "/*@in*/";
+        i += 6;
+        continue;
+      }
       inBlock = true;
       ++i;
       continue;
@@ -108,40 +113,26 @@ bool ParseAnnotatedFunction(const std::string& text, CatalogEntry* entry, std::s
       line.pop_back();
     }
     const std::string functionTag = "//@function ";
-    const std::string membersTag = "//@members ";
-    const std::string sourceTag = "//@source ";
-    const std::string whenTag = "//@when ";
-    const std::string memberTag = "//@member ";
-    const std::string memberStartTag = "//@member-start ";
+
     const std::string requiresTag = "//@requires ";
     if (line.rfind(functionTag, 0) == 0) {
       if (!entry->name.empty()) {
         *error = "a file declares more than one //@function";
         return false;
       }
-      entry->name = line.substr(functionTag.size());
-    } else if (line.rfind(requiresTag, 0) == 0) {
-      *error = "//@requires is retired: the scan infers a function's dependencies from its body";
+      const std::string rest = line.substr(functionTag.size());
+      const auto space = rest.find(' ');
+      if (space != std::string::npos) {
+        entry->name = rest.substr(0, space);
+        entry->opPrefix = rest.substr(space + 1);
+      } else {
+        entry->name = rest;
+      }
+    } else if (line.rfind("//@members ", 0) == 0 || line.rfind("//@member ", 0) == 0 ||
+               line.rfind("//@source ", 0) == 0 || line.rfind("//@when ", 0) == 0 ||
+               line.rfind("//@member-start ", 0) == 0 || line.rfind("//@requires ", 0) == 0) {
+      *error = "retired annotation: " + line + " (see the //@function prefix form)";
       return false;
-    } else if (line.rfind(membersTag, 0) == 0) {
-      entry->memberPrefix = line.substr(membersTag.size());
-    } else if (line.rfind(sourceTag, 0) == 0 || line.rfind(whenTag, 0) == 0) {
-      const bool isSource = line.rfind(sourceTag, 0) == 0;
-      const std::string rest = line.substr(isSource ? sourceTag.size() : whenTag.size());
-      const auto space = rest.find(' ');
-      if (space != std::string::npos) {
-        auto& target = isSource ? entry->sources : entry->conditions;
-        target.emplace_back(rest.substr(0, space), rest.substr(space + 1));
-      }
-    } else if (line.rfind(memberStartTag, 0) == 0) {
-      entry->memberStart =
-          static_cast<size_t>(std::atoi(line.substr(memberStartTag.size()).c_str()));
-    } else if (line.rfind(memberTag, 0) == 0) {
-      const std::string rest = line.substr(memberTag.size());
-      const auto space = rest.find(' ');
-      if (space != std::string::npos) {
-        entry->members.emplace_back(rest.substr(0, space), rest.substr(space + 1));
-      }
     } else {
       source += line;
       source.push_back('\n');
@@ -190,7 +181,33 @@ std::vector<std::pair<std::string, std::string>> SignatureParams(const std::stri
       item = item.substr(first, last - first + 1);
       const auto space = item.find_last_of(" \t\n");
       if (space != std::string::npos) {
-        params.emplace_back(item.substr(0, space), item.substr(space + 1));
+        std::string name = item.substr(space + 1);
+        std::string type = item.substr(0, space);
+        // An array parameter: the name may carry the count ("scales[8]") or the type may
+        // ("vec4[8]"). Extract the count and normalize both.
+        size_t arrayCount = 0;
+        const auto nameBracket = name.find('[');
+        if (nameBracket != std::string::npos) {
+          arrayCount = static_cast<size_t>(std::atoi(name.c_str() + nameBracket + 1));
+          name = name.substr(0, nameBracket);
+        }
+        const auto typeBracket = type.find('[');
+        if (typeBracket != std::string::npos && arrayCount == 0) {
+          arrayCount = static_cast<size_t>(std::atoi(type.c_str() + typeBracket + 1));
+        }
+        type = type.substr(0, typeBracket == std::string::npos ? type.size() : typeBracket);
+        if (arrayCount > 0) {
+          type += "[" + std::to_string(arrayCount) + "]";
+        }
+        // A trailing /*@in*/ marks a call argument; strip it and remember it as a prefix.
+        const auto marker = name.find("/*@in*/");
+        if (marker != std::string::npos) {
+          name = name.substr(0, marker);
+          const auto trim = name.find_last_not_of(" \t");
+          name = (trim == std::string::npos) ? "" : name.substr(0, trim + 1);
+          type += " /*@in*/";
+        }
+        params.emplace_back(type, name);
       }
     }
     if (end == list.size()) {
@@ -202,47 +219,30 @@ std::vector<std::pair<std::string, std::string>> SignatureParams(const std::stri
 }
 
 const char* FragmentTypeOf(const std::string& glslType) {
-  if (glslType == "int") {
+  const auto bracket = glslType.find('[');
+  const std::string base = bracket == std::string::npos ? glslType : glslType.substr(0, bracket);
+  if (base == "int") {
     return "Int";
   }
-  if (glslType == "float") {
+  if (base == "float") {
     return "Float";
   }
-  if (glslType == "vec2") {
+  if (base == "vec2") {
     return "Float2";
   }
-  if (glslType == "vec3") {
+  if (base == "vec3") {
     return "Float3";
   }
-  if (glslType == "vec4") {
+  if (base == "vec4") {
     return "Float4";
   }
-  if (glslType == "ivec4") {
+  if (base == "ivec4") {
     return "Int4";
   }
-  if (glslType == "mat3") {
+  if (base == "mat3") {
     return "Matrix3";
   }
   return nullptr;
-}
-
-// The member's binding source, derived from its name: Gradient_leftBorder -> GradientLeftBorder.
-std::string BindingSourceOf(const std::string& member, const std::string& prefix) {
-  std::string head = prefix;
-  if (!head.empty() && head.back() == '_') {
-    head.pop_back();
-  }
-  std::string tail = member;
-  if (tail.rfind(prefix, 0) == 0) {
-    // The separator form: Gradient_leftBorder -> LeftBorder -> GradientLeftBorder.
-    tail = tail.substr(prefix.size());
-  } else if (!head.empty() && member.rfind(head, 0) == 0) {
-    return member;  // an explicit name already carries the prefix
-  }
-  if (!tail.empty()) {
-    tail[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(tail[0])));
-  }
-  return head + tail;
 }
 
 }  // namespace
@@ -352,7 +352,7 @@ bool WriteFunctionCatalog(const std::string& shaderDir, const std::string& outPa
   header << "#pragma once\n\n#include <cstring>\n\nnamespace tgfx {\n\n";
   header << "struct ChainFunctionEntry {\n  const char* name = nullptr;\n"
             "  const char* source = nullptr;\n  const char* requires = nullptr;\n"
-            "  const char* memberPrefix = nullptr;\n  const char* members = nullptr;\n};\n\n";
+            "  const char* opPrefix = nullptr;\n  const char* members = nullptr;\n};\n\n";
   header << "inline constexpr ChainFunctionEntry kChainFunctions[] = {\n";
   for (const auto& entry : entries) {
     std::string requiresList = {};
@@ -370,7 +370,7 @@ bool WriteFunctionCatalog(const std::string& shaderDir, const std::string& outPa
       membersList += member.first + "=" + member.second;
     }
     header << "    {\"" << entry.name << "\", R\"TGSLSRC(" << entry.source << ")TGSLSRC\", \""
-           << requiresList << "\", \"" << entry.memberPrefix << "\", \"" << membersList << "\"},\n";
+           << requiresList << "\", \"" << entry.opPrefix << "\", \"" << membersList << "\"},\n";
   }
   header << "};\n\n";
   header << "inline const char* FindChainFunctionSource(const char* name) {\n";
@@ -400,75 +400,45 @@ bool WriteFunctionCatalog(const std::string& shaderDir, const std::string& outPa
               "// the one entry it registers (no include guard, the file is included once per "
               "entry).\n\n";
   for (const CatalogEntry* entry : sorted) {
-    if (entry->members.empty() || entry->memberPrefix.empty()) {
-      continue;
+    if (entry->opPrefix.empty()) {
+      continue;  // a helper, not an op entry: it registers no members
+    }
+    const auto params = SignatureParams(entry->source, entry->name);
+    if (params.empty()) {
+      *error = entry->name + ": the signature is unreadable";
+      return false;
     }
     registry << "#if defined(TGFX_REGISTER_" << entry->name << ")\n";
-    const auto params = SignatureParams(entry->source, entry->name);
-    if (params.size() < entry->memberStart) {
-      continue;
-    }
-    const std::string prefix = entry->memberPrefix;
-    std::vector<std::string> order = {};
-    std::map<std::string, std::tuple<std::string, size_t, std::string, std::string>> members = {};
-    for (size_t index = entry->memberStart; index < params.size(); ++index) {
-      const std::string& paramName = params[index].second;
-      std::string memberName = prefix + paramName;
-      size_t count = 1;
-      for (const auto& member : entry->members) {
-        if (member.first != paramName) {
-          continue;
-        }
-        memberName = member.second;
-        const auto bracket = memberName.find('[');
-        if (bracket != std::string::npos) {
-          count = static_cast<size_t>(std::atoi(memberName.c_str() + bracket + 1)) + 1;
-          memberName = memberName.substr(0, bracket);
-        }
-        break;
+    const std::string& prefix = entry->opPrefix;
+    // A parameter whose type carries /*@in*/ is a call argument; everything else is a block
+    // member. The type carries the array count (vec4[8] -> one member, count 8); the name is
+    // the parameter name, capitalized and prefixed. The signature IS the structure.
+    for (size_t index = 0; index < params.size(); ++index) {
+      const std::string& glslType = params[index].first;
+      if (glslType.find("/*@in*/") != std::string::npos) {
+        continue;
       }
-      const char* fragmentType = FragmentTypeOf(params[index].first);
+      const std::string& paramName = params[index].second;
+      size_t arrayCount = 0;
+      const auto bracket = glslType.find('[');
+      if (bracket != std::string::npos) {
+        arrayCount = static_cast<size_t>(std::atoi(glslType.c_str() + bracket + 1));
+      }
+      const char* fragmentType = FragmentTypeOf(glslType);
       if (fragmentType == nullptr) {
-        *error = entry->name + ": unsupported parameter type " + params[index].first;
+        *error = entry->name + ": unsupported parameter type " + glslType;
         return false;
       }
-      std::string enumName = BindingSourceOf(memberName, prefix);
-      std::string guard = {};
-      for (const auto& source : entry->sources) {
-        if (source.first == paramName) {
-          enumName = source.second;
-        }
-      }
-      for (const auto& condition : entry->conditions) {
-        if (condition.first == paramName) {
-          guard = condition.second;
-        }
-      }
-      auto found = members.find(memberName);
-      if (found == members.end()) {
-        order.push_back(memberName);
-        members.emplace(memberName,
-                        std::make_tuple(std::string(fragmentType), count, enumName, guard));
-      } else if (count > std::get<1>(found->second)) {
-        std::get<1>(found->second) = count;
-      }
-    }
-    for (const auto& memberName : order) {
-      const auto& info = members[memberName];
-      if (!std::get<3>(info).empty()) {
-        registry << "  if (" << std::get<3>(info) << ") {\n";
-      }
-      registry << (std::get<3>(info).empty() ? "  " : "    ") << "registry->uniform(\""
-               << memberName << "\", FragmentType::" << std::get<0>(info)
-               << ", ChainBindingSource::" << std::get<2>(info) << ", -1";
-      if (std::get<1>(info) > 1) {
-        // uniform(name, type, source, slot, index, count): an array names no index.
-        registry << ", -1, " << std::get<1>(info);
+      std::string memberName = prefix;
+      memberName.push_back(
+          static_cast<char>(std::toupper(static_cast<unsigned char>(paramName[0]))));
+      memberName += paramName.substr(1);
+      registry << "  registry->uniform(\"" << memberName << "\", FragmentType::" << fragmentType
+               << ", ChainBindingSource::" << memberName << ", -1";
+      if (arrayCount > 1) {
+        registry << ", -1, " << arrayCount;
       }
       registry << ");\n";
-      if (!std::get<3>(info).empty()) {
-        registry << "  }\n";
-      }
     }
     registry << "#endif\n";
   }

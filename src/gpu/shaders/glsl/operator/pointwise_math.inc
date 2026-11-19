@@ -16,7 +16,7 @@
 // copy); the plain evaluator below still spells the stages through this apply macro.
 #include "ops/ColorSpaceXform.glsl"
 
-// ColorSpaceXform stage flags (the CSFlags / ChainCSFlags bit set), shared by both evaluators.
+// ColorSpaceXform stage flags (the CSFlags / ChainFlags bit set), shared by both evaluators.
 #define CS_UNPREMUL 1
 #define CS_LINEARIZE 2
 #define CS_GAMUT 4

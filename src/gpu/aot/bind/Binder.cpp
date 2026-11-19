@@ -60,7 +60,7 @@ struct ChainIndices {
   uint8_t gradientIntervalCount = ChainElement("GradientIntervalCount");
   uint8_t gradientKinds = ChainElement("GradientKinds");
   uint8_t gradientLayoutType = ChainElement("GradientLayoutType");
-  uint8_t gradientLUTLeaf = ChainElement("GradientLUTLeaf");
+  uint8_t gradientLUTLeaf = ChainElement("GradientLutLeaf");
   uint8_t hasMaskTexture = ChainElement("HasMaskTexture");
   uint8_t leafReadSwizzles = ChainElement("LeafReadSwizzles");
   uint8_t needsBlendMath = ChainElement("NeedsBlendMath");
@@ -100,12 +100,12 @@ constexpr YUVTailIndices YUVField = {};
 // The chain-wide color-space block's element indices: the Chain and YUVChainTail modules spell
 // the same ten fields, each through its own element order.
 constexpr ColorSpaceXformHelper::FieldElements ChainCSFields = {
-    ChainElement("ChainCSFlags"),   ChainElement("ChainSrcTF0"),  ChainElement("ChainSrcTF1"),
+    ChainElement("ChainFlags"),   ChainElement("ChainSrcTF0"),  ChainElement("ChainSrcTF1"),
     ChainElement("ChainSrcTFType"), ChainElement("ChainSrcOOTF"), ChainElement("ChainColorXform"),
     ChainElement("ChainDstOOTF"),   ChainElement("ChainDstTF0"),  ChainElement("ChainDstTF1"),
     ChainElement("ChainDstTFType")};
 constexpr ColorSpaceXformHelper::FieldElements YUVCSFields = {
-    YUVElement("ChainCSFlags"),   YUVElement("ChainSrcTF0"),  YUVElement("ChainSrcTF1"),
+    YUVElement("ChainFlags"),   YUVElement("ChainSrcTF0"),  YUVElement("ChainSrcTF1"),
     YUVElement("ChainSrcTFType"), YUVElement("ChainSrcOOTF"), YUVElement("ChainColorXform"),
     YUVElement("ChainDstOOTF"),   YUVElement("ChainDstTF0"),  YUVElement("ChainDstTF1"),
     YUVElement("ChainDstTFType")};
@@ -229,21 +229,21 @@ void UploadGradientParams(SlotWriter* chainWriter, size_t /*blockBase*/,
   chainWriter->setIfPresent(ChainField.gradientIntervalCount, params.intervalCount);
   // The named parameter block: the evaluator reads these members directly, so each field is
   // written once by element index — no pool packing round trip.
-  constexpr uint8_t LeftBorder = UniformElementIndexOf(Chain, "Gradient_leftBorder");
-  constexpr uint8_t RightBorder = UniformElementIndexOf(Chain, "Gradient_rightBorder");
-  constexpr uint8_t Start = UniformElementIndexOf(Chain, "Gradient_start");
-  constexpr uint8_t End = UniformElementIndexOf(Chain, "Gradient_end");
-  constexpr uint8_t Scale01 = UniformElementIndexOf(Chain, "Gradient_scale01");
-  constexpr uint8_t Bias01 = UniformElementIndexOf(Chain, "Gradient_bias01");
-  constexpr uint8_t Scale23 = UniformElementIndexOf(Chain, "Gradient_scale23");
-  constexpr uint8_t Bias23 = UniformElementIndexOf(Chain, "Gradient_bias23");
-  constexpr uint8_t Threshold = UniformElementIndexOf(Chain, "Gradient_threshold");
-  constexpr uint8_t Bias = UniformElementIndexOf(Chain, "Gradient_bias");
-  constexpr uint8_t Scale = UniformElementIndexOf(Chain, "Gradient_scale");
-  constexpr uint8_t Thresholds1_7 = UniformElementIndexOf(Chain, "Gradient_thresholds1_7");
-  constexpr uint8_t Thresholds9_13 = UniformElementIndexOf(Chain, "Gradient_thresholds9_13");
-  constexpr uint8_t Scales = UniformElementIndexOf(Chain, "Gradient_scales");
-  constexpr uint8_t Biases = UniformElementIndexOf(Chain, "Gradient_biases");
+  constexpr uint8_t LeftBorder = UniformElementIndexOf(Chain, "GradientLeftBorder");
+  constexpr uint8_t RightBorder = UniformElementIndexOf(Chain, "GradientRightBorder");
+  constexpr uint8_t Start = UniformElementIndexOf(Chain, "GradientStart");
+  constexpr uint8_t End = UniformElementIndexOf(Chain, "GradientEnd");
+  constexpr uint8_t Scale01 = UniformElementIndexOf(Chain, "GradientScale01");
+  constexpr uint8_t Bias01 = UniformElementIndexOf(Chain, "GradientBias01");
+  constexpr uint8_t Scale23 = UniformElementIndexOf(Chain, "GradientScale23");
+  constexpr uint8_t Bias23 = UniformElementIndexOf(Chain, "GradientBias23");
+  constexpr uint8_t Threshold = UniformElementIndexOf(Chain, "GradientThreshold");
+  constexpr uint8_t Bias = UniformElementIndexOf(Chain, "GradientBiases");
+  constexpr uint8_t Scale = UniformElementIndexOf(Chain, "GradientScales");
+  constexpr uint8_t Thresholds1_7 = UniformElementIndexOf(Chain, "GradientThresholds1_7");
+  constexpr uint8_t Thresholds9_13 = UniformElementIndexOf(Chain, "GradientThresholds9_13");
+  constexpr uint8_t Scales = UniformElementIndexOf(Chain, "GradientScales");
+  constexpr uint8_t Biases = UniformElementIndexOf(Chain, "GradientBiases");
   chainWriter->setIfPresent(LeftBorder, params.leftBorder);
   chainWriter->setIfPresent(RightBorder, params.rightBorder);
   chainWriter->setIfPresent(Start, params.start);
@@ -516,7 +516,7 @@ void BindChainProgram(const AOTProgram& program, SlotWriter* chainWriter, bool n
     }
     if (slots[index].op == AOTChainOp::PerlinNoise) {
       const auto& noise = slots[index].noise;
-      constexpr uint8_t FrequencyStitch = UniformElementIndexOf(Chain, "Noise_frequencyStitch");
+      constexpr uint8_t FrequencyStitch = UniformElementIndexOf(Chain, "NoiseFrequencyStitch");
       chainWriter->setIfPresent(FrequencyStitch,
                                 std::array<float, 4>{noise.baseFrequencyX, noise.baseFrequencyY,
                                                      static_cast<float>(noise.stitchWidth),

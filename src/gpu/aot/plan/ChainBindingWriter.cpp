@@ -253,34 +253,34 @@ bool ReadColorSpace(const ReadContext& ctx, ChainBindingSource source, uint8_t* 
   ColorSpaceXformValues values = {};
   ResolveColorSpaceXformValues(chainSlot->colorSpaceXform.steps.get(), &values);
   switch (source) {
-    case ChainBindingSource::CSFlags:
+    case ChainBindingSource::ChainFlags:
       Store(out, values.flags);
       return true;
-    case ChainBindingSource::CSTransferSrc0:
+    case ChainBindingSource::ChainSrcTF0:
       std::memcpy(out, values.srcTF0, sizeof(values.srcTF0));
       return true;
-    case ChainBindingSource::CSTransferSrc1:
+    case ChainBindingSource::ChainSrcTF1:
       std::memcpy(out, values.srcTF1, sizeof(values.srcTF1));
       return true;
-    case ChainBindingSource::CSTransferSrcType:
+    case ChainBindingSource::ChainSrcTFType:
       Store(out, values.srcTFType);
       return true;
-    case ChainBindingSource::CSOotfSrc:
+    case ChainBindingSource::ChainSrcOOTF:
       std::memcpy(out, values.srcOOTF, sizeof(values.srcOOTF));
       return true;
-    case ChainBindingSource::CSColorXform:
+    case ChainBindingSource::ChainColorXform:
       std::memcpy(out, values.colorXform, sizeof(values.colorXform));
       return true;
-    case ChainBindingSource::CSOotfDst:
+    case ChainBindingSource::ChainDstOOTF:
       std::memcpy(out, values.dstOOTF, sizeof(values.dstOOTF));
       return true;
-    case ChainBindingSource::CSTransferDst0:
+    case ChainBindingSource::ChainDstTF0:
       std::memcpy(out, values.dstTF0, sizeof(values.dstTF0));
       return true;
-    case ChainBindingSource::CSTransferDst1:
+    case ChainBindingSource::ChainDstTF1:
       std::memcpy(out, values.dstTF1, sizeof(values.dstTF1));
       return true;
-    case ChainBindingSource::CSTransferDstType:
+    case ChainBindingSource::ChainDstTFType:
       Store(out, values.dstTFType);
       return true;
     default:
@@ -521,16 +521,16 @@ bool ReadBinding(const ReadContext& ctx, const ChainBinding& binding, uint8_t* o
       std::memcpy(out, modeOctaves, sizeof(modeOctaves));
       return true;
     }
-    case ChainBindingSource::CSFlags:
-    case ChainBindingSource::CSTransferSrc0:
-    case ChainBindingSource::CSTransferSrc1:
-    case ChainBindingSource::CSTransferSrcType:
-    case ChainBindingSource::CSOotfSrc:
-    case ChainBindingSource::CSColorXform:
-    case ChainBindingSource::CSOotfDst:
-    case ChainBindingSource::CSTransferDst0:
-    case ChainBindingSource::CSTransferDst1:
-    case ChainBindingSource::CSTransferDstType:
+    case ChainBindingSource::ChainFlags:
+    case ChainBindingSource::ChainSrcTF0:
+    case ChainBindingSource::ChainSrcTF1:
+    case ChainBindingSource::ChainSrcTFType:
+    case ChainBindingSource::ChainSrcOOTF:
+    case ChainBindingSource::ChainColorXform:
+    case ChainBindingSource::ChainDstOOTF:
+    case ChainBindingSource::ChainDstTF0:
+    case ChainBindingSource::ChainDstTF1:
+    case ChainBindingSource::ChainDstTFType:
       return ReadColorSpace(ctx, binding.source, out);
     case ChainBindingSource::LeafSubset:
     case ChainBindingSource::LeafSubsetClampOn:
