@@ -690,14 +690,9 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
     // The snapshotOffset translation propagates to the brush's space, so apply the inverse to
     // the mask shader to keep it anchored in the original space.
     Brush imageBrush = brush;
-    if (imageBrush.maskFilter != nullptr &&
-        Types::Get(imageBrush.maskFilter.get()) == Types::MaskFilterType::Shader) {
-      const auto* shaderMaskFilter =
-          static_cast<const ShaderMaskFilter*>(imageBrush.maskFilter.get());
-      auto maskShader = shaderMaskFilter->getShader()->makeWithMatrix(
+    if (imageBrush.maskFilter != nullptr) {
+      imageBrush.maskFilter = imageBrush.maskFilter->makeWithMatrix(
           Matrix::MakeTrans(-snapshotOffset.x, -snapshotOffset.y));
-      imageBrush.maskFilter =
-          MaskFilter::MakeShader(std::move(maskShader), shaderMaskFilter->isInverted());
     }
     drawImage(std::move(image), SamplingOptions(), imageMatrix, clip, imageBrush);
   }
