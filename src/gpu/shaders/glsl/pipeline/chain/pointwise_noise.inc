@@ -7,21 +7,20 @@
 #define TGSL_POINTWISE_NOISE_INCLUDED
 
 #include "source/perlin_noise_math.inc"
+#include "fn/noise/sample_0.inc"
+#include "fn/noise/sample_1.inc"
+#include "fn/noise/sample_2.inc"
 
 // Evaluates one noise source: the layout math and the octaves loop live in the shared noise
 // module, byte-matching the runtime kernel.
 vec4 evalNoiseSlot(vec3 sourceCoords, vec4 frequencyStitch, ivec4 modeOctaves) {
-  highp vec2 coord = sourceCoords.xy / sourceCoords.z;
   if (modeOctaves.w == 0) {
-    return aotPerlinNoise(coord, frequencyStitch.xy, frequencyStitch.zw, modeOctaves.x,
-                          modeOctaves.y, modeOctaves.z, TextureSampler_0, TextureSampler_1);
+    return noiseSample0(sourceCoords, frequencyStitch, modeOctaves);
   }
   if (modeOctaves.w == 1) {
-    return aotPerlinNoise(coord, frequencyStitch.xy, frequencyStitch.zw, modeOctaves.x,
-                          modeOctaves.y, modeOctaves.z, TextureSampler_1, TextureSampler_2);
+    return noiseSample1(sourceCoords, frequencyStitch, modeOctaves);
   }
-  return aotPerlinNoise(coord, frequencyStitch.xy, frequencyStitch.zw, modeOctaves.x,
-                        modeOctaves.y, modeOctaves.z, TextureSampler_2, TextureSampler_3);
+  return noiseSample2(sourceCoords, frequencyStitch, modeOctaves);
 }
 
 #endif  // TGSL_POINTWISE_NOISE_INCLUDED

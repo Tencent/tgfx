@@ -7,6 +7,9 @@
 
 #include "source/gradient_layout.inc"
 #include "source/gradient_colorize.inc"
+#include "fn/gradient/colorize_mix.inc"
+#include "fn/gradient/colorize_dual.inc"
+#include "fn/gradient/colorize_lut.inc"
 
 // Evaluates one gradient. The layout math and border clamp are verbatim from the dedicated
 // gradient kernels; the colorizer kind selects between the single-interval mix, the dual-interval
@@ -28,37 +31,15 @@ vec4 evalGradientSlot(vec4 in0, vec3 sourceCoords, int layoutType, int colorizer
   } else if (gradT >= 1.0) {
     gradColor = rightBorder;
   } else if (colorizerKind == 0) {
-    // Keep the same arithmetic order as GLSLSingleIntervalGradientColorizer on the JIT path.
-    gradColor = (1.0 - gradT) * start + gradT * end;
+    gradColor = gradientColorizeMix(start, end, gradT);
   } else if (colorizerKind == 1) {
-    vec4 gradScale = scale01;
-    vec4 gradBias = bias01;
-    if (gradT >= threshold) {
-      gradScale = scale23;
-      gradBias = bias23;
-    }
-    gradColor = vec4(gradT * gradScale + gradBias);
+    gradColor = gradientColorizeDual(scale01, bias01, scale23, bias23, threshold, gradT);
   } else if (colorizerKind == 3) {
     // LUT colorizer, matching the dedicated texture_gradient kernel: sample the baked gradient
     // texture at the computed t. The LUT child occupies a leaf slot for sampler binding only;
     // lutLeaf selects it with static indices. Unreachable when NTEX == 0 (a LUT chain always
     // carries the child), but the branch must still compile for those variants.
-    gradColor = vec4(0.0);
-#if NTEX > 0
-    highp vec2 lutCoord = vec2(gradT, 0.5);
-    if (lutLeaf == 0) {
-      gradColor = texture(TextureSampler_0, lutCoord);
-    }
-    if (lutLeaf == 1) {
-      gradColor = texture(TextureSampler_1, lutCoord);
-    }
-    if (lutLeaf == 2) {
-      gradColor = texture(TextureSampler_2, lutCoord);
-    }
-    if (lutLeaf == 3) {
-      gradColor = texture(TextureSampler_3, lutCoord);
-    }
-#endif
+    gradColor = gradientColorizeLut(lutLeaf, gradT);
   } else {
     gradColor = gradientColorizeUnrolled(gradT, thresholds1_7, thresholds9_13, scale0, bias0,
                                          scale1, bias1, scale2, bias2, scale3, bias3, scale4,
