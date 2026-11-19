@@ -56,7 +56,7 @@ std::optional<Rect> GetClipBounds(const Canvas* canvas) {
 }
 
 static bool HasEmptyClip(const Canvas* canvas) {
-  auto bounds = canvas->getTotalClipBounds();
+  auto bounds = GetClipBounds(canvas);
   return bounds.has_value() && bounds->isEmpty();
 }
 
