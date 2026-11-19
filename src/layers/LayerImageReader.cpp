@@ -211,10 +211,7 @@ DrawOutcome LayerImageReader::Impl::drawRegionList(Context* context,
     auto readInfo =
         ImageInfo::Make(region.coreRect.width(), region.coreRect.height(), bandInfo.colorType(),
                         bandInfo.alphaType(), destination.rowBytes(), bandInfo.colorSpace());
-    if (readInfo.isEmpty()) {
-      control.fail(LayerImageErrorCode::InvalidInput);
-      return DrawOutcome::Failed;
-    }
+    DEBUG_ASSERT(!readInfo.isEmpty());
     auto rowOffset = static_cast<size_t>(region.coreRect.top - bandFirstRow);
     auto* dstPixels = basePixels + rowOffset * destination.rowBytes() +
                       static_cast<size_t>(region.coreRect.left) * bytesPerPixel;
@@ -406,14 +403,8 @@ std::unique_ptr<LayerImageReader> LayerImageReader::Make(Context* context,
   auto bandHeight = std::min(options.bandRows, request.outputSize.height);
   auto bandInfo = ImageInfo::Make(request.outputSize.width, bandHeight, request.colorType,
                                   request.alphaType, 0, outputColorSpace);
-  if (bandInfo.isEmpty()) {
-    return FailMake(error, LayerImageErrorCode::InvalidInput);
-  }
-  auto bytesPerPixel = bandInfo.bytesPerPixel();
+  DEBUG_ASSERT(!bandInfo.isEmpty());
   auto maxSize = std::numeric_limits<size_t>::max();
-  if (static_cast<uint64_t>(bandInfo.width()) > static_cast<uint64_t>(maxSize / bytesPerPixel)) {
-    return FailMake(error, LayerImageErrorCode::InvalidInput);
-  }
   if (static_cast<uint64_t>(bandInfo.height()) >
       static_cast<uint64_t>(maxSize / bandInfo.rowBytes())) {
     return FailMake(error, LayerImageErrorCode::InvalidInput);
