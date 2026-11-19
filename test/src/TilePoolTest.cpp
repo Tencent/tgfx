@@ -559,11 +559,11 @@ struct SkipRun {
   std::vector<uint8_t> pixels = {};
 };
 
-// Renders `count` small panels with a background blur over a striped backdrop at the given zoom,
-// optionally with one large panel with its own blur below them. The first render of a fresh
-// display list is measured, after an identical throwaway render has filled the texture pools.
+// Renders `count` small panels with a background blur over a striped backdrop at the given zoom.
+// The first render of a fresh display list is measured, after an identical throwaway render has
+// filled the texture pools.
 SkipRun RenderPanels(Context* context, float zoom, float sigma, int count, bool skip,
-                     float bigSigma = 0.0f, float stripePeriod = 16.0f, float origin = 150.0f) {
+                     float stripePeriod = 16.0f, float origin = 150.0f) {
   BackgroundHandler::SetSkippingNegligibleBlur(skip);
   auto size = 512;
   auto surface = Surface::Make(context, size, size);
@@ -592,9 +592,6 @@ SkipRun RenderPanels(Context* context, float zoom, float sigma, int count, bool 
       group->addChild(shape);
       return group;
     };
-    if (bigSigma > 0.0f) {
-      root->addChild(makePanel(100, 100, 2000, 2000, bigSigma));
-    }
     for (int i = 0; i < count; ++i) {
       root->addChild(makePanel(origin + static_cast<float>((i % 10) * 160),
                                origin + static_cast<float>((i / 10) * 160), 100, 100, sigma));
@@ -640,8 +637,8 @@ TGFX_TEST(TilePoolTest, SkippingNegligibleBackgroundBlurIsExactOnPixelBoundaries
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
   // Panels at multiples of 160 world units are whole pixels at zoom 0.05.
-  auto on = RenderPanels(context, 0.05f, 4.0f, 40, true, 0.0f, 400.0f, 160.0f);
-  auto off = RenderPanels(context, 0.05f, 4.0f, 40, false, 0.0f, 400.0f, 160.0f);
+  auto on = RenderPanels(context, 0.05f, 4.0f, 40, true, 400.0f, 160.0f);
+  auto off = RenderPanels(context, 0.05f, 4.0f, 40, false, 400.0f, 160.0f);
   EXPECT_EQ(MaxDifference(on, off), 0);
 }
 
