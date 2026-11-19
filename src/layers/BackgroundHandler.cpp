@@ -22,8 +22,9 @@
 #include "core/utils/MathExtra.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
+#include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
-#include "layers/LayerDrawSession.h"
+#include "layers/DrawControl.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/PictureRecorder.h"
@@ -234,18 +235,6 @@ void BackgroundCapturer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* 
   _forcedCaptureDepth -= forceDescendants;
 }
 
-bool BackgroundCapturer::HasDescendantBackdrop(Layer* layer) {
-  for (const auto& child : layer->children()) {
-    if (!child->visible() || child->alpha() <= 0.0f || child->maskOwner != nullptr) {
-      continue;
-    }
-    if (child->hasOwnBackgroundStyle() || HasDescendantBackdrop(child.get())) {
-      return true;
-    }
-  }
-  return false;
-}
-
 bool BackgroundCapturer::needsSurface(Layer* layer) const {
   return layer != nullptr && layer->hasDescendantBackgroundStyle();
 }
@@ -281,22 +270,16 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
     const Matrix& localToWorld, const Matrix& localToSurface) const {
   Matrix toWorld = Matrix::I();
   Rect worldBounds = Rect::MakeEmpty();
-  ISize surfaceSize =
-      surface != nullptr ? ISize::Make(surface->width(), surface->height()) : ISize{};
   if (!ComputeSubGeometry(bgSource.get(), localBounds, localToWorld, &toWorld, &worldBounds)) {
     if (parentArgs.drawControl != nullptr) {
-      parentArgs.drawControl->fail(DrawFailureCode::MissingDependency, DrawStage::Background,
-                                   nullptr, surfaceSize,
-                                   "failed to derive a nested background geometry");
+      parentArgs.drawControl->fail(LayerImageErrorCode::DrawFailed);
     }
     DEBUG_ASSERT(false);
     return nullptr;
   }
   auto subSource = bgSource->createFromSurface(surface, worldBounds, toWorld, localToSurface);
   if (subSource == nullptr && parentArgs.drawControl != nullptr) {
-    parentArgs.drawControl->fail(DrawFailureCode::AllocationFailure, DrawStage::Background, nullptr,
-                                 surfaceSize,
-                                 "failed to create a nested background surface source");
+    parentArgs.drawControl->fail(LayerImageErrorCode::AllocationFailed);
   }
   DEBUG_ASSERT(subSource != nullptr);
   return buildSubCapturer(parentArgs, std::move(subSource));
@@ -393,8 +376,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   auto bgImage = bgSource->getBackgroundImage();
   if (bgImage == nullptr) {
     if (args.drawControl != nullptr) {
-      args.drawControl->fail(DrawFailureCode::RenderingFailure, DrawStage::Background, layer, {},
-                             "failed to read the background snapshot image");
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
     }
     return;
   }
@@ -428,16 +410,12 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       BackgroundSnapshotEntry{std::move(image), offset});
 }
 
-std::optional<const LayerStyleSource*> BackgroundCapturer::getCachedLayerStyleSource(
-    Layer* layer) const {
+const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* layer) const {
   if (snapshots == nullptr) {
-    return std::nullopt;
+    return nullptr;
   }
   auto it = snapshots->layerStyleSources.find(layer);
-  if (it == snapshots->layerStyleSources.end()) {
-    return std::nullopt;
-  }
-  return it->second.get();
+  return it == snapshots->layerStyleSources.end() ? nullptr : it->second.get();
 }
 
 bool BackgroundCapturer::canCacheLayerStyleSource(Layer* /*layer*/) const {
@@ -488,16 +466,12 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
   return raw;
 }
 
-std::optional<const LayerStyleSource*> BackgroundConsumer::getCachedLayerStyleSource(
-    Layer* layer) const {
+const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* layer) const {
   if (snapshots == nullptr) {
-    return std::nullopt;
+    return nullptr;
   }
   auto it = snapshots->layerStyleSources.find(layer);
-  if (it == snapshots->layerStyleSources.end()) {
-    return std::nullopt;
-  }
-  return it->second.get();
+  return it == snapshots->layerStyleSources.end() ? nullptr : it->second.get();
 }
 
 void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
@@ -530,8 +504,21 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       // Surface path: the map is authoritative, so a miss is a capture-side coverage bug.
       // Silently skip rather than masking the bug with on-the-fly synthesis.
       if (args.drawControl != nullptr) {
-        args.drawControl->fail(DrawFailureCode::MissingDependency, DrawStage::Rendering, layer, {},
-                               "the background capture is missing a layer style snapshot");
+        // Without scene culling, a style can be visited outside a tile's effective clip.
+        if (args.renderRects == nullptr || args.renderRects->empty()) {
+          auto clipBounds = GetClipBounds(canvas);
+          if (clipBounds.has_value()) {
+            auto contentBounds =
+                Rect::MakeXYWH(contentOffset.x, contentOffset.y, contentWidth, contentHeight);
+            auto styleBounds = style->filterBounds(contentBounds, source->contentScale);
+            auto inverseScale = 1.0f / source->contentScale;
+            styleBounds.scale(inverseScale, inverseScale);
+            if (!Rect::Intersects(styleBounds, *clipBounds)) {
+              return;
+            }
+          }
+        }
+        args.drawControl->fail(LayerImageErrorCode::DrawFailed);
       }
       return;
     }
@@ -539,8 +526,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     DEBUG_ASSERT(cursor < it->second.size() && "capture/consume push-pop count mismatch");
     if (cursor >= it->second.size()) {
       if (args.drawControl != nullptr) {
-        args.drawControl->fail(DrawFailureCode::MissingDependency, DrawStage::Rendering, layer, {},
-                               "the background capture ran out of layer style snapshots");
+        args.drawControl->fail(LayerImageErrorCode::DrawFailed);
       }
       return;
     }
@@ -678,14 +664,16 @@ struct TargetCapture {
   bool replayUnclipped = false;
 };
 
-class TargetBackgroundCapturer final : public BackgroundCapturer {
+}  // namespace
+
+class BackgroundCapturer::TargetBackgroundCapturer final : public BackgroundCapturer {
  public:
   TargetBackgroundCapturer(BackgroundSnapshotMap* snapshots,
                            std::shared_ptr<BackgroundSource> source,
                            const std::vector<Rect>* styleSourceRects,
-                           const TargetCapture* selection, bool drawingUnclipped = false)
+                           const TargetCapture* selection, bool useLiveStyles)
       : BackgroundCapturer(snapshots, std::move(source), styleSourceRects), selection(selection),
-        drawingUnclipped(drawingUnclipped) {
+        useLiveStyles(useLiveStyles) {
   }
 
   LayerChildRange childRange(const Layer* parent) const override {
@@ -696,7 +684,16 @@ class TargetBackgroundCapturer final : public BackgroundCapturer {
         return {limit->second, false};
       }
     }
-    return BackgroundCapturer::childRange(parent);
+    if (!useLiveStyles || isForcedCapture()) {
+      return BackgroundCapturer::childRange(parent);
+    }
+    const auto& children = parent->children();
+    for (int i = static_cast<int>(children.size()) - 1; i >= 0; --i) {
+      if (HasBackdrop(children[static_cast<size_t>(i)].get())) {
+        return {i};
+      }
+    }
+    return {};
   }
 
   void drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent, Layer* child, float alpha,
@@ -710,26 +707,21 @@ class TargetBackgroundCapturer final : public BackgroundCapturer {
     BackgroundCapturer::drawChild(args, canvas, parent, child, alpha, forceDescendants);
   }
 
-  std::optional<const LayerStyleSource*> getCachedLayerStyleSource(Layer* layer) const override {
-    if (selection != nullptr && selection->childLimits.count(layer) != 0) {
-      bool hasBelowStyle = false;
-      for (const auto& style : layer->layerStyles()) {
-        if (style->position() == LayerStylePosition::Below) {
-          hasBelowStyle = true;
-          break;
-        }
-      }
-      if (!hasBelowStyle) {
-        // Avoid recording style inputs for ancestor content that paints after the target.
-        return nullptr;
+  bool needsLayerStyleSource(Layer* layer) const override {
+    if (selection == nullptr || selection->childLimits.count(layer) == 0) {
+      return true;
+    }
+    // Ancestor content above the target is outside this capture pass.
+    for (const auto& style : layer->layerStyles()) {
+      if (style->position() == LayerStylePosition::Below) {
+        return true;
       }
     }
-    return BackgroundCapturer::getCachedLayerStyleSource(layer);
+    return false;
   }
 
   bool needsSurface(Layer* layer) const override {
-    if (drawingUnclipped) {
-      // The scene's cached style coverage can omit descendants outside the target scroll clip.
+    if (useLiveStyles) {
       return layer != nullptr && HasDescendantBackdrop(layer);
     }
     return BackgroundCapturer::needsSurface(layer);
@@ -739,22 +731,35 @@ class TargetBackgroundCapturer final : public BackgroundCapturer {
   std::unique_ptr<BackgroundCapturer> makeSubCapturer(
       BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source,
       const std::vector<Rect>* styleSourceRects) const override {
-    return std::make_unique<TargetBackgroundCapturer>(
-        snapshots, std::move(source), styleSourceRects, selection, drawingUnclipped);
+    return std::make_unique<TargetBackgroundCapturer>(snapshots, std::move(source),
+                                                      styleSourceRects, selection, useLiveStyles);
   }
 
  private:
-  const TargetCapture* selection = nullptr;
-  bool drawingUnclipped = false;
-};
+  static bool HasBackdrop(Layer* layer) {
+    return layer->visible() && layer->alpha() > 0.0f && layer->maskOwner == nullptr &&
+           (layer->hasOwnBackgroundStyle() || HasDescendantBackdrop(layer));
+  }
 
-}  // namespace
+  static bool HasDescendantBackdrop(Layer* layer) {
+    for (const auto& child : layer->children()) {
+      if (HasBackdrop(child.get())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  const TargetCapture* selection = nullptr;
+  bool useLiveStyles = false;
+};
 
 void BackgroundCapturer::RunForTarget(Layer* captureRoot, Layer* target, float alpha,
                                       BlendMode blendMode, const DrawArgs& baseArgs,
                                       std::shared_ptr<BackgroundSource> bgSource,
                                       BackgroundSnapshotMap* snapshots,
-                                      const std::vector<Rect>& renderRects) {
+                                      const std::vector<Rect>& renderRects,
+                                      const std::vector<Layer*>& clippedAncestors) {
   auto* canvas = bgSource->getCanvas();
   DrawArgs args = baseArgs;
   AutoCanvasRestore restore(canvas);
@@ -777,10 +782,12 @@ void BackgroundCapturer::RunForTarget(Layer* captureRoot, Layer* target, float a
     selection.childLimits.emplace(parent, parent->doGetChildIndex(child));
   }
   {
-    TargetBackgroundCapturer capturer(snapshots, bgSource, &renderRects, &selection);
+    // A clipped scene bound can omit backdrop inputs needed before an ancestor's mask is applied.
+    args.renderRects = clippedAncestors.empty() ? &renderRects : nullptr;
+    TargetBackgroundCapturer capturer(snapshots, bgSource, args.renderRects, &selection,
+                                      !clippedAncestors.empty());
     AutoCanvasRestore restoreScene(canvas);
     args.backgroundHandler = &capturer;
-    args.renderRects = &renderRects;
     captureRoot->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
   }
   if (selection.replayUnclipped) {
@@ -790,6 +797,10 @@ void BackgroundCapturer::RunForTarget(Layer* captureRoot, Layer* target, float a
     args.renderRects = nullptr;
     capturer.forceDrawDescendants();
     canvas->concat(target->getRelativeMatrix3D(captureRoot).asMatrix());
+    if (!clippedAncestors.empty() &&
+        !LayerClip::ApplyAncestorClips(clippedAncestors, target, args, canvas, nullptr)) {
+      return;
+    }
     target->drawLayer(args, canvas, alpha, blendMode);
   }
 }

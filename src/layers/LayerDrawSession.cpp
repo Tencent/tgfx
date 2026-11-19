@@ -21,28 +21,19 @@
 #include <cmath>
 #include <cstdint>
 #include <utility>
-#include "core/Matrix3DUtils.h"
 #include "layers/BackgroundHandler.h"
-#include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
+#include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
-#include "layers/contents/LayerContent.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/Context.h"
-#include "tgfx/gpu/GPU.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
 
 namespace {
-
-// Fixed background sampling density relative to the final output pixel grid. One output pixel is
-// sampled by one background pixel, so every region of an export sees the same quality and the same
-// sampling phase.
-static constexpr float ExportBackgroundSurfaceScale = 1.0f;
 
 // Bound the output drawing surfaces even on devices with larger textures.
 static constexpr int DefaultExportSurfaceLimit = 2048;
@@ -51,10 +42,6 @@ static constexpr int DefaultExportSurfaceLimit = 2048;
 static constexpr int MaxBackgroundCaptureBytes = 32 * 1024 * 1024;
 static constexpr int BackgroundCaptureBytesPerPixel = 4;
 
-static constexpr char UnsupportedCoordinates[] =
-    "tiled export coordinates must be within [-2^23, 2^23] pixels";
-static constexpr char Unsupported3D[] = "the tiled export does not support 3D scenes";
-
 static bool IsSupportedCoordinate(double coordinate) {
   return std::abs(coordinate) <= MaxLayerExportCoordinate;
 }
@@ -62,11 +49,6 @@ static bool IsSupportedCoordinate(double coordinate) {
 static bool HasSupportedTranslation(const Matrix& matrix) {
   return IsSupportedCoordinate(matrix.getTranslateX()) &&
          IsSupportedCoordinate(matrix.getTranslateY());
-}
-
-static bool HasSupportedBounds(const Rect& bounds) {
-  return IsSupportedCoordinate(bounds.left) && IsSupportedCoordinate(bounds.top) &&
-         IsSupportedCoordinate(bounds.right) && IsSupportedCoordinate(bounds.bottom);
 }
 
 static Rect ToRect(const PixelRect& rect) {
@@ -145,15 +127,10 @@ static bool FitsLimit(const PixelRect& rect, int limitWidth, int limitHeight) {
          rect.height() <= limitHeight;
 }
 
-static const char* BackgroundCaptureLimitReason(const PixelRect& rect, int deviceLimit) {
-  if (!FitsLimit(rect, deviceLimit, deviceLimit)) {
-    return "the background capture exceeds the device texture limit";
-  }
-  auto pixelCount = static_cast<int64_t>(rect.width()) * rect.height();
-  if (pixelCount > MaxBackgroundCaptureBytes / BackgroundCaptureBytesPerPixel) {
-    return "the background capture exceeds the 32 MiB budget";
-  }
-  return nullptr;
+static bool FitsBackgroundCapture(const PixelRect& rect, int deviceLimit) {
+  return FitsLimit(rect, deviceLimit, deviceLimit) &&
+         static_cast<int64_t>(rect.width()) * rect.height() <=
+             MaxBackgroundCaptureBytes / BackgroundCaptureBytesPerPixel;
 }
 
 }  // namespace
@@ -180,63 +157,31 @@ float LayerDrawSession::AncestorFilterOutset(Layer* target, Layer* captureRoot,
   return outset;
 }
 
-bool LayerDrawSession::IsSupported2DLayer(const Layer* layer) {
-  return !layer->canPreserve3D() && layer->bitFields.matrix3DIsAffine &&
-         layer->matrix3D().asMatrix().isFinite();
-}
-
-bool LayerDrawSession::IsSupported2DScene(const Layer* layer) {
-  if (!IsSupported2DLayer(layer)) {
+bool LayerDrawSession::IsSupported2DScene(const Layer* layer,
+                                          std::vector<const Layer*>& activeMasks) {
+  if (layer->canPreserve3D() || !layer->bitFields.matrix3DIsAffine ||
+      !layer->matrix3D().asMatrix().isFinite()) {
     return false;
   }
   for (const auto& child : layer->children()) {
-    if (!IsSupported2DScene(child.get())) {
+    if (!child->visible() || child->alpha() <= 0 || child->maskOwner != nullptr) {
+      continue;
+    }
+    if (!IsSupported2DScene(child.get(), activeMasks)) {
       return false;
     }
   }
-  return true;
-}
-
-const char* LayerDrawSession::UnsupportedSubtreeReason(Layer* layer,
-                                                       std::vector<Layer*>& activeMasks) {
-  if (!IsSupported2DLayer(layer)) {
-    return Unsupported3D;
-  }
-  if (auto content = layer->getContent()) {
-    if (!HasSupportedBounds(content->getBounds(layer->hasGeometryStyle()))) {
-      return UnsupportedCoordinates;
-    }
-  }
-  for (const auto& child : layer->children()) {
-    if (!child->visible() || child->alpha() <= 0 || child->maskOwner) {
-      continue;
-    }
-    if (!HasSupportedTranslation(child->getMatrixWithScrollRect().asMatrix()) ||
-        (child->_scrollRect && !HasSupportedBounds(*child->_scrollRect))) {
-      return UnsupportedCoordinates;
-    }
-    if (auto reason = UnsupportedSubtreeReason(child.get(), activeMasks)) {
-      return reason;
-    }
-  }
   if (!layer->hasValidMask()) {
-    return nullptr;
+    return true;
   }
   auto* mask = layer->mask().get();
   if (std::find(activeMasks.begin(), activeMasks.end(), mask) != activeMasks.end()) {
-    return "the tiled export does not support cyclic masks";
-  }
-  auto maskToLayer = mask->getRelativeMatrix3D(layer);
-  if (!Matrix3DUtils::IsMatrix3DAffine(maskToLayer)) {
-    return Unsupported3D;
-  }
-  if (!HasSupportedTranslation(maskToLayer.asMatrix())) {
-    return UnsupportedCoordinates;
+    return false;
   }
   activeMasks.push_back(mask);
-  auto reason = UnsupportedSubtreeReason(mask, activeMasks);
+  const bool supported = IsSupported2DScene(mask, activeMasks);
   activeMasks.pop_back();
-  return reason;
+  return supported;
 }
 
 void LayerDrawSession::CollectLayerEffects(Layer* layer, const Matrix& localToOutput,
@@ -306,41 +251,6 @@ void LayerDrawSession::collectPrecedingEffects() {
   }
 }
 
-void DrawControl::fail(DrawFailure failure) {
-  if (failure.code == DrawFailureCode::None || failed()) {
-    return;
-  }
-  firstFailure = std::move(failure);
-}
-
-void DrawControl::fail(DrawFailureCode code, DrawStage stage, Layer* layer, ISize surfaceSize,
-                       std::string message) {
-  DrawFailure failure = {};
-  failure.code = code;
-  failure.stage = stage;
-  failure.layer = layer;
-  failure.surfaceSize = surfaceSize;
-  failure.message = std::move(message);
-  fail(std::move(failure));
-}
-
-class LayerDrawBatch::Impl {
- public:
-  std::vector<LayerRegionPlan> regions = {};
-  std::vector<Rect> renderRects = {};
-  BackgroundSnapshotMap snapshots = {};
-  bool hasSnapshots = false;
-};
-
-LayerDrawBatch::LayerDrawBatch() : impl(new Impl()) {
-}
-
-LayerDrawBatch::~LayerDrawBatch() = default;
-
-size_t LayerDrawBatch::regionCount() const {
-  return impl->regions.size();
-}
-
 ISize LayerDrawSession::ResolveSurfaceLimit(const LayerDrawLimits& limits) {
   auto deviceLimit = limits.gpuLimits.maxTextureDimension2D;
   if (deviceLimit <= 0) {
@@ -355,60 +265,19 @@ ISize LayerDrawSession::ResolveSurfaceLimit(const LayerDrawLimits& limits) {
   return result;
 }
 
-std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
-                                                            const LayerDrawRequest& request,
-                                                            DrawControl* control) {
-  if (request.target == nullptr) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::InvalidRequest, DrawStage::Validation, nullptr, {},
-                    "missing target");
-    }
+std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(const LayerDrawRequest& request,
+                                                            DrawControl& control) {
+  const auto& outputMatrix = request.targetLocalToOutput;
+  if (request.target == nullptr || request.outputSize.isEmpty() || !std::isfinite(request.alpha) ||
+      request.alpha < 0.0f || request.alpha > 1.0f || !outputMatrix.isFinite() ||
+      !outputMatrix.invertible()) {
+    control.fail(LayerImageErrorCode::InvalidInput);
     return nullptr;
   }
-  if (!std::isfinite(request.alpha) || request.alpha < 0.0f || request.alpha > 1.0f) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::InvalidRequest, DrawStage::Validation, request.target, {},
-                    "alpha is not a finite value in [0, 1]");
-    }
-    return nullptr;
-  }
-
-  if (context == nullptr || context->gpu() == nullptr) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::InvalidRequest, DrawStage::Validation, request.target, {},
-                    "a usable GPU context is required");
-    }
-    return nullptr;
-  }
-  auto outputMatrix = request.targetLocalToOutput;
-  if (!outputMatrix.isFinite() || outputMatrix.hasPerspective()) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::UnsupportedContent, DrawStage::Validation, request.target, {},
-                    "the output matrix is not a finite 2D affine transform");
-    }
-    return nullptr;
-  }
-  if (!outputMatrix.invertible()) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::InvalidRequest, DrawStage::Validation, request.target, {},
-                    "the output matrix is not invertible");
-    }
-    return nullptr;
-  }
-  if (request.outputSize.width <= 0 || request.outputSize.height <= 0) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::InvalidRequest, DrawStage::Validation, request.target, {},
-                    "the output size is invalid");
-    }
-    return nullptr;
-  }
-  if (request.outputSize.width > MaxLayerExportCoordinate ||
+  if (outputMatrix.hasPerspective() || request.outputSize.width > MaxLayerExportCoordinate ||
       request.outputSize.height > MaxLayerExportCoordinate ||
       !HasSupportedTranslation(outputMatrix)) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::UnsupportedContent, DrawStage::Validation, request.target, {},
-                    UnsupportedCoordinates);
-    }
+    control.fail(LayerImageErrorCode::UnsupportedContent);
     return nullptr;
   }
   auto* sceneRoot = request.target->root();
@@ -416,36 +285,32 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
   // The DisplayList root has no parent and its own visibility attributes do not affect drawing.
   for (auto* layer = request.target; layer != sceneRoot; layer = layer->parent()) {
     if (!layer->visible() || layer->alpha() <= 0.0f || layer->maskOwner != nullptr) {
-      if (control != nullptr) {
-        control->fail(DrawFailureCode::UnsupportedContent, DrawStage::Validation, layer, {},
-                      "the tiled export does not support hidden target branches");
-      }
+      control.fail(LayerImageErrorCode::UnsupportedContent);
       return nullptr;
     }
     if (layer == captureRoot) {
       break;
     }
   }
-  if (!IsSupported2DScene(captureRoot)) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::UnsupportedContent, DrawStage::Validation, request.target, {},
-                    Unsupported3D);
-    }
-    return nullptr;
-  }
-  std::vector<Layer*> activeMasks = {};
-  if (auto reason = UnsupportedSubtreeReason(request.target, activeMasks)) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::UnsupportedContent, DrawStage::Validation, request.target, {},
-                    reason);
-    }
+  std::vector<const Layer*> activeMasks;
+  if (!IsSupported2DScene(captureRoot, activeMasks)) {
+    control.fail(LayerImageErrorCode::UnsupportedContent);
     return nullptr;
   }
 
   std::unique_ptr<LayerDrawSession> session(new LayerDrawSession());
   session->request = request;
   session->outputPixelBounds = {0, 0, request.outputSize.width, request.outputSize.height};
-  session->useSceneBounds = sceneRoot != nullptr && request.target->_scrollRect == nullptr;
+  if (sceneRoot != nullptr && request.target != sceneRoot) {
+    for (auto* ancestor = request.target->parent(); ancestor != sceneRoot;
+         ancestor = ancestor->parent()) {
+      if (ancestor->_scrollRect != nullptr || ancestor->hasValidMask()) {
+        session->clippedAncestors.push_back(ancestor);
+      }
+    }
+  }
+  const bool captureInScene = sceneRoot != nullptr && request.target->_scrollRect == nullptr;
+  session->useSceneBounds = captureInScene && session->clippedAncestors.empty();
 
   if (sceneRoot != nullptr) {
     session->sceneRoot = sceneRoot->shared_from_this();
@@ -454,40 +319,43 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
   if (request.alpha > 0.0f) {
     CollectSubtreeEffects(request.target, outputMatrix, 0.0f, &session->targetEffects);
   }
-  if (session->targetEffects.empty()) {
+  if (session->targetEffects.empty() && session->clippedAncestors.empty()) {
     return session;
   }
 
   auto targetToRoot = request.target->getRelativeMatrix3D(captureRoot).asMatrix();
   Matrix rootToTarget = Matrix::I();
-  if (!targetToRoot.invert(&rootToTarget)) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::InvalidRequest, DrawStage::Validation, request.target, {},
-                    "the target to capture-root matrix is not invertible");
-    }
+  if (!targetToRoot.invert(&rootToTarget) || !rootToTarget.isFinite()) {
+    control.fail(LayerImageErrorCode::InvalidInput);
     return nullptr;
+  }
+  if (session->targetEffects.empty()) {
+    return session;
+  }
+  for (auto* ancestor : session->clippedAncestors) {
+    if (ancestor->_scrollRect == nullptr) {
+      continue;
+    }
+    auto ancestorToOutput = outputMatrix;
+    ancestorToOutput.preConcat(ancestor->getRelativeMatrix(request.target));
+    auto bounds = ancestorToOutput.mapRect(*ancestor->_scrollRect);
+    bounds.roundOut();
+    if (!session->ancestorScrollBounds.has_value()) {
+      session->ancestorScrollBounds = bounds;
+    } else if (!session->ancestorScrollBounds->intersect(bounds)) {
+      session->ancestorScrollBounds->setEmpty();
+    }
   }
   auto rootToOutput = outputMatrix;
   rootToOutput.preConcat(rootToTarget);
   if (!rootToOutput.isFinite() || rootToOutput.hasPerspective() ||
-      !rootToOutput.invert(&session->outputToRoot)) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::UnsupportedContent, DrawStage::Validation, request.target, {},
-                    "the capture-root to output matrix is not a finite 2D affine transform");
-    }
-    return nullptr;
-  }
-  if (!HasSupportedTranslation(rootToOutput)) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::UnsupportedContent, DrawStage::Validation, request.target, {},
-                    UnsupportedCoordinates);
-    }
+      !HasSupportedTranslation(rootToOutput) || !rootToOutput.invert(&session->outputToRoot)) {
+    control.fail(LayerImageErrorCode::UnsupportedContent);
     return nullptr;
   }
   session->rootToOutput = rootToOutput;
-  auto outset = session->useSceneBounds
-                    ? AncestorFilterOutset(request.target, captureRoot, rootToOutput)
-                    : 0.0f;
+  auto outset =
+      captureInScene ? AncestorFilterOutset(request.target, captureRoot, rootToOutput) : 0.0f;
   for (auto& effect : session->targetEffects) {
     effect.outputBounds.outset(outset, outset);
     effect.outset += outset;
@@ -497,18 +365,15 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(Context* context,
 }
 
 RegionPlanResult LayerDrawSession::planRegion(const PixelRect& core, const LayerDrawLimits& limits,
-                                              DrawControl* control) const {
+                                              DrawControl& control) const {
   RegionPlanResult result = {};
-  if (control != nullptr && control->cancelled()) {
+  if (control.cancelled()) {
     result.code = RegionPlanCode::Cancelled;
     return result;
   }
   if (core.isEmpty() || core.left < outputPixelBounds.left || core.top < outputPixelBounds.top ||
       core.right > outputPixelBounds.right || core.bottom > outputPixelBounds.bottom) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::InvalidRequest, DrawStage::Planning, request.target, {},
-                    "core region is empty or outside the output bounds");
-    }
+    control.fail(LayerImageErrorCode::InvalidInput);
     result.code = RegionPlanCode::Failed;
     return result;
   }
@@ -517,13 +382,19 @@ RegionPlanResult LayerDrawSession::planRegion(const PixelRect& core, const Layer
   // their input from snapshots of a separately sized capture surface.
   PixelRect renderRect = {core.left - 1, core.top - 1, core.right + 1, core.bottom + 1};
   auto captureBounds = ToPreciseRect(renderRect);
+  const bool mayDraw = !ancestorScrollBounds.has_value() ||
+                       Rect::Intersects(ToRect(renderRect), *ancestorScrollBounds);
   bool requiresBackground = false;
   for (const auto* effects : {&targetEffects, &precedingEffects}) {
-    if (effects == &precedingEffects && !requiresBackground) {
+    if (!mayDraw || (effects == &precedingEffects && !requiresBackground)) {
       break;
     }
     for (auto it = effects->rbegin(); it != effects->rend(); ++it) {
       const auto& bounds = it->outputBounds;
+      if (!requiresBackground && ancestorScrollBounds.has_value() &&
+          !Rect::Intersects(bounds, *ancestorScrollBounds)) {
+        continue;
+      }
       if (captureBounds.right <= bounds.left || captureBounds.left >= bounds.right ||
           captureBounds.bottom <= bounds.top || captureBounds.top >= bounds.bottom) {
         continue;
@@ -547,31 +418,20 @@ RegionPlanResult LayerDrawSession::planRegion(const PixelRect& core, const Layer
       requiresBackground = true;
     }
   }
-  captureBounds.roundOut();
-  if (!IsSafePixelRect(captureBounds)) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::UnsupportedContent, DrawStage::Planning, request.target, {},
-                    UnsupportedCoordinates);
+  if (requiresBackground) {
+    captureBounds.roundOut();
+    if (!IsSafePixelRect(captureBounds)) {
+      control.fail(LayerImageErrorCode::UnsupportedContent);
+      return result;
     }
-    result.code = RegionPlanCode::Failed;
-    return result;
+    result.region.captureRect = ToPixelRect(captureBounds);
   }
-  auto captureRect = ToPixelRect(captureBounds);
   auto deviceLimit = limits.gpuLimits.maxTextureDimension2D;
-  bool renderFits = FitsLimit(renderRect, surfaceLimit.width, surfaceLimit.height);
-  const auto* captureLimitReason =
-      requiresBackground ? BackgroundCaptureLimitReason(captureRect, deviceLimit) : nullptr;
-  if (!renderFits || captureLimitReason != nullptr) {
+  if (!FitsLimit(renderRect, surfaceLimit.width, surfaceLimit.height) ||
+      (result.region.captureRect &&
+       !FitsBackgroundCapture(*result.region.captureRect, deviceLimit))) {
     if (core.width() <= 1 && core.height() <= 1) {
-      if (control != nullptr) {
-        const auto& failedRect = renderFits ? captureRect : renderRect;
-        const auto* message = renderFits
-                                  ? captureLimitReason
-                                  : "a single output pixel exceeds the drawing surface limit";
-        control->fail(DrawFailureCode::SurfaceLimit, DrawStage::Planning, request.target,
-                      ISize::Make(failedRect.width(), failedRect.height()), message);
-      }
-      result.code = RegionPlanCode::Failed;
+      control.fail(LayerImageErrorCode::DeviceLimitExceeded);
       return result;
     }
     result.code = RegionPlanCode::RequiresSubdivision;
@@ -579,201 +439,149 @@ RegionPlanResult LayerDrawSession::planRegion(const PixelRect& core, const Layer
   }
   result.region.coreRect = core;
   result.region.renderRect = renderRect;
-  if (requiresBackground) {
-    auto dependencies = std::make_shared<RegionDependencyPlan>();
-    dependencies->needsBackground = true;
-    dependencies->captureRect = captureRect;
-    result.region.dependencies = std::move(dependencies);
-  }
   result.code = RegionPlanCode::Ready;
   return result;
 }
 
 BatchPlanResult LayerDrawSession::planBatch(const std::vector<LayerRegionPlan>& regions,
                                             const LayerDrawLimits& limits,
-                                            DrawControl* control) const {
+                                            DrawControl& control) const {
   BatchPlanResult result = {};
-  if (control != nullptr && control->cancelled()) {
+  if (control.cancelled()) {
     result.code = BatchPlanCode::Cancelled;
     return result;
   }
-  auto plan = std::make_shared<LayerDrawBatchPlan>();
-  plan->regions = regions;
   for (const auto& region : regions) {
-    if (region.dependencies == nullptr || !region.dependencies->needsBackground) {
+    if (!region.captureRect) {
       continue;
     }
-    auto& captureRect = plan->captureRect;
-    auto& dependencyRect = region.dependencies->captureRect;
-    if (!plan->needsBackground) {
-      captureRect = dependencyRect;
-      plan->needsBackground = true;
+    if (!result.captureRect) {
+      result.captureRect = region.captureRect;
       continue;
     }
-    captureRect.left = std::min(captureRect.left, dependencyRect.left);
-    captureRect.top = std::min(captureRect.top, dependencyRect.top);
-    captureRect.right = std::max(captureRect.right, dependencyRect.right);
-    captureRect.bottom = std::max(captureRect.bottom, dependencyRect.bottom);
+    auto& combined = *result.captureRect;
+    const auto& capture = *region.captureRect;
+    combined.left = std::min(combined.left, capture.left);
+    combined.top = std::min(combined.top, capture.top);
+    combined.right = std::max(combined.right, capture.right);
+    combined.bottom = std::max(combined.bottom, capture.bottom);
   }
-  auto deviceLimit = limits.gpuLimits.maxTextureDimension2D;
-  const auto* captureLimitReason =
-      plan->needsBackground ? BackgroundCaptureLimitReason(plan->captureRect, deviceLimit)
-                            : nullptr;
-  if (captureLimitReason != nullptr) {
+  if (result.captureRect &&
+      !FitsBackgroundCapture(*result.captureRect, limits.gpuLimits.maxTextureDimension2D)) {
     if (regions.size() <= 1) {
-      if (control != nullptr) {
-        control->fail(DrawFailureCode::SurfaceLimit, DrawStage::Planning, request.target,
-                      ISize::Make(plan->captureRect.width(), plan->captureRect.height()),
-                      captureLimitReason);
-      }
-      result.code = BatchPlanCode::Failed;
-      return result;
+      control.fail(LayerImageErrorCode::DeviceLimitExceeded);
+    } else {
+      result.code = BatchPlanCode::RequiresSplit;
     }
-    result.code = BatchPlanCode::RequiresSplit;
     return result;
   }
   result.code = BatchPlanCode::Ready;
-  result.plan = std::move(plan);
   return result;
 }
 
-std::unique_ptr<LayerDrawBatch> LayerDrawSession::prepareBatch(Context* context,
-                                                               const LayerDrawBatchPlan& plan,
-                                                               DrawControl* control) {
-  auto batch = std::unique_ptr<LayerDrawBatch>(new LayerDrawBatch());
-  batch->impl->regions = plan.regions;
-  // Style sources stay as lazy pictures: rasterizing a full-content recording would allocate a
-  // texture the size of the whole layer, while every output region samples only its own part.
-  batch->impl->snapshots.rasterizeStyleSources = false;
-  if (control != nullptr && control->failed()) {
-    return nullptr;
-  }
-  if (!plan.needsBackground) {
+std::optional<LayerDrawBatch> LayerDrawSession::prepareBatch(
+    Context* context, const std::optional<PixelRect>& captureRect, DrawControl& control) {
+  LayerDrawBatch batch;
+  if (!captureRect) {
     return batch;
   }
-  auto& captureRect = plan.captureRect;
-  if (captureRect.isEmpty()) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::MissingDependency, DrawStage::Background, request.target, {},
-                    "background capture has no output region");
-    }
-    return nullptr;
-  }
-  ISize captureSize = {captureRect.width(), captureRect.height()};
-  if (context != nullptr && context->gpu() != nullptr) {
-    auto deviceLimit = context->gpu()->limits()->maxTextureDimension2D;
-    if (const auto* reason = BackgroundCaptureLimitReason(captureRect, deviceLimit)) {
-      if (control != nullptr) {
-        control->fail(DrawFailureCode::SurfaceLimit, DrawStage::Background, request.target,
-                      captureSize, reason);
-      }
-      return nullptr;
-    }
-  }
-  BackgroundRasterGeometry geometry = {};
-  geometry.size = captureSize;
-  geometry.surfaceScale = ExportBackgroundSurfaceScale;
-  geometry.sceneRootToSurface = MakeTileMatrix(rootToOutput, captureRect);
-
-  auto bgSource = BackgroundSource::MakeWithGeometry(context, geometry, request.renderColorSpace);
+  // Keep style sources lazy so export never rasterizes a texture the size of the entire layer.
+  batch.snapshots.rasterizeStyleSources = false;
+  auto captureSize = ISize::Make(captureRect->width(), captureRect->height());
+  auto bgSource = BackgroundSource::MakeWithGeometry(
+      context, captureSize, MakeTileMatrix(rootToOutput, *captureRect), request.renderColorSpace);
   if (bgSource == nullptr) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::AllocationFailure, DrawStage::Background, request.target,
-                    captureSize, "failed to allocate the background capture surface");
-    }
-    return nullptr;
+    control.fail(LayerImageErrorCode::AllocationFailed);
+    return std::nullopt;
   }
   if (request.clearColor != Color::Transparent()) {
     bgSource->getCanvas()->drawColor(request.clearColor, BlendMode::SrcOver);
   }
   DrawArgs args(context);
   args.dstColorSpace = request.renderColorSpace;
-  args.drawControl = control;
-  // The capture and consume traversals must cull with the same rect, otherwise a style culled
-  // during capture would still be dispatched while consuming and find no snapshot. renderBounds
-  // already carries every ancestor effect outset, so this rect is safe for the consume pass too.
-  auto cullRect = outputToRoot.mapRect(ToRect(captureRect));
+  args.drawControl = &control;
+  // Capture and consume use the same cull rect when scene bounds apply.
+  auto cullRect = outputToRoot.mapRect(ToRect(*captureRect));
   cullRect.roundOut();
   cullRect.outset(1.0f, 1.0f);
-  batch->impl->renderRects = {cullRect};
+  batch.renderRects.push_back(cullRect);
   auto* captureRoot = sceneRoot ? sceneRoot.get() : request.target;
   BackgroundCapturer::RunForTarget(captureRoot, request.target, request.alpha, request.blendMode,
-                                   args, std::move(bgSource), &batch->impl->snapshots,
-                                   batch->impl->renderRects);
-  if (control != nullptr && control->failed()) {
-    return nullptr;
+                                   args, std::move(bgSource), &batch.snapshots, batch.renderRects,
+                                   clippedAncestors);
+  if (control.failed()) {
+    return std::nullopt;
   }
-  batch->impl->hasSnapshots = true;
   return batch;
 }
 
-DrawOutcome LayerDrawSession::drawRegion(Context* context, LayerDrawBatch& batch,
-                                         size_t regionIndex, const LayerDrawTarget& target,
-                                         DrawControl* control) {
-  if (control != nullptr && control->cancelled()) {
+bool LayerDrawSession::drawClippedTarget(const DrawArgs& args, Canvas* canvas, const Rect& bounds) {
+  auto saveCount = canvas->getSaveCount();
+  AutoCanvasRestore restore(canvas);
+  std::shared_ptr<Shader> coverage;
+  if (!LayerClip::ApplyAncestorClips(clippedAncestors, request.target, args, canvas,
+                                     &coverage)) {
+    return true;
+  }
+  request.target->drawLayer(args, canvas, request.alpha, request.blendMode);
+  if (coverage == nullptr) {
+    return true;
+  }
+  if (args.drawControl->failed()) {
+    return false;
+  }
+  auto result = canvas->getSurface()->makeImageSnapshot();
+  if (result == nullptr) {
+    return false;
+  }
+
+  // Reapply the clear color before mixing in the already-blended tile. The masks affect the
+  // complete group result, including when the target uses a blend mode such as Clear or Src.
+  canvas->restoreToCount(saveCount);
+  canvas->resetMatrix();
+  canvas->clear(request.clearColor);
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setBlendMode(BlendMode::Src);
+  paint.setMaskFilter(MaskFilter::MakeShader(std::move(coverage)));
+  const SamplingOptions sampling{FilterMode::Nearest, MipmapMode::None};
+  canvas->drawImageRect(std::move(result), bounds, bounds, sampling, &paint);
+  return true;
+}
+
+DrawOutcome LayerDrawSession::drawRegion(const LayerRegionPlan& region, LayerDrawBatch& batch,
+                                         Canvas* canvas, DrawControl& control) {
+  if (control.cancelled()) {
     return DrawOutcome::Cancelled;
   }
-  if (control != nullptr && control->failed()) {
-    return DrawOutcome::Failed;
-  }
-  if (target.canvas == nullptr || context == nullptr) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::InvalidRequest, DrawStage::Rendering, request.target, {},
-                    "the draw target or context is missing");
-    }
-    return DrawOutcome::Failed;
-  }
-  if (regionIndex >= batch.impl->regions.size()) {
-    if (control != nullptr) {
-      control->fail(DrawFailureCode::InvalidRequest, DrawStage::Rendering, request.target, {},
-                    "region index is outside the batch");
-    }
-    return DrawOutcome::Failed;
-  }
-  auto canvas = target.canvas;
-  AutoCanvasRestore autoRestore(canvas);
-  const auto& region = batch.impl->regions[regionIndex];
-  auto* surface = canvas->getSurface();
-  const int width = region.renderRect.width();
-  const int height = region.renderRect.height();
-  const auto bounds = Rect::MakeWH(width, height);
-  const bool reusesLargerSurface =
-      surface != nullptr && (surface->width() > width || surface->height() > height);
+  AutoCanvasRestore restore(canvas);
   canvas->resetMatrix();
-  if (target.clearBeforeDraw) {
-    canvas->clear(request.clearColor);
-  }
-  if (surface != nullptr) {
-    canvas->clipRect(bounds, false);
-  }
+  canvas->clear(request.clearColor);
+  const auto bounds = Rect::MakeWH(region.renderRect.width(), region.renderRect.height());
+  canvas->clipRect(bounds, false);
   canvas->setMatrix(MakeTileMatrix(request.targetLocalToOutput, region.renderRect));
 
-  const DrawViewport viewport = {canvas, bounds};
-  DrawArgs args(context);
+  DrawArgs args(canvas->getSurface()->getContext());
   args.dstColorSpace = request.renderColorSpace;
-  args.drawControl = control;
-  args.viewport = reusesLargerSurface ? &viewport : nullptr;
-  bool needsRegionBackground = region.dependencies != nullptr;
-  if (needsRegionBackground && useSceneBounds) {
-    args.renderRects = &batch.impl->renderRects;
+  args.drawControl = &control;
+  const bool needsBackground = region.captureRect.has_value();
+  if (needsBackground && useSceneBounds) {
+    args.renderRects = &batch.renderRects;
   }
-  BackgroundConsumer consumer(batch.impl->hasSnapshots ? &batch.impl->snapshots : nullptr, false);
-  args.backgroundHandler = needsRegionBackground ? static_cast<BackgroundHandler*>(&consumer)
-                                                 : BackgroundHandler::NoOp();
-  // Layer::draw() returns before drawing for a zero alpha. Skipping the draw here keeps that
-  // semantic, so a Clear or Src blend mode cannot erase the cleared output.
+  BackgroundConsumer consumer(&batch.snapshots, false);
+  args.backgroundHandler =
+      needsBackground ? static_cast<BackgroundHandler*>(&consumer) : BackgroundHandler::NoOp();
   if (request.alpha > 0.0f) {
-    request.target->drawLayer(args, canvas, request.alpha, request.blendMode);
-  }
-  if (control != nullptr) {
-    if (control->failed()) {
-      return DrawOutcome::Failed;
-    }
-    if (control->cancelled()) {
-      return DrawOutcome::Cancelled;
+    if (clippedAncestors.empty()) {
+      request.target->drawLayer(args, canvas, request.alpha, request.blendMode);
+    } else if (!drawClippedTarget(args, canvas, bounds)) {
+      control.fail(LayerImageErrorCode::DrawFailed);
     }
   }
-  return DrawOutcome::Success;
+  if (control.failed()) {
+    return DrawOutcome::Failed;
+  }
+  return control.cancelled() ? DrawOutcome::Cancelled : DrawOutcome::Success;
 }
 
 }  // namespace tgfx

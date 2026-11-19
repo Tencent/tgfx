@@ -87,26 +87,6 @@ static bool IsSupportedBlendMode(BlendMode blendMode) {
   return false;
 }
 
-static LayerImageErrorCode ToImageCode(DrawFailureCode code) {
-  switch (code) {
-    case DrawFailureCode::None:
-      return LayerImageErrorCode::None;
-    case DrawFailureCode::InvalidRequest:
-      return LayerImageErrorCode::InvalidInput;
-    case DrawFailureCode::UnsupportedContent:
-      return LayerImageErrorCode::UnsupportedContent;
-    case DrawFailureCode::SurfaceLimit:
-      return LayerImageErrorCode::DeviceLimitExceeded;
-    case DrawFailureCode::MissingDependency:
-      return LayerImageErrorCode::DrawFailed;
-    case DrawFailureCode::AllocationFailure:
-      return LayerImageErrorCode::AllocationFailed;
-    case DrawFailureCode::RenderingFailure:
-      return LayerImageErrorCode::DrawFailed;
-  }
-  return LayerImageErrorCode::DrawFailed;
-}
-
 static std::unique_ptr<LayerImageReader> FailMake(LayerImageErrorCode* error,
                                                   LayerImageErrorCode code) {
   if (error != nullptr) {
@@ -114,11 +94,6 @@ static std::unique_ptr<LayerImageReader> FailMake(LayerImageErrorCode* error,
   }
   return nullptr;
 }
-
-struct BandSurface {
-  ISize size = {};
-  std::shared_ptr<Surface> surface = nullptr;
-};
 
 }  // namespace
 
@@ -152,15 +127,11 @@ class LayerImageReader::Impl {
     return result;
   }
 
-  LayerImageReadResult failFromControl(const DrawControl& control) {
-    return fail(ToImageCode(control.firstFailure.code));
-  }
-
   bool validateDestination(const Pixmap& destination, size_t destinationByteSize,
                            int requiredRows) const;
   DrawOutcome drawRegionList(Context* context, const std::vector<LayerRegionPlan>& regions,
-                             int bandFirstRow, const Pixmap& destination, DrawControl* control,
-                             BandSurface* bandSurface, LayerImageReadResult* failure);
+                             const LayerDrawLimits& limits, int bandFirstRow,
+                             const Pixmap& destination, DrawControl& control);
   LayerImageReadResult readNextBand(Context* context, const Pixmap& destination,
                                     size_t destinationByteSize);
 };
@@ -196,67 +167,43 @@ bool LayerImageReader::Impl::validateDestination(const Pixmap& destination,
 
 DrawOutcome LayerImageReader::Impl::drawRegionList(Context* context,
                                                    const std::vector<LayerRegionPlan>& regions,
-                                                   int bandFirstRow, const Pixmap& destination,
-                                                   DrawControl* control, BandSurface* bandSurface,
-                                                   LayerImageReadResult* failure) {
-  auto batchResult = session->planBatch(
-      regions, LayerDrawLimits{*context->gpu()->limits(), options.tileSizeLimit}, control);
-  if (batchResult.code == BatchPlanCode::RequiresSplit) {
+                                                   const LayerDrawLimits& limits, int bandFirstRow,
+                                                   const Pixmap& destination,
+                                                   DrawControl& control) {
+  auto batchPlan = session->planBatch(regions, limits, control);
+  if (batchPlan.code == BatchPlanCode::RequiresSplit) {
     using Difference = std::vector<LayerRegionPlan>::difference_type;
     auto mid = static_cast<Difference>(regions.size() / 2);
     std::vector<LayerRegionPlan> left(regions.begin(), regions.begin() + mid);
     std::vector<LayerRegionPlan> right(regions.begin() + mid, regions.end());
-    auto first =
-        drawRegionList(context, left, bandFirstRow, destination, control, bandSurface, failure);
+    auto first = drawRegionList(context, left, limits, bandFirstRow, destination, control);
     if (first != DrawOutcome::Success) {
       return first;
     }
-    return drawRegionList(context, right, bandFirstRow, destination, control, bandSurface, failure);
+    return drawRegionList(context, right, limits, bandFirstRow, destination, control);
   }
-  if (batchResult.code == BatchPlanCode::Cancelled) {
+  if (batchPlan.code == BatchPlanCode::Cancelled) {
     return DrawOutcome::Cancelled;
   }
-  if (batchResult.code != BatchPlanCode::Ready || batchResult.plan == nullptr) {
-    *failure = control != nullptr && control->failed() ? failFromControl(*control)
-                                                       : fail(LayerImageErrorCode::DrawFailed);
+  if (batchPlan.code == BatchPlanCode::Failed) {
     return DrawOutcome::Failed;
   }
-  auto batch = session->prepareBatch(context, *batchResult.plan, control);
-  if (batch == nullptr) {
-    if (control != nullptr && control->failed()) {
-      *failure = failFromControl(*control);
-    } else {
-      *failure = fail(LayerImageErrorCode::AllocationFailed);
-    }
+  auto batch = session->prepareBatch(context, batchPlan.captureRect, control);
+  if (!batch) {
     return DrawOutcome::Failed;
   }
-  auto& surface = bandSurface->surface;
-  if (surface == nullptr) {
-    surface = Surface::Make(context, bandSurface->size.width, bandSurface->size.height,
-                            ColorType::RGBA_8888, 1, false, 0, request.renderColorSpace);
-    if (surface == nullptr) {
-      *failure = fail(LayerImageErrorCode::AllocationFailed);
-      return DrawOutcome::Failed;
-    }
-  }
-  LayerDrawTarget target = {};
-  target.canvas = surface->getCanvas();
-  target.clearBeforeDraw = true;
   auto bytesPerPixel = bandInfo.bytesPerPixel();
   auto* basePixels = static_cast<uint8_t*>(destination.writablePixels());
-  for (size_t i = 0; i < batch->regionCount(); ++i) {
-    auto& region = regions[i];
-    auto outcome = session->drawRegion(context, *batch, i, target, control);
-    if (outcome == DrawOutcome::Cancelled) {
-      return DrawOutcome::Cancelled;
-    }
-    if (outcome != DrawOutcome::Success) {
-      if (control != nullptr && control->failed()) {
-        *failure = failFromControl(*control);
-      } else {
-        *failure = fail(LayerImageErrorCode::DrawFailed);
-      }
+  for (const auto& region : regions) {
+    auto surface = Surface::Make(context, region.renderRect.width(), region.renderRect.height(),
+                                 ColorType::RGBA_8888, 1, false, 0, request.renderColorSpace);
+    if (surface == nullptr) {
+      control.fail(LayerImageErrorCode::AllocationFailed);
       return DrawOutcome::Failed;
+    }
+    auto outcome = session->drawRegion(region, *batch, surface->getCanvas(), control);
+    if (outcome != DrawOutcome::Success) {
+      return outcome;
     }
     auto sourceX = region.coreRect.left - region.renderRect.left;
     auto sourceY = region.coreRect.top - region.renderRect.top;
@@ -264,14 +211,14 @@ DrawOutcome LayerImageReader::Impl::drawRegionList(Context* context,
         ImageInfo::Make(region.coreRect.width(), region.coreRect.height(), bandInfo.colorType(),
                         bandInfo.alphaType(), destination.rowBytes(), bandInfo.colorSpace());
     if (readInfo.isEmpty()) {
-      *failure = fail(LayerImageErrorCode::InvalidInput);
+      control.fail(LayerImageErrorCode::InvalidInput);
       return DrawOutcome::Failed;
     }
     auto rowOffset = static_cast<size_t>(region.coreRect.top - bandFirstRow);
     auto* dstPixels = basePixels + rowOffset * destination.rowBytes() +
                       static_cast<size_t>(region.coreRect.left) * bytesPerPixel;
     if (!surface->readPixels(readInfo, dstPixels, sourceX, sourceY)) {
-      *failure = fail(LayerImageErrorCode::ReadbackFailed);
+      control.fail(LayerImageErrorCode::ReadbackFailed);
       return DrawOutcome::Failed;
     }
     if (cancelRequested.load()) {
@@ -323,9 +270,6 @@ LayerImageReadResult LayerImageReader::Impl::readNextBand(Context* context,
   DrawControl control = {};
   control.cancelRequested = &cancelRequested;
   const int outputWidth = request.outputSize.width;
-  BandSurface bandSurface = {};
-  bandSurface.size = {std::min(outputWidth, coreLimitWidth) + 2,
-                      std::min(bandRows, coreLimitHeight) + 2};
   const auto estimatedRegions = static_cast<size_t>((outputWidth - 1) / coreLimitWidth + 1);
   std::vector<LayerRegionPlan> regions = {};
   regions.reserve(std::min(estimatedRegions, MaxRegionsPerBatch));
@@ -347,7 +291,7 @@ LayerImageReadResult LayerImageReader::Impl::readNextBand(Context* context,
           core.top = bandFirstRow + bandOffsetY;
           core.right = offsetX + width;
           core.bottom = bandFirstRow + bandOffsetY + chunkHeight;
-          auto regionResult = session->planRegion(core, limits, &control);
+          auto regionResult = session->planRegion(core, limits, control);
           if (regionResult.code == RegionPlanCode::Ready) {
             region = regionResult.region;
             regionReady = true;
@@ -357,10 +301,7 @@ LayerImageReadResult LayerImageReader::Impl::readNextBand(Context* context,
             return cancel();
           }
           if (regionResult.code == RegionPlanCode::Failed) {
-            if (control.failed()) {
-              return failFromControl(control);
-            }
-            return fail(LayerImageErrorCode::DeviceLimitExceeded);
+            return fail(control.error);
           }
           if (width <= 1) {
             break;
@@ -376,11 +317,9 @@ LayerImageReadResult LayerImageReader::Impl::readNextBand(Context* context,
         if (regions.size() < MaxRegionsPerBatch && offsetX < outputWidth) {
           continue;
         }
-        LayerImageReadResult failure = {};
-        auto outcome = drawRegionList(context, regions, bandFirstRow, destination, &control,
-                                      &bandSurface, &failure);
+        auto outcome = drawRegionList(context, regions, limits, bandFirstRow, destination, control);
         if (outcome == DrawOutcome::Failed) {
-          return failure;
+          return fail(control.error);
         }
         if (outcome == DrawOutcome::Cancelled || cancelRequested.load()) {
           return cancel();
@@ -420,22 +359,6 @@ std::unique_ptr<LayerImageReader> LayerImageReader::Make(Context* context,
   if (context == nullptr || context->gpu() == nullptr) {
     return FailMake(error, LayerImageErrorCode::ContextUnavailable);
   }
-  if (request.target == nullptr) {
-    return FailMake(error, LayerImageErrorCode::InvalidInput);
-  }
-  if (request.outputSize.isEmpty()) {
-    return FailMake(error, LayerImageErrorCode::InvalidInput);
-  }
-  if (request.outputSize.width > MaxLayerExportCoordinate ||
-      request.outputSize.height > MaxLayerExportCoordinate) {
-    return FailMake(error, LayerImageErrorCode::UnsupportedContent);
-  }
-  if (!request.targetLocalToOutput.isFinite() || !request.targetLocalToOutput.invertible()) {
-    return FailMake(error, LayerImageErrorCode::InvalidInput);
-  }
-  if (!std::isfinite(request.alpha) || request.alpha < 0.0f || request.alpha > 1.0f) {
-    return FailMake(error, LayerImageErrorCode::InvalidInput);
-  }
   if (!IsFiniteColor(request.clearColor)) {
     return FailMake(error, LayerImageErrorCode::InvalidInput);
   }
@@ -464,6 +387,20 @@ std::unique_ptr<LayerImageReader> LayerImageReader::Make(Context* context,
   if (options.tileSizeLimit.height > 0 && options.tileSizeLimit.height <= 2) {
     return FailMake(error, LayerImageErrorCode::InvalidInput);
   }
+  LayerDrawRequest drawRequest = {};
+  drawRequest.target = request.target.get();
+  drawRequest.targetLocalToOutput = request.targetLocalToOutput;
+  drawRequest.outputSize = request.outputSize;
+  drawRequest.renderColorSpace = request.renderColorSpace;
+  drawRequest.clearColor = request.clearColor;
+  drawRequest.alpha = request.alpha;
+  drawRequest.blendMode = request.blendMode;
+  DrawControl control = {};
+  auto session = LayerDrawSession::Prepare(drawRequest, control);
+  if (session == nullptr) {
+    return FailMake(error, control.error);
+  }
+
   auto outputColorSpace =
       request.outputColorSpace != nullptr ? request.outputColorSpace : request.renderColorSpace;
   auto bandHeight = std::min(options.bandRows, request.outputSize.height);
@@ -482,19 +419,6 @@ std::unique_ptr<LayerImageReader> LayerImageReader::Make(Context* context,
     return FailMake(error, LayerImageErrorCode::InvalidInput);
   }
 
-  LayerDrawRequest drawRequest = {};
-  drawRequest.target = request.target.get();
-  drawRequest.targetLocalToOutput = request.targetLocalToOutput;
-  drawRequest.outputSize = request.outputSize;
-  drawRequest.renderColorSpace = request.renderColorSpace;
-  drawRequest.clearColor = request.clearColor;
-  drawRequest.alpha = request.alpha;
-  drawRequest.blendMode = request.blendMode;
-  DrawControl control = {};
-  auto session = LayerDrawSession::Prepare(context, drawRequest, &control);
-  if (session == nullptr) {
-    return FailMake(error, ToImageCode(control.firstFailure.code));
-  }
   auto impl = std::make_unique<Impl>();
   impl->session = std::move(session);
   impl->request = request;

@@ -18,17 +18,29 @@
 
 #pragma once
 
+#include <memory>
 #include <optional>
+#include <vector>
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
 
 class Canvas;
+class DrawArgs;
+class Layer;
+class Shader;
 
 /**
  * Returns the canvas clip bounds in the canvas's current local space, or std::nullopt if the canvas
  * cannot provide a meaningful clip (e.g. no canvas or no surface to derive bounds from).
  */
 std::optional<Rect> GetClipBounds(const Canvas* canvas);
+
+class LayerClip {
+ public:
+  static bool ApplyAncestorClips(const std::vector<Layer*>& clippedAncestors, Layer* target,
+                                 const DrawArgs& args, Canvas* canvas,
+                                 std::shared_ptr<Shader>* coverage);
+};
 
 }  // namespace tgfx

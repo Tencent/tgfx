@@ -37,7 +37,7 @@
 #include "layers/BackgroundSource.h"
 #include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
-#include "layers/LayerDrawSession.h"
+#include "layers/DrawControl.h"
 #include "layers/LayerStyleSource.h"
 #include "layers/MaskContext.h"
 #include "layers/OffscreenRenderer.h"
@@ -533,12 +533,13 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
     return nullptr;
   }
   auto child = _children[static_cast<size_t>(index)];
-  if (_root) {
-    _root->invalidateRect(child->renderBounds);
-  }
   child->_parent = nullptr;
   child->onDetachFromRoot();
   _children.erase(_children.begin() + index);
+  if (_root) {
+    _root->invalidateRect(child->renderBounds);
+    child->renderBounds = {};
+  }
   invalidateDescendents();
   return child;
 }
@@ -624,11 +625,12 @@ void Layer::setChildren(const std::vector<std::shared_ptr<Layer>>& children) {
     auto it = newIndexMap.find(ptr);
     if (it == newIndexMap.end()) {
       nodesToMarkDirty.push_back(ptr);
-      if (_root) {
-        _root->invalidateRect(ptr->renderBounds);
-      }
       ptr->_parent = nullptr;
       ptr->onDetachFromRoot();
+      if (_root) {
+        _root->invalidateRect(ptr->renderBounds);
+        ptr->renderBounds = {};
+      }
     } else {
       retainedChildren.push_back(ptr);
       newPositions.push_back(it->second);
@@ -1032,7 +1034,6 @@ void Layer::onAttachToRoot(RootLayer* rootLayer) {
 
 void Layer::onDetachFromRoot() {
   _root = nullptr;
-  renderBounds = {};
   for (auto& child : _children) {
     child->onDetachFromRoot();
   }
@@ -1547,8 +1548,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
   auto invertImageMatrix = Matrix::I();
   if (result.isEmpty() || !result.imageMatrix.invert(&invertImageMatrix)) {
     if (!result.isEmpty() && args.drawControl != nullptr) {
-      args.drawControl->fail(DrawFailureCode::RenderingFailure, DrawStage::Rendering, this, {},
-                             "the offscreen image matrix is not invertible");
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
     }
     return;
   }
@@ -1586,25 +1586,24 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
+  if (_layerStyles.empty()) {
+    drawContents(args, canvas, alpha);
+    return;
+  }
   // Capture and consume passes share the same per-layer LayerStyleSource via the active handler,
   // so the content, contour and geometry intermediate renders happen once per snapshot map
   // instead of once per pass.
-  auto cached = args.backgroundHandler != nullptr
-                    ? args.backgroundHandler->getCachedLayerStyleSource(this)
-                    : std::nullopt;
-  auto* sourcePtr = cached.value_or(nullptr);
+  auto* handler = args.backgroundHandler;
+  auto* source = handler != nullptr ? handler->getCachedLayerStyleSource(this) : nullptr;
   std::unique_ptr<LayerStyleSource> ownedSource;
-  if (!cached.has_value()) {
+  if (source == nullptr && (handler == nullptr || handler->needsLayerStyleSource(this))) {
     ownedSource = getLayerStyleSource(args, canvas->getMatrix());
-    if (ownedSource != nullptr && args.backgroundHandler != nullptr &&
-        args.backgroundHandler->canCacheLayerStyleSource(this)) {
-      sourcePtr = args.backgroundHandler->cacheLayerStyleSource(this, std::move(ownedSource));
-    }
-    if (sourcePtr == nullptr) {
-      sourcePtr = ownedSource.get();
+    source = ownedSource.get();
+    if (source != nullptr && handler != nullptr && handler->canCacheLayerStyleSource(this)) {
+      source = handler->cacheLayerStyleSource(this, std::move(ownedSource));
     }
   }
-  drawContents(args, canvas, alpha, sourcePtr);
+  drawContents(args, canvas, alpha, source);
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,

@@ -17,9 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/OffscreenRenderer.h"
-#include "core/utils/MathExtra.h"
 #include "layers/BackgroundHandler.h"
-#include "layers/LayerDrawSession.h"
+#include "layers/DrawControl.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
@@ -86,10 +85,7 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
   if (args.backgroundHandler != nullptr && args.backgroundHandler->needsSurface(layer) &&
       args.context != nullptr) {
     if (args.drawControl != nullptr && ExceedsDeviceLimit(args.context, imageClip)) {
-      args.drawControl->fail(DrawFailureCode::SurfaceLimit, DrawStage::Rendering, layer,
-                             ISize::Make(FloatSaturateToInt(imageClip.width()),
-                                         FloatSaturateToInt(imageClip.height())),
-                             "an intermediate backdrop surface exceeds the device texture limit");
+      args.drawControl->fail(LayerImageErrorCode::DeviceLimitExceeded);
       return {};
     }
     auto surface =
@@ -100,10 +96,7 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
                                       *inputBounds, contentMatrix);
     } else if (args.drawControl != nullptr) {
       // A picture fallback would drop descendant backdrop styles, so a strict draw fails instead.
-      args.drawControl->fail(
-          DrawFailureCode::AllocationFailure, DrawStage::Rendering, layer,
-          ISize::Make(static_cast<int>(imageClip.width()), static_cast<int>(imageClip.height())),
-          "failed to allocate an intermediate backdrop surface");
+      args.drawControl->fail(LayerImageErrorCode::AllocationFailed);
       return {};
     } else {
       result = RenderContentOnPicture(layer, args, density, imageClip, contentMatrix);
@@ -122,8 +115,7 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
     // A filter that returns no image drops the whole layer content, so a strict draw must fail
     // instead of delivering an empty result as a success.
     if (args.drawControl != nullptr) {
-      args.drawControl->fail(DrawFailureCode::RenderingFailure, DrawStage::Rendering, layer, {},
-                             "a layer filter produced no image");
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
     }
     return {};
   }
@@ -141,21 +133,15 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
   auto backdrop = SnapshotOf(parentCanvas);
   if (!backdrop) {
     if (args.drawControl != nullptr) {
-      args.drawControl->fail(DrawFailureCode::RenderingFailure, DrawStage::Rendering, layer, {},
-                             "failed to snapshot the pass-through backdrop");
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
     }
     return {};
   }
   auto parentMatrix = parentCanvas->getMatrix();
   auto surfaceRect = parentMatrix.mapRect(*inputBounds);
   surfaceRect.roundOut();
-  auto backdropBounds = Rect::MakeWH(backdrop->width(), backdrop->height());
-  // The local clip was rounded out, so mapping it back can extend beyond the tile viewport.
-  if (args.viewport != nullptr && args.viewport->canvas == parentCanvas &&
-      !backdropBounds.intersect(args.viewport->bounds)) {
-    return {};
-  }
-  if (!surfaceRect.intersect(backdropBounds) || surfaceRect.isEmpty()) {
+  if (!surfaceRect.intersect(Rect::MakeWH(backdrop->width(), backdrop->height())) ||
+      surfaceRect.isEmpty()) {
     return {};
   }
 
@@ -169,10 +155,7 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
     }
     if (args.drawControl != nullptr) {
       // The picture variant cannot sample the parent backdrop, so a strict draw fails instead.
-      args.drawControl->fail(DrawFailureCode::AllocationFailure, DrawStage::Rendering, layer,
-                             ISize::Make(static_cast<int>(surfaceRect.width()),
-                                         static_cast<int>(surfaceRect.height())),
-                             "failed to allocate a pass-through surface");
+      args.drawControl->fail(LayerImageErrorCode::AllocationFailed);
       return {};
     }
   }

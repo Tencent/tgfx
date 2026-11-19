@@ -111,10 +111,14 @@ class BackgroundHandler {
   virtual void drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent, Layer* child,
                          float alpha, bool forceDescendants);
 
-  // The consume pass reuses sources from capture to avoid redundant image recordings. A nullopt
-  // requests recording, while an engaged nullptr skips it when the pass samples no styles here.
-  virtual std::optional<const LayerStyleSource*> getCachedLayerStyleSource(Layer* /*layer*/) const {
-    return std::nullopt;
+  // The consume pass reuses sources from capture to avoid redundant image recordings.
+  virtual const LayerStyleSource* getCachedLayerStyleSource(Layer* /*layer*/) const {
+    return nullptr;
+  }
+
+  // Determines whether to record an uncached source for this layer's styles in this pass.
+  virtual bool needsLayerStyleSource(Layer* /*layer*/) const {
+    return true;
   }
 
   // Whether this handler will cache a LayerStyleSource for `layer`. Used by Layer::drawDirectly
@@ -165,7 +169,7 @@ class BackgroundCapturer : public BackgroundHandler {
   void drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent, Layer* child, float alpha,
                  bool forceDescendants) override;
 
-  std::optional<const LayerStyleSource*> getCachedLayerStyleSource(Layer* layer) const override;
+  const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
 
   bool canCacheLayerStyleSource(Layer* layer) const override;
 
@@ -184,7 +188,8 @@ class BackgroundCapturer : public BackgroundHandler {
   // Captures the scene backdrop for a target drawn with explicit export attributes.
   static void RunForTarget(Layer* captureRoot, Layer* target, float alpha, BlendMode blendMode,
                            const DrawArgs& baseArgs, std::shared_ptr<BackgroundSource> bgSource,
-                           BackgroundSnapshotMap* snapshots, const std::vector<Rect>& renderRects);
+                           BackgroundSnapshotMap* snapshots, const std::vector<Rect>& renderRects,
+                           const std::vector<Layer*>& clippedAncestors);
 
   // Exposes the snapshot map this capturer writes into, so per-fragment Sub3DCapturers spawned
   // by 3D subtrees can append their composed-backdrop entries to the same map under the same
@@ -215,16 +220,16 @@ class BackgroundCapturer : public BackgroundHandler {
   static void DrawTargetChild(const DrawArgs& args, Canvas* canvas, Layer* target, float alpha,
                               BlendMode blendMode);
 
-  static bool HasDescendantBackdrop(Layer* layer);
-
   void forceDrawDescendants() {
     ++_forcedCaptureDepth;
   }
 
- private:
   bool isForcedCapture() const {
     return _forcedCaptureDepth > 0;
   }
+
+ private:
+  class TargetBackgroundCapturer;
 
   std::unique_ptr<BackgroundCapturer> buildSubCapturer(
       const DrawArgs& parentArgs, std::shared_ptr<BackgroundSource> subSource) const;
@@ -255,7 +260,7 @@ class BackgroundConsumer : public BackgroundHandler {
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                            LayerStyle* style, const LayerStyleSource* source) override;
 
-  std::optional<const LayerStyleSource*> getCachedLayerStyleSource(Layer* layer) const override;
+  const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
 
  private:
   BackgroundSnapshotMap* snapshots = nullptr;

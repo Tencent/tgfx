@@ -23,18 +23,6 @@
 namespace tgfx {
 
 /**
- * Explicit background sampling geometry. It lets a tiled export create every background surface
- * on one fixed pixel grid instead of letting the current capture rect pick the sampling density.
- * The scene-root transform already includes the capture surface's offset on the output grid.
- * Nested sampling uses capture-surface pixels as its shared coordinate space.
- */
-struct BackgroundRasterGeometry {
-  ISize size = {};
-  Matrix sceneRootToSurface = Matrix::I();
-  float surfaceScale = 1.0f;
-};
-
-/**
  * Read-only query handle that lets Background-sourced LayerStyles sample the already-rendered
  * backdrop. Callers render into getCanvas() and later call getBackgroundImage() to read it back.
  * Backed by a GPU Surface; the picture-only variant has been removed since picture-canvas
@@ -49,12 +37,11 @@ class BackgroundSource {
                                                 const Matrix& matrix,
                                                 std::shared_ptr<ColorSpace> colorSpace);
 
-  // Creates the top-level source with an explicit, already aligned geometry. The factory only
-  // validates and allocates the requested geometry; it never re-selects a surface scale or caps
-  // the size to an internal limit.
-  static std::shared_ptr<BackgroundSource> MakeWithGeometry(
-      Context* context, const BackgroundRasterGeometry& geometry,
-      std::shared_ptr<ColorSpace> colorSpace);
+  // Creates a top-level source aligned to the output pixel grid at full resolution. The
+  // scene-root transform includes the capture surface's offset on that grid.
+  static std::shared_ptr<BackgroundSource> MakeWithGeometry(Context* context, const ISize& size,
+                                                            const Matrix& sceneRootToSurface,
+                                                            std::shared_ptr<ColorSpace> colorSpace);
 
   virtual ~BackgroundSource() = default;
 

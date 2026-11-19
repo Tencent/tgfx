@@ -18,7 +18,6 @@
 
 #include "BackgroundSource.h"
 #include <algorithm>
-#include <cmath>
 #include <utility>
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/utils/Log.h"
@@ -207,33 +206,18 @@ std::shared_ptr<BackgroundSource> BackgroundSource::Make(Context* context, const
 }
 
 std::shared_ptr<BackgroundSource> BackgroundSource::MakeWithGeometry(
-    Context* context, const BackgroundRasterGeometry& geometry,
+    Context* context, const ISize& size, const Matrix& sceneRootToSurface,
     std::shared_ptr<ColorSpace> colorSpace) {
-  if (context == nullptr || context->gpu() == nullptr) {
-    return nullptr;
-  }
-  auto maxTextureSize = context->gpu()->limits()->maxTextureDimension2D;
-  if (geometry.size.isEmpty() || geometry.size.width > maxTextureSize ||
-      geometry.size.height > maxTextureSize) {
-    return nullptr;
-  }
-  if (!geometry.sceneRootToSurface.isFinite() || !geometry.sceneRootToSurface.invertible() ||
-      geometry.sceneRootToSurface.hasPerspective() || !std::isfinite(geometry.surfaceScale) ||
-      geometry.surfaceScale <= 0.0f) {
-    return nullptr;
-  }
-  auto surface = Surface::Make(context, geometry.size.width, geometry.size.height, false, 1, false,
-                               0, colorSpace);
+  auto surface = Surface::Make(context, size.width, size.height, false, 1, false, 0, colorSpace);
   if (surface == nullptr) {
     return nullptr;
   }
-  auto coverage = Rect::MakeWH(static_cast<float>(geometry.size.width),
-                               static_cast<float>(geometry.size.height));
+  auto coverage = Rect::MakeWH(static_cast<float>(size.width), static_cast<float>(size.height));
   auto result = std::make_shared<SurfaceBackgroundSource>(std::move(surface), Matrix::I(), coverage,
-                                                          geometry.surfaceScale, colorSpace);
+                                                          1.0f, std::move(colorSpace));
   auto* canvas = result->getCanvas();
   canvas->clear();
-  canvas->setMatrix(geometry.sceneRootToSurface);
+  canvas->setMatrix(sceneRootToSurface);
   return result;
 }
 

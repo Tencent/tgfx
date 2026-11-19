@@ -18,10 +18,11 @@
 
 #pragma once
 
-#include <atomic>
 #include <memory>
-#include <string>
+#include <optional>
 #include <vector>
+#include "layers/BackgroundSnapshotMap.h"
+#include "layers/DrawControl.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorSpace.h"
@@ -29,10 +30,12 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/gpu/GPULimits.h"
+#include "tgfx/layers/LayerImageReader.h"
 
 namespace tgfx {
 class Canvas;
 class Context;
+class DrawArgs;
 class Layer;
 enum class LayerStylePosition;
 
@@ -78,58 +81,6 @@ struct LayerDrawRequest {
 };
 
 /**
- * Diagnostic code of a shared drawing failure.
- */
-enum class DrawFailureCode {
-  None,
-  InvalidRequest,
-  UnsupportedContent,
-  SurfaceLimit,
-  MissingDependency,
-  AllocationFailure,
-  RenderingFailure
-};
-
-/**
- * Phase in which a shared drawing failure was observed.
- */
-enum class DrawStage { Validation, Planning, Background, Rendering };
-
-/**
- * First failure of one drawing session. It is only filled by strict callers; the regular draw path
- * keeps its existing silent handling.
- */
-struct DrawFailure {
-  DrawFailureCode code = DrawFailureCode::None;
-  DrawStage stage = DrawStage::Validation;
-  Layer* layer = nullptr;
-  ISize surfaceSize = {};
-  std::string message = {};
-};
-
-/**
- * Carries cancellation and failure state through one shared drawing pass. A non-null control means
- * the caller wants observable failures; a null control keeps the regular draw behavior.
- */
-struct DrawControl {
-  const std::atomic<bool>* cancelRequested = nullptr;
-  DrawFailure firstFailure = {};
-
-  bool cancelled() const {
-    return cancelRequested != nullptr && cancelRequested->load();
-  }
-
-  bool failed() const {
-    return firstFailure.code != DrawFailureCode::None;
-  }
-
-  void fail(DrawFailure failure);
-
-  void fail(DrawFailureCode code, DrawStage stage, Layer* layer = nullptr, ISize surfaceSize = {},
-            std::string message = {});
-};
-
-/**
  * Result of drawing one planned region.
  */
 enum class DrawOutcome { Success, Cancelled, Failed };
@@ -144,24 +95,11 @@ struct LayerDrawLimits {
   ISize outputSurfaceLimit = {};
 };
 
-/**
- * CPU description of the background input one output region needs. captureRect is expressed in
- * final output pixels and may extend outside the output bounds.
- */
-class RegionDependencyPlan {
- public:
-  bool needsBackground = false;
-  PixelRect captureRect = {};
-};
-
-/**
- * One output region: the pixels to deliver, the surface window that produces them and the
- * background inputs they depend on.
- */
 struct LayerRegionPlan {
   PixelRect coreRect = {};
   PixelRect renderRect = {};
-  std::shared_ptr<const RegionDependencyPlan> dependencies = nullptr;
+  // Background sampling bounds in output pixels. They may extend outside the image.
+  std::optional<PixelRect> captureRect;
 };
 
 /**
@@ -174,51 +112,16 @@ struct RegionPlanResult {
   LayerRegionPlan region = {};
 };
 
-/**
- * CPU description of one batch of regions sharing a background capture.
- */
-class LayerDrawBatchPlan {
- public:
-  std::vector<LayerRegionPlan> regions = {};
-  PixelRect captureRect = {};
-  bool needsBackground = false;
-};
-
-/**
- * Planning outcome for one batch.
- */
 enum class BatchPlanCode { Ready, RequiresSplit, Cancelled, Failed };
 
 struct BatchPlanResult {
   BatchPlanCode code = BatchPlanCode::Failed;
-  std::shared_ptr<const LayerDrawBatchPlan> plan = nullptr;
+  std::optional<PixelRect> captureRect;
 };
 
-/**
- * Destination of one region draw. Set clearBeforeDraw to initialize the surface for this region.
- */
-struct LayerDrawTarget {
-  Canvas* canvas = nullptr;
-  bool clearBeforeDraw = false;
-};
-
-/**
- * GPU state that lives inside one valid context lock for a batch of regions.
- */
-class LayerDrawBatch {
- public:
-  ~LayerDrawBatch();
-  LayerDrawBatch(const LayerDrawBatch&) = delete;
-  LayerDrawBatch& operator=(const LayerDrawBatch&) = delete;
-
-  size_t regionCount() const;
-
- private:
-  LayerDrawBatch();
-  class Impl;
-  std::unique_ptr<Impl> impl;
-
-  friend class LayerDrawSession;
+struct LayerDrawBatch {
+  BackgroundSnapshotMap snapshots;
+  std::vector<Rect> renderRects;
 };
 
 /**
@@ -229,30 +132,29 @@ class LayerDrawBatch {
  */
 class LayerDrawSession {
  public:
-  // Validates the request and fixes the root mapping and sampling rules. Requires a GPU context.
-  static std::unique_ptr<LayerDrawSession> Prepare(Context* context,
-                                                   const LayerDrawRequest& request,
-                                                   DrawControl* control);
+  static std::unique_ptr<LayerDrawSession> Prepare(const LayerDrawRequest& request,
+                                                   DrawControl& control);
 
   // Derives the surface window and background dependency of one core region. It only describes
   // CPU geometry and never allocates GPU pixels.
   RegionPlanResult planRegion(const PixelRect& core, const LayerDrawLimits& limits,
-                              DrawControl* control) const;
+                              DrawControl& control) const;
 
   // Checks whether the given regions can share one background capture under the fixed sampling
   // rules. It never allocates GPU pixels.
   BatchPlanResult planBatch(const std::vector<LayerRegionPlan>& regions,
-                            const LayerDrawLimits& limits, DrawControl* control) const;
+                            const LayerDrawLimits& limits, DrawControl& control) const;
 
   // Builds the background snapshots and style inputs a batch needs. The returned batch must not
   // outlive the current context lock.
-  std::unique_ptr<LayerDrawBatch> prepareBatch(Context* context, const LayerDrawBatchPlan& plan,
-                                               DrawControl* control);
+  std::optional<LayerDrawBatch> prepareBatch(Context* context,
+                                             const std::optional<PixelRect>& captureRect,
+                                             DrawControl& control);
 
   // Draws one region of the batch on the given target, applying the fixed output matrix, the
   // target window and the scene clear color.
-  DrawOutcome drawRegion(Context* context, LayerDrawBatch& batch, size_t regionIndex,
-                         const LayerDrawTarget& target, DrawControl* control);
+  DrawOutcome drawRegion(const LayerRegionPlan& region, LayerDrawBatch& batch, Canvas* canvas,
+                         DrawControl& control);
 
   // Resolves the effective surface limit from the device limit and the optional output limit.
   static ISize ResolveSurfaceLimit(const LayerDrawLimits& limits);
@@ -262,9 +164,8 @@ class LayerDrawSession {
 
   static float FilterOutset(Layer* layer, float scale);
   static float AncestorFilterOutset(Layer* target, Layer* captureRoot, const Matrix& rootToOutput);
-  static bool IsSupported2DLayer(const Layer* layer);
-  static bool IsSupported2DScene(const Layer* layer);
-  static const char* UnsupportedSubtreeReason(Layer* layer, std::vector<Layer*>& activeMasks);
+  static bool IsSupported2DScene(const Layer* layer, std::vector<const Layer*>& activeMasks);
+  bool drawClippedTarget(const DrawArgs& args, Canvas* canvas, const Rect& bounds);
   struct BackgroundEffect {
     Rect outputBounds = {};
     float outset = 0;
@@ -282,7 +183,9 @@ class LayerDrawSession {
   Matrix rootToOutput = Matrix::I();  // captureRoot-local to final output pixels.
   Matrix outputToRoot = Matrix::I();  // output pixels to the capture-root coordinate space.
   PixelRect outputPixelBounds = {};
+  std::optional<Rect> ancestorScrollBounds = std::nullopt;
   bool useSceneBounds = true;
+  std::vector<Layer*> clippedAncestors = {};
   std::vector<BackgroundEffect> targetEffects = {};
   std::vector<BackgroundEffect> precedingEffects = {};
 };

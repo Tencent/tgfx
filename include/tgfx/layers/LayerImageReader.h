@@ -58,8 +58,9 @@ enum class LayerImageErrorCode {
 struct LayerImageRequest {
   // The layer to draw in its local coordinate space. The request supplies the output matrix,
   // alpha and blend mode. The scene root supplies the backdrop for an attached target. A detached
-  // target is exported on its own. The target branch must participate in scene drawing. The
-  // output mapping can cover local content beyond the target's own scroll rect.
+  // target is exported on its own. The target branch must participate in scene drawing. Attached
+  // targets inherit ancestor scroll rects and masks. The output mapping can cover local content
+  // beyond the target's own scroll rect.
   std::shared_ptr<Layer> target;
 
   // Size of the final image in pixels, rounded by the caller. Each dimension supports up to 2^23.
@@ -131,9 +132,9 @@ struct LayerImageReadResult {
  * callback. All methods except requestCancel() must be called on the scene's rendering thread
  * while a valid Context of the device bound at creation is locked.
  *
- * The reader reports UnsupportedContent for 3D scenes and hidden targets, or when output
- * dimensions, tile origins, output or backdrop translations, or recorded local bounds and
- * relative placements in the target subtree exceed 2^23 in magnitude.
+ * The reader reports UnsupportedContent for hidden targets or 3D content that participates in
+ * scene drawing or masking. Output dimensions, tile origins, and output-space translations are
+ * limited to a magnitude of 2^23.
  *
  * The reader holds strong references to the target and scene root, but that does not freeze the
  * scene: the caller must keep the layers, styles, fonts and image resources unchanged until the

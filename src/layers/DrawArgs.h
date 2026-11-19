@@ -27,14 +27,8 @@
 
 namespace tgfx {
 class BackgroundHandler;
-class Canvas;
 class OpaqueContext;
 struct DrawControl;
-
-struct DrawViewport {
-  const Canvas* canvas = nullptr;
-  Rect bounds = {};
-};
 
 /**
  * DrawArgs represents the arguments passed to the draw method of a Layer.
@@ -56,9 +50,6 @@ class DrawArgs {
   // Strict-mode failure feedback for the tiled export path. Null keeps the regular draw behavior,
   // in which intermediate failures are handled silently by the existing fallbacks.
   DrawControl* drawControl = nullptr;
-
-  // Device-space bounds of the drawing region when its surface has a larger backing size.
-  const DrawViewport* viewport = nullptr;
 
   // Whether to exclude effects during the drawing process.
   // Note: When set to true, all layer styles and filters will be skipped.
