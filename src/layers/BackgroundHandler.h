@@ -65,8 +65,9 @@ class BackgroundHandler {
 
   /**
    * A background blur whose radius, measured in the pixels of the tile it is drawn into, is at or
-   * below this value changes no pixel by more than 1/255 (the neighbour weight of a gaussian with
-   * sigma 0.3 is 0.0038), so drawing it only costs passes and textures.
+   * below this value moves an edge by about 10/255 at most (the neighbour weight of a gaussian with
+   * sigma 0.4 is 0.044), so drawing it costs a pass and a texture for a change that is hard to see
+   * at a normal zoom.
    */
   static constexpr float NegligibleBlurRadius = 0.4f;
 
@@ -77,7 +78,7 @@ class BackgroundHandler {
   static bool& SkipNegligibleBlurEnabled();
 
   /**
-   * Returns true if drawing the style at the given density would not change the picture, so the
+   * Returns true if drawing the style at the given density barely changes the picture, so the
    * capture pass, the consume pass and the style source creation can all leave it out. The density
    * must be the one the consumer draws with, which the capturer derives with
    * consumerContentScale(). Every caller has to use this one function, because a style that is

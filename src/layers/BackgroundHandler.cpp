@@ -211,7 +211,7 @@ bool BackgroundHandler::IsNegligibleBackgroundStyle(const LayerStyle* style, flo
   }
   auto* blur = static_cast<const BackgroundBlurStyle*>(style);
   // A style without any blur is already ignored when drawn, leave it on that path.
-  if (blur->blurrinessX() <= 0 && blur->blurrinessY() <= 0) {
+  if (blur->blurrinessX() <= 0.0f && blur->blurrinessY() <= 0.0f) {
     return false;
   }
   auto radius = std::max(blur->blurrinessX(), blur->blurrinessY()) * densityScale;
