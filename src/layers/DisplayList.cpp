@@ -426,9 +426,6 @@ static void GetAtlasTileGrid(int tileCount, int* countX, int* countY) {
   *countY = FloatCeilToInt(static_cast<float>(tileCount) / static_cast<float>(*countX));
 }
 
-// Frames with a still viewport that rasterize nothing and show no missing content are skipped to
-// keep the log readable.
-
 DisplayList::DisplayList()
     : _root(RootLayer::Make()), tilePool(std::make_unique<TilePool>()),
       blankTiles(std::make_unique<BlankTileSet>()) {
