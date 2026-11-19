@@ -526,8 +526,7 @@ bool LayerDrawSession::drawClippedTarget(const DrawArgs& args, Canvas* canvas,
   auto saveCount = canvas->getSaveCount();
   AutoCanvasRestore restore(canvas);
   std::shared_ptr<Shader> coverage;
-  if (!LayerClip::ApplyAncestorClips(clippedAncestors, request.target, args, canvas,
-                                     &coverage)) {
+  if (!LayerClip::ApplyAncestorClips(clippedAncestors, request.target, args, canvas, &coverage)) {
     return true;
   }
   request.target->drawLayer(args, canvas, request.alpha, request.blendMode);
