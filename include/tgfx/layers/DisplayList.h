@@ -30,6 +30,7 @@ class BlankTileSet;
 class DrawTask;
 enum class TileType;
 struct BackgroundSnapshotMap;
+struct TreeLevelCoverage;
 
 /**
  * RenderMode defines the different modes of rendering a DisplayList.
@@ -347,6 +348,10 @@ class DisplayList {
 
   std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
                                            std::vector<Rect>* skippedRects);
+
+  size_t rasterizeTreeTiles(const Surface* surface, TreeLevelCoverage* coverage,
+                            const std::vector<std::pair<int, int>>& cells,
+                            std::vector<DrawTask>* tileTasks);
 
   std::vector<std::shared_ptr<Tile>> getFreeTiles(const Surface* renderSurface, TileType type,
                                                   size_t tileCount);

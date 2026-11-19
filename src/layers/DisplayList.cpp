@@ -375,24 +375,6 @@ static void AppendFallbackScreenTasks(TreeLevelCoverage* coverage, const Rect& z
   });
 }
 
-// Hands the tiles to the cells of a tree level in order and queues them for rasterization.
-static void QueueTreeTiles(const std::vector<std::shared_ptr<Tile>>& tiles,
-                           const std::vector<std::pair<int, int>>& cells,
-                           TreeLevelCoverage* coverage, TilePool* tilePool, int tileSize,
-                           std::vector<DrawTask>* tileTasks) {
-  for (size_t i = 0; i < tiles.size(); ++i) {
-    auto& tile = tiles[i];
-    tile->tileX = cells[i].first;
-    tile->tileY = cells[i].second;
-    tilePool->insert(TileKey::MakeTree(tile->tileX, tile->tileY, coverage->level), tile);
-    coverage->tileAt(tile->tileX, tile->tileY) = tile;
-    DrawTask task(tile, tileSize);
-    task.setTreeLevel(coverage->level);
-    task.setCoversTiles(true);
-    tileTasks->push_back(std::move(task));
-  }
-}
-
 static std::vector<std::shared_ptr<Tile>> GetGridTilesUnderRect(const TilePool* tilePool,
                                                                 int64_t scaleInt, int tileSize,
                                                                 const Rect& rect,
@@ -1098,11 +1080,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       // instead, so the frame that changes the zoom does not pay for tiles the budget skipped.
       if (!uncoveredRects.empty() && _tileUpdateMode != TileUpdateMode::Fast) {
         auto& coarsest = coverages.back();
-        auto cells = CollectMissingTreeTiles(coarsest, uncoveredRects, _tileSize);
-        if (!cells.empty()) {
-          QueueTreeTiles(getFreeTiles(surface, TileType::Tree, cells.size()), cells, &coarsest,
-                         tilePool.get(), _tileSize, tileTasks);
-        }
+        rasterizeTreeTiles(surface, &coarsest,
+                           CollectMissingTreeTiles(coarsest, uncoveredRects, _tileSize), tileTasks);
       }
       // Pass 2: the budget refines the displayed fallbacks one level at a time, coarse levels
       // first, so the screen sharpens evenly instead of one cell at a time.
@@ -1144,13 +1123,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
           cellsByLevel[candidate.coverageIndex].emplace_back(candidate.tileX, candidate.tileY);
         }
         for (size_t i = 0; i < coverages.size(); ++i) {
-          if (cellsByLevel[i].empty()) {
-            continue;
-          }
-          auto tiles = getFreeTiles(surface, TileType::Tree, cellsByLevel[i].size());
-          QueueTreeTiles(tiles, cellsByLevel[i], &coverages[i], tilePool.get(), _tileSize,
-                         tileTasks);
-          refineBudget -= static_cast<int>(tiles.size());
+          auto refined = rasterizeTreeTiles(surface, &coverages[i], cellsByLevel[i], tileTasks);
+          refineBudget -= static_cast<int>(refined);
         }
       }
       // The passes above may have added tiles, so the coverage is queried again: the finest
@@ -1186,9 +1160,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
           if (cells.size() > static_cast<size_t>(chainBudget)) {
             cells.resize(static_cast<size_t>(chainBudget));
           }
-          auto tiles = getFreeTiles(surface, TileType::Tree, cells.size());
-          QueueTreeTiles(tiles, cells, &coverage, tilePool.get(), _tileSize, tileTasks);
-          chainBudget -= static_cast<int>(tiles.size());
+          auto refined = rasterizeTreeTiles(surface, &coverage, cells, tileTasks);
+          chainBudget -= static_cast<int>(refined);
         }
       }
       // Report the state left after this frame: a skipped frame still has to keep the loop alive,
@@ -1257,6 +1230,27 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     }
   }
   return screenTasks;
+}
+
+size_t DisplayList::rasterizeTreeTiles(const Surface* surface, TreeLevelCoverage* coverage,
+                                       const std::vector<std::pair<int, int>>& cells,
+                                       std::vector<DrawTask>* tileTasks) {
+  if (cells.empty()) {
+    return 0;
+  }
+  auto treeTiles = getFreeTiles(surface, TileType::Tree, cells.size());
+  for (size_t i = 0; i < treeTiles.size(); ++i) {
+    auto& tile = treeTiles[i];
+    tile->tileX = cells[i].first;
+    tile->tileY = cells[i].second;
+    tilePool->insert(TileKey::MakeTree(tile->tileX, tile->tileY, coverage->level), tile);
+    coverage->tileAt(tile->tileX, tile->tileY) = tile;
+    DrawTask task(tile, _tileSize);
+    task.setTreeLevel(coverage->level);
+    task.setCoversTiles(true);
+    tileTasks->push_back(std::move(task));
+  }
+  return treeTiles.size();
 }
 
 std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(const Surface* renderSurface,
