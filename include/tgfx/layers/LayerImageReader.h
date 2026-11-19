@@ -39,14 +39,51 @@ class Pixmap;
  * generation itself; encoding, delivery and scene version problems belong to the caller.
  */
 enum class LayerImageErrorCode {
+  /**
+   * No error occurred.
+   */
   None,
+  /**
+   * The request, options or destination buffer are invalid. For example: a null target or
+   * render color space, an empty output size, a non-finite clear color, an alpha outside [0, 1], a
+   * non-invertible output matrix, an unsupported color type or alpha type, a non-positive
+   * bandRows, an illegal tileSizeLimit, a band buffer that exceeds the addressable memory, or a
+   * destination that does not match the band template or is too small.
+   */
   InvalidInput,
+  /**
+   * The layer tree or output mapping cannot be exported by the reader. For example: a hidden
+   * target branch, 3D content that participates in scene drawing or masking, a perspective output
+   * matrix, or output dimensions, translations or background capture bounds beyond 2^23.
+   */
   UnsupportedContent,
+  /**
+   * The given context is null or has no GPU.
+   */
   ContextUnavailable,
+  /**
+   * The given context does not belong to the device bound when the reader was created.
+   */
   ContextMismatch,
+  /**
+   * The device cannot draw the content within its limits. For example: the resolved surface limit
+   * leaves no room for the one-pixel sampling margin, a 1x1 output tile or its background capture
+   * still exceeds the device texture limit or the 32 MiB capture budget, or an offscreen layer
+   * exceeds the device texture limit.
+   */
   DeviceLimitExceeded,
+  /**
+   * Allocating a GPU drawing surface, background capture or offscreen target failed.
+   */
   AllocationFailed,
+  /**
+   * Drawing the layer tree failed, for example when a filter, background style or mask could not
+   * produce its result.
+   */
   DrawFailed,
+  /**
+   * Reading the drawn pixels back into the destination buffer failed.
+   */
   ReadbackFailed
 };
 
@@ -109,7 +146,27 @@ struct LayerImageReadOptions {
 /**
  * Result code of one band read.
  */
-enum class LayerImageReadCode { BandReady, Done, Cancelled, Failed };
+enum class LayerImageReadCode {
+  /**
+   * A band of rowCount complete rows was written to the destination and published. lastBand is
+   * true when this band contains the final output row; the reader is then done.
+   */
+  BandReady,
+  /**
+   * All output rows were already delivered by earlier calls. Nothing is written.
+   */
+  Done,
+  /**
+   * A cancellation request was observed before the band was published. The current band must be
+   * discarded, and all later calls return Cancelled.
+   */
+  Cancelled,
+  /**
+   * The read failed with the reported error code. The current band must be discarded, and all
+   * later calls return the same failure.
+   */
+  Failed
+};
 
 /**
  * Result of one band read.
