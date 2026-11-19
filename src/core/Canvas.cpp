@@ -17,15 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Canvas.h"
-#include <algorithm>
-#include <limits>
 #include "core/CanvasState.h"
 #include "core/ClipStack.h"
 #include "core/DrawContext.h"
 #include "core/LayerUnrollContext.h"
 #include "core/PictureContext.h"
-#include "core/ShapeMesh.h"
-#include "core/VertexMesh.h"
 #include "core/shapes/StrokeShape.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -34,7 +30,6 @@
 #include "images/SubsetImage.h"
 #include "shapes/MatrixShape.h"
 #include "shapes/PathShape.h"
-#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
@@ -86,7 +81,7 @@ Canvas::Canvas(DrawContext* drawContext, Surface* surface)
 Canvas::~Canvas() = default;
 
 int Canvas::save() {
-  stateStack.push(std::make_unique<CanvasState>(_matrix, tileTranslation));
+  stateStack.push(std::make_unique<CanvasState>(_matrix));
   clipStack->save();
   return static_cast<int>(stateStack.size()) - 1;
 }
@@ -94,7 +89,7 @@ int Canvas::save() {
 int Canvas::saveLayer(const Paint* paint) {
   auto layer = std::make_unique<CanvasLayer>(drawContext, paint);
   drawContext = layer->layerContext.get();
-  stateStack.push(std::make_unique<CanvasState>(_matrix, tileTranslation, std::move(layer)));
+  stateStack.push(std::make_unique<CanvasState>(_matrix, std::move(layer)));
   clipStack->save();
   return static_cast<int>(stateStack.size()) - 1;
 }
@@ -111,7 +106,6 @@ void Canvas::restore() {
   }
   auto& canvasState = stateStack.top();
   _matrix = canvasState->matrix;
-  tileTranslation = canvasState->tileTranslation;
   clipStack->restore();
   auto layer = std::move(canvasState->savedLayer);
   stateStack.pop();
@@ -141,10 +135,6 @@ void Canvas::restoreToCount(int saveCount) {
 }
 
 void Canvas::translate(float dx, float dy) {
-  if (tileTranslation) {
-    concat(Matrix::MakeTrans(dx, dy));
-    return;
-  }
   _matrix.preTranslate(dx, dy);
 }
 
@@ -159,102 +149,27 @@ void Canvas::rotate(float degrees) {
 void Canvas::rotate(float degrees, float px, float py) {
   Matrix m = {};
   m.setRotate(degrees, px, py);
-  concat(m);
+  _matrix.preConcat(m);
 }
 
 void Canvas::skew(float sx, float sy) {
   _matrix.preSkew(sx, sy);
 }
 
-// Keep the tile-relative translation until a child transform cancels its large integer part.
-// Linear coefficients can stay in Matrix. Only the translation contains the tile origin.
-static void ConcatTileMatrix(Matrix* current, std::array<double, 2>* translation,
-                             const Matrix& child) {
-  auto result = *current;
-  result.preConcat(child);
-  for (size_t row = 0; row < translation->size(); ++row) {
-    const int offset = static_cast<int>(row) * 3;
-    const double axisX = current->get(offset);
-    const double axisY = current->get(offset + 1);
-    const double position = (*translation)[row];
-    if (child.hasPerspective()) {
-      for (int col = 0; col < 2; ++col) {
-        result.set(offset + col,
-                   static_cast<float>(axisX * child.get(col) + axisY * child.get(3 + col) +
-                                      position * child.get(6 + col)));
-      }
-    }
-    (*translation)[row] =
-        axisX * child.getTranslateX() + axisY * child.getTranslateY() + position * child.get(8);
-    result.set(offset + 2, static_cast<float>((*translation)[row]));
-  }
-  *current = result;
-}
-
-Matrix Canvas::getConcatMatrix(const Matrix& matrix) const {
-  auto result = _matrix;
-  if (tileTranslation) {
-    auto translation = *tileTranslation;
-    ConcatTileMatrix(&result, &translation, matrix);
-  } else {
-    result.preConcat(matrix);
-  }
-  return result;
-}
-
 void Canvas::concat(const Matrix& matrix) {
-  if (tileTranslation) {
-    ConcatTileMatrix(&_matrix, &*tileTranslation, matrix);
-  } else {
-    _matrix.preConcat(matrix);
-  }
-}
-
-void Canvas::setMatrixForTile(const Matrix& localToOutput, int originX, int originY) {
-  DEBUG_ASSERT(!localToOutput.hasPerspective());
-  // Beyond this magnitude adjacent float values are at least one whole pixel apart.
-  constexpr int SubpixelLimit = 1 << (std::numeric_limits<float>::digits - 1);
-  if (originX > -SubpixelLimit && originX < SubpixelLimit && originY > -SubpixelLimit &&
-      originY < SubpixelLimit && std::abs(localToOutput.getTranslateX()) < SubpixelLimit &&
-      std::abs(localToOutput.getTranslateY()) < SubpixelLimit) {
-    auto matrix = Matrix::MakeTrans(-static_cast<float>(originX), -static_cast<float>(originY));
-    matrix.preConcat(localToOutput);
-    setMatrix(matrix);
-    return;
-  }
-  double x = static_cast<double>(localToOutput.getTranslateX()) - originX;
-  double y = static_cast<double>(localToOutput.getTranslateY()) - originY;
-  _matrix = localToOutput;
-  _matrix.setTranslateX(static_cast<float>(x));
-  _matrix.setTranslateY(static_cast<float>(y));
-  tileTranslation = std::array<double, 2>{x, y};
+  _matrix.preConcat(matrix);
 }
 
 void Canvas::setMatrix(const Matrix& matrix) {
   _matrix = matrix;
-  tileTranslation.reset();
 }
 
 void Canvas::resetMatrix() {
   _matrix.reset();
-  tileTranslation.reset();
 }
 
 const Matrix& Canvas::getMatrix() const {
   return _matrix;
-}
-
-bool Canvas::needsTileRebase() const {
-  return tileTranslation && ((*tileTranslation)[0] != _matrix.getTranslateX() ||
-                             (*tileTranslation)[1] != _matrix.getTranslateY());
-}
-
-Point Canvas::getTileAnchor() const {
-  Matrix inverse = {};
-  if (!_matrix.invert(&inverse)) {
-    return Point::Zero();
-  }
-  return inverse.mapXY(0, 0);
 }
 
 Path Canvas::getTotalClip() const {
@@ -269,34 +184,14 @@ std::optional<Rect> Canvas::getTotalClipBounds() const {
 }
 
 void Canvas::clipRect(const Rect& rect, bool antiAlias) {
-  if (needsTileRebase()) {
-    auto anchor = getTileAnchor();
-    clipStack->clipRect(rect.makeOffset(-anchor.x, -anchor.y),
-                        getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y)), antiAlias);
-    return;
-  }
   clipStack->clipRect(rect, _matrix, antiAlias);
 }
 
 void Canvas::clipRRect(const RRect& rRect, bool antiAlias) {
-  if (needsTileRebase()) {
-    auto anchor = getTileAnchor();
-    auto local = rRect;
-    local.offset(-anchor.x, -anchor.y);
-    clipStack->clipRRect(local, getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y)), antiAlias);
-    return;
-  }
   clipStack->clipRRect(rRect, _matrix, antiAlias);
 }
 
 void Canvas::clipPath(const Path& path, bool antiAlias) {
-  if (needsTileRebase()) {
-    auto anchor = getTileAnchor();
-    auto local = path;
-    local.transform(Matrix::MakeTrans(-anchor.x, -anchor.y));
-    clipStack->clipPath(local, getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y)), antiAlias);
-    return;
-  }
   if (path.isInverseFillType()) {
     // Inverse-fill paths cannot be expressed as a simple rect/rrect clip, so fall back to path.
     clipStack->clipPath(path, _matrix, antiAlias);
@@ -320,7 +215,7 @@ void Canvas::clipPath(const Path& path, bool antiAlias) {
 }
 
 void Canvas::resetStateStack() {
-  resetMatrix();
+  _matrix = Matrix::I();
   std::stack<std::unique_ptr<CanvasState>>().swap(stateStack);
   clipStack = std::make_unique<ClipStack>();
 }
@@ -343,16 +238,6 @@ void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint
   Stroke stroke(paint.getStrokeWidth(), paint.getLineCap(), paint.getLineJoin(),
                 paint.getMiterLimit());
   Point line[2] = {{x0, y0}, {x1, y1}};
-  if (needsTileRebase()) {
-    auto anchor = getTileAnchor();
-    for (auto& point : line) {
-      point.x -= anchor.x;
-      point.y -= anchor.y;
-    }
-    drawLine(line, getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y)), *clipStack,
-             paint.getBrush().makeWithMatrix(Matrix::MakeTrans(-anchor.x, -anchor.y)), stroke);
-    return;
-  }
   drawLine(line, _matrix, *clipStack, paint.getBrush(), stroke);
 }
 
@@ -377,13 +262,6 @@ void Canvas::drawLine(const Point line[2], const Matrix& matrix, const ClipStack
   }
 }
 
-static Point RectTileAnchor(Point tileAnchor, const Rect& rect) {
-  // Use the nearest point inside the geometry so subtracting a distant tile origin cannot
-  // round both edges of a narrow rectangle to the same float.
-  return {std::clamp(tileAnchor.x, rect.left, rect.right),
-          std::clamp(tileAnchor.y, rect.top, rect.bottom)};
-}
-
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   if (rect.isEmpty()) {
     if (paint.getStyle() != PaintStyle::Stroke) {
@@ -395,14 +273,6 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  if (needsTileRebase()) {
-    auto anchor = RectTileAnchor(getTileAnchor(), rect);
-    drawContext->drawRect(rect.makeOffset(-anchor.x, -anchor.y),
-                          getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y)), *clipStack,
-                          paint.getBrush().makeWithMatrix(Matrix::MakeTrans(-anchor.x, -anchor.y)),
-                          paint.getStroke());
-    return;
-  }
   drawContext->drawRect(rect, _matrix, *clipStack, paint.getBrush(), paint.getStroke());
 }
 
@@ -560,16 +430,6 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  if (needsTileRebase()) {
-    auto anchor = RectTileAnchor(getTileAnchor(), rRect.rect());
-    auto local = rRect;
-    local.offset(-anchor.x, -anchor.y);
-    drawContext->drawRRect(local, getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y)),
-                           *clipStack,
-                           paint.getBrush().makeWithMatrix(Matrix::MakeTrans(-anchor.x, -anchor.y)),
-                           paint.getStroke());
-    return;
-  }
   drawContext->drawRRect(rRect, _matrix, *clipStack, paint.getBrush(), paint.getStroke());
 }
 
@@ -580,15 +440,6 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
       // No geometry to draw, so draw the fill instead.
       drawFill(_matrix, *clipStack, paint.getBrush());
     }
-    return;
-  }
-  if (needsTileRebase()) {
-    auto anchor = getTileAnchor();
-    auto local = path;
-    auto toLocal = Matrix::MakeTrans(-anchor.x, -anchor.y);
-    local.transform(toLocal);
-    drawPath(local, getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y)), *clipStack,
-             paint.getBrush().makeWithMatrix(toLocal), paint.getStroke());
     return;
   }
   drawPath(path, _matrix, *clipStack, paint.getBrush(), paint.getStroke());
@@ -649,25 +500,6 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   auto brush = paint.getBrush();
   auto drawMatrix = _matrix;
   auto stroke = paint.getStroke();
-  if (needsTileRebase()) {
-    auto anchor = getTileAnchor();
-    auto toLocal = Matrix::MakeTrans(-anchor.x, -anchor.y);
-    if (shape->isSimplePath()) {
-      auto local = shape->getPath();
-      local.transform(toLocal);
-      if (!local.isEmpty()) {
-        drawPath(local, getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y)), *clipStack,
-                 brush.makeWithMatrix(toLocal), stroke);
-      } else if (local.isInverseFillType()) {
-        drawFill(drawMatrix, *clipStack, brush);
-      }
-      return;
-    }
-    auto local = Shape::ApplyMatrix(std::move(shape), toLocal);
-    drawContext->drawShape(std::move(local), getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y)),
-                           *clipStack, brush.makeWithMatrix(toLocal), stroke);
-    return;
-  }
   Path* path = nullptr;
   if (shape->type() == Shape::Type::Path) {
     path = &std::static_pointer_cast<PathShape>(shape)->path;
@@ -677,7 +509,7 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
       Matrix inverse = {};
       if (matrixShape->matrix.invert(&inverse)) {
         path = &std::static_pointer_cast<PathShape>(matrixShape->shape)->path;
-        drawMatrix = getConcatMatrix(matrixShape->matrix);
+        drawMatrix.preConcat(matrixShape->matrix);
         brush = brush.makeWithMatrix(inverse);
       }
     }
@@ -701,35 +533,6 @@ void Canvas::drawMesh(std::shared_ptr<Mesh> mesh, const Paint& paint) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  if (needsTileRebase()) {
-    auto anchor = getTileAnchor();
-    auto offset = Matrix::MakeTrans(-anchor.x, -anchor.y);
-    auto brush = paint.getBrush().makeWithMatrix(offset);
-    auto base = static_cast<MeshBase*>(mesh.get());
-    if (base->type() == MeshBase::Type::Shape) {
-      auto* source = static_cast<ShapeMesh*>(base);
-      mesh =
-          Mesh::MakeFromShape(Shape::ApplyMatrix(source->shape(), offset), source->isAntiAlias());
-    } else {
-      auto* source = static_cast<VertexMesh*>(base);
-      std::vector<Point> positions(source->positions(),
-                                   source->positions() + source->vertexCount());
-      for (auto& point : positions) {
-        point -= anchor;
-      }
-      if (source->hasTexCoords()) {
-        brush.shader = paint.getBrush().shader;
-      }
-      mesh = Mesh::MakeCopy(source->topology(), source->vertexCount(), positions.data(),
-                            source->texCoords(), source->colors(), source->indexCount(),
-                            source->indices());
-    }
-    if (mesh) {
-      drawContext->drawMesh(std::move(mesh), getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y)),
-                            *clipStack, brush);
-    }
-    return;
-  }
   drawContext->drawMesh(std::move(mesh), _matrix, *clipStack, paint.getBrush());
 }
 
@@ -781,7 +584,7 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const Brush& brush,
   auto drawMatrix = _matrix;
   auto newBrush = brush;
   if (dstMatrix) {
-    drawMatrix = getConcatMatrix(*dstMatrix);
+    drawMatrix.preConcat(*dstMatrix);
     auto brushMatrix = Matrix::I();
     if (!dstMatrix->invert(&brushMatrix)) {
       return;
@@ -807,19 +610,6 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!srcRect.isEmpty());
   DEBUG_ASSERT(!dstRect.isEmpty());
-  if (needsTileRebase()) {
-    auto anchor = getTileAnchor();
-    auto localRect = dstRect.makeOffset(-anchor.x, -anchor.y);
-    if (localRect.isEmpty()) {
-      return;
-    }
-    AutoCanvasRestore restore(this);
-    setMatrix(getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y)));
-    drawImageRect(std::move(image), srcRect, localRect, sampling,
-                  brush.makeWithMatrix(Matrix::MakeTrans(-anchor.x, -anchor.y)), constraint,
-                  strictRect);
-    return;
-  }
   auto type = Types::Get(image.get());
   if (type != Types::ImageType::Subset || image->hasMipmaps()) {
     drawContext->drawImageRect(std::move(image), srcRect, dstRect, sampling, _matrix, *clipStack,
@@ -863,8 +653,13 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
   if (glyphCount == 0) {
     return;
   }
+  SaveLayerForImageFilter(paint.getImageFilter());
   auto textBlob = TextBlob::MakeFrom(glyphs, positions, glyphCount, font);
-  drawTextBlob(std::move(textBlob), 0, 0, paint);
+  if (textBlob == nullptr) {
+    return;
+  }
+  drawContext->drawTextBlob(std::move(textBlob), _matrix, *clipStack, paint.getBrush(),
+                            paint.getStroke());
 }
 
 void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
@@ -873,24 +668,9 @@ void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  if (needsTileRebase()) {
-    auto anchor = getTileAnchor();
-    if (x != anchor.x || y != anchor.y) {
-      textBlob = textBlob->makeOffset(x - anchor.x, y - anchor.y);
-    }
-    drawContext->drawTextBlob(
-        std::move(textBlob), getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y)), *clipStack,
-        paint.getBrush().makeWithMatrix(Matrix::MakeTrans(-anchor.x, -anchor.y)),
-        paint.getStroke());
-    return;
-  }
   auto drawMatrix = _matrix;
   if (!FloatNearlyZero(x) || !FloatNearlyZero(y)) {
-    if (tileTranslation) {
-      drawMatrix = getConcatMatrix(Matrix::MakeTrans(x, y));
-    } else {
-      drawMatrix.preTranslate(x, y);
-    }
+    drawMatrix.preTranslate(x, y);
     auto brush = paint.getBrush().makeWithMatrix(Matrix::MakeTrans(-x, -y));
     drawContext->drawTextBlob(std::move(textBlob), drawMatrix, *clipStack, brush,
                               paint.getStroke());
@@ -904,10 +684,6 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture) {
   if (picture == nullptr) {
     return;
   }
-  if (tileTranslation) {
-    picture->playback(this);
-    return;
-  }
   drawContext->drawPicture(std::move(picture), _matrix, *clipStack);
 }
 
@@ -916,42 +692,9 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
   if (picture == nullptr) {
     return;
   }
-  if (tileTranslation) {
-    AutoCanvasRestore restore(this);
-    if (matrix != nullptr) {
-      concat(*matrix);
-    }
-    if (paint == nullptr) {
-      picture->playback(this);
-      return;
-    }
-    auto drawMatrix = _matrix;
-    auto brush = paint->getBrush();
-    brush.shader = nullptr;
-    if (needsTileRebase()) {
-      // Keep the filter and its entire input in picture-local coordinates. An integral change
-      // of origin preserves the raster grid when this group is finally composited onto the tile.
-      auto anchor = getTileAnchor();
-      anchor.x = std::floor(anchor.x);
-      anchor.y = std::floor(anchor.y);
-      PictureRecorder recorder;
-      auto* recording = recorder.beginRecording();
-      auto offset = Matrix::MakeTrans(-anchor.x, -anchor.y);
-      recording->setMatrixForTile(offset, 0, 0);
-      picture->playback(recording);
-      picture = recorder.finishRecordingAsPicture();
-      if (!picture) {
-        return;
-      }
-      drawMatrix = getConcatMatrix(Matrix::MakeTrans(anchor.x, anchor.y));
-      brush = brush.makeWithMatrix(offset);
-    }
-    drawLayer(std::move(picture), drawMatrix, *clipStack, brush, paint->getImageFilter());
-    return;
-  }
   auto drawMatrix = _matrix;
   if (matrix) {
-    drawMatrix = getConcatMatrix(*matrix);
+    drawMatrix.preConcat(*matrix);
   }
   if (paint) {
     auto brush = paint->getBrush();
@@ -1009,26 +752,11 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
       continue;
     }
     auto dstMatrix = matrix[i];
+    dstMatrix.preTranslate(-rect.x(), -rect.y());
     auto glyphBrush = brush;
     if (colors) {
       glyphBrush.color = colors[i];
     }
-    // Map the sprite's corners near its own origin so a narrow sprite survives a distant placement.
-    constexpr float SubpixelLimit = 1 << (std::numeric_limits<float>::digits - 1);
-    float x = dstMatrix.getTranslateX();
-    float y = dstMatrix.getTranslateY();
-    if (tileTranslation && !dstMatrix.hasPerspective() &&
-        (std::abs(x) >= SubpixelLimit || std::abs(y) >= SubpixelLimit)) {
-      AutoCanvasRestore restore(this);
-      translate(x, y);
-      dstMatrix.setTranslateX(0);
-      dstMatrix.setTranslateY(0);
-      dstMatrix.preTranslate(-rect.x(), -rect.y());
-      drawImageRect(atlas, rect, dstMatrix.mapRect(rect), sampling,
-                    glyphBrush.makeWithMatrix(Matrix::MakeTrans(-x, -y)));
-      continue;
-    }
-    dstMatrix.preTranslate(-rect.x(), -rect.y());
     auto dstRect = dstMatrix.mapRect(rect);
     drawImageRect(atlas, rect, dstRect, sampling, glyphBrush);
   }

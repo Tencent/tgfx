@@ -25,14 +25,12 @@ namespace tgfx {
 /**
  * Explicit background sampling geometry. It lets a tiled export create every background surface
  * on one fixed pixel grid instead of letting the current capture rect pick the sampling density.
- * The origin is expressed in integer output pixels. Nested sampling uses capture-surface pixels
- * as its shared coordinate space.
+ * The scene-root transform already includes the capture surface's offset on the output grid.
+ * Nested sampling uses capture-surface pixels as its shared coordinate space.
  */
 struct BackgroundRasterGeometry {
   ISize size = {};
-  Matrix sceneRootToOutput = Matrix::I();
-  int originX = 0;
-  int originY = 0;
+  Matrix sceneRootToSurface = Matrix::I();
   float surfaceScale = 1.0f;
 };
 

@@ -22,12 +22,19 @@
 #include <vector>
 #include "layers/compositing3d/Layer3DContext.h"
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 class BackgroundHandler;
+class Canvas;
 class OpaqueContext;
 struct DrawControl;
+
+struct DrawViewport {
+  const Canvas* canvas = nullptr;
+  Rect bounds = {};
+};
 
 /**
  * DrawArgs represents the arguments passed to the draw method of a Layer.
@@ -50,6 +57,9 @@ class DrawArgs {
   // in which intermediate failures are handled silently by the existing fallbacks.
   DrawControl* drawControl = nullptr;
 
+  // Device-space bounds of the drawing region when its surface has a larger backing size.
+  const DrawViewport* viewport = nullptr;
+
   // Whether to exclude effects during the drawing process.
   // Note: When set to true, all layer styles and filters will be skipped.
   bool excludeEffects = false;
@@ -57,11 +67,6 @@ class DrawArgs {
   // Layer whose renderBounds does not intersect any of these rects. Callers should pre-outset the
   // rects if blur sampling range needs to be included. nullptr means no culling (full recording).
   const std::vector<Rect>* renderRects = nullptr;
-  // A directly exported hidden branch has no current scene render bounds.
-  bool useSceneBounds = true;
-  // Projected scene bounds of unsupported inputs encountered before a background style.
-  // Export reports them only if the style actually needs the affected part of this capture.
-  std::vector<Rect>* unsupportedBackdropBounds = nullptr;
 
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 

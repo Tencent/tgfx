@@ -18,9 +18,7 @@
 
 #pragma once
 
-#include <array>
 #include <memory>
-#include <optional>
 #include "core/DrawContext.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
@@ -38,13 +36,11 @@ class CanvasLayer {
 
 class CanvasState {
  public:
-  CanvasState(const Matrix& matrix, const std::optional<std::array<double, 2>>& tileTranslation,
-              std::unique_ptr<CanvasLayer> savedLayer = nullptr)
-      : matrix(matrix), tileTranslation(tileTranslation), savedLayer(std::move(savedLayer)) {
+  explicit CanvasState(const Matrix& matrix, std::unique_ptr<CanvasLayer> savedLayer = nullptr)
+      : matrix(matrix), savedLayer(std::move(savedLayer)) {
   }
 
   Matrix matrix = Matrix::I();
-  std::optional<std::array<double, 2>> tileTranslation = {};
   std::unique_ptr<CanvasLayer> savedLayer = nullptr;
 };
 }  // namespace tgfx

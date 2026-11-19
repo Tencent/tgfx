@@ -885,65 +885,84 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     return;
   }
 
+  auto surface = canvas->getSurface();
+  DrawArgs args = {};
+  Context* context = nullptr;
+
   auto bounds = getBounds();
   auto clippedBounds = GetClippedBounds(bounds, canvas);
   if (clippedBounds.isEmpty()) {
     return;
   }
+  auto localToGlobalMatrix = getGlobalMatrix();
+  auto globalToLocalMatrix = Matrix3D::I();
+  bool canInvert = localToGlobalMatrix.invert(&globalToLocalMatrix);
 
-  DrawArgs args = {};
-  Context* context = nullptr;
-  if (auto surface = canvas->getSurface()) {
-    context = surface->getContext();
+  Rect renderRect = {};
+  std::vector<Rect> renderRectsVec = {};
+  if (_root && canInvert) {
+    _root->updateRenderBounds();
+    renderRect = localToGlobalMatrix.mapRect(clippedBounds);
+    renderRectsVec = {renderRect};
+    args.renderRects = &renderRectsVec;
+  }
+
+  if (surface) {
     args.dstColorSpace = surface->colorSpace();
+    context = surface->getContext();
     if (!(surface->renderFlags() & RenderFlags::DisableCache)) {
       args.context = context;
     }
   }
 
-  auto localToRoot = getGlobalMatrix();
-  Matrix3D rootToLocal = {};
-  bool canInvert = localToRoot.invert(&rootToLocal);
-  std::vector<Rect> renderRects = {};
-  if (_root && canInvert) {
-    _root->updateRenderBounds();
-    renderRects.push_back(localToRoot.mapRect(clippedBounds));
-    args.renderRects = &renderRects;
-  }
-
-  bool preserve3D = canPreserve3D();
-  bool needsBackground = canInvert && !preserve3D && hasBackgroundStyle();
-  std::optional<BackgroundSnapshotMap> snapshots;
-  if (needsBackground && context != nullptr) {
+  // Capture pass — only when this layer or descendants have Background-sourced styles. Disabled
+  // in 3D subtrees. Requires a GPU context; on picture-canvas paths the capture is skipped and
+  // the consumer falls back to on-the-fly synthesis (signalled by passing a null snapshot map).
+  BackgroundSnapshotMap snapshotMap = {};
+  BackgroundSnapshotMap* snapshotsPtr = nullptr;
+  bool needBackground = canInvert && !canPreserve3D() && hasBackgroundStyle();
+  if (needBackground && context != nullptr) {
     auto rectForDraw = maxBackgroundOutset > 0.0f ? clippedBounds : bounds;
-    auto backgroundMatrix = canvas->getMatrix();
-    auto drawRect = backgroundMatrix.mapRect(rectForDraw);
-    if (_root) {
-      // Replay the backdrop in root coordinates while the direct draw stays in local coordinates.
-      backgroundMatrix.preConcat(rootToLocal.asMatrix());
+    Matrix backgroundMatrix = canvas->getMatrix();
+    Rect drawRect = backgroundMatrix.mapRect(rectForDraw);
+    if (_root != nullptr) {
+      // Capture replays from _root, so bgCanvas accumulates globalMatrix when reaching this
+      // layer. But Layer::draw() itself paints via drawLayer without concatenating globalMatrix,
+      // so the device position is just outerCanvas * self-local. Compose the viewMatrix as
+      // outerCanvas * invert(globalMatrix) so that surfaceMatrix * globalMatrix collapses back
+      // to outerCanvas, aligning capture and consume in the same device-pixel space.
+      // drawRect stays at outerCanvas.mapRect(rectForDraw) (the device-pixel layer rect)
+      // computed above, since BackgroundSource uses it to size the surface.
+      backgroundMatrix.preConcat(globalToLocalMatrix.asMatrix());
     }
-    if (auto source = createBackgroundSource(context, drawRect, backgroundMatrix,
-                                             rectForDraw == bounds, args.dstColorSpace)) {
-      if (!_root) {
-        renderRects.push_back(clippedBounds);
-      }
-      snapshots.emplace();
-      // The cull rects cover the whole captured area here, so the style sources recorded during
-      // this pass are reused by the consume pass under the same range.
-      BackgroundCapturer::Run(_root ? _root : this, args, std::move(source), &*snapshots,
-                              renderRects, renderRects);
+    if (auto bgSource = createBackgroundSource(context, drawRect, backgroundMatrix,
+                                               rectForDraw == bounds, args.dstColorSpace)) {
+      // Replay from _root so ancestor matrices apply; orphan layers replay from themselves.
+      // The capture rect is in the captureRoot's local coordinate space: world (root-local) when
+      // rooted, or this layer's local bounds when orphan.
+      Layer* captureRoot = _root ? _root : this;
+      Rect captureRect = _root ? renderRect : clippedBounds;
+      BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), &snapshotMap, {captureRect},
+                              {captureRect});
+      snapshotsPtr = &snapshotMap;
     }
   }
 
+  // Consume pass — normal render. NoOp when there's no background style so stray ones silently
+  // skip (same as contour / 3D subtrees). A null snapshot map signals the picture-canvas path,
+  // which makes the consumer synthesize backdrops on the fly via PictureRecorder.
   AutoCanvasRestore autoRestore(canvas);
-  BackgroundConsumer consumer(snapshots ? &*snapshots : nullptr, false);
-  // Without a captured backdrop the consumer retains the regular canvas fallback.
-  args.backgroundHandler =
-      needsBackground ? static_cast<BackgroundHandler*>(&consumer) : BackgroundHandler::NoOp();
-  if (preserve3D) {
-    drawByStarting3DContext(args, canvas, getMatrixWithScrollRect(), &Layer::drawLayer, alpha);
+  BackgroundConsumer consumer(snapshotsPtr, false);
+  BackgroundHandler* handler =
+      needBackground ? static_cast<BackgroundHandler*>(&consumer) : BackgroundHandler::NoOp();
+  DrawArgs drawArgs = args;
+  drawArgs.backgroundHandler = handler;
+  // Check if the current layer needs to start a 3D context. Since Layer::draw is called directly
+  // without going through a parent layer's drawChildren, 3D context handling must be done here.
+  if (canPreserve3D()) {
+    drawByStarting3DContext(drawArgs, canvas, getMatrixWithScrollRect(), &Layer::drawLayer, alpha);
   } else {
-    drawLayer(args, canvas, alpha, blendMode);
+    drawLayer(drawArgs, canvas, alpha, blendMode);
   }
 }
 
@@ -1127,8 +1146,7 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (FloatNearlyZero(contentScale)) {
     return true;
   }
-  if (args.useSceneBounds && args.renderRects != nullptr && !args.renderRects->empty() &&
-      !renderBounds.isEmpty()) {
+  if (args.renderRects != nullptr && !args.renderRects->empty() && !renderBounds.isEmpty()) {
     bool anyHit = false;
     for (const auto& rect : *args.renderRects) {
       if (Rect::Intersects(rect, renderBounds)) {
@@ -1233,13 +1251,6 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   return recorder.finishRecordingAsPicture();
 }
 
-static void RecordUnsupportedBackdrop(const DrawArgs& args, const Matrix3D& localToScene,
-                                      Rect bounds, const std::optional<Rect>& clip) {
-  if (!bounds.isEmpty() && (!clip.has_value() || bounds.intersect(*clip))) {
-    args.unsupportedBackdropBounds->push_back(localToScene.mapRect(bounds));
-  }
-}
-
 MaskData Layer::getMaskData(const DrawArgs& args, float scale,
                             const std::optional<Rect>& layerClipBounds) {
   DEBUG_ASSERT(_mask != nullptr);
@@ -1254,12 +1265,6 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
                   maskType == LayerMaskType::ContourInverted;
 
   auto relativeMatrix3D = _mask->getRelativeMatrix3D(this);
-  if (args.unsupportedBackdropBounds != nullptr &&
-      (_mask->canPreserve3D() || !Matrix3DUtils::IsMatrix3DAffine(relativeMatrix3D))) {
-    RecordUnsupportedBackdrop(args, getGlobalMatrix(),
-                              _mask->getBoundsInternal(relativeMatrix3D, false), layerClipBounds);
-    return MaskData(inverted);
-  }
   auto maskPicture = getMaskPicture(args, isContourMode, scale, relativeMatrix3D);
   if (maskPicture == nullptr) {
     return MaskData(inverted);
@@ -1581,24 +1586,15 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
-  auto* capturer = args.backgroundHandler ? args.backgroundHandler->asCapturer() : nullptr;
-  if (capturer != nullptr && capturer->isExportAncestor(this) &&
-      std::none_of(_layerStyles.begin(), _layerStyles.end(), [](const auto& style) {
-        return style->position() == LayerStylePosition::Below;
-      })) {
-    // Preparing an Above style would record children that paint after the export target.
-    drawContents(args, canvas, alpha, nullptr);
-    return;
-  }
   // Capture and consume passes share the same per-layer LayerStyleSource via the active handler,
   // so the content, contour and geometry intermediate renders happen once per snapshot map
   // instead of once per pass.
-  const LayerStyleSource* sourcePtr = nullptr;
-  if (args.backgroundHandler != nullptr) {
-    sourcePtr = args.backgroundHandler->getCachedLayerStyleSource(this);
-  }
+  auto cached = args.backgroundHandler != nullptr
+                    ? args.backgroundHandler->getCachedLayerStyleSource(this)
+                    : std::nullopt;
+  auto* sourcePtr = cached.value_or(nullptr);
   std::unique_ptr<LayerStyleSource> ownedSource;
-  if (sourcePtr == nullptr) {
+  if (!cached.has_value()) {
     ownedSource = getLayerStyleSource(args, canvas->getMatrix());
     if (ownedSource != nullptr && args.backgroundHandler != nullptr &&
         args.backgroundHandler->canCacheLayerStyleSource(this)) {
@@ -1622,11 +1618,6 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
   }
   if (!drawChildren(args, canvas, alpha, stopChild)) {
-    return;
-  }
-  auto* capturer = args.backgroundHandler ? args.backgroundHandler->asCapturer() : nullptr;
-  if (stopChild != nullptr || (capturer != nullptr && capturer->isExportAncestor(this))) {
-    // Ancestor foreground and Above styles paint after the child whose backdrop is being read.
     return;
   }
   if (layerStyleSource) {
@@ -1734,20 +1725,12 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
   // 3D middle node: descendants are independently registered with the active Layer3DContext and
   // composited via BSP. Do not recurse here, otherwise we would double-draw them.
   if (canPreserve3D() && args.render3DContext != nullptr) {
-    return true;
+    return stopChild == nullptr;
   }
-  auto childCount = static_cast<int>(_children.size());
-  int maxIndex = childCount - 1;
-  if (args.backgroundHandler != nullptr) {
-    int lastCaptureIndex = args.backgroundHandler->lastCaptureChildIndex(this);
-    if (lastCaptureIndex < 0) {
-      return true;
-    }
-    if (lastCaptureIndex < maxIndex) {
-      maxIndex = lastCaptureIndex;
-    }
-  }
-  for (int i = 0; i <= maxIndex; ++i) {
+  auto* handler = args.backgroundHandler;
+  auto range = handler != nullptr ? handler->childRange(this)
+                                  : LayerChildRange{static_cast<int>(_children.size()) - 1};
+  for (int i = 0; i <= range.lastIndex; ++i) {
     auto& child = _children[static_cast<size_t>(i)];
     if (stopChild != nullptr && child.get() == stopChild) {
       // Background-walk truncation: the caller only wants prior siblings of stopChild.
@@ -1756,15 +1739,14 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
       continue;
     }
-    if (args.backgroundHandler != nullptr && i < maxIndex) {
-      args.backgroundHandler->beginForceDrawChildren();
-      drawChild(args, canvas, child.get(), alpha, &Layer::drawLayer);
-      args.backgroundHandler->endForceDrawChildren();
+    bool forceDescendants = i < range.lastIndex;
+    if (handler != nullptr && (forceDescendants || !range.drawTrailingContent)) {
+      handler->drawChild(args, canvas, this, child.get(), alpha, forceDescendants);
     } else {
       drawChild(args, canvas, child.get(), alpha, &Layer::drawLayer);
     }
   }
-  return true;
+  return stopChild == nullptr && range.drawTrailingContent;
 }
 
 void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const Matrix3D& matrix3D,
@@ -1786,14 +1768,6 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const 
 
 bool Layer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float alpha,
                       LayerDrawFunc drawFunc) {
-  if (args.unsupportedBackdropBounds != nullptr &&
-      (child->canPreserve3D() || !child->bitFields.matrix3DIsAffine)) {
-    // Test projected bounds in the current offscreen's parent space before entering a 3D
-    // context. Detached trees have no scene render bounds, but the canvas still has its clip.
-    auto bounds = child->getBoundsInternal(child->getMatrixWithScrollRect(), false);
-    RecordUnsupportedBackdrop(args, getGlobalMatrix(), bounds, GetClipBounds(canvas));
-    return true;
-  }
   // 2D → 3D switch: hand off to drawByStarting3DContext, which expands the 3D subtree internally.
   if (child->canPreserve3D()) {
     auto matrix3D = child->getMatrixWithScrollRect();
@@ -1803,10 +1777,6 @@ bool Layer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float 
 
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(child->getMatrixWithScrollRect().asMatrix());
-  auto* capturer = args.backgroundHandler ? args.backgroundHandler->asCapturer() : nullptr;
-  if (capturer != nullptr && capturer->drawExportTarget(args, canvas, child)) {
-    return true;
-  }
   ClipScrollRect(canvas, child->_scrollRect.get(), nullptr,
                  child->bitFields.allowsEdgeAntialiasing);
   auto blendMode = static_cast<BlendMode>(child->bitFields.blendMode);

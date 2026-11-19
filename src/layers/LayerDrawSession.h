@@ -36,6 +36,9 @@ class Context;
 class Layer;
 enum class LayerStylePosition;
 
+// The tiled export uses float geometry, with subpixel precision below this magnitude.
+inline constexpr int MaxLayerExportCoordinate = 1 << 23;
+
 /**
  * Integer rectangle in a final pixel grid. It is used for tiled output planning so that the float
  * Rect used by layout code never mixes with the integer pixel partition of the delivered image.
@@ -60,11 +63,10 @@ struct PixelRect {
 };
 
 /**
- * The target, scene and output parameters for a tiled export.
+ * The target and output parameters for a tiled export.
  */
 struct LayerDrawRequest {
-  Layer* target = nullptr;
-  Layer* captureRoot = nullptr;  // Its lifetime is guaranteed by the caller.
+  Layer* target = nullptr;  // Its lifetime is guaranteed by the caller.
 
   Matrix targetLocalToOutput = Matrix::I();
   // Keep the final output size integral to preserve exact pixel bounds for large images.
@@ -133,8 +135,9 @@ struct DrawControl {
 enum class DrawOutcome { Success, Cancelled, Failed };
 
 /**
- * Device limits and the optional limit for the surface that receives one output region. The
- * region surface limit includes the margin an effect needs, so it is not a core region size.
+ * Device limits and the optional size limit for the output surface, including its one-pixel
+ * sampling margin. Background captures have their own byte budget and use the device texture
+ * limit.
  */
 struct LayerDrawLimits {
   GPULimits gpuLimits = {};
@@ -192,7 +195,7 @@ struct BatchPlanResult {
 };
 
 /**
- * Destination of one region draw. clearBeforeDraw is true for a fresh export surface.
+ * Destination of one region draw. Set clearBeforeDraw to initialize the surface for this region.
  */
 struct LayerDrawTarget {
   Canvas* canvas = nullptr;
@@ -259,8 +262,9 @@ class LayerDrawSession {
 
   static float FilterOutset(Layer* layer, float scale);
   static float AncestorFilterOutset(Layer* target, Layer* captureRoot, const Matrix& rootToOutput);
-  static bool IsSupported2DSubtree(Layer* layer, std::vector<Layer*>& activeMasks);
-  static bool IsSupportedAncestorChain(Layer* target, Layer* captureRoot);
+  static bool IsSupported2DLayer(const Layer* layer);
+  static bool IsSupported2DScene(const Layer* layer);
+  static const char* UnsupportedSubtreeReason(Layer* layer, std::vector<Layer*>& activeMasks);
   struct BackgroundEffect {
     Rect outputBounds = {};
     float outset = 0;
@@ -274,9 +278,9 @@ class LayerDrawSession {
   void collectPrecedingEffects();
 
   LayerDrawRequest request = {};
+  std::shared_ptr<Layer> sceneRoot = nullptr;
   Matrix rootToOutput = Matrix::I();  // captureRoot-local to final output pixels.
-  Matrix outputToRoot = Matrix::I();
-  Matrix outputToGlobal = Matrix::I();  // output pixels to the renderBounds space.
+  Matrix outputToRoot = Matrix::I();  // output pixels to the capture-root coordinate space.
   PixelRect outputPixelBounds = {};
   bool useSceneBounds = true;
   std::vector<BackgroundEffect> targetEffects = {};

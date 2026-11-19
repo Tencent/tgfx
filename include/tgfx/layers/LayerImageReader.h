@@ -20,7 +20,6 @@
 
 #include <cstddef>
 #include <memory>
-#include <string>
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
@@ -52,40 +51,18 @@ enum class LayerImageErrorCode {
 };
 
 /**
- * Phase in which a layer image error was observed.
- */
-enum class LayerImageStage { Validation, Planning, Background, Rendering, Readback };
-
-/**
- * Diagnostic information of a failed layer image request.
- */
-struct LayerImageError {
-  LayerImageErrorCode code = LayerImageErrorCode::None;
-  LayerImageStage stage = LayerImageStage::Validation;
-  // First output row that could not be delivered.
-  int firstRow = 0;
-  // Size of the failing target when it is relevant, (0, 0) otherwise.
-  ISize surfaceSize = {};
-  // Owned description of the failure.
-  std::string message = {};
-};
-
-/**
  * Description of one layer image: which layer to draw, in which scene context and with which
  * fixed output mapping. The request is fixed when the reader is created and must stay valid for
  * the whole read sequence.
  */
 struct LayerImageRequest {
   // The layer to draw in its local coordinate space. The request supplies the output matrix,
-  // alpha and blend mode. Direct drawing ignores the target's visible flag and scroll rect.
+  // alpha and blend mode. The scene root supplies the backdrop for an attached target. A detached
+  // target is exported on its own. The target branch must participate in scene drawing. The
+  // output mapping can cover local content beyond the target's own scroll rect.
   std::shared_ptr<Layer> target;
-  // Keeps the background capture context alive and defines the scene the target belongs to. For
-  // an attached target this must be the display list's root layer; for a detached target it may be
-  // the target itself. Other ancestors are rejected because their coordinate space would differ
-  // from the one the layer bounds are defined in.
-  std::shared_ptr<Layer> sceneRoot;
 
-  // Size of the final image in pixels. It is already limited and rounded by the caller.
+  // Size of the final image in pixels, rounded by the caller. Each dimension supports up to 2^23.
   ISize outputSize = {};
   // Complete 2D mapping from the target's local space to final output pixels, including the
   // export scale and the crop translation.
@@ -118,10 +95,13 @@ struct LayerImageRequest {
 struct LayerImageReadOptions {
   // Maximum number of rows returned by one successful read. Must be positive.
   int bandRows = 0;
-  // Upper bound for one region's drawing surface, including its sampling margin. With (0, 0),
-  // each dimension is capped at the smaller of 2048 pixels and the device's texture limit.
+  // Upper bound for one output tile's drawing surface, including its one-pixel sampling margin.
+  // With (0, 0), each dimension is capped at the smaller of 2048 pixels and the device's texture
+  // limit.
   // For an explicit limit, both dimensions must be at least 3 pixels. The device limit still
   // applies to each dimension.
+  // The shared capture surface for each batch has a 32 MiB RGBA8 pixel budget and must fit the
+  // device texture dimensions.
   ISize tileSizeLimit = {0, 0};
 };
 
@@ -141,8 +121,8 @@ struct LayerImageReadResult {
   int rowCount = 0;
   // True when the delivered band contains the final output row.
   bool lastBand = false;
-  // Failure details when code is Failed.
-  LayerImageError error = {};
+  // Error code when code is Failed.
+  LayerImageErrorCode error = LayerImageErrorCode::None;
 };
 
 /**
@@ -150,6 +130,10 @@ struct LayerImageReadResult {
  * targets. The caller owns the CPU band buffer and the encoder; TGFX holds no encoder, queue or
  * callback. All methods except requestCancel() must be called on the scene's rendering thread
  * while a valid Context of the device bound at creation is locked.
+ *
+ * The reader reports UnsupportedContent for 3D scenes and hidden targets, or when output
+ * dimensions, tile origins, output or backdrop translations, or recorded local bounds and
+ * relative placements in the target subtree exceed 2^23 in magnitude.
  *
  * The reader holds strong references to the target and scene root, but that does not freeze the
  * scene: the caller must keep the layers, styles, fonts and image resources unchanged until the
@@ -164,11 +148,11 @@ class LayerImageReader {
    * @param context the locked GPU context of the scene's device.
    * @param request the fixed layer image description.
    * @param options band and surface limits.
-   * @param error optional failure details.
+   * @param error optional error code.
    */
   static std::unique_ptr<LayerImageReader> Make(Context* context, const LayerImageRequest& request,
                                                 const LayerImageReadOptions& options,
-                                                LayerImageError* error = nullptr);
+                                                LayerImageErrorCode* error = nullptr);
 
   ~LayerImageReader();
 

@@ -24,12 +24,9 @@
 #include "layers/DrawArgs.h"
 #include "layers/LayerDrawSession.h"
 #include "tgfx/core/ColorSpace.h"
-#include "tgfx/core/ImageFilter.h"
-#include "tgfx/core/Mesh.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/core/TextBlobBuilder.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
@@ -47,6 +44,7 @@ namespace {
 
 static constexpr int TestWidth = 160;
 static constexpr int TestHeight = 120;
+static constexpr int ExportCoordinateLimit = 1 << 23;
 
 class FailingCancelLayer final : public Layer {
  public:
@@ -170,6 +168,13 @@ static ImageInfo OutputInfo(int width, int height) {
                          ColorSpace::SRGB());
 }
 
+static void ExpectUnsupportedRequest(Context* context, const LayerImageRequest& request,
+                                     const LayerImageReadOptions& options) {
+  LayerImageErrorCode error = LayerImageErrorCode::None;
+  EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
+  EXPECT_EQ(error, LayerImageErrorCode::UnsupportedContent);
+}
+
 static PixelImage RenderReference(Context* context, DisplayList* displayList) {
   PixelImage image = {};
   auto surface =
@@ -198,17 +203,16 @@ static std::unique_ptr<DisplayList> MakeDisplayList(const std::shared_ptr<Layer>
 
 struct ReadResult {
   PixelImage image = {};
-  LayerImageError error = {};
+  LayerImageErrorCode error = LayerImageErrorCode::None;
   bool bandSequenceValid = true;
   int bandsRead = 0;
 };
 
 static ReadResult ReadTiled(Context* context, const std::shared_ptr<Layer>& target,
-                            const std::shared_ptr<Layer>& sceneRoot, const ISize& tileSizeLimit) {
+                            const ISize& tileSizeLimit) {
   ReadResult output = {};
   LayerImageRequest request = {};
   request.target = target;
-  request.sceneRoot = sceneRoot;
   request.outputSize = {TestWidth, TestHeight};
   request.targetLocalToOutput = Matrix::I();
   request.renderColorSpace = ColorSpace::SRGB();
@@ -324,10 +328,8 @@ TGFX_TEST(LayerImageReaderTest, TiledMatchesSingleSurface) {
     auto displayList = MakeDisplayList(content);
     auto reference = RenderReference(context, displayList.get());
     ASSERT_FALSE(reference.pixels.empty());
-    auto tiled = ReadTiled(context, content, displayList->root()->shared_from_this(), {64, 64});
-    ASSERT_FALSE(tiled.image.pixels.empty())
-        << "code=" << static_cast<int>(tiled.error.code)
-        << " stage=" << static_cast<int>(tiled.error.stage) << " message=" << tiled.error.message;
+    auto tiled = ReadTiled(context, content, {64, 64});
+    ASSERT_FALSE(tiled.image.pixels.empty()) << "code=" << static_cast<int>(tiled.error);
     EXPECT_TRUE(tiled.bandSequenceValid);
     EXPECT_GT(tiled.bandsRead, 1);
     EXPECT_EQ(CountDifferentPixels(reference, tiled.image, 0), 0);
@@ -389,15 +391,13 @@ TGFX_TEST(LayerImageReaderTest, CanvasDrawPreservesAlphaModulationAboveOne) {
 
   LayerImageRequest request = {};
   request.target = content;
-  request.sceneRoot = content;
   request.outputSize = {8, 8};
   request.alpha = 2.0f;
   LayerImageReadOptions options = {};
   options.bandRows = 1;
-  LayerImageError error = {};
+  LayerImageErrorCode error = LayerImageErrorCode::None;
   EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
-  EXPECT_EQ(error.code, LayerImageErrorCode::InvalidInput);
-  EXPECT_EQ(error.stage, LayerImageStage::Validation);
+  EXPECT_EQ(error, LayerImageErrorCode::InvalidInput);
 }
 
 TGFX_TEST(LayerImageReaderTest, CanvasDrawMatchesDisplayList) {
@@ -452,7 +452,6 @@ TGFX_TEST(LayerImageReaderTest, MaskedTargetWithAttributesMatchesSingleSurface) 
 
   LayerImageRequest request = {};
   request.target = content;
-  request.sceneRoot = displayList->root()->shared_from_this();
   request.outputSize = {TestWidth, TestHeight};
   request.targetLocalToOutput = Matrix::MakeTrans(6, 4);
   request.alpha = 0.7f;
@@ -479,8 +478,7 @@ TGFX_TEST(LayerImageReaderTest, MaskedTargetWithAttributesMatchesSingleSurface) 
     auto* bandPixels = output.pixels.data() + static_cast<size_t>(nextRow) * reference.rowBytes;
     auto result = reader->readNextBand(context, Pixmap(bandInfo, bandPixels), bandInfo.byteSize());
     ASSERT_EQ(result.code, LayerImageReadCode::BandReady)
-        << "firstRow=" << result.firstRow << " error=" << static_cast<int>(result.error.code)
-        << " stage=" << static_cast<int>(result.error.stage) << " message=" << result.error.message;
+        << "firstRow=" << result.firstRow << " error=" << static_cast<int>(result.error);
     nextRow += result.rowCount;
   }
   EXPECT_TRUE(reader->isDone());
@@ -506,13 +504,9 @@ TGFX_TEST(LayerImageReaderTest, NestedBackdropMatchesAndIsTileInvariant) {
   auto displayList = MakeDisplayList(content);
   auto reference = RenderReference(context, displayList.get());
   ASSERT_FALSE(reference.pixels.empty());
-  auto sceneRoot = displayList->root()->shared_from_this();
 
-  auto smallTiles = ReadTiled(context, content, sceneRoot, {64, 64});
-  ASSERT_FALSE(smallTiles.image.pixels.empty())
-      << "code=" << static_cast<int>(smallTiles.error.code)
-      << " stage=" << static_cast<int>(smallTiles.error.stage)
-      << " message=" << smallTiles.error.message;
+  auto smallTiles = ReadTiled(context, content, {64, 64});
+  ASSERT_FALSE(smallTiles.image.pixels.empty()) << "code=" << static_cast<int>(smallTiles.error);
   EXPECT_TRUE(smallTiles.bandSequenceValid);
   // A layer filter applied to the enclosing group rasterizes its intermediate image at the tile's
   // clip window, so its fractional output offset lands on a tile-dependent sub-pixel phase. That
@@ -520,7 +514,7 @@ TGFX_TEST(LayerImageReaderTest, NestedBackdropMatchesAndIsTileInvariant) {
   EXPECT_EQ(CountDifferentPixels(reference, smallTiles.image, 1), 0);
   EXPECT_LE(CountDifferentPixels(reference, smallTiles.image, 0), TestWidth * TestHeight / 200);
 
-  auto largeTiles = ReadTiled(context, content, sceneRoot, {4096, 4096});
+  auto largeTiles = ReadTiled(context, content, {4096, 4096});
   ASSERT_FALSE(largeTiles.image.pixels.empty());
   EXPECT_EQ(CountDifferentPixels(reference, largeTiles.image, 0), 0);
   EXPECT_EQ(CountDifferentPixels(smallTiles.image, largeTiles.image, 1), 0);
@@ -554,7 +548,6 @@ TGFX_TEST(LayerImageReaderTest, ScaledOutputMatchesCanvasDraw) {
 
   LayerImageRequest request = {};
   request.target = content;
-  request.sceneRoot = displayList->root()->shared_from_this();
   request.outputSize = {scaledWidth, scaledHeight};
   request.targetLocalToOutput = Matrix::MakeScale(scale);
   request.renderColorSpace = ColorSpace::SRGB();
@@ -628,7 +621,6 @@ TGFX_TEST(LayerImageReaderTest, PaddedStrideLeavesPaddingUntouched) {
 
   LayerImageRequest request = {};
   request.target = content;
-  request.sceneRoot = displayList->root()->shared_from_this();
   request.outputSize = {TestWidth, TestHeight};
   request.renderColorSpace = ColorSpace::SRGB();
   request.outputColorSpace = ColorSpace::SRGB();
@@ -684,7 +676,6 @@ TGFX_TEST(LayerImageReaderTest, BgraOutputSwapsChannels) {
 
   LayerImageRequest request = {};
   request.target = content;
-  request.sceneRoot = displayList->root()->shared_from_this();
   request.outputSize = {TestWidth, TestHeight};
   request.colorType = ColorType::BGRA_8888;
   request.renderColorSpace = ColorSpace::SRGB();
@@ -732,7 +723,6 @@ TGFX_TEST(LayerImageReaderTest, EquivalentColorSpacesAcceptIndependentInstances)
     ASSERT_TRUE(ColorSpace::Equals(outputColorSpace.get(), destinationColorSpace.get()));
     LayerImageRequest request = {};
     request.target = root;
-    request.sceneRoot = root;
     request.outputSize = {8, 4};
     request.outputColorSpace = outputColorSpace;
     request.clearColor = Color::Red();
@@ -765,7 +755,6 @@ TGFX_TEST(LayerImageReaderTest, ReadsUnpremultipliedColor) {
   ASSERT_TRUE(context != nullptr);
   LayerImageRequest request = {};
   request.target = Layer::Make();
-  request.sceneRoot = request.target;
   request.outputSize = {1, 1};
   request.alphaType = AlphaType::Unpremultiplied;
   request.clearColor = Color::FromRGBA(200, 120, 40, 128);
@@ -775,7 +764,7 @@ TGFX_TEST(LayerImageReaderTest, ReadsUnpremultipliedColor) {
   ASSERT_TRUE(reader != nullptr);
   uint8_t pixel[4] = {};
   auto result = reader->readNextBand(context, Pixmap(reader->bandInfo(), pixel), sizeof(pixel));
-  ASSERT_EQ(result.code, LayerImageReadCode::BandReady) << result.error.message;
+  ASSERT_EQ(result.code, LayerImageReadCode::BandReady) << static_cast<int>(result.error);
   EXPECT_NEAR(pixel[0], 200, 1);
   EXPECT_NEAR(pixel[1], 120, 1);
   EXPECT_NEAR(pixel[2], 40, 1);
@@ -794,7 +783,6 @@ TGFX_TEST(LayerImageReaderTest, RejectsAContextFromAnotherDevice) {
   }
   LayerImageRequest request = {};
   request.target = Layer::Make();
-  request.sceneRoot = request.target;
   request.outputSize = {1, 1};
   LayerImageReadOptions options = {};
   options.bandRows = 1;
@@ -813,8 +801,7 @@ TGFX_TEST(LayerImageReaderTest, RejectsAContextFromAnotherDevice) {
   auto result = reader->readNextBand(otherContext, Pixmap(info, pixels.data()), pixels.size());
   otherDevice->unlock();
   EXPECT_EQ(result.code, LayerImageReadCode::Failed);
-  EXPECT_EQ(result.error.code, LayerImageErrorCode::ContextMismatch);
-  EXPECT_EQ(result.error.stage, LayerImageStage::Rendering);
+  EXPECT_EQ(result.error, LayerImageErrorCode::ContextMismatch);
   EXPECT_EQ(result.rowCount, 0);
   EXPECT_EQ(pixels, std::vector<uint8_t>(pixels.size(), 0x7f));
 }
@@ -826,14 +813,120 @@ TGFX_TEST(LayerImageReaderTest, TileSizeDoesNotChangePixels) {
   ASSERT_TRUE(context != nullptr);
   auto content = BuildTestScene(true);
   auto displayList = MakeDisplayList(content);
-  auto sceneRoot = displayList->root()->shared_from_this();
-  auto smallTiles = ReadTiled(context, content, sceneRoot, {32, 24});
+  auto smallTiles = ReadTiled(context, content, {32, 24});
   ASSERT_FALSE(smallTiles.image.pixels.empty());
-  auto largeTiles = ReadTiled(context, content, sceneRoot, {4096, 4096});
+  auto largeTiles = ReadTiled(context, content, {4096, 4096});
   ASSERT_FALSE(largeTiles.image.pixels.empty());
   EXPECT_TRUE(smallTiles.bandSequenceValid);
   EXPECT_TRUE(largeTiles.bandSequenceValid);
   EXPECT_EQ(CountDifferentPixels(smallTiles.image, largeTiles.image, 0), 0);
+}
+
+TGFX_TEST(LayerImageReaderTest, ReusesSurfaceAcrossFullAndEdgeTiles) {
+  class ColorPatternLayer final : public Layer {
+   public:
+    std::vector<uint32_t> surfaceIDs = {};
+    std::vector<Rect> clips = {};
+
+   protected:
+    bool drawLayer(const DrawArgs&, Canvas* canvas, float, BlendMode) override {
+      auto surface = canvas->getSurface();
+      surfaceIDs.push_back(surface != nullptr ? surface->uniqueID() : 0);
+      clips.push_back(canvas->getTotalClipBounds().value_or(Rect::MakeEmpty()));
+      Paint paint = {};
+      paint.setColor(Color::Red());
+      canvas->drawRect(Rect::MakeWH(2, 2), paint);
+      paint.setColor(Color::Blue());
+      canvas->drawRect(Rect::MakeXYWH(12, 6, 1, 1), paint);
+      return true;
+    }
+  };
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto target = std::make_shared<ColorPatternLayer>();
+  LayerImageRequest request = {};
+  request.target = target;
+  request.outputSize = {13, 7};
+  LayerImageReadOptions options = {};
+  options.bandRows = 7;
+  options.tileSizeLimit = {8, 6};
+  auto reader = LayerImageReader::Make(context, request, options);
+  ASSERT_TRUE(reader != nullptr);
+  auto info = reader->bandInfo();
+  std::vector<uint8_t> pixels(info.byteSize(), 0x7f);
+  auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
+  ASSERT_EQ(result.code, LayerImageReadCode::BandReady);
+  EXPECT_TRUE(result.lastBand);
+  const std::vector<Rect> expectedClips = {Rect::MakeWH(8, 6), Rect::MakeWH(8, 6),
+                                           Rect::MakeWH(3, 6), Rect::MakeWH(8, 5),
+                                           Rect::MakeWH(8, 5), Rect::MakeWH(3, 5)};
+  EXPECT_EQ(target->clips, expectedClips);
+  ASSERT_EQ(target->surfaceIDs.size(), expectedClips.size());
+  EXPECT_NE(target->surfaceIDs.front(), 0U);
+  for (auto id : target->surfaceIDs) {
+    EXPECT_EQ(id, target->surfaceIDs.front());
+  }
+  auto row = pixels.data();
+  for (int y = 0; y < info.height(); ++y, row += info.rowBytes()) {
+    for (int x = 0; x < info.width(); ++x) {
+      auto pixel = row + x * 4;
+      bool red = x < 2 && y < 2;
+      bool blue = x == 12 && y == 6;
+      EXPECT_EQ(pixel[0], red ? 255 : 0);
+      EXPECT_EQ(pixel[1], 0);
+      EXPECT_EQ(pixel[2], blue ? 255 : 0);
+      EXPECT_EQ(pixel[3], red || blue ? 255 : 0);
+    }
+  }
+}
+
+TGFX_TEST(LayerImageReaderTest, PassThroughOffscreenUsesLogicalTileBounds) {
+  class MeasuringSolidLayer final : public SolidLayer {
+   public:
+    std::vector<ISize> surfaceSizes = {};
+
+   protected:
+    bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha,
+                   BlendMode blendMode) override {
+      auto surface = canvas->getSurface();
+      surfaceSizes.push_back(surface != nullptr ? ISize::Make(surface->width(), surface->height())
+                                                : ISize{});
+      return Layer::drawLayer(args, canvas, alpha, blendMode);
+    }
+  };
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto group = Layer::Make();
+  group->setAllowsGroupOpacity(true);
+  auto child = std::make_shared<MeasuringSolidLayer>();
+  child->setColor(Color::Red());
+  child->setWidth(64);
+  child->setHeight(64);
+  child->setMatrix(Matrix::MakeTrans(-16, -16));
+  child->setBlendMode(BlendMode::Multiply);
+  group->addChild(child);
+  auto displayList = MakeDisplayList(group);
+
+  LayerImageRequest request = {};
+  request.target = group;
+  request.alpha = 0.5f;
+  request.outputSize = {7, 4};
+  request.targetLocalToOutput = Matrix::MakeSkew(0.5f, 0.0f);
+  LayerImageReadOptions options = {};
+  options.bandRows = 4;
+  options.tileSizeLimit = {8, 6};
+  auto reader = LayerImageReader::Make(context, request, options);
+  ASSERT_TRUE(reader != nullptr);
+  auto info = reader->bandInfo();
+  std::vector<uint8_t> pixels(info.byteSize());
+  auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
+  ASSERT_EQ(result.code, LayerImageReadCode::BandReady);
+  const std::vector<ISize> expectedSizes = {{8, 6}, {3, 6}};
+  EXPECT_EQ(child->surfaceSizes, expectedSizes);
 }
 
 TGFX_TEST(LayerImageReaderTest, EmptySceneDeliversClearColor) {
@@ -843,16 +936,15 @@ TGFX_TEST(LayerImageReaderTest, EmptySceneDeliversClearColor) {
   auto root = Layer::Make();
   LayerImageRequest request = {};
   request.target = root;
-  request.sceneRoot = root;
   request.outputSize = {40, 30};
   request.clearColor = Color::FromRGBA(200, 10, 20, 255);
   LayerImageReadOptions options = {};
   options.bandRows = 7;
   options.tileSizeLimit = {16, 16};
-  LayerImageError error = {};
+  LayerImageErrorCode error = LayerImageErrorCode::None;
   auto reader = LayerImageReader::Make(context, request, options, &error);
   ASSERT_TRUE(reader != nullptr);
-  ASSERT_EQ(error.code, LayerImageErrorCode::None);
+  ASSERT_EQ(error, LayerImageErrorCode::None);
   std::vector<uint8_t> pixels(static_cast<size_t>(40) * 30 * 4);
   int nextRow = 0;
   bool finished = false;
@@ -892,45 +984,43 @@ TGFX_TEST(LayerImageReaderTest, RejectsInvalidOptions) {
   auto root = BuildTestScene(false);
   LayerImageRequest request = {};
   request.target = root;
-  request.sceneRoot = root;
   request.outputSize = {40, 30};
-  LayerImageError error = {};
+  LayerImageErrorCode error = LayerImageErrorCode::None;
 
   LayerImageReadOptions options = {};
   options.bandRows = 0;
   EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
-  EXPECT_EQ(error.code, LayerImageErrorCode::InvalidInput);
+  EXPECT_EQ(error, LayerImageErrorCode::InvalidInput);
 
   options.bandRows = 4;
   options.tileSizeLimit = {32, 0};
   EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
-  EXPECT_EQ(error.code, LayerImageErrorCode::InvalidInput);
+  EXPECT_EQ(error, LayerImageErrorCode::InvalidInput);
 
   for (const auto& tileSizeLimit : {ISize{-1, -1}, ISize{-1, 0}, ISize{0, -1}}) {
     options.tileSizeLimit = tileSizeLimit;
     EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
-    EXPECT_EQ(error.code, LayerImageErrorCode::InvalidInput);
-    EXPECT_EQ(error.stage, LayerImageStage::Validation);
+    EXPECT_EQ(error, LayerImageErrorCode::InvalidInput);
   }
 
   options.tileSizeLimit = {0, 0};
   request.colorType = ColorType::ALPHA_8;
   EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
-  EXPECT_EQ(error.code, LayerImageErrorCode::InvalidInput);
+  EXPECT_EQ(error, LayerImageErrorCode::InvalidInput);
 
   request.colorType = ColorType::RGBA_8888;
   request.alphaType = AlphaType::Opaque;
   EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
-  EXPECT_EQ(error.code, LayerImageErrorCode::InvalidInput);
+  EXPECT_EQ(error, LayerImageErrorCode::InvalidInput);
 
   request.alphaType = AlphaType::Premultiplied;
   request.renderColorSpace = nullptr;
   EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
-  EXPECT_EQ(error.code, LayerImageErrorCode::InvalidInput);
+  EXPECT_EQ(error, LayerImageErrorCode::InvalidInput);
 
   request.renderColorSpace = ColorSpace::SRGB();
   EXPECT_TRUE(LayerImageReader::Make(nullptr, request, options, &error) == nullptr);
-  EXPECT_EQ(error.code, LayerImageErrorCode::ContextUnavailable);
+  EXPECT_EQ(error, LayerImageErrorCode::ContextUnavailable);
 }
 
 TGFX_TEST(LayerImageReaderTest, RejectsReadOnlyAndMismatchedDestination) {
@@ -940,7 +1030,6 @@ TGFX_TEST(LayerImageReaderTest, RejectsReadOnlyAndMismatchedDestination) {
   auto root = BuildTestScene(false);
   LayerImageRequest request = {};
   request.target = root;
-  request.sceneRoot = root;
   request.outputSize = {40, 30};
   LayerImageReadOptions options = {};
   options.bandRows = 8;
@@ -953,8 +1042,7 @@ TGFX_TEST(LayerImageReaderTest, RejectsReadOnlyAndMismatchedDestination) {
   const Pixmap readOnly(info, static_cast<const void*>(pixels.data()));
   auto result = readOnlyReader->readNextBand(context, readOnly, info.byteSize());
   EXPECT_EQ(result.code, LayerImageReadCode::Failed);
-  EXPECT_EQ(result.error.code, LayerImageErrorCode::InvalidInput);
-  EXPECT_EQ(result.error.stage, LayerImageStage::Validation);
+  EXPECT_EQ(result.error, LayerImageErrorCode::InvalidInput);
   EXPECT_EQ(result.firstRow, 0);
   EXPECT_EQ(result.rowCount, 0);
   EXPECT_EQ(readOnlyReader->rowsRead(), 0);
@@ -968,8 +1056,7 @@ TGFX_TEST(LayerImageReaderTest, RejectsReadOnlyAndMismatchedDestination) {
   Pixmap narrow(narrowInfo, pixels.data());
   result = narrowReader->readNextBand(context, narrow, narrowInfo.byteSize());
   EXPECT_EQ(result.code, LayerImageReadCode::Failed);
-  EXPECT_EQ(result.error.code, LayerImageErrorCode::InvalidInput);
-  EXPECT_EQ(result.error.stage, LayerImageStage::Validation);
+  EXPECT_EQ(result.error, LayerImageErrorCode::InvalidInput);
   EXPECT_EQ(result.firstRow, 0);
   EXPECT_EQ(result.rowCount, 0);
   EXPECT_EQ(narrowReader->rowsRead(), 0);
@@ -981,8 +1068,7 @@ TGFX_TEST(LayerImageReaderTest, RejectsReadOnlyAndMismatchedDestination) {
   Pixmap shortBuffer(info, pixels.data());
   result = shortReader->readNextBand(context, shortBuffer, info.byteSize() - 1);
   EXPECT_EQ(result.code, LayerImageReadCode::Failed);
-  EXPECT_EQ(result.error.code, LayerImageErrorCode::InvalidInput);
-  EXPECT_EQ(result.error.stage, LayerImageStage::Validation);
+  EXPECT_EQ(result.error, LayerImageErrorCode::InvalidInput);
   EXPECT_EQ(result.firstRow, 0);
   EXPECT_EQ(result.rowCount, 0);
   EXPECT_EQ(shortReader->rowsRead(), 0);
@@ -996,7 +1082,6 @@ TGFX_TEST(LayerImageReaderTest, FailedReaderKeepsOriginalFailureAndPixels) {
   auto root = BuildTestScene(false);
   LayerImageRequest request = {};
   request.target = root;
-  request.sceneRoot = root;
   request.outputSize = {40, 30};
   LayerImageReadOptions options = {};
   options.bandRows = 8;
@@ -1007,8 +1092,7 @@ TGFX_TEST(LayerImageReaderTest, FailedReaderKeepsOriginalFailureAndPixels) {
   const Pixmap readOnly(info, static_cast<const void*>(pixels.data()));
   const auto first = reader->readNextBand(context, readOnly, pixels.size());
   ASSERT_EQ(first.code, LayerImageReadCode::Failed);
-  ASSERT_EQ(first.error.code, LayerImageErrorCode::InvalidInput);
-  ASSERT_EQ(first.error.stage, LayerImageStage::Validation);
+  ASSERT_EQ(first.error, LayerImageErrorCode::InvalidInput);
   EXPECT_EQ(pixels, std::vector<uint8_t>(pixels.size(), 0x7f));
 
   Context* readContexts[] = {nullptr, context};
@@ -1019,11 +1103,7 @@ TGFX_TEST(LayerImageReaderTest, FailedReaderKeepsOriginalFailureAndPixels) {
     EXPECT_EQ(result.firstRow, 0);
     EXPECT_EQ(result.rowCount, 0);
     EXPECT_FALSE(result.lastBand);
-    EXPECT_EQ(result.error.code, first.error.code);
-    EXPECT_EQ(result.error.stage, first.error.stage);
-    EXPECT_EQ(result.error.firstRow, first.error.firstRow);
-    EXPECT_EQ(result.error.surfaceSize, first.error.surfaceSize);
-    EXPECT_EQ(result.error.message, first.error.message);
+    EXPECT_EQ(result.error, first.error);
     EXPECT_EQ(reader->rowsRead(), 0);
     EXPECT_FALSE(reader->isDone());
     EXPECT_EQ(pixels, std::vector<uint8_t>(pixels.size(), 0x3f));
@@ -1037,7 +1117,6 @@ TGFX_TEST(LayerImageReaderTest, DrawingFailureTakesPriorityOverCancellation) {
   auto root = std::make_shared<FailingCancelLayer>();
   LayerImageRequest request = {};
   request.target = root;
-  request.sceneRoot = root;
   request.outputSize = {8, 4};
   LayerImageReadOptions options = {};
   options.bandRows = 4;
@@ -1052,10 +1131,7 @@ TGFX_TEST(LayerImageReaderTest, DrawingFailureTakesPriorityOverCancellation) {
   EXPECT_EQ(result.firstRow, 0);
   EXPECT_EQ(result.rowCount, 0);
   EXPECT_FALSE(result.lastBand);
-  EXPECT_EQ(result.error.code, LayerImageErrorCode::DrawFailed);
-  EXPECT_EQ(result.error.stage, LayerImageStage::Rendering);
-  EXPECT_EQ(result.error.firstRow, 0);
-  EXPECT_EQ(result.error.message, "test drawing failure before cancellation");
+  EXPECT_EQ(result.error, LayerImageErrorCode::DrawFailed);
   EXPECT_EQ(reader->rowsRead(), 0);
   EXPECT_FALSE(reader->isDone());
   EXPECT_EQ(pixels, std::vector<uint8_t>(pixels.size(), 0x7f));
@@ -1065,11 +1141,7 @@ TGFX_TEST(LayerImageReaderTest, DrawingFailureTakesPriorityOverCancellation) {
   EXPECT_EQ(next.firstRow, result.firstRow);
   EXPECT_EQ(next.rowCount, 0);
   EXPECT_FALSE(next.lastBand);
-  EXPECT_EQ(next.error.code, result.error.code);
-  EXPECT_EQ(next.error.stage, result.error.stage);
-  EXPECT_EQ(next.error.firstRow, result.error.firstRow);
-  EXPECT_EQ(next.error.surfaceSize, result.error.surfaceSize);
-  EXPECT_EQ(next.error.message, result.error.message);
+  EXPECT_EQ(next.error, result.error);
   EXPECT_EQ(root->drawCount, 1);
   EXPECT_EQ(reader->rowsRead(), 0);
   EXPECT_FALSE(reader->isDone());
@@ -1083,7 +1155,6 @@ TGFX_TEST(LayerImageReaderTest, CancelledReaderStaysCancelled) {
   auto root = BuildTestScene(true);
   LayerImageRequest request = {};
   request.target = root;
-  request.sceneRoot = root;
   request.outputSize = {40, 30};
   LayerImageReadOptions options = {};
   options.bandRows = 8;
@@ -1108,7 +1179,6 @@ TGFX_TEST(LayerImageReaderTest, PartialBandWritesAreNeverPublished) {
     root->cancel = cancel;
     LayerImageRequest request = {};
     request.target = root;
-    request.sceneRoot = root;
     request.outputSize = {4, 1};
     request.clearColor = Color::White();
     LayerImageReadOptions options = {};
@@ -1123,8 +1193,7 @@ TGFX_TEST(LayerImageReaderTest, PartialBandWritesAreNeverPublished) {
     auto expected = cancel ? LayerImageReadCode::Cancelled : LayerImageReadCode::Failed;
     ASSERT_EQ(result.code, expected);
     if (!cancel) {
-      EXPECT_EQ(result.error.code, LayerImageErrorCode::DrawFailed);
-      EXPECT_EQ(result.error.stage, LayerImageStage::Rendering);
+      EXPECT_EQ(result.error, LayerImageErrorCode::DrawFailed);
     }
     EXPECT_EQ(result.firstRow, 0);
     EXPECT_EQ(result.rowCount, 0);
@@ -1156,14 +1225,13 @@ TGFX_TEST(LayerImageReaderTest, RejectsPreserve3DContent) {
   root->addChild(child);
   LayerImageRequest request = {};
   request.target = root;
-  request.sceneRoot = root;
   request.outputSize = {40, 30};
   LayerImageReadOptions options = {};
   options.bandRows = 8;
-  LayerImageError error = {};
+  LayerImageErrorCode error = LayerImageErrorCode::None;
   auto reader = LayerImageReader::Make(context, request, options, &error);
   EXPECT_TRUE(reader == nullptr);
-  EXPECT_EQ(error.code, LayerImageErrorCode::UnsupportedContent);
+  EXPECT_EQ(error, LayerImageErrorCode::UnsupportedContent);
 }
 
 TGFX_TEST(LayerImageReaderTest, RejectsTinyTileLimit) {
@@ -1173,14 +1241,13 @@ TGFX_TEST(LayerImageReaderTest, RejectsTinyTileLimit) {
   auto root = BuildTestScene(false);
   LayerImageRequest request = {};
   request.target = root;
-  request.sceneRoot = root;
   request.outputSize = {40, 30};
   LayerImageReadOptions options = {};
   options.bandRows = 8;
   options.tileSizeLimit = {2, 2};
-  LayerImageError error = {};
+  LayerImageErrorCode error = LayerImageErrorCode::None;
   EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
-  EXPECT_EQ(error.code, LayerImageErrorCode::InvalidInput);
+  EXPECT_EQ(error, LayerImageErrorCode::InvalidInput);
 
   options.tileSizeLimit = {0, 0};
   auto reader = LayerImageReader::Make(context, request, options);
@@ -1206,28 +1273,111 @@ TGFX_TEST(LayerImageReaderTest, BackgroundCaptureIncludesAncestorFilterOutset) {
   for (bool attached : {false, true}) {
     Layer* group = nullptr;
     auto content = BuildNestedFilteredBackdropScene(&group);
-    std::shared_ptr<Layer> sceneRoot = content;
     std::unique_ptr<DisplayList> displayList = nullptr;
     if (attached) {
       displayList = MakeDisplayList(content);
-      sceneRoot = displayList->root()->shared_from_this();
     }
     LayerDrawRequest request = {};
     request.target = group;
-    request.captureRoot = sceneRoot.get();
     request.outputSize = {200, 200};
     DrawControl control = {};
     auto session = LayerDrawSession::Prepare(context, request, &control);
     ASSERT_TRUE(session != nullptr) << control.firstFailure.message;
     LayerDrawLimits limits = {};
     limits.gpuLimits = *context->gpu()->limits();
+    limits.outputSurfaceLimit = {core.width() + 2, core.height() + 2};
     auto plan = session->planRegion(core, limits, &control);
     ASSERT_EQ(plan.code, RegionPlanCode::Ready) << control.firstFailure.message;
     ASSERT_TRUE(plan.region.dependencies != nullptr);
+    EXPECT_EQ(plan.region.renderRect.width(), core.width() + 2);
+    EXPECT_EQ(plan.region.renderRect.height(), core.height() + 2);
     auto captureRect = plan.region.dependencies->captureRect;
     EXPECT_GE(captureRect.width(), core.width() + 2 * requiredOutset);
     EXPECT_GE(captureRect.height(), core.height() + 2 * requiredOutset);
+
+    // The draw of one pixel still fits when the capture hits the actual GPU limit.
+    limits.gpuLimits.maxTextureDimension2D = 3;
+    plan = session->planRegion({20, 20, 21, 21}, limits, &control);
+    EXPECT_EQ(plan.code, RegionPlanCode::Failed);
+    EXPECT_EQ(control.firstFailure.code, DrawFailureCode::SurfaceLimit);
+    EXPECT_EQ(control.firstFailure.stage, DrawStage::Planning);
+    EXPECT_GT(control.firstFailure.surfaceSize.width, limits.gpuLimits.maxTextureDimension2D);
   }
+}
+
+static LayerRegionPlan MakeRegionWithCapture(const PixelRect& captureRect) {
+  auto dependency = std::make_shared<RegionDependencyPlan>();
+  dependency->needsBackground = true;
+  dependency->captureRect = captureRect;
+  LayerRegionPlan region = {};
+  region.dependencies = std::move(dependency);
+  return region;
+}
+
+TGFX_TEST(LayerImageReaderTest, SplitsSharedBackgroundCaptureAtMemoryBudget) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto root = Layer::Make();
+  LayerDrawRequest request = {};
+  request.target = root.get();
+  request.outputSize = {4097, 2048};
+  DrawControl control = {};
+  auto session = LayerDrawSession::Prepare(context, request, &control);
+  ASSERT_TRUE(session != nullptr) << control.firstFailure.message;
+
+  // At this height, a shared capture 4096 pixels wide occupies exactly 32 MiB in RGBA8.
+  LayerDrawLimits limits = {};
+  limits.gpuLimits.maxTextureDimension2D = 16384;
+  auto left = MakeRegionWithCapture({0, 0, 2048, 2048});
+  auto atBudget =
+      session->planBatch({left, MakeRegionWithCapture({2048, 0, 4096, 2048})}, limits, &control);
+  ASSERT_EQ(atBudget.code, BatchPlanCode::Ready) << control.firstFailure.message;
+  ASSERT_TRUE(atBudget.plan != nullptr);
+  EXPECT_EQ(atBudget.plan->captureRect.width(), 4096);
+  EXPECT_EQ(atBudget.plan->captureRect.height(), 2048);
+
+  auto right = MakeRegionWithCapture({2048, 0, 4097, 2048});
+  EXPECT_EQ(session->planBatch({left, right}, limits, &control).code, BatchPlanCode::RequiresSplit);
+  EXPECT_EQ(session->planBatch({left}, limits, &control).code, BatchPlanCode::Ready);
+  EXPECT_EQ(session->planBatch({right}, limits, &control).code, BatchPlanCode::Ready);
+  EXPECT_FALSE(control.failed()) << control.firstFailure.message;
+}
+
+TGFX_TEST(LayerImageReaderTest, AppliesMemoryBudgetToIndividualBackgroundCaptures) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto target = SolidLayer::Make();
+  target->setColor(Color::White());
+  target->setWidth(2048);
+  target->setHeight(2048);
+  target->setLayerStyles({BackgroundBlurStyle::Make(512, 512)});
+  LayerDrawRequest request = {};
+  request.target = target.get();
+  request.outputSize = {2048, 2048};
+  DrawControl control = {};
+  auto session = LayerDrawSession::Prepare(context, request, &control);
+  ASSERT_TRUE(session != nullptr) << control.firstFailure.message;
+
+  LayerDrawLimits limits = {};
+  limits.gpuLimits.maxTextureDimension2D = 16384;
+  // The first tile fits the output surface limit and has a 4096 x 4096 background capture.
+  EXPECT_EQ(session->planRegion({0, 0, 2046, 2046}, limits, &control).code,
+            RegionPlanCode::RequiresSubdivision);
+  auto smaller = session->planRegion({0, 0, 512, 512}, limits, &control);
+  EXPECT_EQ(smaller.code, RegionPlanCode::Ready) << control.firstFailure.message;
+  EXPECT_FALSE(control.failed()) << control.firstFailure.message;
+
+  // A larger blur exceeds the capture budget even when the core is a single pixel.
+  target->setLayerStyles({BackgroundBlurStyle::Make(768, 768)});
+  session = LayerDrawSession::Prepare(context, request, &control);
+  ASSERT_TRUE(session != nullptr) << control.firstFailure.message;
+  EXPECT_EQ(session->planRegion({0, 0, 1, 1}, limits, &control).code, RegionPlanCode::Failed);
+  EXPECT_EQ(control.firstFailure.code, DrawFailureCode::SurfaceLimit);
+  EXPECT_EQ(control.firstFailure.stage, DrawStage::Planning);
+  EXPECT_EQ(control.firstFailure.surfaceSize, ISize::Make(3075, 3075));
+  EXPECT_NE(control.firstFailure.message.find("32 MiB"), std::string::npos);
 }
 
 TGFX_TEST(LayerImageReaderTest, FilterFailureFailsTheBand) {
@@ -1243,7 +1393,6 @@ TGFX_TEST(LayerImageReaderTest, FilterFailureFailsTheBand) {
   root->addChild(content);
   LayerImageRequest request = {};
   request.target = root;
-  request.sceneRoot = root;
   request.outputSize = {16, 16};
   LayerImageReadOptions options = {};
   options.bandRows = 4;
@@ -1253,9 +1402,7 @@ TGFX_TEST(LayerImageReaderTest, FilterFailureFailsTheBand) {
   auto info = reader->bandInfo();
   auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), info.byteSize());
   EXPECT_EQ(result.code, LayerImageReadCode::Failed);
-  EXPECT_EQ(result.error.code, LayerImageErrorCode::DrawFailed);
-  EXPECT_EQ(result.error.stage, LayerImageStage::Rendering);
-  EXPECT_EQ(result.error.message, "a layer filter produced no image");
+  EXPECT_EQ(result.error, LayerImageErrorCode::DrawFailed);
   EXPECT_EQ(reader->rowsRead(), 0);
   EXPECT_FALSE(reader->isDone());
 }
@@ -1270,7 +1417,6 @@ TGFX_TEST(LayerImageReaderTest, ZeroAlphaKeepsClearedOutput) {
   content->setHeight(8);
   LayerImageRequest request = {};
   request.target = content;
-  request.sceneRoot = content;
   request.outputSize = {8, 8};
   request.alpha = 0.0f;
   request.blendMode = BlendMode::Clear;
@@ -1302,15 +1448,14 @@ TGFX_TEST(LayerImageReaderTest, PlusDarkerBlendModeIsAccepted) {
   content->setHeight(4);
   LayerImageRequest request = {};
   request.target = content;
-  request.sceneRoot = content;
   request.outputSize = {8, 4};
   request.blendMode = BlendMode::PlusDarker;
   LayerImageReadOptions options = {};
   options.bandRows = 4;
-  LayerImageError error = {};
+  LayerImageErrorCode error = LayerImageErrorCode::None;
   auto reader = LayerImageReader::Make(context, request, options, &error);
-  ASSERT_TRUE(reader != nullptr) << static_cast<int>(error.code);
-  EXPECT_EQ(error.code, LayerImageErrorCode::None);
+  ASSERT_TRUE(reader != nullptr) << static_cast<int>(error);
+  EXPECT_EQ(error, LayerImageErrorCode::None);
   std::vector<uint8_t> pixels(static_cast<size_t>(8) * 4 * 4, 0x7f);
   auto info = reader->bandInfo();
   auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), info.byteSize());
@@ -1318,104 +1463,107 @@ TGFX_TEST(LayerImageReaderTest, PlusDarkerBlendModeIsAccepted) {
   EXPECT_TRUE(result.lastBand);
 }
 
-TGFX_TEST(LayerImageReaderTest, LargeOutputKeepsIntegerBounds) {
+TGFX_TEST(LayerImageReaderTest, OutputCoordinateLimit) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  // One pixel wider than the largest integer a float holds exactly.
-  constexpr int OutputWidth = 16777217;
-  auto root = Layer::Make();
-  auto marker = SolidLayer::Make();
-  marker->setColor(Color::Red());
-  marker->setWidth(8);
-  marker->setHeight(1);
-  marker->setMatrix(Matrix::MakeTrans(static_cast<float>(OutputWidth - 5), 0.0f));
-  root->addChild(marker);
   LayerImageRequest request = {};
-  request.target = root;
-  request.sceneRoot = root;
-  request.outputSize = {OutputWidth, 1};
-  request.clearColor = Color::FromRGBA(0, 0, 0, 255);
+  request.target = Layer::Make();
   LayerImageReadOptions options = {};
   options.bandRows = 1;
-  LayerImageError error = {};
-  auto reader = LayerImageReader::Make(context, request, options, &error);
-  ASSERT_TRUE(reader != nullptr) << error.message;
-  std::vector<uint8_t> pixels(static_cast<size_t>(OutputWidth) * 4, 0);
-  auto info = reader->bandInfo();
-  ASSERT_EQ(info.width(), OutputWidth);
-  auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), info.byteSize());
-  ASSERT_EQ(result.code, LayerImageReadCode::BandReady)
-      << "code=" << static_cast<int>(result.error.code) << " message=" << result.error.message;
-  EXPECT_TRUE(result.lastBand);
-  EXPECT_TRUE(reader->isDone());
-  auto* last = pixels.data() + static_cast<size_t>(OutputWidth - 1) * 4;
-  EXPECT_EQ(last[0], 255);
-  EXPECT_EQ(last[1], 0);
-  EXPECT_EQ(last[2], 0);
-  EXPECT_EQ(last[3], 255);
-  auto* first = pixels.data();
-  EXPECT_EQ(first[0], 0);
-  EXPECT_EQ(first[3], 255);
+  for (bool vertical : {false, true}) {
+    SCOPED_TRACE(vertical);
+    request.outputSize =
+        vertical ? ISize::Make(1, ExportCoordinateLimit) : ISize::Make(ExportCoordinateLimit, 1);
+    LayerImageErrorCode error = LayerImageErrorCode::None;
+    auto reader = LayerImageReader::Make(context, request, options, &error);
+    ASSERT_TRUE(reader != nullptr) << static_cast<int>(error);
+    EXPECT_EQ(reader->bandInfo().width(), request.outputSize.width);
+
+    request.outputSize = vertical ? ISize::Make(1, ExportCoordinateLimit + 1)
+                                  : ISize::Make(ExportCoordinateLimit + 1, 1);
+    EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
+    EXPECT_EQ(error, LayerImageErrorCode::UnsupportedContent);
+  }
 }
 
-TGFX_TEST(LayerImageReaderTest, LargeTileOriginPreservesSinglePixelAlignment) {
+TGFX_TEST(LayerImageReaderTest, RejectsOutOfRangeOutputTranslation) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  // With default tiles, the marker is at a core boundary and the halo starts at an odd pixel.
-  constexpr int MarkerX = 8201 * 2046;
-  for (bool translateRequest : {false, true}) {
-    SCOPED_TRACE(translateRequest);
-    auto root = Layer::Make();
-    auto marker = SolidLayer::Make();
-    marker->setWidth(1);
-    marker->setHeight(1);
-    marker->setColor(Color::Red());
-    auto translation = Matrix::MakeTrans(static_cast<float>(MarkerX), 0);
-    if (!translateRequest) {
-      marker->setMatrix(translation);
-    }
-    root->addChild(marker);
-    const float pathX = translateRequest ? 4.0f : static_cast<float>(MarkerX + 4);
-    auto shape = ShapeLayer::Make();
-    Path path = {};
-    path.addRect(Rect::MakeXYWH(pathX, 0.0f, 2.0f, 1.0f));
-    shape->setPath(path);
-    shape->setFillStyle(ShapeStyle::Make(Color::Blue()));
-    root->addChild(shape);
-    LayerImageRequest request = {};
-    request.target = root;
-    request.sceneRoot = root;
-    request.outputSize = {MarkerX + 8, 1};
-    if (translateRequest) {
-      request.targetLocalToOutput = translation;
-    }
-    LayerImageReadOptions options = {};
-    options.bandRows = 1;
-    auto reader = LayerImageReader::Make(context, request, options);
-    ASSERT_TRUE(reader != nullptr);
-    auto info = reader->bandInfo();
-    std::vector<uint8_t> pixels(info.byteSize());
-    auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
-    ASSERT_EQ(result.code, LayerImageReadCode::BandReady) << result.error.message;
-    const auto* center = pixels.data() + static_cast<size_t>(MarkerX) * 4;
-    EXPECT_EQ(center[-1], 0);
-    EXPECT_EQ(center[0], 255);
-    EXPECT_EQ(center[3], 255);
-    EXPECT_EQ(center[7], 0);
-    EXPECT_EQ(center[3 * 4 + 3], 0);
-    EXPECT_EQ(center[4 * 4 + 2], 255);
-    EXPECT_EQ(center[5 * 4 + 2], 255);
-    EXPECT_EQ(center[6 * 4 + 3], 0);
+  LayerImageRequest request = {};
+  request.target = Layer::Make();
+  request.outputSize = {8, 8};
+  LayerImageReadOptions options = {};
+  options.bandRows = 1;
+  constexpr float BeyondLimit = ExportCoordinateLimit + 1;
+  for (const auto& matrix :
+       {Matrix::MakeTrans(BeyondLimit, 0), Matrix::MakeTrans(-BeyondLimit, 0),
+        Matrix::MakeTrans(0, BeyondLimit), Matrix::MakeTrans(0, -BeyondLimit)}) {
+    request.targetLocalToOutput = matrix;
+    LayerImageErrorCode error = LayerImageErrorCode::None;
+    EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
+    EXPECT_EQ(error, LayerImageErrorCode::UnsupportedContent);
   }
+}
+
+TGFX_TEST(LayerImageReaderTest, RejectsOutOfRangeLayerCoordinates) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto root = Layer::Make();
+  auto shape = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(ExportCoordinateLimit + 1, 0, 2, 3));
+  shape->setPath(path);
+  shape->setFillStyle(ShapeStyle::Make(Color::Red()));
+  shape->setMatrix(Matrix::MakeTrans(-ExportCoordinateLimit, 0));
+  root->addChild(shape);
+
+  LayerImageRequest request = {};
+  request.target = root;
+  request.outputSize = {8, 8};
+  LayerImageReadOptions options = {};
+  options.bandRows = 1;
+  LayerImageErrorCode error = LayerImageErrorCode::None;
+  EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
+  EXPECT_EQ(error, LayerImageErrorCode::UnsupportedContent);
+}
+
+TGFX_TEST(LayerImageReaderTest, RejectsOutOfRangeBackdropTranslation) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto root = Layer::Make();
+  auto glass = SolidLayer::Make();
+  glass->setWidth(8);
+  glass->setHeight(8);
+  glass->setColor(Color::FromRGBA(255, 255, 255, 96));
+  glass->setMatrix(Matrix::MakeTrans(ExportCoordinateLimit + 1, 0));
+  root->addChild(glass);
+
+  LayerImageRequest request = {};
+  request.target = glass;
+  request.outputSize = {8, 8};
+  LayerImageReadOptions options = {};
+  options.bandRows = 1;
+  LayerImageErrorCode error = LayerImageErrorCode::None;
+  ASSERT_TRUE(LayerImageReader::Make(context, request, options, &error) != nullptr)
+      << static_cast<int>(error);
+
+  glass->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
+  ASSERT_TRUE(LayerImageReader::Make(context, request, options, &error) != nullptr)
+      << static_cast<int>(error);
+
+  auto displayList = MakeDisplayList(root);
+  EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
+  EXPECT_EQ(error, LayerImageErrorCode::UnsupportedContent);
 }
 
 static void CheckTinyTilePixel(Context* context, Layer* layer, int left) {
   LayerDrawRequest request = {};
   request.target = layer;
-  request.captureRoot = layer;
-  request.outputSize = {left + 4, 3};
+  request.outputSize = {left + 1, 3};
   DrawControl control = {};
   auto session = LayerDrawSession::Prepare(context, request, &control);
   ASSERT_TRUE(session != nullptr) << control.firstFailure.message;
@@ -1447,7 +1595,7 @@ TGFX_TEST(LayerImageReaderTest, FarBackdropCaptureMatchesNearPixelGrid) {
   ASSERT_TRUE(context != nullptr);
   constexpr int CoreWidth = 16;
   std::vector<uint8_t> reference;
-  for (int left : {32, (1 << 24) + 32}) {
+  for (int left : {32, ExportCoordinateLimit - 64}) {
     SCOPED_TRACE(left);
     auto scene = Layer::Make();
     for (int offset : {4, 10}) {
@@ -1466,31 +1614,36 @@ TGFX_TEST(LayerImageReaderTest, FarBackdropCaptureMatchesNearPixelGrid) {
     auto glassPlacement = Matrix::MakeTrans(static_cast<float>(left - 4), 0);
     glass->setMatrix(glassPlacement);
     scene->addChild(glass);
+    auto displayList = MakeDisplayList(scene);
 
     // Export only the glass. Color variations in the result must come from its sampled backdrop.
     LayerDrawRequest request = {};
     request.target = glass.get();
-    request.captureRoot = scene.get();
     request.targetLocalToOutput = glassPlacement;
     request.outputSize = {left + CoreWidth, 8};
     request.clearColor = Color::Black();
     DrawControl control = {};
     auto session = LayerDrawSession::Prepare(context, request, &control);
     ASSERT_TRUE(session != nullptr) << control.firstFailure.message;
-    // A one-pixel core plus the blur's two-pixel radius and one sampling pixel on each side
-    // fills a seven-pixel target. Neighboring cores exercise both odd and even tile origins.
-    LayerDrawLimits limits = {*context->gpu()->limits(), {7, 7}};
+    // The blur captures seven pixels across, while each core draws into a three-pixel tile.
+    // Neighboring cores exercise both odd and even tile origins.
+    LayerDrawLimits limits = {*context->gpu()->limits(), {3, 3}};
     auto info = OutputInfo(1, 1);
     std::vector<uint8_t> pixels(CoreWidth * info.byteSize());
     for (int x = 0; x < CoreWidth; ++x) {
       auto column = left + x;
       auto plan = session->planRegion({column, 4, column + 1, 5}, limits, &control);
       ASSERT_EQ(plan.code, RegionPlanCode::Ready) << control.firstFailure.message;
+      ASSERT_TRUE(plan.region.dependencies != nullptr);
+      EXPECT_EQ(plan.region.dependencies->captureRect.width(), 7);
+      EXPECT_EQ(plan.region.dependencies->captureRect.height(), 7);
       auto batchPlan = session->planBatch({plan.region}, limits, &control);
       ASSERT_EQ(batchPlan.code, BatchPlanCode::Ready);
       auto batch = session->prepareBatch(context, *batchPlan.plan, &control);
       ASSERT_TRUE(batch != nullptr) << control.firstFailure.message;
       const auto& rect = plan.region.renderRect;
+      EXPECT_EQ(rect.width(), 3);
+      EXPECT_EQ(rect.height(), 3);
       auto surface = Surface::Make(context, rect.width(), rect.height());
       ASSERT_TRUE(surface != nullptr);
       LayerDrawTarget target = {};
@@ -1512,13 +1665,13 @@ TGFX_TEST(LayerImageReaderTest, FarBackdropCaptureMatchesNearPixelGrid) {
   }
 }
 
-TGFX_TEST(LayerImageReaderTest, TinyTilePreservesFarPathCoordinates) {
+TGFX_TEST(LayerImageReaderTest, TinyTileAtCoordinateLimitPreservesPath) {
   ContextScope scope;
   ASSERT_TRUE(scope.getContext() != nullptr);
-  constexpr int Left = 16779246;
+  constexpr int Left = ExportCoordinateLimit - 1;
   auto shape = ShapeLayer::Make();
   Path path = {};
-  path.addRect(Rect::MakeXYWH(Left, 0, 2, 3));
+  path.addRect(Rect::MakeXYWH(Left, 0, 1, 3));
   shape->setPath(path);
   shape->setFillStyle(ShapeStyle::Make(Color::Red()));
   CheckTinyTilePixel(scope.getContext(), shape.get(), Left);
@@ -1535,7 +1688,7 @@ TGFX_TEST(LayerImageReaderTest, TinyTilePreservesRecordedGeometryAndClips) {
   };
   ContextScope scope;
   ASSERT_TRUE(scope.getContext() != nullptr);
-  constexpr int Left = 16779246;
+  constexpr int Left = ExportCoordinateLimit - 18;
   for (bool translateRecording : {false, true}) {
     SCOPED_TRACE(translateRecording);
     PictureRecorder recorder;
@@ -1554,142 +1707,6 @@ TGFX_TEST(LayerImageReaderTest, TinyTilePreservesRecordedGeometryAndClips) {
   }
 }
 
-TGFX_TEST(LayerImageReaderTest, ScaledFilteredPictureMatchesNearAndFarTiles) {
-  ContextScope scope;
-  auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  constexpr int Width = 64;
-  constexpr int Height = 36;
-  const auto info = OutputInfo(Width, Height);
-  Paint fill;
-  fill.setColor(Color::Red());
-  Paint filter;
-  filter.setImageFilter(ImageFilter::Blur(2, 2));
-  const auto scale = Matrix::MakeScale(3);
-  for (bool clipSource : {false, true}) {
-    SCOPED_TRACE(clipSource);
-    std::vector<uint8_t> reference;
-    for (int left : {0, (1 << 24) + 16}) {
-      SCOPED_TRACE(left);
-      PictureRecorder recorder;
-      recorder.beginRecording()->drawRect(Rect::MakeXYWH(left + 8, 2, 8, 8), fill);
-      auto picture = recorder.finishRecordingAsPicture();
-      ASSERT_TRUE(picture != nullptr);
-      auto surface = Surface::Make(context, Width, Height);
-      ASSERT_TRUE(surface != nullptr);
-      auto* canvas = surface->getCanvas();
-      canvas->clear();
-      if (clipSource) {
-        // The scaled source starts at column 25. Only its blurred edge enters this clip.
-        canvas->clipRect(Rect::MakeWH(25, Height), false);
-      }
-      canvas->setMatrixForTile(Matrix::I(), 3 * left - 1, 0);
-      canvas->drawPicture(picture, &scale, &filter);
-      std::vector<uint8_t> pixels(info.byteSize());
-      ASSERT_TRUE(surface->readPixels(info, pixels.data()));
-      auto* row = pixels.data() + 18 * info.rowBytes();
-      if (left == 0) {
-        ASSERT_GT(row[23 * 4], 0);
-        ASSERT_GT(row[23 * 4 + 3], 0);
-        ASSERT_LT(row[23 * 4 + 3], 255);
-        if (clipSource) {
-          EXPECT_EQ(row[36 * 4 + 3], 0);
-        } else {
-          EXPECT_GT(row[36 * 4 + 3], row[23 * 4 + 3]);
-        }
-        reference = std::move(pixels);
-      } else {
-        EXPECT_EQ(pixels, reference);
-      }
-    }
-  }
-}
-
-enum class TilePrimitive { VertexMesh, ShapeMesh, ImageRect, Atlas, Glyphs, DefaultTextRun };
-
-static void DrawTilePrimitive(Canvas* canvas, TilePrimitive primitive, float left,
-                              const std::shared_ptr<Image>& image, const Font& font) {
-  Paint paint = {};
-  paint.setColor(Color::Red());
-  auto rect = Rect::MakeXYWH(left, 0.0f, 2.0f, 3.0f);
-  switch (primitive) {
-    case TilePrimitive::VertexMesh: {
-      Point points[] = {{rect.left, 0}, {rect.right, 0}, {rect.left, 3}, {rect.right, 3}};
-      canvas->drawMesh(Mesh::MakeCopy(MeshTopology::TriangleStrip, 4, points), paint);
-      break;
-    }
-    case TilePrimitive::ShapeMesh: {
-      Path path = {};
-      path.addRect(rect);
-      canvas->drawMesh(Mesh::MakeFromPath(std::move(path), false), paint);
-      break;
-    }
-    case TilePrimitive::ImageRect:
-      canvas->drawImageRect(image, rect, SamplingOptions(FilterMode::Nearest));
-      break;
-    case TilePrimitive::Atlas: {
-      auto matrix = Matrix::MakeTrans(left, 0);
-      auto source = Rect::MakeWH(1, 3);
-      canvas->drawAtlas(image, &matrix, &source, nullptr, 1, SamplingOptions(FilterMode::Nearest));
-      break;
-    }
-    case TilePrimitive::Glyphs: {
-      auto glyph = font.getGlyphID('H');
-      Point position = {left, 5};
-      canvas->drawGlyphs(&glyph, &position, 1, font, paint);
-      break;
-    }
-    case TilePrimitive::DefaultTextRun: {
-      TextBlobBuilder builder = {};
-      auto& run = builder.allocRun(font, 1, left, 5);
-      run.glyphs[0] = font.getGlyphID('H');
-      canvas->drawTextBlob(builder.build(), 0, 0, paint);
-      break;
-    }
-  }
-}
-
-TGFX_TEST(LayerImageReaderTest, TinyTilePreservesMeshImagesAndGlyphs) {
-  ContextScope scope;
-  auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto source = Surface::Make(context, 2, 3);
-  ASSERT_TRUE(source != nullptr);
-  source->getCanvas()->clear(Color::Red());
-  auto image = source->makeImageSnapshot();
-  ASSERT_TRUE(image != nullptr);
-  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
-  ASSERT_TRUE(typeface != nullptr);
-  Font font(typeface, 12);
-  auto info = OutputInfo(3, 3);
-  for (auto primitive :
-       {TilePrimitive::VertexMesh, TilePrimitive::ShapeMesh, TilePrimitive::ImageRect,
-        TilePrimitive::Atlas, TilePrimitive::Glyphs, TilePrimitive::DefaultTextRun}) {
-    SCOPED_TRACE(static_cast<int>(primitive));
-    std::vector<uint8_t> reference = {};
-    for (int left : {0, 16779246}) {
-      auto surface = Surface::Make(context, 3, 3);
-      ASSERT_TRUE(surface != nullptr);
-      auto* canvas = surface->getCanvas();
-      canvas->clear();
-      if (left == 0) {
-        canvas->translate(1, 0);
-      } else {
-        canvas->setMatrixForTile(Matrix::I(), left - 1, 0);
-      }
-      DrawTilePrimitive(canvas, primitive, static_cast<float>(left), image, font);
-      std::vector<uint8_t> pixels(info.byteSize());
-      ASSERT_TRUE(surface->readPixels(info, pixels.data()));
-      if (left == 0) {
-        EXPECT_NE(pixels, std::vector<uint8_t>(pixels.size(), 0));
-        reference = std::move(pixels);
-      } else {
-        EXPECT_EQ(pixels, reference);
-      }
-    }
-  }
-}
-
 static std::shared_ptr<SolidLayer> MakeExportSolid(const Color& color) {
   auto layer = SolidLayer::Make();
   layer->setColor(color);
@@ -1698,127 +1715,60 @@ static std::shared_ptr<SolidLayer> MakeExportSolid(const Color& color) {
   return layer;
 }
 
-TGFX_TEST(LayerImageReaderTest, HiddenTargetsKeepTheirExportBackdrop) {
+TGFX_TEST(LayerImageReaderTest, RejectsHiddenTargetBranches) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto background = MakeExportSolid(Color::Red());
-  auto displayList = MakeDisplayList(background);
-  auto sceneRoot = displayList->root()->shared_from_this();
-  auto group = Layer::Make();
-  sceneRoot->addChild(group);
-  auto sibling = MakeExportSolid(Color::Blue());
-  group->addChild(sibling);
-  auto glass = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
-  glass->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
-  group->addChild(glass);
-  for (bool hideAncestor : {false, true}) {
-    sibling->setVisible(!hideAncestor);
-    auto reference = ReadTiled(context, glass, sceneRoot, {64, 64});
-    ASSERT_EQ(reference.error.code, LayerImageErrorCode::None) << reference.error.message;
-    const auto* center = reference.image.pixels.data() + reference.image.rowBytes * 60 + 80 * 4;
-    ASSERT_GT(center[hideAncestor ? 0 : 2], center[1]);
-    sibling->setVisible(true);
-    auto layer = hideAncestor ? group : std::static_pointer_cast<Layer>(glass);
-    for (bool useAlpha : {false, true}) {
-      SCOPED_TRACE(hideAncestor);
-      SCOPED_TRACE(useAlpha);
-      layer->setVisible(useAlpha);
-      layer->setAlpha(useAlpha ? 0.0f : 1.0f);
-      auto output = ReadTiled(context, glass, sceneRoot, {64, 64});
-      EXPECT_EQ(output.error.code, LayerImageErrorCode::None) << output.error.message;
-      EXPECT_EQ(reference.image.pixels, output.image.pixels);
-      layer->setVisible(true);
-      layer->setAlpha(1.0f);
-    }
+  auto ancestor = Layer::Make();
+  auto target = MakeExportSolid(Color::Red());
+  ancestor->addChild(target);
+  auto displayList = MakeDisplayList(ancestor);
+  LayerImageRequest request = {};
+  request.target = target;
+  request.outputSize = {8, 8};
+  LayerImageReadOptions options = {};
+  options.bandRows = 1;
+
+  for (auto* layer : {static_cast<Layer*>(target.get()), ancestor.get()}) {
+    SCOPED_TRACE(layer == target.get() ? "target" : "ancestor");
+    layer->setVisible(false);
+    ExpectUnsupportedRequest(context, request, options);
+    layer->setVisible(true);
+    layer->setAlpha(0);
+    ExpectUnsupportedRequest(context, request, options);
+    layer->setAlpha(1);
   }
+  EXPECT_TRUE(LayerImageReader::Make(context, request, options) != nullptr);
 }
 
-TGFX_TEST(LayerImageReaderTest, OnlyPreceding3DSiblingsAreBackdropDependencies) {
+TGFX_TEST(LayerImageReaderTest, RejectsSceneWith3DOutsideTarget) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto displayList = MakeDisplayList(MakeExportSolid(Color::Red()));
-  auto sceneRoot = displayList->root()->shared_from_this();
-  auto glass = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
-  glass->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
-  sceneRoot->addChild(glass);
-  auto reference = ReadTiled(context, glass, sceneRoot, {64, 64});
-  ASSERT_EQ(reference.error.code, LayerImageErrorCode::None) << reference.error.message;
-  auto sibling = MakeExportSolid(Color::Blue());
-  sibling->setPreserve3D(true);
-  sceneRoot->addChild(sibling);
-  auto output = ReadTiled(context, glass, sceneRoot, {64, 64});
-  EXPECT_EQ(output.error.code, LayerImageErrorCode::None) << output.error.message;
-  EXPECT_EQ(output.image.pixels, reference.image.pixels);
-  sceneRoot->setChildIndex(sibling, 1);
-  sibling->setMatrix(Matrix::MakeTrans(10000, 0));
-  output = ReadTiled(context, glass, sceneRoot, {64, 64});
-  EXPECT_EQ(output.error.code, LayerImageErrorCode::None) << output.error.message;
-  EXPECT_EQ(output.image.pixels, reference.image.pixels);
-  sibling->setMatrix(Matrix::I());
-  output = ReadTiled(context, glass, sceneRoot, {64, 64});
-  EXPECT_EQ(output.error.code, LayerImageErrorCode::UnsupportedContent);
-}
+  auto target = MakeExportSolid(Color::Red());
+  auto displayList = MakeDisplayList(target);
+  auto laterSibling = MakeExportSolid(Color::Blue());
+  laterSibling->setMatrix(Matrix::MakeTrans(10000, 0));
+  displayList->root()->addChild(laterSibling);
 
-TGFX_TEST(LayerImageReaderTest, PrecedingBackdropBlurCanSample3DOutsideTargetInput) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto source = MakeExportSolid(Color::Blue());
-  source->setWidth(8);
-  source->setHeight(20);
-  source->setMatrix(Matrix::MakeTrans(16, 0));
-  source->setPreserve3D(true);
-  auto displayList = MakeDisplayList(source);
-  auto sceneRoot = displayList->root()->shared_from_this();
-  auto earlierGlass = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
-  earlierGlass->setWidth(40);
-  earlierGlass->setHeight(20);
-  earlierGlass->setMatrix(Matrix::MakeTrans(10, 0));
-  sceneRoot->addChild(earlierGlass);
-  auto target = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
-  target->setWidth(20);
-  target->setHeight(20);
-  target->setMatrix(Matrix::MakeTrans(30, 0));
-  target->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
-  sceneRoot->addChild(target);
+  LayerImageRequest request = {};
+  request.target = target;
+  request.outputSize = {8, 8};
+  LayerImageReadOptions options = {};
+  options.bandRows = 1;
+  ASSERT_TRUE(LayerImageReader::Make(context, request, options) != nullptr);
 
-  // The target reads from x=28 onward, while the 3D source ends at x=24.
-  auto direct = ReadTiled(context, target, sceneRoot, {64, 64});
-  ASSERT_EQ(direct.error.code, LayerImageErrorCode::None) << direct.error.message;
-  // The preceding blur spreads that source to x=34, inside the target's input.
-  earlierGlass->setLayerStyles({BackgroundBlurStyle::Make(5, 5)});
-  auto indirect = ReadTiled(context, target, sceneRoot, {64, 64});
-  EXPECT_EQ(indirect.error.code, LayerImageErrorCode::UnsupportedContent);
-}
-
-TGFX_TEST(LayerImageReaderTest, PrecedingLayerFilterCanSpread3DIntoTargetInput) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto group = Layer::Make();
-  auto source = MakeExportSolid(Color::Blue());
-  source->setWidth(6);
-  source->setHeight(20);
-  source->setMatrix(Matrix::MakeTrans(24, 0));
-  source->setPreserve3D(true);
-  group->addChild(source);
-  auto displayList = MakeDisplayList(group);
-  auto sceneRoot = displayList->root()->shared_from_this();
-  auto target = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
-  target->setWidth(20);
-  target->setHeight(20);
-  target->setMatrix(Matrix::MakeTrans(38, 0));
-  target->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
-  sceneRoot->addChild(target);
-
-  // The target reads from x=36 onward. Filtering the 3D group extends its right edge from 30 to 42.
-  auto direct = ReadTiled(context, target, sceneRoot, {64, 64});
-  ASSERT_EQ(direct.error.code, LayerImageErrorCode::None) << direct.error.message;
-  group->setFilters({BlurFilter::Make(6, 6)});
-  auto indirect = ReadTiled(context, target, sceneRoot, {64, 64});
-  EXPECT_EQ(indirect.error.code, LayerImageErrorCode::UnsupportedContent);
+  // The later sibling is outside the output and the target does not sample the backdrop.
+  laterSibling->setPreserve3D(true);
+  ExpectUnsupportedRequest(context, request, options);
+  laterSibling->setVisible(false);
+  ExpectUnsupportedRequest(context, request, options);
+  laterSibling->setPreserve3D(false);
+  laterSibling->setVisible(true);
+  auto matrix = Matrix3D::MakeRotate({0, 1, 0}, 45);
+  matrix.postTranslate(10000, 0, 0);
+  laterSibling->setMatrix3D(matrix);
+  ExpectUnsupportedRequest(context, request, options);
 }
 
 TGFX_TEST(LayerImageReaderTest, LaterSiblingFailureDoesNotInvalidateTargetBackdrop) {
@@ -1826,19 +1776,53 @@ TGFX_TEST(LayerImageReaderTest, LaterSiblingFailureDoesNotInvalidateTargetBackdr
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto displayList = MakeDisplayList(MakeExportSolid(Color::Red()));
-  auto sceneRoot = displayList->root()->shared_from_this();
+  auto sceneRoot = displayList->root();
+  auto group = Layer::Make();
+  group->setFilters({BlurFilter::Make(0.5f, 0.5f)});
   auto glass = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
   glass->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
-  sceneRoot->addChild(glass);
-  auto reference = ReadTiled(context, glass, sceneRoot, {64, 64});
-  ASSERT_EQ(reference.error.code, LayerImageErrorCode::None) << reference.error.message;
-  auto sibling = MakeExportSolid(Color::Blue());
-  sibling->setFilters({std::make_shared<FailingFilter>()});
-  sibling->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
-  sceneRoot->addChild(sibling);
-  auto output = ReadTiled(context, glass, sceneRoot, {64, 64});
-  EXPECT_EQ(output.error.code, LayerImageErrorCode::None) << output.error.message;
+  group->addChild(glass);
+  sceneRoot->addChild(group);
+  auto reference = ReadTiled(context, glass, {64, 64});
+  ASSERT_EQ(reference.error, LayerImageErrorCode::None);
+  ASSERT_FALSE(reference.image.pixels.empty());
+  const auto* center = reference.image.pixels.data() + reference.image.rowBytes * 60 + 80 * 4;
+  EXPECT_EQ(center[0], 255);
+  EXPECT_NEAR(center[1], 96, 1);
+  EXPECT_NEAR(center[2], 96, 1);
+  for (auto* parent : {group.get(), sceneRoot}) {
+    auto sibling = MakeExportSolid(Color::Blue());
+    sibling->setFilters({std::make_shared<FailingFilter>()});
+    sibling->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+    parent->addChild(sibling);
+  }
+  auto output = ReadTiled(context, glass, {64, 64});
+  EXPECT_EQ(output.error, LayerImageErrorCode::None);
   EXPECT_EQ(output.image.pixels, reference.image.pixels);
+}
+
+TGFX_TEST(LayerImageReaderTest, ScrolledTargetKeepsLocalBackdropOutsideItsViewport) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto displayList = MakeDisplayList(MakeExportSolid(Color::Red()));
+  auto target = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
+  target->setWidth(12);
+  target->setHeight(12);
+  target->setMatrix(Matrix::MakeTrans(20, 20));
+  target->setScrollRect(Rect::MakeXYWH(2, 2, 4, 4));
+  target->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
+  displayList->root()->addChild(target);
+
+  auto output = ReadTiled(context, target, {16, 16});
+  ASSERT_EQ(output.error, LayerImageErrorCode::None);
+  ASSERT_FALSE(output.image.pixels.empty());
+  // Direct target drawing uses the requested local mapping across the complete target.
+  const auto* pixel = output.image.pixels.data() + output.image.rowBytes * 8 + 8 * 4;
+  EXPECT_EQ(pixel[0], 255);
+  EXPECT_NEAR(pixel[1], 96, 1);
+  EXPECT_NEAR(pixel[2], 96, 1);
+  EXPECT_EQ(pixel[3], 255);
 }
 
 TGFX_TEST(LayerImageReaderTest, TinyBackgroundBlurAtHighScaleFitsSmallTiles) {
@@ -1855,7 +1839,6 @@ TGFX_TEST(LayerImageReaderTest, TinyBackgroundBlurAtHighScaleFitsSmallTiles) {
   root->addChild(glass);
   LayerImageRequest request = {};
   request.target = root;
-  request.sceneRoot = root;
   request.outputSize = {8, 8};
   request.targetLocalToOutput = Matrix::MakeScale(1024);
   request.targetLocalToOutput.postTranslate(-512, -512);
@@ -1867,11 +1850,55 @@ TGFX_TEST(LayerImageReaderTest, TinyBackgroundBlurAtHighScaleFitsSmallTiles) {
   auto info = reader->bandInfo();
   std::vector<uint8_t> pixels(info.byteSize());
   auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
-  ASSERT_EQ(result.code, LayerImageReadCode::BandReady) << result.error.message;
+  ASSERT_EQ(result.code, LayerImageReadCode::BandReady) << static_cast<int>(result.error);
   EXPECT_EQ(pixels[0], 255);
   EXPECT_NEAR(pixels[1], 96, 1);
   EXPECT_NEAR(pixels[2], 96, 1);
   EXPECT_EQ(pixels[3], 255);
+}
+
+TGFX_TEST(LayerImageReaderTest, LargeBackgroundBlurFitsDefaultTiles) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int OutputSize = 8;
+  constexpr int Scale = 1024;
+  constexpr int CaptureSize = OutputSize + 2 + 2 * Scale;
+  if (context->gpu()->limits()->maxTextureDimension2D < CaptureSize) {
+    GTEST_SKIP() << "The device cannot allocate the background capture";
+  }
+
+  auto root = Layer::Make();
+  auto background = MakeExportSolid(Color::Red());
+  background->setMatrix(Matrix::MakeTrans(-2, -2));
+  root->addChild(background);
+  auto glass = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
+  glass->setWidth(1.0f / 64);
+  glass->setHeight(1.0f / 64);
+  // The output-space blur needs 1024 pixels of background on each side.
+  glass->setLayerStyles({BackgroundBlurStyle::Make(0.5f, 0.0f)});
+  root->addChild(glass);
+  auto displayList = MakeDisplayList(root);
+
+  LayerImageRequest request = {};
+  request.target = glass;
+  request.outputSize = {OutputSize, OutputSize};
+  request.targetLocalToOutput = Matrix::MakeScale(Scale);
+  LayerImageReadOptions options = {};
+  options.bandRows = OutputSize;
+  auto reader = LayerImageReader::Make(context, request, options);
+  ASSERT_TRUE(reader != nullptr);
+  auto info = reader->bandInfo();
+  std::vector<uint8_t> pixels(info.byteSize());
+  auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
+  ASSERT_EQ(result.code, LayerImageReadCode::BandReady) << static_cast<int>(result.error);
+  EXPECT_TRUE(result.lastBand);
+  // Only the backdrop can supply red beneath the white layer.
+  const auto* center = pixels.data() + (OutputSize / 2) * (info.rowBytes() + info.bytesPerPixel());
+  EXPECT_EQ(center[0], 255);
+  EXPECT_NEAR(center[1], 96, 1);
+  EXPECT_NEAR(center[2], 96, 1);
+  EXPECT_EQ(center[3], 255);
 }
 
 TGFX_TEST(LayerImageReaderTest, OffscreenBlurDoesNotEnlargeLocalTiles) {
@@ -1880,7 +1907,6 @@ TGFX_TEST(LayerImageReaderTest, OffscreenBlurDoesNotEnlargeLocalTiles) {
   ASSERT_TRUE(context != nullptr);
   auto root = BuildNestedBackdropScene();
   auto displayList = MakeDisplayList(root);
-  auto sceneRoot = displayList->root()->shared_from_this();
   auto upperGlass = MakeExportSolid(Color::FromRGBA(255, 255, 255, 64));
   upperGlass->setWidth(50);
   upperGlass->setHeight(30);
@@ -1893,12 +1919,12 @@ TGFX_TEST(LayerImageReaderTest, OffscreenBlurDoesNotEnlargeLocalTiles) {
   distant->setMatrix(Matrix::MakeTrans(10000, 0));
   distant->setLayerStyles({BackgroundBlurStyle::Make(100, 100)});
   root->addChild(distant);
-  auto output = ReadTiled(context, root, sceneRoot, {64, 64});
-  ASSERT_EQ(output.error.code, LayerImageErrorCode::None) << output.error.message;
+  auto output = ReadTiled(context, root, {64, 64});
+  ASSERT_EQ(output.error, LayerImageErrorCode::None);
   EXPECT_EQ(CountDifferentPixels(reference, output.image, 1), 0);
 }
 
-TGFX_TEST(LayerImageReaderTest, WideBandRemainsCompleteAfterLateHeightSubdivision) {
+TGFX_TEST(LayerImageReaderTest, WideBandRemainsCompleteAcrossBackgroundBatches) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -1920,12 +1946,11 @@ TGFX_TEST(LayerImageReaderTest, WideBandRemainsCompleteAfterLateHeightSubdivisio
 
   LayerImageRequest request = {};
   request.target = root;
-  request.sceneRoot = root;
   request.outputSize = {Width, Height};
   request.clearColor = Color::Black();
   PixelImage reference = {};
-  // At the smaller limit the clear prefix takes over 64 cores of 14 pixels. The glass needs
-  // extra space for its blur and forces shorter cores only after that first batch has been drawn.
+  // At the smaller limit the clear prefix takes over 64 cores of 14 pixels, so the glass
+  // first requires a background capture after an earlier batch has already been drawn.
   for (const auto& tileLimit : {ISize{2048, 64}, ISize{16, 16}}) {
     LayerImageReadOptions options = {};
     options.bandRows = Height;
@@ -1937,7 +1962,7 @@ TGFX_TEST(LayerImageReaderTest, WideBandRemainsCompleteAfterLateHeightSubdivisio
                          info.rowBytes()};
     auto result =
         reader->readNextBand(context, Pixmap(info, output.pixels.data()), output.pixels.size());
-    ASSERT_EQ(result.code, LayerImageReadCode::BandReady) << result.error.message;
+    ASSERT_EQ(result.code, LayerImageReadCode::BandReady) << static_cast<int>(result.error);
     EXPECT_EQ(result.firstRow, 0);
     EXPECT_EQ(result.rowCount, Height);
     EXPECT_TRUE(result.lastBand);

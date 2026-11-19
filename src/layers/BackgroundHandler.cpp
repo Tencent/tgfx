@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BackgroundHandler.h"
+#include <algorithm>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/BackgroundSnapshotMap.h"
@@ -204,48 +205,55 @@ void BackgroundHandler::DispatchOrSkip(const DrawArgs& args, Canvas* canvas, Lay
   handler->drawBackgroundStyle(args, canvas, layer, alpha, style, source);
 }
 
-int BackgroundHandler::lastCaptureChildIndex(const Layer* parent) const {
-  return static_cast<int>(parent->children().size()) - 1;
+LayerChildRange BackgroundHandler::childRange(const Layer* parent) const {
+  return {static_cast<int>(parent->children().size()) - 1};
 }
 
-int BackgroundCapturer::lastCaptureChildIndex(const Layer* parent) const {
-  if (capturePath != nullptr) {
-    auto next = capturePath->children.find(parent);
-    if (next != capturePath->children.end()) {
-      return next->second;
-    }
-  }
+void BackgroundHandler::drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent, Layer* child,
+                                  float alpha, bool /*forceDescendants*/) {
+  parent->drawChild(args, canvas, child, alpha, &Layer::drawLayer);
+}
+
+LayerChildRange BackgroundCapturer::childRange(const Layer* parent) const {
   if (isForcedCapture()) {
-    return static_cast<int>(parent->children().size()) - 1;
+    return BackgroundHandler::childRange(parent);
   }
   const auto& children = parent->children();
   for (int i = static_cast<int>(children.size()) - 1; i >= 0; --i) {
     if (children[static_cast<size_t>(i)]->hasBackgroundStyle()) {
-      return i;
+      return {i};
     }
   }
-  return -1;
+  return {};
+}
+
+void BackgroundCapturer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent,
+                                   Layer* child, float alpha, bool forceDescendants) {
+  _forcedCaptureDepth += forceDescendants;
+  BackgroundHandler::drawChild(args, canvas, parent, child, alpha, forceDescendants);
+  _forcedCaptureDepth -= forceDescendants;
+}
+
+bool BackgroundCapturer::HasDescendantBackdrop(Layer* layer) {
+  for (const auto& child : layer->children()) {
+    if (!child->visible() || child->alpha() <= 0.0f || child->maskOwner != nullptr) {
+      continue;
+    }
+    if (child->hasOwnBackgroundStyle() || HasDescendantBackdrop(child.get())) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool BackgroundCapturer::needsSurface(Layer* layer) const {
-  if (capturingHiddenTarget && layer != nullptr) {
-    // Scene updates skip hidden subtrees, so inspect their live styles instead of cached outsets.
-    for (const auto& child : layer->children()) {
-      if (!child->visible() || child->alpha() <= 0.0f || child->maskOwner != nullptr) {
-        continue;
-      }
-      for (const auto& style : child->layerStyles()) {
-        if (NeedsBackgroundSource(style->extraSourceType())) {
-          return true;
-        }
-      }
-      if (needsSurface(child.get())) {
-        return true;
-      }
-    }
-    return false;
-  }
   return layer != nullptr && layer->hasDescendantBackgroundStyle();
+}
+
+std::unique_ptr<BackgroundCapturer> BackgroundCapturer::makeSubCapturer(
+    BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source,
+    const std::vector<Rect>* styleSourceRects) const {
+  return std::make_unique<BackgroundCapturer>(snapshots, std::move(source), styleSourceRects);
 }
 
 std::unique_ptr<BackgroundCapturer> BackgroundCapturer::buildSubCapturer(
@@ -256,18 +264,14 @@ std::unique_ptr<BackgroundCapturer> BackgroundCapturer::buildSubCapturer(
   auto subRect = subSource->getBackgroundRect();
   // The sources recorded here are cached in the shared map and may be reused by the consume pass
   // outside this sub surface, so the sub capturer keeps the parent's recording range.
-  auto clone =
-      std::make_unique<BackgroundCapturer>(snapshots, std::move(subSource), _styleSourceRects);
-  clone->capturePath = capturePath;
-  clone->capturingHiddenTarget = capturingHiddenTarget;
+  auto clone = makeSubCapturer(snapshots, std::move(subSource), _styleSourceRects);
   // Tiled capture and consumption must traverse the same styles, including at offscreen edges.
-  if (parentArgs.drawControl == nullptr || parentArgs.renderRects == nullptr ||
-      parentArgs.renderRects->empty()) {
+  if (parentArgs.drawControl == nullptr) {
     NarrowRenderRects(parentArgs, subRect, &clone->_renderRects);
   }
   // Forced-capture state must propagate so pass-through subtrees still feed the parent bgSource.
   if (isForcedCapture()) {
-    clone->beginForceDrawChildren();
+    clone->forceDrawDescendants();
   }
   return clone;
 }
@@ -350,45 +354,6 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   auto bounds = contentBounds;
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
-  if (args.unsupportedBackdropBounds != nullptr && !args.unsupportedBackdropBounds->empty() &&
-      args.drawControl != nullptr && capturePath != nullptr) {
-    auto inputBounds = style->filterBackground(bounds, contentScale);
-    inputBounds.scale(1.0f / contentScale, 1.0f / contentScale);
-    auto localToScene = layer->getGlobalMatrix().asMatrix();
-    auto sceneBounds = localToScene.mapRect(inputBounds);
-    auto& unsupported = *args.unsupportedBackdropBounds;
-    auto styleToScene = localToScene;
-    styleToScene.preScale(1.0f / contentScale, 1.0f / contentScale);
-    Matrix sceneToStyle;
-    auto invertible = styleToScene.invert(&sceneToStyle);
-    auto affectedOutput = Rect::MakeEmpty();
-    auto outsets = style->filterBackground(Rect::MakeEmpty(), contentScale);
-    auto outputBounds = style->filterBounds(bounds, contentScale);
-    for (const auto& dependency : unsupported) {
-      if (!Rect::Intersects(sceneBounds, dependency)) {
-        continue;
-      }
-      if (capturePath->target->doContains(layer)) {
-        args.drawControl->fail(DrawFailureCode::UnsupportedContent, DrawStage::Background, layer,
-                               {}, "the exported backdrop intersects unsupported 3D content");
-        return;
-      }
-      // An earlier style can carry the unsupported input into a later style's sampling area.
-      // Invert its sampling outsets to bound the affected output pixels, then restrict them to
-      // the style's actual output geometry.
-      if (invertible) {
-        auto affected = sceneToStyle.mapRect(dependency);
-        affected = Rect::MakeLTRB(affected.left - outsets.right, affected.top - outsets.bottom,
-                                  affected.right - outsets.left, affected.bottom - outsets.top);
-        if (affected.intersect(outputBounds)) {
-          affectedOutput.join(affected);
-        }
-      }
-    }
-    if (!affectedOutput.isEmpty()) {
-      unsupported.push_back(styleToScene.mapRect(affectedOutput));
-    }
-  }
   // Use the runtime canvas chain (capture canvas matrix · bgSource->surfaceToWorldMatrix) so
   // capture and consume share the same frame of reference. Do NOT use getGlobalMatrix(): it walks
   // the static layer tree with per-step z-flattening and diverges from the runtime concat chain
@@ -463,13 +428,14 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       BackgroundSnapshotEntry{std::move(image), offset});
 }
 
-const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* layer) const {
+std::optional<const LayerStyleSource*> BackgroundCapturer::getCachedLayerStyleSource(
+    Layer* layer) const {
   if (snapshots == nullptr) {
-    return nullptr;
+    return std::nullopt;
   }
   auto it = snapshots->layerStyleSources.find(layer);
   if (it == snapshots->layerStyleSources.end()) {
-    return nullptr;
+    return std::nullopt;
   }
   return it->second.get();
 }
@@ -522,13 +488,14 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
   return raw;
 }
 
-const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* layer) const {
+std::optional<const LayerStyleSource*> BackgroundConsumer::getCachedLayerStyleSource(
+    Layer* layer) const {
   if (snapshots == nullptr) {
-    return nullptr;
+    return std::nullopt;
   }
   auto it = snapshots->layerStyleSources.find(layer);
   if (it == snapshots->layerStyleSources.end()) {
-    return nullptr;
+    return std::nullopt;
   }
   return it->second.get();
 }
@@ -694,73 +661,137 @@ void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
   captureRoot->drawLayer(captureArgs, bgCanvas, 1.0f, BlendMode::SrcOver);
 }
 
-Layer* BackgroundCapturer::HiddenBranch(Layer* captureRoot, Layer* target) {
-  Layer* hiddenBranch = nullptr;
-  for (auto* layer = target; layer != captureRoot; layer = layer->parent()) {
-    if (!layer->visible() || layer->alpha() <= 0.0f || layer->maskOwner != nullptr) {
-      hiddenBranch = layer;
+void BackgroundCapturer::DrawTargetChild(const DrawArgs& args, Canvas* canvas, Layer* target,
+                                         float alpha, BlendMode blendMode) {
+  AutoCanvasRestore restore(canvas);
+  canvas->concat(target->getMatrixWithScrollRect().asMatrix());
+  target->drawLayer(args, canvas, alpha, blendMode);
+}
+
+namespace {
+
+struct TargetCapture {
+  std::unordered_map<const Layer*, int> childLimits;
+  Layer* target = nullptr;
+  float alpha = 1.0f;
+  BlendMode blendMode = BlendMode::SrcOver;
+  bool replayUnclipped = false;
+};
+
+class TargetBackgroundCapturer final : public BackgroundCapturer {
+ public:
+  TargetBackgroundCapturer(BackgroundSnapshotMap* snapshots,
+                           std::shared_ptr<BackgroundSource> source,
+                           const std::vector<Rect>* styleSourceRects,
+                           const TargetCapture* selection, bool drawingUnclipped = false)
+      : BackgroundCapturer(snapshots, std::move(source), styleSourceRects), selection(selection),
+        drawingUnclipped(drawingUnclipped) {
+  }
+
+  LayerChildRange childRange(const Layer* parent) const override {
+    if (selection != nullptr) {
+      auto limit = selection->childLimits.find(parent);
+      if (limit != selection->childLimits.end()) {
+        // An ancestor's foreground and Above styles paint after the selected child.
+        return {limit->second, false};
+      }
     }
+    return BackgroundCapturer::childRange(parent);
   }
-  return hiddenBranch;
-}
 
-bool BackgroundCapturer::isExportAncestor(const Layer* layer) const {
-  return capturePath != nullptr && capturePath->children.count(layer) != 0;
-}
+  void drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent, Layer* child, float alpha,
+                 bool forceDescendants) override {
+    if (selection != nullptr && child == selection->target) {
+      if (!selection->replayUnclipped) {
+        DrawTargetChild(args, canvas, child, selection->alpha, selection->blendMode);
+      }
+      return;
+    }
+    BackgroundCapturer::drawChild(args, canvas, parent, child, alpha, forceDescendants);
+  }
 
-bool BackgroundCapturer::drawExportTarget(const DrawArgs& args, Canvas* canvas,
-                                          Layer* layer) const {
-  if (capturePath == nullptr || capturePath->target != layer) {
-    return false;
+  std::optional<const LayerStyleSource*> getCachedLayerStyleSource(Layer* layer) const override {
+    if (selection != nullptr && selection->childLimits.count(layer) != 0) {
+      bool hasBelowStyle = false;
+      for (const auto& style : layer->layerStyles()) {
+        if (style->position() == LayerStylePosition::Below) {
+          hasBelowStyle = true;
+          break;
+        }
+      }
+      if (!hasBelowStyle) {
+        // Avoid recording style inputs for ancestor content that paints after the target.
+        return nullptr;
+      }
+    }
+    return BackgroundCapturer::getCachedLayerStyleSource(layer);
   }
-  if (!capturePath->separateTarget) {
-    layer->drawLayer(args, canvas, capturePath->alpha, capturePath->blendMode);
+
+  bool needsSurface(Layer* layer) const override {
+    if (drawingUnclipped) {
+      // The scene's cached style coverage can omit descendants outside the target scroll clip.
+      return layer != nullptr && HasDescendantBackdrop(layer);
+    }
+    return BackgroundCapturer::needsSurface(layer);
   }
-  return true;
-}
+
+ protected:
+  std::unique_ptr<BackgroundCapturer> makeSubCapturer(
+      BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source,
+      const std::vector<Rect>* styleSourceRects) const override {
+    return std::make_unique<TargetBackgroundCapturer>(
+        snapshots, std::move(source), styleSourceRects, selection, drawingUnclipped);
+  }
+
+ private:
+  const TargetCapture* selection = nullptr;
+  bool drawingUnclipped = false;
+};
+
+}  // namespace
 
 void BackgroundCapturer::RunForTarget(Layer* captureRoot, Layer* target, float alpha,
                                       BlendMode blendMode, const DrawArgs& baseArgs,
                                       std::shared_ptr<BackgroundSource> bgSource,
                                       BackgroundSnapshotMap* snapshots,
                                       const std::vector<Rect>& renderRects) {
-  auto* hiddenBranch = HiddenBranch(captureRoot, target);
   auto* canvas = bgSource->getCanvas();
-  BackgroundCapturer capturer(snapshots, std::move(bgSource), &renderRects);
   DrawArgs args = baseArgs;
-  args.backgroundHandler = &capturer;
-  args.renderRects = &renderRects;
-  std::vector<Rect> unsupportedBounds;
-  args.unsupportedBackdropBounds = &unsupportedBounds;
   AutoCanvasRestore restore(canvas);
-  ExportPath path = {};
-  path.target = target;
-  path.alpha = alpha;
-  path.blendMode = blendMode;
-  path.separateTarget = hiddenBranch != nullptr || target->_scrollRect != nullptr;
-  for (auto* child = hiddenBranch != nullptr ? hiddenBranch : target; child != captureRoot;
-       child = child->parent()) {
+  if (target == captureRoot) {
+    args.renderRects =
+        target->root() != nullptr && target->_scrollRect == nullptr ? &renderRects : nullptr;
+    BackgroundCapturer capturer(snapshots, std::move(bgSource), args.renderRects);
+    args.backgroundHandler = &capturer;
+    target->drawLayer(args, canvas, alpha, blendMode);
+    return;
+  }
+
+  TargetCapture selection = {};
+  selection.target = target;
+  selection.alpha = alpha;
+  selection.blendMode = blendMode;
+  selection.replayUnclipped = target->_scrollRect != nullptr;
+  for (auto* child = target; child != captureRoot; child = child->parent()) {
     auto* parent = child->parent();
-    path.children.emplace(parent, parent->getChildIndex(child->shared_from_this()));
+    selection.childLimits.emplace(parent, parent->doGetChildIndex(child));
   }
-  capturer.capturePath = &path;
-  if (target != captureRoot) {
-    {
-      AutoCanvasRestore restoreScene(canvas);
-      captureRoot->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
-    }
-    if (!path.separateTarget) {
-      return;
-    }
-    // Replay the target on the collected backdrop. Direct export ignores its own scroll clip,
-    // and does not make any siblings inside a hidden branch visible.
+  {
+    TargetBackgroundCapturer capturer(snapshots, bgSource, &renderRects, &selection);
+    AutoCanvasRestore restoreScene(canvas);
+    args.backgroundHandler = &capturer;
+    args.renderRects = &renderRects;
+    captureRoot->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
+  }
+  if (selection.replayUnclipped) {
+    // Direct exports draw the target outside its scene scroll clip on the captured backdrop.
+    TargetBackgroundCapturer capturer(snapshots, std::move(bgSource), nullptr, nullptr, true);
+    args.backgroundHandler = &capturer;
+    args.renderRects = nullptr;
+    capturer.forceDrawDescendants();
     canvas->concat(target->getRelativeMatrix3D(captureRoot).asMatrix());
-    // Scene bounds and cached outsets may exclude part or all of this target.
-    args.useSceneBounds = false;
-    capturer.capturingHiddenTarget = true;
-    capturer.beginForceDrawChildren();
+    target->drawLayer(args, canvas, alpha, blendMode);
   }
-  target->drawLayer(args, canvas, alpha, blendMode);
 }
 
 }  // namespace tgfx

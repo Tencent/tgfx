@@ -217,8 +217,8 @@ std::shared_ptr<BackgroundSource> BackgroundSource::MakeWithGeometry(
       geometry.size.height > maxTextureSize) {
     return nullptr;
   }
-  if (!geometry.sceneRootToOutput.isFinite() || !geometry.sceneRootToOutput.invertible() ||
-      geometry.sceneRootToOutput.hasPerspective() || !std::isfinite(geometry.surfaceScale) ||
+  if (!geometry.sceneRootToSurface.isFinite() || !geometry.sceneRootToSurface.invertible() ||
+      geometry.sceneRootToSurface.hasPerspective() || !std::isfinite(geometry.surfaceScale) ||
       geometry.surfaceScale <= 0.0f) {
     return nullptr;
   }
@@ -233,7 +233,7 @@ std::shared_ptr<BackgroundSource> BackgroundSource::MakeWithGeometry(
                                                           geometry.surfaceScale, colorSpace);
   auto* canvas = result->getCanvas();
   canvas->clear();
-  canvas->setMatrixForTile(geometry.sceneRootToOutput, geometry.originX, geometry.originY);
+  canvas->setMatrix(geometry.sceneRootToSurface);
   return result;
 }
 

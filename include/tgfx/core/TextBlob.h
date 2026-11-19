@@ -156,9 +156,7 @@ class TextBlob {
 
   const RunRecord* firstRun() const;
   Rect computeBounds() const;
-  std::shared_ptr<TextBlob> makeOffset(float dx, float dy) const;
 
-  friend class Canvas;
   friend class TextBlobBuilder;
 };
 }  // namespace tgfx

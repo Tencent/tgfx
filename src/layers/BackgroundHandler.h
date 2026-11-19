@@ -38,6 +38,11 @@ class LayerStyle;
 class Surface;
 struct LayerStyleSource;
 
+struct LayerChildRange {
+  int lastIndex = -1;
+  bool drawTrailingContent = true;
+};
+
 /**
  * Strategy for rendering Background-sourced LayerStyles.
  *   - BackgroundCapturer: samples the bg surface into a snapshot map during the capture pass.
@@ -98,17 +103,18 @@ class BackgroundHandler {
     return nullptr;
   }
 
-  // Returns the index of the last child in parent's children list that should be traversed
-  // during the capture pass, or -1 if no children need traversal. BackgroundCapturer overrides
-  // this to skip children after the last one with background styles.
-  virtual int lastCaptureChildIndex(const Layer* /*parent*/) const;
+  // Selects the children to visit and whether to draw the parent's content after them.
+  virtual LayerChildRange childRange(const Layer* parent) const;
 
-  // Returns a previously cached LayerStyleSource for the given layer, or nullptr if none. Capture
-  // and consume passes walk the same tree, so the source built in capture is reused in consume —
-  // avoiding redundant content/contour image renders. Default implementation returns nullptr so
-  // NoOp handlers don't engage caching.
-  virtual const LayerStyleSource* getCachedLayerStyleSource(Layer* /*layer*/) const {
-    return nullptr;
+  // Draws a child whose descendants must be visited or whose parent has a truncated range.
+  // The final child of a full range uses the layer's normal draw path directly.
+  virtual void drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent, Layer* child,
+                         float alpha, bool forceDescendants);
+
+  // The consume pass reuses sources from capture to avoid redundant image recordings. A nullopt
+  // requests recording, while an engaged nullptr skips it when the pass samples no styles here.
+  virtual std::optional<const LayerStyleSource*> getCachedLayerStyleSource(Layer* /*layer*/) const {
+    return std::nullopt;
   }
 
   // Whether this handler will cache a LayerStyleSource for `layer`. Used by Layer::drawDirectly
@@ -122,15 +128,6 @@ class BackgroundHandler {
   virtual const LayerStyleSource* cacheLayerStyleSource(
       Layer* /*layer*/, std::unique_ptr<LayerStyleSource> /*source*/) {
     return nullptr;
-  }
-
-  // During the capture pass, a subtree that sits before a later bg-style sibling must draw all
-  // descendants so their content appears on the bg source surface. drawChildren wraps each such
-  // child draw in begin/endForceDrawChildren. Non-capturing handlers default to no-ops, so
-  // callers can invoke these unconditionally.
-  virtual void beginForceDrawChildren() {
-  }
-  virtual void endForceDrawChildren() {
   }
 };
 
@@ -163,21 +160,17 @@ class BackgroundCapturer : public BackgroundHandler {
     return _styleSourceRects;
   }
 
-  int lastCaptureChildIndex(const Layer* parent) const override;
+  LayerChildRange childRange(const Layer* parent) const override;
 
-  const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
+  void drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent, Layer* child, float alpha,
+                 bool forceDescendants) override;
+
+  std::optional<const LayerStyleSource*> getCachedLayerStyleSource(Layer* layer) const override;
 
   bool canCacheLayerStyleSource(Layer* layer) const override;
 
   const LayerStyleSource* cacheLayerStyleSource(Layer* layer,
                                                 std::unique_ptr<LayerStyleSource> source) override;
-
-  void beginForceDrawChildren() override {
-    ++_forcedCaptureDepth;
-  }
-  void endForceDrawChildren() override {
-    --_forcedCaptureDepth;
-  }
 
   // Runs a capture pass: replays captureRoot onto bgSource's canvas, populating snapshots. The
   // replay walks the tree exactly once with renderRects set to the rects the capture actually
@@ -192,12 +185,6 @@ class BackgroundCapturer : public BackgroundHandler {
   static void RunForTarget(Layer* captureRoot, Layer* target, float alpha, BlendMode blendMode,
                            const DrawArgs& baseArgs, std::shared_ptr<BackgroundSource> bgSource,
                            BackgroundSnapshotMap* snapshots, const std::vector<Rect>& renderRects);
-  // Returns the outermost branch skipped by a normal traversal from captureRoot to target.
-  static Layer* HiddenBranch(Layer* captureRoot, Layer* target);
-
-  bool isExportAncestor(const Layer* layer) const;
-  // Draws the exported target with the caller's attributes when reached from its scene parent.
-  bool drawExportTarget(const DrawArgs& args, Canvas* canvas, Layer* layer) const;
 
   // Exposes the snapshot map this capturer writes into, so per-fragment Sub3DCapturers spawned
   // by 3D subtrees can append their composed-backdrop entries to the same map under the same
@@ -220,6 +207,20 @@ class BackgroundCapturer : public BackgroundHandler {
     return _captureWorldMatrix;
   }
 
+ protected:
+  virtual std::unique_ptr<BackgroundCapturer> makeSubCapturer(
+      BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source,
+      const std::vector<Rect>* styleSourceRects) const;
+
+  static void DrawTargetChild(const DrawArgs& args, Canvas* canvas, Layer* target, float alpha,
+                              BlendMode blendMode);
+
+  static bool HasDescendantBackdrop(Layer* layer);
+
+  void forceDrawDescendants() {
+    ++_forcedCaptureDepth;
+  }
+
  private:
   bool isForcedCapture() const {
     return _forcedCaptureDepth > 0;
@@ -231,15 +232,6 @@ class BackgroundCapturer : public BackgroundHandler {
   BackgroundSnapshotMap* snapshots = nullptr;
   std::shared_ptr<BackgroundSource> bgSource = nullptr;
   std::vector<Rect> _renderRects;
-  struct ExportPath {
-    std::unordered_map<const Layer*, int> children;
-    Layer* target = nullptr;
-    float alpha = 1.0f;
-    BlendMode blendMode = BlendMode::SrcOver;
-    bool separateTarget = false;
-  };
-  const ExportPath* capturePath = nullptr;
-  bool capturingHiddenTarget = false;
   const std::vector<Rect>* _styleSourceRects = nullptr;
   int _forcedCaptureDepth = 0;
   std::optional<Matrix> _captureWorldMatrix = std::nullopt;
@@ -263,7 +255,7 @@ class BackgroundConsumer : public BackgroundHandler {
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                            LayerStyle* style, const LayerStyleSource* source) override;
 
-  const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
+  std::optional<const LayerStyleSource*> getCachedLayerStyleSource(Layer* layer) const override;
 
  private:
   BackgroundSnapshotMap* snapshots = nullptr;

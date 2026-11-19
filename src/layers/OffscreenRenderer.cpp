@@ -25,7 +25,6 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/layers/Layer.h"
-#include "tgfx/layers/filters/LayerFilter.h"
 
 namespace tgfx {
 
@@ -82,8 +81,6 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
                             -(inputContentBounds.top + imageClip.top));
 
   OffscreenResult result;
-  const auto firstUnsupported =
-      args.unsupportedBackdropBounds != nullptr ? args.unsupportedBackdropBounds->size() : 0;
   // Need a Surface backing only when a descendant Background-sourced style will read back
   // through this subtree; otherwise a PictureRecorder is cheaper.
   if (args.backgroundHandler != nullptr && args.backgroundHandler->needsSurface(layer) &&
@@ -115,25 +112,6 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
     result = RenderContentOnPicture(layer, args, density, imageClip, contentMatrix);
   }
 
-  if (hasFilter && args.unsupportedBackdropBounds != nullptr &&
-      firstUnsupported < args.unsupportedBackdropBounds->size()) {
-    // Unsupported children may be the only content of the offscreen. Carry their projected
-    // coverage through the same filter chain even when no supported image was recorded.
-    float scale = density.getMaxScale();
-    auto imageToScene = layer->getGlobalMatrix().asMatrix();
-    imageToScene.preScale(1.f / scale, 1.f / scale);
-    Matrix sceneToImage;
-    if (imageToScene.invert(&sceneToImage)) {
-      for (size_t i = firstUnsupported; i < args.unsupportedBackdropBounds->size(); ++i) {
-        auto& unsupported = (*args.unsupportedBackdropBounds)[i];
-        auto affected = sceneToImage.mapRect(unsupported);
-        for (const auto& filter : layer->filters()) {
-          affected = filter->filterBounds(affected, scale);
-        }
-        unsupported = imageToScene.mapRect(affected);
-      }
-    }
-  }
   if (result.image == nullptr || !hasFilter) {
     return result;
   }
@@ -171,8 +149,13 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
   auto parentMatrix = parentCanvas->getMatrix();
   auto surfaceRect = parentMatrix.mapRect(*inputBounds);
   surfaceRect.roundOut();
-  if (!surfaceRect.intersect(Rect::MakeWH(backdrop->width(), backdrop->height())) ||
-      surfaceRect.isEmpty()) {
+  auto backdropBounds = Rect::MakeWH(backdrop->width(), backdrop->height());
+  // The local clip was rounded out, so mapping it back can extend beyond the tile viewport.
+  if (args.viewport != nullptr && args.viewport->canvas == parentCanvas &&
+      !backdropBounds.intersect(args.viewport->bounds)) {
+    return {};
+  }
+  if (!surfaceRect.intersect(backdropBounds) || surfaceRect.isEmpty()) {
     return {};
   }
 
