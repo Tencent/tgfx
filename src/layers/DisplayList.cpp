@@ -1172,10 +1172,9 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       // pass 1.
       auto chainBudget = gridComplete ? std::max(_maxTilesRefinedPerFrame, 0) : 0;
       if (mayRefine) {
-        // coverages[0] is L and coverages[3] is L+3. Both loops below walk backwards from L+2 to
-        // L, starting one past rbegin() to skip L+3.
-        for (auto it = coverages.rbegin() + 1; it != coverages.rend() && chainBudget > 0; ++it) {
-          auto& coverage = *it;
+        // coverages[0] is L and coverages[3] is L+3.
+        for (int index = TREE_LEVEL_COUNT - 2; index >= 0 && chainBudget > 0; --index) {
+          auto& coverage = coverages[static_cast<size_t>(index)];
           auto cells = CollectMissingTreeTiles(coverage, {renderRect}, _tileSize);
           if (cells.empty()) {
             continue;
@@ -1192,8 +1191,9 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       // loop alive, so only a complete one needs the scan.
       bool chainPending = false;
       if (gridComplete) {
-        for (auto it = coverages.rbegin() + 1; it != coverages.rend(); ++it) {
-          if (!CollectMissingTreeTiles(*it, {renderRect}, _tileSize).empty()) {
+        for (int index = TREE_LEVEL_COUNT - 2; index >= 0; --index) {
+          auto& coverage = coverages[static_cast<size_t>(index)];
+          if (!CollectMissingTreeTiles(coverage, {renderRect}, _tileSize).empty()) {
             chainPending = true;
             break;
           }
