@@ -85,6 +85,10 @@ bool VideoElement::onUpdateTexture(std::shared_ptr<TextureView> textureView) {
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
                                           source, glTexture->textureID(), 0, 0, false);
 #endif
+  // The upload calls above drop frames silently on failure (video not ready, device lost), in
+  // which case the texture keeps its previous content. Report success either way: the first
+  // upload targets a zero-initialized texture, and during playback keeping the previous frame is
+  // preferable to flickering transparent.
   return true;
 }
 }  // namespace tgfx

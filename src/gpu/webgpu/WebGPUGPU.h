@@ -22,6 +22,7 @@
 #include <list>
 #include <memory>
 #include <unordered_map>
+#include <utility>
 #include "WebGPUCaps.h"
 #include "core/utils/ReturnQueue.h"
 #include "tgfx/gpu/GPU.h"
@@ -117,6 +118,15 @@ class WebGPUGPU : public GPU {
 
   const MipmapPipeline* getMipmapPipeline(WGPUTextureFormat format);
 
+  /**
+   * Returns the lazily created 1x1 texture view and sampler used to complete bind groups whose
+   * pipelines declare texture slots the caller never binds. Guarded shader branches never sample
+   * it, so its contents are irrelevant. The resources are created once per device and stay alive
+   * until releaseAll(). Returns {nullptr, nullptr} if creation failed, in which case the caller
+   * must abort the bind group update.
+   */
+  std::pair<WGPUTextureView, WGPUSampler> getPlaceholderBindings();
+
  private:
   // Holds the initial refs created when importing a JS GPUDevice. Declared before the GPU members so
   // it is destroyed after the command queue and other objects using those runtime handles.
@@ -142,6 +152,11 @@ class WebGPUGPU : public GPU {
   std::shared_ptr<ReturnQueue> returnQueue = ReturnQueue::Make();
   std::unordered_map<uint32_t, std::shared_ptr<Sampler>> samplerCache = {};
   std::unordered_map<uint32_t, MipmapPipeline> mipmapPipelineCache = {};
+  // Cached 1x1 resources that complete bind groups with unbound texture slots. Created through
+  // createTexture()/createSampler() so they are reclaimed like any other resource, and released
+  // before the resource list is cleared in releaseAll().
+  std::shared_ptr<Texture> placeholderTexture = nullptr;
+  std::shared_ptr<Sampler> placeholderSampler = nullptr;
 };
 
 }  // namespace tgfx

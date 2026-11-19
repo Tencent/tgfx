@@ -279,11 +279,13 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   EXPECT_TRUE(result);
   CHECK_PIXELS(AlphaRectInfo, pixels, "Surface_alpha_to_alpha_100_-100");
 
-  auto texture = context->gpu()->createTexture({width, height, PixelFormat::RGBA_8888});
+  auto texture = context->gpu()->createTexture(
+      {width, height, PixelFormat::RGBA_8888, false, 1,
+       TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT});
   ASSERT_TRUE(texture != nullptr);
   surface = Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
-  colorSpace = surface->colorSpace();
   ASSERT_TRUE(surface != nullptr);
+  colorSpace = surface->colorSpace();
   canvas = surface->getCanvas();
   canvas->clear();
   canvas->drawImage(image);

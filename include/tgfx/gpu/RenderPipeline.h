@@ -245,6 +245,14 @@ class BindingLayout {
 
   /**
    * Specifies the binding points for texture samplers used in the shader program.
+   *
+   * A binding declared here does not have to be set on every draw call, but leaving it unset is
+   * only valid when the shader provably cannot sample it during that draw, for example when the
+   * sampling expression sits behind a branch selected by a constant or by a uniform value. The
+   * value sampled from an unset binding is undefined and differs between backends: OpenGL returns
+   * its default texture value (0, 0, 0, 1) while the WebGPU backend substitutes a zero-initialized
+   * placeholder (0, 0, 0, 0). Backends do not validate this precondition, so a shader that samples
+   * an unset binding renders wrong pixels silently instead of failing.
    */
   std::vector<BindingEntry> textureSamplers = {};
 };

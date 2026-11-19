@@ -309,6 +309,11 @@ class RenderPass {
    * Sets a texture and its sampler state to a specified binding index in the shader's texture
    * table. The mapping is resolved when the next draw is encoded, so this call may be issued
    * before or after setPipeline(); a draw with no pipeline bound is dropped.
+   *
+   * Every binding declared by BindingLayout::textureSamplers must be set for any draw that can
+   * sample it. A binding left unset is only valid when the shader provably never samples it during
+   * that draw; see BindingLayout::textureSamplers for the undefined results and the missing
+   * backend validation.
    */
   virtual void setTexture(unsigned binding, std::shared_ptr<Texture> texture,
                           std::shared_ptr<Sampler> sampler) = 0;

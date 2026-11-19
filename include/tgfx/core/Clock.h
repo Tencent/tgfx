@@ -19,6 +19,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 
