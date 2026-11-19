@@ -704,6 +704,8 @@ void DisplayList::captureTileBackgrounds(
   // not the current zoom.
   captureMaps->clear();
   taskCapture->assign(tileTasks.size(), -1);
+  // tileRect is in zoom space; offset by contentOffset to line it up with surface pixel coords.
+  std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
   if (_root->hasBackgroundStyle()) {
     std::vector<Rect> captureRects = {};
     captureRects.reserve(tileTasks.size());
