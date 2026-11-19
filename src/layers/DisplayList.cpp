@@ -749,13 +749,13 @@ void DisplayList::captureTileBackgrounds(
 }
 
 std::vector<Rect> DisplayList::drawTileTasks(
-    std::vector<DrawTask>& tileTasks,
+    const std::vector<DrawTask>& tileTasks,
     const std::vector<std::unique_ptr<BackgroundSnapshotMap>>& captureMaps,
     const std::vector<int>& taskCapture, Surface* surface, float zoomScale) {
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   for (size_t taskIndex = 0; taskIndex < tileTasks.size(); ++taskIndex) {
-    auto& task = tileTasks[taskIndex];
+    const auto& task = tileTasks[taskIndex];
     auto isTreeTask = task.treeLevel() != kExactLevel;
     auto captureIndex = taskCapture[taskIndex];
     auto* snapshots =

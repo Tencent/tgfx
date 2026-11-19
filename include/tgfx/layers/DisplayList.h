@@ -368,7 +368,7 @@ class DisplayList {
                               std::vector<int>* taskCapture) const;
 
   std::vector<Rect> drawTileTasks(
-      std::vector<DrawTask>& tileTasks,
+      const std::vector<DrawTask>& tileTasks,
       const std::vector<std::unique_ptr<BackgroundSnapshotMap>>& captureMaps,
       const std::vector<int>& taskCapture, Surface* surface, float zoomScale);
 
