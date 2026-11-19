@@ -489,6 +489,7 @@ void DisplayList::setRenderMode(RenderMode renderMode) {
   if (_renderMode != RenderMode::Direct) {
     resetCaches();
   }
+  hasZoomBlurTiles = false;
   _renderMode = renderMode;
 }
 

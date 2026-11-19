@@ -152,6 +152,29 @@ TGFX_TEST_PRIVATE(TilePoolTest, ZoomWithoutBudgetFillsViewportFromTreeLevels) {
                       EXPECT_EQ(displayList->tilePool->size(TileType::Tree), treeCount));
 }
 
+TGFX_TEST(TilePoolTest, LeavingTiledModeDropsPendingFallbackWork) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 512, 512);
+  ASSERT_NE(surface, nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileUpdateMode(TileUpdateMode::Smooth);
+  displayList->setMaxTilesRefinedPerFrame(0);
+  displayList->root()->addChild(MakeSolid(4096, 4096, Color::Red()));
+  displayList->render(surface.get());
+  displayList->setZoomScale(0.7f);
+  displayList->render(surface.get());
+  ASSERT_TRUE(displayList->hasContentChanged());
+
+  // The other modes never refine tiles, so the work the tiled frames left pending must not keep
+  // asking for frames once they take over.
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->render(surface.get());
+  EXPECT_FALSE(displayList->hasContentChanged());
+}
+
 TGFX_TEST_PRIVATE(TilePoolTest, FastModeLeavesUncoveredCellsToTheBackground) {
   ContextScope scope;
   auto context = scope.getContext();
