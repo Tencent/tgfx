@@ -23,6 +23,7 @@
 #include <limits>
 #include <utility>
 #include <vector>
+#include "core/utils/Log.h"
 #include "layers/LayerDrawSession.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Surface.h"
@@ -327,9 +328,8 @@ LayerImageReadResult LayerImageReader::Impl::readNextBand(Context* context,
         regions.clear();
       }
       if (!planned) {
-        if (chunkHeight <= 1) {
-          return fail(LayerImageErrorCode::DeviceLimitExceeded);
-        }
+        // planRegion() fails instead of requesting subdivision for a 1x1 core.
+        DEBUG_ASSERT(chunkHeight > 1);
         // Earlier batches may already have written into the destination. The shorter strip
         // redraws from x = 0, and later strips overwrite any rows below it before publication.
         chunkHeight = std::max(1, chunkHeight / 2);
