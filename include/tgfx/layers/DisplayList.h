@@ -404,7 +404,7 @@ class DisplayList {
   std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
 
   static void collectBackgroundFootprints(const Layer* layer, const Rect& bounds, bool clipped,
-                                          bool covered, std::vector<Rect>* footprints);
+                                          bool covered, std::vector<Rect>* footprints, float alpha);
 
   static std::vector<Rect> narrowCullRects(const std::vector<Rect>& footprints,
                                            const std::vector<Rect>& captureRects);

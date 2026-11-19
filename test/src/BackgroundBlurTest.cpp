@@ -2947,78 +2947,76 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest,
 
 // A 3D subtree is composited through the BSP, but its styles still sample only their own bounds, so
 // the capture culls to those bounds instead of covering everything the subtree draws.
-TGFX_TEST_PRIVATE(BackgroundBlurTest, ThreeDSubtreeCullsToItsStyles) {
-  TGFX_PRIVATE_ACCESS({
-    ContextScope scope;
-    auto context = scope.getContext();
-    ASSERT_TRUE(context != nullptr);
-    constexpr int SurfaceSize = 240;
+TGFX_TEST_PRIVATE(BackgroundBlurTest, ThreeDSubtreeCullsToItsStyles){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int SurfaceSize = 240;
 
-    auto render = [&](bool cull) {
-      auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
-      EXPECT_TRUE(surface != nullptr);
-      auto displayList = std::make_unique<DisplayList>();
-      displayList->setRenderMode(RenderMode::Tiled);
-      CaptureCullScope cullScope(cull);
-      displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
+  auto render = [&](bool cull) {
+    auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
+    EXPECT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(RenderMode::Tiled);
+    CaptureCullScope cullScope(cull);
+    displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
 
-      Path blockPath;
-      blockPath.addRect(Rect::MakeWH(20, 20));
-      for (auto offset : {Point::Make(30, 30), Point::Make(160, 160)}) {
-        auto block = ShapeLayer::Make();
-        block->setPath(blockPath);
-        block->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
-        block->setMatrix(Matrix::MakeTrans(offset.x, offset.y));
-        displayList->root()->addChild(block);
-      }
+    Path blockPath;
+    blockPath.addRect(Rect::MakeWH(20, 20));
+    for (auto offset : {Point::Make(30, 30), Point::Make(160, 160)}) {
+      auto block = ShapeLayer::Make();
+      block->setPath(blockPath);
+      block->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
+      block->setMatrix(Matrix::MakeTrans(offset.x, offset.y));
+      displayList->root()->addChild(block);
+    }
 
-      auto group = Layer::Make();
-      group->setPreserve3D(true);
-      auto cube = ShapeLayer::Make();
-      Path cubePath;
-      cubePath.addRect(Rect::MakeWH(40, 40));
-      cube->setPath(cubePath);
-      cube->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 120, 0, 255)));
-      cube->setMatrix(Matrix::MakeTrans(150, 20));
-      group->addChild(cube);
+    auto group = Layer::Make();
+    group->setPreserve3D(true);
+    auto cube = ShapeLayer::Make();
+    Path cubePath;
+    cubePath.addRect(Rect::MakeWH(40, 40));
+    cube->setPath(cubePath);
+    cube->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 120, 0, 255)));
+    cube->setMatrix(Matrix::MakeTrans(150, 20));
+    group->addChild(cube);
 
-      auto blurred3D = ShapeLayer::Make();
-      Path blurPath;
-      blurPath.addRect(Rect::MakeWH(40, 40));
-      blurred3D->setPath(blurPath);
-      blurred3D->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
-      blurred3D->setMatrix(Matrix::MakeTrans(20, 20));
-      blurred3D->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
-      group->addChild(blurred3D);
-      displayList->root()->addChild(group);
+    auto blurred3D = ShapeLayer::Make();
+    Path blurPath;
+    blurPath.addRect(Rect::MakeWH(40, 40));
+    blurred3D->setPath(blurPath);
+    blurred3D->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
+    blurred3D->setMatrix(Matrix::MakeTrans(20, 20));
+    blurred3D->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
+    group->addChild(blurred3D);
+    displayList->root()->addChild(group);
 
-      auto blurred = ShapeLayer::Make();
-      blurred->setPath(blurPath);
-      blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
-      blurred->setMatrix(Matrix::MakeTrans(150, 150));
-      blurred->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
-      displayList->root()->addChild(blurred);
+    auto blurred = ShapeLayer::Make();
+    blurred->setPath(blurPath);
+    blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
+    blurred->setMatrix(Matrix::MakeTrans(150, 150));
+    blurred->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
+    displayList->root()->addChild(blurred);
 
-      displayList->render(surface.get());
-      return std::make_pair(std::move(displayList), ReadSurfacePixels(surface.get()));
-    };
+    displayList->render(surface.get());
+    return std::make_pair(std::move(displayList), ReadSurfacePixels(surface.get()));
+  };
 
-    auto culledResult = render(true);
-    auto unculledResult = render(false);
-    EXPECT_GT(CountPixelsDifferentFrom(unculledResult.second, 0), 1000u);
-    ExpectMatchingRenders(unculledResult.second, culledResult.second);
+  auto culledResult = render(true);
+  auto unculledResult = render(false);
+  EXPECT_GT(CountPixelsDifferentFrom(unculledResult.second, 0), 1000u);
+  ExpectMatchingRenders(unculledResult.second, culledResult.second);
 
-    auto& displayList = culledResult.first;
-    auto cullRects =
-        displayList->computeCaptureCullRects({Rect::MakeWH(240.0f, 240.0f)}, Matrix::I());
-    ASSERT_EQ(cullRects.size(), 2u);
-    auto blurred3D = displayList->root()->_children[2]->_children[1].get();
-    auto blurred = displayList->root()->_children[3].get();
-    EXPECT_EQ(cullRects[0], SampledBounds(blurred3D->renderBounds));
-    EXPECT_EQ(cullRects[1], SampledBounds(blurred->renderBounds));
-    context->flushAndSubmit();
-  })
-}
+  auto& displayList = culledResult.first;
+  auto cullRects =
+      displayList->computeCaptureCullRects({Rect::MakeWH(240.0f, 240.0f)}, Matrix::I());
+  ASSERT_EQ(cullRects.size(), 2u);
+  auto blurred3D = displayList->root()->_children[2]->_children[1].get();
+  auto blurred = displayList->root()->_children[3].get();
+  EXPECT_EQ(cullRects[0], SampledBounds(blurred3D->renderBounds));
+  EXPECT_EQ(cullRects[1], SampledBounds(blurred->renderBounds));
+  context->flushAndSubmit();
+})}
 
 // A background blur under fully opaque content, its own fill and its children, is hidden by that
 // content, so the layer stops depending on the background altogether.
@@ -3062,9 +3060,9 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, OpaqueContentHidesBackgroundBlur) {
     for (int i = 0; i < 3; ++i) {
       displayList.render(surface.get());
     }
-    EXPECT_FALSE(card->drawsBackgroundStyle(blur.get()));
-    EXPECT_FALSE(card->hasBackgroundStyle());
-    EXPECT_FALSE(container->hasBackgroundStyle());
+    EXPECT_FALSE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
+    EXPECT_FALSE(card->hasBackgroundStyle(1.0f));
+    EXPECT_FALSE(container->hasBackgroundStyle(1.0f));
     // Nothing samples the background, so the container caches like any other static subtree.
     EXPECT_TRUE(container->subtreeCache != nullptr);
     auto inside = surface->getColor(130, 110);
@@ -3074,21 +3072,21 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, OpaqueContentHidesBackgroundBlur) {
     // A child that lets the backdrop through brings the blur back.
     child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 220, 0, 200)));
     displayList.render(surface.get());
-    EXPECT_TRUE(card->drawsBackgroundStyle(blur.get()));
-    EXPECT_TRUE(container->hasBackgroundStyle());
+    EXPECT_TRUE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
+    EXPECT_TRUE(container->hasBackgroundStyle(1.0f));
 
     // So does a fill that is not fully opaque.
     child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 220, 0, 255)));
     card->setColor(Color::FromRGBA(30, 120, 220, 252));
     displayList.render(surface.get());
-    EXPECT_TRUE(card->drawsBackgroundStyle(blur.get()));
+    EXPECT_TRUE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
 
     // And a mask that includes the children's effects, which opaque content does not cover.
     card->setColor(Color::FromRGBA(30, 120, 220, 255));
     displayList.render(surface.get());
-    EXPECT_FALSE(card->drawsBackgroundStyle(blur.get()));
+    EXPECT_FALSE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
     blur->setExcludeChildEffects(false);
-    EXPECT_TRUE(card->drawsBackgroundStyle(blur.get()));
+    EXPECT_TRUE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
     context->flushAndSubmit();
   });
 }

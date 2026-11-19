@@ -934,7 +934,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   // the consumer falls back to on-the-fly synthesis (signalled by passing a null snapshot map).
   BackgroundSnapshotMap snapshotMap = {};
   BackgroundSnapshotMap* snapshotsPtr = nullptr;
-  bool needBackground = canInvert && !canPreserve3D() && hasBackgroundStyle();
+  bool needBackground = canInvert && !canPreserve3D() && hasBackgroundStyle(alpha);
   if (needBackground && context != nullptr) {
     auto rectForDraw = maxBackgroundOutset > 0.0f ? clippedBounds : bounds;
     Matrix backgroundMatrix = canvas->getMatrix();
@@ -1176,7 +1176,7 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     return true;
   }
   bool needsMaskFilter = maskFilter != nullptr;
-  if (canUseSubtreeCache(args, blendMode) &&
+  if (canUseSubtreeCache(args, blendMode, alpha) &&
       drawWithSubtreeCache(args, canvas, alpha, blendMode, maskFilter)) {
     return true;
   }
@@ -1401,7 +1401,7 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode) const {
   return true;
 }
 
-bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
+bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, float alpha) {
   if (canPreserve3D()) {
     return false;
   }
@@ -1417,7 +1417,7 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
     }
     return true;
   }
-  if (shouldPassThroughBackground(blendMode) || hasBackgroundStyle()) {
+  if (shouldPassThroughBackground(blendMode) || hasBackgroundStyle(alpha)) {
     return false;
   }
   if (!bitFields.staticSubtree) {
@@ -1605,7 +1605,7 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
   }
   std::unique_ptr<LayerStyleSource> ownedSource;
   if (sourcePtr == nullptr) {
-    ownedSource = getLayerStyleSource(args, canvas->getMatrix());
+    ownedSource = getLayerStyleSource(args, canvas->getMatrix(), alpha);
     if (ownedSource != nullptr && args.backgroundHandler != nullptr &&
         args.backgroundHandler->canCacheLayerStyleSource(this)) {
       sourcePtr = args.backgroundHandler->cacheLayerStyleSource(this, std::move(ownedSource));
@@ -1808,7 +1808,7 @@ bool Layer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float 
 }
 
 std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& args,
-                                                             const Matrix& matrix) {
+                                                             const Matrix& matrix, float alpha) {
   if (_layerStyles.empty() || args.excludeEffects) {
     return nullptr;
   }
@@ -1826,7 +1826,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
     if (NeedsBackgroundSource(layerStyle->extraSourceType()) &&
-        !drawsBackgroundStyle(layerStyle.get())) {
+        !needsBackgroundStyleOutput(layerStyle.get(), alpha)) {
       continue;
     }
     if (DeclaresGeometry(layerStyle.get())) {
@@ -1977,7 +1977,7 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       continue;
     }
     if (NeedsBackgroundSource(layerStyle->extraSourceType())) {
-      if (drawsBackgroundStyle(layerStyle.get())) {
+      if (needsBackgroundStyleOutput(layerStyle.get(), alpha)) {
         BackgroundHandler::DispatchOrSkip(args, canvas, this, alpha, layerStyle.get(), source);
       }
       continue;
@@ -1995,7 +1995,7 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
   // come before `this`. The current frame's `this` is the parent's stopChild, so siblings at or
   // after `this` are skipped.
   auto currentAlpha = _parent->drawBackgroundLayers(args, canvas);
-  auto parentSource = _parent->getLayerStyleSource(args, canvas->getMatrix());
+  auto parentSource = _parent->getLayerStyleSource(args, canvas->getMatrix(), currentAlpha);
   _parent->drawContents(args, canvas, currentAlpha, parentSource.get(), this);
   canvas->concat(getMatrixWithScrollRect().asMatrix());
   if (_scrollRect) {
@@ -2035,7 +2035,7 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
   subArgs.excludeEffects = false;
 
   auto currentAlpha = drawBackgroundLayers(subArgs, recordingCanvas);
-  auto belowSource = getLayerStyleSource(subArgs, recordingCanvas->getMatrix());
+  auto belowSource = getLayerStyleSource(subArgs, recordingCanvas->getMatrix(), currentAlpha);
   if (belowSource) {
     drawLayerStyles(subArgs, recordingCanvas, currentAlpha, belowSource.get(),
                     LayerStylePosition::Below);
@@ -2134,12 +2134,14 @@ bool Layer::hasValidMask() const {
   return _mask && _mask->root() == root() && _mask->bitFields.visible;
 }
 
-void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
+void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty,
+                               float alpha) {
+  const auto accumulatedAlpha = alpha * _alpha;
   if (!forceDirty && !bitFields.dirtyDescendents) {
     if (maxBackgroundOutset > 0 || bitFields.hasBlendMode) {
       propagateLayerState();
       if (_root->hasDirtyRegions()) {
-        checkBackgroundStyles(transformer);
+        checkBackgroundStyles(transformer, accumulatedAlpha);
       }
     }
     return;
@@ -2242,7 +2244,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       childTransformer = RegionTransformer::MakeFromClip(*clipRect, std::move(childTransformer));
     }
     auto childForceDirty = forceDirty || child->bitFields.dirtyTransform;
-    child->updateRenderBounds(std::move(childTransformer), childForceDirty);
+    child->updateRenderBounds(std::move(childTransformer), childForceDirty, accumulatedAlpha);
     child->bitFields.dirtyTransform = false;
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);
@@ -2265,7 +2267,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   if (!renderBounds.isEmpty()) {
     for (auto& style : _layerStyles) {
       DEBUG_ASSERT(style != nullptr);
-      if (!drawsBackgroundStyle(style.get())) {
+      if (!needsBackgroundStyleOutput(style.get(), accumulatedAlpha)) {
         continue;
       }
       auto bounds = style->filterBackground(Rect::MakeEmpty(), contentScale);
@@ -2297,7 +2299,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   if (backOutset > 0) {
     maxBackgroundOutset = std::max(backOutset, maxBackgroundOutset);
     minBackgroundOutset = std::min(downsampleOutset, minBackgroundOutset);
-    updateBackgroundBounds(contentScale, backgroundSourceRects);
+    updateBackgroundBounds(contentScale, backgroundSourceRects, accumulatedAlpha);
   }
   if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver) ||
       (content && content->hasBlendMode())) {
@@ -2307,26 +2309,27 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   bitFields.dirtyDescendents = false;
 }
 
-void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer) {
+void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer, float alpha) {
   for (auto& child : _children) {
     if (child->maxBackgroundOutset <= 0 || !child->bitFields.visible || child->_alpha <= 0) {
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
     auto childTransformer = RegionTransformer::MakeFromMatrix(childMatrix.asMatrix(), transformer);
-    child->checkBackgroundStyles(childTransformer);
+    child->checkBackgroundStyles(childTransformer, alpha * child->_alpha);
   }
   // Fast path: this layer's subtree did not change, so every current dirty rect originates from
   // outside this subtree and is a legitimate blur input candidate. Passing the live list is safe
   // because invalidateBackground collects all expanded rects locally before re-appending them.
   updateBackgroundBounds(transformer ? transformer->getMaxScale() : 1.0f,
-                         _root->currentDirtyRects());
+                         _root->currentDirtyRects(), alpha);
 }
 
-void Layer::updateBackgroundBounds(float contentScale, const std::vector<Rect>& sourceRects) {
+void Layer::updateBackgroundBounds(float contentScale, const std::vector<Rect>& sourceRects,
+                                   float alpha) {
   for (auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
-    if (drawsBackgroundStyle(style.get())) {
+    if (needsBackgroundStyleOutput(style.get(), alpha)) {
       _root->invalidateBackground(renderBounds, style.get(), contentScale, sourceRects);
     }
   }
@@ -2359,26 +2362,26 @@ void Layer::propagateLayerState() {
   }
 }
 
-bool Layer::hasOwnBackgroundStyle() const {
+bool Layer::hasOwnBackgroundStyle(float alpha) const {
   for (const auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
-    if (drawsBackgroundStyle(style.get())) {
+    if (needsBackgroundStyleOutput(style.get(), alpha)) {
       return true;
     }
   }
   return false;
 }
 
-bool Layer::hasBackgroundStyle() {
+bool Layer::hasBackgroundStyle(float alpha) {
   if (!bitFields.dirtyDescendents) {
     return maxBackgroundOutset > 0;
   }
-  return hasOwnBackgroundStyle() || hasDescendantBackgroundStyle();
+  return hasOwnBackgroundStyle(alpha) || hasDescendantBackgroundStyle(alpha);
 }
 
-bool Layer::hasDescendantBackgroundStyle() {
+bool Layer::hasDescendantBackgroundStyle(float alpha) {
   for (const auto& child : _children) {
-    if (child->hasBackgroundStyle()) {
+    if (child->hasBackgroundStyle(alpha * child->_alpha)) {
       return true;
     }
   }
@@ -2394,13 +2397,12 @@ bool Layer::isSubtreeOpaque() const {
          bitFields.contentOpaque && bitFields.childrenOpaque;
 }
 
-bool Layer::drawsBackgroundStyle(const LayerStyle* style) const {
+bool Layer::needsBackgroundStyleOutput(const LayerStyle* style, float alpha) const {
   if (style == nullptr || !NeedsBackgroundSource(style->extraSourceType())) {
     return false;
   }
-  if (style->position() == LayerStylePosition::Below &&
-      style->contentSource() == LayerStyleContentSource::All && style->excludeChildEffects() &&
-      bitFields.contentOpaque && bitFields.childrenOpaque) {
+  if (style->isHiddenByOpaqueInput() && alpha >= 1.0f && bitFields.contentOpaque &&
+      bitFields.childrenOpaque) {
     return false;
   }
   return true;

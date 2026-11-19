@@ -179,6 +179,15 @@ class LayerStyle : public LayerProperty {
   }
 
   /**
+   * Returns whether the style only paints over the input it draws, so an input that is fully opaque
+   * hides its output entirely. A style drawn below the content, with child effects excluded from the
+   * mask, is clipped to that content.
+   */
+  virtual bool isHiddenByOpaqueInput() const {
+    return false;
+  }
+
+  /**
    * Draws this layer style onto the canvas using the provided input data.
    * @param canvas The canvas to draw the layer style on.
    * @param input The input data for this layer style.

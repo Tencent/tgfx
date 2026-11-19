@@ -666,7 +666,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float alpha,
                  LayerDrawFunc drawFunc);
 
-  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
+  std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix,
+                                                        float alpha);
 
   void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                        const LayerStyleSource* source, LayerStylePosition position);
@@ -708,30 +709,36 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasValidMask() const;
 
+  // `alpha` is the alpha that reaches this layer from its ancestors. It keeps accumulating through
+  // an offscreen boundary on purpose: the subtree drawn offscreen composites with the group alpha
+  // afterwards, which leaves a style output and the content under it equally translucent, so the
+  // bounds side only ever overestimates an outset instead of missing one.
   void updateRenderBounds(std::shared_ptr<RegionTransformer> transformer = nullptr,
-                          bool forceDirty = false);
+                          bool forceDirty = false, float alpha = 1.0f);
 
-  void checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer);
+  void checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer, float alpha);
 
-  void updateBackgroundBounds(float contentScale, const std::vector<Rect>& sourceRects);
+  void updateBackgroundBounds(float contentScale, const std::vector<Rect>& sourceRects,
+                              float alpha);
 
   void propagateLayerState();
 
-  bool hasBackgroundStyle();
+  bool hasBackgroundStyle(float alpha);
 
-  bool hasOwnBackgroundStyle() const;
+  bool hasOwnBackgroundStyle(float alpha) const;
 
-  // Whether everything the subtree paints, apart from layer styles and filters, is fully opaque and
-  // composited in place. Reads the layer's own compositing state live and the content and children
-  // as of the last render bounds update.
+  // Whether everything the subtree paints is fully opaque and composited in place: the content and
+  // every visible child are opaque, and no filter, offscreen mask, 3D context, group alpha or
+  // non-SrcOver blend breaks it up. Reads the layer's own compositing state live and the content and
+  // children as of the last render bounds update.
   bool isSubtreeOpaque() const;
 
-  // Whether the style needs the background and its output can show. A background style drawn below
-  // the layer's content and masked by that same content, children's effects excluded, is hidden
-  // entirely when the content is fully opaque, so it is treated as absent.
-  bool drawsBackgroundStyle(const LayerStyle* style) const;
+  // Whether the style still samples the background when the given alpha reaches the layer. False
+  // when every pixel it would draw is already hidden: the style paints only over its input, that
+  // input is the layer's content including its descendants, and both are fully opaque.
+  bool needsBackgroundStyleOutput(const LayerStyle* style, float alpha) const;
 
-  bool hasDescendantBackgroundStyle();
+  bool hasDescendantBackgroundStyle(float alpha);
 
   std::shared_ptr<BackgroundSource> createBackgroundSource(
       Context* context, const Rect& drawRect, const Matrix& viewMatrix, bool fullLayer = false,
@@ -739,7 +746,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool shouldPassThroughBackground(BlendMode blendMode) const;
 
-  bool canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode);
+  bool canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, float alpha);
 
   SubtreeCache* getValidSubtreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds);
 
@@ -775,7 +782,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool staticSubtree : 1;  // Whether the subtree (content, children, filters, styles) is static.
     // Whether the layer's own content paints only fully opaque pixels.
     bool contentOpaque : 1;
-    // Whether every visible child paints only fully opaque pixels, see isSubtreeOpaque().
+    // Whether every visible child that is not a mask owner passes isSubtreeOpaque().
     bool childrenOpaque : 1;
     uint8_t blendMode : 5;
     uint8_t maskType : 3;
