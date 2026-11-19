@@ -638,16 +638,6 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       payload.blob.assign(text.begin(), text.end());
       report->composedByTag[profileTag].push_back(std::move(payload));
     };
-    auto readFile = [&options, &stripComments](const char* path) {
-      std::ifstream file(std::string(options.shaderDir) + "/" + path, std::ios::binary);
-      if (!file.is_open()) {
-        return std::string();
-      }
-      std::ostringstream buffer;
-      buffer << file.rdbuf();
-      return stripComments(buffer.str());
-    };
-    addEntry(FragmentPackTail, "ChainTail", readFile("entry/ChainTail.glsl"));
     addEntry(FragmentPackDepAnalyticClipMath, "AnalyticClipMath",
              readExpanded("coverage/analytic_clip_math.inc"));
     addEntry(FragmentPackDepTextureSwizzle, "TextureSwizzle",

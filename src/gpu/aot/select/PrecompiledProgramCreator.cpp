@@ -64,13 +64,20 @@ bool ComposedChainEnabled() {
   return enabled;
 }
 
-/// Whether the from-scratch assembled executor is active: its own experiment switch, off by
-/// default, ahead of the composed splice in the dispatch order.
-bool AssembledChainEnabled() {
-  // The assembled route is the default; TGFX_NO_ASSEMBLED_CHAIN keeps the interpreter reachable for
-  // debugging a composition the emitter cannot spell.
-  static const bool enabled = std::getenv("TGFX_NO_ASSEMBLED_CHAIN") == nullptr;
-  return enabled;
+/// Whether the assembled route is active for a profile. The default is per profile: a profile joins
+/// the list only once its assembled run matches its interpreter run (same failure set, no crash).
+/// TGFX_ASSEMBLED_CHAIN forces every profile on and TGFX_NO_ASSEMBLED_CHAIN forces every profile
+/// off, so a profile that is not listed stays reachable for the work that unlocks it.
+bool AssembledChainEnabled(const std::string& profileTag) {
+  static const bool forcedOn = std::getenv("TGFX_ASSEMBLED_CHAIN") != nullptr;
+  static const bool forcedOff = std::getenv("TGFX_NO_ASSEMBLED_CHAIN") != nullptr;
+  if (forcedOff) {
+    return false;
+  }
+  if (forcedOn) {
+    return true;
+  }
+  return profileTag == "opengl";
 }
 }  // namespace
 
@@ -81,13 +88,13 @@ bool AssembledChainEnabled() {
 // otherwise reuse one shape's program for another.
 static void AppendAssembledChainKey(Context* context, const ProgramInfo& info,
                                     const DrawPlan& resolved, BytesKey* key) {
-  if (!AssembledChainEnabled() || resolved.sources.chain == nullptr) {
+  auto cache = ContextCacheAccess::Cache(context);
+  if (!AssembledChainEnabled(cache->profileTag()) || resolved.sources.chain == nullptr) {
     return;
   }
   if (strcmp(Families()[resolved.variant.family].name, "Chain") != 0) {
     return;
   }
-  auto cache = ContextCacheAccess::Cache(context);
   const auto payloadFormat = SpecFormatForBackend(context->backend(), cache->payloadFormat());
   if (payloadFormat != ShaderCodeFormat::GLSL && payloadFormat != ShaderCodeFormat::SPIRV &&
       payloadFormat != ShaderCodeFormat::METALLIB && payloadFormat != ShaderCodeFormat::MSL) {
@@ -385,7 +392,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   ChainBindings chainBindings = {};
   const bool assembledVulkan = format == ShaderCodeFormat::SPIRV;
   const bool assembledMetal = format == ShaderCodeFormat::METALLIB;
-  if (allowComposed && AssembledChainEnabled() &&
+  if (allowComposed && AssembledChainEnabled(cache->profileTag()) &&
       (format == ShaderCodeFormat::GLSL || assembledVulkan || assembledMetal) &&
       strcmp(Families()[variant.family].name, "Chain") == 0) {
     const auto* assembledSources = programInfo->getSources();
