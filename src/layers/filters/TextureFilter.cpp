@@ -31,27 +31,6 @@ bool IsValidParameter(float value) {
 
 }  // namespace
 
-uint32_t TextureFilter::ToSVGSeed(uint32_t seed) {
-  seed ^= seed >> 16;
-  seed *= 0x7feb352dU;
-  seed ^= seed >> 15;
-  seed *= 0x846ca68bU;
-  seed ^= seed >> 16;
-  return 1U + seed % 16777215U;
-}
-
-const std::string& TextureFilter::SVGClipAlphaTable() {
-  static const std::string table = [] {
-    std::string result = "0";
-    result.reserve(512);
-    for (int index = 1; index < 255; index++) {
-      result += " 1";
-    }
-    return result;
-  }();
-  return table;
-}
-
 std::shared_ptr<TextureFilter> TextureFilter::Make(float sizeX, float sizeY, float radius,
                                                    uint32_t seed, bool clipToShape) {
   if (!IsValidParameter(sizeX) || !IsValidParameter(sizeY) || !IsValidParameter(radius)) {
@@ -69,7 +48,9 @@ void TextureFilter::setSizeX(float value) {
   if (!IsValidParameter(value)) {
     return;
   }
-  if (_sizeX == value) return;
+  if (_sizeX == value) {
+    return;
+  }
   _sizeX = value;
   invalidateFilter();
 }
@@ -78,7 +59,9 @@ void TextureFilter::setSizeY(float value) {
   if (!IsValidParameter(value)) {
     return;
   }
-  if (_sizeY == value) return;
+  if (_sizeY == value) {
+    return;
+  }
   _sizeY = value;
   invalidateFilter();
 }
@@ -87,7 +70,9 @@ void TextureFilter::setRadius(float value) {
   if (!IsValidParameter(value)) {
     return;
   }
-  if (_radius == value) return;
+  if (_radius == value) {
+    return;
+  }
   _radius = value;
   invalidateFilter();
 }

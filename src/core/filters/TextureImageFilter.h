@@ -42,7 +42,7 @@ struct TextureGrainParams {
   bool clipToShape = false;
 };
 
-// Non-finite pixelsPerLocalUnit is normalized to 1 by TextureImageFilter.
+// Non-finite or non-positive pixelsPerLocalUnit is normalized to 1 by TextureImageFilter.
 TextureGrainParams MakeTextureGrainParams(float sizeX, float sizeY, float radius,
                                           const Point& nodeCenter, uint32_t seed = 0,
                                           const Point& sourceOrigin = Point::Zero(),

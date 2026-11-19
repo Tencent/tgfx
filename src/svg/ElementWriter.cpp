@@ -48,12 +48,32 @@
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/layers/filters/TextureFilter.h"
 #include "tgfx/svg/SVGPathParser.h"
 
 namespace tgfx {
 
 namespace {
+
+uint32_t ToSVGTextureSeed(uint32_t seed) {
+  seed ^= seed >> 16;
+  seed *= 0x7feb352dU;
+  seed ^= seed >> 15;
+  seed *= 0x846ca68bU;
+  seed ^= seed >> 16;
+  return 1U + seed % 16777215U;
+}
+
+const std::string& TextureClipAlphaTable() {
+  static const std::string table = [] {
+    std::string result = "0";
+    result.reserve(512);
+    for (int index = 1; index < 255; index++) {
+      result += " 1";
+    }
+    return result;
+  }();
+  return table;
+}
 
 void WriteTextureImageFilter(XMLWriter* writer, const TextureImageFilter* filter) {
   const auto& params = filter->getParams();
@@ -72,7 +92,7 @@ void WriteTextureImageFilter(XMLWriter* writer, const TextureImageFilter* filter
     turbulenceElement.addAttribute(
         "baseFrequency", FloatToString(baseFrequencyX) + " " + FloatToString(baseFrequencyY));
     turbulenceElement.addAttribute("numOctaves", 3);
-    turbulenceElement.addAttribute("seed", std::to_string(TextureFilter::ToSVGSeed(params.seed)));
+    turbulenceElement.addAttribute("seed", std::to_string(ToSVGTextureSeed(params.seed)));
     turbulenceElement.addAttribute("data-pagx-seed", std::to_string(params.seed));
     turbulenceElement.addAttribute("data-pagx-size-x", FloatToString(1.0f / params.frequencyX));
     turbulenceElement.addAttribute("data-pagx-size-y", FloatToString(1.0f / params.frequencyY));
@@ -97,7 +117,7 @@ void WriteTextureImageFilter(XMLWriter* writer, const TextureImageFilter* filter
       transferElement.addAttribute("result", "textureValidColor");
       ElementWriter alphaElement("feFuncA", writer);
       alphaElement.addAttribute("type", "discrete");
-      alphaElement.addAttribute("tableValues", TextureFilter::SVGClipAlphaTable());
+      alphaElement.addAttribute("tableValues", TextureClipAlphaTable());
     }
     ElementWriter clipElement("feComposite", writer);
     clipElement.addAttribute("in", "textureValidColor");

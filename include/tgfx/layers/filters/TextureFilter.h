@@ -19,7 +19,6 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 #include "tgfx/layers/filters/LayerFilter.h"
 
 namespace tgfx {
@@ -43,19 +42,7 @@ class TextureFilter : public LayerFilter {
   static std::shared_ptr<TextureFilter> Make(float sizeX, float sizeY, float radius,
                                              uint32_t seed = 0, bool clipToShape = true);
 
-  /**
-   * Maps a full uint32 texture seed to [1, 16777215], the positive range that SVG's
-   * feTurbulence seed attribute can preserve exactly in its floating-point representation.
-   */
-  static uint32_t ToSVGSeed(uint32_t seed);
-
-  /**
-   * Returns the 255-entry, space-separated feFuncA tableValues string used by SVG serializers for
-   * clipToShape. The first entry is 0 and the remaining entries are 1.
-   */
-  static const std::string& SVGClipAlphaTable();
-
-  // Property setters ignore negative, NaN, or infinite values.
+  // Numeric property setters ignore negative, NaN, or infinite values.
   float sizeX() const {
     return _sizeX;
   }

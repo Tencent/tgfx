@@ -233,7 +233,7 @@ void GLSLTextureGrainFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("highp vec2 grainOffset = %s.z * grainNoise;", common.c_str());
   if (!params.clipToShape) {
     fragBuilder->codeAppendf("vec4 displacedColor = %s(sourcePoint + grainOffset);",
-                             sampleSourceName.c_str(), sourceRect.c_str());
+                             sampleSourceName.c_str());
     if (sourceProxy->isAlphaOnly()) {
       fragBuilder->codeAppendf("%s = displacedColor.a * %s;", args.outputColor.c_str(),
                                args.inputColor.c_str());
@@ -244,10 +244,9 @@ void GLSLTextureGrainFragmentProcessor::emitCode(EmitArgs& args) const {
     return;
   }
 
-  fragBuilder->codeAppendf("vec4 originalColor = %s(sourcePoint);", sampleSourceName.c_str(),
-                           sourceRect.c_str());
+  fragBuilder->codeAppendf("vec4 originalColor = %s(sourcePoint);", sampleSourceName.c_str());
   fragBuilder->codeAppendf("vec4 displacedColor = %s(sourcePoint + grainOffset);",
-                           sampleSourceName.c_str(), sourceRect.c_str());
+                           sampleSourceName.c_str());
   fragBuilder->codeAppend("vec4 clippedColor = originalColor;");
   fragBuilder->codeAppend("if (originalColor.a > 0.0 && displacedColor.a >= (1.0 / 255.0)) {");
   fragBuilder->codeAppend(

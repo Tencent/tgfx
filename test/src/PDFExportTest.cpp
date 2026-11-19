@@ -1748,6 +1748,31 @@ TGFX_TEST(PDFExportTest, TextureFilterFallback) {
   EXPECT_FALSE(bytes.empty());
   EXPECT_NE(bytes.find("/Subtype /Image"), std::string::npos);
   EXPECT_TRUE(HasImageLargerThan(data, 160, 110));
+
+  class RasterizationFailTextureFilter : public TextureImageFilter {
+   public:
+    RasterizationFailTextureFilter()
+        : TextureImageFilter(
+              MakeTextureGrainParams(16.0f, 12.0f, 8.0f, Point::Make(90.0f, 65.0f), 3491)) {
+    }
+
+   protected:
+    Rect onFilterBounds(const Rect&, MapDirection) const override {
+      return Rect::MakeEmpty();
+    }
+  };
+
+  Paint failurePaint = {};
+  failurePaint.setImageFilter(std::make_shared<RasterizationFailTextureFilter>());
+  auto failureData = renderPDF(180.0f, 130.0f, [&](Canvas* canvas) {
+    canvas->drawPicture(picture, nullptr, &failurePaint);
+  });
+  auto fallbackData =
+      renderPDF(180.0f, 130.0f, [&](Canvas* canvas) { canvas->drawPicture(picture); });
+  ASSERT_TRUE(failureData != nullptr);
+  ASSERT_TRUE(fallbackData != nullptr);
+  EXPECT_EQ(failureData->size(), fallbackData->size());
+  EXPECT_EQ(std::memcmp(failureData->data(), fallbackData->data(), failureData->size()), 0);
 }
 
 TGFX_TEST(PDFExportTest, TextLayerStyleAlignment) {

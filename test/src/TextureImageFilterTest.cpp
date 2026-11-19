@@ -515,11 +515,10 @@ struct TestYUVImage {
   std::shared_ptr<Image> image = nullptr;
 };
 
-TestYUVImage MakeTestYUVImage(bool nv12, YUVColorSpace colorSpace) {
-  constexpr int width = 64;
-  constexpr int height = 64;
+TestYUVImage MakeTestYUVImage(bool nv12, YUVColorSpace colorSpace, int width = 64,
+                              int height = 64) {
   TestYUVImage result = {};
-  result.y.resize(static_cast<size_t>(width) * height);
+  result.y.resize(static_cast<size_t>(width) * static_cast<size_t>(height));
   for (int y = 0; y < height; ++y) {
     for (int x = 0; x < width; ++x) {
       auto high = (x / 8 + y / 8) % 2 == 0;
@@ -532,15 +531,15 @@ TestYUVImage MakeTestYUVImage(bool nv12, YUVColorSpace colorSpace) {
   size_t rowBytes[3] = {};
   size_t planeCount = 0;
   if (nv12) {
-    result.u.resize(static_cast<size_t>(width) * height / 2);
+    result.u.resize(static_cast<size_t>(width) * static_cast<size_t>(height) / 2);
     for (size_t index = 0; index < result.u.size(); index += 2) {
       result.u[index] = 85;
       result.u[index + 1] = 255;
     }
     addresses[0] = result.y.data();
     addresses[1] = result.u.data();
-    rowBytes[0] = width;
-    rowBytes[1] = width;
+    rowBytes[0] = static_cast<size_t>(width);
+    rowBytes[1] = static_cast<size_t>(width);
     planeCount = YUVData::NV12_PLANE_COUNT;
   } else {
     auto chromaSize = static_cast<size_t>(width / 2) * static_cast<size_t>(height / 2);
@@ -549,9 +548,9 @@ TestYUVImage MakeTestYUVImage(bool nv12, YUVColorSpace colorSpace) {
     addresses[0] = result.y.data();
     addresses[1] = result.u.data();
     addresses[2] = result.v.data();
-    rowBytes[0] = width;
-    rowBytes[1] = width / 2;
-    rowBytes[2] = width / 2;
+    rowBytes[0] = static_cast<size_t>(width);
+    rowBytes[1] = static_cast<size_t>(width / 2);
+    rowBytes[2] = static_cast<size_t>(width / 2);
     planeCount = YUVData::I420_PLANE_COUNT;
   }
   auto yuvData = YUVData::MakeFrom(width, height, addresses, rowBytes, planeCount);
@@ -648,6 +647,11 @@ TGFX_TEST(TextureImageFilterTest, ZeroParametersAreIdentity) {
   for (const auto& size :
        {Point::Make(0.0f, 25.0f), Point::Make(25.0f, 0.0f), Point::Make(0.0f, 0.0f)}) {
     auto params = MakeTextureGrainParams(size.x, size.y, 20.0f, Point::Make(160.0f, 120.0f), 3491);
+    verifyIdentity(params);
+  }
+
+  for (auto size : {1.0e-37f, 1.0e-38f, std::numeric_limits<float>::min()}) {
+    auto params = MakeTextureGrainParams(size, size, 20.0f, Point::Make(160.0f, 120.0f), 3491);
     verifyIdentity(params);
   }
 }
@@ -865,6 +869,34 @@ TGFX_TEST(TextureImageFilterTest, YUVInputUsesDeclaredColorSpace) {
                 std::abs(static_cast<int>(bt601Center[1]) - static_cast<int>(bt709Center[1])) +
                 std::abs(static_cast<int>(bt601Center[2]) - static_cast<int>(bt709Center[2])),
             2);
+}
+
+TGFX_TEST(TextureImageFilterTest, OversizedYUVSourceUsesClampedCrop) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr int sourceWidth = 4096;
+  constexpr int sourceHeight = 64;
+  auto crop = Rect::MakeXYWH(3000.0f, 0.0f, 512.0f, 64.0f);
+  for (auto nv12 : {false, true}) {
+    auto source = MakeTestYUVImage(nv12, YUVColorSpace::BT601_LIMITED, sourceWidth, sourceHeight);
+    ASSERT_TRUE(source.image != nullptr);
+    auto params = MakeTextureGrainParams(
+        16.0f, 16.0f, 8.0f, Point::Make(sourceWidth * 0.5f, sourceHeight * 0.5f), 3491);
+    auto filter = std::make_shared<TextureImageFilter>(params);
+    Point offset = {};
+    auto filtered = source.image->makeWithFilter(filter, &offset, &crop);
+    ASSERT_TRUE(filtered != nullptr);
+    EXPECT_EQ(offset.x, crop.left);
+    EXPECT_EQ(offset.y, crop.top);
+
+    auto result = RenderImageOnGPU(context, filtered, filtered->width(), filtered->height());
+    auto unfiltered = RenderImageOnGPU(context, source.image, filtered->width(), filtered->height(),
+                                       nullptr, -crop.left, -crop.top);
+    EXPECT_EQ(PixelAt(result, result.width / 2, result.height / 2)[3], 255);
+    EXPECT_GT(Compare(result, unfiltered).meanDifference, 0.1);
+  }
 }
 
 TGFX_TEST(TextureImageFilterTest, MaxParametersComplexImageClipPair) {

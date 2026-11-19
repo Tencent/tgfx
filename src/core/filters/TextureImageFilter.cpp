@@ -34,8 +34,33 @@ namespace tgfx {
 
 namespace {
 
+// A quantized stored gradient has magnitude at most about 1.008. Its dot with a unit-square offset
+// is therefore at most sqrt(2) * 1.008. The three FBM weights sum to 1 + 0.5 + 0.25 = 1.75,
+// keeping the displacement magnitude below 2.5. Keep this in sync with the octave weights and
+// gradient encoding used by TextureGrainNoise.
+constexpr float TextureGrainDisplacementScale = 2.5f;
+constexpr float MaximumTextureGrainOctaveScale = 4.0f;
+
 float MaximumDisplacement(const TextureGrainParams& params) {
-  return std::abs(params.radius) * params.pixelsPerLocalUnit * 2.5f;
+  return std::abs(params.radius) * params.pixelsPerLocalUnit * TextureGrainDisplacementScale;
+}
+
+bool HasRepresentableGrainCoordinates(const TextureGrainParams& params, const Rect& sourceBounds) {
+  auto checkAxis = [](float low, float high, float origin, float center, float frequency) {
+    auto lowGrain = (origin + low - center) * frequency;
+    auto highGrain = (origin + high - center) * frequency;
+    return std::isfinite(lowGrain) && std::isfinite(highGrain) &&
+           std::isfinite(lowGrain * MaximumTextureGrainOctaveScale) &&
+           std::isfinite(highGrain * MaximumTextureGrainOctaveScale);
+  };
+  auto localLeft = sourceBounds.left / params.pixelsPerLocalUnit;
+  auto localRight = sourceBounds.right / params.pixelsPerLocalUnit;
+  auto localTop = sourceBounds.top / params.pixelsPerLocalUnit;
+  auto localBottom = sourceBounds.bottom / params.pixelsPerLocalUnit;
+  return checkAxis(localLeft, localRight, params.sourceOrigin.x, params.nodeCenter.x,
+                   params.frequencyX) &&
+         checkAxis(localTop, localBottom, params.sourceOrigin.y, params.nodeCenter.y,
+                   params.frequencyY);
 }
 
 std::shared_ptr<TextureProxy> MakeTextureProxy(Context* context,
@@ -82,7 +107,9 @@ std::shared_ptr<TextureProxy> MakeCroppedTextureProxy(const std::shared_ptr<Imag
                     std::max(sourceScale.x, sourceScale.y));
   auto sourceMatrix = Matrix::MakeTrans(crop->left, crop->top);
   sourceMatrix.preScale(1.0f / sourceScale.x, 1.0f / sourceScale.y);
-  auto sourceFP = FragmentProcessor::Make(source, sourceArgs, TileMode::Decal, TileMode::Decal,
+  // The copy target covers exactly this crop. Clamp supports YUV texture views, while the Decal
+  // specialization cannot sample buffers exposed as separate Y/U/V textures.
+  auto sourceFP = FragmentProcessor::Make(source, sourceArgs, TileMode::Clamp, TileMode::Clamp,
                                           sampling, SrcRectConstraint::Fast, &sourceMatrix);
   if (!args.context->drawingManager()->fillRTWithFP(renderTarget, std::move(sourceFP),
                                                     args.renderFlags)) {
@@ -141,11 +168,12 @@ TextureImageFilter::TextureImageFilter(const TextureGrainParams& params) : param
 }
 
 Rect TextureImageFilter::onFilterBounds(const Rect& rect, MapDirection) const {
-  if (params.frequencyX <= 0.0f || params.frequencyY <= 0.0f) {
+  if (params.frequencyX <= 0.0f || params.frequencyY <= 0.0f ||
+      !HasRepresentableGrainCoordinates(params, rect)) {
     return rect;
   }
   auto maximumDisplacement = MaximumDisplacement(params);
-  if (maximumDisplacement <= 0.0f) {
+  if (!std::isfinite(maximumDisplacement) || maximumDisplacement <= 0.0f) {
     return rect;
   }
   auto outset = maximumDisplacement + 2.0f;
@@ -158,10 +186,15 @@ PlacementPtr<FragmentProcessor> TextureImageFilter::asFragmentProcessor(
   if (source == nullptr || args.context == nullptr) {
     return nullptr;
   }
-  if (params.radius == 0.0f || params.frequencyX <= 0.0f || params.frequencyY <= 0.0f) {
+  auto sourceBounds =
+      Rect::MakeWH(static_cast<float>(source->width()), static_cast<float>(source->height()));
+  auto maximumDisplacement = MaximumDisplacement(params);
+  if (params.radius == 0.0f || params.frequencyX <= 0.0f || params.frequencyY <= 0.0f ||
+      !std::isfinite(maximumDisplacement) ||
+      !HasRepresentableGrainCoordinates(params, sourceBounds)) {
     return FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
   }
-  auto crop = MakeSourceCrop(args.drawRect, uvMatrix, MaximumDisplacement(params) + 3.0f);
+  auto crop = MakeSourceCrop(args.drawRect, uvMatrix, maximumDisplacement + 3.0f);
   if (crop.isEmpty()) {
     return nullptr;
   }

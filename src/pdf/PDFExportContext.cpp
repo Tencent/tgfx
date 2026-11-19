@@ -856,7 +856,8 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
         }
       }
     }
-    LOGE("PDFExportContext: failed to rasterize unsupported image filter.");
+    LOGE("PDFExportContext: failed to rasterize texture image filter.");
+    picture->playback(this, matrix, clip);
     return;
   }
   picture->playback(this, matrix, clip);
