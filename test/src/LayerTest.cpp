@@ -4053,8 +4053,8 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 20: SolidLayer with spread large enough to collapse the shape, spread=-35 for drop and
-  // 35 for inner (analytic)
+  // Case 20: SolidLayer with a semi-transparent shadow color and spread large enough to collapse
+  // the shape, spread=-35 for drop and 35 for inner (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = SolidLayer::Make();
     layer->setColor(Color::Red());
@@ -4065,8 +4065,9 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     layer->setMatrix(
         Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 6 + gap));
     auto collapseSpread = type == ShadowType::Drop ? -35.0f : 35.0f;
+    auto shadowColor = Color{1.0f, 1.0f, 0.0f, 0.5f};
     layer->setLayerStyles(
-        {MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : collapseSpread)});
+        {MakeShadow(type, 25, 25, 3, 3, shadowColor, i == 0 ? 0.0f : collapseSpread)});
     displayList.root()->addChild(layer);
   }
 

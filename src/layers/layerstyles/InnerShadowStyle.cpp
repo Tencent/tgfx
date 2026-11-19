@@ -234,9 +234,10 @@ bool InnerShadowStyle::tryDrawAnalytic(Canvas* canvas, const LayerStyleInput& in
   // A collapsed mask means the inner shadow covers the entire shadow area.
   if (maskShape->rect().isEmpty()) {
     Paint paint = {};
-    paint.setColor(_color);
+    auto color = _color;
+    color.alpha *= alpha;
+    paint.setColor(color);
     paint.setBlendMode(blendMode);
-    paint.setAlpha(alpha);
     paint.setAntiAlias(true);
     canvas->drawRRect(*shadowShape, paint);
     return true;
