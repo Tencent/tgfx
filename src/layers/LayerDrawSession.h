@@ -39,9 +39,6 @@ class DrawArgs;
 class Layer;
 enum class LayerStylePosition;
 
-// The tiled export uses float geometry, with subpixel precision below this magnitude.
-inline constexpr int MaxLayerExportCoordinate = 1 << 23;
-
 /**
  * Integer rectangle in a final pixel grid. It is used for tiled output planning so that the float
  * Rect used by layout code never mixes with the integer pixel partition of the delivered image.

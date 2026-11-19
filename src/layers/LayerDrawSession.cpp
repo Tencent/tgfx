@@ -35,6 +35,9 @@ namespace tgfx {
 
 namespace {
 
+// The tiled export uses float geometry, with subpixel precision below this magnitude.
+static constexpr int MaxLayerExportCoordinate = 1 << 23;
+
 // Bound the output drawing surfaces even on devices with larger textures.
 static constexpr int DefaultExportSurfaceLimit = 2048;
 
