@@ -544,8 +544,8 @@ bool Path::addPath(const Path& src, PathOp op) {
     // reading them after that would leave the cache holding the bounds from before the merge.
     auto bounds = getBounds();
     auto sourceBounds = src.getBounds();
-    concatenate = PathRef::UnionsByConcatenation(getFillType(), bounds, src.getFillType(),
-                                                 sourceBounds);
+    concatenate =
+        PathRef::UnionsByConcatenation(getFillType(), bounds, src.getFillType(), sourceBounds);
   }
   return PathRef::AddPath(*this, src, op, concatenate);
 }
