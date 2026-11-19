@@ -23,6 +23,7 @@
 #include <vector>
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/platform/ImageReader.h"
 
 namespace tgfx {
 class ImageReader;
@@ -58,52 +59,45 @@ class ImageStream {
   ImageStream(int width, int height) : _width(width), _height(height) {
   }
 
-  /**
-   * Creates a new TextureView capturing the pixels in the ImageBuffer. The mipmapped parameter
-   * specifies whether created texture view must allocate mip map levels.
-   */
+  /** Creates a texture using the stream's native pixel source. */
   virtual std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) = 0;
 
-  /**
-   * Updates the specified bounds of the texture view with the pixels in the ImageBuffer.
-   */
+  /** Updates an existing texture using the stream's native pixel source. */
   virtual bool onUpdateTexture(std::shared_ptr<TextureView> textureView) = 0;
 
+  struct TextureReadResult {
+    std::shared_ptr<TextureView> texture = nullptr;
+    ImageReaderStatus status = ImageReaderStatus::Failed;
+    int64_t timestamp = -1;
+  };
+
   /**
-   * Returns true when currentFrameTimestamp() reports a meaningful presentation time, so that
-   * ImageReader may wait for a target timestamp instead of only draining the queued frames. The
-   * default implementation returns false: a stream without timestamps cannot tell whether a target
-   * has been reached, so ImageReader ignores the target for it.
+   * Creates or updates a texture and reports which frame is bound. The deadline uses Clock::Now()'s
+   * microsecond timeline and bounds all producer-notification waits in this read. A target of -1
+   * requests the latest available frame. The result may retain a texture without declaring Ready.
    */
-  virtual bool hasFrameTimestamp() const {
-    return false;
+  virtual TextureReadResult onReadTexture(Context* context, bool mipmapped,
+                                          std::shared_ptr<TextureView> texture, int64_t target,
+                                          int64_t /*deadline*/) {
+    if (texture == nullptr) {
+      texture = onMakeTexture(context, mipmapped);
+    } else if (!onUpdateTexture(texture)) {
+      return {std::move(texture), ImageReaderStatus::Failed, -1};
+    }
+    if (texture == nullptr) {
+      return {};
+    }
+    auto status = target >= 0 ? ImageReaderStatus::Unsupported : ImageReaderStatus::Ready;
+    return {std::move(texture), status, -1};
   }
 
   /**
-   * Returns the presentation timestamp, in nanoseconds, of the frame held by the texture. Only valid
-   * when hasFrameTimestamp() returns true.
+   * Tells the stream that the producer restarted its timeline, so anything derived from the previous
+   * presentation time must be dropped: after a seek the timestamps start over and a stale reference
+   * would make the next frame look like it was already reached. The default implementation does
+   * nothing.
    */
-  virtual int64_t currentFrameTimestamp() {
-    return 0;
-  }
-
-  /**
-   * Consumes the frames the producer has already delivered until the texture reaches the given
-   * presentation timestamp. Unlike onUpdateTexture(), implementations must never wait for a new
-   * frame: when the target is not available yet they return with the current frame still bound, and
-   * the next draw picks it up. The default implementation does nothing.
-   */
-  virtual void onSyncToTimestamp(int64_t /*target*/) {
-  }
-
-  /**
-   * Consumes any frames the producer has already delivered beyond the one most recently consumed,
-   * so the texture ends on the latest available frame. ImageReader calls this from readTexture()
-   * after each frame has been consumed. The default implementation does nothing; only streams whose
-   * producer can queue several frames ahead (the Android SurfaceTexture) override it. Implementations
-   * must not block waiting for a new frame.
-   */
-  virtual void onDrainPendingFrames() {
+  virtual void onSeeked() {
   }
 
  private:

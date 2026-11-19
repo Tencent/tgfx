@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include <chrono>
-#include <limits>
+#include <condition_variable>
 #include "platform/ImageStream.h"
 #include "tgfx/platform/android/Global.h"
 
@@ -66,15 +65,11 @@ class SurfaceTexture : public ImageStream {
 
   bool onUpdateTexture(std::shared_ptr<TextureView> textureView) override;
 
-  void onDrainPendingFrames() override;
+  TextureReadResult onReadTexture(Context* context, bool mipmapped,
+                                  std::shared_ptr<TextureView> texture, int64_t target,
+                                  int64_t deadline) override;
 
-  void onSyncToTimestamp(int64_t target) override;
-
-  bool hasFrameTimestamp() const override {
-    return true;
-  }
-
-  int64_t currentFrameTimestamp() override;
+  void onSeeked() override;
 
  private:
   std::mutex locker = {};
@@ -85,17 +80,9 @@ class SurfaceTexture : public ImageStream {
   bool hasLatchedFrame = false;
   bool lastLatchAdvanced = false;
   int64_t lastLatchedTimestamp = 0;
-  bool hasDrawnFrame = false;
-  int64_t lastDrawnTimestamp = 0;
+  bool seekPending = false;
   ISize textureSize = {};
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
-
-  using TimePoint = std::chrono::steady_clock::time_point;
-
-  // A target that means "no target": latch until the queue runs dry.
-  static constexpr int64_t NO_TARGET = std::numeric_limits<int64_t>::max();
-
-  void latchQueuedFrames(int64_t target, TimePoint deadline);
 
   bool latchTexture(JNIEnv* env);
 
@@ -107,7 +94,11 @@ class SurfaceTexture : public ImageStream {
 
   unsigned makeExternalOESTexture(Context* context);
 
-  bool updateTexImage();
+  void releaseExternalOESTexture(Context* context, unsigned textureID);
+
+  ImageReaderStatus updateTexImage(int64_t target, int64_t deadline);
+
+  void resolveTextureSize(JNIEnv* env);
 
   friend class JNIInit;
 };

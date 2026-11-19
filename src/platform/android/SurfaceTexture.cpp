@@ -26,6 +26,7 @@
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLTexture.h"
 #include "gpu/resources/DefaultTextureView.h"
+#include "tgfx/core/Clock.h"
 
 namespace tgfx {
 static Global<jclass> SurfaceTextureClass;
@@ -241,15 +242,31 @@ static ISize ComputeTextureSize(const float matrix[16], int width, int height) {
   return result;
 }
 
-std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, bool) {
-  auto textureID = makeExternalOESTexture(context);
-  if (textureID == 0) {
-    return nullptr;
+std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, bool mipmapped) {
+  return onReadTexture(context, mipmapped, nullptr, -1, 0).texture;
+}
+
+bool SurfaceTexture::onUpdateTexture(std::shared_ptr<TextureView>) {
+  return updateTexImage(-1, 0) == ImageReaderStatus::Ready;
+}
+
+ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
+    Context* context, bool, std::shared_ptr<TextureView> textureView, int64_t target,
+    int64_t deadline) {
+  unsigned textureID = 0;
+  if (textureView == nullptr) {
+    textureID = makeExternalOESTexture(context);
+    if (textureID == 0) {
+      return {};
+    }
   }
-  if (!updateTexImage()) {
-    auto gl = static_cast<GLGPU*>(context->gpu())->functions();
-    gl->deleteTextures(1, &textureID);
-    return nullptr;
+  auto status = updateTexImage(target, deadline);
+  if (textureView != nullptr) {
+    return {std::move(textureView), status, hasLatchedFrame ? lastLatchedTimestamp : -1};
+  }
+  if (!hasLatchedFrame || status == ImageReaderStatus::Failed) {
+    releaseExternalOESTexture(context, textureID);
+    return {nullptr, status, -1};
   }
   // The descriptor must match the real size of the OES texture, otherwise getTextureCoord()
   // converts pixel coordinates with a wrong base: hardware decoders pad the output buffer to an
@@ -270,21 +287,8 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
   auto gpu = static_cast<GLGPU*>(context->gpu());
   auto texture = gpu->makeResource<GLTexture>(
       descriptor, static_cast<unsigned>(GL_TEXTURE_EXTERNAL_OES), textureID);
-  return Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
-}
-
-bool SurfaceTexture::onUpdateTexture(std::shared_ptr<TextureView>) {
-  return updateTexImage();
-}
-
-int64_t SurfaceTexture::currentFrameTimestamp() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  JNIEnvironment environment;
-  auto env = environment.current();
-  if (env == nullptr) {
-    return 0;
-  }
-  return currentTimestamp(env);
+  textureView = Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
+  return {std::move(textureView), status, lastLatchedTimestamp};
 }
 
 bool SurfaceTexture::latchTexture(JNIEnv* env) {
@@ -314,41 +318,12 @@ int64_t SurfaceTexture::currentTimestamp(JNIEnv* env) {
       env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp));
 }
 
-void SurfaceTexture::latchQueuedFrames(int64_t target, TimePoint deadline) {
+void SurfaceTexture::onSeeked() {
   std::lock_guard<std::mutex> autoLock(locker);
-  JNIEnvironment environment;
-  auto env = environment.current();
-  if (env == nullptr) {
-    return;
-  }
-  // Latch the frames the producer already queued beyond the one just consumed, stopping at the
-  // requested presentation time or when the queue runs dry, whichever comes first. This runs on the
-  // GPU thread with the GL context current (it is called from ImageReader::readTexture), so the
-  // external texture can be rebound. Unlike updateTexImage(), this path never waits for a new frame.
-  static constexpr int MAX_LATCH_FRAMES = 8;
-  for (int i = 0; i < MAX_LATCH_FRAMES; i++) {
-    if (target != NO_TARGET && lastLatchedTimestamp >= target) {
-      break;
-    }
-    if (std::chrono::steady_clock::now() >= deadline) {
-      break;
-    }
-    // Consume the flag right before latching: a frame that arrives from now on sets it again and is
-    // picked up by the next draw instead of being lost.
-    frameAvailable = false;
-    if (!latchTexture(env) || !lastLatchAdvanced) {
-      break;
-    }
-  }
-}
-
-void SurfaceTexture::onDrainPendingFrames() {
-  latchQueuedFrames(NO_TARGET, TimePoint::max());
-}
-
-void SurfaceTexture::onSyncToTimestamp(int64_t target) {
-  static constexpr auto SYNC_BUDGET = std::chrono::milliseconds(4);
-  latchQueuedFrames(target, std::chrono::steady_clock::now() + SYNC_BUDGET);
+  hasLatchedFrame = false;
+  lastLatchAdvanced = false;
+  lastLatchedTimestamp = 0;
+  seekPending = true;
 }
 
 unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
@@ -374,32 +349,70 @@ unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
   return textureID;
 }
 
-bool SurfaceTexture::updateTexImage() {
+void SurfaceTexture::releaseExternalOESTexture(Context* context, unsigned textureID) {
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env != nullptr) {
+    env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_detachFromGLContext);
+    if (!env->ExceptionCheck()) {
+      return;
+    }
+    env->ExceptionClear();
+  }
+  auto gl = static_cast<GLGPU*>(context->gpu())->functions();
+  gl->deleteTextures(1, &textureID);
+}
+
+ImageReaderStatus SurfaceTexture::updateTexImage(int64_t target, int64_t deadline) {
   std::unique_lock<std::mutex> autoLock(locker);
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
-    return false;
+    return ImageReaderStatus::Failed;
   }
-  // A drain may already have latched a frame that no draw has used yet. Waiting for another one
-  // would block a draw that already has newer content available.
-  if (hasDrawnFrame && lastLatchedTimestamp > lastDrawnTimestamp) {
-    lastDrawnTimestamp = lastLatchedTimestamp;
-    return true;
-  }
-  if (!frameAvailable) {
-    static const auto TIMEOUT = std::chrono::seconds(1);
-    if (condition.wait_for(autoLock, TIMEOUT) == std::cv_status::timeout) {
-      LOGE("NativeImageReader::onUpdateTexture(): timeout when waiting for the frame available!");
-      return false;
+  // Notifications can be coalesced, so an advancing latch also permits polling the queue. Only an
+  // empty queue waits for another notification, always using the caller's remaining wall-clock
+  // budget. A producer that continuously queues frames is bounded independently of that budget.
+  static constexpr int MAX_LATCH_FRAMES = 8;
+  int latchCount = 0;
+  while (latchCount < MAX_LATCH_FRAMES) {
+    if (hasLatchedFrame && target >= 0 && lastLatchedTimestamp == target) {
+      seekPending = false;
+      return ImageReaderStatus::Ready;
     }
+    if (hasLatchedFrame && target >= 0 && lastLatchedTimestamp > target && !seekPending) {
+      return ImageReaderStatus::Mismatched;
+    }
+    if (!frameAvailable && (!hasLatchedFrame || !lastLatchAdvanced)) {
+      auto remaining = deadline - Clock::Now();
+      if (target < 0 && hasLatchedFrame) {
+        break;
+      }
+      if (remaining <= 0) {
+        break;
+      }
+      condition.wait_for(autoLock, std::chrono::microseconds(remaining));
+      continue;
+    }
+    frameAvailable = false;
+    if (!latchTexture(env)) {
+      return ImageReaderStatus::Failed;
+    }
+    latchCount++;
+    resolveTextureSize(env);
   }
-  frameAvailable = false;
-  if (!latchTexture(env)) {
-    return false;
+  if (!hasLatchedFrame) {
+    return ImageReaderStatus::NotReady;
   }
-  hasDrawnFrame = true;
-  lastDrawnTimestamp = lastLatchedTimestamp;
+  if (target < 0 || lastLatchedTimestamp == target) {
+    seekPending = false;
+    return ImageReaderStatus::Ready;
+  }
+  return lastLatchedTimestamp > target ? ImageReaderStatus::Mismatched
+                                       : ImageReaderStatus::NotReady;
+}
+
+void SurfaceTexture::resolveTextureSize(JNIEnv* env) {
   if (SurfaceTexture_getTransformMatrix != nullptr && !textureSizeResolved) {
     auto floatArray = env->NewFloatArray(16);
     if (floatArray == nullptr) {
@@ -423,7 +436,6 @@ bool SurfaceTexture::updateTexImage() {
       env->DeleteLocalRef(floatArray);
     }
   }
-  return true;
 }
 
 }  // namespace tgfx
