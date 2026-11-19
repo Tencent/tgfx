@@ -150,7 +150,7 @@ float LayerDrawSession::FilterOutset(Layer* layer, float scale) {
 }
 
 float LayerDrawSession::AncestorFilterOutset(Layer* target, Layer* captureRoot,
-                                            const Matrix& rootToOutput) {
+                                             const Matrix& rootToOutput) {
   auto outset = 0.0f;
   for (auto ancestor = target->parent(); ancestor != nullptr && ancestor != captureRoot;
        ancestor = ancestor->parent()) {

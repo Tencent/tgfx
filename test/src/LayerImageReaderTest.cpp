@@ -1935,8 +1935,8 @@ TGFX_TEST(LayerImageReaderTest, WideBandRemainsCompleteAfterLateHeightSubdivisio
     auto info = reader->bandInfo();
     PixelImage output = {std::vector<uint8_t>(info.byteSize(), 0xcc), Width, Height,
                          info.rowBytes()};
-    auto result = reader->readNextBand(context, Pixmap(info, output.pixels.data()),
-                                       output.pixels.size());
+    auto result =
+        reader->readNextBand(context, Pixmap(info, output.pixels.data()), output.pixels.size());
     ASSERT_EQ(result.code, LayerImageReadCode::BandReady) << result.error.message;
     EXPECT_EQ(result.firstRow, 0);
     EXPECT_EQ(result.rowCount, Height);

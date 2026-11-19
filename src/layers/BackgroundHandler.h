@@ -89,6 +89,15 @@ class BackgroundHandler {
     return nullptr;
   }
 
+  // Returns the rects the layer style sources are recorded against during this pass, or nullptr
+  // when they follow renderRects. Only a capture pass narrows its draw, but the sources it caches
+  // are reused outside those rects, so it records them against the whole captured area instead.
+  // Belongs to the pass rather than to DrawArgs so that a recording which deliberately clears
+  // renderRects to stay complete cannot inherit it by accident. Base class returns nullptr.
+  virtual const std::vector<Rect>* styleSourceRects() const {
+    return nullptr;
+  }
+
   // Returns the index of the last child in parent's children list that should be traversed
   // during the capture pass, or -1 if no children need traversal. BackgroundCapturer overrides
   // this to skip children after the last one with background styles.
@@ -127,8 +136,9 @@ class BackgroundHandler {
 
 class BackgroundCapturer : public BackgroundHandler {
  public:
-  BackgroundCapturer(BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source)
-      : snapshots(snapshots), bgSource(std::move(source)) {
+  BackgroundCapturer(BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source,
+                     const std::vector<Rect>* styleSourceRects)
+      : snapshots(snapshots), bgSource(std::move(source)), _styleSourceRects(styleSourceRects) {
   }
 
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
@@ -149,6 +159,10 @@ class BackgroundCapturer : public BackgroundHandler {
     return _renderRects.empty() ? nullptr : &_renderRects;
   }
 
+  const std::vector<Rect>* styleSourceRects() const override {
+    return _styleSourceRects;
+  }
+
   int lastCaptureChildIndex(const Layer* parent) const override;
 
   const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
@@ -166,11 +180,13 @@ class BackgroundCapturer : public BackgroundHandler {
   }
 
   // Runs a capture pass: replays captureRoot onto bgSource's canvas, populating snapshots. The
-  // replay walks the tree exactly once with renderRects set to the pre-outset world-space dirty
-  // rects. drawLayer culls each layer whose renderBounds does not intersect any of these rects.
+  // replay walks the tree exactly once with renderRects set to the rects the capture actually
+  // samples, so drawLayer culls each layer whose renderBounds does not intersect any of them.
+  // styleSourceRects covers the whole captured area: the layer style sources it caches are reused
+  // outside those cull rects, so they are recorded against this wider set instead.
   static void Run(Layer* captureRoot, const DrawArgs& baseArgs,
                   std::shared_ptr<BackgroundSource> bgSource, BackgroundSnapshotMap* snapshots,
-                  const std::vector<Rect>& renderRects);
+                  const std::vector<Rect>& renderRects, const std::vector<Rect>& styleSourceRects);
 
   // Captures the scene backdrop for a target drawn with explicit export attributes.
   static void RunForTarget(Layer* captureRoot, Layer* target, float alpha, BlendMode blendMode,
@@ -224,6 +240,7 @@ class BackgroundCapturer : public BackgroundHandler {
   };
   const ExportPath* capturePath = nullptr;
   bool capturingHiddenTarget = false;
+  const std::vector<Rect>* _styleSourceRects = nullptr;
   int _forcedCaptureDepth = 0;
   std::optional<Matrix> _captureWorldMatrix = std::nullopt;
 };

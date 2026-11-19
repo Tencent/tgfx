@@ -253,13 +253,17 @@ std::unique_ptr<BackgroundCapturer> BackgroundCapturer::buildSubCapturer(
   if (subSource == nullptr) {
     return nullptr;
   }
-  auto clone = std::make_unique<BackgroundCapturer>(snapshots, std::move(subSource));
+  auto subRect = subSource->getBackgroundRect();
+  // The sources recorded here are cached in the shared map and may be reused by the consume pass
+  // outside this sub surface, so the sub capturer keeps the parent's recording range.
+  auto clone =
+      std::make_unique<BackgroundCapturer>(snapshots, std::move(subSource), _styleSourceRects);
   clone->capturePath = capturePath;
   clone->capturingHiddenTarget = capturingHiddenTarget;
   // Tiled capture and consumption must traverse the same styles, including at offscreen edges.
   if (parentArgs.drawControl == nullptr || parentArgs.renderRects == nullptr ||
       parentArgs.renderRects->empty()) {
-    NarrowRenderRects(parentArgs, clone->bgSource->getBackgroundRect(), &clone->_renderRects);
+    NarrowRenderRects(parentArgs, subRect, &clone->_renderRects);
   }
   // Forced-capture state must propagate so pass-through subtrees still feed the parent bgSource.
   if (isForcedCapture()) {
@@ -672,8 +676,8 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
 
 void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
                              std::shared_ptr<BackgroundSource> bgSource,
-                             BackgroundSnapshotMap* snapshots,
-                             const std::vector<Rect>& renderRects) {
+                             BackgroundSnapshotMap* snapshots, const std::vector<Rect>& renderRects,
+                             const std::vector<Rect>& styleSourceRects) {
   DEBUG_ASSERT(captureRoot != nullptr);
   DEBUG_ASSERT(bgSource != nullptr);
   DEBUG_ASSERT(snapshots != nullptr);
@@ -682,7 +686,7 @@ void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
   }
 
   auto* bgCanvas = bgSource->getCanvas();
-  BackgroundCapturer capturer(snapshots, std::move(bgSource));
+  BackgroundCapturer capturer(snapshots, std::move(bgSource), &styleSourceRects);
   AutoCanvasRestore autoRestore(bgCanvas);
   DrawArgs captureArgs = baseArgs;
   captureArgs.backgroundHandler = &capturer;
@@ -722,7 +726,7 @@ void BackgroundCapturer::RunForTarget(Layer* captureRoot, Layer* target, float a
                                       const std::vector<Rect>& renderRects) {
   auto* hiddenBranch = HiddenBranch(captureRoot, target);
   auto* canvas = bgSource->getCanvas();
-  BackgroundCapturer capturer(snapshots, std::move(bgSource));
+  BackgroundCapturer capturer(snapshots, std::move(bgSource), &renderRects);
   DrawArgs args = baseArgs;
   args.backgroundHandler = &capturer;
   args.renderRects = &renderRects;

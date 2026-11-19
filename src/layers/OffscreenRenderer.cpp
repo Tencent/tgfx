@@ -89,10 +89,10 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
   if (args.backgroundHandler != nullptr && args.backgroundHandler->needsSurface(layer) &&
       args.context != nullptr) {
     if (args.drawControl != nullptr && ExceedsDeviceLimit(args.context, imageClip)) {
-      args.drawControl->fail(
-          DrawFailureCode::SurfaceLimit, DrawStage::Rendering, layer,
-          ISize::Make(FloatSaturateToInt(imageClip.width()), FloatSaturateToInt(imageClip.height())),
-          "an intermediate backdrop surface exceeds the device texture limit");
+      args.drawControl->fail(DrawFailureCode::SurfaceLimit, DrawStage::Rendering, layer,
+                             ISize::Make(FloatSaturateToInt(imageClip.width()),
+                                         FloatSaturateToInt(imageClip.height())),
+                             "an intermediate backdrop surface exceeds the device texture limit");
       return {};
     }
     auto surface =
