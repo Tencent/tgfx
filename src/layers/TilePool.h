@@ -134,6 +134,10 @@ struct TileKeyHash {
  */
 class TilePool {
  public:
+  TilePool() = default;
+  TilePool(const TilePool&) = delete;
+  TilePool& operator=(const TilePool&) = delete;
+
   /**
    * Returns the tile for the key without changing its LRU position, or nullptr if there is none.
    */
