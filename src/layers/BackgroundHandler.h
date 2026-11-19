@@ -68,7 +68,7 @@ class BackgroundHandler {
    * below this value changes no pixel by more than 1/255 (the neighbour weight of a gaussian with
    * sigma 0.3 is 0.0038), so drawing it only costs passes and textures.
    */
-  static constexpr float NegligibleBlurRadius = 0.3f;
+  static constexpr float NegligibleBlurRadius = 0.4f;
 
   /**
    * Debugging switch for comparing the picture and the cost with and without skipping negligible

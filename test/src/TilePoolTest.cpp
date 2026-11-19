@@ -638,15 +638,16 @@ TGFX_TEST(TilePoolTest, BackgroundBlurAtTheThresholdBoundary) {
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
   auto style = BackgroundBlurStyle::Make(6.0f, 2.0f);
-  // The larger of the two blurs decides: 6 * 0.05 = 0.3 is still negligible, a hair more is not.
-  EXPECT_TRUE(BackgroundHandler::IsNegligibleBackgroundStyle(style.get(), 0.05f));
-  EXPECT_FALSE(BackgroundHandler::IsNegligibleBackgroundStyle(style.get(), 0.0501f));
-  EXPECT_FALSE(BackgroundHandler::IsNegligibleBackgroundStyle(nullptr, 0.05f));
+  // The larger of the two blurs decides: 6 * 0.0666 = 0.3996 is still negligible, a hair more
+  // is not.
+  EXPECT_TRUE(BackgroundHandler::IsNegligibleBackgroundStyle(style.get(), 0.0666f));
+  EXPECT_FALSE(BackgroundHandler::IsNegligibleBackgroundStyle(style.get(), 0.0667f));
+  EXPECT_FALSE(BackgroundHandler::IsNegligibleBackgroundStyle(nullptr, 0.0666f));
   // A style without any blur keeps the path it always had.
   auto none = BackgroundBlurStyle::Make(0.0f, 0.0f);
   EXPECT_FALSE(BackgroundHandler::IsNegligibleBackgroundStyle(none.get(), 0.05f));
   BackgroundHandler::SkipNegligibleBlurEnabled() = false;
-  EXPECT_FALSE(BackgroundHandler::IsNegligibleBackgroundStyle(style.get(), 0.05f));
+  EXPECT_FALSE(BackgroundHandler::IsNegligibleBackgroundStyle(style.get(), 0.0666f));
   BackgroundHandler::SkipNegligibleBlurEnabled() = true;
 }
 
