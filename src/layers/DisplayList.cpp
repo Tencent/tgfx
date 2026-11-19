@@ -1168,7 +1168,9 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     if (useFallback && !coverages.empty()) {
       const bool mayRefine = tileTasks->empty();
       const bool gridComplete = missingGrids.empty();
-      // Top up the levels above L from L+2 towards L, only once the grid is complete.
+      // Once the grid is complete, the budget tops up L+2, L+1 and then L itself. L+3 is left to
+      // pass 1. While the grid is incomplete there is no budget here, and only L+2 and L+1 are
+      // checked for pending work.
       auto chainBudget = gridComplete ? std::max(_maxTilesRefinedPerFrame, 0) : 0;
       const auto lowestLevel = gridComplete ? size_t{1} : size_t{2};
       if (mayRefine) {
