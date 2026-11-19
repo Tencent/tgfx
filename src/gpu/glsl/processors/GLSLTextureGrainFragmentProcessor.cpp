@@ -31,7 +31,11 @@ namespace {
 std::string FloatLiteral(float value) {
   std::ostringstream stream;
   stream << std::setprecision(std::numeric_limits<float>::max_digits10) << value;
-  return stream.str();
+  auto result = stream.str();
+  if (result.find_first_of(".eE") == std::string::npos) {
+    result += ".0";
+  }
+  return result;
 }
 
 }  // namespace
