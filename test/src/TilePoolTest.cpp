@@ -542,7 +542,7 @@ struct SkipRun {
 // display list is measured, after an identical throwaway render has filled the texture pools.
 SkipRun RenderPanels(Context* context, float zoom, float sigma, int count, bool skip,
                      float bigSigma = 0.0f, float stripePeriod = 16.0f, float origin = 150.0f) {
-  BackgroundHandler::SkipNegligibleBlurEnabled() = skip;
+  BackgroundHandler::SetSkippingNegligibleBlur(skip);
   auto size = 512;
   auto surface = Surface::Make(context, size, size);
   SkipRun run = {};
@@ -581,7 +581,7 @@ SkipRun RenderPanels(Context* context, float zoom, float sigma, int count, bool 
     displayList->render(surface.get());
     context->flushAndSubmit();
   }
-  BackgroundHandler::SkipNegligibleBlurEnabled() = true;
+  BackgroundHandler::SetSkippingNegligibleBlur(true);
   auto info = ImageInfo::Make(size, size, ColorType::RGBA_8888, AlphaType::Premultiplied);
   run.pixels.resize(static_cast<size_t>(size * size * 4));
   EXPECT_TRUE(surface->readPixels(info, run.pixels.data(), 0, 0));
@@ -646,9 +646,10 @@ TGFX_TEST(TilePoolTest, BackgroundBlurAtTheThresholdBoundary) {
   // A style without any blur keeps the path it always had.
   auto none = BackgroundBlurStyle::Make(0.0f, 0.0f);
   EXPECT_FALSE(BackgroundHandler::IsNegligibleBackgroundStyle(none.get(), 0.05f));
-  BackgroundHandler::SkipNegligibleBlurEnabled() = false;
-  EXPECT_FALSE(BackgroundHandler::IsNegligibleBackgroundStyle(style.get(), 0.0666f));
-  BackgroundHandler::SkipNegligibleBlurEnabled() = true;
+  BackgroundHandler::SetSkippingNegligibleBlur(false);
+  auto skippedWhenDisabled = BackgroundHandler::IsNegligibleBackgroundStyle(style.get(), 0.0666f);
+  BackgroundHandler::SetSkippingNegligibleBlur(true);
+  EXPECT_FALSE(skippedWhenDisabled);
 }
 
 TGFX_TEST(TilePoolTest, ClusterTileRectsGroupsCompactTilesOnly) {

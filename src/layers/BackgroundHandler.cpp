@@ -199,13 +199,18 @@ BackgroundHandler* BackgroundHandler::NoOp() {
   return &instance;
 }
 
-bool& BackgroundHandler::SkipNegligibleBlurEnabled() {
-  static bool enabled = true;
-  return enabled;
+static bool skippingNegligibleBlur = true;
+
+bool BackgroundHandler::IsSkippingNegligibleBlur() {
+  return skippingNegligibleBlur;
+}
+
+void BackgroundHandler::SetSkippingNegligibleBlur(bool enabled) {
+  skippingNegligibleBlur = enabled;
 }
 
 bool BackgroundHandler::IsNegligibleBackgroundStyle(const LayerStyle* style, float densityScale) {
-  if (!SkipNegligibleBlurEnabled() || style == nullptr ||
+  if (!IsSkippingNegligibleBlur() || style == nullptr ||
       style->Type() != LayerStyleType::BackgroundBlur) {
     return false;
   }

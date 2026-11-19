@@ -72,10 +72,15 @@ class BackgroundHandler {
   static constexpr float NegligibleBlurRadius = 0.4f;
 
   /**
-   * Debugging switch for comparing the picture and the cost with and without skipping negligible
-   * background blurs. Enabled by default.
+   * Whether background blurs no larger than NegligibleBlurRadius are skipped. Enabled by default;
+   * the tests switch it off to compare the picture and the cost with and without the skip.
    */
-  static bool& SkipNegligibleBlurEnabled();
+  static bool IsSkippingNegligibleBlur();
+
+  /**
+   * Sets whether background blurs no larger than NegligibleBlurRadius are skipped.
+   */
+  static void SetSkippingNegligibleBlur(bool enabled);
 
   /**
    * Returns true if drawing the style at the given density barely changes the picture, so the
