@@ -9013,4 +9013,45 @@ TGFX_TEST(LayerTest, TiledDirtyRegionOutsideViewport) {
   EXPECT_EQ(pixel, 0xFFFF0000u) << "off-screen tiles kept stale content after scrolling back";
 }
 
+TGFX_TEST(LayerTest, DetachedSubtreeRetainsBackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto scene = Surface::Make(context, 256, 64);
+  auto direct = Surface::Make(context, 64, 64);
+  ASSERT_NE(scene, nullptr);
+  ASSERT_NE(direct, nullptr);
+
+  auto subtree = Layer::Make();
+  subtree->setMatrix(Matrix::MakeTrans(160, 0));
+  auto background = SolidLayer::Make();
+  background->setColor(Color::Red());
+  background->setWidth(32);
+  background->setHeight(64);
+  subtree->addChild(background);
+  auto glass = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(16, 16, 32, 32));
+  glass->setPath(path);
+  glass->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 1)));
+  glass->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
+  subtree->addChild(glass);
+
+  DisplayList displayList;
+  auto root = displayList.root();
+  ASSERT_TRUE(root->addChild(subtree));
+  displayList.render(scene.get());
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  uint8_t attachedPixel[4] = {};
+  ASSERT_TRUE(scene->readPixels(info, attachedPixel, 192, 32));
+  ASSERT_GT(attachedPixel[3], 1);
+
+  ASSERT_EQ(root->removeChildAt(0), subtree);
+  subtree->draw(direct->getCanvas());
+  uint8_t detachedPixel[4] = {};
+  ASSERT_TRUE(direct->readPixels(info, detachedPixel, 32, 32));
+  EXPECT_NEAR(detachedPixel[0], attachedPixel[0], 2);
+  EXPECT_NEAR(detachedPixel[3], attachedPixel[3], 2);
+}
+
 }  // namespace tgfx
