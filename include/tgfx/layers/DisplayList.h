@@ -349,9 +349,8 @@ class DisplayList {
   std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
                                            std::vector<Rect>* skippedRects);
 
-  size_t rasterizeTreeTiles(const Surface* surface, TreeLevelCoverage* coverage,
-                            const std::vector<std::pair<int, int>>& cells,
-                            std::vector<DrawTask>* tileTasks);
+  size_t rasterizeTreeTiles(const Surface* surface, const std::vector<std::pair<int, int>>& cells,
+                            TreeLevelCoverage* coverage, std::vector<DrawTask>* tileTasks);
 
   std::vector<std::shared_ptr<Tile>> getFreeTiles(const Surface* renderSurface, TileType type,
                                                   size_t tileCount);

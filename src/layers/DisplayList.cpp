@@ -1080,8 +1080,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       // instead, so the frame that changes the zoom does not pay for tiles the budget skipped.
       if (!uncoveredRects.empty() && _tileUpdateMode != TileUpdateMode::Fast) {
         auto& coarsest = coverages.back();
-        rasterizeTreeTiles(surface, &coarsest,
-                           CollectMissingTreeTiles(coarsest, uncoveredRects, _tileSize), tileTasks);
+        rasterizeTreeTiles(surface, CollectMissingTreeTiles(coarsest, uncoveredRects, _tileSize),
+                           &coarsest, tileTasks);
       }
       // Pass 2: the budget refines the displayed fallbacks one level at a time, coarse levels
       // first, so the screen sharpens evenly instead of one cell at a time.
@@ -1123,7 +1123,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
           cellsByLevel[candidate.coverageIndex].emplace_back(candidate.tileX, candidate.tileY);
         }
         for (size_t i = 0; i < coverages.size(); ++i) {
-          auto refined = rasterizeTreeTiles(surface, &coverages[i], cellsByLevel[i], tileTasks);
+          auto refined = rasterizeTreeTiles(surface, cellsByLevel[i], &coverages[i], tileTasks);
           refineBudget -= static_cast<int>(refined);
         }
       }
@@ -1160,7 +1160,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
           if (cells.size() > static_cast<size_t>(chainBudget)) {
             cells.resize(static_cast<size_t>(chainBudget));
           }
-          auto refined = rasterizeTreeTiles(surface, &coverage, cells, tileTasks);
+          auto refined = rasterizeTreeTiles(surface, cells, &coverage, tileTasks);
           chainBudget -= static_cast<int>(refined);
         }
       }
@@ -1232,8 +1232,9 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   return screenTasks;
 }
 
-size_t DisplayList::rasterizeTreeTiles(const Surface* surface, TreeLevelCoverage* coverage,
+size_t DisplayList::rasterizeTreeTiles(const Surface* surface,
                                        const std::vector<std::pair<int, int>>& cells,
+                                       TreeLevelCoverage* coverage,
                                        std::vector<DrawTask>* tileTasks) {
   if (cells.empty()) {
     return 0;
