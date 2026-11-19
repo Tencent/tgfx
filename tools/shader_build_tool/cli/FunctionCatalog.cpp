@@ -25,6 +25,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 #include "cli/BuildCommand.h"
@@ -38,7 +39,9 @@ struct CatalogEntry {
   std::vector<std::string>
   requires = {};
   std::string memberPrefix = {};
-  std::vector<std::pair<std::string, std::string>> members = {};
+  std::vector<std::pair<std::string, std::string>> members = {};     // param -> member
+  std::vector<std::pair<std::string, std::string>> sources = {};     // param -> enum override
+  std::vector<std::pair<std::string, std::string>> conditions = {};  // param -> guard
 };
 
 // Drops comments and blank lines from a catalog function (the header ships into the binary).
@@ -104,6 +107,8 @@ bool ParseAnnotatedFunction(const std::string& text, CatalogEntry* entry, std::s
     }
     const std::string functionTag = "//@function ";
     const std::string membersTag = "//@members ";
+    const std::string sourceTag = "//@source ";
+    const std::string whenTag = "//@when ";
     const std::string memberTag = "//@member ";
     const std::string requiresTag = "//@requires ";
     if (line.rfind(functionTag, 0) == 0) {
@@ -133,6 +138,14 @@ bool ParseAnnotatedFunction(const std::string& text, CatalogEntry* entry, std::s
       }
     } else if (line.rfind(membersTag, 0) == 0) {
       entry->memberPrefix = line.substr(membersTag.size());
+    } else if (line.rfind(sourceTag, 0) == 0 || line.rfind(whenTag, 0) == 0) {
+      const bool isSource = line.rfind(sourceTag, 0) == 0;
+      const std::string rest = line.substr(isSource ? sourceTag.size() : whenTag.size());
+      const auto space = rest.find(' ');
+      if (space != std::string::npos) {
+        auto& target = isSource ? entry->sources : entry->conditions;
+        target.emplace_back(rest.substr(0, space), rest.substr(space + 1));
+      }
     } else if (line.rfind(memberTag, 0) == 0) {
       const std::string rest = line.substr(memberTag.size());
       const auto space = rest.find(' ');
@@ -382,7 +395,7 @@ bool WriteFunctionCatalog(const std::string& shaderDir, const std::string& outPa
     }
     const std::string prefix = entry->memberPrefix;
     std::vector<std::string> order = {};
-    std::map<std::string, std::pair<std::string, size_t>> members = {};
+    std::map<std::string, std::tuple<std::string, size_t, std::string, std::string>> members = {};
     for (size_t index = 2; index < params.size(); ++index) {
       const std::string& paramName = params[index].second;
       std::string memberName = prefix + paramName;
@@ -404,22 +417,42 @@ bool WriteFunctionCatalog(const std::string& shaderDir, const std::string& outPa
         *error = entry->name + ": unsupported parameter type " + params[index].first;
         return false;
       }
+      std::string enumName = BindingSourceOf(memberName, prefix);
+      std::string guard = {};
+      for (const auto& source : entry->sources) {
+        if (source.first == paramName) {
+          enumName = source.second;
+        }
+      }
+      for (const auto& condition : entry->conditions) {
+        if (condition.first == paramName) {
+          guard = condition.second;
+        }
+      }
       auto found = members.find(memberName);
       if (found == members.end()) {
         order.push_back(memberName);
-        members.emplace(memberName, std::make_pair(std::string(fragmentType), count));
-      } else if (count > found->second.second) {
-        found->second.second = count;
+        members.emplace(memberName,
+                        std::make_tuple(std::string(fragmentType), count, enumName, guard));
+      } else if (count > std::get<1>(found->second)) {
+        std::get<1>(found->second) = count;
       }
     }
     for (const auto& memberName : order) {
       const auto& info = members[memberName];
-      registry << "  registry->uniform(\"" << memberName << "\", FragmentType::" << info.first
-               << ", ChainBindingSource::" << BindingSourceOf(memberName, prefix) << ", -1";
-      if (info.second > 1) {
-        registry << ", " << info.second;
+      if (!std::get<3>(info).empty()) {
+        registry << "  if (" << std::get<3>(info) << ") {\n";
+      }
+      registry << (std::get<3>(info).empty() ? "  " : "    ") << "registry->uniform(\""
+               << memberName << "\", FragmentType::" << std::get<0>(info)
+               << ", ChainBindingSource::" << std::get<2>(info) << ", -1";
+      if (std::get<1>(info) > 1) {
+        registry << ", " << std::get<1>(info);
       }
       registry << ");\n";
+      if (!std::get<3>(info).empty()) {
+        registry << "  }\n";
+      }
     }
   }
   const std::filesystem::path registryPath =

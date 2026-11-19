@@ -3,6 +3,8 @@
 //@member layoutType GradientLayoutType
 //@member colorizerKind GradientColorizerKind
 //@member lutLeaf GradientLUTLeaf
+//@source lutLeaf GradientLutLeaf
+//@when lutLeaf lutForm
 //@member scale0 Gradient_scales[0]
 //@member scale1 Gradient_scales[1]
 //@member scale2 Gradient_scales[2]
