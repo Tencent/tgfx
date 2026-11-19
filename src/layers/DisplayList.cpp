@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
-#include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include "core/utils/DecomposeRects.h"
@@ -36,7 +35,6 @@
 #include "layers/RootLayer.h"
 #include "layers/TilePool.h"
 #include "tgfx/gpu/GPU.h"
-#include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 
 namespace tgfx {
 static constexpr size_t MAX_DIRTY_REGION_FRAMES = 5;

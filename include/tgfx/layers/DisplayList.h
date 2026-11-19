@@ -19,7 +19,6 @@
 #pragma once
 
 #include <deque>
-#include <unordered_map>
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
 
