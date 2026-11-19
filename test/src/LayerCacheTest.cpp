@@ -734,6 +734,11 @@ TGFX_TEST_PRIVATE(LayerCacheTest, DirtyRegionTest) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerCacheTest/DirtyRegionTest7"));
 
+  // Fill the fallback levels first, so the zoom below shows the same tree tiles whatever the
+  // default budget is, then cap the budget so that frame rasterizes nothing of its own and only
+  // displays what was prepared.
+  displayList->setMaxTilesRefinedPerFrame(INT_MAX);
+  displayList->render(surface.get());
   // Clear the previous dirty regions.
   displayList->showDirtyRegions(false);
   displayList->showDirtyRegions(true);
