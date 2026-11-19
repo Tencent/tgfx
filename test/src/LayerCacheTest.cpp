@@ -730,10 +730,6 @@ TGFX_TEST_PRIVATE(LayerCacheTest, DirtyRegionTest) {
   // Clear the previous dirty regions.
   displayList->showDirtyRegions(false);
   displayList->showDirtyRegions(true);
-  // A pan leaves every grid tile in place, so nothing has to be rasterized for it. The idle
-  // refinement of the tree levels is a separate matter: pin the budget so this case keeps
-  // checking that panning alone dirties nothing.
-  displayList->setMaxTilesRefinedPerFrame(0);
   displayList->setContentOffset(-100, -300);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerCacheTest/DirtyRegionTest7"));
