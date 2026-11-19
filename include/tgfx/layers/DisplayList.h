@@ -68,33 +68,32 @@ enum class RenderMode {
 
 /**
  * TileUpdateMode defines how missing tiles are produced in tiled rendering mode when the
- * zoomScale changes or when the viewport scrolls into uncached regions. Tiled rendering keeps two
- * kinds of tiles: grid tiles, rasterized at the current zoomScale, and tree tiles, rasterized at
- * power-of-two scales and therefore reusable across zoom scales. A frame with no grid tile left to
- * rasterize tops the tree levels up, so a later zoom already has a fallback to show.
+ * zoomScale changes or when the viewport scrolls into uncached regions. A missing tile either
+ * shows a fallback, which is a coarser rendering of the same content prepared ahead of time and
+ * therefore still usable after the zoom changes, or is rasterized at the current zoomScale. A
+ * frame with nothing left to rasterize prepares fallbacks for later zoom instead.
  */
 enum class TileUpdateMode {
   /**
-   * Grid tiles are rasterized at the current zoomScale within the same frame, and tree tiles are
+   * Missing tiles are rasterized at the current zoomScale within the same frame, and fallbacks are
    * not used. This produces the highest visual fidelity but may cause frame drops during heavy zoom
    * or pan. This is the default mode.
    */
   Immediate,
 
   /**
-   * A missing grid tile shows the tree tile covering it as a temporary stand-in, which produces
-   * brief zoom blur, and the grid tiles fill in over the following frames at most
-   * setMaxTilesRefinedPerFrame() per frame to keep the frame rate stable. A grid tile no tree tile
-   * covers yet is rasterized at the coarsest tree level within the same frame, so the screen always
-   * shows content.
+   * A missing tile shows the fallback covering it as a temporary stand-in, which produces brief
+   * zoom blur, and the tiles at the current zoomScale fill in over the following frames at most
+   * setMaxTilesRefinedPerFrame() per frame to keep the frame rate stable. An area no fallback
+   * covers yet is rasterized within the same frame, so the screen always shows content.
    */
   Smooth,
 
   /**
-   * Same as Smooth, except that a grid tile no tree tile covers yet is left as the background
-   * color instead of being rasterized in the same frame. Combined with the
-   * setMaxTilesRefinedPerFrame() cap this keeps the frame rate stable during heavy zoom or pan at
-   * the cost of longer-lasting blur or background-colored regions.
+   * Same as Smooth, except that an area no fallback covers yet keeps the background color instead
+   * of being rasterized in the same frame. Combined with the setMaxTilesRefinedPerFrame() cap this
+   * keeps the frame rate stable during heavy zoom or pan at the cost of longer-lasting blur or
+   * background-colored regions.
    */
   Fast
 };
@@ -219,12 +218,11 @@ class DisplayList {
   /**
    * Returns the per-frame budget for rasterizing missing tiles. This setting only applies in
    * tiled rendering mode and is ignored when tileUpdateMode() is TileUpdateMode::Immediate. While
-   * the viewport stays still, the budget rasterizes the missing grid tiles and tops the tree levels
-   * up. While it zooms or pans, the budget instead refines the displayed tree tiles one
-   * power-of-two level at a time, coarse levels first. Tree tiles rasterized because nothing covers
-   * a missing grid tile do not count against the budget in TileUpdateMode::Smooth. Higher values
-   * fill the screen faster during zoom and pan at the cost of per-frame GPU load; lower values
-   * prioritize stable frame rate.
+   * the viewport stays still, the budget rasterizes the missing tiles and prepares fallbacks for
+   * later zoom. While it zooms or pans, the budget instead sharpens the displayed fallbacks one
+   * step at a time, coarse first. Fallbacks rasterized because nothing covers a missing tile do not
+   * count against the budget in TileUpdateMode::Smooth. Higher values fill the screen faster during
+   * zoom and pan at the cost of per-frame GPU load; lower values prioritize stable frame rate.
    */
   int maxTilesRefinedPerFrame() const {
     return _maxTilesRefinedPerFrame;
