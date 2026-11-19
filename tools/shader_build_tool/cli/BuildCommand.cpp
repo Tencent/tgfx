@@ -430,7 +430,57 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
     return text;
   };
   // A dependency entry packs its includes resolved, for the same reason the fragment sources do.
-  auto readExpanded = [&options](const char* path) {
+  // Strips comments and blank lines from a shader source before it enters the pack: the text ships
+  // to the bundle and gets compiled, so a comment is pure payload. `#pragma` lines survive (the
+  // spec-injection pass rewrites them), and string literals do not exist in GLSL.
+  auto stripComments = [](const std::string& text) {
+    std::string out;
+    out.reserve(text.size());
+    bool inBlock = false;
+    for (size_t i = 0; i < text.size(); ++i) {
+      const char c = text[i];
+      const char next = i + 1 < text.size() ? text[i + 1] : '\0';
+      if (inBlock) {
+        if (c == '*' && next == '/') {
+          inBlock = false;
+          ++i;
+        }
+        continue;
+      }
+      if (c == '/' && next == '/') {
+        while (i + 1 < text.size() && text[i] != '\n') {
+          ++i;
+        }
+        continue;
+      }
+      if (c == '/' && next == '*') {
+        inBlock = true;
+        ++i;
+        continue;
+      }
+      out.push_back(c);
+    }
+    std::string compact;
+    compact.reserve(out.size());
+    size_t lineStart = 0;
+    while (lineStart <= out.size()) {
+      size_t lineEnd = out.find('\n', lineStart);
+      if (lineEnd == std::string::npos) {
+        lineEnd = out.size();
+      }
+      const std::string line = out.substr(lineStart, lineEnd - lineStart);
+      if (line.find_first_not_of(" \t\r") != std::string::npos) {
+        compact += line;
+        compact.push_back('\n');
+      }
+      if (lineEnd == out.size()) {
+        break;
+      }
+      lineStart = lineEnd + 1;
+    }
+    return compact;
+  };
+  auto readExpanded = [&options, &stripComments](const char* path) {
     const std::string raw = [&] {
       std::ifstream file(std::string(options.shaderDir) + "/" + path, std::ios::binary);
       if (!file.is_open()) {
@@ -444,7 +494,7 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       return raw;
     }
     std::string expandError;
-    return ExpandStageIncludes(raw, options.shaderDir, &expandError);
+    return stripComments(ExpandStageIncludes(raw, options.shaderDir, &expandError));
   };
   std::vector<std::pair<ShaderProfile, std::unique_ptr<ProfileEmitter>>> emitters;
   for (auto profile : options.backends) {
@@ -520,7 +570,8 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       // lines (the resource evaluators, the xp blend table) that a driver cannot consume, and the
       // shared sub-files' include guards keep the expanded copies from colliding.
       std::string expandError;
-      const auto expanded = ExpandStageIncludes(buffer.str(), options.shaderDir, &expandError);
+      const auto expanded =
+          stripComments(ExpandStageIncludes(buffer.str(), options.shaderDir, &expandError));
       if (expanded.empty()) {
         RecordBuildError(&report->diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
                          fragment->functionName, profileTag, -1, -1,
@@ -585,14 +636,14 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       payload.blob.assign(text.begin(), text.end());
       report->composedByTag[profileTag].push_back(std::move(payload));
     };
-    auto readFile = [&options](const char* path) {
+    auto readFile = [&options, &stripComments](const char* path) {
       std::ifstream file(std::string(options.shaderDir) + "/" + path, std::ios::binary);
       if (!file.is_open()) {
         return std::string();
       }
       std::ostringstream buffer;
       buffer << file.rdbuf();
-      return buffer.str();
+      return stripComments(buffer.str());
     };
     addEntry(FragmentPackTail, "ChainTail", readFile("entry/ChainTail.glsl"));
     addEntry(FragmentPackDepAnalyticClipMath, "AnalyticClipMath",
@@ -601,7 +652,7 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
              readExpanded("source/texture_read_swizzle.inc"));
     addEntry(FragmentPackDepTextureSampling, "TextureSampling",
              readExpanded("source/texture_sampling.inc"));
-    auto readXp = [&options](int hasXp) {
+    auto readXp = [&options, &stripComments](int hasXp) {
       const std::string raw = "#define HAS_XP " + std::to_string(hasXp) +
                               "\n#define TGFX_DECLARED_CHAIN 1\n#include "
                               "\"pipeline/chain/pointwise_xp_support.inc\"\n";
@@ -691,7 +742,7 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         text = std::move(out);
       };
       stripFolded();
-      return text;
+      return stripComments(text);
     };
     addEntry(FragmentPackXpDstTexture, "XpDstTexture", readXp(1));
     addEntry(FragmentPackXpFramebufferFetch, "XpFramebufferFetch", readXp(2));
