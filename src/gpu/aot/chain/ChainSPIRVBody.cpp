@@ -20,7 +20,9 @@
 // The linking route exists only where Vulkan does: the SPIRV-Tools sources the runtime links
 // against are built for the Vulkan configuration alone. Other backends get the declining stubs
 // below, so the creator's Vulkan branch collapses to its fallback.
-#if defined(TGFX_USE_VULKAN)
+// The runtime link route serves both link-less backends: Vulkan links the module pairs into a
+// binary module, Metal links the same modules and then translates the result to MSL.
+#if defined(TGFX_USE_VULKAN) || defined(TGFX_USE_METAL)
 
 #include <algorithm>
 #include <cstring>
@@ -58,6 +60,8 @@ enum : uint16_t {
   kOpLoad = 61,
   kOpStore = 62,
   kOpAccessChain = 65,
+  kOpName = 5,
+  kOpMemberName = 6,
   kOpDecorate = 71,
   kOpMemberDecorate = 72,
   kOpVectorShuffle = 79,
@@ -96,10 +100,11 @@ enum : uint32_t { kStorageUniform = 2, kStorageUniformConstant = 0, kStorageFunc
 // module. The writer routes each instruction into its section as it is emitted, so the emission
 // code can interleave types and decorations freely.
 struct Writer {
-  std::vector<uint32_t> pre = {};   // capabilities and the memory model
-  std::vector<uint32_t> ann = {};   // decorations
-  std::vector<uint32_t> decl = {};  // types, constants, variables
-  std::vector<uint32_t> func = {};  // functions
+  std::vector<uint32_t> pre = {};    // capabilities and the memory model
+  std::vector<uint32_t> debug = {};  // names
+  std::vector<uint32_t> ann = {};    // decorations
+  std::vector<uint32_t> decl = {};   // types, constants, variables
+  std::vector<uint32_t> func = {};   // functions
   std::vector<uint32_t>* sink = &pre;
   uint32_t nextId = 1;
 
@@ -122,13 +127,14 @@ struct Writer {
 
   void Finish(std::vector<uint32_t>* out) const {
     out->clear();
-    out->reserve(5 + pre.size() + ann.size() + decl.size() + func.size());
+    out->reserve(5 + pre.size() + debug.size() + ann.size() + decl.size() + func.size());
     out->push_back(0x07230203u);
     out->push_back(0x00010000u);  // SPIR-V 1.0, the op modules' version
     out->push_back(0);
     out->push_back(nextId);
     out->push_back(0);
     out->insert(out->end(), pre.begin(), pre.end());
+    out->insert(out->end(), debug.begin(), debug.end());
     out->insert(out->end(), ann.begin(), ann.end());
     out->insert(out->end(), decl.begin(), decl.end());
     out->insert(out->end(), func.begin(), func.end());
@@ -769,6 +775,40 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     operands.insert(operands.end(), memberTypes.begin(), memberTypes.end());
     return operands;
   }());
+  // The block carries its name: Vulkan binds by number, but Metal's pipeline matches the
+  // uniform block by the name the shader declares, so an anonymous struct would read an
+  // unbound buffer.
+  writer.Sink(&writer.debug);
+  writer.Inst(kOpName, [&] {
+    std::vector<uint32_t> operands = {state.structId};
+    std::string padded = FragmentUniformBlockName;
+    padded.push_back('\0');
+    while (padded.size() % 4 != 0) {
+      padded.push_back('\0');
+    }
+    std::vector<uint32_t> nameWords(padded.size() / 4, 0);
+    std::memcpy(nameWords.data(), padded.data(), padded.size());
+    operands.insert(operands.end(), nameWords.begin(), nameWords.end());
+    return operands;
+  }());
+  for (size_t index = 0; index < plan.uniforms.size(); ++index) {
+    const std::string& memberName = plan.uniforms[index].name;
+    if (memberName.empty()) {
+      continue;
+    }
+    writer.Inst(kOpMemberName, [&] {
+      std::vector<uint32_t> operands = {state.structId, static_cast<uint32_t>(index)};
+      std::string padded = memberName;
+      padded.push_back('\0');
+      while (padded.size() % 4 != 0) {
+        padded.push_back('\0');
+      }
+      std::vector<uint32_t> nameWords(padded.size() / 4, 0);
+      std::memcpy(nameWords.data(), padded.data(), padded.size());
+      operands.insert(operands.end(), nameWords.begin(), nameWords.end());
+      return operands;
+    }());
+  }
   writer.Sink(&writer.ann);
   writer.Inst(kOpDecorate, {state.structId, kDecorationBlock});
   for (size_t index = 0; index < plan.uniforms.size(); ++index) {
@@ -1385,7 +1425,7 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
 
 }  // namespace tgfx
 
-#else  // TGFX_USE_VULKAN
+#else  // TGFX_USE_VULKAN || TGFX_USE_METAL
 
 namespace tgfx {
 
@@ -1418,4 +1458,4 @@ bool EmitChainBodySPIRV(const ChainProgramPlan&, const Layout&, std::vector<uint
 
 }  // namespace tgfx
 
-#endif  // TGFX_USE_VULKAN
+#endif  // TGFX_USE_VULKAN || TGFX_USE_METAL

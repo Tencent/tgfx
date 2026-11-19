@@ -22,7 +22,6 @@
 #include <climits>
 #include <cstdlib>
 #include <cstring>
-#include <fstream>
 #include <vector>
 #include "core/utils/Log.h"
 #include "gpu/ContextInternal.h"
@@ -33,6 +32,7 @@
 #include "gpu/aot/chain/ChainBodyEmitter.h"
 #include "gpu/aot/chain/ChainProgramEmit.h"
 #include "gpu/aot/chain/ChainSPIRVBody.h"
+#include "gpu/aot/chain/ChainSPIRVToMSL.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/plan/ChainBindingWriter.h"
@@ -87,7 +87,8 @@ static void AppendAssembledChainKey(Context* context, const ProgramInfo& info,
   }
   auto cache = ContextCacheAccess::Cache(context);
   const auto payloadFormat = SpecFormatForBackend(context->backend(), cache->payloadFormat());
-  if (payloadFormat != ShaderCodeFormat::GLSL && payloadFormat != ShaderCodeFormat::SPIRV) {
+  if (payloadFormat != ShaderCodeFormat::GLSL && payloadFormat != ShaderCodeFormat::SPIRV &&
+      payloadFormat != ShaderCodeFormat::METALLIB && payloadFormat != ShaderCodeFormat::MSL) {
     return;
   }
   const bool xpPass =
@@ -378,8 +379,9 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   bool assembledAttempt = false;
   ChainBindings chainBindings = {};
   const bool assembledVulkan = format == ShaderCodeFormat::SPIRV;
+  const bool assembledMetal = format == ShaderCodeFormat::METALLIB;
   if (allowComposed && AssembledChainEnabled() &&
-      (format == ShaderCodeFormat::GLSL || assembledVulkan) &&
+      (format == ShaderCodeFormat::GLSL || assembledVulkan || assembledMetal) &&
       strcmp(Families()[variant.family].name, "Chain") == 0) {
     const auto* assembledSources = programInfo->getSources();
     if (assembledSources != nullptr && assembledSources->chain != nullptr) {
@@ -388,7 +390,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
                                               static_cast<int>(programInfo->getBlendMode()));
       const ChainComposition composition =
           DescribeChainComposition(*assembledSources->chain, xpPass);
-      if (assembledVulkan) {
+      if (assembledVulkan || assembledMetal) {
         // The linking route: the precompiled frame's entry calls a body emitted here, linked
         // with the op modules the plan reaches. Shapes outside the linkable slice keep the
         // interpreter's precompiled payload.
@@ -448,14 +450,33 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
                 std::vector<uint32_t> linked = {};
                 std::string linkError;
                 if (modulesOk && LinkChainSPIRV(modules, &linked, &linkError)) {
-                  assembledAttempt = true;
-                  chainBindings = plan.bindings;
-                  const auto* linkedBytes = reinterpret_cast<const uint8_t*>(linked.data());
-                  fragmentDesc.binaryData.assign(linkedBytes,
-                                                 linkedBytes + linked.size() * sizeof(uint32_t));
-                  fragmentDesc.code.clear();
-                  LOGI("AssembledChain: linked Vulkan entry for %s[variant=%u] (%zu modules)",
-                       shaderName, variantId, modules.size());
+                  if (assembledMetal) {
+                    // Metal has no binary linker: the linked module is translated to MSL and the
+                    // driver compiles it at pipeline creation (the module cache keys it like any
+                    // other precompiled payload).
+                    std::string msl = {};
+                    std::string mslError = {};
+                    if (TranslateChainSPIRVToMSL(linked, &msl, &mslError)) {
+                      assembledAttempt = true;
+                      chainBindings = plan.bindings;
+                      fragmentDesc.code = std::move(msl);
+                      fragmentDesc.format = ShaderCodeFormat::MSL;
+                      LOGI("AssembledChain: translated Metal entry for %s[variant=%u]",
+                           shaderName, variantId);
+                    } else {
+                      LOGE("AssembledChain: Metal translation declined for %s[variant=%u]: %s",
+                           shaderName, variantId, mslError.c_str());
+                    }
+                  } else {
+                    assembledAttempt = true;
+                    chainBindings = plan.bindings;
+                    const auto* linkedBytes = reinterpret_cast<const uint8_t*>(linked.data());
+                    fragmentDesc.binaryData.assign(linkedBytes,
+                                                   linkedBytes + linked.size() * sizeof(uint32_t));
+                    fragmentDesc.code.clear();
+                    LOGI("AssembledChain: linked Vulkan entry for %s[variant=%u] (%zu modules)",
+                         shaderName, variantId, modules.size());
+                  }
                 } else if (modulesOk) {
                   LOGE("AssembledChain: Vulkan link declined for %s[variant=%u]: %s", shaderName,
                        variantId, linkError.c_str());

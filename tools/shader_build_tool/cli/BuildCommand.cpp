@@ -708,7 +708,9 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
   // from the same sources the text pack ships (a dummy entry forces glslang to emit the function;
   // the surgery then strips the entry and exports the operator for linking).
   for (const auto& emitterEntry : emitters) {
-    if (emitterEntry.first != ShaderProfile::Vulkan) {
+    if (emitterEntry.first != ShaderProfile::Vulkan && emitterEntry.first != ShaderProfile::Metal) {
+      // The composed payloads are SPIR-V: Vulkan links them, Metal links and translates them to
+      // MSL at draw time, so both profiles carry the same pool.
       continue;
     }
     const std::string profileTag = ProfileTag(emitterEntry.first);

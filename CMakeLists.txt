@@ -782,7 +782,7 @@ target_include_directories(tgfx PRIVATE ${TGFX_INCLUDES} third_party/zstd/lib)
 if (TGFX_USE_VULKAN)
     target_include_directories(tgfx SYSTEM PRIVATE third_party/VulkanMemoryAllocator/include)
 endif ()
-if (TGFX_USE_VULKAN AND NOT TGFX_USE_WEBGPU)
+if ((TGFX_USE_VULKAN OR TGFX_USE_METAL) AND NOT TGFX_USE_WEBGPU)
     # The Vulkan assembled path links precompiled op modules into a runtime-emitted body at draw
     # time. The linker lives in the vendored SPIRV-Tools source (the prebuilt shaderc archives
     # carry its optimizer but not the linker), so the tree is built here for the runtime. WebGPU
@@ -793,6 +793,15 @@ if (TGFX_USE_VULKAN AND NOT TGFX_USE_WEBGPU)
     add_subdirectory(third_party/shaderc/third_party/spirv-tools EXCLUDE_FROM_ALL)
     target_link_libraries(tgfx PUBLIC SPIRV-Tools-link SPIRV-Tools-opt SPIRV-Tools)
     target_include_directories(tgfx SYSTEM PUBLIC third_party/shaderc/third_party/spirv-tools/include)
+endif ()
+if (TGFX_USE_METAL)
+    # The Metal assembled path links the same precompiled modules at draw time and translates the
+    # linked module to MSL with the vendored SPIRV-Cross (the tool's own dependency).
+    target_include_directories(tgfx SYSTEM PRIVATE third_party/SPIRV-Cross)
+    add_vendor_target(tgfx-metal-vendor STATIC_VENDORS SPIRV-Cross)
+    add_dependencies(tgfx tgfx-metal-vendor)
+    find_vendor_libraries(tgfx-metal-vendor STATIC TGFX_METAL_VENDOR_LIBS)
+    target_link_libraries(tgfx PUBLIC ${TGFX_METAL_VENDOR_LIBS})
 endif ()
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS} "$<TARGET_FILE:tgfx_zstd>")
 target_link_libraries(tgfx PUBLIC ${TGFX_SHARED_LIBS})
