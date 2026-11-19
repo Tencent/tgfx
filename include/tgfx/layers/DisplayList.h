@@ -404,8 +404,9 @@ class DisplayList {
    * the snapshot density matches the tile it is drawn into. The layers drawn are culled to the
    * footprints those styles sample inside it.
    */
-  std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(
-      Surface* surface, const std::vector<Rect>& renderRects, const Matrix& viewMatrix) const;
+  std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(Surface* surface,
+                                                            const std::vector<Rect>& renderRects,
+                                                            const Matrix& viewMatrix) const;
 
   void updateMousePosition();
 };

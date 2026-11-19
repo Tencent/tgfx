@@ -223,8 +223,8 @@ TGFX_TEST_PRIVATE(TilePoolTest, FallbackLevelsFillAfterTheExactTiles) {
     // Once the grid is complete the remaining frames only top up the fallback levels, two tiles at
     // a time.
     TGFX_PRIVATE_ACCESS(auto count = displayList->tilePool->size(TileType::Tree);
-                        EXPECT_GE(count, treeTiles); if (displayList->tilePool->size(
-                                                           TileType::Grid) == 4u) {
+                        EXPECT_GE(count, treeTiles);
+                        if (displayList->tilePool->size(TileType::Grid) == 4u) {
                           EXPECT_LE(count - treeTiles, 2u);
                         } treeTiles = count);
   }
@@ -232,11 +232,10 @@ TGFX_TEST_PRIVATE(TilePoolTest, FallbackLevelsFillAfterTheExactTiles) {
   auto level = GetTileLevel(0.7f);
   // L+2 and L+1 are what the next zoom-in uses as its own L+3 and L+2, and they are filled whether
   // or not the idle fill goes all the way down to L.
-  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 4u);
-                      EXPECT_NE(displayList->tilePool->find(TileKey::MakeTree(0, 0, level + 1)),
-                                nullptr);
-                      EXPECT_NE(displayList->tilePool->find(TileKey::MakeTree(0, 0, level + 2)),
-                                nullptr));
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 4u);
+      EXPECT_NE(displayList->tilePool->find(TileKey::MakeTree(0, 0, level + 1)), nullptr);
+      EXPECT_NE(displayList->tilePool->find(TileKey::MakeTree(0, 0, level + 2)), nullptr));
 }
 
 TGFX_TEST_PRIVATE(TilePoolTest, FallbackLevelsKeepTheLoopAliveOnDirtyFrames) {
@@ -458,20 +457,18 @@ TGFX_TEST_PRIVATE(TilePoolTest, BlankGridTilesTakeNoSlot) {
   displayList->render(surface.get());
   EXPECT_EQ(ReadPixel(surface, 100, 100), OPAQUE_RED);
   EXPECT_EQ(ReadPixel(surface, 400, 100), OPAQUE_WHITE);
-  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 2u);
-                      EXPECT_EQ(displayList->blankTiles->size(), 2u);
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 2u);
+      EXPECT_EQ(displayList->blankTiles->size(), 2u);
 
-  displayList->render(surface.get());
-  EXPECT_EQ(ReadPixel(surface, 400, 100), OPAQUE_WHITE);
+      displayList->render(surface.get()); EXPECT_EQ(ReadPixel(surface, 400, 100), OPAQUE_WHITE);
 
-  // New content in a blank cell must show up, so the edit has to clear the mark.
-  auto blue = MakeSolid(100, 100, Color::Blue());
-  blue->setMatrix(Matrix::MakeTrans(300, 0));
-  displayList->root()->addChild(blue);
-  displayList->render(surface.get());
-  EXPECT_EQ(ReadPixel(surface, 350, 50), OPAQUE_BLUE);
-  EXPECT_EQ(ReadPixel(surface, 600, 100), OPAQUE_WHITE);
-  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->blankTiles->size(), 1u));)
+      // New content in a blank cell must show up, so the edit has to clear the mark.
+      auto blue = MakeSolid(100, 100, Color::Blue());
+      blue->setMatrix(Matrix::MakeTrans(300, 0)); displayList->root()->addChild(blue);
+      displayList->render(surface.get()); EXPECT_EQ(ReadPixel(surface, 350, 50), OPAQUE_BLUE);
+      EXPECT_EQ(ReadPixel(surface, 600, 100), OPAQUE_WHITE);
+      TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->blankTiles->size(), 1u));)
 }
 
 TGFX_TEST_PRIVATE(TilePoolTest, BlankTreeTilesCoverViewport) {
@@ -499,8 +496,8 @@ TGFX_TEST_PRIVATE(TilePoolTest, BlankTreeTilesCoverViewport) {
   EXPECT_EQ(ReadPixel(surface, 256, 256), OPAQUE_WHITE);
   TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tilePool->size(TileType::Tree), 0u);
 
-  displayList->render(surface.get());
-  EXPECT_EQ(ReadPixel(surface, 256, 256), OPAQUE_WHITE);)
+                      displayList->render(surface.get());
+                      EXPECT_EQ(ReadPixel(surface, 256, 256), OPAQUE_WHITE);)
 }
 
 TGFX_TEST_PRIVATE(TilePoolTest, MovingViewportRefinesCoarseLevelsFirst) {
@@ -652,7 +649,6 @@ TGFX_TEST(TilePoolTest, BackgroundBlurAtTheThresholdBoundary) {
   EXPECT_FALSE(BackgroundHandler::IsNegligibleBackgroundStyle(style.get(), 0.05f));
   BackgroundHandler::SkipNegligibleBlurEnabled() = true;
 }
-
 
 TGFX_TEST(TilePoolTest, ClusterTileRectsGroupsCompactTilesOnly) {
   auto tile = [](int x, int y) {
