@@ -1746,6 +1746,9 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
       drawChild(args, canvas, child.get(), alpha, &Layer::drawLayer);
     }
   }
+  // Returning false makes the caller skip Above styles and foreground: they paint after the child
+  // whose backdrop is being read, whether the walk is truncated by stopChild (the background walk
+  // only wants content before it) or by the handler's range.
   return stopChild == nullptr && range.drawTrailingContent;
 }
 

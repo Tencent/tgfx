@@ -39,7 +39,10 @@ class Surface;
 struct LayerStyleSource;
 
 struct LayerChildRange {
+  // Index of the last child to visit, or -1 to visit none.
   int lastIndex = -1;
+  // When false, the parent skips its Above styles and foreground, and every child in the range,
+  // including the last one, is drawn through BackgroundHandler::drawChild.
   bool drawTrailingContent = true;
 };
 
@@ -107,7 +110,9 @@ class BackgroundHandler {
   virtual LayerChildRange childRange(const Layer* parent) const;
 
   // Draws a child whose descendants must be visited or whose parent has a truncated range.
-  // The final child of a full range uses the layer's normal draw path directly.
+  // The final child of a full range uses the layer's normal draw path directly, so this is only
+  // called when forceDescendants is true or the range is truncated. A subclass that intercepts a
+  // specific child must return drawTrailingContent = false from childRange for its parent.
   virtual void drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent, Layer* child,
                          float alpha, bool forceDescendants);
 
