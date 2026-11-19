@@ -639,7 +639,8 @@ TGFX_TEST(TilePoolTest, SkippingNegligibleBackgroundBlurKeepsThePicture) {
   auto on = RenderPanels(context, 0.05f, 4.0f, 40, true);
   auto off = RenderPanels(context, 0.05f, 4.0f, 40, false);
   // Every style in the frame is below the threshold, so the capture is elided; the picture changes by
-  // at most a few levels of 255.
+  // at most a few levels of 255. The fine stripes average out at this zoom, so even a lost blur
+  // stays within that bound; the pixel boundary test below is the strict check.
   EXPECT_LE(MaxDifference(on, off), 4);
 }
 
@@ -661,9 +662,12 @@ TGFX_TEST(TilePoolTest, BackgroundBlurAboveTheThresholdIsNotSkipped) {
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
   // sigma 16 at zoom 0.05 is 0.8 pixels of the tile: it must be drawn whether or not skipping is on.
-  auto on = RenderPanels(context, 0.05f, 16.0f, 40, true);
-  auto off = RenderPanels(context, 0.05f, 16.0f, 40, false);
+  // The hard-edged backdrop makes the blur visible, so a blur lost on both paths is caught too.
+  auto on = RenderPanels(context, 0.05f, 16.0f, 40, true, 400.0f, 160.0f);
+  auto off = RenderPanels(context, 0.05f, 16.0f, 40, false, 400.0f, 160.0f);
+  auto none = RenderPanels(context, 0.05f, 0.0f, 40, false, 400.0f, 160.0f);
   EXPECT_EQ(MaxDifference(on, off), 0);
+  EXPECT_GE(MaxDifference(off, none), 32);
 }
 
 TGFX_TEST(TilePoolTest, BackgroundBlurAtTheThresholdBoundary) {
