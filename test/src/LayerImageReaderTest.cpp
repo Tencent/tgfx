@@ -632,8 +632,6 @@ TGFX_TEST(LayerImageReaderTest, PaddedStrideLeavesPaddingUntouched) {
   auto padding = static_cast<size_t>(16);
   auto rowBytes = info.rowBytes() + padding;
   std::vector<uint8_t> pixels(static_cast<size_t>(TestHeight) * rowBytes, 0xcc);
-  auto paddedInfo = ImageInfo::Make(TestWidth, info.height(), info.colorType(), info.alphaType(),
-                                    rowBytes, info.colorSpace());
   int nextRow = 0;
   while (nextRow < TestHeight) {
     auto rows = std::min(info.height(), TestHeight - nextRow);
