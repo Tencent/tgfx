@@ -23,18 +23,34 @@
 
 namespace tgfx {
 
+/**
+ * Cancellation and failure state shared by one strict export draw. The tiled export passes it
+ * through DrawArgs::drawControl so that layer drawing reports failures instead of degrading the
+ * output. The regular display drawing path leaves DrawArgs::drawControl null and keeps its
+ * original silent fallback behavior.
+ */
 struct DrawControl {
   const std::atomic<bool>* cancelRequested = nullptr;
   LayerImageErrorCode error = LayerImageErrorCode::None;
 
+  /**
+   * Returns true if cancellation was requested. A null cancelRequested means the draw cannot be
+   * cancelled.
+   */
   bool cancelled() const {
     return cancelRequested != nullptr && cancelRequested->load();
   }
 
+  /**
+   * Returns true if a failure has been recorded.
+   */
   bool failed() const {
     return error != LayerImageErrorCode::None;
   }
 
+  /**
+   * Records a failure. Only the first error code is kept; later calls are ignored.
+   */
   void fail(LayerImageErrorCode code) {
     if (!failed()) {
       error = code;
