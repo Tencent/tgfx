@@ -1425,7 +1425,8 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, float 
     }
     return true;
   }
-  if (shouldPassThroughBackground(blendMode) || hasBackgroundStyle(alpha)) {
+  if (shouldPassThroughBackground(blendMode) ||
+      (hasBackgroundStyle(alpha) && !canCacheBackgroundSubtree())) {
     return false;
   }
   if (!bitFields.staticSubtree) {
@@ -1468,6 +1469,9 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 
   auto pictureBounds = layerBounds;
   pictureBounds.scale(contentScale, contentScale);
+  if (hasBackgroundStyle(1.0f)) {
+    return createBackgroundSubtreeCacheImage(drawArgs, contentScale, pictureBounds, drawingMatrix);
+  }
   if (!_filters.empty()) {
     auto reverseBounds = mapOutputBoundsToInput(pictureBounds, contentScale);
     pictureBounds.intersect(reverseBounds);
@@ -1501,6 +1505,59 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
   drawingMatrix->preTranslate(offset.x, offset.y);
 
   return image->makeTextureImage(args.context);
+}
+
+std::shared_ptr<Image> Layer::createBackgroundSubtreeCacheImage(const DrawArgs& args,
+                                                                float contentScale,
+                                                                const Rect& imageBounds,
+                                                                Matrix* drawingMatrix) {
+  DEBUG_ASSERT(canCacheBackgroundSubtree());
+  if (args.context == nullptr) {
+    return nullptr;
+  }
+  // The capture runs in global coordinates so that it agrees with renderBounds, which culls the
+  // layers it draws; a projected ancestor would make the global matrix diverge from the drawing.
+  for (auto layer = this; layer != nullptr; layer = layer->_parent) {
+    if (!layer->bitFields.matrix3DIsAffine || layer->canPreserve3D()) {
+      return nullptr;
+    }
+  }
+  auto localToGlobal = getGlobalMatrix().asMatrix();
+  auto globalToLocal = Matrix::I();
+  if (!localToGlobal.invert(&globalToLocal)) {
+    return nullptr;
+  }
+  auto bounds = imageBounds;
+  bounds.roundOut();
+  auto surface =
+      Surface::Make(args.context, static_cast<int>(bounds.width()),
+                    static_cast<int>(bounds.height()), false, 1, false, 0, args.dstColorSpace);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto canvas = surface->getCanvas();
+  canvas->translate(-bounds.left, -bounds.top);
+  canvas->scale(contentScale, contentScale);
+  auto backgroundMatrix = canvas->getMatrix();
+  backgroundMatrix.preConcat(globalToLocal);
+  auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
+  auto bgSource =
+      createBackgroundSource(args.context, surfaceRect, backgroundMatrix, true, args.dstColorSpace);
+  if (bgSource == nullptr) {
+    return nullptr;
+  }
+  BackgroundSnapshotMap snapshots = {};
+  std::vector<Rect> captureRects = {renderBounds};
+  BackgroundCapturer::Run(this, args, std::move(bgSource), &snapshots, captureRects, captureRects,
+                          1.0f, localToGlobal);
+  BackgroundConsumer consumer(&snapshots, false);
+  auto drawArgs = args;
+  drawArgs.backgroundHandler = &consumer;
+  drawDirectly(drawArgs, canvas, 1.0f);
+  drawingMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
+  drawingMatrix->preTranslate(bounds.left, bounds.top);
+  auto image = surface->makeImageSnapshot();
+  return image ? image->makeTextureImage(args.context) : nullptr;
 }
 
 SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
@@ -2143,7 +2200,7 @@ bool Layer::hasValidMask() const {
 }
 
 void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty,
-                               float alpha) {
+                               float alpha, bool ancestorSamplesBackground) {
   const auto accumulatedAlpha = alpha * _alpha;
   if (!forceDirty && !bitFields.dirtyDescendents) {
     if (maxBackgroundOutset > 0 || bitFields.hasBlendMode) {
@@ -2252,7 +2309,8 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       childTransformer = RegionTransformer::MakeFromClip(*clipRect, std::move(childTransformer));
     }
     auto childForceDirty = forceDirty || child->bitFields.dirtyTransform;
-    child->updateRenderBounds(std::move(childTransformer), childForceDirty, accumulatedAlpha);
+    child->updateRenderBounds(std::move(childTransformer), childForceDirty, accumulatedAlpha,
+                              ancestorSamplesBackground || hasOwnBackgroundStyle(accumulatedAlpha));
     child->bitFields.dirtyTransform = false;
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);
@@ -2313,6 +2371,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       (content && content->hasBlendMode())) {
     bitFields.hasBlendMode = true;
   }
+  updateBackgroundCoverage(accumulatedAlpha, ancestorSamplesBackground);
   propagateLayerState();
   bitFields.dirtyDescendents = false;
 }
@@ -2433,6 +2492,118 @@ std::shared_ptr<BackgroundSource> Layer::createBackgroundSource(
   auto scale = viewMatrix.getMaxScale();
   return BackgroundSource::Make(context, drawRect, maxBackgroundOutset * scale,
                                 minBackgroundOutset * scale, viewMatrix, colorSpace);
+}
+
+static bool IsCoveredBy(const Rect& rect, const std::vector<Rect>& covers) {
+  for (const auto& cover : covers) {
+    if (cover.contains(rect)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void KeepLarger(Rect* largest, const Rect& rect) {
+  if (!rect.isEmpty() && rect.area() > largest->area()) {
+    *largest = rect;
+  }
+}
+
+void Layer::updateBackgroundCoverage(float alpha, bool ancestorSamplesBackground) {
+  // Bounds a long list keeps growing with: merging into one rect only makes the test stricter.
+  static constexpr size_t MaxUncoveredRects = 16;
+  uncoveredBackgroundRects.clear();
+  opaqueBounds.setEmpty();
+  auto content = getContent();
+  const bool ownsBackgroundStyle = hasOwnBackgroundStyle(alpha);
+  bool samplesBackground = ownsBackgroundStyle;
+  for (const auto& child : _children) {
+    if (child->bitFields.visible && child->_alpha > 0 && child->maskOwner == nullptr) {
+      samplesBackground = samplesBackground || child->bitFields.subtreeSamplesBackground;
+    }
+  }
+  bitFields.subtreeSamplesBackground = samplesBackground;
+  // Nothing in the subtree samples the backdrop and no ancestor can consume this layer's opaque
+  // bounds, so there is no coverage to compute.
+  if (!samplesBackground && !ancestorSamplesBackground) {
+    bitFields.backgroundCoverageBlocked = false;
+    bitFields.backgroundSelfContained = true;
+    return;
+  }
+  bool blocked = false;
+  if (ownsBackgroundStyle) {
+    // The style samples the backdrop under everything the layer draws, which nothing in the subtree
+    // draws below, so only an ancestor or an earlier sibling can cover it.
+    uncoveredBackgroundRects.push_back(getBounds());
+  }
+  // Covers, in local coordinates, of what is drawn before the next child.
+  std::vector<Rect> covers = {};
+  if (content) {
+    auto ownOpaque = content->getOpaqueRect(false);
+    if (!ownOpaque.isEmpty()) {
+      covers.push_back(ownOpaque);
+    }
+  }
+  for (const auto& child : _children) {
+    if (!child->bitFields.visible || child->_alpha <= 0 || child->maskOwner != nullptr) {
+      continue;
+    }
+    const bool affine = child->bitFields.matrix3DIsAffine && !child->canPreserve3D();
+    auto childMatrix = child->getMatrixWithScrollRect().asMatrix();
+    if (child->bitFields.backgroundCoverageBlocked ||
+        (!affine && !child->uncoveredBackgroundRects.empty())) {
+      blocked = true;
+    }
+    if (affine) {
+      for (const auto& rect : child->uncoveredBackgroundRects) {
+        auto mapped = childMatrix.mapRect(rect);
+        if (!IsCoveredBy(mapped, covers)) {
+          uncoveredBackgroundRects.push_back(mapped);
+        }
+      }
+      if (!child->opaqueBounds.isEmpty() && childMatrix.rectStaysRect()) {
+        auto childOpaque = child->opaqueBounds;
+        if (child->_scrollRect == nullptr || childOpaque.intersect(*child->_scrollRect)) {
+          covers.push_back(childMatrix.mapRect(childOpaque));
+        }
+      }
+    }
+  }
+  // An alpha or contour mask resolves to a clip path, which leaves the backdrop in place; the other
+  // mask types composite the subtree offscreen.
+  auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
+  const bool maskComposesOffscreen =
+      hasValidMask() && maskType != LayerMaskType::Alpha && maskType != LayerMaskType::Contour;
+  const bool composesOffscreen =
+      (_alpha < 1.0f && bitFields.allowsGroupOpacity) ||
+      static_cast<BlendMode>(bitFields.blendMode) != BlendMode::SrcOver || !_filters.empty() ||
+      maskComposesOffscreen || !bitFields.passThroughBackground;
+  if (composesOffscreen && !uncoveredBackgroundRects.empty()) {
+    blocked = true;
+  }
+  if (uncoveredBackgroundRects.size() > MaxUncoveredRects) {
+    auto unionRect = Rect::MakeEmpty();
+    for (const auto& rect : uncoveredBackgroundRects) {
+      unionRect.join(rect);
+    }
+    uncoveredBackgroundRects.assign(1, unionRect);
+  }
+  if (_alpha >= 1.0f && static_cast<BlendMode>(bitFields.blendMode) == BlendMode::SrcOver &&
+      _filters.empty() && !hasValidMask()) {
+    for (const auto& cover : covers) {
+      KeepLarger(&opaqueBounds, cover);
+    }
+    if (content) {
+      KeepLarger(&opaqueBounds, content->getOpaqueRect(true));
+    }
+  }
+  bitFields.backgroundCoverageBlocked = blocked;
+  bitFields.backgroundSelfContained = !blocked && uncoveredBackgroundRects.empty();
+}
+
+bool Layer::canCacheBackgroundSubtree() const {
+  return bitFields.backgroundSelfContained && _filters.empty() && !hasValidMask() &&
+         bitFields.passThroughBackground;
 }
 
 bool Layer::canPreserve3D() const {

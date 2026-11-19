@@ -59,6 +59,20 @@ bool RRectsContent::hitTestPoint(float localX, float localY, bool includeUnpaint
   return false;
 }
 
+Rect RRectsContent::getOpaqueRect(bool) const {
+  if (!isOpaqueFill()) {
+    return Rect::MakeEmpty();
+  }
+  auto largest = Rect::MakeEmpty();
+  for (const auto& rRect : rRects) {
+    auto inner = InnerRect(rRect);
+    if (inner.area() > largest.area()) {
+      largest = inner;
+    }
+  }
+  return largest;
+}
+
 Rect RRectsContent::onGetBounds() const {
   auto bounds = rRects[0].rect();
   for (size_t i = 1; i < rRects.size(); ++i) {

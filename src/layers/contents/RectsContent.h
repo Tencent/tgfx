@@ -30,6 +30,8 @@ class RectsContent : public DrawContent {
   Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;
   bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const override;
 
+  Rect getOpaqueRect(bool includeForeground) const override;
+
   std::vector<Rect> rects = {};
 
  protected:

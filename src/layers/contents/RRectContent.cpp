@@ -44,6 +44,10 @@ bool RRectContent::hitTestPoint(float localX, float localY, bool includeUnpainte
   return getFilledPath().contains(localX, localY);
 }
 
+Rect RRectContent::getOpaqueRect(bool) const {
+  return isOpaqueFill() ? InnerRect(rRect) : Rect::MakeEmpty();
+}
+
 Rect RRectContent::onGetBounds() const {
   return rRect.rect();
 }

@@ -69,6 +69,15 @@ class LayerContent {
   virtual bool contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const = 0;
 
   /**
+   * Returns an axis-aligned rect, in content coordinates, that the content fully covers with opaque
+   * pixels, or an empty rect when none is known. With includeForeground false, only the part drawn
+   * below the children counts.
+   */
+  virtual Rect getOpaqueRect(bool /*includeForeground*/) const {
+    return Rect::MakeEmpty();
+  }
+
+  /**
    * Returns whether every pixel the content paints is fully opaque: each painted entry draws an
    * opaque color or opaque shader with SrcOver. Entries no paint captured and painters with alpha 0
    * paint nothing and do not count. Edge coverage is not measured: antialiased edges count as
