@@ -714,7 +714,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   // afterwards, which leaves a style output and the content under it equally translucent, so the
   // bounds side only ever overestimates an outset instead of missing one.
   void updateRenderBounds(std::shared_ptr<RegionTransformer> transformer = nullptr,
-                          bool forceDirty = false, float alpha = 1.0f);
+                          bool forceDirty = false, float alpha = 1.0f,
+                          bool ancestorSamplesBackground = false);
 
   void checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer, float alpha);
 
@@ -749,6 +750,20 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, float alpha);
 
+  // Recomputes uncoveredBackgroundRects, opaqueBounds and the background coverage flags from the
+  // layer's own content and its children.
+  void updateBackgroundCoverage(float alpha, bool ancestorSamplesBackground);
+
+  // Whether the subtree can go into a subtree cache although it holds background-sourced styles:
+  // everything they sample is drawn inside it, and the layer itself draws without an offscreen.
+  bool canCacheBackgroundSubtree() const;
+
+  // Rasterizes a subtree that canCacheBackgroundSubtree() accepts, capturing the backdrop of its
+  // background-sourced styles from this layer instead of from the root.
+  std::shared_ptr<Image> createBackgroundSubtreeCacheImage(const DrawArgs& args, float contentScale,
+                                                           const Rect& imageBounds,
+                                                           Matrix* drawingMatrix);
+
   SubtreeCache* getValidSubtreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds);
 
   std::shared_ptr<Image> createSubtreeCacheImage(const DrawArgs& args, float contentScale,
@@ -781,6 +796,14 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool hasBlendMode : 1;
     bool matrix3DIsAffine : 1;  // Whether the matrix3D is equivalent to a 2D affine matrix
     bool staticSubtree : 1;  // Whether the subtree (content, children, filters, styles) is static.
+    // Whether every background-sourced style in the subtree samples only content the subtree draws.
+    bool backgroundSelfContained : 1;
+    // Whether an uncovered background sample of the subtree crosses an offscreen composition, which
+    // keeps every ancestor from containing it.
+    bool backgroundCoverageBlocked : 1;
+    // Whether any layer in this subtree draws a background-sourced style. Lets a subtree without
+    // one skip the background coverage bookkeeping entirely.
+    bool subtreeSamplesBackground : 1;
     // Whether the layer's own content paints only fully opaque pixels.
     bool contentOpaque : 1;
     // Whether every visible child that is not a mask owner passes isSubtreeOpaque().
@@ -812,6 +835,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
   // down-sampling when the outset exceeds the single-pass blur budget.
   float maxBackgroundOutset = 0.f;
   float minBackgroundOutset = std::numeric_limits<float>::max();
+
+  // Areas, in local coordinates, that background-sourced styles of the subtree sample and that no
+  // opaque content drawn before them inside the subtree covers.
+  std::vector<Rect> uncoveredBackgroundRects = {};
+  // An axis-aligned area, in local coordinates, the subtree fully covers with opaque pixels.
+  Rect opaqueBounds = {};
 
   friend class RootLayer;
   friend class DisplayList;

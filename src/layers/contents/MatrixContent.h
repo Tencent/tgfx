@@ -36,6 +36,7 @@ class MatrixContent : public GeometryContent {
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
   bool contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const override;
+  Rect getOpaqueRect(bool includeForeground) const override;
   bool isFullyOpaque() const override {
     return content->isFullyOpaque();
   }

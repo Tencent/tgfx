@@ -89,6 +89,18 @@ bool ComposeContent::contourEqualsOpaqueContent(bool includeUnpaintedGeometry) c
   return true;
 }
 
+Rect ComposeContent::getOpaqueRect(bool includeForeground) const {
+  auto count = includeForeground ? contents.size() : foregroundStartIndex;
+  auto largest = Rect::MakeEmpty();
+  for (size_t i = 0; i < count; ++i) {
+    auto rect = contents[i]->getOpaqueRect(includeForeground);
+    if (rect.area() > largest.area()) {
+      largest = rect;
+    }
+  }
+  return largest;
+}
+
 bool ComposeContent::isFullyOpaque() const {
   for (const auto& content : contents) {
     if (!content->isFullyOpaque()) {

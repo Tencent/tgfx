@@ -59,6 +59,35 @@ bool PathContent::hitTestPoint(float localX, float localY, bool includeUnpainted
   return getFilledPath().contains(localX, localY);
 }
 
+Rect PathContent::getOpaqueRect(bool) const {
+  if (!isOpaqueFill() || path.isInverseFillType()) {
+    return Rect::MakeEmpty();
+  }
+  Rect rect = {};
+  if (path.isRect(&rect)) {
+    return rect;
+  }
+  RRect rRect = {};
+  if (path.isRRect(&rRect)) {
+    return InnerRect(rRect);
+  }
+  // Other shapes, such as smoothed corners or ovals, are probed with growing insets of their
+  // bounds; the containment test is conservative, so a probe that passes is fully covered.
+  auto bounds = path.getBounds();
+  auto side = std::min(bounds.width(), bounds.height());
+  for (float fraction : {0.05f, 0.1f, 0.15f, 0.2f, 0.3f}) {
+    auto candidate = bounds;
+    candidate.inset(side * fraction, side * fraction);
+    if (candidate.isEmpty()) {
+      break;
+    }
+    if (path.contains(candidate)) {
+      return candidate;
+    }
+  }
+  return Rect::MakeEmpty();
+}
+
 Rect PathContent::onGetBounds() const {
   return path.getBounds();
 }
