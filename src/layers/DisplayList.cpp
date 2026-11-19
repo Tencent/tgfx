@@ -18,11 +18,9 @@
 
 #include "tgfx/layers/DisplayList.h"
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <functional>
 #include <map>
-#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include "core/utils/DecomposeRects.h"
