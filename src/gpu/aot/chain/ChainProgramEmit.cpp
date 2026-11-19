@@ -259,9 +259,8 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
     pieces += text + "\n";
     return true;
   };
-  if (needsTexture && !appendPiece(FragmentPackDepTextureSwizzle)) {
-    return false;
-  }
+  // The sampling text includes the read-swizzle helper itself, so the standalone swizzle entry is
+  // never appended: its copy only lengthened the text the driver parsed.
   const bool xpCarriesSampling = xpSupport.find("aotTextureSample(") != std::string::npos;
   if (needsTexture && !xpCarriesSampling && !appendPiece(FragmentPackDepTextureSampling)) {
     return false;
