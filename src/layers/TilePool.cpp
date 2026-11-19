@@ -50,12 +50,6 @@ std::shared_ptr<Tile> TilePool::find(const TileKey& key) const {
 void TilePool::insert(const TileKey& key, std::shared_ptr<Tile> tile) {
   DEBUG_ASSERT(entries.find(key) == entries.end());
   auto& lru = lruOf(key.type());
-  auto result = entries.find(key);
-  if (result != entries.end()) {
-    result->second.tile = std::move(tile);
-    lru.splice(lru.begin(), lru, result->second.lruIterator);
-    return;
-  }
   lru.push_front(key);
   entries[key] = {std::move(tile), lru.begin()};
 }

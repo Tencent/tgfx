@@ -140,7 +140,7 @@ class TilePool {
   std::shared_ptr<Tile> find(const TileKey& key) const;
 
   /**
-   * Adds a tile as the most recently used one of its type.
+   * Adds a tile as the most recently used one of its type. The key must not be in the pool yet.
    */
   void insert(const TileKey& key, std::shared_ptr<Tile> tile);
 
