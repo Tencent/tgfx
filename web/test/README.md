@@ -105,7 +105,7 @@ Web 普通测试默认开启 `GENERATE_BASELINE_IMAGES`，只控制诊断图片�
 
 该命令固定本地 `origin/main` 引用对应的提交（不会自动 fetch），然后：
 1. 检查缓存的 MD5、版本、来源记录及内容摘要；缺任何一项都重新准备。
-2. 将固定提交解包到 `web/test/build-reference-{backend}/run.*/source`，还原并校验 LFS 资源；不切分支、不 stash。依赖定义必须匹配已安装依赖，JS 绑定从该快照重新构建。
+2. 将固定提交解包到 `web/test/build-reference-{backend}/run.*/source`，还原并校验 LFS 资源；不切分支、不 stash。依赖声明（`DEPS`、`web/package.json`）必须与固定提交一致，JS 绑定从该快照重新构建。lockfile 未被 git 跟踪，因此这里不校验实际安装版本。
 3. 用当前测试驱动构建该主干的库、测试及资源；参考构建和普通构建目录独立，普通运行产物不被覆盖。
 4. 全量测试成功且没有 GPU 错误、跳过或下载失败后，校验专用 `reference-cache.zip`，将完整缓存事务发布到 `.cache/{backend}/`。`reference.json` 记录来源提交、执行数量及摘要；失败保留旧缓存，不合并部分结果。
 5. 构建和诊断产物保留在该独立目录；`--skip-images` 仅跳过参考图片生成。
@@ -113,6 +113,8 @@ Web 普通测试默认开启 `GENERATE_BASELINE_IMAGES`，只控制诊断图片�
 之后在当前分支运行 `npm run test:webgpu`（或 `test:webgl`）重新构建并比较，不能直接运行未重新打包参考输入的旧 WASM。
 
 主干本身的编译、测试或 GPU 错误会阻止缓存发布，必须先修复主干，不能用当前分支输出代替。该流程仅重建主干参考，不改变仓库 `test/baseline/version.json`，不替代用户主动执行 `/accept-baseline` 接受截图变更。
+
+若发布阶段被中断（例如 Ctrl-C），可能残留 `test/baseline/.cache/{backend}.lock` 目录，后续发布会直接提示残留锁。确认没有其他发布正在运行后删除该目录再重试即可，已有缓存不受影响。
 
 如仅需刷新 cache 而不生成图像（CI 流水线使用此模式），追加 `--skip-images` 参数：
 

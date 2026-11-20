@@ -33,7 +33,11 @@ function CreateFixture(backend) {
     existsSync(file) { return files.has(file) || directories.has(file); },
     lstatSync() { return { isSymbolicLink() { return fixture.symlink || false; } }; },
     mkdirSync(file, options) {
-      if (directories.has(file) && !options?.recursive) throw new Error('Already exists');
+      if (directories.has(file) && !options?.recursive) {
+        const error = new Error('Already exists');
+        error.code = 'EEXIST';
+        throw error;
+      }
       directories.add(file);
       writes.push(file);
     },
@@ -137,6 +141,20 @@ for (const backend of ['webgl', 'webgpu']) {
     fixture.commit = COMMIT;
     files.set(path.join(directory, 'md5.json'), Buffer.from(JSON.stringify({ Suite: { Image: 'c'.repeat(32) } })));
     assert.equal(api.IsReferenceCurrent(backend, COMMIT), false);
+  });
+
+  test(`${backend} stale publish lock reports an actionable error`, function() {
+    const fixture = CreateFixture(backend);
+    fixture.api.PublishReference('reference.zip', backend, COMMIT, 5);
+    const before = new Map(fixture.files);
+    fixture.directories.add(fixture.directory + '.lock');
+    assert.throws(function() { fixture.api.PublishReference('reference.zip', backend, COMMIT, 5); },
+      function(error) {
+        return error.message.includes(fixture.directory + '.lock') && error.message.includes('delete');
+      });
+    assert.deepEqual(fixture.files, before);
+    assert.equal(fixture.directories.has(fixture.directory + '.lock'), true);
+    assert.equal(fixture.api.IsReferenceCurrent(backend, COMMIT), true);
   });
 
   for (const fault of ['write', 'rename']) {

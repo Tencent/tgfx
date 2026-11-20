@@ -98,7 +98,19 @@ function PublishReference(zipPath, backend, commit, tests) {
   const parent = path.dirname(destination);
   fs.mkdirSync(parent, { recursive: true });
   const lock = `${destination}.lock`;
-  fs.mkdirSync(lock);
+  // A killed process never reaches the finally below, so a leftover lock would otherwise surface
+  // as a bare EEXIST on every later publish. Only remove a lock this call created.
+  let lockCreated = false;
+  try {
+    fs.mkdirSync(lock);
+    lockCreated = true;
+  } catch (error) {
+    if (error.code === 'EEXIST') {
+      throw new Error(`Reference publish lock exists at ${lock}. ` +
+        'If no other publish is running, delete the stale lock directory and retry.');
+    }
+    throw error;
+  }
   let staging;
   let backup;
   let moved = false;
@@ -129,7 +141,7 @@ function PublishReference(zipPath, backend, commit, tests) {
     if (backup && (!moved || fs.existsSync(destination))) {
       fs.rmSync(backup, { recursive: true, force: true });
     }
-    fs.rmdirSync(lock);
+    if (lockCreated) fs.rmdirSync(lock);
   }
   console.log(`Published ${count} reference entries for ${backend} from ${commit.slice(0, 9)}.`);
 }
