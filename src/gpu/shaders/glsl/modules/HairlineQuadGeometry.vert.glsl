@@ -4,6 +4,7 @@
 
 void HairlineQuadGeometry_vertex(inout Vertex v) {
   v.position = (HairlineQuadGeometry_Matrix * vec3(HairlineQuadGeometry_Position, 1.0)).xy;
+  v.localCoord = v.position;
   HairlineQuadGeometry_vHairQuadEdge = HairlineQuadGeometry_InHairQuadEdge;
   HairlineQuadGeometry_vColor = vec4(0.0);
 

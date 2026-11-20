@@ -5,6 +5,7 @@
 
 void ComplexEllipseGeometry_vertex(inout Vertex v) {
   v.position = ComplexEllipseGeometry_Position;
+  v.localCoord = v.position;
   ComplexEllipseGeometry_vOffsets = ComplexEllipseGeometry_InEllipseOffset;
   ComplexEllipseGeometry_vRadii = ComplexEllipseGeometry_InEllipseRadii;
   ComplexEllipseGeometry_vEdgeDist = ComplexEllipseGeometry_InEdgeDist;
