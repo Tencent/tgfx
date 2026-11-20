@@ -71,8 +71,15 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   drawOp->setBlendMode(BlendMode::Src);
   auto drawOps = allocator->makeArray<DrawOp>(&drawOp, 1);
   auto textureProxy = renderTarget->asTextureProxy();
+  std::optional<PMColor> clearColor = std::nullopt;
+  if (textureProxy != nullptr && textureProxy->hasMipmaps() &&
+      (textureProxy->backingStoreWidth() != textureProxy->width() ||
+       textureProxy->backingStoreHeight() != textureProxy->height())) {
+    // Mipmap generation samples the whole backing store, including unwritten padding.
+    clearColor = PMColor::Transparent();
+  }
   auto task = allocator->make<OpsRenderTask>(allocator, std::move(renderTarget), std::move(drawOps),
-                                             std::nullopt);
+                                             clearColor);
   drawingBuffer->renderTasks.emplace_back(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
   return true;

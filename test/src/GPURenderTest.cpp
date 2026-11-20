@@ -23,12 +23,17 @@
 #include "InstancedGridRenderPass.h"
 #include "MultisampleTestEffect.h"
 #include "StencilMaskRenderPass.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/ProxyProvider.h"
+#include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
+#include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/resources/DepthStencilTextureView.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/RenderPass.h"
 #include "tgfx/gpu/Texture.h"
@@ -482,6 +487,97 @@ TGFX_TEST(GPURenderTest, RenderTargetProxyGetStencil) {
     ASSERT_TRUE(stencil != nullptr);
     EXPECT_NE(stencil.get(), shared.get());
   }
+}
+
+TGFX_TEST(GPURenderTest, MipmappedApproxTargetClearsPadding) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int logicalSize = 17;
+  constexpr int backingSize = 32;
+  auto target = RenderTargetProxy::Make(context, logicalSize, logicalSize, false, 1, true,
+                                        ImageOrigin::TopLeft, BackingFit::Approx);
+  ASSERT_TRUE(target != nullptr);
+  auto texture = target->asTextureProxy();
+  ASSERT_TRUE(texture != nullptr);
+  ASSERT_TRUE(texture->hasMipmaps());
+  ASSERT_EQ(texture->backingStoreWidth(), backingSize);
+  ASSERT_EQ(texture->backingStoreHeight(), backingSize);
+  auto manager = context->drawingManager();
+  manager->addOpsRenderTask(target, {}, PMColor::Red());
+  auto blue =
+      ConstColorProcessor::Make(context->drawingAllocator(), PMColor::Blue(), InputMode::Ignore);
+  ASSERT_TRUE(manager->fillRTWithFP(target, std::move(blue), 0));
+  ASSERT_TRUE(context->flushAndSubmit(true));
+  auto backing = target->getRenderTarget();
+  ASSERT_TRUE(backing != nullptr);
+  auto surface =
+      Surface::MakeFrom(context, backing->getBackendRenderTarget(), ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_EQ(surface->width(), backingSize);
+  ASSERT_EQ(surface->height(), backingSize);
+  Bitmap bitmap(backingSize, backingSize, false, false);
+  {
+    Pixmap pixels(bitmap);
+    ASSERT_TRUE(surface->readPixels(pixels.info(), pixels.writablePixels()));
+  }
+  for (int y = 0; y < backingSize; y++) {
+    for (int x = 0; x < backingSize; x++) {
+      auto expected = x < logicalSize && y < logicalSize ? Color::Blue() : Color::Transparent();
+      ASSERT_EQ(bitmap.getColor(x, y), expected) << "pixel " << x << ", " << y;
+    }
+  }
+
+  auto reduced = RenderTargetProxy::Make(context, 1, 1, false);
+  ASSERT_TRUE(reduced != nullptr);
+  SamplingArgs sampling = {};
+  sampling.sampling = SamplingOptions(FilterMode::Nearest, MipmapMode::Nearest);
+  auto matrix = Matrix::MakeScale(static_cast<float>(backingSize));
+  auto backingView = backing->asTextureView();
+  ASSERT_TRUE(backingView != nullptr);
+  auto key = UniqueKey::Make();
+  backingView->assignUniqueKey(key);
+  auto fullTexture = context->proxyProvider()->findOrWrapTextureProxy(key);
+  ASSERT_TRUE(fullTexture != nullptr);
+  ASSERT_TRUE(fullTexture->hasMipmaps());
+  ASSERT_EQ(fullTexture->width(), backingSize);
+  ASSERT_EQ(fullTexture->height(), backingSize);
+  auto processor = TextureEffect::Make(context->drawingAllocator(), fullTexture, sampling, &matrix);
+  ASSERT_TRUE(manager->fillRTWithFP(reduced, std::move(processor), 0));
+  ASSERT_TRUE(context->flushAndSubmit(true));
+  auto reducedBacking = reduced->getRenderTarget();
+  ASSERT_TRUE(reducedBacking != nullptr);
+  auto reducedSurface =
+      Surface::MakeFrom(context, reducedBacking->getBackendRenderTarget(), ImageOrigin::TopLeft);
+  ASSERT_TRUE(reducedSurface != nullptr);
+  auto color = reducedSurface->getColor(0, 0);
+  EXPECT_EQ(color.red, 0.0f);
+  EXPECT_EQ(color.green, 0.0f);
+  EXPECT_NEAR(color.blue, color.alpha, 1.0f / 255.0f);
+  EXPECT_GT(color.alpha, 0.2f);
+  EXPECT_LT(color.alpha, 0.4f);
+}
+
+TGFX_TEST(GPURenderTest, NonMipmappedApproxTargetPreservesPadding) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto target = RenderTargetProxy::Make(context, 17, 17, false, 1, false, ImageOrigin::TopLeft,
+                                        BackingFit::Approx);
+  ASSERT_TRUE(target != nullptr);
+  auto manager = context->drawingManager();
+  manager->addOpsRenderTask(target, {}, PMColor::Red());
+  auto blue =
+      ConstColorProcessor::Make(context->drawingAllocator(), PMColor::Blue(), InputMode::Ignore);
+  ASSERT_TRUE(manager->fillRTWithFP(target, std::move(blue), 0));
+  ASSERT_TRUE(context->flushAndSubmit(true));
+  auto backing = target->getRenderTarget();
+  ASSERT_TRUE(backing != nullptr);
+  auto surface =
+      Surface::MakeFrom(context, backing->getBackendRenderTarget(), ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_EQ(surface->getColor(0, 0), PMColor::Blue());
+  EXPECT_EQ(surface->getColor(31, 31), PMColor::Red());
 }
 
 // Verifies the setter/getter pair for ProgramInfo's stencil and colour-write-mask state, and
