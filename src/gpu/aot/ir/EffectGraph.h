@@ -362,6 +362,19 @@ struct AOTOpaqueKernelParameters {
 // maps device coordinates into the rect's local space in Matrix::get9 row-major order; identity
 // means the rect already lives in device space (the shader then evaluates the separable math
 // directly on gl_FragCoord).
+// The YUV source (a multi-plane texture leaf). subset is the leaf's {l, t, r, b} clamp in the
+// source space; colorConversion is the row-major YUV-to-RGB matrix the view resolves; the RGBAAA
+// layout reads its alpha plane through the Y sampler at alphaStart; format is 0 for three planes
+// (Y, U, V) and anything else for the interleaved RG plane.
+struct AOTYUVParameters {
+  std::array<float, 4> subset = {};
+  std::array<float, 2> alphaStart = {};
+  std::array<float, 9> colorConversion = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+  int limitedRange = 0;
+  int hasRgbaaa = 0;
+  int format = 0;
+};
+
 struct AOTRectCoverageParameters {
   std::array<float, 4> rect = {};
   std::array<float, 9> deviceToLocal = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};

@@ -35,6 +35,11 @@ class SlotWriter;
 // parameter array (the coverage capacities; the slot index for every other op).
 void BindColorMatrixSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index, int ordinal,
                          const AOTChainSlot& slot);
+
+/// The YUV source's slot record (op 16): the planes' subset and alpha offset, the conversion
+/// matrix and the layout facts. The three plane samplers ride the leaf-sampler bindings.
+void BindYUVSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index, int ordinal,
+                 const AOTChainSlot& slot);
 void BindLumaSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index, int ordinal,
                   const AOTChainSlot& slot);
 void BindAlphaThresholdSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index, int ordinal,

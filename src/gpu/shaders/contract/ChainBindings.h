@@ -77,6 +77,12 @@ enum class ChainBindingSource : uint8_t {
   GradientThresholds9_13,
   GradientScales,
   GradientBiases,
+  YuvSubset,
+  YuvAlphaStart,
+  YuvColorConversion,
+  YuvLimitedRange,
+  YuvHasRgbaaa,
+  YuvFormat,
   // The noise source.
   NoiseFrequencyStitch,
   NoiseModeOctaves,

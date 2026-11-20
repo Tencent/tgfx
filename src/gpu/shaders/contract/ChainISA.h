@@ -53,7 +53,8 @@ inline constexpr int DataCapacity = 256;
   X(TexModulate, 12, 1, false, TEX_MODULATE)              \
   X(InputOpaque, 13, 1, false, INPUT_OPAQUE)              \
   X(MulAlpha, 14, 2, false, MUL_ALPHA)                    \
-  X(PerlinNoise, 15, 0, false, PERLIN_NOISE)
+  X(PerlinNoise, 15, 0, false, PERLIN_NOISE)              \
+  X(YUV, 16, 0, false, YUV)
 
 #define TGFX_CHAIN_OP_CONSTANT(name, id, inputs, sensitive, defineName) \
   inline constexpr int name = id;

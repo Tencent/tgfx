@@ -237,6 +237,20 @@ inline constexpr Arg kPerlinNoiseArgs[] = {
     {Param::SampledImage, Source::LeafSampler, 2},
     {Param::SampledImage, Source::LeafSampler, 3},
 };
+inline constexpr Arg kYUVArgs[] = {
+    {Param::Vec3, Source::Varying, 0},  // SourceCoords
+    {Param::Vec4, Source::Member, ChainBindingSource::YuvSubset},
+    {Param::Mat3, Source::Member, ChainBindingSource::YuvColorConversion},
+    {Param::Int, Source::Member, ChainBindingSource::YuvLimitedRange},
+    {Param::Vec2, Source::Member, ChainBindingSource::YuvAlphaStart},
+    {Param::Int, Source::Member, ChainBindingSource::YuvHasRgbaaa},
+    {Param::Int, Source::Member, ChainBindingSource::YuvFormat},
+    {Param::SampledImage, Source::LeafSampler, 0},  // plane Y
+    {Param::SampledImage, Source::LeafSampler, 1},  // plane U (or the interleaved UV)
+    {Param::SampledImage, Source::LeafSampler, 2},  // plane V (format 0 only)
+};
+inline constexpr const char* kYUVIncludes[] = {"fn/entry/yuv.inc"};
+
 inline constexpr const char* kPerlinNoiseIncludes[] = {"pipeline/chain/pointwise_noise.inc"};
 
 // ---- ColorSpaceXform -----------------------------------------------------------------------
@@ -297,6 +311,7 @@ inline constexpr Row kRows[] = {
      "", kGradientArgs, 20},
     {ChainISA::PerlinNoise, "evalNoiseSlot", "", kPerlinNoiseIncludes, 1, false, true, "",
      kPerlinNoiseArgs, 7},
+    {ChainISA::YUV, "pmApplyYUV", "", kYUVIncludes, 1, true, true, "", kYUVArgs, 10},
     {ChainISA::ColorSpaceXform, "chainApplyColorSpaceXform", "", kColorSpaceXformIncludes, 1, false,
      true, "", kColorSpaceXformArgs, 11},
     {LeafFetchId, "chainLeafFetch", "", kLeafFetchIncludes, 2, true, true, "leafFetch",

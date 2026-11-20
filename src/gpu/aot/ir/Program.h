@@ -130,6 +130,10 @@ struct AOTChainSlot {
   // uniforms, so at most one slot per chain may carry this op (enforced by the builder).
   AOTGradientParameters gradient = {};
   AOTPerlinNoiseParameters noise = {};
+  // OP_YUV only: the multi-plane source's own facts. The kernel reads them from the slot's data
+  // record, so at most one such slot per chain is meaningless-by-construction (a chain has one
+  // color root), enforced by the encoder.
+  AOTYUVParameters yuv = {};
 };
 
 /// One chain leaf that samples with shader-side wrap/border emulation (see AOTTiledTextureRecipe).

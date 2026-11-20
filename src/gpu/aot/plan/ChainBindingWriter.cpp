@@ -288,6 +288,38 @@ bool ReadColorSpace(const ReadContext& ctx, ChainBindingSource source, uint8_t* 
   }
 }
 
+// The YUV source's members (op 16): the slot's own record carries every value, so the read is a
+// field copy; the matrix takes the std140 three-column spelling.
+bool ReadYUV(const ReadContext& ctx, int slotIndex, ChainBindingSource source, uint8_t* out) {
+  const auto* chainSlot = SlotOf(ctx, slotIndex);
+  if (chainSlot == nullptr) {
+    return false;
+  }
+  const auto& yuv = chainSlot->yuv;
+  switch (source) {
+    case ChainBindingSource::YuvSubset:
+      std::memcpy(out, yuv.subset.data(), sizeof(float) * 4);
+      return true;
+    case ChainBindingSource::YuvAlphaStart:
+      std::memcpy(out, yuv.alphaStart.data(), sizeof(float) * 2);
+      return true;
+    case ChainBindingSource::YuvColorConversion:
+      StoreMatrix3(out, yuv.colorConversion);
+      return true;
+    case ChainBindingSource::YuvLimitedRange:
+      Store(out, yuv.limitedRange);
+      return true;
+    case ChainBindingSource::YuvHasRgbaaa:
+      Store(out, yuv.hasRgbaaa);
+      return true;
+    case ChainBindingSource::YuvFormat:
+      Store(out, yuv.format);
+      return true;
+    default:
+      return false;
+  }
+}
+
 bool ReadBinding(const ReadContext& ctx, const ChainBinding& binding, uint8_t* out) {
   const auto& geometry = *ctx.geometry;
   switch (binding.source) {
@@ -312,6 +344,13 @@ bool ReadBinding(const ReadContext& ctx, const ChainBinding& binding, uint8_t* o
       Store(out, chainSlot->alphaThreshold.threshold);
       return true;
     }
+    case ChainBindingSource::YuvSubset:
+    case ChainBindingSource::YuvAlphaStart:
+    case ChainBindingSource::YuvColorConversion:
+    case ChainBindingSource::YuvLimitedRange:
+    case ChainBindingSource::YuvHasRgbaaa:
+    case ChainBindingSource::YuvFormat:
+      return ReadYUV(ctx, binding.slot, binding.source, out);
     case ChainBindingSource::SlotConstColor: {
       const auto* chainSlot = SlotOf(ctx, binding.slot);
       if (chainSlot == nullptr) {

@@ -301,6 +301,18 @@ TGFX_CHAIN_DECLARE_OP(MulAlpha, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS
   T(Int32, lutLeaf)
 TGFX_CHAIN_DECLARE_OP(PerlinNoise, TGFX_PERLIN_NOISE_DATA, TGFX_PERLIN_NOISE_STRUCTURE)
 
+// The YUV source: the three planes' subset and the colour-conversion matrix ride the slot's data
+// record; the layout and range facts ride the slot's structure.
+#define TGFX_YUV_DATA(T) \
+  T(Float4, subset)      \
+  T(Float2, alphaStart)  \
+  T(Matrix3, colorConversion)
+#define TGFX_YUV_STRUCTURE(T) \
+  T(Int32, limitedRange)      \
+  T(Int32, hasRgbaaa)         \
+  T(Int32, format)
+TGFX_CHAIN_DECLARE_OP(YUV, TGFX_YUV_DATA, TGFX_YUV_STRUCTURE)
+
 /// The chain-wide block region: operators whose data exceeds the slot stride get a fixed offset
 /// here instead of a slot index. The region starts right after the slot region, so a reader takes
 /// the slot records' extent (`ChainData.length() - BlockWords`) plus `<offset>`.
@@ -338,7 +350,8 @@ static_assert(ColorSpaceXformDataWords > PoolSlotWords,
   X(TexModulate, TGFX_CHAIN_EMPTY_FIELDS)             \
   X(InputOpaque, TGFX_CHAIN_EMPTY_FIELDS)             \
   X(MulAlpha, TGFX_CHAIN_EMPTY_FIELDS)                \
-  X(PerlinNoise, TGFX_PERLIN_NOISE_DATA)
+  X(PerlinNoise, TGFX_PERLIN_NOISE_DATA)              \
+  X(YUV, TGFX_YUV_DATA)
 
 inline constexpr int FieldListCount = 0
 #define TGFX_CHAIN_FIELD_LIST_COUNT(name, data) +1

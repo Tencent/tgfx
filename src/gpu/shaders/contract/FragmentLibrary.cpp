@@ -166,6 +166,13 @@ const std::vector<FragmentDef>& Table() {
        {Param("PerlinNoise.frequencyStitch", FragmentType::Float4)},
        {Arg(FragmentArgKind::EntryValue, 3)},
        {"pipeline/chain/pointwise_noise.inc"}},
+      {ChainISA::YUV,
+       FragmentKind::EntryCoupled,
+       "pmApplyYUV",
+       "fn/entry/yuv.inc",
+       {Param("Yuv.block", FragmentType::Float4, 6, /*programLevel=*/false)},
+       {Arg(FragmentArgKind::Input0)},
+       {"fn/entry/yuv.inc"}},
       {ChainISA::None, FragmentKind::Expression, "", nullptr, {}, {}, {}},
   };
   return table;

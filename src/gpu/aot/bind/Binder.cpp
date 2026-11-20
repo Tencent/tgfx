@@ -100,12 +100,12 @@ constexpr YUVTailIndices YUVField = {};
 // The chain-wide color-space block's element indices: the Chain and YUVChainTail modules spell
 // the same ten fields, each through its own element order.
 constexpr ColorSpaceXformHelper::FieldElements ChainCSFields = {
-    ChainElement("ChainFlags"),   ChainElement("ChainSrcTF0"),  ChainElement("ChainSrcTF1"),
+    ChainElement("ChainFlags"),     ChainElement("ChainSrcTF0"),  ChainElement("ChainSrcTF1"),
     ChainElement("ChainSrcTFType"), ChainElement("ChainSrcOOTF"), ChainElement("ChainColorXform"),
     ChainElement("ChainDstOOTF"),   ChainElement("ChainDstTF0"),  ChainElement("ChainDstTF1"),
     ChainElement("ChainDstTFType")};
 constexpr ColorSpaceXformHelper::FieldElements YUVCSFields = {
-    YUVElement("ChainFlags"),   YUVElement("ChainSrcTF0"),  YUVElement("ChainSrcTF1"),
+    YUVElement("ChainFlags"),     YUVElement("ChainSrcTF0"),  YUVElement("ChainSrcTF1"),
     YUVElement("ChainSrcTFType"), YUVElement("ChainSrcOOTF"), YUVElement("ChainColorXform"),
     YUVElement("ChainDstOOTF"),   YUVElement("ChainDstTF0"),  YUVElement("ChainDstTF1"),
     YUVElement("ChainDstTFType")};
@@ -143,6 +143,7 @@ constexpr AOTOpContract OpContracts[] = {
     {},                           // InputOpaque (13)
     {},                           // MulAlpha (14)
     {},                           // PerlinNoise (15): the program-level noise block
+    {BindYUVSlot},                // YUV (16): the planes' data and layout facts
 };
 
 constexpr size_t OpContractCount = sizeof(OpContracts) / sizeof(AOTOpContract);
@@ -267,6 +268,23 @@ void UploadGradientParams(SlotWriter* chainWriter, size_t /*blockBase*/,
 
 // The instruction contract's bind column (declared in Binder.h): each function writes one op's
 // per-slot parameter block into the chain arrays.
+// The YUV source's slot record: the planes' subset and alpha offset, the conversion matrix, and
+// the layout facts. The three plane samplers ride the leaf-sampler bindings, not the record.
+void BindYUVSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index, int /*ordinal*/,
+                 const AOTChainSlot& slot) {
+  const auto& params = slot.yuv;
+  ChainISA::YUVData data = {};
+  data.subset = {params.subset[0], params.subset[1], params.subset[2], params.subset[3]};
+  data.alphaStart = {params.alphaStart[0], params.alphaStart[1]};
+  const auto columns = Mat3ToStd140ColumnMajor(params.colorConversion);
+  for (size_t column = 0; column < 3; ++column) {
+    for (size_t row = 0; row < 3; ++row) {
+      data.colorConversion.m[column * 3 + row] = columns[column * 4 + row];
+    }
+  }
+  UploadSlotData(chainWriter, dataElement, index, data, ChainISA::PackYUV);
+}
+
 void BindColorMatrixSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index,
                          int /*ordinal*/, const AOTChainSlot& slot) {
   ChainISA::ColorMatrixData data = {};
