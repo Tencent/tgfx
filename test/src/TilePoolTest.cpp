@@ -751,4 +751,48 @@ TGFX_TEST(TilePoolTest, RootPropertiesDoNotSkipBackgroundCapture) {
   EXPECT_EQ(MaxDifference(normal, render(1.0f, true, 0.01f)), 0);
 }
 
+// A layer with group opacity draws into an offscreen seeded from the tile atlas. The seed has to
+// line up with the content drawn on top of it, or a blend that reads the destination shifts the
+// edge of a tile whose boundary falls between pixels.
+TGFX_TEST(TilePoolTest, PassThroughSeedMatchesDirectRendering) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto oldGroupOpacity = Layer::DefaultAllowsGroupOpacity();
+  Layer::SetDefaultAllowsGroupOpacity(true);
+  auto render = [&](RenderMode mode) {
+    auto surface = Surface::Make(context, 300, 300);
+    auto displayList = std::make_unique<DisplayList>();
+    auto background = MakeSolid(300, 300, Color::FromRGBA(0, 100, 200, 255));
+    displayList->root()->addChild(background);
+    auto container = Layer::Make();
+    container->setAlpha(0.9f);
+    auto child = ShapeLayer::Make();
+    Path path = {};
+    path.addRect(Rect::MakeXYWH(75, 75, 150, 150));
+    child->setPath(path);
+    child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 200)));
+    child->setBlendMode(BlendMode::Exclusion);
+    container->addChild(child);
+    displayList->root()->addChild(container);
+    displayList->setRenderMode(mode);
+    if (mode == RenderMode::Tiled) {
+      displayList->render(surface.get());
+    }
+    // At zoom 1.5 the tile boundaries fall between pixels.
+    displayList->setZoomScale(1.5f);
+    displayList->setContentOffset(-100, -100);
+    displayList->render(surface.get());
+    SkipRun run = {};
+    auto info = ImageInfo::Make(300, 300, ColorType::RGBA_8888, AlphaType::Premultiplied);
+    run.pixels.resize(300u * 300u * 4u);
+    EXPECT_TRUE(surface->readPixels(info, run.pixels.data(), 0, 0));
+    return run;
+  };
+  auto tiled = render(RenderMode::Tiled);
+  auto direct = render(RenderMode::Direct);
+  Layer::SetDefaultAllowsGroupOpacity(oldGroupOpacity);
+  EXPECT_EQ(MaxDifference(tiled, direct), 0);
+}
+
 }  // namespace tgfx
