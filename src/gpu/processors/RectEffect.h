@@ -31,14 +31,14 @@ class RectEffect : public FragmentProcessor {
  public:
   /**
    * Creates a coverage FragmentProcessor for the rectangle clip.
-   * @param localRect The rectangle in local space.
-   * @param matrix Maps localRect to device space. Defaults to identity.
+   * @param rect The rectangle in local space.
+   * @param matrix Maps rect to device space. Defaults to identity.
    * @param antiAlias If true, the shader produces a soft edge that ramps over one pixel centered on
    *        the boundary; otherwise a hard edge.
    * @return The new effect, or nullptr when the matrix has perspective or its scale components are
    *         zero.
    */
-  static PlacementPtr<RectEffect> Make(BlockAllocator* allocator, const Rect& localRect,
+  static PlacementPtr<RectEffect> Make(BlockAllocator* allocator, const Rect& rect,
                                        const Matrix& matrix = Matrix::I(), bool antiAlias = true);
 
   std::string name() const override {
@@ -48,8 +48,8 @@ class RectEffect : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  RectEffect(const Rect& localRect, const Matrix& deviceToLocal, bool antiAlias)
-      : FragmentProcessor(ClassID()), localRect(localRect), antiAlias(antiAlias),
+  RectEffect(const Rect& rect, const Matrix& deviceToLocal, bool antiAlias)
+      : FragmentProcessor(ClassID()), rect(rect), antiAlias(antiAlias),
         _deviceToLocal(deviceToLocal), _needTransform(!deviceToLocal.isIdentity()) {
   }
 
@@ -63,7 +63,8 @@ class RectEffect : public FragmentProcessor {
     return _deviceToLocal;
   }
 
-  Rect localRect = {};
+  // Rect in the space that deviceToLocal maps device coordinates into.
+  Rect rect = {};
   bool antiAlias = true;
 
  private:

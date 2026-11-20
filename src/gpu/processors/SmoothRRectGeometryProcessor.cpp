@@ -43,11 +43,12 @@ SmoothRRectGeometryProcessor::SmoothRRectGeometryProcessor(int width, int height
 }
 
 void SmoothRRectGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  // The antiAlias, stroke and unscaledGeometry flags change the generated code, so they must take
-  // part in the key.
   uint32_t key = commonColor.has_value() ? 1u : 0u;
   key |= stroke ? 2u : 0u;
-  key |= unscaledGeometry ? 4u : 0u;
+  // unscaledGeometry changes the generated code only when antiAlias is true.
+  key |= (unscaledGeometry && antiAlias) ? 4u : 0u;
+  // antiAlias also changes the generated code of fills and baked strokes, where unscaledGeometry is
+  // false, so it needs its own bit.
   key |= antiAlias ? 8u : 0u;
   bytesKey->write(key);
 }

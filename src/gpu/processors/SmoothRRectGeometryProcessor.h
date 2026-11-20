@@ -59,8 +59,8 @@ class SmoothRRectGeometryProcessor : public GeometryProcessor {
   Attribute inColor;            // color (4 bytes as UByte4Normalized)
   Attribute inHalfStrokeWidth;  // half stroke width, stroke variant only (1 float)
   // Reciprocals of the view matrix's axis scales, which convert unscaled local distances to the
-  // scaled local frame where the AA ramp is defined. Required only for AA unscaled geometry; see
-  // unscaledGeometry (2 floats).
+  // scaled local frame where the AA ramp is defined (2 floats). Required only for AA unscaled
+  // geometry; see unscaledGeometry.
   Attribute inInvScale;
 
   int width = 1;

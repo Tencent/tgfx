@@ -20,6 +20,7 @@
 
 #include "core/DrawContext.h"
 #include "core/PlaybackContext.h"
+#include "core/RRectUtils.h"
 
 namespace tgfx {
 enum class PictureRecordType {
@@ -231,8 +232,35 @@ class DrawRRect : public PictureRecord {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRRect(rRect, playback->matrix(), playback->clip(), playback->brush(),
-                       playback->stroke());
+    // The draw type depends on the matrix, and the playback matrix can differ from the one the
+    // RRect was recorded under, so choose it again here.
+    const auto& matrix = playback->matrix();
+    const auto& clip = playback->clip();
+    const auto& brush = playback->brush();
+    auto stroke = playback->stroke();
+    switch (RRectUtils::GetDrawType(rRect, stroke, matrix, brush.antiAlias)) {
+      case RRectDrawType::None:
+        break;
+      case RRectDrawType::Rect:
+        context->drawRect(rRect.rect(), matrix, clip, brush, stroke);
+        break;
+      case RRectDrawType::Path: {
+        Path path = {};
+        path.addRRect(rRect);
+        if (stroke == nullptr) {
+          context->drawPath(path, matrix, clip, brush);
+          break;
+        }
+        auto shape = Shape::MakeFrom(std::move(path));
+        if (shape != nullptr) {
+          context->drawShape(std::move(shape), matrix, clip, brush, stroke);
+        }
+        break;
+      }
+      case RRectDrawType::RRect:
+        context->drawRRect(rRect, matrix, clip, brush, stroke);
+        break;
+    }
   }
 
   RRect rRect = {};

@@ -303,14 +303,14 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   auto tealFill = MakeFillStyle(Color::FromRGBA(0, 160, 160, 255));
   group7->setElements({perCornerRect, tealFill});
 
-  // Group 8: Rectangle with uniform roundness at full corner smoothness over a red plain
+  // Group 8: Rectangle with uniform roundness at full corner smoothness over a red general
   // (smoothness 0) underlay
-  auto plainGroup = VectorGroup::Make();
-  auto plainRect = Rectangle::Make();
-  plainRect->setPosition({330, 530});
-  plainRect->setSize({160, 160});
-  plainRect->setRoundness(40);
-  plainGroup->setElements({plainRect, MakeFillStyle(Color::Red())});
+  auto generalGroup = VectorGroup::Make();
+  auto generalRect = Rectangle::Make();
+  generalRect->setPosition({330, 530});
+  generalRect->setSize({160, 160});
+  generalRect->setRoundness(40);
+  generalGroup->setElements({generalRect, MakeFillStyle(Color::Red())});
   auto smoothGroup = VectorGroup::Make();
   auto smoothRect = Rectangle::Make();
   smoothRect->setPosition({330, 530});
@@ -319,7 +319,7 @@ TGFX_TEST(VectorLayerTest, BasicShapes) {
   smoothRect->setSmoothness(1.0f);
   smoothGroup->setElements({smoothRect, MakeFillStyle(Color::FromRGBA(50, 100, 220, 255))});
   auto group8 = VectorGroup::Make();
-  group8->setElements({plainGroup, smoothGroup});
+  group8->setElements({generalGroup, smoothGroup});
 
   vectorLayer->setContents({group1, group2, group3, group4, group5, group6, group7, group8});
 

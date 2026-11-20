@@ -18,7 +18,9 @@
 
 #include "core/ClipStack.h"
 #include "core/utils/BlockAllocator.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/OpsCompositor.h"
+#include "gpu/RenderContext.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/SmoothRRectEffect.h"
@@ -62,6 +64,19 @@ static ClipStack MakeDegenerateClip() {
   return clip;
 }
 
+/**
+ * Flushes the pending draws of the surface and returns the last coverage processor of the last
+ * recorded draw op, or nullptr if that op has no coverage processor.
+ */
+TGFX_PRIVATE_ACCESS(
+    static FragmentProcessor* FlushAndGetLastCoverageFP(const std::shared_ptr<Surface>& surface) {
+      surface->renderContext->flush();
+      auto drawingBuffer = surface->getContext()->drawingManager()->getDrawingBuffer();
+      auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+      const auto& coverages = task->drawOps.back()->coverages;
+      return coverages.empty() ? nullptr : coverages.back().get();
+    })
+
 TGFX_TEST_PRIVATE(ClipTest, RectEffect) {
   TGFX_PRIVATE_ACCESS(
       BlockAllocator allocator;
@@ -71,17 +86,17 @@ TGFX_TEST_PRIVATE(ClipTest, RectEffect) {
         auto fp = RectEffect::Make(&allocator, Rect::MakeWH(100, 80), Matrix::I(), true);
         ASSERT_NE(fp, nullptr);
         EXPECT_FALSE(fp->needTransform());
-        EXPECT_EQ(fp->localRect, Rect::MakeWH(100, 80));
+        EXPECT_EQ(fp->rect, Rect::MakeWH(100, 80));
         EXPECT_TRUE(fp->deviceToLocal().isIdentity());
       }
 
-      // Case 2: Axis-aligned scale bakes into localRect, still identity variant.
+      // Case 2: Axis-aligned scale bakes into rect, still identity variant.
       {
         auto fp =
             RectEffect::Make(&allocator, Rect::MakeWH(100, 80), Matrix::MakeScale(2, 3), true);
         ASSERT_NE(fp, nullptr);
         EXPECT_FALSE(fp->needTransform());
-        EXPECT_EQ(fp->localRect, Rect::MakeWH(200, 240));
+        EXPECT_EQ(fp->rect, Rect::MakeWH(200, 240));
         EXPECT_TRUE(fp->deviceToLocal().isIdentity());
       }
 
@@ -113,19 +128,19 @@ TGFX_TEST_PRIVATE(ClipTest, RRectEffect) {
         auto fp = RRectEffect::Make(&allocator, rRect, Matrix::I(), true);
         ASSERT_NE(fp, nullptr);
         EXPECT_FALSE(fp->needTransform());
-        EXPECT_EQ(fp->localRect, rRect.rect());
+        EXPECT_EQ(fp->rect, rRect.rect());
         EXPECT_EQ(fp->radii[0], (Point{10, 12}));
       }
 
-      // Case 2: Scale matrix bakes axis scales into localRect and radii.
+      // Case 2: Scale matrix bakes axis scales into rect and radii.
       {
         const auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12);
         auto fp = RRectEffect::Make(&allocator, rRect, Matrix::MakeScale(2, 3), true);
         ASSERT_NE(fp, nullptr);
         EXPECT_FALSE(fp->needTransform());
         EXPECT_TRUE(fp->deviceToLocal().isIdentity());
-        EXPECT_FLOAT_EQ(fp->localRect.width(), 200.f);
-        EXPECT_FLOAT_EQ(fp->localRect.height(), 240.f);
+        EXPECT_FLOAT_EQ(fp->rect.width(), 200.f);
+        EXPECT_FLOAT_EQ(fp->rect.height(), 240.f);
         EXPECT_FLOAT_EQ(fp->radii[0].x, 20.f);
         EXPECT_FLOAT_EQ(fp->radii[0].y, 36.f);
       }
@@ -178,12 +193,27 @@ TGFX_TEST_PRIVATE(ClipTest, SmoothRRectEffect) {
         EXPECT_EQ(fp, nullptr);
       }
 
-      // Case 4: A diagonal corner pair whose smoothed extents overlap returns nullptr.
+      // Case 4: The same elongated corner as case 3 without AA produces an effect.
+      {
+        const std::array<Point, 4> radii = {{{20, 20}, {0, 0}, {10, 50}, {20, 30}}};
+        const auto rRect = RRect::MakeRectRadii(Rect::MakeWH(200, 200), radii, 1.0f);
+        auto fp = SmoothRRectEffect::Make(&allocator, rRect, Matrix::I(), false);
+        EXPECT_NE(fp, nullptr);
+      }
+
+      // Case 5: A diagonal corner pair whose smoothed extents overlap returns nullptr.
       {
         const std::array<Point, 4> radii = {{{30, 30}, {0, 0}, {30, 20}, {20, 15}}};
         const auto rRect = RRect::MakeRectRadii(Rect::MakeWH(100, 100), radii, 1.0f);
         EXPECT_FLOAT_EQ(rRect.smoothness(), 1.0f);
         auto fp = SmoothRRectEffect::Make(&allocator, rRect, Matrix::I(), true);
+        EXPECT_EQ(fp, nullptr);
+      }
+
+      // Case 6: Zero-scale matrix returns nullptr.
+      {
+        const auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12, 1.0f);
+        auto fp = SmoothRRectEffect::Make(&allocator, rRect, Matrix::MakeScale(0, 1), true);
         EXPECT_EQ(fp, nullptr);
       })
 }
@@ -933,10 +963,13 @@ TGFX_TEST(ClipTest, Overview) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
+  constexpr int margin = 50;
   constexpr int cellSize = 200;
   constexpr int columns = 5;
   constexpr int rows = 4;
-  auto surface = Surface::Make(context, cellSize * columns, cellSize * rows);
+  constexpr int surfaceWidth = margin * 2 + cellSize * columns;
+  constexpr int surfaceHeight = margin * 2 + cellSize * rows;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   auto canvas = surface->getCanvas();
   const auto cell = Rect::MakeWH(cellSize, cellSize);
   Paint fillPaint = {};
@@ -946,12 +979,13 @@ TGFX_TEST(ClipTest, Overview) {
   // Case 1: Rect under shear, AA. Non-orthogonal axes, RectEffect transform variant.
   {
     canvas->save();
-    canvas->translate(cellSize / 2, cellSize / 2);
+    canvas->translate(margin + cellSize / 2, margin + cellSize / 2);
     Matrix shear = Matrix::I();
     shear.setSkew(0.3f, 0);
     canvas->concat(shear);
     canvas->clipRect(Rect::MakeXYWH(-60, -60, 120, 120), true);
     canvas->resetMatrix();
+    canvas->translate(margin, margin);
     canvas->drawRect(cell, fillPaint);
     canvas->restore();
   }
@@ -959,14 +993,13 @@ TGFX_TEST(ClipTest, Overview) {
   // Case 2: Perspective Rect clip, NonAA. Falls back to mask texture path.
   {
     canvas->save();
-    canvas->translate(cellSize, 0);
-    canvas->translate(cellSize / 2, cellSize / 2);
+    canvas->translate(margin + cellSize + cellSize / 2, margin + cellSize / 2);
     Matrix persp = Matrix::I();
     persp.setAll(1, 0, 0, 0, 1, 0, 0.002f, 0, 1);
     canvas->concat(persp);
     canvas->clipRect(Rect::MakeXYWH(-70, -70, 140, 140), false);
     canvas->resetMatrix();
-    canvas->translate(cellSize, 0);
+    canvas->translate(margin + cellSize, margin);
     canvas->drawRect(cell, fillPaint);
     canvas->restore();
   }
@@ -975,7 +1008,7 @@ TGFX_TEST(ClipTest, Overview) {
   // Case 3: Simple RRect (uniform radii) AA, identity. RRectEffect identity variant.
   {
     canvas->save();
-    canvas->translate(2 * cellSize, 0);
+    canvas->translate(margin + 2 * cellSize, margin);
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(30, 30, 140, 140), 25, 25), true);
     canvas->drawRect(cell, fillPaint);
     canvas->restore();
@@ -984,7 +1017,7 @@ TGFX_TEST(ClipTest, Overview) {
   // Case 4: Complex RRect (4 distinct radii), identity, AA. RRectEffect identity variant.
   {
     canvas->save();
-    canvas->translate(3 * cellSize, 0);
+    canvas->translate(margin + 3 * cellSize, margin);
     canvas->clipRRect(RRect::MakeRectRadii(Rect::MakeXYWH(30, 30, 140, 140),
                                            {{{50, 50}, {12, 30}, {8, 8}, {30, 15}}}),
                       true);
@@ -995,8 +1028,7 @@ TGFX_TEST(ClipTest, Overview) {
   // Case 5: Rotated Simple RRect, AA. RRectEffect transform variant.
   {
     canvas->save();
-    canvas->translate(4 * cellSize, 0);
-    canvas->translate(cellSize / 2, cellSize / 2);
+    canvas->translate(margin + 4 * cellSize + cellSize / 2, margin + cellSize / 2);
     canvas->rotate(20);
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(-70, -55, 140, 110), 20, 20), true);
     canvas->translate(-cellSize / 2, -cellSize / 2);
@@ -1007,14 +1039,13 @@ TGFX_TEST(ClipTest, Overview) {
   // Case 6: Perspective Simple RRect, AA. Falls back to mask texture path.
   {
     canvas->save();
-    canvas->translate(0, cellSize);
-    canvas->translate(cellSize / 2, cellSize / 2);
+    canvas->translate(margin + cellSize / 2, margin + cellSize + cellSize / 2);
     Matrix persp = Matrix::I();
     persp.setAll(1, 0, 0, 0, 1, 0, 0.002f, 0, 1);
     canvas->concat(persp);
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(-70, -70, 140, 140), 25, 25), true);
     canvas->resetMatrix();
-    canvas->translate(0, cellSize);
+    canvas->translate(margin, margin + cellSize);
     canvas->drawRect(cell, fillPaint);
     canvas->restore();
   }
@@ -1025,8 +1056,7 @@ TGFX_TEST(ClipTest, Overview) {
   // variant.
   {
     canvas->save();
-    canvas->translate(cellSize, cellSize);
-    canvas->translate(cellSize / 2, cellSize / 2);
+    canvas->translate(margin + cellSize + cellSize / 2, margin + cellSize + cellSize / 2);
     canvas->clipPath(MakePath({{0, -75}, {72, -23}, {44, 60}, {-44, 60}, {-72, -23}}), false);
     canvas->translate(-cellSize / 2, -cellSize / 2);
     canvas->drawRect(cell, fillPaint);
@@ -1037,7 +1067,7 @@ TGFX_TEST(ClipTest, Overview) {
   // where fills remain visible.
   {
     canvas->save();
-    canvas->translate(2 * cellSize, cellSize);
+    canvas->translate(margin + 2 * cellSize, margin + cellSize);
     Path path = {};
     path.addRect(Rect::MakeXYWH(40, 40, 120, 120));
     path.toggleInverseFillType();
@@ -1052,7 +1082,7 @@ TGFX_TEST(ClipTest, Overview) {
   // outside both rounded corners. Both elements survive and produce two FPs.
   {
     canvas->save();
-    canvas->translate(3 * cellSize, cellSize);
+    canvas->translate(margin + 3 * cellSize, margin + cellSize);
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(20, 20, 140, 140), 50, 50), true);
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(60, 60, 140, 140), 50, 50), true);
     canvas->drawRect(cell, fillPaint);
@@ -1062,13 +1092,13 @@ TGFX_TEST(ClipTest, Overview) {
   // Case 10: 5 RRects overflow. First 4 use analytic FP, 5th falls to mask.
   {
     canvas->save();
-    canvas->translate(4 * cellSize, cellSize);
+    canvas->translate(margin + 4 * cellSize, margin + cellSize);
     for (int i = 0; i < 5; ++i) {
       canvas->translate(cellSize / 2, cellSize / 2);
       canvas->rotate(static_cast<float>(i) * 10.f + 5.f);
       canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(-70, -70, 140, 140), 12, 12), true);
       canvas->resetMatrix();
-      canvas->translate(4 * cellSize, cellSize);
+      canvas->translate(margin + 4 * cellSize, margin + cellSize);
     }
     canvas->drawRect(cell, fillPaint);
     canvas->restore();
@@ -1078,8 +1108,7 @@ TGFX_TEST(ClipTest, Overview) {
   // geometry bypass isSame() elimination, so both survive to the mask path.
   {
     canvas->save();
-    canvas->translate(0, 2 * cellSize);
-    canvas->translate(cellSize / 2, cellSize / 2);
+    canvas->translate(margin + cellSize / 2, margin + 2 * cellSize + cellSize / 2);
     auto pathA = MakePath({{0, -75}, {72, -23}, {44, 60}, {-44, 60}, {-72, -23}});
     auto pathB = MakePath({{0, -75}, {72, -23}, {44, 60}, {-44, 60}, {-72, -23}});
     canvas->clipPath(pathA);
@@ -1094,7 +1123,7 @@ TGFX_TEST(ClipTest, Overview) {
   // via the fast-path that retires the clip stack to Empty.
   {
     canvas->save();
-    canvas->translate(cellSize, 2 * cellSize);
+    canvas->translate(margin + cellSize, margin + 2 * cellSize);
     canvas->clipRect(cell);
     Path inverseFill = {};
     inverseFill.addRect(Rect::MakeLTRB(-10, -10, cellSize + 10, cellSize + 10));
@@ -1109,7 +1138,7 @@ TGFX_TEST(ClipTest, Overview) {
   // outer frame with a rectangular cutout in the middle.
   {
     canvas->save();
-    canvas->translate(2 * cellSize, 2 * cellSize);
+    canvas->translate(margin + 2 * cellSize, margin + 2 * cellSize);
     canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(20, 20, 160, 160), 30, 30));
     Path inverseHole = {};
     inverseHole.addRect(Rect::MakeXYWH(60, 60, 80, 80));
@@ -1126,7 +1155,7 @@ TGFX_TEST(ClipTest, Overview) {
   // back to wide-open.
   {
     canvas->save();
-    canvas->translate(3 * cellSize, 2 * cellSize);
+    canvas->translate(margin + 3 * cellSize, margin + 2 * cellSize);
     canvas->save();
     Path path = {};
     path.addRect(Rect::MakeXYWH(500, 500, 50, 50));
@@ -1138,6 +1167,8 @@ TGFX_TEST(ClipTest, Overview) {
   }
 
   // ---------- Smoothed RRect variants ----------
+  Paint generalPaint = {};
+  generalPaint.setColor(Color::Red());
   Paint smoothPaint = {};
   smoothPaint.setColor(Color::White());
   const std::array<Point, 4> smoothRadii = {{{30, 30}, {0, 0}, {35, 20}, {20, 30}}};
@@ -1146,76 +1177,113 @@ TGFX_TEST(ClipTest, Overview) {
   {
     const auto rect = Rect::MakeXYWH(30, 30, 140, 140);
     canvas->save();
-    canvas->translate(4 * cellSize, 2 * cellSize);
+    canvas->translate(margin + 4 * cellSize, margin + 2 * cellSize);
     canvas->save();
     canvas->clipRRect(RRect::MakeRectRadii(rect, smoothRadii), true);
-    canvas->drawRect(cell, fillPaint);
+    canvas->drawRect(cell, generalPaint);
     canvas->restore();
     canvas->clipRRect(RRect::MakeRectRadii(rect, smoothRadii, 1.0f), true);
     canvas->drawRect(cell, smoothPaint);
     canvas->restore();
+    TGFX_PRIVATE_ACCESS({
+      auto* fp = FlushAndGetLastCoverageFP(surface);
+      ASSERT_NE(fp, nullptr);
+      EXPECT_EQ(fp->classID(), SmoothRRectEffect::ClassID());
+    });
   }
 
-  // Case 16: The same corners as case 15 at a small smoothness, AA, identity. SmoothRRectEffect
+  // Case 16: Case 15 without AA. SmoothRRectEffect identity variant.
+  {
+    const auto rect = Rect::MakeXYWH(30, 30, 140, 140);
+    canvas->save();
+    canvas->translate(margin, margin + 3 * cellSize);
+    canvas->save();
+    canvas->clipRRect(RRect::MakeRectRadii(rect, smoothRadii), false);
+    canvas->drawRect(cell, generalPaint);
+    canvas->restore();
+    canvas->clipRRect(RRect::MakeRectRadii(rect, smoothRadii, 1.0f), false);
+    canvas->drawRect(cell, smoothPaint);
+    canvas->restore();
+    TGFX_PRIVATE_ACCESS({
+      auto* fp = FlushAndGetLastCoverageFP(surface);
+      ASSERT_NE(fp, nullptr);
+      EXPECT_EQ(fp->classID(), SmoothRRectEffect::ClassID());
+    });
+  }
+
+  // Case 17: The same corners as case 15 at a small smoothness, AA, identity. SmoothRRectEffect
   // identity variant.
   {
     const auto rect = Rect::MakeXYWH(30, 30, 140, 140);
     canvas->save();
-    canvas->translate(0, 3 * cellSize);
+    canvas->translate(margin + cellSize, margin + 3 * cellSize);
     canvas->save();
     canvas->clipRRect(RRect::MakeRectRadii(rect, smoothRadii), true);
-    canvas->drawRect(cell, fillPaint);
+    canvas->drawRect(cell, generalPaint);
     canvas->restore();
     canvas->clipRRect(RRect::MakeRectRadii(rect, smoothRadii, 0.1f), true);
     canvas->drawRect(cell, smoothPaint);
     canvas->restore();
+    TGFX_PRIVATE_ACCESS({
+      auto* fp = FlushAndGetLastCoverageFP(surface);
+      ASSERT_NE(fp, nullptr);
+      EXPECT_EQ(fp->classID(), SmoothRRectEffect::ClassID());
+    });
   }
 
-  // Case 17: Smoothed Complex RRect mixing circular, elliptical and sharp corners at full
+  // Case 18: Smoothed Complex RRect mixing circular, elliptical and sharp corners at full
   // smoothness under a non-uniform scale followed by a rotation, AA. SmoothRRectEffect transform
   // variant.
   {
     const auto rect = Rect::MakeXYWH(-30, -50, 60, 100);
     const std::array<Point, 4> radii = {{{15, 15}, {0, 0}, {12, 10}, {10, 15}}};
     canvas->save();
-    canvas->translate(cellSize, 3 * cellSize);
-    canvas->translate(cellSize / 2, cellSize / 2);
+    canvas->translate(margin + 2 * cellSize + cellSize / 2, margin + 3 * cellSize + cellSize / 2);
     canvas->rotate(20);
     canvas->scale(2, 1);
     canvas->save();
     canvas->clipRRect(RRect::MakeRectRadii(rect, radii), true);
     canvas->resetMatrix();
-    canvas->translate(cellSize, 3 * cellSize);
-    canvas->drawRect(cell, fillPaint);
+    canvas->translate(margin + 2 * cellSize, margin + 3 * cellSize);
+    canvas->drawRect(cell, generalPaint);
     canvas->restore();
     canvas->clipRRect(RRect::MakeRectRadii(rect, radii, 1.0f), true);
     canvas->resetMatrix();
-    canvas->translate(cellSize, 3 * cellSize);
+    canvas->translate(margin + 2 * cellSize, margin + 3 * cellSize);
     canvas->drawRect(cell, smoothPaint);
     canvas->restore();
+    TGFX_PRIVATE_ACCESS({
+      auto* fp = FlushAndGetLastCoverageFP(surface);
+      ASSERT_NE(fp, nullptr);
+      EXPECT_EQ(fp->classID(), SmoothRRectEffect::ClassID());
+    });
   }
 
-  // Case 18: The same corners as case 15 at full smoothness under perspective, AA. Falls back to
+  // Case 19: The same corners as case 15 at full smoothness under perspective, AA. Falls back to
   // mask texture path.
   {
     const auto rect = Rect::MakeXYWH(-70, -70, 140, 140);
     canvas->save();
-    canvas->translate(2 * cellSize, 3 * cellSize);
-    canvas->translate(cellSize / 2, cellSize / 2);
+    canvas->translate(margin + 3 * cellSize + cellSize / 2, margin + 3 * cellSize + cellSize / 2);
     Matrix persp = Matrix::I();
     persp.setAll(1, 0, 0, 0, 1, 0, 0.002f, 0, 1);
     canvas->concat(persp);
     canvas->save();
     canvas->clipRRect(RRect::MakeRectRadii(rect, smoothRadii), true);
     canvas->resetMatrix();
-    canvas->translate(2 * cellSize, 3 * cellSize);
-    canvas->drawRect(cell, fillPaint);
+    canvas->translate(margin + 3 * cellSize, margin + 3 * cellSize);
+    canvas->drawRect(cell, generalPaint);
     canvas->restore();
     canvas->clipRRect(RRect::MakeRectRadii(rect, smoothRadii, 1.0f), true);
     canvas->resetMatrix();
-    canvas->translate(2 * cellSize, 3 * cellSize);
+    canvas->translate(margin + 3 * cellSize, margin + 3 * cellSize);
     canvas->drawRect(cell, smoothPaint);
     canvas->restore();
+    TGFX_PRIVATE_ACCESS({
+      auto* fp = FlushAndGetLastCoverageFP(surface);
+      ASSERT_NE(fp, nullptr);
+      EXPECT_NE(fp->classID(), SmoothRRectEffect::ClassID());
+    });
   }
 
   EXPECT_TRUE(Baseline::Compare(surface, "ClipTest/ClipOverview"));

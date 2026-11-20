@@ -24,7 +24,7 @@ namespace tgfx {
 
 class GLSLRectEffect : public RectEffect {
  public:
-  GLSLRectEffect(const Rect& localRect, const Matrix& deviceToLocal, bool antiAlias);
+  GLSLRectEffect(const Rect& rect, const Matrix& deviceToLocal, bool antiAlias);
 
   void emitCode(EmitArgs& args) const override;
 

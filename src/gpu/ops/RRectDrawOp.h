@@ -76,7 +76,7 @@ class RRectDrawOp : public StandardDrawOp {
   size_t rectCount = 0;
   bool hasStroke = false;
   bool unscaledGeometry = false;
-  bool isComplex = false;
+  bool hasComplex = false;
   bool isSmooth = false;
   size_t indicesPerRRect = 0;
   std::optional<PMColor> commonColor = std::nullopt;

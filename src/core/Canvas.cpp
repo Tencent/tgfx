@@ -291,223 +291,25 @@ void Canvas::drawRoundRect(const Rect& rect, float radiusX, float radiusY, const
   drawRRect(RRect::MakeRectXY(rect, radiusX, radiusY), paint);
 }
 
-// The sub-half-pixel threshold classifies a corner as "sharp" only when the arc would be
-// shorter than one device pixel; therefore the local radius must be projected to device space
-// via the current CTM's max scale before comparison. Without this, a tiny local-space radius
-// inside a large scale-up (e.g. a 0.9-unit oval under 100x) is wrongly treated as sharp and
-// the dedicated RRect op is bypassed.
-static bool HasSharpCorner(const RRect& rRect, const Matrix& viewMatrix) {
-  auto deviceScale = viewMatrix.getMaxScale();
-  if (FloatNearlyZero(deviceScale)) {
-    return true;
-  }
-  for (const auto& r : rRect.radii()) {
-    if (r.x * deviceScale < 0.5f || r.y * deviceScale < 0.5f) {
-      return true;
-    }
-  }
-  return false;
-}
-
-static bool UseDrawPathForSmoothRRect(const std::array<Point, 4>& radii, bool isComplex,
-                                      const Stroke* stroke, const Matrix& viewMatrix,
-                                      bool antiAlias) {
-  const auto scales = viewMatrix.getAxisScales();
-  // Axis scales that map the local geometry into the space where the shader evaluates distances.
-  auto evalScales = scales;
-  // Farthest distance from the contour covered by the stroke and its AA band, measured in the
-  // space where the shader evaluates distances.
-  auto strokeReach = 0.0f;
-  if (stroke != nullptr) {
-    // Under non-uniform scaling, a stroke's width differs between the two axes in the scaled
-    // space, so its distances are evaluated in the unscaled local space where the width is
-    // uniform. A hairline (width 0) has a fixed device-space width that is uniform in the scaled
-    // space, so it is evaluated there like other strokes.
-    const auto unscaledGeometry = stroke->width > 0.0f && scales.x != scales.y;
-    evalScales = unscaledGeometry ? Point{1.0f, 1.0f} : scales;
-    if (unscaledGeometry) {
-      const auto minScale = viewMatrix.getMinScale();
-      DEBUG_ASSERT(minScale > 0.0f);
-      if (minScale <= 0.0f) {
-        return true;
-      }
-      strokeReach = stroke->width * 0.5f + 0.5f / minScale;
-    } else {
-      const auto halfStroke = stroke->width > 0.0f ? stroke->width * scales.x * 0.5f : 0.5f;
-      strokeReach = halfStroke + 0.5f;
-    }
-    // The distance solver's error grows with the distance from the contour; cap the reach to
-    // keep the measured error subpixel.
-    if (strokeReach > 50.0f) {
-      return true;
-    }
-  }
-
-  // Non-Complex types have identical radii across all four corners, so only the first needs
-  // check.
-  const auto cornerCount = isComplex ? radii.size() : size_t{1};
-  for (size_t i = 0; i < cornerCount; ++i) {
-    const auto& r = radii[i];
-    // The shader can only produce a square outer join for zero-radius corners. Other join
-    // shapes require drawPath.
-    if ((r.x <= 0.0f || r.y <= 0.0f) && stroke != nullptr &&
-        (stroke->join != LineJoin::Miter || 1.0f / stroke->miterLimit > 1.0f / FLOAT_SQRT2)) {
-      return true;
-    }
-    const auto xRadius = r.x * evalScales.x;
-    const auto yRadius = r.y * evalScales.y;
-    const auto minRadius = std::min(xRadius, yRadius);
-    const auto maxRadius = std::max(xRadius, yRadius);
-    // AA fills and all strokes use the fixed-iteration cubic distance solver. The corner's
-    // axis ratio affects its accuracy; the measured limit keeps the error subpixel.
-    if ((stroke != nullptr || antiAlias) && maxRadius > 4.0f * minRadius) {
-      return true;
-    }
-    // The contour has incoming and outgoing transition cubics separated by a retained arc.
-    // Join-point normals select the nearest segment correctly only within the safe distance
-    // R = minRadius^2 / (2 * maxRadius), so the stroke reach must not exceed it.
-    if (strokeReach * maxRadius > 0.5f * minRadius * minRadius) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * The dedicated RRect op draws stroked rounded corners by offsetting the ellipse equation
- * outward/inward, which assumes a concentric ellipse approximates the true stroke offset
- * curve. The approximation breaks down when the stroke is too thick relative to the corner
- * radii, or when the ellipse is too elongated (major/minor ratio too large). In those cases
- * this function returns true so the caller falls back to drawPath for an accurate stroke.
- */
-static bool UseDrawPathForRRect(const std::array<Point, 4>& radii, bool isComplex,
-                                const Stroke* stroke, const Matrix& viewMatrix,
-                                bool hasSharpCorner) {
-  // Sharp corners (sub-half-unit local radius on either axis) make the ellipse implicit
-  // equation degenerate: at zero radius the equation is undefined, and under stroke the
-  // inner ellipse radius would become negative. Fall back to drawPath so the sharp
-  // geometry renders correctly.
-  if (hasSharpCorner) {
-    return true;
-  }
-  if (stroke == nullptr) {
-    return false;
-  }
-
-  const auto scales = viewMatrix.getAxisScales();
-  // Per-axis scaled stroke width: local width multiplied by the x/y axis scale factors
-  // extracted from the view matrix.
-  const Point scaledStroke = {scales.x * stroke->width, scales.y * stroke->width};
-  Point halfScaledStroke = {};
-  if (FloatNearlyZero(scaledStroke.length())) {
-    // Hairline stroke (width == 0) falls back to half a pixel on each axis.
-    halfScaledStroke = {0.5f, 0.5f};
-  } else {
-    halfScaledStroke = scaledStroke * 0.5f;
-  }
-  const auto halfScaledStrokeLen = halfScaledStroke.length();
-
-  // Non-Complex types have identical radii across all four corners (zero for Rect, equal
-  // per-corner for Simple/Oval), so only the first needs check.
-  const auto cornerCount = isComplex ? radii.size() : size_t{1};
-  for (size_t i = 0; i < cornerCount; ++i) {
-    const auto& r = radii[i];
-    const auto xRadius = scales.x * r.x;
-    const auto yRadius = scales.y * r.y;
-    // Half stroke width exceeds corner radius: the inner offset ellipse collapses
-    // (inner radius would be non-positive), so the concentric-ellipse approximation
-    // cannot be constructed.
-    if (halfScaledStroke.x > xRadius || halfScaledStroke.y > yRadius) {
-      return true;
-    }
-    // Thick stroke on an elongated ellipse (major/minor axis ratio > 2): the concentric-ellipse
-    // approximation visibly diverges from the true offset curve.
-    if (halfScaledStrokeLen > 0.5f && (0.5f * xRadius > yRadius || 0.5f * yRadius > xRadius)) {
-      return true;
-    }
-    // Fall back to drawPath when the stroke half width exceeds the ellipse's curvature radius
-    // at an axis endpoint (yRadius^2/xRadius on the x-axis, xRadius^2/yRadius on the y-axis).
-    // Past that radius, near the x-axis endpoint there is a range of angles over which the y
-    // of the stroke's inner edge decreases as the angle increases, which never happens on a
-    // concentric ellipse (likewise for x at the y-axis endpoint).
-    // With (hx, hy) = halfScaledStroke, the x-axis check first scales y by hx/hy to make the
-    // stroke uniform, so hx > (yRadius*hx/hy)^2/xRadius rearranges to the first check below;
-    // the second check swaps the axes.
-    if (halfScaledStroke.x * yRadius * yRadius <
-        halfScaledStroke.y * halfScaledStroke.y * xRadius) {
-      return true;
-    }
-    if (halfScaledStroke.y * xRadius * xRadius <
-        halfScaledStroke.x * halfScaledStroke.x * yRadius) {
-      return true;
-    }
-  }
-  return false;
-}
-
-static bool UseDrawPath(const RRect& rRect, const Stroke* stroke, const Matrix& viewMatrix,
-                        bool hasSharpCorner, bool antiAlias) {
-  // Under perspective, a fixed-width AA ramp in device space maps back to a ramp of varying width
-  // in local space, which the rrect shaders cannot express when evaluating the contour locally.
-  // NonAA could be supported by interpolating the local coordinates with perspective correction,
-  // but the use case is rare, so perspective falls back for now.
-  // A skew is accepted as a known visual flaw: it changes the width of the AA ramp measured along
-  // the normals of the transformed edges.
-  if (viewMatrix.hasPerspective()) {
-    return true;
-  }
-  // For general rrects:
-  // The AA path partitions the RRect into a 4x4 grid of quads; a diagonal corner pair
-  // overlapping on either axis makes those quads self-intersect. The NonAA path is free of
-  // that mesh constraint but its shader still miscomputes coverage when diagonal corner
-  // boxes truly overlap. We cannot tell here which path the op will take, so apply the
-  // stricter AA rule and fall back to drawPath whenever any axis is crossed.
-  // For smooth rrects:
-  // The shader does not handle fragments shared by two corner regions.
-  if (RRectUtils::HasDiagonalCornerAxisOverlap(rRect)) {
-    return true;
-  }
-  if (rRect.smoothness() > 0.0f) {
-    return UseDrawPathForSmoothRRect(rRect.radii(), rRect.isComplex(), stroke, viewMatrix,
-                                     antiAlias);
-  }
-  return UseDrawPathForRRect(rRect.radii(), rRect.isComplex(), stroke, viewMatrix, hasSharpCorner);
-}
-
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
   if (rRect.rect().isEmpty()) {
     drawRect(rRect.rect(), paint);
     return;
   }
-  // Classify corner radii in a single pass so both the allSmall degenerate check and the
-  // anySmall op-capability check share one traversal. The sub-half-pixel threshold is evaluated
-  // in device space, so the local radii are scaled by the current CTM's max scale before
-  // comparing. Otherwise a layer-local small RRect inside a scaled-up parent (e.g. a 0.9x0.9
-  // oval inside a 100x scale) would be wrongly degenerated into a rect even though its arcs
-  // are clearly visible after the transform. A singular CTM (max scale == 0) projects all
-  // geometry to a zero-area region, so nothing visible would be drawn anyway.
-  auto deviceScale = _matrix.getMaxScale();
-  if (FloatNearlyZero(deviceScale)) {
-    return;
-  }
-  auto allSmall = true;
-  auto anySmall = false;
-  for (const auto& r : rRect.radii()) {
-    if (r.x * deviceScale < 0.5f || r.y * deviceScale < 0.5f) {
-      anySmall = true;
-    } else {
-      allSmall = false;
+  switch (RRectUtils::GetDrawType(rRect, paint.getStroke(), _matrix, paint.getBrush().antiAlias)) {
+    case RRectDrawType::None:
+      return;
+    case RRectDrawType::Rect:
+      drawRect(rRect.rect(), paint);
+      return;
+    case RRectDrawType::Path: {
+      Path path = {};
+      path.addRRect(rRect);
+      drawPath(path, paint);
+      return;
     }
-  }
-  if (allSmall) {
-    drawRect(rRect.rect(), paint);
-    return;
-  }
-  if (UseDrawPath(rRect, paint.getStroke(), _matrix, anySmall, paint.getBrush().antiAlias)) {
-    Path path = {};
-    path.addRRect(rRect);
-    drawPath(path, paint);
-    return;
+    case RRectDrawType::RRect:
+      break;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
   drawContext->drawRRect(rRect, _matrix, *clipStack, paint.getBrush(), paint.getStroke());
@@ -557,8 +359,7 @@ void Canvas::drawPath(const Path& path, const Matrix& matrix, const ClipStack& c
   }
   // UseDrawPath forces complex stroke/radius combinations through the generic stroker, matching
   // the drawRRect entry point.
-  if (hasRRect &&
-      !UseDrawPath(rRect, stroke, matrix, HasSharpCorner(rRect, matrix), brush.antiAlias)) {
+  if (hasRRect && !RRectUtils::UseDrawPath(rRect, stroke, matrix, brush.antiAlias)) {
     drawContext->drawRRect(rRect, matrix, clip, brush, stroke);
     return;
   }

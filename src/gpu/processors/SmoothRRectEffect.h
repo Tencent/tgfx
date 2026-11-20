@@ -54,9 +54,9 @@ class SmoothRRectEffect : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  SmoothRRectEffect(const Rect& localRect, const std::array<Point, 4>& radii, float smoothness,
+  SmoothRRectEffect(const Rect& rect, const std::array<Point, 4>& radii, float smoothness,
                     const Matrix& deviceToLocal, bool antiAlias)
-      : FragmentProcessor(ClassID()), localRect(localRect), radii(radii), smoothness(smoothness),
+      : FragmentProcessor(ClassID()), rect(rect), radii(radii), smoothness(smoothness),
         antiAlias(antiAlias), _deviceToLocal(deviceToLocal),
         _needTransform(!deviceToLocal.isIdentity()) {
   }
@@ -71,9 +71,9 @@ class SmoothRRectEffect : public FragmentProcessor {
     return _deviceToLocal;
   }
 
-  Rect localRect = {};
-  // Per-corner radii in [TL, TR, BR, BL] order, scaled to device-equivalent units when
-  // _needTransform is true (CPU side bakes axisScales into the radii).
+  // Rect in the space that deviceToLocal maps device coordinates into.
+  Rect rect = {};
+  // Per-corner radii in [TL, TR, BR, BL] order, in the same space as rect.
   std::array<Point, 4> radii = {};
   // Corner smoothness in (0, 1], shared by all four corners.
   float smoothness = 0.0f;

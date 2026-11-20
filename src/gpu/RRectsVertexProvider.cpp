@@ -757,6 +757,11 @@ class SmoothRRectsVertexProvider final : public RRectsVertexProvider {
   void getVertices(float* vertices) const override {
     size_t index = 0;
     auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
+    const auto currentAAType = aaType();
+    // Extend the quad so the AA coverage ramp is fully covered. On MSAA, bloat enough to
+    // guarantee any pixel that might be touched by the rRect has full sample coverage.
+    const auto aaBloat =
+        currentAAType == AAType::None ? 0.0f : (currentAAType == AAType::MSAA ? FLOAT_SQRT2 : 0.5f);
 
     size_t currentIndex = 0;
     for (auto& record : rects) {
@@ -765,20 +770,25 @@ class SmoothRRectsVertexProvider final : public RRectsVertexProvider {
       auto scales = viewMatrix.getAxisScales();
       auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
       const auto unscaledGeometry = IsNonUniformScaledStroke(*record, stroke);
-      float minScale = 1.0f;
       // Per-axis factors that convert unscaled local distances to the scaled frame of the AA ramp.
       // Baked records are already in the scaled frame and use (1, 1). Skew is not accounted for.
       Point invScale = {1.0f, 1.0f};
-      StrokeParams strokeParams = {};
+      auto halfStroke = 0.0f;
+      auto aaExtra = aaBloat;
       if (unscaledGeometry) {
         // Skip baking: radii, rect bounds and localCoord stay in the original local frame, and
         // vertex positions are mapped by the full matrix.
-        minScale = viewMatrix.getMinScale();
-        strokeParams.halfStrokeX = 0.5f * stroke->width;
-        strokeParams.halfStrokeY = strokeParams.halfStrokeX;
+        halfStroke = 0.5f * stroke->width;
         invScale = {1.0f / scales.x, 1.0f / scales.y};
+        // In the local stroke frame the AA bloat converts by the largest local-per-device factor.
+        aaExtra = aaBloat / viewMatrix.getMinScale();
       } else {
-        strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
+        rRect.scale(scales.x, scales.y);
+        viewMatrix.preScale(1.0f / scales.x, 1.0f / scales.y);
+        if (stroke != nullptr) {
+          // A hairline is one device pixel wide in the scaled space under any axis scales.
+          halfStroke = stroke->width > 0.0f ? 0.5f * scales.x * stroke->width : 0.5f;
+        }
       }
       uint32_t uintColor = 0;
       if (bitFields.hasColor) {
@@ -787,17 +797,8 @@ class SmoothRRectsVertexProvider final : public RRectsVertexProvider {
 
       const auto& rect = rRect.rect();
       const auto& radii = rRect.radii();
-      const auto currentAAType = aaType();
-      // Extend the quad so the AA coverage ramp is fully covered. On MSAA, bloat enough to
-      // guarantee any pixel that might be touched by the rRect has full sample coverage.
-      const auto aaBloat = currentAAType == AAType::None
-                               ? 0.0f
-                               : (currentAAType == AAType::MSAA ? FLOAT_SQRT2 : 0.5f);
       // Strokes extend the quad by the half stroke width to cover the outer edge of the ring.
-      // In the local stroke frame the AA bloat converts by the largest local-per-device factor.
-      const auto aaExtra = unscaledGeometry ? aaBloat / minScale : aaBloat;
-      const auto quad =
-          rect.makeOutset(strokeParams.halfStrokeX + aaExtra, strokeParams.halfStrokeY + aaExtra);
+      const auto quad = rect.makeOutset(halfStroke + aaExtra, halfStroke + aaExtra);
       // Corner positions for a quad: TL, TR, BR, BL
       const Point corners[] = {
           {quad.left, quad.top},
@@ -838,7 +839,7 @@ class SmoothRRectsVertexProvider final : public RRectsVertexProvider {
         // halfStroke (1 float) - only for stroke mode; in the evaluation frame of the record
         // (baked device pixels, or local units for an unscaledGeometry record).
         if (bitFields.hasStroke) {
-          vertices[index++] = strokeParams.halfStrokeX;
+          vertices[index++] = halfStroke;
         }
         // invScale (2 floats) - only for AA unscaledGeometry records.
         if (_hasUnscaledGeometry && currentAAType != AAType::None) {
@@ -868,8 +869,8 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
   const auto firstIsSmooth = rects.front()->rRect.smoothness() > 0.0f;
   for (size_t i = 0; i < rects.size(); ++i) {
     const auto& record = rects[i];
-    // Plain and smoothed rrects, as well as plain simple and complex rrects, use different vertex
-    // layouts, so a batch never mixes them.
+    // General and smoothed rrects, as well as general simple and complex rrects, use different
+    // vertex layouts, so a batch never mixes them.
     DEBUG_ASSERT((record->rRect.smoothness() > 0.0f) == firstIsSmooth);
     DEBUG_ASSERT(firstIsSmooth || record->rRect.isComplex() == rects.front()->rRect.isComplex());
     if (record->color != firstColor) {

@@ -25,10 +25,10 @@ std::string EmitTransitionImplicitFunction(ShaderBuilder* builder) {
   // The result is not a distance, and its sign is meaningful only in the region where the caller
   // has selected this curve.
   // The curve is the cubic Bezier with control points:
-  //   b0 = (transitionStart, 0)
-  //   b1 = (transitionStart - 2*step, 0)
-  //   b2 = (transitionStart - 3*step, 0)
-  //   b3 = (transitionStart - 3*step - arcOffsetAlong, arcOffsetCross)
+  //   B0 = (transitionStart, 0)
+  //   B1 = (transitionStart - 2*step, 0)
+  //   B2 = (transitionStart - 3*step, 0)
+  //   B3 = (transitionStart - 3*step - arcOffsetAlong, arcOffsetCross)
   // Its parametric form is
   //   X(t) = transitionStart - 6*step*t + 3*step*t^2 - arcOffsetAlong*t^3
   //   Y(t) = arcOffsetCross*t^3
@@ -37,12 +37,6 @@ std::string EmitTransitionImplicitFunction(ShaderBuilder* builder) {
   //   b = (x - transitionStart + arcOffsetAlong*y / arcOffsetCross) / (3*step)
   // the implicit equation is
   //   f(q) = a^2 - 6*b*a - 8*a - b^3
-  //   q                the point in the corner frame
-  //   transitionStart  the distance from the vertex to the curve start along the x axis
-  //   step             the control-point spacing
-  //   arcOffsetAlong   the offset from b2 to the curve end along the x axis, toward the vertex
-  //   arcOffsetCross   the offset from b2 to the curve end along the y axis
-  //   return           a value negative inside the shape and positive outside
   const auto implicitFunc = builder->getMangledFunctionName("smoothCornerTransitionImplicit");
   // clang-format off
   builder->addFunction(R"(
@@ -61,9 +55,6 @@ std::string EmitEllipseImplicitFunction(ShaderBuilder* builder) {
   // Evaluates the implicit ellipse equation, negative inside the ellipse.
   // The result is not a distance, and only its sign is meaningful. The implicit equation is
   //   f(q) = (x / radii.x)^2 + (y / radii.y)^2 - 1
-  //   q       the point relative to the ellipse center
-  //   radii   the ellipse semi-axes on x and y
-  //   return  a value negative inside the ellipse and positive outside
   const auto implicitFunc = builder->getMangledFunctionName("smoothCornerEllipseImplicit");
   // clang-format off
   builder->addFunction(R"(
@@ -81,7 +72,7 @@ std::string EmitCubicBezierNewtonDistFunction(ShaderBuilder* builder, int iterat
                                               bool needNormal) {
   // Performs one Gauss-Newton step toward the parameter of the nearest point on the cubic.
   // For the cubic
-  //   B(t) = (1-t)^3*b0 + 3(1-t)^2*t*b1 + 3(1-t)*t^2*b2 + t^3*b3
+  //   B(t) = (1-t)^3*B0 + 3(1-t)^2*t*B1 + 3(1-t)*t^2*B2 + t^3*B3
   // the step is
   //   t' = t - dot(B(t) - q, B'(t)) / dot(B'(t), B'(t))
   // Expanded in powers of t,
@@ -113,7 +104,7 @@ highp float )" + newtonStepFunc + R"((highp float t, highp vec2 d0, highp vec2 d
                                       : "sqrt(nearestDistSq) * (side > 0.0 ? 1.0 : -1.0)";
   // Computes the signed distance from q to the cubic over t in [0, 1], negative inside the shape.
   // The cubic and its expansion in powers of t are
-  //   B(t) = (1-t)^3*b0 + 3(1-t)^2*t*b1 + 3(1-t)*t^2*b2 + t^3*b3
+  //   B(t) = (1-t)^3*B0 + 3(1-t)^2*t*B1 + 3(1-t)*t^2*B2 + t^3*B3
   //   B(t) - q = d0 + d1*t + d2*t^2 + d3*t^3
   // Each of the seeds 0, 0.5 and 1 runs the Gauss-Newton steps and is clamped to [0, 1] afterwards.
   // The endpoints are not compared on their own, so the caller ensures that the nearest point to q
@@ -123,10 +114,6 @@ highp float )" + newtonStepFunc + R"((highp float t, highp vec2 d0, highp vec2 d
   // tells which side of the tangent q lies on. The contour runs from the x-axis edge toward the
   // y-axis edge, so the cross product is negative inside the shape. The normal is
   //   n = (B'(t*).y, -B'(t*).x)
-  //   q       the point
-  //   b0..b3  the control points of the cubic
-  //   return  the signed distance; when needNormal is true, a vec3 that also carries the
-  //           unnormalized curve normal at the nearest point in yz
   const auto distFunc = builder->getMangledFunctionName("smoothCornerBezierNewtonDist");
   // clang-format off
   builder->addFunction(
@@ -165,7 +152,7 @@ returnType + distFunc + R"((highp vec2 q, highp vec2 b0, highp vec2 b1, highp ve
 
 std::string EmitEllipseSampsonDistFunction(ShaderBuilder* builder) {
   // Computes the approximate signed distance to an ellipse, negative inside the ellipse.
-  // The Sampson distance is accurate to first order near the ellipse. With
+  // The Sampson distance approaches the true distance as q nears the ellipse. With
   //   f(q) = (x / radii.x)^2 + (y / radii.y)^2 - 1
   //   grad f(q) = (2x / radii.x^2, 2y / radii.y^2)
   // the displacement delta that moves q onto the ellipse satisfies f(q + delta) = 0. Keeping only
@@ -173,9 +160,6 @@ std::string EmitEllipseSampsonDistFunction(ShaderBuilder* builder) {
   //   f(q) + dot(grad f(q), delta) = 0
   // The shortest such delta is parallel to the normal, delta = lambda * grad f(q), so
   //   d = f(q) / |grad f(q)|
-  //   q       the point relative to the ellipse center
-  //   radii   the ellipse semi-axes on x and y
-  //   return  the approximate signed distance
   const auto distFunc = builder->getMangledFunctionName("smoothCornerEllipseSampsonDist");
   // clang-format off
   builder->addFunction(R"(

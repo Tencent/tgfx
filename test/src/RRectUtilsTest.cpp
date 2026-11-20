@@ -126,12 +126,16 @@ TGFX_TEST(RRectUtilsTest, ConservativeIntersect) {
     EXPECT_FALSE(RRectUtils::ConservativeIntersect(a, b).has_value());
   }
 
-  // Case 11: A smoothed RRect whose bounding rect overlaps the other's, rejected.
+  // Case 11: A smoothed RRect whose bounding rect overlaps a different RRect's, rejected; with
+  // itself, the result is the same smoothed RRect.
   {
     const auto smooth = RRect::MakeRectXY(Rect::MakeWH(100, 100), 20, 20, 0.5f);
-    const auto plain = RRect::MakeRectXY(Rect::MakeWH(100, 100), 20, 20);
-    EXPECT_FALSE(RRectUtils::ConservativeIntersect(smooth, plain).has_value());
-    EXPECT_FALSE(RRectUtils::ConservativeIntersect(plain, smooth).has_value());
+    const auto general = RRect::MakeRectXY(Rect::MakeWH(100, 100), 20, 20);
+    EXPECT_FALSE(RRectUtils::ConservativeIntersect(smooth, general).has_value());
+    EXPECT_FALSE(RRectUtils::ConservativeIntersect(general, smooth).has_value());
+    const auto result = RRectUtils::ConservativeIntersect(smooth, smooth);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, smooth);
   }
 }
 
@@ -178,8 +182,8 @@ TGFX_TEST(RRectUtilsTest, InnerBounds) {
     EXPECT_NEAR(inner.bottom, 80.f - 11.716129f, 1e-3f);
   }
 
-  // Case 6: A smoothed corner keeps the diagonal inset of the plain corner, which beats the strips
-  // widened to (1 + s) * r.
+  // Case 6: A smoothed corner keeps the diagonal inset of the general corner, which beats the
+  // strips widened to (1 + s) * r.
   {
     const auto rr = RRect::MakeRectXY(Rect::MakeWH(100, 100), 20, 20, 0.5f);
     const auto inner = RRectUtils::InnerBounds(rr);

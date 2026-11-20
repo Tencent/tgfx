@@ -79,7 +79,7 @@ bool RRectsContent::onHasSameGeometry(const GeometryContent* other) const {
     return false;
   }
   for (size_t i = 0; i < rRects.size(); ++i) {
-    if (rRects[i].rect() != otherRRects[i].rect() || rRects[i].radii() != otherRRects[i].radii()) {
+    if (rRects[i] != otherRRects[i]) {
       return false;
     }
   }

@@ -115,7 +115,8 @@ class RRect {
    * @param rect  bounds of rounded rectangle
    * @param radiusX  x-axis radius of corners
    * @param radiusY  y-axis radius of corners
-   * @param smoothness  corner smoothness applied uniformly to all corners
+   * @param smoothness  corner smoothness applied uniformly to all corners. See setRectRadii() for
+   * how it is clamped and reduced.
    */
   void setRectXY(const Rect& rect, float radiusX, float radiusY, float smoothness = 0.0f);
 
@@ -132,7 +133,7 @@ class RRect {
    * Larger values make the curvature change more gradually: the transition curves take up more
    * of the corner and the arc less, and the points where the corner meets the edges move away
    * from the corner vertex, to (1 + smoothness) times the corner radius along each edge. A value
-   * of 1 leaves only the transition curves.
+   * of 1 leaves only the transition curves. Values are clamped to [0, 1].
    */
   void setRectRadii(const Rect& rect, const std::array<Point, 4>& radii, float smoothness = 0.0f);
 

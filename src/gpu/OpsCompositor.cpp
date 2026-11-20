@@ -19,7 +19,6 @@
 #include "OpsCompositor.h"
 #include "core/MeshBase.h"
 #include "core/PathRef.h"
-#include "core/RRectUtils.h"
 #include "core/VertexMesh.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -125,7 +124,7 @@ static bool ShouldFlushRectOps(const std::vector<PlacementPtr<Stroke>>& pendingS
 }
 
 // Returns true when the new RRect needs a different vertex layout from the RRects already
-// queued: plain and smoothed RRects use different layouts, and so do plain Complex and
+// queued: general and smoothed RRects use different layouts, and so do general Complex and
 // non-Complex RRects. Smoothness values do not split batches because each record stores its own
 // value.
 static bool VertexLayoutMismatch(const RRect& newRRect,

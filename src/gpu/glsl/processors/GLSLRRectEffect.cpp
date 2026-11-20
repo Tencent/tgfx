@@ -51,9 +51,9 @@ PlacementPtr<RRectEffect> RRectEffect::Make(BlockAllocator* allocator, const RRe
                                           deviceToLocal, antiAlias);
 }
 
-GLSLRRectEffect::GLSLRRectEffect(const Rect& localRect, const std::array<Point, 4>& radii,
+GLSLRRectEffect::GLSLRRectEffect(const Rect& rect, const std::array<Point, 4>& radii,
                                  const Matrix& deviceToLocal, bool antiAlias)
-    : RRectEffect(localRect, radii, deviceToLocal, antiAlias) {
+    : RRectEffect(rect, radii, deviceToLocal, antiAlias) {
 }
 
 void GLSLRRectEffect::emitCode(EmitArgs& args) const {
@@ -61,7 +61,7 @@ void GLSLRRectEffect::emitCode(EmitArgs& args) const {
   auto uniformHandler = args.uniformHandler;
 
   const auto rectName =
-      uniformHandler->addUniform("LocalRect", UniformFormat::Float4, ShaderStage::Fragment);
+      uniformHandler->addUniform("Rect", UniformFormat::Float4, ShaderStage::Fragment);
   const auto radiiXName =
       uniformHandler->addUniform("RadiiX", UniformFormat::Float4, ShaderStage::Fragment);
   const auto radiiYName =
@@ -141,7 +141,7 @@ void GLSLRRectEffect::emitCode(EmitArgs& args) const {
 }
 
 void GLSLRRectEffect::onSetData(UniformData*, UniformData* fragmentUniformData) const {
-  fragmentUniformData->setData("LocalRect", localRect);
+  fragmentUniformData->setData("Rect", rect);
   // Pack the per-corner radii into two vec4 uniforms (RadiiX, RadiiY) in [TL, TR, BR, BL]
   // order to match the shader.
   const std::array<float, 4> radiiXValues = {radii[0].x, radii[1].x, radii[2].x, radii[3].x};

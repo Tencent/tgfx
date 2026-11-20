@@ -53,9 +53,9 @@ class RRectEffect : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  RRectEffect(const Rect& localRect, const std::array<Point, 4>& radii, const Matrix& deviceToLocal,
+  RRectEffect(const Rect& rect, const std::array<Point, 4>& radii, const Matrix& deviceToLocal,
               bool antiAlias)
-      : FragmentProcessor(ClassID()), localRect(localRect), radii(radii), antiAlias(antiAlias),
+      : FragmentProcessor(ClassID()), rect(rect), radii(radii), antiAlias(antiAlias),
         _deviceToLocal(deviceToLocal), _needTransform(!deviceToLocal.isIdentity()) {
   }
 
@@ -69,9 +69,9 @@ class RRectEffect : public FragmentProcessor {
     return _deviceToLocal;
   }
 
-  Rect localRect = {};
-  // Per-corner radii in [TL, TR, BR, BL] order, scaled to device-equivalent units when
-  // _needTransform is true (CPU side bakes axisScales into the radii).
+  // Rect in the space that deviceToLocal maps device coordinates into.
+  Rect rect = {};
+  // Per-corner radii in [TL, TR, BR, BL] order, in the same space as rect.
   std::array<Point, 4> radii = {};
   bool antiAlias = true;
 

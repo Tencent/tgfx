@@ -24,8 +24,8 @@ namespace tgfx {
 
 class GLSLRRectEffect : public RRectEffect {
  public:
-  GLSLRRectEffect(const Rect& localRect, const std::array<Point, 4>& radii,
-                  const Matrix& deviceToLocal, bool antiAlias);
+  GLSLRRectEffect(const Rect& rect, const std::array<Point, 4>& radii, const Matrix& deviceToLocal,
+                  bool antiAlias);
 
   void emitCode(EmitArgs& args) const override;
 

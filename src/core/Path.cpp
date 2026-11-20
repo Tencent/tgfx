@@ -523,17 +523,20 @@ void Path::addRoundRect(const Rect& rect, const std::array<Point, 4>& radii, boo
 
 /**
  * Bezier points of one smoothed corner of a rounded rectangle, in clockwise order.
+ * The corner contour C consists of the incoming transition curve C1, the retained arc C2 and the
+ * outgoing transition curve C3. PS is the start of C2, where C1 ends, and PE is the end of C2,
+ * where C3 starts.
  */
 struct SmoothCornerPoints {
-  // Incoming transition curve.
+  // C1.
   Point entry = {};
   Point entryCtrl1 = {};
   Point entryCtrl2 = {};
-  // Retained arc.
+  // C2, starting at PS.
   Point arcStart = {};
   Point arcCtrl1 = {};
   Point arcCtrl2 = {};
-  // Outgoing transition curve.
+  // C3, starting at PE.
   Point arcEnd = {};
   Point exitCtrl1 = {};
   Point exitCtrl2 = {};
@@ -593,19 +596,19 @@ static SmoothCornerPoints BuildSmoothCorner(const Point& vertex, const Point& en
   corner.exitCtrl1 = corner.exit - exitDir * (3.0f * step);
   corner.arcEnd = corner.exitCtrl1 - exitDir * arcOffsetAlong + exitNormal * arcOffsetCross;
   const auto center = vertex + (entryNormal + exitNormal) * radius;
-  // Middle point of the retained arc.
+  // Middle point of C2.
   const auto mid = center - (entryNormal + exitNormal) * (radius / FLOAT_SQRT2);
   // The tangent vectors below keep the length of the radius so that multiplying by arcHandle (a
   // ratio of the radius) yields the actual handle length.
   auto tangentStart = Point{center.y - corner.arcStart.y, corner.arcStart.x - center.x};
-  // Orient the tangent at arcStart along the direction of travel, toward mid.
+  // Orient the tangent at PS along the direction of travel, toward mid.
   if (tangentStart.x * (mid.x - corner.arcStart.x) + tangentStart.y * (mid.y - corner.arcStart.y) <
       0.0f) {
     tangentStart = {-tangentStart.x, -tangentStart.y};
   }
   corner.arcCtrl1 = corner.arcStart + tangentStart * coeffs.arcHandle;
   auto tangentEnd = Point{center.y - corner.arcEnd.y, corner.arcEnd.x - center.x};
-  // Orient the tangent at arcEnd along the direction of travel, away from mid.
+  // Orient the tangent at PE along the direction of travel, away from mid.
   if (tangentEnd.x * (corner.arcEnd.x - mid.x) + tangentEnd.y * (corner.arcEnd.y - mid.y) < 0.0f) {
     tangentEnd = {-tangentEnd.x, -tangentEnd.y};
   }

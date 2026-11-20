@@ -24,8 +24,8 @@ namespace tgfx {
 class GLSLSmoothRRectGeometryProcessor : public SmoothRRectGeometryProcessor {
  public:
   GLSLSmoothRRectGeometryProcessor(int width, int height, bool antiAlias,
-                                   std::optional<PMColor> commonColor, bool stroke = false,
-                                   bool unscaledGeometry = false);
+                                   std::optional<PMColor> commonColor, bool stroke,
+                                   bool unscaledGeometry);
 
   void emitCode(EmitArgs& args) const override;
 

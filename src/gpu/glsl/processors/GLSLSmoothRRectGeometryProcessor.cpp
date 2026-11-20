@@ -69,45 +69,66 @@ class SmoothCornerBaseFunctions {
 };
 
 /**
- * Emits the smoothed circular and elliptical corner functions.
- * Non-antialiased fills only need the inside/outside sign and evaluate the implicit equations of
- * the corner segments; strokes and antialiased fills evaluate distances.
+ * Emits the signed distance functions of smoothed circular and elliptical corners.
+ * The corner contour C consists of the incoming transition curve C1, a retained circular or
+ * elliptical arc C2, and the outgoing transition curve C3, running from the x-axis edge toward the
+ * y-axis edge. B0 to B3 denote the control points of a curve along the direction of travel. PS is
+ * the start of C2, where C1 ends, and PE is the end of C2, where C3 starts. TS and TE are the
+ * tangent vectors at PS and PE along the direction of travel, and NS and NE are the normals at PS
+ * and PE. The GLSL locals b0 to b3, ps and pe hold B0 to B3, PS and PE.
+ * fs = -dot(q - PS, TS) and fe = -dot(q - PE, TE), so each is positive when q lies behind NS or NE
+ * along the direction of travel. NS and NE divide the plane into four regions S1 to S4, which fs
+ * and fe determine. S1 and S3 contain C1 and C3, S2 contains C2, and S4 contains no contour
+ * segment.
+ * The functions have the signatures:
+ *   float circleName(vec2 q, float radius, vec4 coeffs, vec3 arcCoeffs);
+ *   float ellipseName(vec2 q, vec2 radii, vec4 coeffs, vec3 arcCoeffs);
+ *     q          the point in the corner frame, with the vertex at the origin and the x/y axes
+ *                pointing into the shape along the edges
+ *     radius     the radius of the circular corner
+ *     radii      the radii on x and y of the elliptical corner
+ *     coeffs     the coefficients of the corner contour with unit radius: x is transitionStart,
+ *                the distance from the vertex to B0 of C1 along the x axis; y is step, the
+ *                control-point spacing; z and w are arcOffsetAlong and arcOffsetCross, the offsets
+ *                from B2 of C1 to PS. C1's control points are B0 = (transitionStart, 0),
+ *                B1 = (transitionStart - 2*step, 0), B2 = (b2x, 0) and
+ *                B3 = PS = (b2x - arcOffsetAlong, arcOffsetCross), where
+ *                b2x = transitionStart - 3*step. C3 is C1 reflected across y = x. The elliptical
+ *                corner scales both per axis by radii.
+ *     arcCoeffs  the coefficients of C2: x and y are the sine and cosine of the angle the tangent
+ *                turns through along C1, and z is the handle length with unit radius of the cubic
+ *                Bezier curve that approximates C2
+ * They return the signed distance from q to C, negative inside. Non-antialiased fills only need
+ * the inside/outside sign, so for them the functions evaluate the implicit equations of the
+ * segments other than the circular C2 and return a value with the same sign instead. When
+ * unscaledGeometry and antiAlias are both true, they return a vec3 instead, whose yz carries the
+ * unnormalized contour normal at the nearest point.
  * @param builder the shader builder that receives the functions
  * @param stroke whether the shape is stroked
  * @param unscaledGeometry whether the geometry keeps the unscaled local frame
  * @param antiAlias whether coverage is antialiased
- * @return the mangled names of the circular and elliptical corner distance functions
+ * @return the mangled names of the circular and elliptical corner functions
  */
-static std::pair<std::string, std::string> EmitSmoothCornerFunctions(ShaderBuilder* builder,
-                                                                     bool stroke,
-                                                                     bool unscaledGeometry,
-                                                                     bool antiAlias) {
+static std::pair<std::string, std::string> EmitCornerFunctions(ShaderBuilder* builder, bool stroke,
+                                                               bool unscaledGeometry,
+                                                               bool antiAlias) {
   // Fills always bake the axis scales into the geometry.
   DEBUG_ASSERT(stroke || !unscaledGeometry);
-
-  // The corner contour consists of an incoming transition curve C1, a retained circular or
-  // elliptical arc C2, and an outgoing transition curve C3. The normals at the arc start ps and
-  // end pe divide the plane into four regions S1-S4.
-  // S1 and S3 contain the transition curves C1 and C3, S2 contains the retained arc C2, and S4
-  // contains no contour segment. PS and PE are the C1-C2 and C2-C3 join points. fs and fe are the
-  // signed values of the join-point normals evaluated at q and determine the region.
 
   const auto nonAAFill = !stroke && !antiAlias;
   // Converting unscaled distances to the scaled frame of the AA ramp needs the contour normal.
   const auto needNormal = unscaledGeometry && antiAlias;
-  // When needNormal is true, the result is vec3(distance, normal.x, normal.y), where normal is
-  // the unnormalized contour normal at the nearest point.
   const std::string returnType = needNormal ? "highp vec3 " : "highp float ";
   // Strokes need accurate distances farther from the contour than fills, which only read the
   // antialiasing ramp. The iteration error grows with that distance, so strokes take one more
   // step, which keeps the measured error subpixel within the range the stroke dispatch allows.
   SmoothCornerBaseFunctions baseFunctions(builder, stroke ? 3 : 2, needNormal);
 
-  // In S2, the nearest point on the retained arc lies along the radial direction, so the distance
-  // is the distance to the circle center minus the radius. It is exact and cheap, so
-  // non-antialiased fills use it as well.
+  // In S2, the nearest point on C2 lies along the radial direction, so the distance is the
+  // distance to the circle center minus the radius. It is exact and cheap, so non-antialiased
+  // fills use it as well.
   // clang-format off
-  const auto circleS2BranchCode = needNormal ? R"(
+  const auto circleArcCode = needNormal ? R"(
     highp vec2 arcDir = q - vec2(radius);
     return vec3(length(arcDir) - radius, arcDir);
   )" : R"(
@@ -116,61 +137,38 @@ static std::pair<std::string, std::string> EmitSmoothCornerFunctions(ShaderBuild
   )";
   // clang-format on
 
-  std::string circleS134BranchCode;
+  std::string circleTransitionCode;
   if (nonAAFill) {
     const auto& transitionFunc = baseFunctions.transitionImplicit();
-    // C1 and C3 mirror each other across y = x, so C3 is evaluated as C1 at the swapped point.
+    // C1 and C3 mirror each other across the corner bisector, so C3 is evaluated as C1 at the
+    // swapped point.
     // clang-format off
-    circleS134BranchCode = R"(
+    circleTransitionCode = R"(
   return )" + transitionFunc + R"((c1 ? q : q.yx, transitionStart, step, coeffs.z * radius,
                                    coeffs.w * radius);)";
     // clang-format on
   } else {
     const auto& transitionFunc = baseFunctions.bezierNewtonDist();
-    // The control points run from the x-axis edge toward the y-axis edge, which the distance sign
-    // relies on.
     // clang-format off
-    circleS134BranchCode = R"(
-  highp vec2 b0 = c1 ? vec2(transitionStart, 0.0) : pe;
-  highp vec2 b1 = c1 ? vec2(transitionStart - 2.0 * step, 0.0) : vec2(0.0, b2x);
-  highp vec2 b2 = c1 ? vec2(b2x, 0.0) : vec2(0.0, transitionStart - 2.0 * step);
-  highp vec2 b3 = c1 ? ps : vec2(0.0, transitionStart);
+    circleTransitionCode = R"(
   return )" + transitionFunc + R"((q, b0, b1, b2, b3);)";
     // clang-format on
   }
 
   // Computes the signed distance to the smoothed circular corner, negative inside.
-  // Non-antialiased fills evaluate the implicit equations of the transition curves instead, so only
-  // the sign of the result is meaningful.
   // S1, S2 and S3 evaluate C1, C2 and C3 respectively. S4 also uses a transition curve: C1 is
   // nearer when q.x >= q.y, and C3 is nearer otherwise, since C1 and C3 mirror each other across
   // y = x.
-  // Near full smoothness the join-point normals nearly coincide, and rounding can classify S4
+  // Near full smoothness NS and NE nearly coincide, and rounding can classify S4
   // fragments beyond the circle center into S2. S2 lies entirely on the vertex side of the center,
   // so S2 also requires q.x <= radius.
-  //   q           the point in the corner frame, with the vertex at the origin and the x/y axes
-  //               pointing into the shape along the edges
-  //   radius      the corner radius
-  //   coeffs      coefficients of the unit-radius corner contour:
-  //               transitionStart is the distance from the vertex to C1's start along the x axis;
-  //               step is the control-point spacing; arcOffsetAlong/Cross are the offsets from
-  //               B2 to ps.
-  //               C1's control points are (transitionStart, 0), (transitionStart - 2*step, 0),
-  //               (b2x, 0) and (b2x - arcOffsetAlong, arcOffsetCross), where b2x =
-  //               transitionStart - 3*step. C3 is C1 reflected across y = x.
-  //   smoothness  the corner smoothness
-  //   return      the signed distance, or the implicit value for non-antialiased fills; when
-  //               needNormal is true, a vec3 that also carries the unnormalized contour normal at
-  //               the nearest point in yz
-  const auto cornerDistFunc = builder->getMangledFunctionName("smoothCornerDist");
+  const auto circleCornerFunc = builder->getMangledFunctionName("smoothCornerDist");
   // clang-format off
   builder->addFunction(
-returnType + cornerDistFunc + R"((highp vec2 q, highp float radius, highp vec4 coeffs,
-                                  highp float smoothness) {
-  highp float clampedSmoothness = clamp(smoothness, 0.0, 1.0);
-  highp float turnAngle = 3.14159265359 * 0.25 * clampedSmoothness;
-  highp float turnSin = sin(turnAngle);
-  highp float turnCos = cos(turnAngle);
+returnType + circleCornerFunc + R"((highp vec2 q, highp float radius, highp vec4 coeffs,
+                                    highp vec3 arcCoeffs) {
+  highp float turnSin = arcCoeffs.x;
+  highp float turnCos = arcCoeffs.y;
   highp float transitionStart = coeffs.x * radius;
   highp float step = coeffs.y * radius;
   highp float b2x = transitionStart - 3.0 * step;
@@ -179,99 +177,76 @@ returnType + cornerDistFunc + R"((highp vec2 q, highp float radius, highp vec4 c
   highp float fs = turnCos * (q.x - ps.x) - turnSin * (q.y - ps.y);
   highp float fe = turnSin * (q.x - pe.x) - turnCos * (q.y - pe.y);
   if (fs <= 0.0 && fe > 0.0 && q.x <= radius) {)" +
-    circleS2BranchCode + R"(
+    circleArcCode + R"(
   }
-  bool c1 = fs > 0.0 && (fe > 0.0 || q.x >= q.y);)" +
-  circleS134BranchCode + R"(
+  bool c1 = fs > 0.0 && (fe > 0.0 || q.x >= q.y);
+  highp vec2 b0 = c1 ? vec2(transitionStart, 0.0) : pe;
+  highp vec2 b1 = c1 ? vec2(transitionStart - 2.0 * step, 0.0) : vec2(0.0, b2x);
+  highp vec2 b2 = c1 ? vec2(b2x, 0.0) : vec2(0.0, transitionStart - 2.0 * step);
+  highp vec2 b3 = c1 ? ps : vec2(0.0, transitionStart);)" +
+  circleTransitionCode + R"(
 }
 )");
   // clang-format on
 
-  std::string ellipseS2BranchCode;
+  std::string ellipseArcCode;
   if (stroke) {
     const auto& arcFunc = baseFunctions.bezierNewtonDist();
-    // Approximate the retained elliptical arc with a cubic Bezier curve and evaluate its distance.
+    // Approximate the elliptical C2 with a cubic Bezier curve and evaluate its distance.
     // clang-format off
-    ellipseS2BranchCode = R"(
-    highp float arcSweep = 3.14159265359 * 0.5 * (1.0 - clampedSmoothness);
-    highp float arcHandle = (4.0 / 3.0) * tan(arcSweep * 0.25);
-    highp vec2 arcCtrl1 = ps + arcHandle * vec2(-turnCos, turnSin) * radii;
-    highp vec2 arcCtrl2 = pe - arcHandle * vec2(-turnSin, turnCos) * radii;
+    ellipseArcCode = R"(
+    highp vec2 arcCtrl1 = ps + arcCoeffs.z * vec2(-turnCos, turnSin) * radii;
+    highp vec2 arcCtrl2 = pe - arcCoeffs.z * vec2(-turnSin, turnCos) * radii;
     return )" + arcFunc + R"((q, ps, arcCtrl1, arcCtrl2, pe);
   )";
     // clang-format on
   } else {
     // An antialiased fill only needs accurate distances within the antialiasing ramp. The Sampson
-    // distance is a cheaper first-order approximation that stays accurate enough there.
+    // distance is cheaper and approaches the true distance near the ellipse, so it stays accurate
+    // enough there.
     const auto& arcFunc =
         nonAAFill ? baseFunctions.ellipseImplicit() : baseFunctions.ellipseSampsonDist();
     // clang-format off
-    ellipseS2BranchCode = R"(
+    ellipseArcCode = R"(
     return )" + arcFunc + R"((q - radii, radii);
   )";
     // clang-format on
   }
 
-  std::string ellipseS134BranchCode;
+  std::string ellipseTransitionCode;
   if (nonAAFill) {
     const auto& transitionFunc = baseFunctions.transitionImplicit();
-    // C3 mirrors across y = x the C1 built with the radii swapped, so it is evaluated as that C1 at
-    // the swapped point.
+    // C3 mirrors across the corner bisector the C1 built with the radii swapped, so it is evaluated
+    // as that C1 at the swapped point.
     // clang-format off
-    ellipseS134BranchCode = R"(
+    ellipseTransitionCode = R"(
   highp vec2 axes = c1 ? radii : radii.yx;
   return )" + transitionFunc + R"((c1 ? q : q.yx, coeffs.x * axes.x, coeffs.y * axes.x,
                                    coeffs.z * axes.x, coeffs.w * axes.y);)";
     // clang-format on
   } else {
     const auto& transitionFunc = baseFunctions.bezierNewtonDist();
-    // The control points run from the x-axis edge toward the y-axis edge, which the distance sign
-    // relies on.
     // clang-format off
-    ellipseS134BranchCode = R"(
-  highp vec2 b0 = c1 ? vec2(transitionStart.x, 0.0) : pe;
-  highp vec2 b1 = c1 ? vec2(transitionStart.x - 2.0 * step.x, 0.0) : vec2(0.0, b2xy.y);
-  highp vec2 b2 = c1 ? vec2(b2xy.x, 0.0) : vec2(0.0, transitionStart.y - 2.0 * step.y);
-  highp vec2 b3 = c1 ? ps : vec2(0.0, transitionStart.y);
+    ellipseTransitionCode = R"(
   return )" + transitionFunc + R"((q, b0, b1, b2, b3);)";
     // clang-format on
   }
 
   // Computes the signed distance to the smoothed elliptical corner, negative inside.
-  // Non-antialiased fills evaluate the implicit equations of the segments instead, so only the sign
-  // of the result is meaningful.
   // S1, S2 and S3 evaluate C1, C2 and C3 respectively. S4 also uses a transition curve: C1 is
-  // nearer when the normal at pe is nearer than the normal at ps, and C3 is nearer otherwise.
-  // The distances to the normals are |fe| and |fs| divided by the lengths of the contour tangent
-  // vectors at pe and ps, compared squared.
-  // Near full smoothness the join-point normals nearly coincide, and rounding can classify S4
+  // nearer when NE is nearer than NS, and C3 is nearer otherwise. TS and TE are not unit vectors,
+  // so the distances to NS and NE are |fs| / |TS| and |fe| / |TE|, compared squared.
+  // Near full smoothness NS and NE nearly coincide, and rounding can classify S4
   // fragments beyond their intersection into S2. S2 lies entirely on the vertex side of the
   // intersection, so S2 also requires q.x <= normalIntersectX, the x coordinate of the
   // intersection.
-  //   q           the point in the corner frame, with the vertex at the origin and the x/y axes
-  //               pointing into the shape along the edges
-  //   radii       the corner radii on x and y
-  //   coeffs      coefficients of the unit-radius corner contour:
-  //               transitionStart is the distance from the vertex to C1's start along the x axis;
-  //               step is the control-point spacing; arcOffsetAlong/Cross are the offsets from
-  //               B2 to ps.
-  //               C1's control points are (transitionStart, 0), (transitionStart - 2*step, 0),
-  //               (b2x, 0) and (b2x - arcOffsetAlong, arcOffsetCross), where b2x =
-  //               transitionStart - 3*step. C3 is C1 reflected across y = x. Both are then
-  //               scaled per axis by radii.
-  //   smoothness  the corner smoothness
-  //   return      the signed distance, or the implicit value for non-antialiased fills; when
-  //               needNormal is true, a vec3 that also carries the unnormalized contour normal at
-  //               the nearest point in yz
-  const auto ellipseDistFunc = builder->getMangledFunctionName("smoothCornerDistEllipse");
+  const auto ellipseCornerFunc = builder->getMangledFunctionName("smoothCornerDistEllipse");
   // clang-format off
   builder->addFunction(
-returnType + ellipseDistFunc + R"((highp vec2 q, highp vec2 radii, highp vec4 coeffs,
-                                   highp float smoothness) {
-  highp float clampedSmoothness = clamp(smoothness, 0.0, 1.0);
-  highp float turnAngle = 3.14159265359 * 0.25 * clampedSmoothness;
-  highp float turnSin = sin(turnAngle);
-  highp float turnCos = cos(turnAngle);
+returnType + ellipseCornerFunc + R"((highp vec2 q, highp vec2 radii, highp vec4 coeffs,
+                                     highp vec3 arcCoeffs) {
+  highp float turnSin = arcCoeffs.x;
+  highp float turnCos = arcCoeffs.y;
   highp float rx = radii.x;
   highp float ry = radii.y;
   highp float rxSq = rx * rx;
@@ -286,17 +261,21 @@ returnType + ellipseDistFunc + R"((highp vec2 q, highp vec2 radii, highp vec4 co
   highp float normalIntersectX =
       rx + (rySq - rxSq) * turnSin * turnCos / ((turnSin + turnCos) * rx);
   if (fs <= 0.0 && fe > 0.0 && q.x <= normalIntersectX) {)" +
-    ellipseS2BranchCode + R"(
+    ellipseArcCode + R"(
   }
   highp float tsLengthSq = rySq + (rxSq - rySq) * turnCos * turnCos;
   highp float teLengthSq = rxSq + rySq - tsLengthSq;
-  bool c1 = fs > 0.0 && (fe > 0.0 || fe * fe * tsLengthSq <= fs * fs * teLengthSq);)" +
-  ellipseS134BranchCode + R"(
+  bool c1 = fs > 0.0 && (fe > 0.0 || fe * fe * tsLengthSq <= fs * fs * teLengthSq);
+  highp vec2 b0 = c1 ? vec2(transitionStart.x, 0.0) : pe;
+  highp vec2 b1 = c1 ? vec2(transitionStart.x - 2.0 * step.x, 0.0) : vec2(0.0, b2xy.y);
+  highp vec2 b2 = c1 ? vec2(b2xy.x, 0.0) : vec2(0.0, transitionStart.y - 2.0 * step.y);
+  highp vec2 b3 = c1 ? ps : vec2(0.0, transitionStart.y);)" +
+  ellipseTransitionCode + R"(
 }
 )");
   // clang-format on
 
-  return {cornerDistFunc, ellipseDistFunc};
+  return {circleCornerFunc, ellipseCornerFunc};
 }
 
 PlacementPtr<SmoothRRectGeometryProcessor> SmoothRRectGeometryProcessor::Make(
@@ -331,9 +310,6 @@ void GLSLSmoothRRectGeometryProcessor::emitCode(EmitArgs& args) const {
   vertBuilder->codeAppendf("%s = %s;", yRadiiVarying.vsOut().c_str(), inYRadii.name().c_str());
   auto boundsVarying = varyingHandler->addVarying("rectBounds", SLType::Float4, true);
   vertBuilder->codeAppendf("%s = %s;", boundsVarying.vsOut().c_str(), inRectBounds.name().c_str());
-  auto smoothnessVarying = varyingHandler->addVarying("smoothness", SLType::Float, true);
-  vertBuilder->codeAppendf("%s = %s;", smoothnessVarying.vsOut().c_str(),
-                           inSmoothness.name().c_str());
   Varying halfStrokeWidthVarying;
   if (stroke) {
     halfStrokeWidthVarying = varyingHandler->addVarying("halfStrokeWidth", SLType::Float, true);
@@ -361,49 +337,54 @@ void GLSLSmoothRRectGeometryProcessor::emitCode(EmitArgs& args) const {
   // Position
   vertBuilder->emitNormalizedPosition(inPosition.name());
 
-  // Transition curve coefficients
+  // Corner contour coefficients
   // Precompute the per-shape coefficients to avoid recomputing them per fragment.
   auto curveCoeffsVarying = varyingHandler->addVarying("curveCoeffs", SLType::Float4, true);
+  auto arcCoeffsVarying = varyingHandler->addVarying("arcCoeffs", SLType::Float3, true);
   vertBuilder->codeAppendf("highp float smoothness = clamp(%s, 0.0, 1.0);",
                            inSmoothness.name().c_str());
   vertBuilder->codeAppend("highp float turnAngle = 3.14159265359 * 0.25 * smoothness;");
+  vertBuilder->codeAppend("highp float turnSin = sin(turnAngle);");
+  vertBuilder->codeAppend("highp float turnCos = cos(turnAngle);");
   vertBuilder->codeAppend("highp float tanTurn = tan(turnAngle);");
   vertBuilder->codeAppend("highp float start = 1.0 + smoothness;");
-  vertBuilder->codeAppend("highp float arcOffsetAlong = tan(turnAngle * 0.5) * cos(turnAngle);");
-  vertBuilder->codeAppend(
-      "highp float step = (smoothness + sin(turnAngle) - arcOffsetAlong) / 3.0;");
+  vertBuilder->codeAppend("highp float arcOffsetAlong = tan(turnAngle * 0.5) * turnCos;");
+  vertBuilder->codeAppend("highp float step = (smoothness + turnSin - arcOffsetAlong) / 3.0;");
   vertBuilder->codeAppend("highp float arcOffsetCross = arcOffsetAlong * tanTurn;");
   vertBuilder->codeAppendf("%s = vec4(start, step, arcOffsetAlong, arcOffsetCross);",
                            curveCoeffsVarying.vsOut().c_str());
+  vertBuilder->codeAppend("highp float arcSweep = 3.14159265359 * 0.5 * (1.0 - smoothness);");
+  vertBuilder->codeAppend("highp float arcHandle = (4.0 / 3.0) * tan(arcSweep * 0.25);");
+  vertBuilder->codeAppendf("%s = vec3(turnSin, turnCos, arcHandle);",
+                           arcCoeffsVarying.vsOut().c_str());
 
   // Transforms
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
                  ShaderVar(inPosition.name(), SLType::Float2));
 
   // Coverage
-  const auto [circleCornerDistFunc, ellipseCornerDistFunc] =
-      EmitSmoothCornerFunctions(fragBuilder, stroke, unscaledGeometry, antiAlias);
-
+  const auto [circleCornerFunc, ellipseCornerFunc] =
+      EmitCornerFunctions(fragBuilder, stroke, unscaledGeometry, antiAlias);
   fragBuilder->codeAppendf("highp vec4 coeffs = %s;", curveCoeffsVarying.fsIn().c_str());
-  fragBuilder->codeAppendf("highp float smoothness = %s;", smoothnessVarying.fsIn().c_str());
+  fragBuilder->codeAppendf("highp vec3 arcCoeffs = %s;", arcCoeffsVarying.fsIn().c_str());
   fragBuilder->codeAppendf("highp vec2 localCoord = %s;", localCoordVarying.fsIn().c_str());
   fragBuilder->codeAppendf("highp vec4 xRadii = %s;", xRadiiVarying.fsIn().c_str());
   fragBuilder->codeAppendf("highp vec4 yRadii = %s;", yRadiiVarying.fsIn().c_str());
   fragBuilder->codeAppendf("highp vec4 bounds = %s;", boundsVarying.fsIn().c_str());
 
   // Compute the fragment position in each corner frame, with the vertex at the origin and the x/y
-  // axes pointing into the shape along the edges. Order matches the vertex data: TL, TR, BR, BL.
+  // axes pointing into the shape along the edges. Order matches the radii: TL, TR, BR, BL.
   fragBuilder->codeAppend("highp vec4 cornersX = vec4(bounds.x, bounds.z, bounds.z, bounds.x);");
   fragBuilder->codeAppend("highp vec4 cornersY = vec4(bounds.y, bounds.y, bounds.w, bounds.w);");
-  fragBuilder->codeAppend("vec4 signsX = vec4(1.0, -1.0, -1.0, 1.0);");
-  fragBuilder->codeAppend("vec4 signsY = vec4(1.0, 1.0, -1.0, -1.0);");
-  fragBuilder->codeAppend("highp vec4 dx = (vec4(localCoord.x) - cornersX) * signsX;");
-  fragBuilder->codeAppend("highp vec4 dy = (vec4(localCoord.y) - cornersY) * signsY;");
+  fragBuilder->codeAppend(
+      "highp vec4 dx = (vec4(localCoord.x) - cornersX) * vec4(1.0, -1.0, -1.0, 1.0);");
+  fragBuilder->codeAppend(
+      "highp vec4 dy = (vec4(localCoord.y) - cornersY) * vec4(1.0, 1.0, -1.0, -1.0);");
   // inCorner is 1.0 for each corner whose region, extended by smoothing to transitionStart along
   // both edges, contains the fragment. RRect limits the transitionStart sum of the two corners on
   // each edge to the edge length, so adjacent regions never overlap.
-  fragBuilder->codeAppendf("vec4 inCorner = step(dx, xRadii * %s.x) * step(dy, yRadii * %s.x);",
-                           "coeffs", "coeffs");
+  fragBuilder->codeAppend(
+      "vec4 inCorner = step(dx, xRadii * coeffs.x) * step(dy, yRadii * coeffs.x);");
   // A zero-radius corner has no corner region, but step() still accepts fragments past its vertex,
   // so clear them.
   fragBuilder->codeAppend(
@@ -426,9 +407,9 @@ void GLSLSmoothRRectGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("highp vec2 q = vec2(dot(inCorner, dx), dot(inCorner, dy));");
     fragBuilder->codeAppend("bool isCircle = abs(rx - ry) <= 1.0 / 4096.0;");
     fragBuilder->codeAppendf(
-        "highp vec3 distNormal = isCircle ? %s(q, rx, coeffs, smoothness) : "
-        "%s(q, vec2(rx, ry), coeffs, smoothness);",
-        circleCornerDistFunc.c_str(), ellipseCornerDistFunc.c_str());
+        "highp vec3 distNormal = isCircle ? %s(q, rx, coeffs, arcCoeffs) : "
+        "%s(q, vec2(rx, ry), coeffs, arcCoeffs);",
+        circleCornerFunc.c_str(), ellipseCornerFunc.c_str());
     fragBuilder->codeAppend("dist = distNormal.x;");
     fragBuilder->codeAppend("normal = distNormal.yz;");
     fragBuilder->codeAppend("} else {");
@@ -456,9 +437,8 @@ void GLSLSmoothRRectGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("highp vec2 q = vec2(dot(inCorner, dx), dot(inCorner, dy));");
     fragBuilder->codeAppend("bool isCircle = abs(rx - ry) <= 1.0 / 4096.0;");
     fragBuilder->codeAppendf(
-        "dist = isCircle ? %s(q, rx, coeffs, smoothness) : "
-        "%s(q, vec2(rx, ry), coeffs, smoothness);",
-        circleCornerDistFunc.c_str(), ellipseCornerDistFunc.c_str());
+        "dist = isCircle ? %s(q, rx, coeffs, arcCoeffs) : %s(q, vec2(rx, ry), coeffs, arcCoeffs);",
+        circleCornerFunc.c_str(), ellipseCornerFunc.c_str());
     fragBuilder->codeAppend("} else {");
     fragBuilder->codeAppend("highp vec2 d0 = localCoord - bounds.xy;");
     fragBuilder->codeAppend("highp vec2 d1 = bounds.zw - localCoord;");

@@ -55,7 +55,7 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
     commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
   hasStroke = provider->hasStroke();
-  isComplex = provider->hasComplex();
+  hasComplex = provider->hasComplex();
   isSmooth = provider->hasSmoothness();
   unscaledGeometry = provider->hasUnscaledGeometry();
   // The elliptical-corner processors only accept geometry with the axis scales baked in.
@@ -77,14 +77,14 @@ PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarge
                                               commonColor, hasStroke, unscaledGeometry);
   }
   if (aaType == AAType::None) {
-    if (isComplex) {
+    if (hasComplex) {
       return ComplexNonAARRectGeometryProcessor::Make(
           allocator, renderTarget->width(), renderTarget->height(), hasStroke, commonColor);
     }
     return NonAARRectGeometryProcessor::Make(allocator, renderTarget->width(),
                                              renderTarget->height(), hasStroke, commonColor);
   }
-  if (isComplex) {
+  if (hasComplex) {
     return ComplexEllipseGeometryProcessor::Make(allocator, renderTarget->width(),
                                                  renderTarget->height(), hasStroke, commonColor);
   }

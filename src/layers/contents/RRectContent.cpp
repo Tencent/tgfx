@@ -54,7 +54,7 @@ void RRectContent::onDraw(Canvas* canvas, const Paint& paint) const {
 
 bool RRectContent::onHasSameGeometry(const GeometryContent* other) const {
   auto otherRRect = static_cast<const RRectContent*>(other)->rRect;
-  return rRect.rect() == otherRRect.rect() && rRect.radii() == otherRRect.radii();
+  return rRect == otherRRect;
 }
 
 Path RRectContent::getFilledPath() const {
