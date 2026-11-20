@@ -301,6 +301,26 @@ void RegisterColorSpaceMembers(PlanRegistry* registry) {
 #endif
 }
 
+// The YUV source's members: the names match the generated registration (the signature's derived
+// spelling), but each carries the operator's own slot, so the reader finds the slot's record. The
+// three planes ride the leaf-sampler bindings at the slot's own index and the two above it; the
+// coordinate is the assembly's own SourceCoords (the same varying the noise reads).
+void RegisterYUVMembers(PlanRegistry* registry, int slot) {
+  const int plane[3] = {slot, slot + 1, slot + 2};
+  for (int index : plane) {
+    registry->sampler("TextureSampler_" + std::to_string(index), ChainSamplerSource::Leaf, index);
+  }
+  registry->uniform("YuvSubset", FragmentType::Float4, ChainBindingSource::YuvSubset, slot);
+  registry->uniform("YuvAlphaStart", FragmentType::Float2, ChainBindingSource::YuvAlphaStart,
+                    slot);
+  registry->uniform("YuvColorConversion", FragmentType::Matrix3,
+                    ChainBindingSource::YuvColorConversion, slot);
+  registry->uniform("YuvLimitedRange", FragmentType::Int, ChainBindingSource::YuvLimitedRange,
+                    slot);
+  registry->uniform("YuvHasRgbaaa", FragmentType::Int, ChainBindingSource::YuvHasRgbaaa, slot);
+  registry->uniform("YuvFormat", FragmentType::Int, ChainBindingSource::YuvFormat, slot);
+}
+
 // One leaf's declarations, registered as the leaf enters the plan: the sampler, the coordinate
 // varying and the four per-leaf records the plain fetch reads.
 void RegisterLeafMembers(PlanRegistry* registry, int leaf) {
@@ -627,6 +647,14 @@ bool PlanChainProgram(const ChainComposition& composition, const Family& family,
         RegisterNoiseMembers(&registry);
         needsSourceCoords = true;
         break;
+      case ChainISA::YUV: {
+        RegisterYUVMembers(&registry, static_cast<int>(slotIndex));
+        needsSourceCoords = true;
+        ChainArg geom = {};
+        geom.kind = ChainArgKind::GeomColor;
+        push(geom);
+        break;
+      }
       default:
         return false;
     }

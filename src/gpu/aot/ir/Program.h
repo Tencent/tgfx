@@ -63,6 +63,7 @@ enum class AOTChainOp : int {
   InputOpaque = Op::InputOpaque,
   MulAlpha = Op::MulAlpha,
   PerlinNoise = Op::PerlinNoise,
+  YUV = Op::YUV,
 };
 
 /// One node of a pointwise DAG after flattening into the fused kernel's instruction array.

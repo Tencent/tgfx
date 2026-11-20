@@ -312,8 +312,17 @@ bool AOTChainBuilder::ValidateSlots(const std::vector<AOTChainSlot>& slots, size
   const auto validOutput = [](int reg) {
     return reg >= -1 && reg < static_cast<int>(MaxChainRegisters);
   };
+  // The budget is one leaf record per slot, plus the two extra planes each multi-plane source
+  // owns (its slot carries three leaf records: Y, U-or-UV, V).
+  size_t multiPlaneSlots = 0;
+  for (const auto& slot : slots) {
+    if (slot.op == AOTChainOp::YUV) {
+      ++multiPlaneSlots;
+    }
+  }
+  const size_t leafBudget = slots.size() + multiPlaneSlots * 2;
   if (rootSlot >= MaxChainRegisters || (coverageRootSlot >= 0 && !validOutput(coverageRootSlot)) ||
-      clipCoverageRegister >= static_cast<int>(MaxChainRegisters) || leafCount > slots.size()) {
+      clipCoverageRegister >= static_cast<int>(MaxChainRegisters) || leafCount > leafBudget) {
     return false;
   }
   for (const auto& slot : slots) {

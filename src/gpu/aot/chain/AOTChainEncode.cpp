@@ -21,6 +21,7 @@
 #include <vector>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/YUVColorConversion.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/chain/AOTChainInternal.h"
 #include "gpu/aot/chain/AOTChainRegisterAllocator.h"
@@ -36,6 +37,7 @@
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/resources/YUVTextureView.h"
 
 namespace tgfx {
 
@@ -188,13 +190,59 @@ static int MapChainOpInput(const AOTChainContext* ctx, size_t inputBase, AOTNode
 // the ordered set. The encoder bodies stay with the pipeline that owns the context, so they sit
 // outside the anonymous namespace (declared in ChainContext.h).
 
+// The multi-plane source: the three planes ride three consecutive leaf samplers (Y at the slot's
+// own index, U/V — or the interleaved UV — at the next two), and the conversion facts come off the
+// view at build time, exactly where the YUVTexture writer read them (the view is the draw's own
+// resource, so the resolved values cannot drift from what the runtime would upload).
+// The multi-plane source: the three planes ride three consecutive leaf samplers (Y at the slot's
+// own index, U/V — or the interleaved UV — at the next two). Only the structural facts resolve
+// here; the conversion matrix and the limited-range flag are upload-time reads off the view (the
+// same place the YUVTexture writer read them), because a lazy view is not resolvable at match
+// time and the draw's own resource cannot drift from what the runtime would upload.
+bool EncodeYUVSourceSlot(AOTChainContext* ctx, size_t combined, size_t index) {
+  auto node = ctx->nodes[combined];
+  const size_t inputBase = combined < ctx->colorCount ? 0 : ctx->colorCount;
+  auto* layout = ctx->layout;
+  auto& slot = ctx->slots[index];
+  auto* parameters = std::get_if<AOTTextureParameters>(&node->parameters);
+  if (parameters == nullptr || !parameters->isYUV ||
+      parameters->samplingKind != AOTTextureSamplingKind::Plain || inputBase != 0 ||
+      parameters->hasPerspective || parameters->yuvFormat < 0) {
+    return false;
+  }
+  slot.op = AOTChainOp::YUV;
+  slot.yuv.format = parameters->yuvFormat;
+  slot.yuv.hasRgbaaa = parameters->hasRGBAAA ? 1 : 0;
+  slot.yuv.alphaStart = {parameters->alphaStart.x, parameters->alphaStart.y};
+  if (parameters->subset.has_value()) {
+    slot.yuv.subset = {parameters->subset->left, parameters->subset->top, parameters->subset->right,
+                       parameters->subset->bottom};
+  } else {
+    slot.yuv.subset = {0.0f, 0.0f, 1.0f, 1.0f};
+  }
+  slot.yuv.textureProxy = parameters->textureProxy;
+  // Three samplers, three leaf slots: the plane bindings index by the leaf slot, so the node
+  // occupies three of them (Y at index, U/UV at +1, V at +2).
+  layout->leafNodes.push_back(node);
+  layout->leafNodes.push_back(node);
+  layout->leafNodes.push_back(node);
+  return true;
+}
+
 bool EncodeTextureSourceSlot(AOTChainContext* ctx, size_t combined, size_t index) {
   auto node = ctx->nodes[combined];
   const size_t inputBase = combined < ctx->colorCount ? 0 : ctx->colorCount;
   auto* layout = ctx->layout;
   auto& slot = ctx->slots[index];
   auto* parameters = std::get_if<AOTTextureParameters>(&node->parameters);
-  if (parameters == nullptr || !IsChainTextureLeaf(*parameters)) {
+  if (parameters == nullptr) {
+    return false;
+  }
+  if (parameters->isYUV) {
+    // The multi-plane source is its own operator; the single-tap leaf fetch cannot serve it.
+    return EncodeYUVSourceSlot(ctx, combined, index);
+  }
+  if (!IsChainTextureLeaf(*parameters)) {
     return false;
   }
   if (index != ctx->rawSlotOf[combined]) {
@@ -444,6 +492,11 @@ void DemandTextureSource(const AOTEffectNode* node, AOTResourceDemand* demand) {
     return;
   }
   ++demand->leafBindings;
+  if (texture->isYUV) {
+    // The multi-plane source occupies three leaf slots (Y, U or the interleaved UV, V), so the
+    // demand and the encoder's leaf records must count the same three.
+    demand->leafBindings += 2;
+  }
   if (HasShaderTiling(*texture)) {
     ++demand->tiledRecipes;
   }
@@ -493,6 +546,7 @@ static bool EncodeChainSlots(AOTChainContext* ctx) {
     }
     auto& slot = ctx->slots[index];
     if (slot.op != AOTChainOp::Texture && slot.op != AOTChainOp::PerlinNoise &&
+        slot.op != AOTChainOp::YUV &&
         (slot.in0 == -2 ||
          ((slot.op == AOTChainOp::Blend || slot.op == AOTChainOp::MulAlpha) && slot.in1 == -2))) {
       // An input edge whose producer is outside the pass: the plan omitted a node it depends on.

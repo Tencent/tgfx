@@ -276,12 +276,6 @@ void BindYUVSlot(SlotWriter* chainWriter, uint8_t dataElement, size_t index, int
   ChainISA::YUVData data = {};
   data.subset = {params.subset[0], params.subset[1], params.subset[2], params.subset[3]};
   data.alphaStart = {params.alphaStart[0], params.alphaStart[1]};
-  const auto columns = Mat3ToStd140ColumnMajor(params.colorConversion);
-  for (size_t column = 0; column < 3; ++column) {
-    for (size_t row = 0; row < 3; ++row) {
-      data.colorConversion.m[column * 3 + row] = columns[column * 4 + row];
-    }
-  }
   UploadSlotData(chainWriter, dataElement, index, data, ChainISA::PackYUV);
 }
 

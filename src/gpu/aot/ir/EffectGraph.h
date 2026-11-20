@@ -369,10 +369,12 @@ struct AOTOpaqueKernelParameters {
 struct AOTYUVParameters {
   std::array<float, 4> subset = {};
   std::array<float, 2> alphaStart = {};
-  std::array<float, 9> colorConversion = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
-  int limitedRange = 0;
   int hasRgbaaa = 0;
   int format = 0;
+  // The multi-plane source's own proxy, carried for the upload-time reads (the colour-conversion
+  // matrix and the limited-range flag resolve off the view when the uniforms are written, exactly
+  // where the YUVTexture writer read them — a lazy view is not resolvable at match time).
+  std::shared_ptr<TextureProxy> textureProxy = nullptr;
 };
 
 struct AOTRectCoverageParameters {

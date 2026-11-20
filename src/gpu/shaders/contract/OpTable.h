@@ -238,6 +238,7 @@ inline constexpr Arg kPerlinNoiseArgs[] = {
     {Param::SampledImage, Source::LeafSampler, 3},
 };
 inline constexpr Arg kYUVArgs[] = {
+    {Param::Vec4, Source::CallArg, 0},  // the geometry colour (the kernel's f.color.a modulation)
     {Param::Vec3, Source::Varying, 0},  // SourceCoords
     {Param::Vec4, Source::Member, ChainBindingSource::YuvSubset},
     {Param::Mat3, Source::Member, ChainBindingSource::YuvColorConversion},
@@ -311,7 +312,7 @@ inline constexpr Row kRows[] = {
      "", kGradientArgs, 20},
     {ChainISA::PerlinNoise, "evalNoiseSlot", "", kPerlinNoiseIncludes, 1, false, true, "",
      kPerlinNoiseArgs, 7},
-    {ChainISA::YUV, "pmApplyYUV", "", kYUVIncludes, 1, true, true, "", kYUVArgs, 10},
+    {ChainISA::YUV, "pmApplyYUV", "", kYUVIncludes, 1, true, true, "", kYUVArgs, 11},
     {ChainISA::ColorSpaceXform, "chainApplyColorSpaceXform", "", kColorSpaceXformIncludes, 1, false,
      true, "", kColorSpaceXformArgs, 11},
     {LeafFetchId, "chainLeafFetch", "", kLeafFetchIncludes, 2, true, true, "leafFetch",

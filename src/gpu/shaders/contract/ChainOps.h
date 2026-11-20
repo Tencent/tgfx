@@ -305,10 +305,8 @@ TGFX_CHAIN_DECLARE_OP(PerlinNoise, TGFX_PERLIN_NOISE_DATA, TGFX_PERLIN_NOISE_STR
 // record; the layout and range facts ride the slot's structure.
 #define TGFX_YUV_DATA(T) \
   T(Float4, subset)      \
-  T(Float2, alphaStart)  \
-  T(Matrix3, colorConversion)
+  T(Float2, alphaStart)
 #define TGFX_YUV_STRUCTURE(T) \
-  T(Int32, limitedRange)      \
   T(Int32, hasRgbaaa)         \
   T(Int32, format)
 TGFX_CHAIN_DECLARE_OP(YUV, TGFX_YUV_DATA, TGFX_YUV_STRUCTURE)

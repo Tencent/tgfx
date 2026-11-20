@@ -27,12 +27,14 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/SamplerState.h"
 #include "gpu/Swizzle.h"
+#include "gpu/YUVColorConversion.h"
 #include "gpu/aot/bind/Binder.h"
 #include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/aot/ir/Program.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/resources/TextureView.h"
+#include "gpu/resources/YUVTextureView.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Texture.h"
@@ -288,8 +290,19 @@ bool ReadColorSpace(const ReadContext& ctx, ChainBindingSource source, uint8_t* 
   }
 }
 
-// The YUV source's members (op 16): the slot's own record carries every value, so the read is a
-// field copy; the matrix takes the std140 three-column spelling.
+// The multi-plane view of a YUV leaf's proxy, or null when the proxy carries no YUV view (a lazy
+// or foreign proxy is not an error at this layer; the caller declines the member).
+const YUVTextureView* YUVViewOf(const std::shared_ptr<TextureProxy>& proxy) {
+  auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
+  if (view == nullptr || !view->isYUV()) {
+    return nullptr;
+  }
+  return static_cast<const YUVTextureView*>(view.get());
+}
+
+// The YUV source's members (op 16): the structural facts come off the slot's record; the
+// conversion matrix and the limited-range flag resolve off the view here, at upload time — the
+// same read the YUVTexture writer made, so a lazy view and the runtime's own values agree.
 bool ReadYUV(const ReadContext& ctx, int slotIndex, ChainBindingSource source, uint8_t* out) {
   const auto* chainSlot = SlotOf(ctx, slotIndex);
   if (chainSlot == nullptr) {
@@ -303,18 +316,32 @@ bool ReadYUV(const ReadContext& ctx, int slotIndex, ChainBindingSource source, u
     case ChainBindingSource::YuvAlphaStart:
       std::memcpy(out, yuv.alphaStart.data(), sizeof(float) * 2);
       return true;
-    case ChainBindingSource::YuvColorConversion:
-      StoreMatrix3(out, yuv.colorConversion);
-      return true;
-    case ChainBindingSource::YuvLimitedRange:
-      Store(out, yuv.limitedRange);
-      return true;
     case ChainBindingSource::YuvHasRgbaaa:
       Store(out, yuv.hasRgbaaa);
       return true;
     case ChainBindingSource::YuvFormat:
       Store(out, yuv.format);
       return true;
+    case ChainBindingSource::YuvLimitedRange: {
+      const auto* yuvView = YUVViewOf(yuv.textureProxy);
+      if (yuvView == nullptr) {
+        return false;
+      }
+      Store(out, IsLimitedYUVColorRange(yuvView->yuvColorSpace()) ? 1 : 0);
+      return true;
+    }
+    case ChainBindingSource::YuvColorConversion: {
+      const auto* yuvView = YUVViewOf(yuv.textureProxy);
+      if (yuvView == nullptr) {
+        return false;
+      }
+      const auto conversion = YUVColorConversionMatrix(yuvView->yuvColorSpace());
+      if (!conversion.has_value()) {
+        return false;
+      }
+      std::memcpy(out, conversion->data(), sizeof(float) * 12);
+      return true;
+    }
     default:
       return false;
   }
