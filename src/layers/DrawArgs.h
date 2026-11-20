@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 #include "layers/compositing3d/Layer3DContext.h"
 #include "tgfx/core/ColorSpace.h"
@@ -27,6 +28,7 @@
 
 namespace tgfx {
 class BackgroundHandler;
+class Layer;
 class OpaqueContext;
 struct DrawControl;
 
@@ -58,6 +60,9 @@ class DrawArgs {
   // Layer whose renderBounds does not intersect any of these rects. Callers should pre-outset the
   // rects if blur sampling range needs to be included. nullptr means no culling (full recording).
   const std::vector<Rect>* renderRects = nullptr;
+  // Optional bounds in the coordinate space of renderRects for a draw with a different root.
+  // Layers without an entry are conservatively drawn.
+  const std::unordered_map<const Layer*, Rect>* renderBounds = nullptr;
 
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 

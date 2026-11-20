@@ -53,8 +53,9 @@ enum class LayerImageErrorCode {
   InvalidInput,
   /**
    * The layer tree or output mapping cannot be exported by the reader. For example: a hidden
-   * target branch, 3D content that participates in scene drawing or masking, a perspective output
-   * matrix, or output dimensions, translations or background capture bounds beyond 2^23.
+   * target branch, a singular target-to-scene transform, 3D content that participates in drawing
+   * or masking, a perspective output matrix, or dimensions, translations or capture bounds
+   * beyond 2^23.
    */
   UnsupportedContent,
   /**
@@ -247,9 +248,10 @@ class LayerImageReader {
    * the same failure or cancellation without writing to the buffer.
    *
    * The destination must be writable, have the template's width, format, alpha type and color
-   * space, at least the required number of rows and a valid stride. destinationByteSize must
-   * describe the writable range starting at destination.writablePixels(). The buffer must stay
-   * valid and unshared for the duration of the call.
+   * space, at least the required number of rows and a valid stride. A null destination color
+   * space is treated as sRGB. destinationByteSize must describe the writable range starting
+   * at destination.writablePixels(). The buffer must stay valid and unshared for the duration
+   * of the call.
    * @param context the locked GPU context; it must belong to the device bound at creation.
    * @param destination writable CPU pixels that receive the band.
    * @param destinationByteSize writable byte count from destination.writablePixels().

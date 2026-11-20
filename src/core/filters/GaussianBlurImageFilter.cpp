@@ -21,6 +21,7 @@
 #include <utility>
 #include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
 #include "gpu/processors/GaussianBlur2DFragmentProcessor.h"
@@ -37,10 +38,15 @@ namespace tgfx {
 
 std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrinessY,
                                                TileMode tileMode) {
+  return GaussianBlurImageFilter::Make(blurrinessX, blurrinessY, tileMode, false);
+}
+
+std::shared_ptr<ImageFilter> GaussianBlurImageFilter::Make(float blurrinessX, float blurrinessY,
+                                                           TileMode tileMode, bool forLayer) {
   if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0)) {
     return nullptr;
   }
-  return std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
+  return std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode, forLayer);
 }
 
 float GaussianBlurImageFilter::MaxSigma() {
@@ -53,8 +59,12 @@ float GaussianBlurImageFilter::MaxSigma() {
 static constexpr int SINGLE_PASS_MAX_EDGE = 64;
 
 GaussianBlurImageFilter::GaussianBlurImageFilter(float blurrinessX, float blurrinessY,
-                                                 TileMode tileMode)
-    : blurrinessX(blurrinessX), blurrinessY(blurrinessY), tileMode(tileMode) {
+                                                 TileMode tileMode, bool forLayer)
+    : blurrinessX(blurrinessX), blurrinessY(blurrinessY), tileMode(tileMode), forLayer(forLayer) {
+}
+
+bool GaussianBlurImageFilter::needsPixelAlignedSampling(Context* context) const {
+  return forLayer && context->shaderCaps()->needsPixelAlignedLayerSampling;
 }
 
 static void Blur1D(PlacementPtr<FragmentProcessor> source,
@@ -72,6 +82,16 @@ static void Blur1D(PlacementPtr<FragmentProcessor> source,
 
 std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args) const {
+  auto texture = renderBlur(std::move(source), clipBounds, args);
+  if (texture && needsPixelAlignedSampling(args.context)) {
+    texture->sampleAtPixelCenters = true;
+  }
+  return texture;
+}
+
+std::shared_ptr<TextureProxy> GaussianBlurImageFilter::renderBlur(std::shared_ptr<Image> source,
+                                                                  const Rect& clipBounds,
+                                                                  const TPArgs& args) const {
   // The single pass and the folded crop read the source through whole-pixel offsets, so a clip that
   // reaches past the source's blur range would make the two paths disagree along the columns.
   DEBUG_ASSERT(filterBounds(Rect::MakeWH(source->width(), source->height())).contains(clipBounds));
@@ -159,7 +179,8 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
                                           args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
     auto processor = GaussianBlur2DFragmentProcessor::Make(
         allocator, std::move(sourceFragment), sigmaX, sigmaY,
-        Point::Make(finalUVMatrix.getTranslateX(), finalUVMatrix.getTranslateY()));
+        Point::Make(finalUVMatrix.getTranslateX(), finalUVMatrix.getTranslateY()),
+        blur2D && needsPixelAlignedSampling(args.context));
     if (target == nullptr || processor == nullptr) {
       return nullptr;
     }
@@ -180,6 +201,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
            args.renderFlags);
 
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
+    samplingArgs.sampleAtIntegerOffsets = needsPixelAlignedSampling(args.context);
     sourceFragment = TiledTextureEffect::Make(allocator, renderTarget->asTextureProxy(),
                                               samplingArgs, foldCrop ? &finalUVMatrix : nullptr);
     // A folded pass writes the requested bounds, so its target takes what the copy target took.
@@ -248,6 +270,8 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProces
   SamplingArgs samplingArgs = {};
   samplingArgs.tileModeX = tileMode;
   samplingArgs.tileModeY = tileMode;
+  samplingArgs.sampleAtIntegerOffsets =
+      needsPixelAlignedSampling(context) && scales == Point::Make(1, 1);
   auto fp = FragmentProcessor::Make(source, args, samplingArgs, &uvMatrix);
   if (fp == nullptr) {
     return nullptr;

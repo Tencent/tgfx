@@ -25,7 +25,7 @@ namespace tgfx {
 class GLSLGaussianBlur2DFragmentProcessor : public GaussianBlur2DFragmentProcessor {
  public:
   GLSLGaussianBlur2DFragmentProcessor(PlacementPtr<FragmentProcessor> processor, float sigmaX,
-                                      float sigmaY, const Point& origin);
+                                      float sigmaY, const Point& origin, bool quantizeHorizontal);
 
   void emitCode(EmitArgs& args) const override;
 

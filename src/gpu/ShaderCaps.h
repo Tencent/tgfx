@@ -45,6 +45,10 @@ class ShaderCaps {
    */
   bool usesPrecisionModifiers = false;
 
+  // Interpolating texture coordinates can shift a SwiftShader bilinear sample across a rounding
+  // boundary when a layer is clipped to a different tile.
+  bool needsPixelAlignedLayerSampling = false;
+
   /**
    * Indicates if the shader language supports framebuffer fetch, which allows reading the current
    * contents of the framebuffer in the fragment shader.

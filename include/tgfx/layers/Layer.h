@@ -800,6 +800,5 @@ class Layer : public std::enable_shared_from_this<Layer> {
   friend class OffscreenRenderer;
   friend class Layer3DContext;
   friend class LayerDrawSession;
-  friend class LayerClip;
 };
 }  // namespace tgfx

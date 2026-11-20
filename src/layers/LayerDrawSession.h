@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <optional>
+#include <unordered_map>
 #include <vector>
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/DrawControl.h"
@@ -33,10 +34,13 @@
 #include "tgfx/layers/LayerImageReader.h"
 
 namespace tgfx {
+class BackgroundSource;
 class Canvas;
 class Context;
 class DrawArgs;
 class Layer;
+class RegionTransformer;
+class Shader;
 enum class LayerStylePosition;
 
 /**
@@ -160,11 +164,20 @@ class LayerDrawSession {
   static ISize ResolveSurfaceLimit(const LayerDrawLimits& limits);
 
  private:
+  class TargetBackgroundCapturer;
   LayerDrawSession() = default;
 
+  void captureBackdrop(DrawArgs args, std::shared_ptr<BackgroundSource> source,
+                       BackgroundSnapshotMap* snapshots) const;
+
+  // On success clips remain in effect and the matrix is restored. The optional output combines
+  // ancestor alpha masks into device-space coverage; path masks are always applied as clips.
+  bool applyAncestorClips(const DrawArgs& args, Canvas* canvas,
+                          std::shared_ptr<Shader>* coverage) const;
+
   static float FilterOutset(Layer* layer, float scale);
-  static float AncestorFilterOutset(Layer* target, Layer* captureRoot, const Matrix& rootToOutput);
   static bool IsSupported2DScene(const Layer* layer, std::vector<const Layer*>& activeMasks);
+  Rect collectTargetBounds(Layer* layer, std::shared_ptr<RegionTransformer> transformer);
   bool drawClippedTarget(const DrawArgs& args, Canvas* canvas, const Rect& bounds) const;
   struct BackgroundEffect {
     Rect outputBounds = {};
@@ -176,16 +189,23 @@ class LayerDrawSession {
                                   std::vector<BackgroundEffect>* effects);
   static void CollectSubtreeEffects(Layer* layer, const Matrix& localToOutput, float ancestorOutset,
                                     std::vector<BackgroundEffect>* effects);
-  void collectPrecedingEffects();
+  float collectPrecedingEffects();
 
   LayerDrawRequest request = {};
   std::shared_ptr<Layer> sceneRoot = nullptr;
   Matrix rootToOutput = Matrix::I();  // captureRoot-local to final output pixels.
   Matrix outputToRoot = Matrix::I();  // output pixels to the capture-root coordinate space.
+  Matrix outputToTarget = Matrix::I();
   PixelRect outputPixelBounds = {};
   std::optional<Rect> ancestorScrollBounds = std::nullopt;
   bool useSceneBounds = true;
+  bool replayTarget = false;
+  // True when ancestor clips force the capture pass to replay the target with live style
+  // selection. The export consumer mirrors that selection so nested groups take the same
+  // offscreen route.
+  bool matchLiveBackdrop = false;
   std::vector<Layer*> clippedAncestors = {};
+  std::unordered_map<const Layer*, Rect> targetBounds = {};
   std::vector<BackgroundEffect> targetEffects = {};
   std::vector<BackgroundEffect> precedingEffects = {};
 };

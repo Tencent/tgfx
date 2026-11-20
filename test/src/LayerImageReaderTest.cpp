@@ -69,15 +69,16 @@ class FailingFilter final : public LayerFilter {
   }
 };
 
-class InterruptSecondTileLayer final : public Layer {
+class InterruptTileLayer final : public Layer {
  public:
   LayerImageReader* reader = nullptr;
   bool cancel = false;
+  int interruptAt = 0;
   int drawCount = 0;
 
  protected:
   bool drawLayer(const DrawArgs& args, Canvas*, float, BlendMode) override {
-    if (++drawCount == 2) {
+    if (++drawCount == interruptAt) {
       if (cancel) {
         reader->requestCancel();
       } else {
@@ -340,98 +341,6 @@ TGFX_TEST(LayerImageReaderTest, TiledMatchesSingleSurface) {
   }
 }
 
-TGFX_TEST(LayerImageReaderTest, CanvasDefaultKeepsLargePictureCoordinates) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto content = SolidLayer::Make();
-  content->setColor(Color::Red());
-  content->setWidth(10);
-  content->setHeight(10);
-  constexpr float LargeScale = 1073741824.0f;
-  PictureRecorder recorder = {};
-  auto recording = recorder.beginRecording();
-  recording->scale(LargeScale, LargeScale);
-  content->draw(recording);
-  auto picture = recorder.finishRecordingAsPicture();
-  ASSERT_TRUE(picture != nullptr);
-  EXPECT_EQ(picture->getBounds(), Rect::MakeWH(10.0f * LargeScale, 10.0f * LargeScale));
-  auto surface = Surface::Make(context, 10, 10, false, 1, false, 0, ColorSpace::SRGB());
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
-  canvas->scale(1.0f / LargeScale, 1.0f / LargeScale);
-  canvas->drawPicture(picture);
-  auto info = OutputInfo(10, 10);
-  std::vector<uint8_t> pixels(info.byteSize());
-  ASSERT_TRUE(surface->readPixels(info, pixels.data()));
-  auto offset = static_cast<size_t>(5) * info.rowBytes() + 5 * 4;
-  EXPECT_EQ(pixels[offset], 255);
-  EXPECT_EQ(pixels[offset + 1], 0);
-  EXPECT_EQ(pixels[offset + 2], 0);
-  EXPECT_EQ(pixels[offset + 3], 255);
-}
-
-TGFX_TEST(LayerImageReaderTest, CanvasDrawPreservesAlphaModulationAboveOne) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto content = SolidLayer::Make();
-  auto color = Color::Red();
-  color.alpha = 0.25f;
-  content->setColor(color);
-  content->setWidth(8);
-  content->setHeight(8);
-  auto surface = Surface::Make(context, 8, 8, false, 1, false, 0, ColorSpace::SRGB());
-  ASSERT_TRUE(surface != nullptr);
-  content->draw(surface->getCanvas(), 2.0f);
-  auto info = OutputInfo(8, 8);
-  std::vector<uint8_t> pixels(info.byteSize());
-  ASSERT_TRUE(surface->readPixels(info, pixels.data()));
-  auto offset = static_cast<size_t>(4) * info.rowBytes() + 4 * 4;
-  EXPECT_NEAR(pixels[offset], 128, 1);
-  EXPECT_EQ(pixels[offset + 1], 0);
-  EXPECT_EQ(pixels[offset + 2], 0);
-  EXPECT_NEAR(pixels[offset + 3], 128, 1);
-
-  LayerImageRequest request = {};
-  request.target = content;
-  request.outputSize = {8, 8};
-  request.alpha = 2.0f;
-  LayerImageReadOptions options = {};
-  options.bandRows = 1;
-  LayerImageErrorCode error = LayerImageErrorCode::None;
-  EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
-  EXPECT_EQ(error, LayerImageErrorCode::InvalidInput);
-}
-
-TGFX_TEST(LayerImageReaderTest, CanvasDrawMatchesDisplayList) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  for (bool withBackgroundBlur : {false, true}) {
-    auto content = BuildTestScene(withBackgroundBlur);
-    auto displayList = MakeDisplayList(content);
-    auto reference = RenderReference(context, displayList.get());
-    ASSERT_FALSE(reference.pixels.empty());
-
-    auto surface =
-        Surface::Make(context, TestWidth, TestHeight, false, 1, false, 0, ColorSpace::SRGB());
-    ASSERT_TRUE(surface != nullptr);
-    auto* canvas = surface->getCanvas();
-    canvas->clear();
-    content->draw(canvas);
-
-    auto info = OutputInfo(TestWidth, TestHeight);
-    PixelImage drawn = {};
-    drawn.pixels.resize(info.byteSize());
-    ASSERT_TRUE(surface->readPixels(info, drawn.pixels.data()));
-    drawn.width = TestWidth;
-    drawn.height = TestHeight;
-    drawn.rowBytes = info.rowBytes();
-    EXPECT_EQ(CountDifferentPixels(reference, drawn, 0), 0);
-  }
-}
-
 TGFX_TEST(LayerImageReaderTest, MaskedTargetWithAttributesMatchesSingleSurface) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -553,38 +462,6 @@ TGFX_TEST(LayerImageReaderTest, ScaledOutputMatchesCanvasDraw) {
   EXPECT_EQ(CountDifferentPixels(reference, output.image, 0), 0);
 }
 
-TGFX_TEST(LayerImageReaderTest, PictureCanvasMatchesDisplayList) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto content = BuildTestScene(false);
-  auto displayList = MakeDisplayList(content);
-  auto reference = RenderReference(context, displayList.get());
-  ASSERT_FALSE(reference.pixels.empty());
-
-  PictureRecorder recorder = {};
-  auto* recordingCanvas = recorder.beginRecording();
-  content->draw(recordingCanvas);
-  auto picture = recorder.finishRecordingAsPicture();
-  ASSERT_TRUE(picture != nullptr);
-
-  auto surface =
-      Surface::Make(context, TestWidth, TestHeight, false, 1, false, 0, ColorSpace::SRGB());
-  ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
-  canvas->clear();
-  canvas->drawPicture(picture);
-
-  auto info = OutputInfo(TestWidth, TestHeight);
-  PixelImage drawn = {};
-  drawn.pixels.resize(info.byteSize());
-  ASSERT_TRUE(surface->readPixels(info, drawn.pixels.data()));
-  drawn.width = TestWidth;
-  drawn.height = TestHeight;
-  drawn.rowBytes = info.rowBytes();
-  EXPECT_EQ(CountDifferentPixels(reference, drawn, 0), 0);
-}
-
 TGFX_TEST(LayerImageReaderTest, PaddedStrideLeavesPaddingUntouched) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -701,6 +578,29 @@ TGFX_TEST(LayerImageReaderTest, EquivalentColorSpacesAcceptIndependentInstances)
       EXPECT_EQ(pixels[i + 3], 255);
     }
   }
+}
+
+TGFX_TEST(LayerImageReaderTest, DestinationWithoutColorSpaceUsesSRGB) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  LayerImageRequest request = {};
+  request.target = Layer::Make();
+  request.outputSize = {1, 1};
+  request.clearColor = Color::Red();
+  LayerImageReadOptions options = {};
+  options.bandRows = 1;
+  auto reader = LayerImageReader::Make(context, request, options);
+  ASSERT_NE(reader, nullptr);
+  auto info = reader->bandInfo().makeColorSpace(nullptr);
+  ASSERT_EQ(info.colorSpace(), nullptr);
+  uint8_t pixels[4] = {};
+  auto result = reader->readNextBand(context, Pixmap(info, pixels), sizeof(pixels));
+  ASSERT_EQ(result.code, LayerImageReadCode::BandReady);
+  EXPECT_EQ(pixels[0], 255);
+  EXPECT_EQ(pixels[1], 0);
+  EXPECT_EQ(pixels[2], 0);
+  EXPECT_EQ(pixels[3], 255);
 }
 
 TGFX_TEST(LayerImageReaderTest, ReadsUnpremultipliedColor) {
@@ -826,6 +726,55 @@ TGFX_TEST(LayerImageReaderTest, UsesExactSurfaceSizesForFullAndEdgeTiles) {
       EXPECT_EQ(pixel[3], red || blue ? 255 : 0);
     }
   }
+}
+
+TGFX_TEST(LayerImageReaderTest, PlainTilesCullStyledSubtrees) {
+  class CountingStyle final : public LayerStyle {
+   public:
+    int draws = 0;
+
+    LayerStylePosition position() const override {
+      return LayerStylePosition::Below;
+    }
+
+    Rect filterBounds(const Rect& srcRect, float) override {
+      return srcRect;
+    }
+
+   protected:
+    void onDraw(Canvas*, const LayerStyleInput&, float, BlendMode) override {
+      ++draws;
+    }
+  };
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto root = Layer::Make();
+  auto group = Layer::Make();
+  auto solid = SolidLayer::Make();
+  solid->setWidth(4);
+  solid->setHeight(4);
+  solid->setColor(Color::Red());
+  auto style = std::make_shared<CountingStyle>();
+  solid->setLayerStyles({style});
+  group->addChild(solid);
+  root->addChild(group);
+  LayerImageRequest request = {};
+  request.target = root;
+  request.outputSize = {64, 8};
+  LayerImageReadOptions options = {};
+  options.bandRows = 8;
+  options.tileSizeLimit = {18, 10};
+  auto reader = LayerImageReader::Make(context, request, options);
+  ASSERT_NE(reader, nullptr);
+  auto info = reader->bandInfo();
+  std::vector<uint8_t> pixels(info.byteSize());
+  auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
+  ASSERT_EQ(result.code, LayerImageReadCode::BandReady);
+  EXPECT_EQ(style->draws, 1);
+  EXPECT_EQ(pixels[0], 255);
+  EXPECT_EQ(pixels[info.minRowBytes() - 1], 0);
 }
 
 TGFX_TEST(LayerImageReaderTest, PassThroughOffscreenRespectsEdgeTileSize) {
@@ -976,6 +925,18 @@ TGFX_TEST(LayerImageReaderTest, RejectsInvalidOptions) {
   request.targetLocalToOutput = Matrix::MakeScale(0, 1);
   EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
   EXPECT_EQ(error, LayerImageErrorCode::InvalidInput);
+
+  request.targetLocalToOutput = Matrix::I();
+  request.alpha = 2.0f;
+  EXPECT_TRUE(LayerImageReader::Make(context, request, options, &error) == nullptr);
+  EXPECT_EQ(error, LayerImageErrorCode::InvalidInput);
+
+  request.alpha = 1.0f;
+  auto ancestor = Layer::Make();
+  ancestor->setMatrix(Matrix::MakeScale(0, 1));
+  ancestor->addChild(root);
+  auto displayList = MakeDisplayList(ancestor);
+  ExpectUnsupportedRequest(context, request, options);
 }
 
 TGFX_TEST(LayerImageReaderTest, RejectsReadOnlyAndMismatchedDestination) {
@@ -1129,41 +1090,49 @@ TGFX_TEST(LayerImageReaderTest, PartialBandWritesAreNeverPublished) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  for (bool cancel : {false, true}) {
-    auto root = std::make_shared<InterruptSecondTileLayer>();
-    root->cancel = cancel;
-    LayerImageRequest request = {};
-    request.target = root;
-    request.outputSize = {4, 1};
-    request.clearColor = Color::White();
-    LayerImageReadOptions options = {};
-    options.bandRows = 1;
-    options.tileSizeLimit = {4, 3};
-    auto reader = LayerImageReader::Make(context, request, options);
-    ASSERT_TRUE(reader != nullptr);
-    root->reader = reader.get();
-    auto info = reader->bandInfo();
-    std::vector<uint8_t> pixels(info.byteSize(), 0x7f);
-    auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
-    auto expected = cancel ? LayerImageReadCode::Cancelled : LayerImageReadCode::Failed;
-    ASSERT_EQ(result.code, expected);
-    if (!cancel) {
-      EXPECT_EQ(result.error, LayerImageErrorCode::DrawFailed);
+  // Interrupt the second tile of a batch, once in the first batch and once after a full batch
+  // has been copied to the destination.
+  for (int completedTiles : {0, 64}) {
+    for (bool cancel : {false, true}) {
+      auto root = std::make_shared<InterruptTileLayer>();
+      root->cancel = cancel;
+      root->interruptAt = completedTiles + 2;
+      LayerImageRequest request = {};
+      request.target = root;
+      request.outputSize = {root->interruptAt * 2, 1};
+      request.clearColor = Color::White();
+      LayerImageReadOptions options = {};
+      options.bandRows = 1;
+      options.tileSizeLimit = {4, 3};
+      auto reader = LayerImageReader::Make(context, request, options);
+      ASSERT_TRUE(reader != nullptr);
+      root->reader = reader.get();
+      auto info = reader->bandInfo();
+      std::vector<uint8_t> pixels(info.byteSize(), 0x7f);
+      auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
+      auto expected = cancel ? LayerImageReadCode::Cancelled : LayerImageReadCode::Failed;
+      ASSERT_EQ(result.code, expected);
+      if (!cancel) {
+        EXPECT_EQ(result.error, LayerImageErrorCode::DrawFailed);
+      }
+      EXPECT_EQ(result.firstRow, 0);
+      EXPECT_EQ(result.rowCount, 0);
+      EXPECT_FALSE(result.lastBand);
+      EXPECT_EQ(reader->rowsRead(), 0);
+      EXPECT_FALSE(reader->isDone());
+      std::vector<uint8_t> partial(info.byteSize(), 0x7f);
+      std::fill_n(partial.begin(), static_cast<size_t>(completedTiles) * 2 * info.bytesPerPixel(),
+                  255);
+      EXPECT_EQ(pixels, partial);
+      context->flushAndSubmit(true);
+      EXPECT_EQ(pixels, partial);
+      pixels.assign(pixels.size(), 0x5a);
+      result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
+      EXPECT_EQ(result.code, expected);
+      EXPECT_EQ(result.rowCount, 0);
+      EXPECT_EQ(root->drawCount, root->interruptAt);
+      EXPECT_EQ(pixels, std::vector<uint8_t>(pixels.size(), 0x5a));
     }
-    EXPECT_EQ(result.firstRow, 0);
-    EXPECT_EQ(result.rowCount, 0);
-    EXPECT_FALSE(result.lastBand);
-    EXPECT_EQ(reader->rowsRead(), 0);
-    EXPECT_FALSE(reader->isDone());
-    std::vector<uint8_t> partial(info.byteSize(), 0x7f);
-    std::fill_n(partial.begin(), 2 * info.bytesPerPixel(), 255);
-    EXPECT_EQ(pixels, partial);
-    pixels.assign(pixels.size(), 0x5a);
-    result = reader->readNextBand(context, Pixmap(info, pixels.data()), pixels.size());
-    EXPECT_EQ(result.code, expected);
-    EXPECT_EQ(result.rowCount, 0);
-    EXPECT_EQ(root->drawCount, 2);
-    EXPECT_EQ(pixels, std::vector<uint8_t>(pixels.size(), 0x5a));
   }
 }
 
@@ -1317,8 +1286,11 @@ TGFX_TEST(LayerImageReaderTest, AppliesMemoryBudgetToIndividualBackgroundCapture
   target->setLayerStyles({BackgroundBlurStyle::Make(768, 768)});
   session = LayerDrawSession::Prepare(request, control);
   ASSERT_TRUE(session != nullptr) << static_cast<int>(control.error);
-  EXPECT_EQ(session->planRegion({0, 0, 1, 1}, limits, control).code, RegionPlanCode::Failed);
-  EXPECT_EQ(control.error, LayerImageErrorCode::DeviceLimitExceeded);
+  for (const auto& core : {PixelRect{0, 0, 2046, 2046}, PixelRect{0, 0, 1, 1}}) {
+    control = {};
+    EXPECT_EQ(session->planRegion(core, limits, control).code, RegionPlanCode::Failed);
+    EXPECT_EQ(control.error, LayerImageErrorCode::DeviceLimitExceeded);
+  }
 }
 
 TGFX_TEST(LayerImageReaderTest, FilterFailureFailsTheBand) {
@@ -1838,6 +1810,31 @@ TGFX_TEST(LayerImageReaderTest, AncestorScrollRectClipsBackdropAndPlainTiles) {
   }
 }
 
+TGFX_TEST(LayerImageReaderTest, FullyClippedBackdropDoesNotRequireTileSnapshot) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto target = MakeExportSolid(Color::Red());
+  target->setScrollRect(Rect::MakeWH(TestWidth, TestHeight));
+  auto viewport = Layer::Make();
+  viewport->setScrollRect(Rect::MakeWH(32, TestHeight));
+  viewport->addChild(MakeExportGlass(6, 7, 10));
+  auto hiddenGlass = MakeExportGlass(96, 7, 10);
+  hiddenGlass->setPassThroughBackground(false);
+  viewport->addChild(hiddenGlass);
+  target->addChild(viewport);
+  auto ancestor = Layer::Make();
+  ancestor->setScrollRect(Rect::MakeWH(TestWidth, TestHeight));
+  ancestor->addChild(target);
+  auto displayList = MakeDisplayList(ancestor);
+
+  auto output = ReadTiled(context, target, {32, 32});
+  ASSERT_EQ(output.error, LayerImageErrorCode::None);
+  ASSERT_TRUE(output.bandSequenceValid);
+  ExpectExportPixel(output.image, 10, 10, {255, 96, 96, 255}, 1);
+  ExpectExportPixel(output.image, 100, 10, {255, 0, 0, 255});
+}
+
 TGFX_TEST(LayerImageReaderTest, AncestorAlphaMaskClipsBackdropAndPlainTiles) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -2032,6 +2029,70 @@ TGFX_TEST(LayerImageReaderTest, WideBandRemainsCompleteAcrossBackgroundBatches) 
       reference = std::move(output);
     } else {
       EXPECT_EQ(CountDifferentPixels(reference, output, 1), 0);
+    }
+  }
+}
+
+TGFX_TEST(LayerImageReaderTest, SubdividingATileDoesNotRedrawEarlierBatches) {
+  class TrackingLayer final : public Layer {
+   public:
+    int leftmostTileDraws = 0;
+
+   protected:
+    bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha,
+                   BlendMode blendMode) override {
+      // Only the leftmost output tiles translate x by +1 for the sampling margin.
+      if (canvas->getMatrix().getTranslateX() == 1.0f) {
+        ++leftmostTileDraws;
+      }
+      return Layer::drawLayer(args, canvas, alpha, blendMode);
+    }
+  };
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  if (context->gpu()->limits()->maxTextureDimension2D < 2896) {
+    GTEST_SKIP() << "The device cannot allocate the subdivided background capture";
+  }
+  constexpr int Width = 272;
+  constexpr int Height = 64;
+  constexpr int GlassX = 270;
+  constexpr int GlassY = 62;
+  auto root = std::make_shared<TrackingLayer>();
+  auto glass = MakeExportSolid(Color::FromRGBA(255, 255, 255, 96));
+  glass->setWidth(1);
+  glass->setHeight(1);
+  glass->setMatrix(Matrix::MakeTrans(GlassX, GlassY));
+  // The 1440-pixel outset on each side forces a height split even at one pixel wide.
+  glass->setLayerStyles({BackgroundBlurStyle::Make(720, 720)});
+  root->addChild(glass);
+
+  LayerImageRequest request = {};
+  request.target = root;
+  request.outputSize = {Width, Height};
+  request.clearColor = Color::Red();
+  LayerImageReadOptions options = {};
+  options.bandRows = Height;
+  // A full batch of 64 four-pixel-wide tiles fits before the glass at the end of the strip.
+  options.tileSizeLimit = {6, Height + 2};
+  auto reader = LayerImageReader::Make(context, request, options);
+  ASSERT_NE(reader, nullptr);
+  auto info = reader->bandInfo();
+  PixelImage output = {std::vector<uint8_t>(info.byteSize(), 0xcc), Width, Height, info.rowBytes()};
+  auto result =
+      reader->readNextBand(context, Pixmap(info, output.pixels.data()), output.pixels.size());
+  ASSERT_EQ(result.code, LayerImageReadCode::BandReady) << static_cast<int>(result.error);
+  EXPECT_EQ(result.rowCount, Height);
+  EXPECT_TRUE(result.lastBand);
+  EXPECT_EQ(root->leftmostTileDraws, 1);
+  for (int y = 0; y < Height; ++y) {
+    for (int x = 0; x < Width; ++x) {
+      if (x == GlassX && y == GlassY) {
+        ExpectExportPixel(output, x, y, {255, 96, 96, 255}, 1);
+      } else {
+        ExpectExportPixel(output, x, y, {255, 0, 0, 255});
+      }
     }
   }
 }

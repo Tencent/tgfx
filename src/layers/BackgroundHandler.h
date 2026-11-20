@@ -74,8 +74,9 @@ class BackgroundHandler {
 
   // Returns true when descendants of `layer` should render onto a real Surface so a sub
   // background source can sample them back. Capturer returns true only when `layer` actually has
-  // descendant background-sourced styles AND a GPU context is available; Consumer / NoOp always
-  // return false.
+  // descendant background-sourced styles AND a GPU context is available. Consumer returns true
+  // only when it mirrors a capture pass that selects surfaces from the live layer tree; NoOp and
+  // other passes always return false.
   virtual bool needsSurface(Layer* /*layer*/) const {
     return false;
   }
@@ -181,6 +182,11 @@ class BackgroundCapturer : public BackgroundHandler {
   const LayerStyleSource* cacheLayerStyleSource(Layer* layer,
                                                 std::unique_ptr<LayerStyleSource> source) override;
 
+  // Returns true when `layer` has a visible descendant whose Background-sourced style draws. This
+  // is the live-tree selection both the export capturer and its matching consumer use, so they
+  // agree on which offscreen groups need a real Surface.
+  static bool HasDrawableBackdropDescendant(Layer* layer);
+
   // Runs a capture pass: replays captureRoot onto bgSource's canvas, populating snapshots. The
   // replay walks the tree exactly once with renderRects set to the rects the capture actually
   // samples, so drawLayer culls each layer whose renderBounds does not intersect any of them.
@@ -189,12 +195,6 @@ class BackgroundCapturer : public BackgroundHandler {
   static void Run(Layer* captureRoot, const DrawArgs& baseArgs,
                   std::shared_ptr<BackgroundSource> bgSource, BackgroundSnapshotMap* snapshots,
                   const std::vector<Rect>& renderRects, const std::vector<Rect>& styleSourceRects);
-
-  // Captures the scene backdrop for a target drawn with explicit export attributes.
-  static void RunForTarget(Layer* captureRoot, Layer* target, float alpha, BlendMode blendMode,
-                           const DrawArgs& baseArgs, std::shared_ptr<BackgroundSource> bgSource,
-                           BackgroundSnapshotMap* snapshots, const std::vector<Rect>& renderRects,
-                           const std::vector<Layer*>& clippedAncestors);
 
   // Exposes the snapshot map this capturer writes into, so per-fragment Sub3DCapturers spawned
   // by 3D subtrees can append their composed-backdrop entries to the same map under the same
@@ -218,12 +218,17 @@ class BackgroundCapturer : public BackgroundHandler {
   }
 
  protected:
+  // Returns true when `layer` itself draws a Background-sourced style or contains one that does.
+  static bool HasDrawableBackdrop(Layer* layer);
+
   virtual std::unique_ptr<BackgroundCapturer> makeSubCapturer(
       BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source,
       const std::vector<Rect>* styleSourceRects) const;
 
-  static void DrawTargetChild(const DrawArgs& args, Canvas* canvas, Layer* target, float alpha,
-                              BlendMode blendMode);
+  // A pass that shares style inputs with a later pass may need to keep the parent cull rects.
+  virtual bool narrowSubRenderRects() const {
+    return true;
+  }
 
   void forceDrawDescendants() {
     ++_forcedCaptureDepth;
@@ -234,8 +239,6 @@ class BackgroundCapturer : public BackgroundHandler {
   }
 
  private:
-  class TargetBackgroundCapturer;
-
   std::unique_ptr<BackgroundCapturer> buildSubCapturer(
       const DrawArgs& parentArgs, std::shared_ptr<BackgroundSource> subSource) const;
 
@@ -258,18 +261,26 @@ class BackgroundConsumer : public BackgroundHandler {
   // opaque (which is what makes SrcOver compositing of the cached output match the style's own
   // Src draw), the frame renders through multiple passes, and those passes cover compact render
   // rects, since that is when caching pays for its rasterization.
-  BackgroundConsumer(BackgroundSnapshotMap* snapshots, bool shareStyleOutput)
-      : snapshots(snapshots), shareStyleOutput(shareStyleOutput) {
+  // matchLiveBackdrop mirrors the capture pass that produced `snapshots` when it selects
+  // surfaces from the live layer tree (the export target path). It makes this consumer take the
+  // same offscreen route as the capturer for groups that contain drawable backdrop styles.
+  BackgroundConsumer(BackgroundSnapshotMap* snapshots, bool shareStyleOutput,
+                     bool matchLiveBackdrop = false)
+      : snapshots(snapshots), shareStyleOutput(shareStyleOutput),
+        matchLiveBackdrop(matchLiveBackdrop) {
   }
 
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                            LayerStyle* style, const LayerStyleSource* source) override;
+
+  bool needsSurface(Layer* layer) const override;
 
   const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
 
  private:
   BackgroundSnapshotMap* snapshots = nullptr;
   bool shareStyleOutput = false;
+  bool matchLiveBackdrop = false;
   // Per-consumer read cursors: each (Layer, LayerStyle) entry list is consumed in dispatch order
   // through this map, so a shared snapshot map can be consumed by multiple consumers (e.g. one
   // per tile in tiled rendering) without cursors interfering.

@@ -25,7 +25,11 @@
 namespace tgfx {
 class GaussianBlurImageFilter : public ImageFilter {
  public:
-  GaussianBlurImageFilter(float blurrinessX, float blurrinessY, TileMode tileMode);
+  GaussianBlurImageFilter(float blurrinessX, float blurrinessY, TileMode tileMode,
+                          bool forLayer = false);
+
+  static std::shared_ptr<ImageFilter> Make(float blurrinessX, float blurrinessY, TileMode tileMode,
+                                           bool forLayer);
 
   /**
    * The maximum sigma that can be passed to blur() in the X and/or Y sigma values. Larger requested
@@ -53,6 +57,13 @@ class GaussianBlurImageFilter : public ImageFilter {
                                                       const SamplingOptions& sampling,
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
+
+ private:
+  const bool forLayer;
+  bool needsPixelAlignedSampling(Context* context) const;
+
+  std::shared_ptr<TextureProxy> renderBlur(std::shared_ptr<Image> source, const Rect& clipBounds,
+                                           const TPArgs& args) const;
 
   PlacementPtr<FragmentProcessor> getSourceFragmentProcessor(std::shared_ptr<Image> source,
                                                              Context* context, uint32_t renderFlags,

@@ -1147,16 +1147,23 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (FloatNearlyZero(contentScale)) {
     return true;
   }
-  if (args.renderRects != nullptr && !args.renderRects->empty() && !renderBounds.isEmpty()) {
-    bool anyHit = false;
-    for (const auto& rect : *args.renderRects) {
-      if (Rect::Intersects(rect, renderBounds)) {
-        anyHit = true;
-        break;
-      }
+  if (args.renderRects != nullptr && !args.renderRects->empty()) {
+    const auto* cullBounds = &renderBounds;
+    if (args.renderBounds != nullptr) {
+      auto entry = args.renderBounds->find(this);
+      cullBounds = entry != args.renderBounds->end() ? &entry->second : nullptr;
     }
-    if (!anyHit) {
-      return true;
+    if (cullBounds != nullptr && !cullBounds->isEmpty()) {
+      bool anyHit = false;
+      for (const auto& rect : *args.renderRects) {
+        if (Rect::Intersects(rect, *cullBounds)) {
+          anyHit = true;
+          break;
+        }
+      }
+      if (!anyHit) {
+        return true;
+      }
     }
   }
   std::shared_ptr<MaskFilter> maskFilter = nullptr;

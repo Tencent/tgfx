@@ -104,6 +104,10 @@ class TextureProxy : public ResourceProxy {
     return nullptr;
   }
 
+  // Evaluate affine quad samples from pixel centers so cropping a layer blur does not
+  // change its subpixel sampling phase.
+  bool sampleAtPixelCenters = false;
+
  protected:
   int _width = 0;
   int _height = 0;

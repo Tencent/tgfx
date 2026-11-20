@@ -20,15 +20,19 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <utility>
 #include <vector>
+#include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
+#include "gpu/AlignTo.h"
 #include "layers/LayerDrawSession.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/GPUBuffer.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
@@ -37,6 +41,49 @@ namespace {
 
 // Bound temporary planning storage while still sharing captures across neighboring regions.
 static constexpr size_t MaxRegionsPerBatch = 64;
+
+// Bound the staging memory independently of the shared background capture. One large tile can
+// still be read on its own when the caller requests tiles that exceed this budget.
+static constexpr uint64_t MaxPendingReadbackBytes = 32 * 1024 * 1024;
+
+struct PendingReadback {
+  std::shared_ptr<SurfaceReadback> readback;
+  ImageInfo destinationInfo;
+  void* destinationPixels = nullptr;
+  bool flipY = false;
+};
+
+static DrawOutcome ReadPendingPixels(Context* context, const std::vector<PendingReadback>& pending,
+                                     DrawControl& control) {
+  if (control.cancelled()) {
+    return DrawOutcome::Cancelled;
+  }
+  // Wait once for all the transfers, then map the buffers directly. Calling lockPixels() for
+  // each readback would wait on the whole queue again.
+  context->flushAndSubmit(true);
+  for (const auto& entry : pending) {
+    if (control.cancelled()) {
+      return DrawOutcome::Cancelled;
+    }
+    auto buffer = entry.readback->getGPUBuffer(context);
+    if (buffer == nullptr) {
+      control.fail(LayerImageErrorCode::ReadbackFailed);
+      return DrawOutcome::Failed;
+    }
+    // WebGPU also needs a map request after the transfers have been submitted.
+    buffer->requestMapAsync();
+    auto* pixels = buffer->isReady() ? buffer->map() : nullptr;
+    if (pixels == nullptr) {
+      buffer->unmap();
+      control.fail(LayerImageErrorCode::ReadbackFailed);
+      return DrawOutcome::Failed;
+    }
+    CopyPixels(entry.readback->info(), pixels, entry.destinationInfo, entry.destinationPixels,
+               entry.flipY);
+    buffer->unmap();
+  }
+  return DrawOutcome::Success;
+}
 
 static bool IsFiniteColor(const Color& color) {
   return std::isfinite(color.red) && std::isfinite(color.green) && std::isfinite(color.blue) &&
@@ -144,9 +191,10 @@ bool LayerImageReader::Impl::validateDestination(const Pixmap& destination,
   if (destination.writablePixels() == nullptr || destinationByteSize == 0) {
     return false;
   }
+  auto colorSpace = info.colorSpace() != nullptr ? info.colorSpace() : ColorSpace::SRGB();
   if (info.width() != bandInfo.width() || info.colorType() != bandInfo.colorType() ||
       info.alphaType() != bandInfo.alphaType() ||
-      !ColorSpace::Equals(info.colorSpace().get(), bandInfo.colorSpace().get())) {
+      !ColorSpace::Equals(colorSpace.get(), bandInfo.colorSpace().get())) {
     return false;
   }
   if (requiredRows <= 0 || info.height() < requiredRows) {
@@ -194,8 +242,27 @@ DrawOutcome LayerImageReader::Impl::drawRegionList(Context* context,
     return DrawOutcome::Failed;
   }
   auto bytesPerPixel = bandInfo.bytesPerPixel();
+  const auto readbackBytesPerPixel = ImageInfo::GetBytesPerPixel(ColorType::RGBA_8888);
   auto* basePixels = static_cast<uint8_t*>(destination.writablePixels());
+  const auto alignment = static_cast<size_t>(limits.gpuLimits.minBufferCopyRowAlignment);
+  std::vector<PendingReadback> pending = {};
+  pending.reserve(regions.size());
+  uint64_t pendingBytes = 0;
   for (const auto& region : regions) {
+    const int width = region.coreRect.width();
+    const int height = region.coreRect.height();
+    const auto readbackRowBytes =
+        AlignTo(static_cast<size_t>(width) * readbackBytesPerPixel, alignment);
+    const auto readbackBytes =
+        static_cast<uint64_t>(readbackRowBytes) * static_cast<uint64_t>(height);
+    if (!pending.empty() && pendingBytes + readbackBytes > MaxPendingReadbackBytes) {
+      auto outcome = ReadPendingPixels(context, pending, control);
+      if (outcome != DrawOutcome::Success) {
+        return outcome;
+      }
+      pending.clear();
+      pendingBytes = 0;
+    }
     auto surface = Surface::Make(context, region.renderRect.width(), region.renderRect.height(),
                                  ColorType::RGBA_8888, 1, false, 0, request.renderColorSpace);
     if (surface == nullptr) {
@@ -208,22 +275,22 @@ DrawOutcome LayerImageReader::Impl::drawRegionList(Context* context,
     }
     auto sourceX = region.coreRect.left - region.renderRect.left;
     auto sourceY = region.coreRect.top - region.renderRect.top;
-    auto readInfo =
-        ImageInfo::Make(region.coreRect.width(), region.coreRect.height(), bandInfo.colorType(),
-                        bandInfo.alphaType(), destination.rowBytes(), bandInfo.colorSpace());
+    auto readback = surface->asyncReadPixels(Rect::MakeXYWH(sourceX, sourceY, width, height));
+    if (readback == nullptr) {
+      control.fail(LayerImageErrorCode::ReadbackFailed);
+      return DrawOutcome::Failed;
+    }
+    auto readInfo = ImageInfo::Make(width, height, bandInfo.colorType(), bandInfo.alphaType(),
+                                    destination.rowBytes(), bandInfo.colorSpace());
     DEBUG_ASSERT(!readInfo.isEmpty());
     auto rowOffset = static_cast<size_t>(region.coreRect.top - bandFirstRow);
     auto* dstPixels = basePixels + rowOffset * destination.rowBytes() +
                       static_cast<size_t>(region.coreRect.left) * bytesPerPixel;
-    if (!surface->readPixels(readInfo, dstPixels, sourceX, sourceY)) {
-      control.fail(LayerImageErrorCode::ReadbackFailed);
-      return DrawOutcome::Failed;
-    }
-    if (cancelRequested.load()) {
-      return DrawOutcome::Cancelled;
-    }
+    pending.push_back({std::move(readback), std::move(readInfo), dstPixels,
+                       surface->origin() == ImageOrigin::BottomLeft});
+    pendingBytes += readbackBytes;
   }
-  return DrawOutcome::Success;
+  return ReadPendingPixels(context, pending, control);
 }
 
 LayerImageReadResult LayerImageReader::Impl::readNextBand(Context* context,
@@ -271,68 +338,56 @@ LayerImageReadResult LayerImageReader::Impl::readNextBand(Context* context,
   const auto estimatedRegions = static_cast<size_t>((outputWidth - 1) / coreLimitWidth + 1);
   std::vector<LayerRegionPlan> regions = {};
   regions.reserve(std::min(estimatedRegions, MaxRegionsPerBatch));
-  int bandOffsetY = 0;
-  while (bandOffsetY < bandRows) {
-    int chunkHeight = std::min(coreLimitHeight, bandRows - bandOffsetY);
-    bool planned = false;
-    while (!planned) {
-      regions.clear();
-      planned = true;
-      int offsetX = 0;
-      while (offsetX < outputWidth) {
-        int width = std::min(coreLimitWidth, outputWidth - offsetX);
-        LayerRegionPlan region = {};
-        bool regionReady = false;
-        for (;;) {
-          PixelRect core = {};
-          core.left = offsetX;
-          core.top = bandFirstRow + bandOffsetY;
-          core.right = offsetX + width;
-          core.bottom = bandFirstRow + bandOffsetY + chunkHeight;
-          auto regionResult = session->planRegion(core, limits, control);
-          if (regionResult.code == RegionPlanCode::Ready) {
-            region = regionResult.region;
-            regionReady = true;
-            break;
-          }
-          if (regionResult.code == RegionPlanCode::Cancelled) {
-            return cancel();
-          }
-          if (regionResult.code == RegionPlanCode::Failed) {
-            return fail(control.error);
-          }
-          if (width <= 1) {
-            break;
-          }
-          width = std::max(1, width / 2);
-        }
-        if (!regionReady) {
-          planned = false;
-          break;
-        }
-        regions.push_back(region);
-        offsetX = region.coreRect.right;
-        if (regions.size() < MaxRegionsPerBatch && offsetX < outputWidth) {
-          continue;
-        }
-        auto outcome = drawRegionList(context, regions, limits, bandFirstRow, destination, control);
-        if (outcome == DrawOutcome::Failed) {
-          return fail(control.error);
-        }
-        if (outcome == DrawOutcome::Cancelled || cancelRequested.load()) {
+  std::vector<PixelRect> pending = {};
+  const int bandEndRow = bandFirstRow + bandRows;
+  for (int top = bandFirstRow; top < bandEndRow;) {
+    const int bottom = top + std::min(coreLimitHeight, bandEndRow - top);
+    for (int left = 0; left < outputWidth;) {
+      const int right = left + std::min(coreLimitWidth, outputWidth - left);
+      PixelRect core = {left, top, right, bottom};
+      for (;;) {
+        auto plan = session->planRegion(core, limits, control);
+        if (plan.code == RegionPlanCode::Cancelled) {
           return cancel();
         }
-        regions.clear();
+        if (plan.code == RegionPlanCode::Failed) {
+          return fail(control.error);
+        }
+        if (plan.code == RegionPlanCode::RequiresSubdivision) {
+          DEBUG_ASSERT(core.width() > 1 || core.height() > 1);
+          // Split only the unplanned tile. Its disjoint halves can be read back in any order.
+          auto remainder = core;
+          if (core.width() >= core.height()) {
+            core.right = core.left + core.width() / 2;
+            remainder.left = core.right;
+          } else {
+            core.bottom = core.top + core.height() / 2;
+            remainder.top = core.bottom;
+          }
+          pending.push_back(remainder);
+          continue;
+        }
+        regions.push_back(plan.region);
+        if (regions.size() == MaxRegionsPerBatch || (pending.empty() && right == outputWidth)) {
+          auto outcome =
+              drawRegionList(context, regions, limits, bandFirstRow, destination, control);
+          if (outcome == DrawOutcome::Failed) {
+            return fail(control.error);
+          }
+          if (outcome == DrawOutcome::Cancelled || cancelRequested.load()) {
+            return cancel();
+          }
+          regions.clear();
+        }
+        if (pending.empty()) {
+          break;
+        }
+        core = pending.back();
+        pending.pop_back();
       }
-      if (!planned) {
-        // planRegion() fails instead of requesting subdivision for a 1x1 core.
-        DEBUG_ASSERT(chunkHeight > 1);
-        // Earlier batches may already have written into the destination. The shorter strip
-        // redraws from x = 0, and later strips overwrite any rows below it before publication.
-        chunkHeight = std::max(1, chunkHeight / 2);
-      }
+      left = right;
     }
-    bandOffsetY += chunkHeight;
+    top = bottom;
   }
   if (cancelRequested.load()) {
     return cancel();

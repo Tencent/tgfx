@@ -20,12 +20,16 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <unordered_map>
 #include <utility>
+#include "core/filters/ShaderMaskFilter.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSource.h"
 #include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
+#include "layers/RegionTransformer.h"
+#include "layers/contents/LayerContent.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
@@ -57,6 +61,13 @@ static bool HasSupportedTranslation(const Matrix& matrix) {
 static Rect ToRect(const PixelRect& rect) {
   return Rect::MakeLTRB(static_cast<float>(rect.left), static_cast<float>(rect.top),
                         static_cast<float>(rect.right), static_cast<float>(rect.bottom));
+}
+
+static Rect MakeCullRect(const PixelRect& rect, const Matrix& outputToLocal) {
+  auto bounds = outputToLocal.mapRect(ToRect(rect));
+  bounds.roundOut();
+  bounds.outset(1.0f, 1.0f);
+  return bounds;
 }
 
 static Matrix MakeTileMatrix(Matrix localToOutput, const PixelRect& region) {
@@ -136,7 +147,119 @@ static bool FitsBackgroundCapture(const PixelRect& rect, int deviceLimit) {
              MaxBackgroundCaptureBytes / BackgroundCaptureBytesPerPixel;
 }
 
+static bool HasEmptyClip(const Canvas* canvas) {
+  auto bounds = GetClipBounds(canvas);
+  return bounds.has_value() && bounds->isEmpty();
+}
+
+// Plain tiles never consume background styles. Only record sources for styles they can draw.
+class PlainTileHandler final : public BackgroundHandler {
+ public:
+  bool needsLayerStyleSource(Layer* layer) const override {
+    for (const auto& style : layer->layerStyles()) {
+      if (!NeedsBackgroundSource(style->extraSourceType())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void drawBackgroundStyle(const DrawArgs&, Canvas*, Layer*, float, LayerStyle*,
+                           const LayerStyleSource*) override {
+  }
+};
+
+struct TargetCapture {
+  std::unordered_map<const Layer*, int> childLimits;
+  Layer* target = nullptr;
+  float alpha = 1.0f;
+  BlendMode blendMode = BlendMode::SrcOver;
+};
+
 }  // namespace
+
+class LayerDrawSession::TargetBackgroundCapturer final : public BackgroundCapturer {
+ public:
+  TargetBackgroundCapturer(BackgroundSnapshotMap* snapshots,
+                           std::shared_ptr<BackgroundSource> source,
+                           const std::vector<Rect>* styleSourceRects,
+                           const TargetCapture* selection, bool replayTarget = false)
+      : BackgroundCapturer(snapshots, std::move(source), styleSourceRects), selection(selection),
+        replayTarget(replayTarget) {
+  }
+
+  using BackgroundCapturer::forceDrawDescendants;
+
+  LayerChildRange childRange(const Layer* parent) const override {
+    if (selection != nullptr) {
+      auto limit = selection->childLimits.find(parent);
+      if (limit != selection->childLimits.end()) {
+        // An ancestor's foreground and Above styles paint after the selected child.
+        return {limit->second, false};
+      }
+    }
+    if (styleSourceRects() != nullptr || isForcedCapture()) {
+      return BackgroundCapturer::childRange(parent);
+    }
+    const auto& children = parent->children();
+    for (int i = static_cast<int>(children.size()) - 1; i >= 0; --i) {
+      if (BackgroundCapturer::HasDrawableBackdrop(children[static_cast<size_t>(i)].get())) {
+        return {i};
+      }
+    }
+    return {};
+  }
+
+  void drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent, Layer* child, float alpha,
+                 bool forceDescendants) override {
+    if (selection != nullptr && child == selection->target) {
+      if (!replayTarget) {
+        AutoCanvasRestore restore(canvas);
+        canvas->concat(child->getMatrixWithScrollRect().asMatrix());
+        child->drawLayer(args, canvas, selection->alpha, selection->blendMode);
+      }
+      return;
+    }
+    BackgroundCapturer::drawChild(args, canvas, parent, child, alpha, forceDescendants);
+  }
+
+  bool needsLayerStyleSource(Layer* layer) const override {
+    if (selection == nullptr || selection->childLimits.count(layer) == 0) {
+      return true;
+    }
+    // Ancestor content above the target is outside this capture pass.
+    for (const auto& style : layer->layerStyles()) {
+      if (style->position() == LayerStylePosition::Below) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool needsSurface(Layer* layer) const override {
+    if (styleSourceRects() == nullptr) {
+      return layer != nullptr && BackgroundCapturer::HasDrawableBackdropDescendant(layer);
+    }
+    return BackgroundCapturer::needsSurface(layer);
+  }
+
+ protected:
+  bool narrowSubRenderRects() const override {
+    // Consume uses the batch window even when a capture-side offscreen has different local clips.
+    return false;
+  }
+
+  std::unique_ptr<BackgroundCapturer> makeSubCapturer(
+      BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source,
+      const std::vector<Rect>* styleSourceRects) const override {
+    return std::make_unique<TargetBackgroundCapturer>(snapshots, std::move(source),
+                                                      styleSourceRects, selection, replayTarget);
+  }
+
+ private:
+  const TargetCapture* selection = nullptr;
+  bool replayTarget = false;
+};
 
 float LayerDrawSession::FilterOutset(Layer* layer, float scale) {
   if (!std::isfinite(scale) || scale <= 0.0f) {
@@ -145,19 +268,32 @@ float LayerDrawSession::FilterOutset(Layer* layer, float scale) {
   return MaxAbsOutset(layer->mapOutputBoundsToInput(Rect::MakeEmpty(), scale));
 }
 
-float LayerDrawSession::AncestorFilterOutset(Layer* target, Layer* captureRoot,
-                                             const Matrix& rootToOutput) {
-  auto outset = 0.0f;
-  for (auto ancestor = target->parent(); ancestor != nullptr && ancestor != captureRoot;
-       ancestor = ancestor->parent()) {
-    if (ancestor->filters().empty()) {
+Rect LayerDrawSession::collectTargetBounds(Layer* layer,
+                                           std::shared_ptr<RegionTransformer> transformer) {
+  // Match the forward bounds used by scene culling, starting at the exported target. Omit
+  // clips here: direct target drawing may bypass scene clips, and a mask may invert coverage.
+  transformer = RegionTransformer::MakeFromFilters(layer->filters(), 1.0f, std::move(transformer));
+  transformer =
+      RegionTransformer::MakeFromStyles(layer->layerStyles(), 1.0f, std::move(transformer));
+  auto bounds = Rect::MakeEmpty();
+  if (auto* content = layer->getContent()) {
+    bounds = content->getBounds(layer->hasGeometryStyle());
+    if (transformer != nullptr && !bounds.isEmpty()) {
+      transformer->transform(&bounds);
+    }
+  }
+  for (const auto& child : layer->children()) {
+    if (!child->visible() || child->alpha() <= 0.0f || child->maskOwner != nullptr) {
       continue;
     }
-    auto ancestorToRoot = ancestor->getRelativeMatrix3D(captureRoot).asMatrix();
-    ancestorToRoot.postConcat(rootToOutput);
-    outset += FilterOutset(ancestor, ancestorToRoot.getMaxScale());
+    auto childTransformer =
+        RegionTransformer::MakeFromMatrix(child->getMatrixWithScrollRect().asMatrix(), transformer);
+    bounds.join(collectTargetBounds(child.get(), std::move(childTransformer)));
   }
-  return outset;
+  if (layer != request.target && !bounds.isEmpty()) {
+    targetBounds.emplace(layer, bounds);
+  }
+  return bounds;
 }
 
 bool LayerDrawSession::IsSupported2DScene(const Layer* layer,
@@ -228,7 +364,7 @@ void LayerDrawSession::CollectSubtreeEffects(Layer* layer, const Matrix& localTo
   CollectLayerEffects(layer, localToOutput, filterOutset, LayerStylePosition::Above, effects);
 }
 
-void LayerDrawSession::collectPrecedingEffects() {
+float LayerDrawSession::collectPrecedingEffects() {
   auto* captureRoot = sceneRoot ? sceneRoot.get() : request.target;
   std::vector<Layer*> path = {};
   for (auto* layer = request.target; layer != captureRoot; layer = layer->parent()) {
@@ -238,6 +374,7 @@ void LayerDrawSession::collectPrecedingEffects() {
   auto localToOutput = rootToOutput;
   auto filterOutset = 0.0f;
   for (auto it = path.rbegin(); it != path.rend(); ++it) {
+    // Scene capture calls drawLayer on the capture root too, so its filters also apply.
     filterOutset += FilterOutset(ancestor, localToOutput.getMaxScale());
     CollectLayerEffects(ancestor, localToOutput, filterOutset, LayerStylePosition::Below,
                         &precedingEffects);
@@ -255,6 +392,7 @@ void LayerDrawSession::collectPrecedingEffects() {
     ancestor = *it;
     localToOutput.preConcat(ancestor->getMatrixWithScrollRect().asMatrix());
   }
+  return filterOutset;
 }
 
 ISize LayerDrawSession::ResolveSurfaceLimit(const LayerDrawLimits& limits) {
@@ -306,6 +444,7 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(const LayerDrawReque
 
   std::unique_ptr<LayerDrawSession> session(new LayerDrawSession());
   session->request = request;
+  outputMatrix.invert(&session->outputToTarget);
   session->outputPixelBounds = {0, 0, request.outputSize.width, request.outputSize.height};
   if (sceneRoot != nullptr && request.target != sceneRoot) {
     for (auto* ancestor = request.target->parent(); ancestor != sceneRoot;
@@ -315,25 +454,27 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(const LayerDrawReque
       }
     }
   }
-  const bool captureInScene = sceneRoot != nullptr && request.target->_scrollRect == nullptr;
-  session->useSceneBounds = captureInScene && session->clippedAncestors.empty();
+  session->replayTarget =
+      sceneRoot != nullptr && request.target != sceneRoot && request.target->_scrollRect != nullptr;
+  session->useSceneBounds =
+      sceneRoot != nullptr && !session->replayTarget && session->clippedAncestors.empty();
+  // Ancestor clips make the capture pass replay the target with live style selection. The export
+  // consumer mirrors it so groups containing backdrop styles keep the same offscreen route.
+  session->matchLiveBackdrop = !session->clippedAncestors.empty();
 
+  auto targetToRoot = request.target->getRelativeMatrix3D(captureRoot).asMatrix();
+  Matrix rootToTarget = Matrix::I();
+  if (!targetToRoot.invert(&rootToTarget) || !rootToTarget.isFinite()) {
+    control.fail(LayerImageErrorCode::UnsupportedContent);
+    return nullptr;
+  }
   if (sceneRoot != nullptr) {
     session->sceneRoot = sceneRoot->shared_from_this();
     sceneRoot->updateRenderBounds();
   }
   if (request.alpha > 0.0f) {
+    session->collectTargetBounds(request.target, nullptr);
     CollectSubtreeEffects(request.target, outputMatrix, 0.0f, &session->targetEffects);
-  }
-  if (session->targetEffects.empty() && session->clippedAncestors.empty()) {
-    return session;
-  }
-
-  auto targetToRoot = request.target->getRelativeMatrix3D(captureRoot).asMatrix();
-  Matrix rootToTarget = Matrix::I();
-  if (!targetToRoot.invert(&rootToTarget) || !rootToTarget.isFinite()) {
-    control.fail(LayerImageErrorCode::InvalidInput);
-    return nullptr;
   }
   if (session->targetEffects.empty()) {
     return session;
@@ -360,13 +501,14 @@ std::unique_ptr<LayerDrawSession> LayerDrawSession::Prepare(const LayerDrawReque
     return nullptr;
   }
   session->rootToOutput = rootToOutput;
-  auto outset =
-      captureInScene ? AncestorFilterOutset(request.target, captureRoot, rootToOutput) : 0.0f;
-  for (auto& effect : session->targetEffects) {
-    effect.outputBounds.outset(outset, outset);
-    effect.outset += outset;
+  auto outset = session->collectPrecedingEffects();
+  // A target replayed directly is outside the ancestors' filtered offscreens.
+  if (!session->replayTarget) {
+    for (auto& effect : session->targetEffects) {
+      effect.outputBounds.outset(outset, outset);
+      effect.outset += outset;
+    }
   }
-  session->collectPrecedingEffects();
   return session;
 }
 
@@ -391,6 +533,7 @@ RegionPlanResult LayerDrawSession::planRegion(const PixelRect& core, const Layer
   const bool mayDraw = !ancestorScrollBounds.has_value() ||
                        Rect::Intersects(ToRect(renderRect), *ancestorScrollBounds);
   bool requiresBackground = false;
+  float primaryOutset = 0.0f;
   for (const auto* effects : {&targetEffects, &precedingEffects}) {
     if (!mayDraw || (effects == &precedingEffects && !requiresBackground)) {
       break;
@@ -408,7 +551,8 @@ RegionPlanResult LayerDrawSession::planRegion(const PixelRect& core, const Layer
       // Each style reads earlier drawing, including the output of earlier backdrop styles.
       // Limit secondary expansion to the part of the style visible to the later dependency.
       if (!requiresBackground) {
-        captureBounds.outset(it->outset, it->outset);
+        primaryOutset = it->outset;
+        captureBounds.outset(primaryOutset, primaryOutset);
       } else {
         auto overlap = captureBounds;
         overlap.left = std::max(overlap.left, static_cast<double>(bounds.left));
@@ -433,10 +577,16 @@ RegionPlanResult LayerDrawSession::planRegion(const PixelRect& core, const Layer
     result.region.captureRect = ToPixelRect(captureBounds);
   }
   auto deviceLimit = limits.gpuLimits.maxTextureDimension2D;
-  if (!FitsLimit(renderRect, surfaceLimit.width, surfaceLimit.height) ||
-      (result.region.captureRect &&
-       !FitsBackgroundCapture(*result.region.captureRect, deviceLimit))) {
-    if (core.width() <= 1 && core.height() <= 1) {
+  const bool captureTooLarge =
+      result.region.captureRect && !FitsBackgroundCapture(*result.region.captureRect, deviceLimit);
+  if (!FitsLimit(renderRect, surfaceLimit.width, surfaceLimit.height) || captureTooLarge) {
+    // At least one subtile must sample the primary effect. Its minimum capture covers a single
+    // pixel, the sampling margin and the full outset on every side. Secondary effects only
+    // expand their overlap, so their outsets do not give the same lower bound.
+    const int minCaptureSize = 3 + 2 * static_cast<int>(std::ceil(primaryOutset));
+    if ((core.width() == 1 && core.height() == 1) ||
+        (captureTooLarge &&
+         !FitsBackgroundCapture({0, 0, minCaptureSize, minCaptureSize}, deviceLimit))) {
       control.fail(LayerImageErrorCode::DeviceLimitExceeded);
       return result;
     }
@@ -506,19 +656,90 @@ std::optional<LayerDrawBatch> LayerDrawSession::prepareBatch(
   DrawArgs args(context);
   args.dstColorSpace = request.renderColorSpace;
   args.drawControl = &control;
-  // Capture and consume use the same cull rect when scene bounds apply.
-  auto cullRect = outputToRoot.mapRect(ToRect(*captureRect));
-  cullRect.roundOut();
-  cullRect.outset(1.0f, 1.0f);
-  batch.renderRects.push_back(cullRect);
-  auto* captureRoot = sceneRoot ? sceneRoot.get() : request.target;
-  BackgroundCapturer::RunForTarget(captureRoot, request.target, request.alpha, request.blendMode,
-                                   args, std::move(bgSource), &batch.snapshots, batch.renderRects,
-                                   clippedAncestors);
+  if (useSceneBounds) {
+    batch.renderRects = {MakeCullRect(*captureRect, outputToRoot)};
+    args.renderRects = &batch.renderRects;
+  }
+  captureBackdrop(args, std::move(bgSource), &batch.snapshots);
   if (control.failed()) {
     return std::nullopt;
   }
   return batch;
+}
+
+void LayerDrawSession::captureBackdrop(DrawArgs args, std::shared_ptr<BackgroundSource> source,
+                                       BackgroundSnapshotMap* snapshots) const {
+  auto* canvas = source->getCanvas();
+  auto* target = request.target;
+  auto* captureRoot = sceneRoot != nullptr ? sceneRoot.get() : target;
+  AutoCanvasRestore restore(canvas);
+  if (target == captureRoot) {
+    TargetBackgroundCapturer capturer(snapshots, std::move(source), args.renderRects, nullptr);
+    args.backgroundHandler = &capturer;
+    target->drawLayer(args, canvas, request.alpha, request.blendMode);
+    return;
+  }
+
+  TargetCapture selection = {};
+  selection.target = target;
+  selection.alpha = request.alpha;
+  selection.blendMode = request.blendMode;
+  for (auto* child = target; child != captureRoot; child = child->parent()) {
+    auto* parent = child->parent();
+    selection.childLimits.emplace(parent, parent->doGetChildIndex(child));
+  }
+  {
+    // A clipped scene bound can omit backdrop inputs needed before an ancestor's mask is applied.
+    TargetBackgroundCapturer capturer(snapshots, source, args.renderRects, &selection,
+                                      replayTarget);
+    AutoCanvasRestore restoreScene(canvas);
+    args.backgroundHandler = &capturer;
+    captureRoot->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
+  }
+  if (replayTarget) {
+    // Direct exports draw the target outside its scene scroll clip on the captured backdrop.
+    TargetBackgroundCapturer capturer(snapshots, std::move(source), nullptr, nullptr);
+    args.backgroundHandler = &capturer;
+    capturer.forceDrawDescendants();
+    canvas->concat(target->getRelativeMatrix3D(captureRoot).asMatrix());
+    if (applyAncestorClips(args, canvas, nullptr)) {
+      target->drawLayer(args, canvas, request.alpha, request.blendMode);
+    }
+  }
+}
+
+bool LayerDrawSession::applyAncestorClips(const DrawArgs& args, Canvas* canvas,
+                                          std::shared_ptr<Shader>* coverage) const {
+  const auto targetToTile = canvas->getMatrix();
+  auto maskArgs = args;
+  maskArgs.renderRects = nullptr;
+  for (auto it = clippedAncestors.rbegin(); it != clippedAncestors.rend(); ++it) {
+    auto* ancestor = *it;
+    auto ancestorToTile = targetToTile;
+    ancestorToTile.preConcat(ancestor->getRelativeMatrix(request.target));
+    canvas->setMatrix(ancestorToTile);
+    if (ancestor->_scrollRect != nullptr) {
+      canvas->clipRect(*ancestor->_scrollRect, ancestor->bitFields.allowsEdgeAntialiasing);
+    }
+    std::shared_ptr<MaskFilter> maskFilter;
+    if (HasEmptyClip(canvas) || !ancestor->prepareMask(maskArgs, canvas, &maskFilter)) {
+      return false;
+    }
+    if (coverage != nullptr && maskFilter != nullptr) {
+      // Layer::prepareMask produces a shader mask in the ancestor's local space.
+      auto* mask = static_cast<const ShaderMaskFilter*>(maskFilter.get());
+      auto shader = mask->getShader()->makeWithMatrix(ancestorToTile);
+      if (mask->isInverted()) {
+        shader = Shader::MakeBlend(BlendMode::DstOut, Shader::MakeColorShader(Color::White()),
+                                   std::move(shader));
+      }
+      *coverage = *coverage != nullptr
+                      ? Shader::MakeBlend(BlendMode::SrcIn, std::move(*coverage), std::move(shader))
+                      : std::move(shader);
+    }
+  }
+  canvas->setMatrix(targetToTile);
+  return !HasEmptyClip(canvas);
 }
 
 bool LayerDrawSession::drawClippedTarget(const DrawArgs& args, Canvas* canvas,
@@ -526,7 +747,7 @@ bool LayerDrawSession::drawClippedTarget(const DrawArgs& args, Canvas* canvas,
   auto saveCount = canvas->getSaveCount();
   AutoCanvasRestore restore(canvas);
   std::shared_ptr<Shader> coverage;
-  if (!LayerClip::ApplyAncestorClips(clippedAncestors, request.target, args, canvas, &coverage)) {
+  if (!applyAncestorClips(args, canvas, &coverage)) {
     return true;
   }
   request.target->drawLayer(args, canvas, request.alpha, request.blendMode);
@@ -571,12 +792,19 @@ DrawOutcome LayerDrawSession::drawRegion(const LayerRegionPlan& region, LayerDra
   args.dstColorSpace = request.renderColorSpace;
   args.drawControl = &control;
   const bool needsBackground = region.captureRect.has_value();
-  if (needsBackground && useSceneBounds) {
-    args.renderRects = &batch.renderRects;
+  std::vector<Rect> tileCullRects = {};
+  BackgroundConsumer consumer(&batch.snapshots, false, matchLiveBackdrop);
+  PlainTileHandler plainTileHandler;
+  if (needsBackground) {
+    // Use the exact range selected for capture, including the full-capture fallback.
+    args.renderRects = batch.renderRects.empty() ? nullptr : &batch.renderRects;
+    args.backgroundHandler = &consumer;
+  } else {
+    tileCullRects = {MakeCullRect(region.renderRect, outputToTarget)};
+    args.renderRects = &tileCullRects;
+    args.renderBounds = &targetBounds;
+    args.backgroundHandler = &plainTileHandler;
   }
-  BackgroundConsumer consumer(&batch.snapshots, false);
-  args.backgroundHandler =
-      needsBackground ? static_cast<BackgroundHandler*>(&consumer) : BackgroundHandler::NoOp();
   if (request.alpha > 0.0f) {
     if (clippedAncestors.empty()) {
       request.target->drawLayer(args, canvas, request.alpha, request.blendMode);
