@@ -806,10 +806,16 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
   // Splitting by demand gives both types the same safety factor at any aspect ratio.
   auto treeRatio =
       static_cast<double>(treeTileCount) / static_cast<double>(treeTileCount + gridTileCount);
-  auto treeQuota =
-      static_cast<size_t>(std::lround(static_cast<double>(totalTileCount) * treeRatio));
+  auto total = static_cast<size_t>(totalTileCount);
+  auto treeQuota = static_cast<size_t>(std::lround(static_cast<double>(total) * treeRatio));
+  // MAX_ATLAS_COUNT can leave less than the viewport and the fallback levels need together. Keep the
+  // viewport sharp first and the fallback levels second, so a capped pool degrades instead of
+  // starving one side; the proportional split only decides how the slack is spent.
+  auto gridDemand = std::min(static_cast<size_t>(gridTileCount), total);
+  auto treeDemand = std::min(minTreeTileCount, total);
+  treeQuota = std::min(std::max(treeQuota, treeDemand), total - gridDemand);
   tilePool->setQuota(TileType::Tree, treeQuota);
-  tilePool->setQuota(TileType::Grid, static_cast<size_t>(totalTileCount) - treeQuota);
+  tilePool->setQuota(TileType::Grid, total - treeQuota);
   blankTiles->setMaxCount(BLANK_MARKS_PER_TILE * static_cast<size_t>(totalTileCount));
 }
 
@@ -1070,7 +1076,11 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       hasZoomBlurTiles = true;
     }
     if (!fallbackGrids.empty()) {
-      hasZoomBlurTiles = true;
+      // A static frame only rasterizes while there is budget; without one these grids are selected
+      // again on every frame and never rasterized, so they must not keep the loop alive.
+      if (_maxTilesRefinedPerFrame > 0) {
+        hasZoomBlurTiles = true;
+      }
       std::vector<Rect> uncoveredRects = {};
       for (auto& grid : fallbackGrids) {
         auto gridRect = getGridRect(grid);
@@ -1182,8 +1192,12 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
           }
         }
       }
-      // Without a budget the chain can never progress, so it must not keep the loop running.
-      if (chainPending && _maxTilesRefinedPerFrame > 0) {
+      // Without a budget the chain can never progress, and a capped pool that cannot hold the
+      // levels would keep asking for frames that never fill them, so neither may keep the loop
+      // running.
+      auto treeCapacity = tilePool->quota(TileType::Tree) + tilePool->quota(TileType::Grid);
+      if (chainPending && _maxTilesRefinedPerFrame > 0 &&
+          tilePool->size(TileType::Tree) < treeCapacity) {
         hasZoomBlurTiles = true;
       }
     }
@@ -1195,7 +1209,10 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
         return {};
       }
       // The next frame selects the remaining grids again, so they only need something to show now.
-      hasZoomBlurTiles = true;
+      // A frame that could not allocate any tile would repeat itself, so it must not ask for one.
+      if (!freeTiles.empty()) {
+        hasZoomBlurTiles = true;
+      }
       for (auto i = freeTiles.size(); i < dirtyGrids.size(); ++i) {
         auto gridRect = getGridRect(dirtyGrids[i]);
         auto coverage = FindFinestCoverage(&coverages, gridRect, _tileSize);

@@ -229,7 +229,9 @@ class DisplayList {
   }
 
   /**
-   * Sets the maximum number of tiles processed per frame in tiled rendering mode.
+   * Sets the maximum number of tiles processed per frame in tiled rendering mode. A value of 0
+   * disables refinement, so a tile stays at the fallback it was drawn with and the tiled loop stops
+   * asking for frames once the viewport is covered.
    */
   void setMaxTilesRefinedPerFrame(int count) {
     _maxTilesRefinedPerFrame = count;

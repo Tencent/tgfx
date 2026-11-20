@@ -141,7 +141,9 @@ TGFX_TEST_PRIVATE(TilePoolTest, ZoomWithoutBudgetFillsViewportFromTreeLevels) {
   displayList->render(surface.get());
   EXPECT_EQ(ReadPixel(surface, 10, 10), OPAQUE_RED);
   EXPECT_EQ(ReadPixel(surface, 500, 500), OPAQUE_RED);
-  EXPECT_TRUE(displayList->hasContentChanged());
+  // A zero budget never rasterizes the exact tiles while the viewport is still, so nothing pending
+  // can progress and the loop has to stop.
+  EXPECT_FALSE(displayList->hasContentChanged());
   TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 0u);
                       auto treeCount = displayList->tilePool->size(TileType::Tree);
                       EXPECT_GT(treeCount, 0u);
@@ -159,7 +161,7 @@ TGFX_TEST(TilePoolTest, LeavingTiledModeDropsPendingFallbackWork) {
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Tiled);
   displayList->setTileUpdateMode(TileUpdateMode::Smooth);
-  displayList->setMaxTilesRefinedPerFrame(0);
+  displayList->setMaxTilesRefinedPerFrame(1);
   displayList->root()->addChild(MakeSolid(4096, 4096, Color::Red()));
   displayList->render(surface.get());
   displayList->setZoomScale(0.7f);
@@ -194,7 +196,9 @@ TGFX_TEST_PRIVATE(TilePoolTest, FastModeLeavesUncoveredCellsToTheBackground) {
   // covered by ZoomWithoutBudgetFillsViewportFromTreeLevels.
   EXPECT_EQ(ReadPixel(surface, 10, 10), OPAQUE_WHITE);
   EXPECT_EQ(ReadPixel(surface, 500, 500), OPAQUE_WHITE);
-  EXPECT_TRUE(displayList->hasContentChanged());
+  // Fast mode leaves those cells to the background and the zero budget leaves the grid empty, so no
+  // frame would ever change them and the loop has to stop.
+  EXPECT_FALSE(displayList->hasContentChanged());
   TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 0u);
                       EXPECT_EQ(displayList->tilePool->size(TileType::Tree), 0u));
 }
