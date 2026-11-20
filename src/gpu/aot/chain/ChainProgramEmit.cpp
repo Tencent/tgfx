@@ -34,6 +34,40 @@
 #include "gpu/shaders/contract/FragmentLibrary.h"
 
 namespace tgfx {
+
+#if defined(TGFX_HAS_CHAIN_CATALOG)
+// The catalog's requires list is inferred from the function bodies, so emitting a function after its
+// dependencies gives a text whose callees are always spelled before the call. `emitted` is per
+// program: two programs never share a prefix.
+void AppendCatalogFunction(const char* name, std::set<std::string>* emitted, std::string* out) {
+  if (name == nullptr || name[0] == '\0' || !emitted->insert(name).second) {
+    return;
+  }
+  for (const auto& entry : kChainFunctions) {
+    if (entry.name == nullptr || std::strcmp(entry.name, name) != 0) {
+      continue;
+    }
+    const std::string requires = entry.requires != nullptr ? entry.requires : "";
+    size_t start = 0;
+    while (start <= requires.size()) {
+      const size_t comma = requires.find(',', start);
+      const std::string dep =
+          requires.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+      if (!dep.empty()) {
+        AppendCatalogFunction(dep.c_str(), emitted, out);
+      }
+      if (comma == std::string::npos) {
+        break;
+      }
+      start = comma + 1;
+    }
+    out->append(entry.source);
+    out->push_back('\n');
+    return;
+  }
+}
+#endif
+
 namespace {
 
 const char* GlslTypeOf(FragmentType type) {
@@ -263,6 +297,9 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
     const std::string composed = ComposeXpSupport(xpSupport, blendMode, plan.hasXp == 1);
     pieces += (composed.empty() ? xpSupport : composed) + "\n";
   }
+#if defined(TGFX_HAS_CHAIN_CATALOG)
+  std::set<std::string> catalogEmitted = {};
+#endif
   for (int op : plan.usedOps) {
     if (op == ChainISA::Gradient) {
       continue;
@@ -275,9 +312,8 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
       continue;  // the xfer tail already carries the blend table
     }
 #if defined(TGFX_HAS_CHAIN_CATALOG)
-    if (const char* catalogued = FindChainFunctionSource(def->functionName)) {
-      pieces += catalogued;
-      pieces.push_back('\n');
+    if (FindChainFunctionSource(def->functionName) != nullptr) {
+      AppendCatalogFunction(def->functionName, &catalogEmitted, &pieces);
       continue;
     }
 #endif
