@@ -429,7 +429,7 @@ bool OpaqueContext::Contour::operator==(const Contour& other) const {
     case Type::Rect:
       return rect == other.rect;
     case Type::RRect:
-      return rRect.rect() == other.rRect.rect() && rRect.radii() == other.rRect.radii();
+      return rRect == other.rRect;
     case Type::Path:
       return path == other.path;
     case Type::Shape:

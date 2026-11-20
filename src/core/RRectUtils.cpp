@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectUtils.h"
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 
@@ -163,10 +165,18 @@ static bool RadiiOverflow(const Rect& rect, const std::array<Point, 4>& radii) {
 }
 
 std::optional<RRect> RRectUtils::ConservativeIntersect(const RRect& a, const RRect& b) {
+  if (a == b) {
+    return a;
+  }
   Rect intersection = a.rect();
   if (!intersection.intersect(b.rect())) {
     // Bounding rects do not overlap; return an explicit empty RRect.
     return RRect();
+  }
+  // A smoothed corner can cross a general corner of a larger radius, and the intersection then
+  // cannot be represented as an RRect.
+  if (a.smoothness() > 0.0f || b.smoothness() > 0.0f) {
+    return std::nullopt;
   }
 
   std::array<Point, 4> radii = {};
@@ -190,15 +200,20 @@ std::optional<RRect> RRectUtils::ConservativeIntersect(const RRect& a, const RRe
   return result;
 }
 
-bool RRectUtils::ContainsPoint(const RRect& rRect, const Point& point) {
+bool RRectUtils::ConservativeContainsPoint(const RRect& rRect, const Point& point) {
+  // IsInnerToCorners tests against the ellipse equation of each corner. Smoothed corners would need
+  // a costlier test against their cubic curves C1 and C3, so containment is reported as undecided.
+  if (rRect.smoothness() > 0.0f) {
+    return false;
+  }
   return rRect.rect().contains(point.x, point.y) && IsInnerToCorners(rRect, point);
 }
 
-bool RRectUtils::ContainsRect(const RRect& rRect, const Rect& rect) {
-  return ContainsPoint(rRect, {rect.left, rect.top}) &&
-         ContainsPoint(rRect, {rect.right, rect.top}) &&
-         ContainsPoint(rRect, {rect.right, rect.bottom}) &&
-         ContainsPoint(rRect, {rect.left, rect.bottom});
+bool RRectUtils::ConservativeContainsRect(const RRect& rRect, const Rect& rect) {
+  return ConservativeContainsPoint(rRect, {rect.left, rect.top}) &&
+         ConservativeContainsPoint(rRect, {rect.right, rect.top}) &&
+         ConservativeContainsPoint(rRect, {rect.right, rect.bottom}) &&
+         ConservativeContainsPoint(rRect, {rect.left, rect.bottom});
 }
 
 Rect RRectUtils::InnerBounds(const RRect& rr) {
@@ -214,21 +229,25 @@ Rect RRectUtils::InnerBounds(const RRect& rr) {
   const auto bottomShift = std::max(r[3].y, r[2].y);
   const auto dw = leftShift + rightShift;
   const auto dh = topShift + bottomShift;
-  const auto horizArea = (innerBounds.width() - dw) * innerBounds.height();
-  const auto vertArea = (innerBounds.height() - dh) * innerBounds.width();
+  // Smoothed corners occupy (1 + smoothness) * radius along each edge.
+  const auto rScale = 1.0f + rr.smoothness();
+  const auto horizArea = (innerBounds.width() - rScale * dw) * innerBounds.height();
+  const auto vertArea = (innerBounds.height() - rScale * dh) * innerBounds.width();
   // The maximum inscribed rectangle at the corner ellipse has a corner at
   // sqrt(2)/2 * (rX, rY). Scale all corner shifts by (1 - sqrt(2)/2) to get the safe inset.
   // Add a small epsilon so the shifted corners stay safely inside the curves.
+  // A smoothed corner passes through the same point, as the middle of C2 or the join of C1 and C3,
+  // so smoothness does not change this inset.
   static constexpr float diagInsetScale = (1.0f - 0.70710678118f) + 1e-5f;
   const auto innerArea =
       (innerBounds.width() - diagInsetScale * dw) * (innerBounds.height() - diagInsetScale * dh);
 
   if (horizArea > vertArea && horizArea > innerArea) {
-    innerBounds.left += leftShift;
-    innerBounds.right -= rightShift;
+    innerBounds.left += rScale * leftShift;
+    innerBounds.right -= rScale * rightShift;
   } else if (vertArea > innerArea) {
-    innerBounds.top += topShift;
-    innerBounds.bottom -= bottomShift;
+    innerBounds.top += rScale * topShift;
+    innerBounds.bottom -= rScale * bottomShift;
   } else if (innerArea > 0.f) {
     innerBounds.left += diagInsetScale * leftShift;
     innerBounds.right -= diagInsetScale * rightShift;
@@ -327,8 +346,252 @@ std::optional<RRect> RRectUtils::TryAxisAlignedTransform(const RRect& src, const
   }
 
   RRect dst = {};
-  dst.setRectRadii(newRect, radii);
+  dst.setRectRadii(newRect, radii, src.smoothness());
   return dst;
+}
+
+bool RRectUtils::HasDiagonalCornerAxisOverlap(const RRect& rRect) {
+  // Other types have equal radii at all corners, so each diagonal sum equals an adjacent sum,
+  // which RRect already keeps within the side length.
+  if (!rRect.isComplex()) {
+    return false;
+  }
+  const auto rScale = 1.0f + rRect.smoothness();
+  const auto& r = rRect.radii();
+  const auto w = rRect.rect().width();
+  const auto h = rRect.rect().height();
+  return (r[0].x + r[2].x) * rScale > w || (r[0].y + r[2].y) * rScale > h ||
+         (r[1].x + r[3].x) * rScale > w || (r[1].y + r[3].y) * rScale > h;
+}
+
+UnitSmoothCornerCoeffs RRectUtils::ComputeUnitSmoothCornerCoeffs(float smoothness) {
+  const auto s = std::clamp(smoothness, 0.0f, 1.0f);
+  // Angle the tangent turns through along C1.
+  const auto turnAngle = M_PI_F * 0.25f * s;
+  // Sweep angle of C2.
+  const auto arcSweep = M_PI_2_F * (1.0f - s);
+  const auto tanTurn = tanf(turnAngle);
+  UnitSmoothCornerCoeffs coeffs = {};
+  coeffs.start = 1.0f + s;
+  coeffs.arcOffsetAlong = tanf(turnAngle * 0.5f) * cosf(turnAngle);
+  coeffs.step = (s + sinf(turnAngle) - coeffs.arcOffsetAlong) / 3.0f;
+  coeffs.arcOffsetCross = coeffs.arcOffsetAlong * tanTurn;
+  coeffs.arcHandle = (4.0f / 3.0f) * tanf(arcSweep * 0.25f);
+  return coeffs;
+}
+
+// The sub-half-pixel threshold classifies a corner as "sharp" only when the arc would be
+// shorter than one device pixel; therefore the local radius must be projected to device space
+// via the current CTM's max scale before comparison. Without this, a tiny local-space radius
+// inside a large scale-up (e.g. a 0.9-unit oval under 100x) is wrongly treated as sharp and
+// the dedicated RRect op is bypassed.
+static bool HasSharpCorner(const RRect& rRect, const Matrix& viewMatrix) {
+  auto deviceScale = viewMatrix.getMaxScale();
+  if (FloatNearlyZero(deviceScale)) {
+    return true;
+  }
+  for (const auto& r : rRect.radii()) {
+    if (r.x * deviceScale < 0.5f || r.y * deviceScale < 0.5f) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool UseDrawPathForSmoothRRect(const std::array<Point, 4>& radii, bool isComplex,
+                                      const Stroke* stroke, const Matrix& viewMatrix,
+                                      bool antiAlias) {
+  const auto scales = viewMatrix.getAxisScales();
+  // Axis scales that map the local geometry into the space where the shader evaluates distances.
+  auto evalScales = scales;
+  // Farthest distance from the contour, measured in the space where the shader evaluates distances.
+  // It includes the half stroke width and the AA band. A NonAA fill only tests which side of the
+  // contour a fragment lies on, so its maxDist is 0.
+  auto maxDist = 0.0f;
+  if (stroke != nullptr) {
+    // Under non-uniform scaling, a stroke's width differs between the two axes in the scaled
+    // space, so its distances are evaluated in the unscaled local space where the width is
+    // uniform. A hairline (width 0) has a fixed device-space width that is uniform in the scaled
+    // space, so it is evaluated there like other strokes.
+    const auto unscaledGeometry = stroke->width > 0.0f && scales.x != scales.y;
+    evalScales = unscaledGeometry ? Point{1.0f, 1.0f} : scales;
+    if (unscaledGeometry) {
+      const auto minScale = viewMatrix.getMinScale();
+      // A zero minimum scale collapses the RRect into a line, which is drawn as a path.
+      if (minScale <= 0.0f) {
+        return true;
+      }
+      maxDist = stroke->width * 0.5f + 0.5f / minScale;
+    } else {
+      const auto halfStroke = stroke->width > 0.0f ? stroke->width * scales.x * 0.5f : 0.5f;
+      maxDist = halfStroke + 0.5f;
+    }
+    // The distance solver's error grows with the distance from the contour; cap maxDist to
+    // keep the measured error subpixel.
+    if (maxDist > 50.0f) {
+      return true;
+    }
+  } else if (antiAlias) {
+    maxDist = 0.5f;
+  }
+
+  // Non-Complex types have identical radii across all four corners, so only the first needs
+  // check.
+  const auto cornerCount = isComplex ? radii.size() : size_t{1};
+  for (size_t i = 0; i < cornerCount; ++i) {
+    const auto& r = radii[i];
+    // The shader can only produce a square outer join for zero-radius corners. Other join
+    // shapes require drawPath.
+    if ((r.x <= 0.0f || r.y <= 0.0f) && stroke != nullptr &&
+        (stroke->join != LineJoin::Miter || 1.0f / stroke->miterLimit > 1.0f / FLOAT_SQRT2)) {
+      return true;
+    }
+    const auto xRadius = r.x * evalScales.x;
+    const auto yRadius = r.y * evalScales.y;
+    const auto minRadius = std::min(xRadius, yRadius);
+    const auto maxRadius = std::max(xRadius, yRadius);
+    // AA fills and all strokes use the fixed-iteration cubic distance solver. The corner's
+    // axis ratio affects its accuracy; the measured limit keeps the error subpixel.
+    if ((stroke != nullptr || antiAlias) && maxRadius > 4.0f * minRadius) {
+      return true;
+    }
+    // The shader finds the nearest contour segment correctly only within the safe distance
+    // R = minRadius^2 / (2 * maxRadius), so maxDist must not exceed it.
+    if (maxDist * maxRadius > 0.5f * minRadius * minRadius) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The dedicated RRect op draws stroked rounded corners by offsetting the ellipse equation
+ * outward/inward, which assumes a concentric ellipse approximates the true stroke offset
+ * curve. The approximation breaks down when the stroke is too thick relative to the corner
+ * radii, or when the ellipse is too elongated (major/minor ratio too large). In those cases
+ * this function returns true so the caller falls back to drawPath for an accurate stroke.
+ */
+static bool UseDrawPathForRRect(const std::array<Point, 4>& radii, bool isComplex,
+                                const Stroke* stroke, const Matrix& viewMatrix,
+                                bool hasSharpCorner) {
+  // Sharp corners (sub-half-unit local radius on either axis) make the ellipse implicit
+  // equation degenerate: at zero radius the equation is undefined, and under stroke the
+  // inner ellipse radius would become negative. Fall back to drawPath so the sharp
+  // geometry renders correctly.
+  if (hasSharpCorner) {
+    return true;
+  }
+  if (stroke == nullptr) {
+    return false;
+  }
+
+  const auto scales = viewMatrix.getAxisScales();
+  // Per-axis scaled stroke width: local width multiplied by the x/y axis scale factors
+  // extracted from the view matrix.
+  const Point scaledStroke = {scales.x * stroke->width, scales.y * stroke->width};
+  Point halfScaledStroke = {};
+  if (FloatNearlyZero(scaledStroke.length())) {
+    // Hairline stroke (width == 0) falls back to half a pixel on each axis.
+    halfScaledStroke = {0.5f, 0.5f};
+  } else {
+    halfScaledStroke = scaledStroke * 0.5f;
+  }
+  const auto halfScaledStrokeLen = halfScaledStroke.length();
+
+  // Non-Complex types have identical radii across all four corners (zero for Rect, equal
+  // per-corner for Simple/Oval), so only the first needs check.
+  const auto cornerCount = isComplex ? radii.size() : size_t{1};
+  for (size_t i = 0; i < cornerCount; ++i) {
+    const auto& r = radii[i];
+    const auto xRadius = scales.x * r.x;
+    const auto yRadius = scales.y * r.y;
+    // Half stroke width exceeds corner radius: the inner offset ellipse collapses
+    // (inner radius would be non-positive), so the concentric-ellipse approximation
+    // cannot be constructed.
+    if (halfScaledStroke.x > xRadius || halfScaledStroke.y > yRadius) {
+      return true;
+    }
+    // Thick stroke on an elongated ellipse (major/minor axis ratio > 2): the concentric-ellipse
+    // approximation visibly diverges from the true offset curve.
+    if (halfScaledStrokeLen > 0.5f && (0.5f * xRadius > yRadius || 0.5f * yRadius > xRadius)) {
+      return true;
+    }
+    // Fall back to drawPath when the stroke half width exceeds the ellipse's curvature radius
+    // at an axis endpoint (yRadius^2/xRadius on the x-axis, xRadius^2/yRadius on the y-axis).
+    // Past that radius, near the x-axis endpoint there is a range of angles over which the y
+    // of the stroke's inner edge decreases as the angle increases, which never happens on a
+    // concentric ellipse (likewise for x at the y-axis endpoint).
+    // With (hx, hy) = halfScaledStroke, the x-axis check first scales y by hx/hy to make the
+    // stroke uniform, so hx > (yRadius*hx/hy)^2/xRadius rearranges to the first check below;
+    // the second check swaps the axes.
+    if (halfScaledStroke.x * yRadius * yRadius <
+        halfScaledStroke.y * halfScaledStroke.y * xRadius) {
+      return true;
+    }
+    if (halfScaledStroke.y * xRadius * xRadius <
+        halfScaledStroke.x * halfScaledStroke.x * yRadius) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool RRectUtils::UseDrawPath(const RRect& rRect, const Stroke* stroke, const Matrix& viewMatrix,
+                             bool antiAlias) {
+  // Under perspective, a fixed-width AA ramp in device space maps back to a ramp of varying width
+  // in local space, which the rrect shaders cannot express when evaluating the contour locally.
+  // NonAA could be supported by interpolating the local coordinates with perspective correction,
+  // but the use case is rare, so perspective falls back for now.
+  // A skew is accepted as a known visual flaw: it changes the width of the AA ramp measured along
+  // the normals of the transformed edges.
+  if (viewMatrix.hasPerspective()) {
+    return true;
+  }
+  // For general rrects:
+  // The AA path partitions the RRect into a 4x4 grid of quads; a diagonal corner pair
+  // overlapping on either axis makes those quads self-intersect. The NonAA path is free of
+  // that mesh constraint but its shader still miscomputes coverage when diagonal corner
+  // boxes truly overlap. We cannot tell here which path the op will take, so apply the
+  // stricter AA rule and fall back to drawPath whenever any axis is crossed.
+  // For smooth rrects:
+  // The shader does not handle fragments shared by two corner regions.
+  if (RRectUtils::HasDiagonalCornerAxisOverlap(rRect)) {
+    return true;
+  }
+  if (rRect.smoothness() > 0.0f) {
+    return UseDrawPathForSmoothRRect(rRect.radii(), rRect.isComplex(), stroke, viewMatrix,
+                                     antiAlias);
+  }
+  return UseDrawPathForRRect(rRect.radii(), rRect.isComplex(), stroke, viewMatrix,
+                             HasSharpCorner(rRect, viewMatrix));
+}
+
+RRectDrawType RRectUtils::GetDrawType(const RRect& rRect, const Stroke* stroke,
+                                      const Matrix& viewMatrix, bool antiAlias) {
+  // The sub-half-pixel threshold is evaluated in device space, so the local radii are scaled by the
+  // current CTM's max scale before comparing. Otherwise a layer-local small RRect inside a
+  // scaled-up parent (e.g. a 0.9x0.9 oval inside a 100x scale) would be wrongly degenerated into a
+  // rect even though its arcs are clearly visible after the transform. A singular CTM
+  // (max scale == 0) projects all geometry to a zero-area region, so nothing visible would be
+  // drawn anyway.
+  auto deviceScale = viewMatrix.getMaxScale();
+  if (FloatNearlyZero(deviceScale)) {
+    return RRectDrawType::None;
+  }
+  auto allSmall = true;
+  for (const auto& r : rRect.radii()) {
+    if (r.x * deviceScale >= 0.5f && r.y * deviceScale >= 0.5f) {
+      allSmall = false;
+      break;
+    }
+  }
+  if (allSmall) {
+    return RRectDrawType::Rect;
+  }
+  if (UseDrawPath(rRect, stroke, viewMatrix, antiAlias)) {
+    return RRectDrawType::Path;
+  }
+  return RRectDrawType::RRect;
 }
 
 }  // namespace tgfx

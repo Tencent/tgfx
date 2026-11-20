@@ -61,6 +61,15 @@ void Rectangle::setRoundness(const std::array<float, 4>& values) {
   invalidateContent();
 }
 
+void Rectangle::setSmoothness(float value) {
+  if (_smoothness == value) {
+    return;
+  }
+  _smoothness = value;
+  _cachedShape = nullptr;
+  invalidateContent();
+}
+
 void Rectangle::setReversed(bool value) {
   if (_reversed == value) {
     return;
@@ -88,8 +97,9 @@ void Rectangle::apply(VectorContext* context) {
                                          {_roundness[1], _roundness[1]},
                                          {_roundness[2], _roundness[2]},
                                          {_roundness[3], _roundness[3]}}};
-    // MakeRectRadii scales the radii down proportionally if adjacent corners overflow any edge.
-    const auto rRect = RRect::MakeRectRadii(rect, radii);
+    // MakeRectRadii reduces the smoothness first and then scales the radii down proportionally if
+    // adjacent corners overflow any edge.
+    const auto rRect = RRect::MakeRectRadii(rect, radii, _smoothness);
     path.addRRect(rRect, _reversed, 2);
     _cachedShape = Shape::MakeFrom(path);
   }

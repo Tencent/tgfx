@@ -122,7 +122,7 @@ static bool ShapeContainsRect(const GeometryShape& shape, const Matrix& shapeToD
     const auto invW = 1.0f / h.z;
     // This is a conservative containment test, so the w of deviceToShape's mapping is not
     // re-checked when mapping the corner back into the shape's space.
-    if (!shape.contains(deviceToShape.mapXY(h.x * invW, h.y * invW))) {
+    if (!shape.conservativeContains(deviceToShape.mapXY(h.x * invW, h.y * invW))) {
       return false;
     }
   }

@@ -121,14 +121,14 @@ bool GeometryShape::convex() const {
   return false;
 }
 
-bool GeometryShape::contains(const Point& point) const {
+bool GeometryShape::conservativeContains(const Point& point) const {
   switch (_type) {
     case Type::Empty:
       return false;
     case Type::Rect:
       return _rect.contains(point.x, point.y);
     case Type::RRect:
-      return RRectUtils::ContainsPoint(_rRect, point);
+      return RRectUtils::ConservativeContainsPoint(_rRect, point);
     case Type::Path:
       return _path.contains(point.x, point.y);
   }
@@ -142,7 +142,7 @@ bool GeometryShape::conservativeContains(const Rect& rect) const {
     case Type::Rect:
       return _rect.contains(rect);
     case Type::RRect:
-      return RRectUtils::ContainsRect(_rRect, rect);
+      return RRectUtils::ConservativeContainsRect(_rRect, rect);
     case Type::Path:
       return _path.contains(rect);
   }

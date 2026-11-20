@@ -93,9 +93,11 @@ class GeometryShape {
   bool convex() const;
 
   /**
-   * Returns true if the point lies inside the shape. An empty shape contains no point.
+   * Returns true if the point lies inside the shape. The check is conservative: a true result
+   * guarantees containment, while a false result may or may not actually hold. An empty shape
+   * contains no point.
    */
-  bool contains(const Point& point) const;
+  bool conservativeContains(const Point& point) const;
 
   /**
    * Returns true if the rect lies entirely inside the shape. The check is conservative: a true

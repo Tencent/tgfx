@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/RRect.h"
+#include <algorithm>
 
 namespace tgfx {
 
@@ -39,6 +40,25 @@ static inline void UpdateMinScale(float a, float b, double limit, double& scale)
   if (sum > 0 && limit / sum < scale) {
     scale = limit / sum;
   }
+}
+
+// Scales smoothness so that no two adjacent smoothed corners overflow the side they share.
+static inline void ScaleSmoothness(const Rect& rect, const std::array<Point, 4>& radii,
+                                   float& smoothness) {
+  smoothness = std::clamp(smoothness, 0.0f, 1.0f);
+  if (smoothness == 0.0f) {
+    return;
+  }
+
+  const auto width = static_cast<double>(rect.width());
+  const auto height = static_cast<double>(rect.height());
+  // (1 + s) * (a + b) <= limit bounds 1 + s the same way a radii scale is bounded.
+  double scale = 1.0 + smoothness;
+  UpdateMinScale(radii[0].x, radii[1].x, width, scale);
+  UpdateMinScale(radii[1].y, radii[2].y, height, scale);
+  UpdateMinScale(radii[2].x, radii[3].x, width, scale);
+  UpdateMinScale(radii[3].y, radii[0].y, height, scale);
+  smoothness = static_cast<float>(std::max(scale - 1.0, 0.0));
 }
 
 // Scales per-corner radii so that no two adjacent radii overflow the side they share.
@@ -110,24 +130,32 @@ static inline RRect::Type ComputeType(const Rect& rect, const std::array<Point, 
 void RRect::setRect(const Rect& rect) {
   _rect = rect.makeSorted();
   _radii = {};
+  _smoothness = 0.0f;
   _type = Type::Rect;
 }
 
-void RRect::setRectXY(const Rect& rect, float radiusX, float radiusY) {
+void RRect::setRectXY(const Rect& rect, float radiusX, float radiusY, float smoothness) {
   const auto radius = Point{radiusX, radiusY};
-  setRectRadii(rect, {radius, radius, radius, radius});
+  setRectRadii(rect, {radius, radius, radius, radius}, smoothness);
 }
 
-void RRect::setRectRadii(const Rect& rect, const std::array<Point, 4>& radii) {
+void RRect::setRectRadii(const Rect& rect, const std::array<Point, 4>& radii, float smoothness) {
   _rect = rect.makeSorted();
   _radii = radii;
+  _smoothness = smoothness;
   for (auto& rad : _radii) {
     if (rad.x < 0 || rad.y < 0) {
       rad = {0, 0};
     }
   }
+  // Runs before ScaleRadii: radii that do not fit their edges yield a smoothness of exactly zero,
+  // while the scaled radii fit their edges only up to rounding error.
+  ScaleSmoothness(_rect, _radii, _smoothness);
   ScaleRadii(_rect, _radii);
   _type = ComputeType(_rect, _radii);
+  if (_type == Type::Rect || _type == Type::Oval) {
+    _smoothness = 0.0f;
+  }
 }
 
 void RRect::setOval(const Rect& oval) {
@@ -136,9 +164,9 @@ void RRect::setOval(const Rect& oval) {
   setRectRadii(sorted, {radius, radius, radius, radius});
 }
 
-// Positive scaling preserves all RRect classification invariants (adjacent-radii fit,
-// Oval/Simple/Complex/Rect thresholds), so ScaleRadii and ComputeType are intentionally
-// skipped here. Non-positive factors are out of contract.
+// Positive scaling preserves all RRect invariants (adjacent-radii fit, smoothed-corner fit,
+// Oval/Simple/Complex/Rect thresholds), so ScaleSmoothness, ScaleRadii and ComputeType are
+// intentionally skipped here. Non-positive factors are out of contract.
 void RRect::scale(float scaleX, float scaleY) {
   _rect.scale(scaleX, scaleY);
   for (auto& r : _radii) {

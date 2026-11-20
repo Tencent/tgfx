@@ -21,7 +21,7 @@
 
 namespace tgfx {
 
-PlacementPtr<RectEffect> RectEffect::Make(BlockAllocator* allocator, const Rect& localRect,
+PlacementPtr<RectEffect> RectEffect::Make(BlockAllocator* allocator, const Rect& rect,
                                           const Matrix& matrix, bool antiAlias) {
   // The analytic AA relies on a linear device-to-local inverse map, which cannot represent a
   // perspective matrix.
@@ -30,7 +30,7 @@ PlacementPtr<RectEffect> RectEffect::Make(BlockAllocator* allocator, const Rect&
     return nullptr;
   }
 
-  Rect adjustedRect = localRect;
+  Rect adjustedRect = rect;
   Matrix deviceToLocal = Matrix::I();
   if (!matrix.isIdentity()) {
     // Decompose matrix as M = M_axisFree * diag(axisScales). Bake axisScales into the local
@@ -50,8 +50,8 @@ PlacementPtr<RectEffect> RectEffect::Make(BlockAllocator* allocator, const Rect&
   return allocator->make<GLSLRectEffect>(adjustedRect, deviceToLocal, antiAlias);
 }
 
-GLSLRectEffect::GLSLRectEffect(const Rect& localRect, const Matrix& deviceToLocal, bool antiAlias)
-    : RectEffect(localRect, deviceToLocal, antiAlias) {
+GLSLRectEffect::GLSLRectEffect(const Rect& rect, const Matrix& deviceToLocal, bool antiAlias)
+    : RectEffect(rect, deviceToLocal, antiAlias) {
 }
 
 void GLSLRectEffect::emitCode(EmitArgs& args) const {
@@ -59,7 +59,7 @@ void GLSLRectEffect::emitCode(EmitArgs& args) const {
   auto uniformHandler = args.uniformHandler;
 
   const auto rectName =
-      uniformHandler->addUniform("LocalRect", UniformFormat::Float4, ShaderStage::Fragment);
+      uniformHandler->addUniform("Rect", UniformFormat::Float4, ShaderStage::Fragment);
   const auto antiAliasName =
       uniformHandler->addUniform("AntiAlias", UniformFormat::Float, ShaderStage::Fragment);
 
@@ -94,7 +94,7 @@ void GLSLRectEffect::emitCode(EmitArgs& args) const {
 }
 
 void GLSLRectEffect::onSetData(UniformData*, UniformData* fragmentUniformData) const {
-  fragmentUniformData->setData("LocalRect", localRect);
+  fragmentUniformData->setData("Rect", rect);
   const float antiAliasValue = antiAlias ? 1.0f : 0.0f;
   fragmentUniformData->setData("AntiAlias", antiAliasValue);
   if (needTransform()) {
