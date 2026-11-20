@@ -295,7 +295,7 @@ bool SurfaceTexture::latchTexture(JNIEnv* env) {
   env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
-    LOGE("NativeImageReader::onUpdateTexture(): failed to updateTexImage!");
+    LOGE("SurfaceTexture::latchTexture(): failed to updateTexImage!");
     return false;
   }
   if (SurfaceTexture_getDataSpace) {

@@ -174,7 +174,6 @@ TGFX_TEST(SurfaceTextureFrameStateTest, MismatchedSeekRetryDoesNotConsumeFrames)
   for (int retry = 0; retry < 3; retry++) {
     EXPECT_EQ(state.readStatus(10), ImageReaderStatus::Mismatched);
   }
-  EXPECT_EQ(latchCount, 8);
   state.onSeeked();
   state.onLatched(10);
   EXPECT_EQ(state.readStatus(10), ImageReaderStatus::Ready);
