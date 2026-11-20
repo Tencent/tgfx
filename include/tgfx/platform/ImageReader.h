@@ -114,6 +114,8 @@ class ImageReader {
    * Tells the reader that the producer seeked, so the presentation time it compares the next frame
    * against is discarded. Without it a seek that restarts the timeline makes the first frames look
    * like they were already reached, and the texture keeps showing the frame from before the seek.
+   * All previously acquired ImageBuffers expire immediately, including buffers whose texture reads
+   * already reported Ready. Acquire a new buffer for frames produced after the seek.
    */
   void notifySeeked();
 
