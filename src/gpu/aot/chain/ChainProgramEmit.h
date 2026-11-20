@@ -44,16 +44,17 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
  * spells it. A member exists only because the emission that reads it registered it, so the
  * declaration is the emission's closure: no parameter pool, no packed slot array, no
  * capacity-sized arrays, no prefix the writer has to know about.
- * @param composition  The shape to emit.
- * @param family       The matched family (the variant walk's input).
- * @param variant      The matched variant (its geometry, texture count and xfer fact).
- * @param cache        The loaded bundle's pack.
- * @param code         Receives the fragment text.
- * @param bindings     Receives the declaration tables the upload walks.
- * @return             False when the shape is outside the slice or a pack entry is missing; the
- *                     caller keeps its other paths.
+ * @param ir               The draw's lowered expression (color graph and coverage terms).
+ * @param xpNeedsBlendPass The xfer's advanced-mode fact (the epilogue's blend pass).
+ * @param family           The matched family (the variant walk's input).
+ * @param variant          The matched variant (its geometry, texture count and xfer fact).
+ * @param cache            The loaded bundle's pack.
+ * @param code             Receives the fragment text.
+ * @param bindings         Receives the declaration tables the upload walks.
+ * @return                 False when the expression is outside the slice or a pack entry is
+ *                         missing; the caller keeps its other paths.
  */
-bool EmitChainProgramGLSL(const ChainComposition& composition, const Family& family,
+bool EmitChainProgramGLSL(const DrawIR& ir, bool xpNeedsBlendPass, const Family& family,
                           const Variant& variant, const PrecompiledShaderCache* cache,
                           std::string* code, ChainBindings* bindings, bool esProfile,
                           int blendMode);

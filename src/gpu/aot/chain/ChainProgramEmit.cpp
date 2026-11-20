@@ -30,6 +30,7 @@
 #include <unordered_map>
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/chain/ChainProgramPlan.h"
+#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/shaders/contract/ChainISA.h"
 #include "gpu/shaders/contract/FragmentLibrary.h"
 
@@ -562,7 +563,7 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   return true;
 }
 
-bool EmitChainProgramGLSL(const ChainComposition& composition, const Family& family,
+bool EmitChainProgramGLSL(const DrawIR& ir, bool xpNeedsBlendPass, const Family& family,
                           const Variant& variant, const PrecompiledShaderCache* cache,
                           std::string* code, ChainBindings* bindings, bool esProfile,
                           int blendMode) {
@@ -570,7 +571,7 @@ bool EmitChainProgramGLSL(const ChainComposition& composition, const Family& fam
     return false;
   }
   ChainProgramPlan plan = {};
-  if (!PlanChainProgram(composition, family, variant, cache, &plan)) {
+  if (!PlanChainProgramFromGraph(ir, xpNeedsBlendPass, family, variant, cache, &plan)) {
     return false;
   }
   if (!PrintChainProgramGLSL(plan, cache, code, esProfile, blendMode)) {

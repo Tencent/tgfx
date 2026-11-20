@@ -191,13 +191,19 @@ bool PlanChainProgram(const ChainComposition& composition, const Family& family,
                       ChainProgramPlan* plan);
 
 /**
- * Plans the same program the composition walk plans, directly from the draw's lowered expression:
- * the node order the slot pipeline's schedule derives (texture leaves first, then the remaining
- * nodes in index order, color graph ahead of the merged coverage graph), each node's operator and
- * selector structure the encoders produce, the register assignment the shared allocator returns,
- * and the same declaration closure — none of it through the slot encoding. The graph route is the
- * replacement path for the assembled entry; the composition route stays the serving one until the
- * parity data says otherwise.
+ * Plans the chain program directly from the draw's lowered expression: the node order the slot
+ * pipeline's schedule derives (texture leaves first, then the remaining nodes in index order,
+ * color graph ahead of the merged coverage graph), each node's operator and selector structure
+ * the encoders produce, the register assignment the shared allocator returns, and the same
+ * declaration closure — none of it through the slot encoding. The graph route is the assembled
+ * entry's serving path; the composition walk stays beside it as the parity reference until the
+ * slot system retires.
+ *
+ * The walk runs behind the match, which already compiled this expression through the slot
+ * pipeline (ResolveChainProgram): the slot encoding's cross-slot validation (ValidateSlots — the
+ * selector domains, the leaf-slot alignment, the profile capacities) has therefore accepted this
+ * expression, so this walk re-derives only what the encoding layer derives per node and leaves
+ * the cross-slot validation where it runs.
  * @param ir               The draw's lowered expression (color graph and coverage terms).
  * @param xpNeedsBlendPass The xfer's advanced-mode fact (the epilogue's blend pass).
  * @param family           The matched family (the variant walk's input).
