@@ -46,6 +46,87 @@ struct CatalogEntry {
 };
 
 // Drops comments and blank lines from a catalog function (the header ships into the binary).
+// The include guard is a file-level include mechanism, not part of the function's own text: the
+// catalog stores the function alone and the assembler dedupes by name, so a file wrapped in an
+// #ifndef/#define pair with a trailing #endif contributes only its function. Stripping here
+// keeps guards (and their matching, easily mismatched #endif lines) out of every assembled text;
+// a file without the wrapper pattern passes through unchanged.
+std::string StripIncludeGuard(const std::string& text) {
+  std::vector<std::string> lines = {};
+  size_t lineStart = 0;
+  while (lineStart <= text.size()) {
+    size_t lineEnd = text.find('\n', lineStart);
+    if (lineEnd == std::string::npos) {
+      lineEnd = text.size();
+    }
+    std::string line = text.substr(lineStart, lineEnd - lineStart);
+    if (!line.empty() && line.back() == '\r') {
+      line.pop_back();
+    }
+    lines.push_back(line);
+    if (lineEnd == text.size()) {
+      break;
+    }
+    lineStart = lineEnd + 1;
+  }
+  const auto leadingSpace = [](const std::string& line) {
+    size_t at = 0;
+    while (at < line.size() && (line[at] == ' ' || line[at] == '\t')) {
+      ++at;
+    }
+    return at;
+  };
+  const auto directive = [&](const std::string& line, const char* name) -> std::string {
+    const size_t at = leadingSpace(line);
+    const std::string prefix = std::string("#") + name;
+    if (line.compare(at, prefix.size(), prefix) != 0) {
+      return {};
+    }
+    const auto end = line.find_first_not_of(" \t", at + prefix.size());
+    if (end == std::string::npos) {
+      return {};
+    }
+    const auto nameEnd = line.find_first_of(" \t", end);
+    return line.substr(end, nameEnd == std::string::npos ? std::string::npos : nameEnd - end);
+  };
+  // The guard: a leading #ifndef NAME directly followed by #define NAME, closed by the file's
+  // last #endif.
+  size_t guardStart = std::string::npos;
+  for (size_t index = 0; index + 1 < lines.size(); ++index) {
+    const auto name = directive(lines[index], "ifndef");
+    if (!name.empty() && directive(lines[index + 1], "define") == name) {
+      guardStart = index;
+      break;
+    }
+  }
+  if (guardStart == std::string::npos) {
+    return text;
+  }
+  size_t guardEnd = std::string::npos;
+  for (size_t index = lines.size(); index-- > 0;) {
+    if (leadingSpace(lines[index]) == lines[index].size()) {
+      continue;  // blank tail lines
+    }
+    if (directive(lines[index], "endif").empty()) {
+      return text;  // the file's last directive is not the guard's #endif: not a wrapper
+    }
+    guardEnd = index;
+    break;
+  }
+  if (guardEnd == std::string::npos || guardEnd <= guardStart + 1) {
+    return text;
+  }
+  lines.erase(lines.begin() + static_cast<std::ptrdiff_t>(guardEnd));
+  lines.erase(lines.begin() + static_cast<std::ptrdiff_t>(guardStart),
+              lines.begin() + static_cast<std::ptrdiff_t>(guardStart) + 2);
+  std::string out = {};
+  for (const auto& line : lines) {
+    out += line;
+    out.push_back('\n');
+  }
+  return out;
+}
+
 std::string CompactFunctionSource(const std::string& text) {
   std::string out = {};
   out.reserve(text.size());
@@ -146,7 +227,7 @@ bool ParseAnnotatedFunction(const std::string& text, CatalogEntry* entry, std::s
     *error = "no //@function annotation";
     return false;
   }
-  entry->source = CompactFunctionSource(source);
+  entry->source = CompactFunctionSource(StripIncludeGuard(source));
   if (entry->source.empty()) {
     *error = "the function body is empty";
     return false;
@@ -258,6 +339,10 @@ bool WriteFunctionCatalog(const std::string& shaderDir, const std::string& outPa
     *error = "no fn directory under " + shaderDir;
     return false;
   }
+  // The geometry directory carries the per-pixel edge-coverage formulas beside the vertex-side
+  // layout fragments (gp_*_layout.inc, plain text the catalog cannot parse); only the coverage
+  // files join the scan, by name.
+  const fs::path geometryRoot = fs::path(shaderDir) / "geometry";
   std::vector<CatalogEntry> entries = {};
   for (auto it = fs::recursive_directory_iterator(root); it != fs::recursive_directory_iterator();
        ++it) {
@@ -284,6 +369,34 @@ bool WriteFunctionCatalog(const std::string& shaderDir, const std::string& outPa
       }
     }
     entries.push_back(std::move(entry));
+  }
+  if (fs::exists(geometryRoot)) {
+    for (auto it = fs::directory_iterator(geometryRoot); it != fs::directory_iterator(); ++it) {
+      if (!it->is_regular_file() ||
+          it->path().filename().string().rfind("_coverage.inc") == std::string::npos) {
+        continue;
+      }
+      std::ifstream file(it->path(), std::ios::binary);
+      if (!file.is_open()) {
+        *error = "cannot read " + it->path().string();
+        return false;
+      }
+      std::ostringstream buffer;
+      buffer << file.rdbuf();
+      CatalogEntry entry = {};
+      std::string parseError;
+      if (!ParseAnnotatedFunction(buffer.str(), &entry, &parseError)) {
+        *error = it->path().string() + ": " + parseError;
+        return false;
+      }
+      for (const auto& existing : entries) {
+        if (existing.name == entry.name) {
+          *error = "duplicate function " + entry.name + " (" + it->path().string() + ")";
+          return false;
+        }
+      }
+      entries.push_back(std::move(entry));
+    }
   }
   if (entries.empty()) {
     *error = "the fn directory declares no functions";

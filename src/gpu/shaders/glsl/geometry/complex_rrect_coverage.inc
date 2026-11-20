@@ -7,6 +7,8 @@
 #ifndef TGSL_COMPLEX_RRECT_COVERAGE_INCLUDED
 #define TGSL_COMPLEX_RRECT_COVERAGE_INCLUDED
 
+//@function complexRRectCoverage
+
 float complexRRectCoverage(vec2 localCoord, vec4 rectBounds, vec4 xRadii, vec4 yRadii,
                            vec2 strokeWidth, int strokeEnabled) {
   // Per-corner radii: xR/yR order is [TL, TR, BR, BL]

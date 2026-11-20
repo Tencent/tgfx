@@ -6,6 +6,8 @@
 #ifndef TGSL_ROUND_STROKE_RECT_COVERAGE_INCLUDED
 #define TGSL_ROUND_STROKE_RECT_COVERAGE_INCLUDED
 
+//@function roundStrokeRectCoverage
+
 float roundStrokeRectCoverage(vec2 offsets, vec2 ellipseRadii, float vertexCoverage, bool aa) {
   highp vec2 offset = offsets;
   if (!aa) {

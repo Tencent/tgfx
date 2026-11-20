@@ -29,6 +29,7 @@
 #include "gpu/aot/ir/ChainLayoutMath.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/NodeContract.h"
+#include "gpu/shaders/Families.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/Layout.h"
 #include "gpu/shaders/Module.h"
@@ -358,10 +359,20 @@ void RegisterLeafMembers(PlanRegistry* registry, int leaf) {
 // One stored vertex stage member, addressed through the variant's derived block — the stored text is
 // the declaration, so its layout is the only authority on the offset. Absent members are silent: the
 // variant's own gates decided whether the stored text carries them.
+// The stored vertex block names a member bare for the chain's own rect modules and with the
+// geometry module's prefix for the reused per-pixel geometries (ElementNameOf's rule): a geometry
+// module's own uniform is <Module>_<name> (HairlineLineGeometry_Matrix), while the chain contract
+// members (RTAdjust, CoordTransformMatrix_n) stay bare. The prefix candidate lets one call site
+// serve both spellings; a name absent from both is a contract mismatch the caller would see as an
+// unwritten member, so the lookup must cover every geometry's spelling.
+// The stored vertex block names every member with the module prefix that declares it (the chain
+// contract members RTAdjust and CoordTransformMatrix_n carry the bare spelling the chain module's
+// own text uses). The caller passes the empty prefix for the contract members and the geometry
+// module's prefix for its own uniforms, so each lookup has exactly one spelling to match.
 void RegisterVertexMember(ChainBindings* bindings, const Layout& layout, const std::string& name,
-                          ChainBindingSource source, int index = -1) {
+                          const std::string& prefix, ChainBindingSource source, int index = -1) {
   for (size_t fieldIndex = 0; fieldIndex < layout.fields.size(); ++fieldIndex) {
-    if (layout.fields[fieldIndex].block != 0 || layout.fieldNames[fieldIndex] != name) {
+    if (layout.fields[fieldIndex].block != 0 || layout.fieldNames[fieldIndex] != prefix + name) {
       continue;
     }
     ChainBinding binding = {};
@@ -683,6 +694,13 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
     return false;
   }
 
+  // The geometry module's member prefix: the reused per-pixel geometries and the chain's own rect
+  // modules all spell their own members as <Module>_<name> (ElementNameOf's rule), so one prefix
+  // serves the geometry-owned varyings and vertex uniforms alike.
+  const std::string geometryPrefix =
+      variant.geometry < 9 && ChainGeometries[variant.geometry] != nullptr
+          ? std::string(ChainGeometries[variant.geometry]->name) + "_"
+          : std::string();
   // The leaves the body samples, in slot order, each registering its own declarations. The leaf
   // records read the program's binding table, so they carry no node.
   for (int leaf : leafSlots) {
@@ -701,7 +719,7 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
     registry.uniform("DeviceLeafCoordMatrix", FragmentType::Matrix3,
                      ChainBindingSource::DeviceLeafCoordMatrix, -1, -1, 4);
     if (hasSubset) {
-      registry.varying("vTexSubset", FragmentType::Float4);
+      registry.varying(geometryPrefix + "vTexSubset", FragmentType::Float4);
     }
   }
   // The resource evaluators index the leaf samplers, so their variants need all four declared.
@@ -740,32 +758,57 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
   if (frame.coverageRootRegister < 0) {
     unitCoverageUsed = true;
   }
-  const bool hasColorVarying = LayoutDeclaresVarying(layout, "vColor");
+  // The per-vertex color varying: the rect layouts declare it bare (vColor), the per-pixel
+  // geometries with their module prefix (EllipseGeometry_vColor, ...); one suffix match covers
+  // both spellings.
+  std::string colorVarying = {};
+  for (const auto& varying : layout.varyings) {
+    if (IsColorVaryingName(varying.name)) {
+      colorVarying = varying.name;
+    }
+  }
+  const bool hasColorVarying = !colorVarying.empty();
   if (hasColorVarying) {
     registry.uniform("ChainColorParams_Color", FragmentType::Float4,
                      ChainBindingSource::GeometryColor, -1);
     registry.uniform("ChainColorParams_HasCommonColor", FragmentType::Int,
                      ChainBindingSource::GeometryHasCommonColor, -1);
-    registry.varying("vColor", FragmentType::Float4);
+    registry.varying(colorVarying, FragmentType::Float4);
   }
-  if (unitCoverageUsed) {
-    registry.varying("vCoverage", FragmentType::Float);
+  // A per-pixel-coverage geometry declares its own varyings and the ChainColorParams switches
+  // its edge formula reads, and the unit coverage source becomes the formula's value (the rect
+  // layouts keep the vCoverage varying instead).
+  const ChainGeometryCoverageCall* geometryCoverage = ChainGeometryCoverageOf(variant.geometry);
+  if (geometryCoverage != nullptr) {
+    for (size_t arg = 0; arg < geometryCoverage->argCount; ++arg) {
+      const auto& parameter = geometryCoverage->args[arg];
+      if (parameter.uniform) {
+        registry.uniform(parameter.name, parameter.type, parameter.source, -1);
+      } else {
+        registry.varying(parameter.name, parameter.type);
+      }
+    }
+  }
+  if (unitCoverageUsed && geometryCoverage == nullptr) {
+    registry.varying(geometryPrefix + "vCoverage", FragmentType::Float);
   }
 
   // The stored vertex stage's members: the block the stored text declares, filled from the same
-  // geometry and program facts the writer reads.
-  RegisterVertexMember(&plan->bindings, layout, "RTAdjust", ChainBindingSource::RTAdjust);
-  RegisterVertexMember(&plan->bindings, layout, "Matrix", ChainBindingSource::VertexMatrix);
-  RegisterVertexMember(&plan->bindings, layout, "InTexSubsetMatrix",
+  // geometry and program facts the writer reads. The geometry module's own uniforms carry its
+  // prefix; the chain contract members stay bare.
+  RegisterVertexMember(&plan->bindings, layout, "RTAdjust", "", ChainBindingSource::RTAdjust);
+  RegisterVertexMember(&plan->bindings, layout, "Matrix", geometryPrefix,
+                       ChainBindingSource::VertexMatrix);
+  RegisterVertexMember(&plan->bindings, layout, "InTexSubsetMatrix", geometryPrefix,
                        ChainBindingSource::VertexTexSubsetMatrix);
   for (int leaf : leafSlots) {
     const int transform = leaf + static_cast<int>(leafTransformShift);
     RegisterVertexMember(&plan->bindings, layout,
-                         "CoordTransformMatrix_" + std::to_string(transform),
+                         "CoordTransformMatrix_" + std::to_string(transform), "",
                          ChainBindingSource::CoordTransform, transform);
   }
   if (needsSourceCoords) {
-    RegisterVertexMember(&plan->bindings, layout, "CoordTransformMatrix_0",
+    RegisterVertexMember(&plan->bindings, layout, "CoordTransformMatrix_0", "",
                          ChainBindingSource::CoordTransform, 0);
   }
 
@@ -789,6 +832,7 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
   plan->xpNeedsBlendPass = frame.xpNeedsBlendPass;
   plan->leafSlots = std::move(leafSlots);
   plan->usedOps = std::move(usedOps);
+  plan->geometry = variant.geometry;
   plan->bindings.fragment = registry.bindings();
   plan->bindings.samplers = registry.samplerBindings();
   plan->bindings.leafVaryings = plan->leafSlots;
@@ -799,6 +843,78 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
 }
 
 }  // namespace
+
+// The per-pixel geometry coverage calls, one per non-rect geometry the chain family serves: the
+// catalog function (geometry/*_coverage.inc) and its arguments in call order. The varying names
+// are the stored variant's own prefixed declarations (see pointwise_fragment_main.inc's alias
+// block); the uniforms are the ChainColorParams switches the interpreter text read. One table
+// serves the walk (which declares the members) and the printer (which spells the call), so the
+// two cannot drift about a geometry's contract.
+namespace {
+
+constexpr ChainGeometryCoverageArg EllipseCoverageArgs[] = {
+    {"EllipseGeometry_vOffsets", FragmentType::Float2},
+    {"EllipseGeometry_vRadii", FragmentType::Float4},
+    {"ChainColorParams_StrokeEnabled", FragmentType::Int, true, ChainBindingSource::GeometryStroke},
+};
+constexpr ChainGeometryCoverageArg HairlineLineCoverageArgs[] = {
+    {"HairlineLineGeometry_vEdge", FragmentType::Float},
+    {"ChainColorParams_Coverage", FragmentType::Float, true, ChainBindingSource::GeometryCoverage},
+    {"ChainColorParams_AAEnabled", FragmentType::Int, true, ChainBindingSource::GeometryAA},
+};
+constexpr ChainGeometryCoverageArg ComplexEllipseCoverageArgs[] = {
+    {"ComplexEllipseGeometry_vOffsets", FragmentType::Float2},
+    {"ComplexEllipseGeometry_vRadii", FragmentType::Float4},
+    {"ComplexEllipseGeometry_vEdgeDist", FragmentType::Float2},
+    {"ComplexEllipseGeometry_vStrokeWidth", FragmentType::Float2},
+    {"ChainColorParams_StrokeEnabled", FragmentType::Int, true, ChainBindingSource::GeometryStroke},
+};
+constexpr ChainGeometryCoverageArg NonAARRectCoverageArgs[] = {
+    {"RRectGeometry_vLocalCoord", FragmentType::Float2},
+    {"RRectGeometry_vRectBounds", FragmentType::Float4},
+    {"RRectGeometry_vRadii", FragmentType::Float2},
+    {"RRectGeometry_vStrokeWidth", FragmentType::Float2},
+    {"ChainColorParams_StrokeEnabled", FragmentType::Int, true, ChainBindingSource::GeometryStroke},
+};
+constexpr ChainGeometryCoverageArg ComplexRRectCoverageArgs[] = {
+    {"ComplexRRectGeometry_vLocalCoord", FragmentType::Float2},
+    {"ComplexRRectGeometry_vRectBounds", FragmentType::Float4},
+    {"ComplexRRectGeometry_vXRadii", FragmentType::Float4},
+    {"ComplexRRectGeometry_vYRadii", FragmentType::Float4},
+    {"ComplexRRectGeometry_vStrokeWidth", FragmentType::Float2},
+    {"ChainColorParams_StrokeEnabled", FragmentType::Int, true, ChainBindingSource::GeometryStroke},
+};
+constexpr ChainGeometryCoverageArg HairlineQuadCoverageArgs[] = {
+    {"HairlineQuadGeometry_vHairQuadEdge", FragmentType::Float4},
+    {"ChainColorParams_Coverage", FragmentType::Float, true, ChainBindingSource::GeometryCoverage},
+    {"ChainColorParams_AAEnabled", FragmentType::Int, true, ChainBindingSource::GeometryAA},
+};
+
+constexpr ChainGeometryCoverageCall GeometryCoverageCalls[] = {
+    {3, "ellipseEdgeCoverage", EllipseCoverageArgs,
+     sizeof(EllipseCoverageArgs) / sizeof(EllipseCoverageArgs[0])},
+    {4, "hairlineLineEdgeCoverage", HairlineLineCoverageArgs,
+     sizeof(HairlineLineCoverageArgs) / sizeof(HairlineLineCoverageArgs[0])},
+    {5, "complexEllipseEdgeCoverage", ComplexEllipseCoverageArgs,
+     sizeof(ComplexEllipseCoverageArgs) / sizeof(ComplexEllipseCoverageArgs[0])},
+    {6, "nonAARRectCoverage", NonAARRectCoverageArgs,
+     sizeof(NonAARRectCoverageArgs) / sizeof(NonAARRectCoverageArgs[0])},
+    {7, "complexRRectCoverage", ComplexRRectCoverageArgs,
+     sizeof(ComplexRRectCoverageArgs) / sizeof(ComplexRRectCoverageArgs[0])},
+    {8, "hairlineQuadEdgeCoverage", HairlineQuadCoverageArgs,
+     sizeof(HairlineQuadCoverageArgs) / sizeof(HairlineQuadCoverageArgs[0])},
+};
+
+}  // namespace
+
+const ChainGeometryCoverageCall* ChainGeometryCoverageOf(uint8_t geometry) {
+  for (const auto& call : GeometryCoverageCalls) {
+    if (call.geometry == geometry) {
+      return &call;
+    }
+  }
+  return nullptr;
+}
 
 std::string ChainLeafMemberName(const char* base, int leaf) {
   return leaf == 0 ? std::string(base) : std::string(base) + "_" + std::to_string(leaf);
@@ -1034,7 +1150,11 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
   };
   for (bool texturePhase : {true, false}) {
     for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
-      if (inPass[index]) {
+      // The designator-only input nodes (the white / opaque geometry inputs a xfer's children
+      // lower) stay out of the schedule — their value rides on the input-edge designators, not on
+      // a chain slot. A plan pass already excludes them from its node list; the whole-graph walk
+      // sees every node, so the exclusion lands here.
+      if (inPass[index] && !TraitsOf(graph.nodeAt(AOTNodeID(index))->kind).isInputDesignator()) {
         collectNode(index, texturePhase);
       }
     }
@@ -1280,6 +1400,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
         break;
       }
       default:
+        LOGE("Layout reject #35 kind=%d", static_cast<int>(node->kind));
         return false;
     }
     // An input edge whose producer is outside the pass: the expression omitted a node it depends
@@ -1410,11 +1531,6 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
   if (cache == nullptr || plan == nullptr) {
     return false;
   }
-  // The rect-geometry slice: the stored variant texts the assembler splices are the rect
-  // layouts' own, so the other geometry modules' variants keep their runtime paths.
-  if (variant.geometry != 0) {
-    return false;
-  }
   AOTChainGraphLayout layout = {};
   if (!LayoutChainGraph(ir, nullptr, &layout)) {
     return false;
@@ -1481,6 +1597,7 @@ void AppendChainPlanKey(const ChainProgramPlan& plan, BytesKey* key) {
   key->write(plan.xpNeedsBlendPass ? 1u : 0u);
   key->write(plan.gradientLutForm ? 1u : 0u);
   key->write(plan.hasMaskSampler ? 1u : 0u);
+  key->write(static_cast<uint32_t>(plan.geometry));
   key->write(static_cast<uint32_t>(plan.leafSlots.size()));
   for (int leaf : plan.leafSlots) {
     key->write(static_cast<uint32_t>(leaf));

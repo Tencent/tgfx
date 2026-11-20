@@ -238,13 +238,62 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
     declarations += "layout(location = 0) out vec4 fragColor;\n";
   }
 
+  // The declared varying whose name ends with the suffix, or empty: the per-variant spelling of a
+  // geometry-owned varying (the module prefix rides the stored declaration).
+  const auto varyingByNameSuffix = [&plan](const std::string& suffix) -> std::string {
+    for (const auto& varying : plan.varyings) {
+      if (varying.name.size() > suffix.size() &&
+          varying.name.compare(varying.name.size() - suffix.size(), suffix.size(), suffix) == 0) {
+        return varying.name;
+      }
+    }
+    return {};
+  };
+  // A per-pixel-coverage geometry spells its edge formula into the unit coverage source: the
+  // function comes from the catalog (geometry/*_coverage.inc), its arguments are the varyings and
+  // ChainColorParams switches the walk registered, and the call is the source's own body — the
+  // shape is known here, so no value needs to live in a global the way the interpreter's generic
+  // text needed one. The rect layouts carry the vCoverage varying instead.
+  std::string geometryFormulas = {};
+  std::string unitCoverageExpr = varyingByNameSuffix("_vCoverage");
+  if (unitCoverageExpr.empty()) {
+    unitCoverageExpr = "vCoverage";
+  }
+  if (const auto* coverage = ChainGeometryCoverageOf(plan.geometry)) {
+#if defined(TGFX_HAS_CHAIN_CATALOG)
+    if (FindChainFunctionSource(coverage->function) == nullptr) {
+      return false;
+    }
+    std::string callArgs = {};
+    for (size_t arg = 0; arg < coverage->argCount; ++arg) {
+      if (arg != 0) {
+        callArgs += ", ";
+      }
+      callArgs += coverage->args[arg].name;
+    }
+    unitCoverageExpr = std::string(coverage->function) + "(" + callArgs + ")";
+    std::set<std::string> geometryEmitted = {};
+    AppendCatalogFunction(coverage->function, &geometryEmitted, &geometryFormulas);
+#else
+    return false;
+#endif
+  }
+
   // The source functions the body calls, each reading the members and varyings it declares. The
   // tail's final-coverage expression reads the unit coverage source whenever no coverage subtree
   // replaced it (the walk already folded that fact into the flag).
   std::string sources = {};
+  // The per-vertex color varying's declared name: bare on the rect layouts, module-prefixed on
+  // the per-pixel geometries (the plan registered it under the same name).
+  std::string colorVarying = "vColor";
+  for (const auto& varying : plan.varyings) {
+    if (IsColorVaryingName(varying.name)) {
+      colorVarying = varying.name;
+    }
+  }
   const std::string colorExpr =
       plan.hasColorVarying
-          ? "(ChainColorParams_HasCommonColor != 0) ? ChainColorParams_Color : vColor"
+          ? "(ChainColorParams_HasCommonColor != 0) ? ChainColorParams_Color : " + colorVarying
           : "ChainColorParams_Color";
   if (plan.geomColorUsed) {
     sources += "vec4 chainGeomColorSource() {\n  return " + colorExpr + ";\n}\n\n";
@@ -254,7 +303,7 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
                ";\n  return vec4(color.rgb, 1.0);\n}\n\n";
   }
   if (plan.unitCoverageUsed) {
-    sources += "vec4 chainUnitCoverageSource() {\n  return vec4(vCoverage);\n}\n\n";
+    sources += "vec4 chainUnitCoverageSource() {\n  return vec4(" + unitCoverageExpr + ");\n}\n\n";
   }
   if (plan.xpNeedsBlendPass) {
     const std::string modulation = plan.coverageRootRegister >= 0 ? "1" : "0";
@@ -302,9 +351,6 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   std::set<std::string> catalogEmitted = {};
 #endif
   for (int op : plan.usedOps) {
-    if (op == ChainISA::Gradient) {
-      continue;
-    }
     const auto* def = FindFragment(op);
     if (def == nullptr || def->sourceFile == nullptr) {
       continue;
@@ -322,11 +368,6 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
       return false;
     }
   }
-  if (plan.usedOps.count(ChainISA::Gradient) != 0) {
-    if (!appendPiece(plan.gradientLutForm ? FragmentPackGradientLut : FragmentPackGradientSimple)) {
-      return false;
-    }
-  }
   if (needsTexture) {
     if (!appendPiece(FragmentPackLeafFetchPlain)) {
       return false;
@@ -334,6 +375,7 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   }
 
   // The prefetches: one per texture leaf the composition samples, in slot order.
+  const std::string texSubsetVarying = varyingByNameSuffix("_vTexSubset");
   std::string prefetch = {};
   for (int leaf : plan.leafSlots) {
     const std::string suffix = std::to_string(leaf);
@@ -345,7 +387,7 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
                 ChainLeafMemberName("SubsetClampOn", leaf) + ", " + suffix +
                 ", DeviceLeafMask, DeviceLeafCoordMatrix[" + suffix + "], LeafReadSwizzles[" +
                 suffix + "], gl_FragCoord.xy, " + (applyQuad ? "1" : "0") + ", " +
-                (applyQuad ? "vTexSubset" : "vec4(0.0)") + ");\n";
+                (applyQuad ? texSubsetVarying : "vec4(0.0)") + ");\n";
   }
 
   // The straight-line body: one local per call, the registers an argument names spelled by the
@@ -563,8 +605,11 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   const std::string versionLine =
       esProfile ? "#version 300 es\nprecision highp float;\nprecision highp int;\n"
                 : "#version 330\n";
-  *code = versionLine + "#define TGFX_DECLARED_CHAIN 1\n" + declarations + "\n" + sources + pieces +
-          "vec4 chainLeafTex[4];\n" + xpGlobals +
+  *code = versionLine + "#define TGFX_DECLARED_CHAIN 1\n" +
+          // The catalog functions' own branches (the LUT gradient's sampler read) key on NTEX:
+          // the count is a shape fact here, spelled ahead of every function the text carries.
+          "#define NTEX " + std::to_string(plan.leafSlots.size()) + "\n" + declarations + "\n" +
+          geometryFormulas + sources + pieces + "vec4 chainLeafTex[4];\n" + xpGlobals +
           "\nvoid main() {\n"
           "  vec4 result = vec4(0.0);\n"
           "  vec4 clipRegister = vec4(0.0);\n"
@@ -606,9 +651,12 @@ bool AssembleChainVertexGLSL(const ChainBindings& bindings, const std::string& s
   if (code == nullptr || storedVs.empty()) {
     return false;
   }
-  // The stored vertex text is the rect geometry's exact interface (attributes, the vertex block,
-  // the geometry hook); the emit supplies the varying contract: keep a varying line exactly when
-  // the composition reads it, and write those varyings in the chain hook.
+  // The stored vertex text is the variant's exact interface (attributes, the vertex block, the
+  // geometry hook with its own varyings and the leaf-coordinate transforms); the emit supplies the
+  // varying contract: keep a coordinate-varying declaration exactly when the composition reads it,
+  // drop the stored hook's transform assignments (the interpreter's coordinate-source selection
+  // does not apply — the transforms are pre-baked per leaf here), and spell the assignments the
+  // composition's own leaves need ahead of the geometry hook's position write.
   const std::string varyingHead = " out vec3 TransformedCoords_";
   std::string out = {};
   size_t cursor = 0;
@@ -623,6 +671,12 @@ bool AssembleChainVertexGLSL(const ChainBindings& bindings, const std::string& s
         continue;
       }
     } else if (line.rfind(" out vec3 SourceCoords;", 0) == 0 && !bindings.needsSourceCoords) {
+      continue;
+    } else if (line.rfind("  TransformedCoords_", 0) == 0 ||
+               line.rfind("  SourceCoords = ", 0) == 0) {
+      // The stored hook's own transform assignments: their coordinate source (and, on the
+      // resource profiles, the transform numbering) follows the interpreter's contract, so the
+      // emit rewrites every one of them below instead of keeping any.
       continue;
     }
     out += line;
@@ -639,23 +693,20 @@ bool AssembleChainVertexGLSL(const ChainBindings& bindings, const std::string& s
   if (bindings.needsSourceCoords && out.find("out vec3 SourceCoords;") == std::string::npos) {
     // The stored variant carries no source-coordinate varying (a plain profile declares none),
     // but this composition reads one — the YUV source samples through it. The declaration joins
-    // the text at the top level, ahead of the hook that writes it.
-    const auto insertAt = out.find("void Chain_vertex(inout Vertex v) {");
+    // the text at the top level, ahead of the entry point.
+    const auto insertAt = out.find("void main()");
     if (insertAt == std::string::npos) {
       return false;
     }
     out.insert(insertAt, "out vec3 SourceCoords;\n");
   }
-  const auto hookAt = out.find("void Chain_vertex(inout Vertex v) {");
-  if (hookAt == std::string::npos) {
+  // The assignments land in main after the geometry hook (the leaf sources read
+  // Vertex::localCoord) and before the position write.
+  const auto positionAt = out.find("  gl_Position");
+  if (positionAt == std::string::npos) {
     return false;
   }
-  const auto bodyAt = out.find('\n', hookAt) + 1;
-  const auto hookEnd = out.find("}\n", bodyAt);
-  if (hookEnd == std::string::npos) {
-    return false;
-  }
-  out = out.substr(0, bodyAt) + hookBody + out.substr(hookEnd);
+  out.insert(positionAt, hookBody);
   *code = out;
   return true;
 }

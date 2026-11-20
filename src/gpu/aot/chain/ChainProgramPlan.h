@@ -55,6 +55,20 @@ struct ChainBinding {
   const AOTEffectNode* node = nullptr;
 };
 
+/// The per-vertex color varying's suffix: the rect layouts declare it bare (vColor), the
+/// per-pixel geometries with their module prefix (EllipseGeometry_vColor, ...). One constant
+/// serves every matcher of the name, so the spelling has one authority.
+inline constexpr const char* ColorVaryingSuffix = "_vColor";
+
+/// Whether a varying name is the per-vertex color: bare or module-prefixed (see
+/// ColorVaryingSuffix).
+inline bool IsColorVaryingName(const std::string& name) {
+  const std::string suffix = ColorVaryingSuffix;
+  return name == "vColor" ||
+         (name.size() > suffix.size() &&
+          name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0);
+}
+
 /// Which sampler-binding child one declared sampler reads.
 enum class ChainSamplerSource : uint8_t {
   Leaf,
@@ -177,10 +191,38 @@ struct ChainProgramPlan {
   /// The leaves the body samples and the operator set it reaches, both for the pack entries.
   std::set<int> leafSlots = {};
   std::set<int> usedOps = {};
+  /// The variant's geometry index: a per-pixel-coverage geometry (anything but the rect layouts)
+  /// makes the walk declare the geometry's own varyings and ChainColorParams switches, and the
+  /// printer spell the edge-coverage call ahead of the body.
+  uint8_t geometry = 0;
   /// The writer's tables: the fragment bindings in member order, the vertex stage's members, the
   /// samplers, and the varying contract the vertex stage assembles against.
   ChainBindings bindings = {};
 };
+
+/// One argument of a per-pixel geometry coverage call: a varying the plan declares alongside
+/// (prefixed fragment name, the stored variant's own declaration) or a ChainColorParams uniform
+/// the walk registers (with the reader that fills it).
+struct ChainGeometryCoverageArg {
+  const char* name = nullptr;
+  FragmentType type = FragmentType::Float;
+  bool uniform = false;
+  ChainBindingSource source = ChainBindingSource::GeometryStroke;
+};
+
+/// One per-pixel geometry coverage call: the variant's geometry index, the catalog function and
+/// its arguments in call order. One table serves the walk (which declares the members) and the
+/// printer (which spells the call), so the two cannot disagree about a geometry's contract.
+struct ChainGeometryCoverageCall {
+  uint8_t geometry = 0;
+  const char* function = nullptr;
+  const ChainGeometryCoverageArg* args = nullptr;
+  size_t argCount = 0;
+};
+
+/** The per-pixel coverage call of a geometry index, or null when the geometry carries its
+ * coverage through the vCoverage varying instead (the rect layouts). */
+const ChainGeometryCoverageCall* ChainGeometryCoverageOf(uint8_t geometry);
 
 /**
  * Plans the chain program directly from the draw's lowered expression: the node order the layout

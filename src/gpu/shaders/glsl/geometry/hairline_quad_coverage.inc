@@ -4,6 +4,8 @@
 #ifndef TGSL_HAIRLINE_QUAD_COVERAGE_INCLUDED
 #define TGSL_HAIRLINE_QUAD_COVERAGE_INCLUDED
 
+//@function hairlineQuadEdgeCoverage
+
 float hairlineQuadEdgeCoverage(vec4 hairQuadEdge, float coverageScale, int aaEnabled) {
   highp vec2 duvdx = dFdx(hairQuadEdge.xy);
   highp vec2 duvdy = dFdy(hairQuadEdge.xy);

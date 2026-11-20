@@ -4,6 +4,8 @@
 #ifndef TGSL_HAIRLINE_LINE_COVERAGE_INCLUDED
 #define TGSL_HAIRLINE_LINE_COVERAGE_INCLUDED
 
+//@function hairlineLineEdgeCoverage
+
 float hairlineLineEdgeCoverage(float edgeDistance, float coverageScale, int aaEnabled) {
   highp float edgeAlpha = abs(edgeDistance);
   edgeAlpha = clamp(edgeAlpha, 0.0, 1.0);

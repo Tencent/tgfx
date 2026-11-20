@@ -5,6 +5,8 @@
 #ifndef TGSL_ELLIPSE_COVERAGE_INCLUDED
 #define TGSL_ELLIPSE_COVERAGE_INCLUDED
 
+//@function ellipseEdgeCoverage
+
 float ellipseEdgeCoverage(vec2 ellipseOffsets, vec4 ellipseRadii, int strokeEnabled) {
   highp vec2 offset = ellipseOffsets;
   if (strokeEnabled != 0) {

@@ -5,6 +5,8 @@
 #ifndef TGSL_RRECT_COVERAGE_INCLUDED
 #define TGSL_RRECT_COVERAGE_INCLUDED
 
+//@function nonAARRectCoverage
+
 float nonAARRectCoverage(vec2 localCoord, vec4 rectBounds, vec2 radii, vec2 strokeWidth,
                          int strokeEnabled) {
   highp vec2 center = (rectBounds.xy + rectBounds.zw) * 0.5;

@@ -37,13 +37,13 @@ inline constexpr Element ChainAtlasGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float4, "InColor"},
     {Element::Kind::VertexParam, ShaderType::Mat3, "Matrix"},
     {Element::Kind::VertexParam, ShaderType::Int, "CoordSourceMask"},
-    {Element::Kind::Varying, ShaderType::Float4, "vColor"},
+    {Element::Kind::Varying, ShaderType::Float4, "Color"},
     {Element::Kind::Param, ShaderType::Float4, "Color"},
     {Element::Kind::Param, ShaderType::Int, "HasCommonColor"},
 };
 
 inline constexpr Module ChainAtlasGeometry = {
     "ChainAtlasGeometry", ChainAtlasGeometryDims, 1, ChainAtlasGeometryElements, 8, true, true,
-    /*bareNames=*/true};
+    /*bareNames=*/false};
 
 }  // namespace tgfx

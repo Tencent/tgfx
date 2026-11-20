@@ -10,6 +10,6 @@
 #define CHAIN_GEOMETRY_OWNS_COVERAGE 0
 
 void ChainAtlasGeometry_fragment(inout Fragment f) {
-  f.color = (ChainColorParams_HasCommonColor != 0) ? ChainColorParams_Color : vColor;
+  f.color = (ChainColorParams_HasCommonColor != 0) ? ChainColorParams_Color : ChainAtlasGeometry_vColor;
   f.coverage = vec4(1.0);
 }

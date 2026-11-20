@@ -18,10 +18,12 @@
 
 #include "PrecompiledProgramCreator.h"
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <climits>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <vector>
 #include "core/utils/Log.h"
 #include "gpu/ContextInternal.h"
@@ -382,6 +384,17 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
         // instead of serving a payload nothing could upload.
         LOGE("AssembledChain: the plan declined %s[variant=%u]; the draw keeps its runtime path",
              shaderName, variantId);
+        cache->recordFailure(AOTFailure::NoMatchingRule,
+                             MakeFallbackRecord(cache, programInfo, &variant));
+        return nullptr;
+      }
+      if ((assembledVulkan || assembledMetal) && plan.geometry != 0) {
+        // The linking route has not learned the per-pixel geometry coverage formulas yet; the
+        // GLSL printer is the only assembled path that spells them.
+        LOGE(
+            "AssembledChain: the linking route declines %s[variant=%u] geometry %u; the draw "
+            "keeps its runtime path",
+            shaderName, variantId, plan.geometry);
         cache->recordFailure(AOTFailure::NoMatchingRule,
                              MakeFallbackRecord(cache, programInfo, &variant));
         return nullptr;

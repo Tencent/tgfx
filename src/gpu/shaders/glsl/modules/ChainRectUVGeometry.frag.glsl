@@ -11,6 +11,6 @@
 #define CHAIN_GEOMETRY_OWNS_COVERAGE 1
 
 void ChainRectUVGeometry_fragment(inout Fragment f) {
-  f.color = (ChainColorParams_HasCommonColor != 0) ? ChainColorParams_Color : vColor;
-  f.coverage = vec4(vCoverage);
+  f.color = (ChainColorParams_HasCommonColor != 0) ? ChainColorParams_Color : ChainRectUVGeometry_vColor;
+  f.coverage = vec4(ChainRectUVGeometry_vCoverage);
 }

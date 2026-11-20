@@ -210,8 +210,8 @@ inline constexpr Module Chain = {
     2,
     ChainElements,
     static_cast<uint8_t>(sizeof(ChainElements) / sizeof(ChainElements[0])),
-    true,
-    true,
+    /*hasVertex=*/false,
+    /*hasFragment=*/false,
     /*bareNames=*/true,
     /*chainContract=*/true};
 

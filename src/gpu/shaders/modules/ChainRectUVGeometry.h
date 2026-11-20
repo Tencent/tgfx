@@ -40,15 +40,15 @@ inline constexpr Element ChainRectUVGeometryElements[] = {
     {Element::Kind::Attribute, ShaderType::Float4, "InTexSubset", 1, 0, 0x02},
     {Element::Kind::VertexParam, ShaderType::Mat3, "Matrix"},
     {Element::Kind::VertexParam, ShaderType::Int, "CoordSourceMask"},
-    {Element::Kind::Varying, ShaderType::Float, "vCoverage"},
-    {Element::Kind::Varying, ShaderType::Float4, "vColor"},
-    {Element::Kind::Varying, ShaderType::Float4, "vTexSubset", 1, 0, 0x02},
+    {Element::Kind::Varying, ShaderType::Float, "Coverage"},
+    {Element::Kind::Varying, ShaderType::Float4, "Color"},
+    {Element::Kind::Varying, ShaderType::Float4, "TexSubset", 1, 0, 0x02},
     {Element::Kind::Param, ShaderType::Float4, "Color"},
     {Element::Kind::Param, ShaderType::Int, "HasCommonColor"},
 };
 
 inline constexpr Module ChainRectUVGeometry = {
     "ChainRectUVGeometry", ChainRectUVGeometryDims, 1, ChainRectUVGeometryElements, 12, true, true,
-    /*bareNames=*/true};
+    /*bareNames=*/false};
 
 }  // namespace tgfx

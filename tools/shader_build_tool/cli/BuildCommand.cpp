@@ -512,11 +512,8 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       continue;
     }
     const std::string profileTag = ProfileTag(emitterEntry.first);
-    // The packed pieces' `#if` branches, resolved textually into per-fact forms: the driver
-    // rejects `#if` directives in the assembled text, and the forms differ structurally.
-    // The packed pieces' `#if` branches, resolved textually into per-fact forms: the driver
-    // rejects `#if` directives in the assembled text, and the forms differ structurally.
-    auto resolveBranch = [](const std::string& text, const std::string& directive, bool keep) {
+    [[maybe_unused]] auto resolveBranch = [](const std::string& text, const std::string& directive,
+                                             bool keep) {
       const auto begin = text.find(directive);
       if (begin == std::string::npos) {
         return text;
@@ -738,11 +735,6 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
     };
     addEntry(FragmentPackXpDstTexture, "XpDstTexture", readXp(1));
     addEntry(FragmentPackXpFramebufferFetch, "XpFramebufferFetch", readXp(2));
-    const std::string gradientRaw = readExpanded("pipeline/chain/pointwise_gradient.inc");
-    addEntry(FragmentPackGradientLut, "GradientLut",
-             resolveBranch(gradientRaw, "#if NTEX > 0", true));
-    addEntry(FragmentPackGradientSimple, "GradientSimple",
-             resolveBranch(gradientRaw, "#if NTEX > 0", false));
     std::string leafFetchRaw = stripFetchHelpers(readExpanded("entry/ChainLeafFetch.glsl"));
     strippedLeafFetch = leafFetchRaw;
     addEntry(FragmentPackLeafFetchPlain, "LeafFetchPlain", leafFetchRaw);
@@ -1203,47 +1195,9 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         if (!stages) {
           continue;
         }
-        // The pre-composed payloads: for a GL-text chain variant, every manifest shape this
-        // variant hosts is spelled from the exact bytes the bundle stores, so the runtime's
-        // lookup serves a text byte-identical to what its own splice would have produced. The
-        // canonical proxy compile (defines + splice over the unconverted source) fails the build
-        // when the emitter's marshalling drifts, before any payload is stored.
-        if (std::string(family.name) == "Chain" &&
-            stages->payloadKind == BundleFormat::Payload::Text &&
-            (emitterEntry.first == ShaderProfile::OpenGL ||
-             emitterEntry.first == ShaderProfile::OpenGLES) &&
-            !stages->fragmentBlob.empty()) {
-          const uint32_t chainVariantId =
-              VariantIdOf(static_cast<uint16_t>(familyIndex), variant.ordinal);
-          const std::string profileTag = ProfileTag(emitterEntry.first);
-          for (const auto& shape : ComposedShapeManifest()) {
-            const uint8_t xferSlot = static_cast<uint8_t>(2 + family.moduleCount);
-            if (shape.profile != DimValueOf(family, variant, 2, 0) ||
-                shape.geometry != variant.geometry ||
-                DimValueOf(family, variant, xferSlot, 0) < shape.minHasXp) {
-              continue;
-            }
-            const auto idValues = ComposedSpecIdValues(family, variant, shape.composition);
-            // The payload must be the dialect text the bundle stores, not the canonical source:
-            // the canonical form still declares the spec constants as `layout(constant_id)`, and a
-            // prepended #define would rewrite that declaration into invalid code, while the stored
-            // form carries the idempotent macro blocks the runtime's own injection also expects.
-            std::string text(stages->fragmentBlob.begin(), stages->fragmentBlob.end());
-            if (!PrependChainSpecDefinesGLSL(&text, idValues) ||
-                !ComposeChainFragmentGLSL(shape.composition, &text)) {
-              RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
-                               info.name, profileTag, static_cast<int>(variant.ordinal),
-                               static_cast<int>(variant.ordinal),
-                               std::string("the composed shape ") + shape.name + " did not splice");
-              continue;
-            }
-            ComposedPayload payload;
-            payload.name = shape.name;
-            payload.id = ComposedFragmentId(chainVariantId, shape.composition);
-            payload.blob.assign(text.begin(), text.end());
-            report->composedByTag[profileTag].push_back(std::move(payload));
-          }
-        }
+        // The chain family's pre-composed payloads retired with its interpreter text: the runtime
+        // consumer of those payloads is gone (the assembled walk serves every chain draw), so no
+        // splice runs here anymore.
         VariantData variantData;
         variantData.shaderName = info.name;
         variantData.variantId = VariantIdOf(static_cast<uint16_t>(familyIndex), variant.ordinal);
