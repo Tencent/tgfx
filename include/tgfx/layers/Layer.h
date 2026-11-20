@@ -699,7 +699,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
                                           const Matrix3D& relativeMatrix3D);
 
   std::shared_ptr<Image> getContentContourImage(const DrawArgs& args, float contentScale,
-                                                Point* offset, bool* contourMatchesContent);
+                                                Point* offset, bool* contourMatchesContent,
+                                                bool useTightBounds = false);
 
   // Records the layer's geometry, not what it paints: the contour keeps the geometries no paint
   // captured and the painters with alpha=0. The returned source pairs that one recording's raster
