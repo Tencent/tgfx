@@ -21,6 +21,7 @@
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/CaptureCulling.h"
 #include "layers/RootLayer.h"
+#include "layers/SubtreeCache.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
@@ -3163,13 +3164,14 @@ static std::shared_ptr<SolidLayer> AddSelfContainedCard(Layer* root,
   return card;
 }
 
-static void RenderSelfContainedCard(Context* context, RenderMode mode, int cacheSize,
+static void RenderSelfContainedCard(Context* context, RenderMode mode, int cacheSize, float zoom,
                                     std::shared_ptr<Surface>* surfaceOut,
                                     std::shared_ptr<SolidLayer>* cardOut,
                                     std::unique_ptr<DisplayList>* listOut) {
-  auto surface = Surface::Make(context, 240, 200);
+  auto surface = Surface::Make(context, static_cast<int>(240 * zoom), static_cast<int>(200 * zoom));
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(mode);
+  displayList->setZoomScale(zoom);
   displayList->setBackgroundColor(Color::White());
   displayList->setSubtreeCacheMaxSize(cacheSize);
   std::shared_ptr<ShapeLayer> backdrop = nullptr;
@@ -3191,8 +3193,11 @@ static int CountDifferentSurfacePixels(Surface* a, Surface* b, int tolerance, co
   Bitmap bitmapB(b->width(), b->height(), false, false);
   Pixmap pixA(bitmapA);
   Pixmap pixB(bitmapB);
-  a->readPixels(pixA.info(), pixA.writablePixels());
-  b->readPixels(pixB.info(), pixB.writablePixels());
+  if (!a->readPixels(pixA.info(), pixA.writablePixels()) ||
+      !b->readPixels(pixB.info(), pixB.writablePixels())) {
+    ADD_FAILURE() << "Failed to read the surface pixels for the comparison.";
+    return 1000000;
+  }
   int diff = 0;
   for (int y = static_cast<int>(area.top); y < static_cast<int>(area.bottom); ++y) {
     for (int x = static_cast<int>(area.left); x < static_cast<int>(area.right); ++x) {
@@ -3214,28 +3219,37 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, SelfContainedSubtreeCacheMatchesDirect) {
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
     for (auto mode : {RenderMode::Direct, RenderMode::Tiled}) {
-      std::shared_ptr<Surface> cached = nullptr;
-      std::shared_ptr<Surface> direct = nullptr;
-      std::shared_ptr<SolidLayer> cachedCard = nullptr;
-      std::shared_ptr<SolidLayer> directCard = nullptr;
-      std::unique_ptr<DisplayList> cachedList = nullptr;
-      std::unique_ptr<DisplayList> directList = nullptr;
-      RenderSelfContainedCard(context, mode, 2048, &cached, &cachedCard, &cachedList);
-      RenderSelfContainedCard(context, mode, 0, &direct, &directCard, &directList);
-      EXPECT_TRUE(cachedCard->bitFields.backgroundSelfContained);
-      EXPECT_TRUE(cachedCard->canCacheBackgroundSubtree());
-      ASSERT_TRUE(cachedCard->subtreeCache != nullptr);
-      EXPECT_TRUE(directCard->subtreeCache == nullptr);
-      // Inside the chip the cached blur has to match the direct one; the card's edges only differ
-      // by the cache resampling every subtree cache goes through.
-      auto chipArea = Rect::MakeLTRB(83, 73, 157, 107);
-      auto chipDiff = CountDifferentSurfacePixels(cached.get(), direct.get(), 4, chipArea);
-      EXPECT_LE(chipDiff, static_cast<int>(chipArea.area() * 0.01f))
-          << "mode " << static_cast<int>(mode);
-      auto cardArea = Rect::MakeLTRB(36, 36, 210, 170);
-      auto cardDiff = CountDifferentSurfacePixels(cached.get(), direct.get(), 8, cardArea);
-      EXPECT_LE(cardDiff, static_cast<int>(cardArea.area() * 0.04f))
-          << "mode " << static_cast<int>(mode);
+      for (auto zoom : {1.0f, 1.5f}) {
+        std::shared_ptr<Surface> cached = nullptr;
+        std::shared_ptr<Surface> direct = nullptr;
+        std::shared_ptr<SolidLayer> cachedCard = nullptr;
+        std::shared_ptr<SolidLayer> directCard = nullptr;
+        std::unique_ptr<DisplayList> cachedList = nullptr;
+        std::unique_ptr<DisplayList> directList = nullptr;
+        RenderSelfContainedCard(context, mode, 2048, zoom, &cached, &cachedCard, &cachedList);
+        RenderSelfContainedCard(context, mode, 0, zoom, &direct, &directCard, &directList);
+        EXPECT_TRUE(cachedCard->bitFields.backgroundSelfContained);
+        EXPECT_TRUE(cachedCard->canCacheBackgroundSubtree());
+        ASSERT_TRUE(cachedCard->subtreeCache != nullptr);
+        // The object alone proves nothing; the entry at the layer's long edge proves the image was
+        // built, since a failed build falls back to direct drawing with the object still there.
+        auto longEdge = SubtreeCache::LongEdgeFor(2048, zoom, cachedCard->getBounds());
+        EXPECT_TRUE(cachedCard->subtreeCache->hasCache(context, longEdge))
+            << "mode " << static_cast<int>(mode) << " zoom " << zoom;
+        EXPECT_TRUE(directCard->subtreeCache == nullptr);
+        // Inside the chip the cached blur has to match the direct one; the card's edges only differ
+        // by the cache resampling every subtree cache goes through.
+        auto chipArea = Rect::MakeLTRB(83, 73, 157, 107);
+        chipArea.scale(zoom, zoom);
+        auto chipDiff = CountDifferentSurfacePixels(cached.get(), direct.get(), 4, chipArea);
+        EXPECT_LE(chipDiff, static_cast<int>(chipArea.area() * 0.01f))
+            << "mode " << static_cast<int>(mode) << " zoom " << zoom;
+        auto cardArea = Rect::MakeLTRB(36, 36, 210, 170);
+        cardArea.scale(zoom, zoom);
+        auto cardDiff = CountDifferentSurfacePixels(cached.get(), direct.get(), 8, cardArea);
+        EXPECT_LE(cardDiff, static_cast<int>(cardArea.area() * 0.04f))
+            << "mode " << static_cast<int>(mode) << " zoom " << zoom;
+      }
     }
   });
 }

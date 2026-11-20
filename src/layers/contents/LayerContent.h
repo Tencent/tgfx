@@ -24,6 +24,15 @@
 
 namespace tgfx {
 
+// Keeps the larger of two opaque rects. A content that paints several disjoint areas can only name
+// one rect for the coverage test, so taking the largest one is a conservative approximation: it
+// never claims more than what is fully painted.
+inline void KeepLargerOpaqueRect(Rect* largest, const Rect& rect) {
+  if (!rect.isEmpty() && rect.area() > largest->area()) {
+    *largest = rect;
+  }
+}
+
 /**
  * LayerContent is the base class for all drawable layer contents. It provides a unified interface
  * for rendering geometries with their fill styles.

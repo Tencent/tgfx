@@ -31,7 +31,9 @@ class PathContent : public DrawContent {
   Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;
   bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const override;
 
-  Rect getOpaqueRect(bool includeForeground) const override;
+  Rect getOpaqueRect(bool) const override {
+    return opaqueRect;
+  }
 
   Path path = {};
 
@@ -46,6 +48,12 @@ class PathContent : public DrawContent {
 
  private:
   Path getFilledPath() const;
+
+  Rect computeOpaqueRect() const;
+
+  // Recorded content never changes after construction, so the containment probes run once here
+  // instead of on every render bounds update.
+  Rect opaqueRect = {};
 };
 
 }  // namespace tgfx

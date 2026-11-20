@@ -734,6 +734,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
   // content and children as of the last render bounds update.
   bool isSubtreeOpaque() const;
 
+  // Whether the layer's own compositing leaves its subtree translucent: a non-SrcOver blend,
+  // filters, or a mask that attenuates the pixels instead of clipping them.
+  bool breaksOpaqueCoverage() const;
+
   // Whether the style still samples the background when the given alpha reaches the layer. False
   // when every pixel it would draw is already hidden: the style paints only inside the input it
   // draws, and that input — the layer's content with its descendants — paints opaquely wherever it
@@ -798,12 +802,15 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool staticSubtree : 1;  // Whether the subtree (content, children, filters, styles) is static.
     // Whether every background-sourced style in the subtree samples only content the subtree draws.
     bool backgroundSelfContained : 1;
-    // Whether an uncovered background sample of the subtree crosses an offscreen composition, which
-    // keeps every ancestor from containing it.
+    // Whether an uncovered background sample of the subtree crosses an offscreen composite or a
+    // non-affine transform, both of which keep every ancestor from containing it.
     bool backgroundCoverageBlocked : 1;
     // Whether any layer in this subtree draws a background-sourced style. Lets a subtree without
     // one skip the background coverage bookkeeping entirely.
     bool subtreeSamplesBackground : 1;
+    // Whether the last coverage pass was told an ancestor samples the background. A flip forces the
+    // subtree to recompute the opaque bounds it contributes, which nothing else dirties.
+    bool ancestorSamplesBackground : 1;
     // Whether the layer's own content paints only fully opaque pixels.
     bool contentOpaque : 1;
     // Whether every visible child that is not a mask owner passes isSubtreeOpaque().
