@@ -57,7 +57,8 @@ class Layer3DContext : public std::enable_shared_from_this<Layer3DContext> {
    */
   static std::shared_ptr<Layer3DContext> Make(bool opaqueMode, Context* context,
                                               const Rect& renderRect, float contentScale,
-                                              std::shared_ptr<ColorSpace> colorSpace);
+                                              std::shared_ptr<ColorSpace> colorSpace,
+                                              const std::vector<Rect>* styleSourceRects = nullptr);
 
   Layer3DContext(const Rect& renderRect, float contentScale,
                  std::shared_ptr<ColorSpace> colorSpace);
