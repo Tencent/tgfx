@@ -24,6 +24,7 @@
 #include "core/codecs/png/PngCodec.h"
 #include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
@@ -538,6 +539,19 @@ int SVGParse::FindList(const char target[], const char list[]) {
     index += 1;
   }
   return -1;
+}
+
+bool IsUniformPositiveScaleTranslate(const Matrix& matrix) {
+  if (!matrix.isFinite() || !matrix.isScaleTranslate()) {
+    return false;
+  }
+  auto scaleX = matrix.getScaleX();
+  auto scaleY = matrix.getScaleY();
+  return scaleX > 0.0f && scaleY > 0.0f && FloatNearlyEqual(scaleX, scaleY);
+}
+
+float GetUniformPositiveScale(const Matrix& matrix) {
+  return matrix.getScaleX();
 }
 
 }  // namespace tgfx

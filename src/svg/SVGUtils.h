@@ -48,6 +48,10 @@ std::string ToSVGJoin(LineJoin join);
 
 std::string ToSVGBlendMode(BlendMode mode);
 
+bool IsUniformPositiveScaleTranslate(const Matrix& matrix);
+
+float GetUniformPositiveScale(const Matrix& matrix);
+
 /**
  * Retain 4 decimal places and remove trailing zeros.
  */

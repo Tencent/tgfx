@@ -18,6 +18,9 @@
 
 #include "ElementWriter.h"
 #include <cmath>
+#include <iomanip>
+#include <limits>
+#include <sstream>
 #include "SVGExportContext.h"
 #include "SVGUtils.h"
 #include "core/codecs/jpeg/JpegCodec.h"
@@ -28,6 +31,7 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/LumaColorFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
+#include "core/filters/TextureImageFilter.h"
 #include "core/shaders/ColorFilterShader.h"
 #include "core/shaders/PerlinNoiseShader.h"
 #include "core/utils/ColorHelper.h"
@@ -35,6 +39,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/ShaderUtils.h"
+#include "core/utils/TextureGrainNoise.h"
 #include "core/utils/Types.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/ColorFilter.h"
@@ -50,6 +55,98 @@
 #include "tgfx/svg/SVGPathParser.h"
 
 namespace tgfx {
+
+namespace {
+
+uint32_t ToSVGTextureSeed(uint32_t seed) {
+  seed ^= seed >> 16;
+  seed *= 0x7feb352dU;
+  seed ^= seed >> 15;
+  seed *= 0x846ca68bU;
+  seed ^= seed >> 16;
+  return 1U + seed % 16777215U;
+}
+
+const std::string& TextureClipAlphaTable() {
+  static const std::string table = [] {
+    std::string result = "0";
+    result.reserve(512);
+    for (int index = 1; index < 255; index++) {
+      result += " 1";
+    }
+    return result;
+  }();
+  return table;
+}
+
+std::string TextureFrequencyToString(float value) {
+  auto result = FloatToString(value);
+  if (result != "0") {
+    return result;
+  }
+  // Preserve positives that the standard four-decimal SVG format would erase.
+  std::ostringstream stream;
+  stream << std::setprecision(std::numeric_limits<float>::max_digits10) << value;
+  return stream.str();
+}
+
+void WriteTextureImageFilter(XMLWriter* writer, const TextureImageFilter* filter,
+                             const Rect& sourceBounds, float userScale) {
+  const auto& params = filter->getParams();
+  auto totalScale = params.pixelsPerLocalUnit * userScale;
+  auto baseFrequencyX = params.frequencyX / totalScale;
+  auto baseFrequencyY = params.frequencyY / totalScale;
+  auto displacementScale = 2.0f * std::abs(params.radius) * totalScale;
+  if (IsTextureGrainIdentity(params, sourceBounds) || !std::isfinite(totalScale) ||
+      totalScale <= 0.0f || baseFrequencyX <= 0.0f || baseFrequencyY <= 0.0f ||
+      !std::isfinite(baseFrequencyX) || !std::isfinite(baseFrequencyY) ||
+      !std::isfinite(displacementScale)) {
+    ElementWriter identityElement("feOffset", writer);
+    identityElement.addAttribute("in", "SourceGraphic");
+    identityElement.addAttribute("dx", 0);
+    identityElement.addAttribute("dy", 0);
+    return;
+  }
+  {
+    ElementWriter turbulenceElement("feTurbulence", writer);
+    turbulenceElement.addAttribute("type", "fractalNoise");
+    turbulenceElement.addAttribute("baseFrequency", TextureFrequencyToString(baseFrequencyX) + " " +
+                                                        TextureFrequencyToString(baseFrequencyY));
+    turbulenceElement.addAttribute("numOctaves", TextureGrainOctaveCount);
+    turbulenceElement.addAttribute("seed", std::to_string(ToSVGTextureSeed(params.seed)));
+    turbulenceElement.addAttribute("data-pagx-seed", std::to_string(params.seed));
+    turbulenceElement.addAttribute("data-pagx-size-x", FloatToString(1.0f / params.frequencyX));
+    turbulenceElement.addAttribute("data-pagx-size-y", FloatToString(1.0f / params.frequencyY));
+    turbulenceElement.addAttribute("data-pagx-clip-to-shape",
+                                   params.clipToShape ? "true" : "false");
+    turbulenceElement.addAttribute("result", "textureNoise");
+  }
+  {
+    ElementWriter displacementElement("feDisplacementMap", writer);
+    displacementElement.addAttribute("in", "SourceGraphic");
+    displacementElement.addAttribute("in2", "textureNoise");
+    displacementElement.addAttribute("scale", displacementScale);
+    displacementElement.addAttribute("xChannelSelector", "R");
+    displacementElement.addAttribute("yChannelSelector", "G");
+    displacementElement.addAttribute("result", "textureDisplaced");
+  }
+  if (params.clipToShape) {
+    {
+      ElementWriter transferElement("feComponentTransfer", writer);
+      transferElement.addAttribute("in", "textureDisplaced");
+      transferElement.addAttribute("result", "textureValidColor");
+      ElementWriter alphaElement("feFuncA", writer);
+      alphaElement.addAttribute("type", "discrete");
+      alphaElement.addAttribute("tableValues", TextureClipAlphaTable());
+    }
+    ElementWriter clipElement("feComposite", writer);
+    clipElement.addAttribute("in", "textureValidColor");
+    clipElement.addAttribute("in2", "SourceGraphic");
+    clipElement.addAttribute("operator", "atop");
+  }
+}
+
+}  // namespace
 
 Resources::Resources(const Color& color) {
   colorValue = color;
@@ -330,7 +427,8 @@ bool ElementWriter::writeFilterPrimitives(const std::shared_ptr<ImageFilter>& im
                                           const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                           const std::optional<Rect>& bound, Context* context,
                                           bool preserveSoftAlpha,
-                                          std::vector<PendingImage>* pendings) {
+                                          std::vector<PendingImage>* pendings,
+                                          float textureUserScale) {
   auto type = Types::Get(imageFilter.get());
   switch (type) {
     case Types::ImageFilterType::Blur: {
@@ -356,6 +454,12 @@ bool ElementWriter::writeFilterPrimitives(const std::shared_ptr<ImageFilter>& im
       addColorImageFilter(colorFilter);
       break;
     }
+    case Types::ImageFilterType::Texture: {
+      const auto textureFilter = static_cast<const TextureImageFilter*>(imageFilter.get());
+      WriteTextureImageFilter(writer, textureFilter, bound.value_or(Rect::MakeEmpty()),
+                              textureUserScale);
+      break;
+    }
     case Types::ImageFilterType::Blend: {
       const auto blendFilter = static_cast<const BlendImageFilter*>(imageFilter.get());
       addBlendImageFilter(blendFilter, "", bound ? &*bound : nullptr, context, pendings);
@@ -372,7 +476,8 @@ std::string ElementWriter::emitFilterElement(const std::shared_ptr<ImageFilter>&
                                              const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                              Context* context, bool preserveSoftAlpha,
                                              const std::optional<Rect>& bound,
-                                             std::vector<PendingImage>* pendings) {
+                                             std::vector<PendingImage>* pendings,
+                                             float textureUserScale) {
   std::string filterID = resourceStore->addFilter();
   ElementWriter filterElement("filter", writer);
   filterElement.addAttribute("id", filterID);
@@ -393,7 +498,7 @@ std::string ElementWriter::emitFilterElement(const std::shared_ptr<ImageFilter>&
     filterElement.addAttribute("filterUnits", "userSpaceOnUse");
   }
   if (!writeFilterPrimitives(imageFilter, filterElement, exportWriter, bound, context,
-                             preserveSoftAlpha, pendings)) {
+                             preserveSoftAlpha, pendings, textureUserScale)) {
     return "";
   }
   return filterID;
@@ -463,7 +568,10 @@ std::string ElementWriter::addImageFilter(const std::shared_ptr<ImageFilter>& im
                                           Context* context, std::vector<PendingImage>* pendings) {
   auto filteredBound = matrix.mapRect(imageFilter->filterBounds(bound));
   auto userSpaceFilter = MapFilterToUserSpace(imageFilter, matrix);
-  return emitFilterElement(userSpaceFilter, exportWriter, context, false, filteredBound, pendings);
+  auto textureUserScale =
+      IsUniformPositiveScaleTranslate(matrix) ? GetUniformPositiveScale(matrix) : 1.0f;
+  return emitFilterElement(userSpaceFilter, exportWriter, context, false, filteredBound, pendings,
+                           textureUserScale);
 }
 
 std::vector<std::string> ElementWriter::addImageFilterChain(
@@ -480,11 +588,13 @@ std::vector<std::string> ElementWriter::addImageFilterChain(
     // In SVG, nested <g filter="..."> achieves exactly this: each layer's SourceGraphic/SourceAlpha
     // is the output of the inner layer's filter. This matches the GPU's serial FilterImage chain.
     auto composeBound = matrix.mapRect(imageFilter->filterBounds(bound));
+    auto textureUserScale =
+        IsUniformPositiveScaleTranslate(matrix) ? GetUniformPositiveScale(matrix) : 1.0f;
     std::vector<std::string> filterIDs;
     for (const auto& filterItem : composeFilter->filters) {
       auto userSpaceFilter = MapFilterToUserSpace(filterItem, matrix);
-      filterIDs.push_back(
-          emitFilterElement(userSpaceFilter, exportWriter, context, true, composeBound, pendings));
+      filterIDs.push_back(emitFilterElement(userSpaceFilter, exportWriter, context, true,
+                                            composeBound, pendings, textureUserScale));
     }
     return filterIDs;
   }

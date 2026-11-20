@@ -66,6 +66,8 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
   // extensions) so geometry-anchored filters such as NoiseFilter recover the layer-local anchor
   // regardless of how the input image is clipped relative to the full content bounds.
   auto inputContentBounds = layer->mapContentBoundsToImage(density.getMaxScale(), imageClip);
+  auto contentOrigin =
+      Point::Make(imageClip.left + inputContentBounds.left, imageClip.top + inputContentBounds.top);
   inputContentBounds.offset(-(inputContentBounds.left + imageClip.left),
                             -(inputContentBounds.top + imageClip.top));
 
@@ -90,9 +92,12 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
   if (result.image == nullptr || !hasFilter) {
     return result;
   }
+  auto imageTopLeft = result.imageMatrix.mapXY(0.0f, 0.0f);
+  Point imageOrigin = {imageTopLeft.x - contentOrigin.x / density.getMaxScale(),
+                       imageTopLeft.y - contentOrigin.y / density.getMaxScale()};
   Point filterOffset = {};
   result.image = layer->applyFilters(std::move(result.image), density.getMaxScale(),
-                                     inputContentBounds, &filterOffset);
+                                     inputContentBounds, imageOrigin, &filterOffset);
   if (result.image == nullptr) {
     return {};
   }

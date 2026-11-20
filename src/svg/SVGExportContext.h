@@ -142,6 +142,9 @@ class SVGExportContext : public DrawContext {
 
   void exportPixmap(const Pixmap& pixmap, const Matrix& matrix, const Brush& brush);
 
+  bool exportImageAsRaster(const std::shared_ptr<Image>& image, const Matrix& matrix,
+                           const ClipStack& clip, const Brush& brush);
+
   /**
    * Emits the same structure as exportPixmap, with the data URI replaced by a pending image token.
    */

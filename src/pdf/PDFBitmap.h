@@ -27,6 +27,12 @@ namespace tgfx {
 class PDFBitmap {
  public:
   /**
+   * Returns whether the image can be rasterized into a PDF image XObject on the document's
+   * context. This is a preflight check; the caller must still handle asynchronous readback failure.
+   */
+  static bool CanSerialize(const std::shared_ptr<Image>& image, Context* context);
+
+  /**
    * Serialize a image as an Image Xobject. quality > 100 means lossless
    */
   static PDFIndirectReference Serialize(const std::shared_ptr<Image>& image,
