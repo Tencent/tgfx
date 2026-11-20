@@ -51,10 +51,12 @@ class DrawContent : public GeometryContent {
   bool isFullyOpaque() const override;
 
   /**
-   * Returns whether the entry fills its geometry with opaque pixels: an opaque color or opaque
-   * shader, no stroke, drawn with SrcOver.
+   * Returns whether the entry paints the interior of its geometry with opaque pixels: an opaque
+   * color or opaque shader, no stroke, drawn with SrcOver. Unlike isFullyOpaque(), which describes
+   * every pixel the entry paints, this describes the area inside the geometry, so a stroke
+   * disqualifies it: it paints on both sides of the outline, including the interior side.
    */
-  bool isOpaqueFill() const;
+  bool paintsOpaqueInterior() const;
 
   const BlendMode& getBlendMode() const {
     return blendMode;

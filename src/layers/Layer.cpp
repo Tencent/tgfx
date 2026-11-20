@@ -65,9 +65,6 @@ static bool NeedsContourSource(uint32_t sourceFlags) {
   return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour);
 }
 
-// The minimum size (longest edge) for subtree cache. This prevents creating excessively small
-// mipmap levels that would be inefficient to cache.
-static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
 
@@ -157,23 +154,6 @@ static void ComputeDirtyNodesForReordering(const std::vector<Layer*>& retainedCh
       nodesToMarkDirty->push_back(retainedChildren[i]);
     }
   }
-}
-
-static int GetMipmapCacheLongEdge(int maxSize, float contentScale, const Rect& layerBounds) {
-  auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
-  auto scaleBoundsSize = FloatRoundToInt(maxBoundsSize * contentScale);
-  if (scaleBoundsSize > maxSize) {
-    return scaleBoundsSize;
-  }
-  if (SUBTREE_CACHE_MIN_SIZE >= maxSize) {
-    return maxSize;
-  }
-  auto targetSize = std::max(scaleBoundsSize, SUBTREE_CACHE_MIN_SIZE);
-  auto currentLongEdge = maxSize;
-  while ((currentLongEdge >> 1) >= targetSize) {
-    currentLongEdge >>= 1;
-  }
-  return currentLongEdge;
 }
 
 /**
@@ -1417,10 +1397,11 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, float 
     if (subtreeCache->maxSize() != args.subtreeCacheMaxSize) {
       subtreeCache = std::make_unique<SubtreeCache>(args.subtreeCacheMaxSize);
     }
-    // The cached image holds only the styles that were visible when it was recorded. A fade lowers
-    // the alpha that reaches the subtree, which brings back a background style that opaque content
-    // used to hide, so such a frame cannot be served from the cache.
-    if (alpha < 1.0f && hasBackgroundStyle(alpha)) {
+    // The cached image holds only the styles that were visible when it was recorded, and a
+    // background capture is only valid while the subtree keeps sampling its own content. A fade
+    // lowers the alpha that reaches the subtree, which brings back a style that opaque content used
+    // to hide, so neither case can be served from the cache.
+    if (hasBackgroundStyle(alpha) && (alpha < 1.0f || !canCacheBackgroundSubtree())) {
       return false;
     }
     return true;
@@ -1511,7 +1492,11 @@ std::shared_ptr<Image> Layer::createBackgroundSubtreeCacheImage(const DrawArgs& 
                                                                 float contentScale,
                                                                 const Rect& imageBounds,
                                                                 Matrix* drawingMatrix) {
-  DEBUG_ASSERT(canCacheBackgroundSubtree());
+  // The subtree may have changed into one that samples the backdrop outside itself since the cache
+  // was accepted; bail out so the frame draws directly instead of caching a wrong capture.
+  if (!canCacheBackgroundSubtree()) {
+    return nullptr;
+  }
   if (args.context == nullptr) {
     return nullptr;
   }
@@ -1590,7 +1575,7 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
   DEBUG_ASSERT(!canPreserve3D());
   auto layerBounds = getBounds();
   auto contentScale = canvas->getMatrix().getMaxScale();
-  auto longEdge = GetMipmapCacheLongEdge(args.subtreeCacheMaxSize, contentScale, layerBounds);
+  auto longEdge = SubtreeCache::LongEdgeFor(args.subtreeCacheMaxSize, contentScale, layerBounds);
   auto cache = getValidSubtreeCache(args, longEdge, layerBounds);
   if (cache == nullptr) {
     return false;
@@ -2202,7 +2187,12 @@ bool Layer::hasValidMask() const {
 void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty,
                                float alpha, bool ancestorSamplesBackground) {
   const auto accumulatedAlpha = alpha * _alpha;
-  if (!forceDirty && !bitFields.dirtyDescendents) {
+  // A flip in what the ancestors consume changes this layer's coverage contribution without
+  // dirtying it, so it has to reopen the recompute.
+  const bool coverageInputChanged =
+      bitFields.ancestorSamplesBackground != ancestorSamplesBackground;
+  bitFields.ancestorSamplesBackground = ancestorSamplesBackground;
+  if (!forceDirty && !bitFields.dirtyDescendents && !coverageInputChanged) {
     if (maxBackgroundOutset > 0 || bitFields.hasBlendMode) {
       propagateLayerState();
       if (_root->hasDirtyRegions()) {
@@ -2457,15 +2447,19 @@ bool Layer::hasDescendantBackgroundStyle(float alpha) {
   return false;
 }
 
-bool Layer::isSubtreeOpaque() const {
+bool Layer::breaksOpaqueCoverage() const {
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   // A contour mask clips with a path, while the other mask types can fall back to a per-pixel mask
   // filter that attenuates the subtree and lets a background style show through.
   const bool maskAttenuates = hasValidMask() && maskType != LayerMaskType::Contour;
+  return static_cast<BlendMode>(bitFields.blendMode) != BlendMode::SrcOver || !_filters.empty() ||
+         maskAttenuates;
+}
+
+bool Layer::isSubtreeOpaque() const {
   // A layer style can paint past its content (a drop shadow, a blur), so the subtree does not
   // cover what sits below it there.
-  return _alpha >= 1.0f && static_cast<BlendMode>(bitFields.blendMode) == BlendMode::SrcOver &&
-         _filters.empty() && _layerStyles.empty() && !maskAttenuates && !canPreserve3D() &&
+  return _alpha >= 1.0f && !breaksOpaqueCoverage() && _layerStyles.empty() && !canPreserve3D() &&
          bitFields.contentOpaque && bitFields.childrenOpaque;
 }
 
@@ -2503,15 +2497,12 @@ static bool IsCoveredBy(const Rect& rect, const std::vector<Rect>& covers) {
   return false;
 }
 
-static void KeepLarger(Rect* largest, const Rect& rect) {
-  if (!rect.isEmpty() && rect.area() > largest->area()) {
-    *largest = rect;
-  }
-}
-
 void Layer::updateBackgroundCoverage(float alpha, bool ancestorSamplesBackground) {
   // Bounds a long list keeps growing with: merging into one rect only makes the test stricter.
   static constexpr size_t MaxUncoveredRects = 16;
+  // Everything the layer and its children draw is scaled by the accumulated alpha, so a value under
+  // one leaves them translucent and they cover nothing for an ancestor.
+  const bool coversOpaquely = alpha >= 1.0f;
   uncoveredBackgroundRects.clear();
   opaqueBounds.setEmpty();
   auto content = getContent();
@@ -2538,7 +2529,7 @@ void Layer::updateBackgroundCoverage(float alpha, bool ancestorSamplesBackground
   }
   // Covers, in local coordinates, of what is drawn before the next child.
   std::vector<Rect> covers = {};
-  if (content) {
+  if (content && coversOpaquely) {
     auto ownOpaque = content->getOpaqueRect(false);
     if (!ownOpaque.isEmpty()) {
       covers.push_back(ownOpaque);
@@ -2561,7 +2552,8 @@ void Layer::updateBackgroundCoverage(float alpha, bool ancestorSamplesBackground
           uncoveredBackgroundRects.push_back(mapped);
         }
       }
-      if (!child->opaqueBounds.isEmpty() && childMatrix.rectStaysRect()) {
+      if (coversOpaquely && child->_alpha >= 1.0f && !child->opaqueBounds.isEmpty() &&
+          childMatrix.rectStaysRect()) {
         auto childOpaque = child->opaqueBounds;
         if (child->_scrollRect == nullptr || childOpaque.intersect(*child->_scrollRect)) {
           covers.push_back(childMatrix.mapRect(childOpaque));
@@ -2569,15 +2561,10 @@ void Layer::updateBackgroundCoverage(float alpha, bool ancestorSamplesBackground
       }
     }
   }
-  // An alpha or contour mask resolves to a clip path, which leaves the backdrop in place; the other
-  // mask types composite the subtree offscreen.
-  auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
-  const bool maskComposesOffscreen =
-      hasValidMask() && maskType != LayerMaskType::Alpha && maskType != LayerMaskType::Contour;
-  const bool composesOffscreen =
-      (_alpha < 1.0f && bitFields.allowsGroupOpacity) ||
-      static_cast<BlendMode>(bitFields.blendMode) != BlendMode::SrcOver || !_filters.empty() ||
-      maskComposesOffscreen || !bitFields.passThroughBackground;
+  // A group alpha below one, an offscreen composite or a mask that attenuates instead of clipping
+  // all break the coverage the subtree gives its ancestors.
+  const bool composesOffscreen = (_alpha < 1.0f && bitFields.allowsGroupOpacity) ||
+                                 breaksOpaqueCoverage() || !bitFields.passThroughBackground;
   if (composesOffscreen && !uncoveredBackgroundRects.empty()) {
     blocked = true;
   }
@@ -2588,13 +2575,12 @@ void Layer::updateBackgroundCoverage(float alpha, bool ancestorSamplesBackground
     }
     uncoveredBackgroundRects.assign(1, unionRect);
   }
-  if (_alpha >= 1.0f && static_cast<BlendMode>(bitFields.blendMode) == BlendMode::SrcOver &&
-      _filters.empty() && !hasValidMask()) {
+  if (coversOpaquely && !breaksOpaqueCoverage() && !hasValidMask()) {
     for (const auto& cover : covers) {
-      KeepLarger(&opaqueBounds, cover);
+      KeepLargerOpaqueRect(&opaqueBounds, cover);
     }
     if (content) {
-      KeepLarger(&opaqueBounds, content->getOpaqueRect(true));
+      KeepLargerOpaqueRect(&opaqueBounds, content->getOpaqueRect(true));
     }
   }
   bitFields.backgroundCoverageBlocked = blocked;

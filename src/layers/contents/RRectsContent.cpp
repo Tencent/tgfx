@@ -60,15 +60,12 @@ bool RRectsContent::hitTestPoint(float localX, float localY, bool includeUnpaint
 }
 
 Rect RRectsContent::getOpaqueRect(bool) const {
-  if (!isOpaqueFill()) {
+  if (!paintsOpaqueInterior()) {
     return Rect::MakeEmpty();
   }
   auto largest = Rect::MakeEmpty();
   for (const auto& rRect : rRects) {
-    auto inner = InnerRect(rRect);
-    if (inner.area() > largest.area()) {
-      largest = inner;
-    }
+    KeepLargerOpaqueRect(&largest, InnerRect(rRect));
   }
   return largest;
 }

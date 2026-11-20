@@ -93,10 +93,7 @@ Rect ComposeContent::getOpaqueRect(bool includeForeground) const {
   auto count = includeForeground ? contents.size() : foregroundStartIndex;
   auto largest = Rect::MakeEmpty();
   for (size_t i = 0; i < count; ++i) {
-    auto rect = contents[i]->getOpaqueRect(includeForeground);
-    if (rect.area() > largest.area()) {
-      largest = rect;
-    }
+    KeepLargerOpaqueRect(&largest, contents[i]->getOpaqueRect(includeForeground));
   }
   return largest;
 }

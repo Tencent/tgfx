@@ -113,7 +113,7 @@ bool DrawContent::isFullyOpaque() const {
   return shader == nullptr || shader->isOpaque();
 }
 
-bool DrawContent::isOpaqueFill() const {
+bool DrawContent::paintsOpaqueInterior() const {
   if (!color.has_value() || color->alpha < 1.0f || stroke != nullptr ||
       blendMode != BlendMode::SrcOver) {
     return false;

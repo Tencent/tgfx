@@ -18,10 +18,32 @@
 
 #include "SubtreeCache.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/ProxyProvider.h"
 #include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
+
+// The minimum size (longest edge) for subtree cache. This prevents creating excessively small
+// mipmap levels that would be inefficient to cache.
+static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
+
+int SubtreeCache::LongEdgeFor(int maxSize, float contentScale, const Rect& layerBounds) {
+  auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
+  auto scaleBoundsSize = FloatRoundToInt(maxBoundsSize * contentScale);
+  if (scaleBoundsSize > maxSize) {
+    return scaleBoundsSize;
+  }
+  if (SUBTREE_CACHE_MIN_SIZE >= maxSize) {
+    return maxSize;
+  }
+  auto targetSize = std::max(scaleBoundsSize, SUBTREE_CACHE_MIN_SIZE);
+  auto currentLongEdge = maxSize;
+  while ((currentLongEdge >> 1) >= targetSize) {
+    currentLongEdge >>= 1;
+  }
+  return currentLongEdge;
+}
 
 UniqueKey SubtreeCache::makeSizeKey(int longEdge) const {
   uint32_t sizeData[1] = {static_cast<uint32_t>(longEdge)};

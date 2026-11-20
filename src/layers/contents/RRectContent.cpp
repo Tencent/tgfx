@@ -45,7 +45,7 @@ bool RRectContent::hitTestPoint(float localX, float localY, bool includeUnpainte
 }
 
 Rect RRectContent::getOpaqueRect(bool) const {
-  return isOpaqueFill() ? InnerRect(rRect) : Rect::MakeEmpty();
+  return paintsOpaqueInterior() ? InnerRect(rRect) : Rect::MakeEmpty();
 }
 
 Rect RRectContent::onGetBounds() const {

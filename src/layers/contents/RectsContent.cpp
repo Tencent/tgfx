@@ -66,14 +66,12 @@ bool RectsContent::hitTestPoint(float localX, float localY, bool includeUnpainte
 }
 
 Rect RectsContent::getOpaqueRect(bool) const {
-  if (!isOpaqueFill()) {
+  if (!paintsOpaqueInterior()) {
     return Rect::MakeEmpty();
   }
   auto largest = Rect::MakeEmpty();
   for (const auto& rect : rects) {
-    if (rect.area() > largest.area()) {
-      largest = rect;
-    }
+    KeepLargerOpaqueRect(&largest, rect);
   }
   return largest;
 }
