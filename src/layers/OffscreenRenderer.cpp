@@ -37,12 +37,10 @@ std::shared_ptr<Image> SnapshotOf(Canvas* canvas) {
 
 void SeedBackdrop(Canvas* canvas, const std::shared_ptr<Image>& backdrop, const Rect& surfaceRect) {
   canvas->save();
-  canvas->setMatrix(Matrix::I());
-  Paint paint = {};
-  canvas->drawImageRect(backdrop, surfaceRect,
-                        Rect::MakeWH(surfaceRect.width(), surfaceRect.height()),
-                        SamplingOptions(FilterMode::Nearest, MipmapMode::None), &paint,
-                        SrcRectConstraint::Strict);
+  canvas->resetMatrix();
+  canvas->drawImageRect(
+      backdrop, surfaceRect, Rect::MakeWH(surfaceRect.width(), surfaceRect.height()),
+      SamplingOptions(FilterMode::Nearest, MipmapMode::None), nullptr, SrcRectConstraint::Strict);
   canvas->restore();
 }
 
