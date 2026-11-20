@@ -33,8 +33,6 @@ class MergeShape : public UniqueKeyShape {
 
   PathFillType fillType() const override;
 
-  bool isInverseFillType() const override;
-
   Rect onGetBounds() const override;
 
   std::shared_ptr<Shape> first = nullptr;
@@ -49,6 +47,6 @@ class MergeShape : public UniqueKeyShape {
   Path onGetPath(float resolutionScale) const override;
 
  private:
-  bool unionConcatenates() const;
+  bool unionConcatenates(const Path& firstPath, const Path& secondPath) const;
 };
 }  // namespace tgfx

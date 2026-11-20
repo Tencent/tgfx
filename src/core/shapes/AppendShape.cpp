@@ -62,6 +62,8 @@ std::shared_ptr<Shape> AppendShape::MakeFrom(std::shared_ptr<Shape> first,
   return std::shared_ptr<AppendShape>(new AppendShape(std::move(shapes)));
 }
 
+// fillType() reads the first nonempty or inverse outline, and the inherited isInverseFillType()
+// derives its flag from that rule, so both queries agree with the path handed out.
 PathFillType AppendShape::fillType() const {
   auto rule = PathFillType::Winding;
   for (const auto& shape : shapes) {
@@ -73,11 +75,6 @@ PathFillType AppendShape::fillType() const {
     }
   }
   return rule;
-}
-
-// The appended rule comes from the first nonempty or inverse outline, which fillType() reads.
-bool AppendShape::isInverseFillType() const {
-  return Shape::isInverseFillType();
 }
 
 Rect AppendShape::onGetBounds() const {

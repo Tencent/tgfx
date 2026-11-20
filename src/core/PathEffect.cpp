@@ -39,7 +39,11 @@ class SkPathEffectWrapper : public PathEffect {
       return false;
     }
     PathRef::WriteAccess(*path) = result;
-    path->setFillType(fillType);
+    // Effects rewrite the outline, so the input rule only carries over when it does not flip the
+    // filled area: applying an inverse rule to dash contours would draw the plane minus the dashes.
+    if (fillType != PathFillType::InverseWinding && fillType != PathFillType::InverseEvenOdd) {
+      path->setFillType(fillType);
+    }
     return true;
   }
 

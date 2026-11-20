@@ -20,6 +20,7 @@
 #include "core/PathRef.h"
 #include "core/shapes/AppendShape.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_ptr<Shape> second,
@@ -39,39 +40,42 @@ std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_pt
   return std::make_shared<MergeShape>(std::move(first), std::move(second), pathOp);
 }
 
-bool MergeShape::unionConcatenates() const {
+bool MergeShape::unionConcatenates(const Path& firstPath, const Path& secondPath) const {
   if (pathOp != PathOp::Union) {
     return false;
   }
-  // A text run reports its em box, which overlaps neighbours whose outlines do not, so both
-  // fillType() and onGetPath() decide from the reported bounds: deciding from tighter outline
-  // bounds here would concatenate where fillType() promised a boolean result. Reported rules are
-  // not reliable either, so the outlines have to confirm them before any concatenation.
+  // A text run reports its em box, which overlaps neighbours whose outlines do not, so the fast
+  // path is decided from the reported bounds. A Shape can also report a rule that differs from its
+  // outline, and an outline grown by a non-unit resolution scale can reach a neighbour that the
+  // scale=1 outline misses, so the two outlines actually being combined must confirm the rules
+  // and disjointness before concatenation.
   auto firstType = first->fillType();
   auto secondType = second->fillType();
   if (!PathRef::UnionsByConcatenation(firstType, first->getBounds(), secondType,
                                       second->getBounds())) {
     return false;
   }
-  auto firstPath = first->getPath();
-  auto secondPath = second->getPath();
   return firstPath.getFillType() == firstType && secondPath.getFillType() == secondType &&
          PathRef::UnionsByConcatenation(firstPath.getFillType(), firstPath.getBounds(),
                                         secondPath.getFillType(), secondPath.getBounds());
 }
 
+// fillType() and the base isInverseFillType() both describe the rule of the outline handed out, so
+// the inverse flag needs no separate override here.
 PathFillType MergeShape::fillType() const {
   if (pathOp == PathOp::Append || pathOp == PathOp::Extend) {
     return getPath().getFillType();
   }
-  if (unionConcatenates()) {
+  auto firstPath = first->getPath();
+  auto secondPath = second->getPath();
+  if (unionConcatenates(firstPath, secondPath)) {
     // Concatenation keeps the first operand's outline unchanged, including its rule.
-    return first->getPath().getFillType();
+    return firstPath.getFillType();
   }
   // A boolean operation resolves both operands under the rules of the outlines it receives and
   // writes an even-odd result, inverse only when the area outside that result stays filled.
-  auto firstInverse = first->getPath().isInverseFillType();
-  auto secondInverse = second->getPath().isInverseFillType();
+  auto firstInverse = firstPath.isInverseFillType();
+  auto secondInverse = secondPath.isInverseFillType();
   bool inverse = false;
   switch (pathOp) {
     case PathOp::Union:
@@ -90,12 +94,6 @@ PathFillType MergeShape::fillType() const {
       break;
   }
   return inverse ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd;
-}
-
-// Deriving the flag from fillType() keeps the two public queries in agreement with the outline,
-// including the empty result reported when a boolean operation fails.
-bool MergeShape::isInverseFillType() const {
-  return Shape::isInverseFillType();
 }
 
 Rect MergeShape::onGetBounds() const {
@@ -118,10 +116,13 @@ Rect MergeShape::onGetBounds() const {
 }
 
 Path MergeShape::onGetPath(float resolutionScale) const {
-  auto path = first->onGetPath(resolutionScale);
-  auto secondPath = second->onGetPath(resolutionScale);
-  // fillType() and onGetPath() must agree on the fast path, so both use the shared decision.
-  if (!PathRef::AddPath(path, secondPath, pathOp, unionConcatenates())) {
+  // Reusing the cached scale=1 paths keeps a chain of merges linear: each operand is built once
+  // instead of once per ancestor. Export paths with another scale build their own outlines, and
+  // those exact outlines are used for the concatenation check below.
+  bool unitScale = FloatNearlyEqual(resolutionScale, 1.0f);
+  auto path = unitScale ? first->getPath() : first->onGetPath(resolutionScale);
+  auto secondPath = unitScale ? second->getPath() : second->onGetPath(resolutionScale);
+  if (!PathRef::AddPath(path, secondPath, pathOp, unionConcatenates(path, secondPath))) {
     // A failed operation leaves the first operand behind, which is not the merge that was asked
     // for: reading it as the result would draw one side of the operation as if it were both. An
     // empty path is the only answer that is wrong in a visible way rather than a silent one, and

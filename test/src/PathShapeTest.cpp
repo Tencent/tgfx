@@ -582,6 +582,22 @@ TGFX_TEST(PathShapeTest, AppendInverseQueryUsesOnlyNecessaryPaths) {
   }
 }
 
+TGFX_TEST(PathShapeTest, ChainedUnionBuildsEachOperandOnce) {
+  int pathCalls = 0;
+  std::shared_ptr<Shape> shapes[3] = {};
+  for (int i = 0; i < 3; ++i) {
+    Path rect = {};
+    rect.addRect(Rect::MakeXYWH(i * 100, 0, 10, 10));
+    shapes[i] = std::make_shared<RuleCountingShape>(rect, &pathCalls);
+  }
+  auto merged = Shape::Merge(Shape::Merge(shapes[0], shapes[1], PathOp::Union), shapes[2],
+                             PathOp::Union);
+  ASSERT_TRUE(merged != nullptr);
+  EXPECT_EQ(merged->getPath().getBounds(), Rect::MakeXYWH(0, 0, 210, 10));
+  // A left-deep chain must build each leaf once, not once per ancestor.
+  EXPECT_EQ(pathCalls, 3);
+}
+
 // A PathProvider is allowed to report bounds that only contain its outlines - that is what a text
 // run does with its em box. Two such shapes whose reported bounds overlap but whose outlines sit
 // apart are the case where a union has to be resolved: deciding the fast path from the tighter
