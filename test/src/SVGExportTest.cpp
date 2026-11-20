@@ -549,6 +549,29 @@ TGFX_TEST(SVGExportTest, ClipState) {
   ASSERT_EQ(SVGString, compareString);
 }
 
+TGFX_TEST(SVGExportTest, RasterImageClip) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+                                    SVGExportFlags::DisablePrettyXML);
+  auto canvas = exporter->getCanvas();
+  auto scale = 200.0f / static_cast<float>(std::max(image->width(), image->height()));
+  canvas->scale(scale, scale);
+  canvas->clipRect(Rect::MakeXYWH(50, 50, 100, 100));
+  canvas->drawImage(image);
+  exporter->close();
+
+  auto svg = SVGStream->readString();
+  EXPECT_NE(svg.find("<clipPath"), std::string::npos);
+  EXPECT_NE(svg.find("clip-path=\"url(#clip_0)\""), std::string::npos);
+  EXPECT_NE(svg.find("<image"), std::string::npos);
+}
+
 TGFX_TEST(SVGExportTest, GradientMask) {
 
   ContextScope scope;

@@ -997,6 +997,8 @@ bool SVGExportContext::exportImageAsRaster(const std::shared_ptr<Image>& image,
   auto modifyImage =
       ConvertImageColorSpace(image, context, _targetColorSpace, _assignColorSpace, _pendingImages);
   if (modifyImage == nullptr) {
+    // The registered readback holds the converted full-size pixels, so its geometry uses the
+    // original image dimensions.
     if (_pendingImages != nullptr && _pendingImages->size() > pendingCount) {
       applyClip(clip, matrix.mapRect(Rect::MakeWH(image->width(), image->height())));
       exportPendingImage(_pendingImages->back().token, image->width(), image->height(), matrix,

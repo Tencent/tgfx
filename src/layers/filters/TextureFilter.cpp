@@ -114,9 +114,11 @@ std::shared_ptr<Image> TextureFilter::onFilterImage(std::shared_ptr<Image> input
   if (input == nullptr || !std::isfinite(scale) || scale <= 0.0f) {
     return input;
   }
-  auto localBounds = Rect::MakeLTRB(contentBounds.left / scale, contentBounds.top / scale,
-                                    contentBounds.right / scale, contentBounds.bottom / scale);
-  auto center = Point::Make(localBounds.width() * 0.5f, localBounds.height() * 0.5f);
+  auto localLeft = contentBounds.left / scale;
+  auto localTop = contentBounds.top / scale;
+  auto localRight = contentBounds.right / scale;
+  auto localBottom = contentBounds.bottom / scale;
+  auto center = Point::Make((localRight - localLeft) * 0.5f, (localBottom - localTop) * 0.5f);
   auto params = MakeTextureGrainParams(_sizeX, _sizeY, _radius, center, _seed, imageOrigin, scale,
                                        _clipToShape);
   auto filter = std::make_shared<TextureImageFilter>(params);
