@@ -32,30 +32,34 @@ GaussianBlur1DFragmentProcessor::GaussianBlur1DFragmentProcessor(
   computeKernel(sigma);
 }
 
-void GaussianBlur1DFragmentProcessor::computeKernel(float sigma) {
-  // Make() guarantees in debug builds that sigma is finite, positive, and not greater than
-  // maxSigma, so no clamping is needed here. In release builds the DEBUG_ASSERT is compiled out
-  // and the same contract is upheld by the only call site, GaussianBlurImageFilter, which clamps
-  // sigma before construction. The radius clamp below is a defensive guard for the kernel table
-  // capacity that never triggers while the contract holds.
-  kernelRadius = static_cast<int>(ceil(2.0f * sigma));
-  // Clamp by the sample count so the total number of samples (2 * radius + 1) never exceeds the
-  // kernel table capacity.
-  kernelRadius = std::min(kernelRadius, MAX_KERNEL_RADIUS);
+int GaussianBlur1DFragmentProcessor::ComputeHalfKernel(float sigma, float* weights, int maxRadius) {
+  auto radius = static_cast<int>(ceil(2.0f * std::max(sigma, 0.0f)));
+  // Clamp by the table capacity so the total number of samples (2 * radius + 1) always fits.
+  radius = std::min(radius, maxRadius);
   // Guard against a zero denominator: the product 2 * sigma * sigma can underflow to zero even
   // when sigma itself is a valid positive float, in which case the kernel degenerates to a single
   // center sample, which means no blurring.
   const float denominator = std::max(2.0f * sigma * sigma, std::numeric_limits<float>::min());
   float total = 0.0f;
-  for (int i = 0; i <= kernelRadius; ++i) {
+  for (int i = 0; i <= radius; ++i) {
     const float weight = exp(-static_cast<float>(i * i) / denominator);
-    kernel[static_cast<size_t>(i)] = weight;
+    weights[i] = weight;
     // The kernel is symmetric, so each off-center weight contributes twice to the total.
     total += (i == 0) ? weight : 2.0f * weight;
   }
-  for (int i = 0; i <= kernelRadius; ++i) {
-    kernel[static_cast<size_t>(i)] /= total;
+  for (int i = 0; i <= radius; ++i) {
+    weights[i] /= total;
   }
+  return radius;
+}
+
+void GaussianBlur1DFragmentProcessor::computeKernel(float sigma) {
+  // Make() guarantees in debug builds that sigma is finite, positive, and not greater than
+  // maxSigma, so no clamping is needed here. In release builds the DEBUG_ASSERT is compiled out
+  // and the same contract is upheld by the only call site, GaussianBlurImageFilter, which clamps
+  // sigma before construction. The radius clamp is a defensive guard for the kernel table
+  // capacity that never triggers while the contract holds.
+  kernelRadius = ComputeHalfKernel(sigma, kernel.data(), MAX_KERNEL_RADIUS);
 }
 
 void GaussianBlur1DFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {

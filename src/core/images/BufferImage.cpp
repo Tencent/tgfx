@@ -46,12 +46,23 @@ float BufferImage::getRasterizedScale(float drawScale) const {
   return 1.0f;
 }
 
-std::shared_ptr<TextureProxy> BufferImage::lockTextureProxy(const TPArgs& args) const {
+ISize BufferImage::getRasterizedSize(float scale) const {
   if (imageBuffer->isPixelBuffer()) {
     auto codec = PixelBufferCodec::Make(std::static_pointer_cast<PixelBuffer>(imageBuffer));
-    auto [scaleWidth, scaleHeight] = codec->getScaledDimensions(args.drawScale);
+    auto [scaleWidth, scaleHeight] = codec->getScaledDimensions(scale);
     if (scaleWidth < imageBuffer->width() && scaleHeight < imageBuffer->height()) {
-      auto generator = ScaledImageGenerator::MakeFrom(codec, scaleWidth, scaleHeight);
+      return ISize::Make(scaleWidth, scaleHeight);
+    }
+  }
+  return ISize::Make(imageBuffer->width(), imageBuffer->height());
+}
+
+std::shared_ptr<TextureProxy> BufferImage::lockTextureProxy(const TPArgs& args) const {
+  if (imageBuffer->isPixelBuffer()) {
+    auto size = getRasterizedSize(args.drawScale);
+    if (size.width < imageBuffer->width() && size.height < imageBuffer->height()) {
+      auto codec = PixelBufferCodec::Make(std::static_pointer_cast<PixelBuffer>(imageBuffer));
+      auto generator = ScaledImageGenerator::MakeFrom(codec, size.width, size.height);
       return args.context->proxyProvider()->createTextureProxy(generator, args.mipmapped,
                                                                args.renderFlags);
     }

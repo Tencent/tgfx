@@ -36,6 +36,7 @@
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/TextContent.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
+#include "tgfx/core/ImageProvider.h"
 #include "tgfx/core/Mesh.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Shape.h"
@@ -267,6 +268,109 @@ TGFX_TEST(LayerTest, imageLayer) {
   imageLayer->setMatrix(Matrix::MakeScale(5.0f));
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/imageLayer"));
+}
+
+namespace {
+/**
+ * Creates a solid color image from raw RGBA bytes, where rgba is laid out as R, G, B, A.
+ */
+std::shared_ptr<Image> MakeSolidColorImage(int width, int height, uint32_t rgba) {
+  auto info = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  std::vector<uint32_t> pixels(static_cast<size_t>(width) * static_cast<size_t>(height), rgba);
+  auto data = Data::MakeWithCopy(pixels.data(), pixels.size() * sizeof(uint32_t));
+  return Image::MakeFrom(info, std::move(data));
+}
+
+class TestImageProvider : public ImageProvider {
+ public:
+  TestImageProvider(int width, int height, std::shared_ptr<Image> low, std::shared_ptr<Image> high)
+      : _width(width), _height(height), _low(std::move(low)), _high(std::move(high)) {
+  }
+
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
+  std::shared_ptr<Image> getImage(float scale) const override {
+    lastScale = scale;
+    ++callCount;
+    return scale >= 2.0f ? _high : _low;
+  }
+
+  mutable int callCount = 0;
+  mutable float lastScale = 0.0f;
+
+ private:
+  int _width = 0;
+  int _height = 0;
+  std::shared_ptr<Image> _low = nullptr;
+  std::shared_ptr<Image> _high = nullptr;
+};
+}  // namespace
+
+TGFX_TEST(LayerTest, imageLayerProvider) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  // Opaque red at logical size and opaque green at twice the pixel density.
+  auto lowImage = MakeSolidColorImage(10, 10, 0xFF0000FF);
+  auto highImage = MakeSolidColorImage(20, 20, 0xFF00FF00);
+  ASSERT_TRUE(lowImage != nullptr);
+  ASSERT_TRUE(highImage != nullptr);
+
+  auto displayList = std::make_unique<DisplayList>();
+  auto imageLayer = ImageLayer::Make();
+  displayList->root()->addChild(imageLayer);
+  auto provider = std::make_shared<TestImageProvider>(10, 10, lowImage, highImage);
+  auto providerImage = Image::MakeFrom(provider);
+  ASSERT_TRUE(providerImage != nullptr);
+  imageLayer->setImage(providerImage);
+  EXPECT_FLOAT_EQ(imageLayer->getBounds().width(), 10.0f);
+  EXPECT_FLOAT_EQ(imageLayer->getBounds().height(), 10.0f);
+
+  imageLayer->setMatrix(Matrix::MakeScale(2.0f));
+  auto surface = Surface::Make(context, 20, 20);
+  ASSERT_TRUE(surface != nullptr);
+  displayList->render(surface.get());
+  EXPECT_GT(provider->callCount, 0);
+  EXPECT_NEAR(provider->lastScale, 2.0f, 0.01f);
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  uint32_t pixel = 0;
+  ASSERT_TRUE(surface->readPixels(info, &pixel, 10, 10));
+  EXPECT_EQ(pixel, 0xFF00FF00u);
+
+  auto secondList = std::make_unique<DisplayList>();
+  auto secondLayer = ImageLayer::Make();
+  secondList->root()->addChild(secondLayer);
+  auto secondProvider = std::make_shared<TestImageProvider>(10, 10, lowImage, highImage);
+  secondLayer->setImage(Image::MakeFrom(secondProvider));
+  auto secondSurface = Surface::Make(context, 10, 10);
+  ASSERT_TRUE(secondSurface != nullptr);
+  secondList->render(secondSurface.get());
+  EXPECT_GT(secondProvider->callCount, 0);
+  EXPECT_NEAR(secondProvider->lastScale, 1.0f, 0.01f);
+  ASSERT_TRUE(secondSurface->readPixels(info, &pixel, 5, 5));
+  EXPECT_EQ(pixel, 0xFF0000FFu);
+
+  // The same image switches to the variant of the new draw scale instead of keeping the first one.
+  auto switchingProvider = std::make_shared<TestImageProvider>(10, 10, lowImage, highImage);
+  auto switchingLayer = ImageLayer::Make();
+  auto switchingList = std::make_unique<DisplayList>();
+  switchingList->root()->addChild(switchingLayer);
+  switchingLayer->setImage(Image::MakeFrom(switchingProvider));
+  auto switchingSurface = Surface::Make(context, 20, 20);
+  ASSERT_TRUE(switchingSurface != nullptr);
+  switchingList->render(switchingSurface.get());
+  ASSERT_TRUE(switchingSurface->readPixels(info, &pixel, 5, 5));
+  EXPECT_EQ(pixel, 0xFF0000FFu);
+  switchingLayer->setMatrix(Matrix::MakeScale(2.0f));
+  switchingList->render(switchingSurface.get());
+  ASSERT_TRUE(switchingSurface->readPixels(info, &pixel, 10, 10));
+  EXPECT_EQ(pixel, 0xFF00FF00u);
 }
 
 TGFX_TEST_PRIVATE(LayerTest, Layer_getTotalMatrix) {
@@ -3560,9 +3664,9 @@ enum class ShadowType { Drop, Inner };
 
 static inline std::shared_ptr<LayerStyle> MakeShadow(ShadowType type, float offsetX, float offsetY,
                                                      float blurX, float blurY, const Color& color,
-                                                     float spread, bool dropBehindLayer = true) {
+                                                     float spread, bool showBehindLayer = true) {
   if (type == ShadowType::Drop) {
-    auto style = DropShadowStyle::Make(offsetX, offsetY, blurX, blurY, color, dropBehindLayer);
+    auto style = DropShadowStyle::Make(offsetX, offsetY, blurX, blurY, color, showBehindLayer);
     style->setSpread(spread);
     return style;
   }
@@ -3593,7 +3697,11 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
   const auto rItemXOffset = gap + cellW / 2.0f;
   auto image = MakeImage("resources/apitest/test_timestretch.png")->makeScaled(100, 60);
 
-  // Case 1: SolidLayer with roundness 10, spread=8
+  // Each case draws a pair with and without spread. The no-spread draw always uses the
+  // image-filter path; the spread draw uses the analytic closed form when the outline allows it
+  // (marked "analytic"), and falls back to a rasterized spread image otherwise (marked "raster").
+
+  // Case 1: SolidLayer with roundness 10, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = SolidLayer::Make();
     layer->setColor(Color::Red());
@@ -3606,7 +3714,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 2: ImageLayer, spread=8
+  // Case 2: ImageLayer, spread=8 (raster)
   for (int i = 0; i < 2; ++i) {
     auto layer = ImageLayer::Make();
     layer->setImage(image);
@@ -3615,7 +3723,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 3: ShapeLayer Oval fill, spread=8
+  // Case 3: ShapeLayer Oval fill, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = ShapeLayer::Make();
     Path path = {};
@@ -3627,7 +3735,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 4: ShapeLayer Oval stroke, spread=8
+  // Case 4: ShapeLayer Oval stroke, spread=8 (raster)
   for (int i = 0; i < 2; ++i) {
     auto layer = ShapeLayer::Make();
     Path path = {};
@@ -3642,7 +3750,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 5: ShapeLayer star stroke, spread=8
+  // Case 5: ShapeLayer star stroke, spread=8 (raster)
   for (int i = 0; i < 2; ++i) {
     auto layer = ShapeLayer::Make();
     layer->setPath(MakeStarPath());
@@ -3654,7 +3762,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 6: ShapeLayer Rect + ImageShader fill, spread=8
+  // Case 6: ShapeLayer Rect + ImageShader fill, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = ShapeLayer::Make();
     Path path = {};
@@ -3668,7 +3776,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 7: ShapeLayer Rect fill + Outside dashed stroke, spread=8
+  // Case 7: ShapeLayer Rect fill + Outside dashed stroke, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = ShapeLayer::Make();
     Path path = {};
@@ -3686,7 +3794,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 8: ShapeLayer with an Inside dashed stroke baked into a fill path, spread=8
+  // Case 8: ShapeLayer with an Inside dashed stroke baked into a fill path, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = ShapeLayer::Make();
     Path rectPath = {};
@@ -3710,7 +3818,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 9: TextLayer with perspective, spread=8
+  // Case 9: TextLayer with perspective, spread=8 (raster)
   {
     auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
     for (int i = 0; i < 2; ++i) {
@@ -3729,7 +3837,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     }
   }
 
-  // Case 10: VectorLayer RoundRect + ImagePattern fill, spread=-8
+  // Case 10: VectorLayer RoundRect + ImagePattern fill, spread=-8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3749,7 +3857,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 11: VectorLayer Ellipse + Center stroke 15px, spread=-10 (stroke collapse)
+  // Case 11: VectorLayer Ellipse + Center stroke 15px, spread=-10 (stroke collapse) (raster)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3767,7 +3875,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 12: VectorLayer star fill, spread=8
+  // Case 12: VectorLayer star fill, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3783,7 +3891,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 13: VectorLayer Rect+Ellipse + Inside stroke 8px, spread=5
+  // Case 13: VectorLayer Rect+Ellipse + Inside stroke 8px, spread=5 (raster)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3805,7 +3913,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 14: VectorLayer Ellipse + Outside dashed stroke 8px + SolidLayer child, spread=8
+  // Case 14: VectorLayer Ellipse + Outside dashed stroke 8px + SolidLayer child, spread=8 (raster)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3832,7 +3940,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 15: VectorLayer Rect fill + Outside dashed stroke, spread=8
+  // Case 15: VectorLayer Rect fill + Outside dashed stroke, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3855,7 +3963,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 16: VectorLayer Ellipse + Inside stroke 15px with compound transform, spread=-5
+  // Case 16: VectorLayer Ellipse + Inside stroke 15px with compound transform, spread=-5 (raster)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto innerGroup = VectorGroup::Make();
@@ -3882,7 +3990,8 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 17: VectorLayer Ellipse + Outside dashed stroke 15px with transparent-fill child, spread=6
+  // Case 17: VectorLayer Ellipse + Outside dashed stroke 15px with transparent-fill child,
+  // spread=6 (raster)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3912,6 +4021,91 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
         {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 6.0f, false)});
     displayList.root()->addChild(vectorLayer);
   }
+
+  // Case 18: ShapeLayer thin strip 130x4 fill with large blur, spread=8 (analytic)
+  for (int i = 0; i < 2; ++i) {
+    auto layer = ShapeLayer::Make();
+    Path path = {};
+    path.addRect(Rect::MakeXYWH(0.0f, 28.0f, 130.0f, 4.0f));
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(Color::Red()));
+    layer->setMatrix(
+        Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 5 + gap));
+    layer->setLayerStyles({MakeShadow(type, 25, 25, 10, 10, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 19: SolidLayer with half alpha and non-uniform scale, showBehindLayer = false (drop
+  // shadow only), spread=8 (analytic)
+  for (int i = 0; i < 2; ++i) {
+    auto layer = SolidLayer::Make();
+    layer->setColor(Color::Red());
+    layer->setWidth(60);
+    layer->setHeight(40);
+    layer->setRadiusX(8);
+    layer->setRadiusY(8);
+    layer->setAlpha(0.5f);
+    auto matrix = Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 6 + gap);
+    matrix.preScale(2.0f, 1.5f);
+    layer->setMatrix(matrix);
+    layer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f, false)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 20: SolidLayer with a semi-transparent shadow color and spread large enough to collapse
+  // the shape, spread=-35 for drop and 35 for inner (analytic)
+  for (int i = 0; i < 2; ++i) {
+    auto layer = SolidLayer::Make();
+    layer->setColor(Color::Red());
+    layer->setWidth(100);
+    layer->setHeight(60);
+    layer->setRadiusX(10);
+    layer->setRadiusY(10);
+    layer->setMatrix(
+        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 6 + gap));
+    auto collapseSpread = type == ShadowType::Drop ? -35.0f : 35.0f;
+    auto shadowColor = Color{1.0f, 1.0f, 0.0f, 0.5f};
+    layer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, shadowColor, i == 0 ? 0.0f : collapseSpread)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 21: SolidLayer with an anisotropic blur (12, 4), spread=8 (analytic)
+  for (int i = 0; i < 2; ++i) {
+    auto layer = SolidLayer::Make();
+    layer->setColor(Color::Red());
+    layer->setWidth(100);
+    layer->setHeight(60);
+    layer->setRadiusX(10);
+    layer->setRadiusY(10);
+    layer->setMatrix(
+        Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 6 + gap));
+    layer->setLayerStyles({MakeShadow(type, 25, 25, 12, 4, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 22: VectorLayer Rect fill in a group rotated 90 degrees with a non-uniform scale, on a
+  // layer rotated -45 degrees, spread=8 (analytic)
+  for (int i = 0; i < 2; ++i) {
+    auto vectorLayer = VectorLayer::Make();
+    auto group = VectorGroup::Make();
+    auto rect = Rectangle::Make();
+    rect->setSize({60, 40});
+    rect->setPosition({50, -10});
+    rect->setRoundness(8);
+    auto fill = FillStyle::Make(SolidColor::Make(Color::Red()));
+    group->setElements({rect, fill});
+    group->setRotation(90);
+    group->setScale({1.5f, 1.0f});
+    vectorLayer->setContents({group});
+    auto matrix = Matrix::MakeTrans((i == 0 ? lItemXOffset : rItemXOffset), cellH * 7 + gap);
+    matrix.preConcat(Matrix::MakeRotate(-45));
+    vectorLayer->setMatrix(matrix);
+    vectorLayer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(vectorLayer);
+  }
 }
 
 TGFX_TEST(LayerTest, DropShadow) {
@@ -3922,7 +4116,7 @@ TGFX_TEST(LayerTest, DropShadow) {
   constexpr float cellH = 120.0f;
   constexpr float gap = 30.0f;
   auto surface =
-      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 6 + gap));
+      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 8 + gap));
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Drop, cellW, cellH, gap);
   displayList->render(surface.get());
@@ -3937,7 +4131,7 @@ TGFX_TEST(LayerTest, InnerShadow) {
   constexpr float cellH = 120.0f;
   constexpr float gap = 30.0f;
   auto surface =
-      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 6 + gap));
+      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 8 + gap));
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Inner, cellW, cellH, gap);
   displayList->render(surface.get());
@@ -6675,6 +6869,73 @@ TGFX_TEST(LayerTest, NestedOffscreenTiledZoom) {
                                  "LayerTest/NestedOffscreenTiledZoom");
 }
 
+// Centers the given content point on the surface at the requested zoom, so every frame renders the
+// same region while the zoomed tiles are refined.
+static void CenterTiledContent(DisplayList* displayList, const Surface& surface,
+                               const Point& contentCenter, float zoom) {
+  auto halfWidth = static_cast<float>(surface.width()) * 0.5f;
+  auto halfHeight = static_cast<float>(surface.height()) * 0.5f;
+  displayList->setZoomScale(zoom);
+  displayList->setContentOffset(halfWidth - contentCenter.x * zoom,
+                                halfHeight - contentCenter.y * zoom);
+}
+
+/**
+ * A red rectangle wrapped in a group whose Gaussian blur is zoomed far beyond the tile
+ * resolution. The blurred group is pasted back with a draw rect larger than its offscreen
+ * picture, so the picture has to be sampled through a downscaled crop of the image. A wrong crop
+ * matrix turns the continuous blur into repeating tile-sized gradient blocks.
+ */
+TGFX_TEST(LayerTest, GroupBlurTiledZoom) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 2048, 1024);
+  ASSERT_NE(surface, nullptr);
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.setTileUpdateMode(TileUpdateMode::Smooth);
+  displayList.setTileSize(256);
+  displayList.setMaxTilesRefinedPerFrame(1);
+  displayList.setSubtreeCacheMaxSize(0);
+  displayList.setBackgroundColor(Color::White());
+
+  const Point groupPosition = {2664.0f, -676.0f};
+  const Point rectangleCenter = {20.0f, 10.0f};
+  auto group = Layer::Make();
+  group->setPosition(groupPosition);
+  group->setBlendMode(BlendMode::SrcOver);
+  group->setPassThroughBackground(false);
+  group->setFilters({BlurFilter::Make(3, 3, TileMode::Decal)});
+  auto rectangle = Rectangle::Make();
+  rectangle->setSize({40, 20});
+  rectangle->setPosition(rectangleCenter);
+  auto fill = FillStyle::Make(SolidColor::Make(Color::Red()));
+  auto rectangleLayer = VectorLayer::Make();
+  rectangleLayer->setContents({rectangle, fill});
+  rectangleLayer->setBlendMode(BlendMode::SrcOver);
+  rectangleLayer->setPassThroughBackground(false);
+  group->addChild(rectangleLayer);
+  displayList.root()->addChild(group);
+
+  const Point contentCenter = {groupPosition.x + rectangleCenter.x,
+                               groupPosition.y + rectangleCenter.y};
+  // Warm up at zoom 1 so that the zoomed frames rebuild every visible tile from a stale cache
+  // instead of drawing the content in one continuous pass.
+  CenterTiledContent(&displayList, *surface, contentCenter, 1.0f);
+  displayList.render(surface.get());
+  CenterTiledContent(&displayList, *surface, contentCenter, 36.505f);
+  // Refine one tile per frame until every tile is rasterized at the target zoom; a fixed frame
+  // count would leave the last tiles at the stale zoom and make the image depend on scheduling.
+  int frames = 0;
+  do {
+    displayList.render(surface.get());
+    ++frames;
+  } while (displayList.hasContentChanged() && frames < 200);
+  ASSERT_FALSE(displayList.hasContentChanged()) << "tile refinement did not settle";
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GroupBlurTiledZoom"));
+}
+
 TGFX_TEST(LayerTest, GlassStyleWithDropShadow) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -7598,7 +7859,8 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleSourceSwapSharesOneRasterizedGeometry) {
       auto recording = source->groups[0]->geometry->image(); ASSERT_TRUE(recording != nullptr);
       EXPECT_TRUE(recording == source->groups[1]->geometry->image())
       << "control: both buckets start from the one geometry recording";
-      BackgroundSnapshotMap snapshots = {}; BackgroundCapturer capturer(&snapshots, nullptr);
+      BackgroundSnapshotMap snapshots = {};
+      BackgroundCapturer capturer(&snapshots, nullptr, nullptr);
       auto* cached = capturer.cacheLayerStyleSource(panel.get(), std::move(source));
       ASSERT_TRUE(cached != nullptr); ASSERT_TRUE(cached->groups[0] != nullptr);
       ASSERT_TRUE(cached->groups[1] != nullptr);

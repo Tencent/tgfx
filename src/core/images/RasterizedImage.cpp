@@ -32,11 +32,15 @@ std::shared_ptr<Image> RasterizedImage::makeRasterized() const {
   return weakThis.lock();
 }
 
-std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& args) const {
-  auto proxyProvider = args.context->proxyProvider();
+float RasterizedImage::getCacheScale(float drawScale) const {
   // If the source has mipmaps, cache the texture at the original scale to stay consistent with the
   // mipmap branch in getTextureKey().
-  auto newScale = source->hasMipmaps() ? 1.0f : source->getRasterizedScale(args.drawScale);
+  return source->hasMipmaps() ? 1.0f : source->getRasterizedScale(drawScale);
+}
+
+std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& args) const {
+  auto proxyProvider = args.context->proxyProvider();
+  auto newScale = getCacheScale(args.drawScale);
   auto textureKey = getTextureKey(newScale);
   auto textureProxy = proxyProvider->findOrWrapTextureProxy(textureKey);
   if (textureProxy != nullptr) {
@@ -69,14 +73,29 @@ PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
   if (textureProxy == nullptr) {
     return nullptr;
   }
+  // Derive the content size from the source instead of the proxy. A cached texture view can be
+  // larger than the content it carries, for example a hardware-decoded video buffer aligned by the
+  // decoder, and the proxy reports that padded size once it is rewrapped from the resource cache.
+  // Using the source size keeps the coordinate transform and the sampling clamp identical whether
+  // the proxy was freshly created or rewrapped, so the padding is never sampled. When the source
+  // reports no size (for example a provider that serves a lower-density variant whose texture does
+  // not match the logical size), fall back to the proxy size so the transform matches the texture
+  // that lockTextureProxy() actually produced.
+  auto contentSize = source->getRasterizedSize(getCacheScale(args.drawScale));
+  if (contentSize.isEmpty()) {
+    contentSize = ISize::Make(textureProxy->width(), textureProxy->height());
+  }
   auto fpMatrix =
-      Matrix::MakeScale(static_cast<float>(textureProxy->width()) / static_cast<float>(width()),
-                        static_cast<float>(textureProxy->height()) / static_cast<float>(height()));
+      Matrix::MakeScale(static_cast<float>(contentSize.width) / static_cast<float>(width()),
+                        static_cast<float>(contentSize.height) / static_cast<float>(height()));
   SamplingArgs newSamplingArgs = samplingArgs;
   if (samplingArgs.sampleArea) {
     Rect subset = *samplingArgs.sampleArea;
     fpMatrix.mapRect(&subset);
     newSamplingArgs.sampleArea = subset;
+  } else {
+    newSamplingArgs.sampleArea =
+        Rect::MakeWH(static_cast<float>(contentSize.width), static_cast<float>(contentSize.height));
   }
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);

@@ -40,6 +40,7 @@ void GlassRefractionFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey)
     flags |= 2;
   }
   bytesKey->write(flags);
+  bytesKey->write(static_cast<uint32_t>(params.shapeType));
 }
 
 size_t GlassRefractionFragmentProcessor::onCountTextureSamplers() const {
