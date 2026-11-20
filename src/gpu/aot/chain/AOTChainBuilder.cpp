@@ -49,7 +49,6 @@ namespace {
 bool IsSchedulableChainOp(AOTChainOp op) {
   return op != AOTChainOp::None && static_cast<int>(op) < ChainISA::OpCount;
 }
-
 }  // namespace
 
 bool AOTChainBuilder::IsChainCompatibleTiledMode(TiledTextureShaderMode mode) {
@@ -362,7 +361,8 @@ bool AOTChainBuilder::ValidateSlots(const std::vector<AOTChainSlot>& slots, size
     // Required-input checks: the kernel resolves an unmapped input (-2) to vec4(0.0) silently, so
     // an operator that actually consumes its input must not leave it unmapped. Texture slots
     // carry flags in in0/in1 rather than register indices, and Texture is exempt.
-    if (slot.op != AOTChainOp::Texture && slot.op != AOTChainOp::PerlinNoise && slot.in0 == -2) {
+    if (slot.op != AOTChainOp::Texture && slot.op != AOTChainOp::PerlinNoise &&
+        slot.op != AOTChainOp::YUV && slot.in0 == -2) {
       return false;
     }
     if ((slot.op == AOTChainOp::Blend || slot.op == AOTChainOp::MulAlpha) && slot.in1 == -2) {
@@ -380,16 +380,36 @@ bool AOTChainBuilder::ValidateSlots(const std::vector<AOTChainSlot>& slots, size
       }
     }
   }
-  // Only real DAG leaves have prefetched samples; LUT and padding children do not.
+  // Only real DAG leaves have prefetched samples; LUT and padding children do not. A leaf-owning
+  // slot must sit exactly where its first leaf record starts, and every leaf record must be owned:
+  // a Texture owns one, a multi-plane source owns three (Y, U-or-UV, V).
+  size_t leafCursor = 0;
   for (size_t index = 0; index < slots.size(); ++index) {
     const auto& slot = slots[index];
-    if ((slot.op == AOTChainOp::Texture) != (index < leafCount)) {
+    size_t owned = 0;
+    if (slot.op == AOTChainOp::Texture) {
+      owned = 1;
+    } else if (slot.op == AOTChainOp::YUV) {
+      owned = 3;
+    }
+    if (owned != 0) {
+      if (leafCursor != index) {
+        return false;
+      }
+      leafCursor += owned;
+    } else if (index < leafCursor) {
       return false;
     }
     if (slot.op == AOTChainOp::TexModulate &&
         static_cast<size_t>(slot.texModulateSourceSlot) >= leafCount) {
       return false;
     }
+  }
+  if (leafCursor != leafCount) {
+    return false;
+  }
+  if (leafCursor != leafCount) {
+    return false;
   }
   size_t colorSpaceSlots = 0;
   size_t gradientSlots = 0;
@@ -472,5 +492,4 @@ const AOTProgram* AOTChainBuilder::ResolveYUVProgram(const ProgramInfo* programI
   }
   return &*carried->yuvProgram;
 }
-
 }  // namespace tgfx

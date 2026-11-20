@@ -319,9 +319,24 @@ bool ReadYUV(const ReadContext& ctx, int slotIndex, ChainBindingSource source, u
     case ChainBindingSource::YuvHasRgbaaa:
       Store(out, yuv.hasRgbaaa);
       return true;
-    case ChainBindingSource::YuvFormat:
-      Store(out, yuv.format);
+    case ChainBindingSource::YuvFormat: {
+      int format = yuv.format;
+      if (format < 0) {
+        const auto* yuvView = YUVViewOf(yuv.textureProxy);
+        if (yuvView == nullptr) {
+          return false;
+        }
+        if (yuvView->yuvFormat() == YUVFormat::I420) {
+          format = 0;
+        } else if (yuvView->yuvFormat() == YUVFormat::NV12) {
+          format = 1;
+        } else {
+          return false;
+        }
+      }
+      Store(out, format);
       return true;
+    }
     case ChainBindingSource::YuvLimitedRange: {
       const auto* yuvView = YUVViewOf(yuv.textureProxy);
       if (yuvView == nullptr) {

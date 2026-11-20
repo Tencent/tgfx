@@ -207,10 +207,12 @@ bool EncodeYUVSourceSlot(AOTChainContext* ctx, size_t combined, size_t index) {
   auto* parameters = std::get_if<AOTTextureParameters>(&node->parameters);
   if (parameters == nullptr || !parameters->isYUV ||
       parameters->samplingKind != AOTTextureSamplingKind::Plain || inputBase != 0 ||
-      parameters->hasPerspective || parameters->yuvFormat < 0) {
+      parameters->hasPerspective) {
     return false;
   }
   slot.op = AOTChainOp::YUV;
+  // The plane layout may not be known at match time (the IR carries -1 until the view resolves);
+  // the upload reads it off the view in that case, like the conversion matrix.
   slot.yuv.format = parameters->yuvFormat;
   slot.yuv.hasRgbaaa = parameters->hasRGBAAA ? 1 : 0;
   slot.yuv.alphaStart = {parameters->alphaStart.x, parameters->alphaStart.y};
@@ -713,5 +715,4 @@ bool EncodeSlots(AOTChainContext* ctx) {
   RouteAnalyticChains(ctx);
   return true;
 }
-
 }  // namespace tgfx
