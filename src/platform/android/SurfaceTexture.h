@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <condition_variable>
 #include "platform/ImageStream.h"
+#include "platform/android/SurfaceTextureFrameState.h"
 #include "tgfx/platform/android/Global.h"
 
 namespace tgfx {
@@ -64,14 +66,25 @@ class SurfaceTexture : public ImageStream {
 
   bool onUpdateTexture(std::shared_ptr<TextureView> textureView) override;
 
+  TextureReadResult onReadTexture(Context* context, bool mipmapped,
+                                  std::shared_ptr<TextureView> texture, int64_t target,
+                                  int64_t deadline) override;
+
+  void onSeeked() override;
+
  private:
   std::mutex locker = {};
   std::condition_variable condition = {};
   Global<jobject> surfaceTexture;
   bool frameAvailable = false;
   bool textureSizeResolved = false;
+  SurfaceTextureFrameState frameState = {};
   ISize textureSize = {};
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
+
+  bool latchTexture(JNIEnv* env);
+
+  int64_t currentTimestamp(JNIEnv* env);
 
   static void JNIInit(JNIEnv* env);
 
@@ -79,7 +92,17 @@ class SurfaceTexture : public ImageStream {
 
   unsigned makeExternalOESTexture(Context* context);
 
-  bool updateTexImage();
+  void releaseExternalOESTexture(Context* context, unsigned textureID);
+
+  struct FrameUpdateResult {
+    ImageReaderStatus status = ImageReaderStatus::Failed;
+    int64_t timestamp = -1;
+    ISize textureSize = {};
+  };
+
+  FrameUpdateResult updateTexImage(int64_t target, int64_t deadline);
+
+  void resolveTextureSize(JNIEnv* env);
 
   friend class JNIInit;
 };

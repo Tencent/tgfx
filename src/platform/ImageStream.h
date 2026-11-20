@@ -23,6 +23,7 @@
 #include <vector>
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/platform/ImageReader.h"
 
 namespace tgfx {
 class ImageReader;
@@ -32,7 +33,8 @@ class Context;
 /**
  * ImageStream represents a writable pixel buffer that can continuously generate ImageBuffer
  * objects, which can be directly accessed by The ImageReader class. ImageStream is an abstract
- * class. Use its subclasses instead.
+ * class. Use its subclasses instead. ImageReader serializes callbacks only within one reader;
+ * implementations shared by multiple readers must synchronize their own mutable state.
  */
 class ImageStream {
  public:
@@ -59,15 +61,48 @@ class ImageStream {
   }
 
   /**
-   * Creates a new TextureView capturing the pixels in the ImageBuffer. The mipmapped parameter
-   * specifies whether created texture view must allocate mip map levels.
+   * Creates a texture using the stream's native pixel source. The mipmapped parameter specifies
+   * whether the created texture view must allocate mip map levels, when supported by the source.
    */
   virtual std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) = 0;
 
-  /**
-   * Updates the specified bounds of the texture view with the pixels in the ImageBuffer.
-   */
+  /** Updates an existing texture using the stream's native pixel source. */
   virtual bool onUpdateTexture(std::shared_ptr<TextureView> textureView) = 0;
+
+  struct TextureReadResult {
+    std::shared_ptr<TextureView> texture = nullptr;
+    ImageReaderStatus status = ImageReaderStatus::Failed;
+    int64_t timestamp = -1;
+  };
+
+  /**
+   * Creates or updates a texture and reports which frame is bound. The deadline uses Clock::Now()'s
+   * microsecond timeline and bounds all producer-notification waits in this read. A target of -1
+   * requests the latest available frame. The result may retain a texture without declaring Ready.
+   */
+  virtual TextureReadResult onReadTexture(Context* context, bool mipmapped,
+                                          std::shared_ptr<TextureView> texture, int64_t target,
+                                          int64_t /*deadline*/) {
+    if (texture == nullptr) {
+      texture = onMakeTexture(context, mipmapped);
+    } else if (!onUpdateTexture(texture)) {
+      return {std::move(texture), ImageReaderStatus::Failed, -1};
+    }
+    if (texture == nullptr) {
+      return {};
+    }
+    auto status = target >= 0 ? ImageReaderStatus::Unsupported : ImageReaderStatus::Ready;
+    return {std::move(texture), status, -1};
+  }
+
+  /**
+   * Tells the stream that the producer restarted its timeline, so anything derived from the previous
+   * presentation time must be dropped: after a seek the timestamps start over and a stale reference
+   * would make the next frame look like it was already reached. The default implementation does
+   * nothing.
+   */
+  virtual void onSeeked() {
+  }
 
  private:
   int _width = 0;

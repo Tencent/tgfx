@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <mutex>
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/Rect.h"
@@ -25,6 +26,38 @@
 namespace tgfx {
 class TextureView;
 class ImageStream;
+
+/**
+ * Describes the delivery state of a texture read. Only Ready confirms that the requested frame is
+ * bound. Other states do not prescribe whether the caller should display, retry, or cache it.
+ */
+enum class ImageReaderStatus {
+  Pending,
+  Ready,
+  NotReady,
+  Mismatched,
+  Failed,
+  Expired,
+  Unsupported,
+};
+
+/**
+ * Carries the target and delivery state of one ImageBuffer. Set targetTimestamp before acquiring
+ * the buffer and keep it unchanged afterwards. The caller may update deadline before each texture
+ * read, including retries. Read status with acquire ordering after the GPU resource tasks complete.
+ */
+struct ImageReaderFrame {
+  /** The requested presentation timestamp in nanoseconds, or -1 to read the latest available frame. */
+  int64_t targetTimestamp = -1;
+  /** The absolute waiting deadline in microseconds on Clock::Now()'s monotonic timeline.
+   * A deadline at or before Clock::Now(), including 0, disables waiting for producer notifications.
+   * This bounds notification waits, not platform driver calls or GPU execution. */
+  std::atomic<int64_t> deadline = 0;
+  /** The timestamp of the bound texture in nanoseconds, or -1 if no timestamp is available. */
+  std::atomic<int64_t> timestamp = -1;
+  /** The result of the most recent texture read. */
+  std::atomic<ImageReaderStatus> status = ImageReaderStatus::Pending;
+};
 
 /**
  * The ImageReader class allows direct access to ImageBuffers generated from a video source of the
@@ -61,11 +94,30 @@ class ImageReader {
   const std::shared_ptr<ColorSpace>& colorSpace() const;
 
   /**
-   * Acquires the next ImageBuffer from the ImageReader after a new image frame has been rendered
-   * into the associated video source. Note that the previously returned image buffers will
-   * immediately expire after the newly created ImageBuffer is drawn.
+   * Acquires an ImageBuffer after the producer renders a frame into the associated source. The
+   * frame request belongs to this buffer and cannot be overwritten by later acquisitions. A texture
+   * read returns no texture while reporting NotReady, Mismatched, Failed, or Expired. This prevents
+   * resource caches from treating unrelated pixels as this buffer's content. The caller decides
+   * whether to retry, retain its previous output, or request the latest frame instead. An incomplete
+   * read remains retryable until another buffer is acquired or the producer seeks. A timestamped
+   * stream may immediately report Mismatched again after passing the target; retrying does not seek
+   * the producer. To recover an earlier target, reposition the producer, notifySeeked(), and acquire
+   * a new buffer.
+   * @param frame Optional target, waiting deadline, and delivery state for this buffer. Passing
+   * nullptr requests the latest available frame without waiting. Do not reuse a frame request for
+   * different buffers. Streams without timestamps report Unsupported for a nonnegative target.
+   * @return The acquired ImageBuffer, whose pixels are resolved when it is first drawn.
    */
-  std::shared_ptr<ImageBuffer> acquireNextBuffer();
+  std::shared_ptr<ImageBuffer> acquireNextBuffer(std::shared_ptr<ImageReaderFrame> frame = nullptr);
+
+  /**
+   * Tells the reader that the producer seeked, so the presentation time it compares the next frame
+   * against is discarded. Without it a seek that restarts the timeline makes the first frames look
+   * like they were already reached, and the texture keeps showing the frame from before the seek.
+   * All previously acquired ImageBuffers expire immediately, including buffers whose texture reads
+   * already reported Ready. Acquire a new buffer for frames produced after the seek.
+   */
+  void notifySeeked();
 
  protected:
   std::mutex locker = {};
@@ -84,7 +136,8 @@ class ImageReader {
   bool checkExpired(uint64_t contentVersion);
 
   std::shared_ptr<TextureView> readTexture(uint64_t contentVersion, Context* context,
-                                           bool mipmapped);
+                                           bool mipmapped,
+                                           const std::shared_ptr<ImageReaderFrame>& frame);
 
   friend class ImageReaderBuffer;
   friend class ImageStream;

@@ -26,6 +26,7 @@
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLTexture.h"
 #include "gpu/resources/DefaultTextureView.h"
+#include "tgfx/core/Clock.h"
 
 namespace tgfx {
 static Global<jclass> SurfaceTextureClass;
@@ -40,6 +41,7 @@ static jmethodID SurfaceTexture_detachFromGLContext;
 static jmethodID SurfaceTexture_release;
 static jmethodID SurfaceTexture_getDataSpace;
 static jmethodID SurfaceTexture_getTransformMatrix;
+static jmethodID SurfaceTexture_getTimestamp;
 static Global<jclass> SurfaceClass;
 static jmethodID Surface_Constructor;
 static Global<jclass> HandlerClass;
@@ -85,6 +87,7 @@ void SurfaceTexture::JNIInit(JNIEnv* env) {
   SurfaceTexture_detachFromGLContext =
       env->GetMethodID(SurfaceTextureClass.get(), "detachFromGLContext", "()V");
   SurfaceTexture_release = env->GetMethodID(SurfaceTextureClass.get(), "release", "()V");
+  SurfaceTexture_getTimestamp = env->GetMethodID(SurfaceTextureClass.get(), "getTimestamp", "()J");
   SurfaceTexture_getDataSpace = env->GetMethodID(SurfaceTextureClass.get(), "getDataSpace", "()I");
   if (SurfaceTexture_getDataSpace == nullptr) {
     env->ExceptionClear();
@@ -239,15 +242,31 @@ static ISize ComputeTextureSize(const float matrix[16], int width, int height) {
   return result;
 }
 
-std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, bool) {
-  auto textureID = makeExternalOESTexture(context);
-  if (textureID == 0) {
-    return nullptr;
+std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, bool mipmapped) {
+  return onReadTexture(context, mipmapped, nullptr, -1, 0).texture;
+}
+
+bool SurfaceTexture::onUpdateTexture(std::shared_ptr<TextureView>) {
+  return updateTexImage(-1, 0).status == ImageReaderStatus::Ready;
+}
+
+ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
+    Context* context, bool, std::shared_ptr<TextureView> textureView, int64_t target,
+    int64_t deadline) {
+  unsigned textureID = 0;
+  if (textureView == nullptr) {
+    textureID = makeExternalOESTexture(context);
+    if (textureID == 0) {
+      return {};
+    }
   }
-  if (!updateTexImage()) {
-    auto gl = static_cast<GLGPU*>(context->gpu())->functions();
-    gl->deleteTextures(1, &textureID);
-    return nullptr;
+  auto result = updateTexImage(target, deadline);
+  if (textureView != nullptr) {
+    return {std::move(textureView), result.status, result.timestamp};
+  }
+  if (result.timestamp < 0 || result.status == ImageReaderStatus::Failed) {
+    releaseExternalOESTexture(context, textureID);
+    return {nullptr, result.status, -1};
   }
   // The descriptor must match the real size of the OES texture, otherwise getTextureCoord()
   // converts pixel coordinates with a wrong base: hardware decoders pad the output buffer to an
@@ -257,8 +276,8 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
   // and exposed the black background of the video as an outline around the content. The padding
   // rows are kept out of the sampling by the subset clamp that needSubset() enables for external
   // textures.
-  auto descriptorWidth = textureSize.isEmpty() ? width() : textureSize.width;
-  auto descriptorHeight = textureSize.isEmpty() ? height() : textureSize.height;
+  auto descriptorWidth = result.textureSize.isEmpty() ? width() : result.textureSize.width;
+  auto descriptorHeight = result.textureSize.isEmpty() ? height() : result.textureSize.height;
   TextureDescriptor descriptor = {descriptorWidth,
                                   descriptorHeight,
                                   PixelFormat::RGBA_8888,
@@ -268,11 +287,37 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
   auto gpu = static_cast<GLGPU*>(context->gpu());
   auto texture = gpu->makeResource<GLTexture>(
       descriptor, static_cast<unsigned>(GL_TEXTURE_EXTERNAL_OES), textureID);
-  return Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
+  textureView = Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
+  return {std::move(textureView), result.status, result.timestamp};
 }
 
-bool SurfaceTexture::onUpdateTexture(std::shared_ptr<TextureView>) {
-  return updateTexImage();
+bool SurfaceTexture::latchTexture(JNIEnv* env) {
+  env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    LOGE("SurfaceTexture::latchTexture(): failed to updateTexImage!");
+    return false;
+  }
+  if (SurfaceTexture_getDataSpace) {
+    jint dataSpace = env->CallIntMethod(surfaceTexture.get(), SurfaceTexture_getDataSpace);
+    jint standard =
+        env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getStandard, dataSpace);
+    jint transfer =
+        env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getTransfer, dataSpace);
+    _colorSpace = AndroidDataSpaceToColorSpace(standard, transfer);
+  }
+  frameState.onLatched(currentTimestamp(env));
+  return true;
+}
+
+int64_t SurfaceTexture::currentTimestamp(JNIEnv* env) {
+  return static_cast<int64_t>(
+      env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp));
+}
+
+void SurfaceTexture::onSeeked() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  frameState.onSeeked();
 }
 
 unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
@@ -298,36 +343,62 @@ unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
   return textureID;
 }
 
-bool SurfaceTexture::updateTexImage() {
-  std::unique_lock<std::mutex> autoLock(locker);
-  if (!frameAvailable) {
-    static const auto TIMEOUT = std::chrono::seconds(1);
-    auto status = condition.wait_for(autoLock, TIMEOUT);
-    if (status == std::cv_status::timeout) {
-      LOGE("NativeImageReader::onUpdateTexture(): timeout when waiting for the frame available!");
-      return false;
+void SurfaceTexture::releaseExternalOESTexture(Context* context, unsigned textureID) {
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env != nullptr) {
+    env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_detachFromGLContext);
+    if (!env->ExceptionCheck()) {
+      return;
     }
+    env->ExceptionClear();
   }
+  auto gl = static_cast<GLGPU*>(context->gpu())->functions();
+  gl->deleteTextures(1, &textureID);
+}
+
+SurfaceTexture::FrameUpdateResult SurfaceTexture::updateTexImage(int64_t target, int64_t deadline) {
+  std::unique_lock<std::mutex> autoLock(locker);
+  auto snapshot = [this](ImageReaderStatus status) {
+    return FrameUpdateResult{status, frameState.lastLatchedTimestamp(), textureSize};
+  };
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
-    return false;
+    return snapshot(ImageReaderStatus::Failed);
   }
-  frameAvailable = false;
-  env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
-  if (env->ExceptionCheck()) {
-    env->ExceptionClear();
-    LOGE("NativeImageReader::onUpdateTexture(): failed to updateTexImage!");
-    return false;
+  // Notifications can be coalesced, so an advancing latch also permits polling the queue. Only an
+  // empty queue waits for another notification, always using the caller's remaining monotonic
+  // budget. A producer that continuously queues frames is bounded independently of that budget.
+  static constexpr int MAX_LATCH_FRAMES = 8;
+  int latchCount = 0;
+  while (latchCount < MAX_LATCH_FRAMES) {
+    auto status = frameState.readStatus(target);
+    if (status != ImageReaderStatus::Pending) {
+      return snapshot(status);
+    }
+    if (!frameAvailable && (!frameState.hasLatchedFrame() || !frameState.lastLatchAdvanced())) {
+      auto remaining = deadline - Clock::Now();
+      if (target < 0 && frameState.hasLatchedFrame()) {
+        break;
+      }
+      if (remaining <= 0) {
+        break;
+      }
+      condition.wait_for(autoLock, std::chrono::microseconds(remaining));
+      continue;
+    }
+    frameAvailable = false;
+    if (!latchTexture(env)) {
+      return snapshot(ImageReaderStatus::Failed);
+    }
+    latchCount++;
+    resolveTextureSize(env);
   }
-  if (SurfaceTexture_getDataSpace) {
-    jint dataSpace = env->CallIntMethod(surfaceTexture.get(), SurfaceTexture_getDataSpace);
-    jint standard =
-        env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getStandard, dataSpace);
-    jint transfer =
-        env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getTransfer, dataSpace);
-    _colorSpace = AndroidDataSpaceToColorSpace(standard, transfer);
-  }
+  return snapshot(frameState.readStatus(target, true));
+}
+
+void SurfaceTexture::resolveTextureSize(JNIEnv* env) {
   if (SurfaceTexture_getTransformMatrix != nullptr && !textureSizeResolved) {
     auto floatArray = env->NewFloatArray(16);
     if (floatArray == nullptr) {
@@ -351,7 +422,6 @@ bool SurfaceTexture::updateTexImage() {
       env->DeleteLocalRef(floatArray);
     }
   }
-  return true;
 }
 
 }  // namespace tgfx
