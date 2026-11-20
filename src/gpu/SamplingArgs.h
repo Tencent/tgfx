@@ -19,6 +19,7 @@
 #pragma once
 
 #include <optional>
+#include "core/utils/MathExtra.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/TileMode.h"
@@ -33,10 +34,21 @@ class SamplingArgs {
       : tileModeX(tileModeX), tileModeY(tileModeY), sampling(sampling), constraint(constraint) {
   }
 
+  // For a convolution in pixel space, sampling at an integer offset reads exactly one texel.
+  // Resolve this after image wrappers have applied their subset, scale, or orientation.
+  SamplingOptions samplingForMatrix(const Matrix& matrix) const {
+    if (sampleAtIntegerOffsets && matrix.isTranslate() && IsInteger(matrix.getTranslateX()) &&
+        IsInteger(matrix.getTranslateY())) {
+      return SamplingOptions(FilterMode::Nearest, MipmapMode::None);
+    }
+    return sampling;
+  }
+
   TileMode tileModeX = TileMode::Clamp;
   TileMode tileModeY = TileMode::Clamp;
   SamplingOptions sampling = {};
   SrcRectConstraint constraint = SrcRectConstraint::Fast;
   std::optional<Rect> sampleArea = std::nullopt;
+  bool sampleAtIntegerOffsets = false;
 };
 }  // namespace tgfx

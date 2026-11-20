@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include "tgfx/core/SamplingOptions.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
@@ -36,6 +38,13 @@ class BackgroundSource {
                                                 const Matrix& matrix,
                                                 std::shared_ptr<ColorSpace> colorSpace);
 
+  // Creates a top-level source aligned to the output pixel grid at full resolution. The
+  // scene-root transform includes the capture surface's offset on that grid. As in Make(),
+  // world coordinates are the coordinates before the transform applied to the canvas.
+  static std::shared_ptr<BackgroundSource> MakeWithGeometry(Context* context, const ISize& size,
+                                                            const Matrix& sceneRootToSurface,
+                                                            std::shared_ptr<ColorSpace> colorSpace);
+
   virtual ~BackgroundSource() = default;
 
   // Canvas callers draw into.
@@ -48,7 +57,7 @@ class BackgroundSource {
 
   // Returns "parent backdrop + everything drawn through getCanvas() so far". Safe to call
   // repeatedly.
-  std::shared_ptr<Image> getBackgroundImage();
+  std::shared_ptr<Image> getBackgroundImage(const SamplingOptions& parentSampling = {});
 
   // Derives a sub source backed by an externally-owned Surface (the offscreen carrier's surface).
   // renderBounds is in world coords; localToWorld / localToSurface map the sub's local coords.

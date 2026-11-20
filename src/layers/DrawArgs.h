@@ -19,14 +19,18 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 #include "layers/compositing3d/Layer3DContext.h"
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 class BackgroundHandler;
+class Layer;
 class OpaqueContext;
+struct DrawControl;
 
 /**
  * DrawArgs represents the arguments passed to the draw method of a Layer.
@@ -45,6 +49,10 @@ class DrawArgs {
 
   uint32_t renderFlags = 0;
 
+  // Strict-mode failure feedback for the tiled export path. Null keeps the regular draw behavior,
+  // in which intermediate failures are handled silently by the existing fallbacks.
+  DrawControl* drawControl = nullptr;
+
   // Whether to exclude effects during the drawing process.
   // Note: When set to true, all layer styles and filters will be skipped.
   bool excludeEffects = false;
@@ -52,6 +60,9 @@ class DrawArgs {
   // Layer whose renderBounds does not intersect any of these rects. Callers should pre-outset the
   // rects if blur sampling range needs to be included. nullptr means no culling (full recording).
   const std::vector<Rect>* renderRects = nullptr;
+  // Optional bounds in the coordinate space of renderRects for a draw with a different root.
+  // Layers without an entry are conservatively drawn.
+  const std::unordered_map<const Layer*, Rect>* renderBounds = nullptr;
 
   std::shared_ptr<ColorSpace> dstColorSpace = ColorSpace::SRGB();
 

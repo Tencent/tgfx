@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -37,6 +38,7 @@
 #include "layers/BackgroundSource.h"
 #include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
+#include "layers/DrawControl.h"
 #include "layers/LayerStyleSource.h"
 #include "layers/MaskContext.h"
 #include "layers/OffscreenRenderer.h"
@@ -51,19 +53,6 @@
 #include "tgfx/layers/ShapeLayer.h"
 
 namespace tgfx {
-
-// Returns true if the given source flags include the requested source type.
-static bool HasExtraSource(uint32_t sourceFlags, LayerStyleExtraSourceType type) {
-  return (sourceFlags & static_cast<uint32_t>(type)) != 0;
-}
-
-static bool NeedsBackgroundSource(uint32_t sourceFlags) {
-  return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Background);
-}
-
-static bool NeedsContourSource(uint32_t sourceFlags) {
-  return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour);
-}
 
 // The minimum size (longest edge) for subtree cache. This prevents creating excessively small
 // mipmap levels that would be inefficient to cache.
@@ -545,13 +534,12 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
     return nullptr;
   }
   auto child = _children[static_cast<size_t>(index)];
+  if (_root) {
+    _root->invalidateRect(child->renderBounds);
+  }
   child->_parent = nullptr;
   child->onDetachFromRoot();
   _children.erase(_children.begin() + index);
-  if (_root) {
-    _root->invalidateRect(child->renderBounds);
-    child->renderBounds = {};
-  }
   invalidateDescendents();
   return child;
 }
@@ -637,12 +625,11 @@ void Layer::setChildren(const std::vector<std::shared_ptr<Layer>>& children) {
     auto it = newIndexMap.find(ptr);
     if (it == newIndexMap.end()) {
       nodesToMarkDirty.push_back(ptr);
-      ptr->_parent = nullptr;
-      ptr->onDetachFromRoot();
       if (_root) {
         _root->invalidateRect(ptr->renderBounds);
-        ptr->renderBounds = {};
       }
+      ptr->_parent = nullptr;
+      ptr->onDetachFromRoot();
     } else {
       retainedChildren.push_back(ptr);
       newPositions.push_back(it->second);
@@ -1046,6 +1033,7 @@ void Layer::onAttachToRoot(RootLayer* rootLayer) {
 
 void Layer::onDetachFromRoot() {
   _root = nullptr;
+  renderBounds = {};
   for (auto& child : _children) {
     child->onDetachFromRoot();
   }
@@ -1159,16 +1147,23 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (FloatNearlyZero(contentScale)) {
     return true;
   }
-  if (args.renderRects != nullptr && !args.renderRects->empty() && !renderBounds.isEmpty()) {
-    bool anyHit = false;
-    for (const auto& rect : *args.renderRects) {
-      if (Rect::Intersects(rect, renderBounds)) {
-        anyHit = true;
-        break;
-      }
+  if (args.renderRects != nullptr && !args.renderRects->empty()) {
+    const auto* cullBounds = &renderBounds;
+    if (args.renderBounds != nullptr) {
+      auto entry = args.renderBounds->find(this);
+      cullBounds = entry != args.renderBounds->end() ? &entry->second : nullptr;
     }
-    if (!anyHit) {
-      return true;
+    if (cullBounds != nullptr && !cullBounds->isEmpty()) {
+      bool anyHit = false;
+      for (const auto& rect : *args.renderRects) {
+        if (Rect::Intersects(rect, *cullBounds)) {
+          anyHit = true;
+          break;
+        }
+      }
+      if (!anyHit) {
+        return true;
+      }
     }
   }
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
@@ -1560,6 +1555,9 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
 
   auto invertImageMatrix = Matrix::I();
   if (result.isEmpty() || !result.imageMatrix.invert(&invertImageMatrix)) {
+    if (!result.isEmpty() && args.drawControl != nullptr) {
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
+    }
     return;
   }
 
@@ -1596,25 +1594,24 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
+  if (_layerStyles.empty()) {
+    drawContents(args, canvas, alpha);
+    return;
+  }
   // Capture and consume passes share the same per-layer LayerStyleSource via the active handler,
   // so the content, contour and geometry intermediate renders happen once per snapshot map
   // instead of once per pass.
-  const LayerStyleSource* sourcePtr = nullptr;
-  if (args.backgroundHandler != nullptr) {
-    sourcePtr = args.backgroundHandler->getCachedLayerStyleSource(this);
-  }
+  auto* handler = args.backgroundHandler;
+  auto* source = handler != nullptr ? handler->getCachedLayerStyleSource(this) : nullptr;
   std::unique_ptr<LayerStyleSource> ownedSource;
-  if (sourcePtr == nullptr) {
+  if (source == nullptr && (handler == nullptr || handler->needsLayerStyleSource(this))) {
     ownedSource = getLayerStyleSource(args, canvas->getMatrix());
-    if (ownedSource != nullptr && args.backgroundHandler != nullptr &&
-        args.backgroundHandler->canCacheLayerStyleSource(this)) {
-      sourcePtr = args.backgroundHandler->cacheLayerStyleSource(this, std::move(ownedSource));
-    }
-    if (sourcePtr == nullptr) {
-      sourcePtr = ownedSource.get();
+    source = ownedSource.get();
+    if (source != nullptr && handler != nullptr && handler->canCacheLayerStyleSource(this)) {
+      source = handler->cacheLayerStyleSource(this, std::move(ownedSource));
     }
   }
-  drawContents(args, canvas, alpha, sourcePtr);
+  drawContents(args, canvas, alpha, source);
 }
 
 void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
@@ -1628,11 +1625,6 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     hasForeground = content->drawDefault(canvas, alpha, bitFields.allowsEdgeAntialiasing);
   }
   if (!drawChildren(args, canvas, alpha, stopChild)) {
-    return;
-  }
-  if (stopChild != nullptr) {
-    // Background-walk path: skip Above styles and foreground for this layer; the caller is only
-    // interested in the portion that contributes to the synthesized backdrop.
     return;
   }
   if (layerStyleSource) {
@@ -1740,20 +1732,12 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
   // 3D middle node: descendants are independently registered with the active Layer3DContext and
   // composited via BSP. Do not recurse here, otherwise we would double-draw them.
   if (canPreserve3D() && args.render3DContext != nullptr) {
-    return true;
+    return stopChild == nullptr;
   }
-  auto childCount = static_cast<int>(_children.size());
-  int maxIndex = childCount - 1;
-  if (args.backgroundHandler != nullptr) {
-    int lastCaptureIndex = args.backgroundHandler->lastCaptureChildIndex(this);
-    if (lastCaptureIndex < 0) {
-      return true;
-    }
-    if (lastCaptureIndex < maxIndex) {
-      maxIndex = lastCaptureIndex;
-    }
-  }
-  for (int i = 0; i <= maxIndex; ++i) {
+  auto* handler = args.backgroundHandler;
+  auto range = handler != nullptr ? handler->childRange(this)
+                                  : LayerChildRange{static_cast<int>(_children.size()) - 1};
+  for (int i = 0; i <= range.lastIndex; ++i) {
     auto& child = _children[static_cast<size_t>(i)];
     if (stopChild != nullptr && child.get() == stopChild) {
       // Background-walk truncation: the caller only wants prior siblings of stopChild.
@@ -1762,15 +1746,17 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
       continue;
     }
-    if (args.backgroundHandler != nullptr && i < maxIndex) {
-      args.backgroundHandler->beginForceDrawChildren();
-      drawChild(args, canvas, child.get(), alpha, &Layer::drawLayer);
-      args.backgroundHandler->endForceDrawChildren();
+    bool forceDescendants = i < range.lastIndex;
+    if (handler != nullptr && (forceDescendants || !range.drawTrailingContent)) {
+      handler->drawChild(args, canvas, this, child.get(), alpha, forceDescendants);
     } else {
       drawChild(args, canvas, child.get(), alpha, &Layer::drawLayer);
     }
   }
-  return true;
+  // Returning false makes the caller skip Above styles and foreground: they paint after the child
+  // whose backdrop is being read, whether the walk is truncated by stopChild (the background walk
+  // only wants content before it) or by the handler's range.
+  return stopChild == nullptr && range.drawTrailingContent;
 }
 
 void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const Matrix3D& matrix3D,

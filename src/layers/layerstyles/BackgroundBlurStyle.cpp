@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
+#include "core/filters/GaussianBlurImageFilter.h"
 #include "core/utils/Log.h"
 #include "layers/CanvasUtils.h"
 
@@ -132,8 +133,8 @@ std::shared_ptr<ImageFilter> BackgroundBlurStyle::getBackgroundFilter(float cont
     return backgroundFilter;
   }
   currentScale = contentScale;
-  backgroundFilter =
-      ImageFilter::Blur(_blurrinessX * contentScale, _blurrinessY * contentScale, _tileMode);
+  backgroundFilter = GaussianBlurImageFilter::Make(_blurrinessX * contentScale,
+                                                   _blurrinessY * contentScale, _tileMode, true);
   return backgroundFilter;
 }
 

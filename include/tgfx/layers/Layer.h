@@ -793,10 +793,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   friend class RootLayer;
   friend class DisplayList;
+  friend class BackgroundHandler;
   friend class BackgroundCapturer;
   friend class BackgroundConsumer;
   friend class LayerProperty;
   friend class OffscreenRenderer;
   friend class Layer3DContext;
+  friend class LayerDrawSession;
 };
 }  // namespace tgfx

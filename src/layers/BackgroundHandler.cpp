@@ -20,9 +20,12 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/PictureUtils.h"
+#include "gpu/ShaderCaps.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
+#include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
+#include "layers/DrawControl.h"
 #include "layers/LayerStyleSource.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/PictureRecorder.h"
@@ -74,10 +77,11 @@ std::shared_ptr<Image> MakeDetachedBgCopy(Context* context, const std::shared_pt
   auto* canvas = surface->getCanvas();
   canvas->translate(-bgPixelBounds.left, -bgPixelBounds.top);
   canvas->drawImage(bgImage);
-  if (offset != nullptr) {
+  auto snapshot = surface->makeImageSnapshot();
+  if (snapshot && offset != nullptr) {
     *offset = {bgPixelBounds.left, bgPixelBounds.top};
   }
-  return surface->makeImageSnapshot();
+  return snapshot;
 }
 
 // Intersects the sub background's rect with parentArgs.renderRects to produce a narrowed cull
@@ -204,25 +208,64 @@ void BackgroundHandler::DispatchOrSkip(const DrawArgs& args, Canvas* canvas, Lay
   handler->drawBackgroundStyle(args, canvas, layer, alpha, style, source);
 }
 
-int BackgroundHandler::lastCaptureChildIndex(const Layer* parent) const {
-  return static_cast<int>(parent->children().size()) - 1;
+LayerChildRange BackgroundHandler::childRange(const Layer* parent) const {
+  return {static_cast<int>(parent->children().size()) - 1};
 }
 
-int BackgroundCapturer::lastCaptureChildIndex(const Layer* parent) const {
+void BackgroundHandler::drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent, Layer* child,
+                                  float alpha, bool /*forceDescendants*/) {
+  parent->drawChild(args, canvas, child, alpha, &Layer::drawLayer);
+}
+
+LayerChildRange BackgroundCapturer::childRange(const Layer* parent) const {
   if (isForcedCapture()) {
-    return static_cast<int>(parent->children().size()) - 1;
+    return BackgroundHandler::childRange(parent);
   }
   const auto& children = parent->children();
   for (int i = static_cast<int>(children.size()) - 1; i >= 0; --i) {
     if (children[static_cast<size_t>(i)]->hasBackgroundStyle()) {
-      return i;
+      return {i};
     }
   }
-  return -1;
+  return {};
+}
+
+void BackgroundCapturer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent,
+                                   Layer* child, float alpha, bool forceDescendants) {
+  if (forceDescendants) {
+    ++_forcedCaptureDepth;
+  }
+  BackgroundHandler::drawChild(args, canvas, parent, child, alpha, forceDescendants);
+  if (forceDescendants) {
+    --_forcedCaptureDepth;
+  }
 }
 
 bool BackgroundCapturer::needsSurface(Layer* layer) const {
   return layer != nullptr && layer->hasDescendantBackgroundStyle();
+}
+
+bool BackgroundCapturer::HasDrawableBackdrop(Layer* layer) {
+  return layer->visible() && layer->alpha() > 0.0f && layer->maskOwner == nullptr &&
+         (layer->hasOwnBackgroundStyle() || HasDrawableBackdropDescendant(layer));
+}
+
+bool BackgroundCapturer::HasDrawableBackdropDescendant(Layer* layer) {
+  if (layer == nullptr) {
+    return false;
+  }
+  for (const auto& child : layer->children()) {
+    if (HasDrawableBackdrop(child.get())) {
+      return true;
+    }
+  }
+  return false;
+}
+
+std::unique_ptr<BackgroundCapturer> BackgroundCapturer::makeSubCapturer(
+    BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source,
+    const std::vector<Rect>* styleSourceRects) const {
+  return std::make_unique<BackgroundCapturer>(snapshots, std::move(source), styleSourceRects);
 }
 
 std::unique_ptr<BackgroundCapturer> BackgroundCapturer::buildSubCapturer(
@@ -233,12 +276,13 @@ std::unique_ptr<BackgroundCapturer> BackgroundCapturer::buildSubCapturer(
   auto subRect = subSource->getBackgroundRect();
   // The sources recorded here are cached in the shared map and may be reused by the consume pass
   // outside this sub surface, so the sub capturer keeps the parent's recording range.
-  auto clone =
-      std::make_unique<BackgroundCapturer>(snapshots, std::move(subSource), _styleSourceRects);
-  NarrowRenderRects(parentArgs, subRect, &clone->_renderRects);
+  auto clone = makeSubCapturer(snapshots, std::move(subSource), _styleSourceRects);
+  if (narrowSubRenderRects()) {
+    NarrowRenderRects(parentArgs, subRect, &clone->_renderRects);
+  }
   // Forced-capture state must propagate so pass-through subtrees still feed the parent bgSource.
   if (isForcedCapture()) {
-    clone->beginForceDrawChildren();
+    clone->forceDrawDescendants();
   }
   return clone;
 }
@@ -249,10 +293,16 @@ std::unique_ptr<BackgroundHandler> BackgroundCapturer::createSubHandler(
   Matrix toWorld = Matrix::I();
   Rect worldBounds = Rect::MakeEmpty();
   if (!ComputeSubGeometry(bgSource.get(), localBounds, localToWorld, &toWorld, &worldBounds)) {
+    if (parentArgs.drawControl != nullptr) {
+      parentArgs.drawControl->fail(LayerImageErrorCode::DrawFailed);
+    }
     DEBUG_ASSERT(false);
     return nullptr;
   }
   auto subSource = bgSource->createFromSurface(surface, worldBounds, toWorld, localToSurface);
+  if (subSource == nullptr && parentArgs.drawControl != nullptr) {
+    parentArgs.drawControl->fail(LayerImageErrorCode::AllocationFailed);
+  }
   DEBUG_ASSERT(subSource != nullptr);
   return buildSubCapturer(parentArgs, std::move(subSource));
 }
@@ -345,27 +395,38 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
                        visibleLocal.top * contentScale - contentOffset.y,
                        visibleLocal.width() * contentScale, visibleLocal.height() * contentScale);
   }
-  auto bgImage = bgSource->getBackgroundImage();
+  // The detached capture replays at native resolution with a whole-pixel translation.
+  // Parent subsets also use whole-pixel offsets within this capture.
+  auto parentSampling = args.context && args.context->shaderCaps()->needsPixelAlignedLayerSampling
+                            ? SamplingOptions(FilterMode::Nearest, MipmapMode::None)
+                            : SamplingOptions();
+  auto bgImage = bgSource->getBackgroundImage(parentSampling);
+  Point imageOffset = {};
+  if (bgImage) {
+    auto bgPixelToLocal = worldToLocal;
+    bgPixelToLocal.preConcat(bgSource->backgroundMatrix());
+    auto detached = MakeDetachedBgCopy(args.context, bgImage, bgPixelToLocal, contentBounds,
+                                       &imageOffset, args.dstColorSpace);
+    if (detached) {
+      bgImage = std::move(detached);
+    } else if (parentSampling != SamplingOptions()) {
+      // The fallback is replayed under the layer transform and may need linear sampling.
+      bgImage = bgSource->getBackgroundImage();
+    }
+  }
   if (bgImage == nullptr) {
+    if (args.drawControl != nullptr) {
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
+    }
     return;
   }
-  Matrix bgPixelToLocal = worldToLocal;
-  bgPixelToLocal.preConcat(bgSource->backgroundMatrix());
-  Point smallBgOffset = {};
-  auto smallBgImage = MakeDetachedBgCopy(args.context, bgImage, bgPixelToLocal, contentBounds,
-                                         &smallBgOffset, args.dstColorSpace);
   PictureRecorder recorder = {};
   auto* recording = recorder.beginRecording();
   recording->scale(contentScale, contentScale);
   recording->concat(worldToLocal);
   recording->concat(bgSource->backgroundMatrix());
-  if (smallBgImage != nullptr) {
-    recording->translate(smallBgOffset.x, smallBgOffset.y);
-    recording->drawImage(std::move(smallBgImage));
-  } else {
-    // Fallback when detached copy is unavailable; original path may trigger COW.
-    recording->drawImage(bgImage);
-  }
+  recording->translate(imageOffset.x, imageOffset.y);
+  recording->drawImage(std::move(bgImage));
   auto picture = recorder.finishRecordingAsPicture();
   if (picture == nullptr) {
     return;
@@ -385,10 +446,7 @@ const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* lay
     return nullptr;
   }
   auto it = snapshots->layerStyleSources.find(layer);
-  if (it == snapshots->layerStyleSources.end()) {
-    return nullptr;
-  }
-  return it->second.get();
+  return it == snapshots->layerStyleSources.end() ? nullptr : it->second.get();
 }
 
 bool BackgroundCapturer::canCacheLayerStyleSource(Layer* /*layer*/) const {
@@ -402,6 +460,11 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
   DEBUG_ASSERT(canCacheLayerStyleSource(layer));
   if (source == nullptr) {
     return nullptr;
+  }
+  if (!snapshots->rasterizeStyleSources) {
+    auto* raw = source.get();
+    snapshots->layerStyleSources.emplace(layer, std::move(source));
+    return raw;
   }
   // Rasterize so the first draw uploads a GPU texture and the second reuses it. Wrapping an image
   // again produces a new image object with its own GPU cache, so the geometry recording, which
@@ -439,10 +502,11 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
     return nullptr;
   }
   auto it = snapshots->layerStyleSources.find(layer);
-  if (it == snapshots->layerStyleSources.end()) {
-    return nullptr;
-  }
-  return it->second.get();
+  return it == snapshots->layerStyleSources.end() ? nullptr : it->second.get();
+}
+
+bool BackgroundConsumer::needsSurface(Layer* layer) const {
+  return matchLiveBackdrop && BackgroundCapturer::HasDrawableBackdropDescendant(layer);
 }
 
 void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
@@ -474,11 +538,31 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     if (it == snapshots->snapshots.end()) {
       // Surface path: the map is authoritative, so a miss is a capture-side coverage bug.
       // Silently skip rather than masking the bug with on-the-fly synthesis.
+      if (args.drawControl != nullptr && !args.drawControl->failed()) {
+        // Without scene culling, a style can be visited outside a tile's effective clip.
+        if (args.renderRects == nullptr || args.renderRects->empty()) {
+          auto clipBounds = GetClipBounds(canvas);
+          if (clipBounds.has_value()) {
+            auto contentBounds =
+                Rect::MakeXYWH(contentOffset.x, contentOffset.y, contentWidth, contentHeight);
+            auto styleBounds = style->filterBounds(contentBounds, source->contentScale);
+            auto inverseScale = 1.0f / source->contentScale;
+            styleBounds.scale(inverseScale, inverseScale);
+            if (!Rect::Intersects(styleBounds, *clipBounds)) {
+              return;
+            }
+          }
+        }
+        args.drawControl->fail(LayerImageErrorCode::DrawFailed);
+      }
       return;
     }
     auto& cursor = readCursors[key];
     DEBUG_ASSERT(cursor < it->second.size() && "capture/consume push-pop count mismatch");
     if (cursor >= it->second.size()) {
+      if (args.drawControl != nullptr) {
+        args.drawControl->fail(LayerImageErrorCode::DrawFailed);
+      }
       return;
     }
     auto& entry = it->second[cursor++];

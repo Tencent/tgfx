@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <vector>
 #include "layers/BackgroundSnapshotMap.h"
+#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 
@@ -36,6 +37,14 @@ class Layer;
 class LayerStyle;
 class Surface;
 struct LayerStyleSource;
+
+struct LayerChildRange {
+  // Index of the last child to visit, or -1 to visit none.
+  int lastIndex = -1;
+  // When false, the parent skips its Above styles and foreground, and every child in the range,
+  // including the last one, is drawn through BackgroundHandler::drawChild.
+  bool drawTrailingContent = true;
+};
 
 /**
  * Strategy for rendering Background-sourced LayerStyles.
@@ -65,8 +74,9 @@ class BackgroundHandler {
 
   // Returns true when descendants of `layer` should render onto a real Surface so a sub
   // background source can sample them back. Capturer returns true only when `layer` actually has
-  // descendant background-sourced styles AND a GPU context is available; Consumer / NoOp always
-  // return false.
+  // descendant background-sourced styles AND a GPU context is available. Consumer returns true
+  // only when it mirrors a capture pass that selects surfaces from the live layer tree; NoOp and
+  // other passes always return false.
   virtual bool needsSurface(Layer* /*layer*/) const {
     return false;
   }
@@ -97,17 +107,24 @@ class BackgroundHandler {
     return nullptr;
   }
 
-  // Returns the index of the last child in parent's children list that should be traversed
-  // during the capture pass, or -1 if no children need traversal. BackgroundCapturer overrides
-  // this to skip children after the last one with background styles.
-  virtual int lastCaptureChildIndex(const Layer* /*parent*/) const;
+  // Selects the children to visit and whether to draw the parent's content after them.
+  virtual LayerChildRange childRange(const Layer* parent) const;
 
-  // Returns a previously cached LayerStyleSource for the given layer, or nullptr if none. Capture
-  // and consume passes walk the same tree, so the source built in capture is reused in consume —
-  // avoiding redundant content/contour image renders. Default implementation returns nullptr so
-  // NoOp handlers don't engage caching.
+  // Draws a child whose descendants must be visited or whose parent has a truncated range.
+  // The final child of a full range uses the layer's normal draw path directly, so this is only
+  // called when forceDescendants is true or the range is truncated. A subclass that intercepts a
+  // specific child must return drawTrailingContent = false from childRange for its parent.
+  virtual void drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent, Layer* child,
+                         float alpha, bool forceDescendants);
+
+  // The consume pass reuses sources from capture to avoid redundant image recordings.
   virtual const LayerStyleSource* getCachedLayerStyleSource(Layer* /*layer*/) const {
     return nullptr;
+  }
+
+  // Determines whether to record an uncached source for this layer's styles in this pass.
+  virtual bool needsLayerStyleSource(Layer* /*layer*/) const {
+    return true;
   }
 
   // Whether this handler will cache a LayerStyleSource for `layer`. Used by Layer::drawDirectly
@@ -121,15 +138,6 @@ class BackgroundHandler {
   virtual const LayerStyleSource* cacheLayerStyleSource(
       Layer* /*layer*/, std::unique_ptr<LayerStyleSource> /*source*/) {
     return nullptr;
-  }
-
-  // During the capture pass, a subtree that sits before a later bg-style sibling must draw all
-  // descendants so their content appears on the bg source surface. drawChildren wraps each such
-  // child draw in begin/endForceDrawChildren. Non-capturing handlers default to no-ops, so
-  // callers can invoke these unconditionally.
-  virtual void beginForceDrawChildren() {
-  }
-  virtual void endForceDrawChildren() {
   }
 };
 
@@ -162,7 +170,10 @@ class BackgroundCapturer : public BackgroundHandler {
     return _styleSourceRects;
   }
 
-  int lastCaptureChildIndex(const Layer* parent) const override;
+  LayerChildRange childRange(const Layer* parent) const override;
+
+  void drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent, Layer* child, float alpha,
+                 bool forceDescendants) override;
 
   const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
 
@@ -171,12 +182,10 @@ class BackgroundCapturer : public BackgroundHandler {
   const LayerStyleSource* cacheLayerStyleSource(Layer* layer,
                                                 std::unique_ptr<LayerStyleSource> source) override;
 
-  void beginForceDrawChildren() override {
-    ++_forcedCaptureDepth;
-  }
-  void endForceDrawChildren() override {
-    --_forcedCaptureDepth;
-  }
+  // Returns true when `layer` has a visible descendant whose Background-sourced style draws. This
+  // is the live-tree selection both the export capturer and its matching consumer use, so they
+  // agree on which offscreen groups need a real Surface.
+  static bool HasDrawableBackdropDescendant(Layer* layer);
 
   // Runs a capture pass: replays captureRoot onto bgSource's canvas, populating snapshots. The
   // replay walks the tree exactly once with renderRects set to the rects the capture actually
@@ -208,11 +217,28 @@ class BackgroundCapturer : public BackgroundHandler {
     return _captureWorldMatrix;
   }
 
- private:
+ protected:
+  // Returns true when `layer` itself draws a Background-sourced style or contains one that does.
+  static bool HasDrawableBackdrop(Layer* layer);
+
+  virtual std::unique_ptr<BackgroundCapturer> makeSubCapturer(
+      BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source,
+      const std::vector<Rect>* styleSourceRects) const;
+
+  // A pass that shares style inputs with a later pass may need to keep the parent cull rects.
+  virtual bool narrowSubRenderRects() const {
+    return true;
+  }
+
+  void forceDrawDescendants() {
+    ++_forcedCaptureDepth;
+  }
+
   bool isForcedCapture() const {
     return _forcedCaptureDepth > 0;
   }
 
+ private:
   std::unique_ptr<BackgroundCapturer> buildSubCapturer(
       const DrawArgs& parentArgs, std::shared_ptr<BackgroundSource> subSource) const;
 
@@ -235,18 +261,26 @@ class BackgroundConsumer : public BackgroundHandler {
   // opaque (which is what makes SrcOver compositing of the cached output match the style's own
   // Src draw), the frame renders through multiple passes, and those passes cover compact render
   // rects, since that is when caching pays for its rasterization.
-  BackgroundConsumer(BackgroundSnapshotMap* snapshots, bool shareStyleOutput)
-      : snapshots(snapshots), shareStyleOutput(shareStyleOutput) {
+  // matchLiveBackdrop mirrors the capture pass that produced `snapshots` when it selects
+  // surfaces from the live layer tree (the export target path). It makes this consumer take the
+  // same offscreen route as the capturer for groups that contain drawable backdrop styles.
+  BackgroundConsumer(BackgroundSnapshotMap* snapshots, bool shareStyleOutput,
+                     bool matchLiveBackdrop = false)
+      : snapshots(snapshots), shareStyleOutput(shareStyleOutput),
+        matchLiveBackdrop(matchLiveBackdrop) {
   }
 
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                            LayerStyle* style, const LayerStyleSource* source) override;
+
+  bool needsSurface(Layer* layer) const override;
 
   const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
 
  private:
   BackgroundSnapshotMap* snapshots = nullptr;
   bool shareStyleOutput = false;
+  bool matchLiveBackdrop = false;
   // Per-consumer read cursors: each (Layer, LayerStyle) entry list is consumed in dispatch order
   // through this map, so a shared snapshot map can be consumed by multiple consumers (e.g. one
   // per tile in tiled rendering) without cursors interfering.

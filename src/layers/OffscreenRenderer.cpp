@@ -19,8 +19,10 @@
 #include "layers/OffscreenRenderer.h"
 #include "core/utils/PictureUtils.h"
 #include "layers/BackgroundHandler.h"
+#include "layers/DrawControl.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/gpu/GPU.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
@@ -40,6 +42,14 @@ void SeedBackdrop(Canvas* canvas, const std::shared_ptr<Image>& backdrop, const 
   canvas->setMatrix(Matrix::MakeTrans(-surfaceRect.x(), -surfaceRect.y()));
   canvas->drawImage(backdrop);
   canvas->restore();
+}
+
+bool ExceedsDeviceLimit(Context* context, const Rect& rect) {
+  if (context == nullptr || context->gpu() == nullptr) {
+    return false;
+  }
+  auto limit = static_cast<float>(context->gpu()->limits()->maxTextureDimension2D);
+  return rect.width() > limit || rect.height() > limit;
 }
 
 }  // namespace
@@ -74,12 +84,20 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
   // through this subtree; otherwise a PictureRecorder is cheaper.
   if (args.backgroundHandler != nullptr && args.backgroundHandler->needsSurface(layer) &&
       args.context != nullptr) {
+    if (args.drawControl != nullptr && ExceedsDeviceLimit(args.context, imageClip)) {
+      args.drawControl->fail(LayerImageErrorCode::DeviceLimitExceeded);
+      return {};
+    }
     auto surface =
         Surface::Make(args.context, static_cast<int>(imageClip.width()),
                       static_cast<int>(imageClip.height()), false, 1, false, 0, args.dstColorSpace);
     if (surface != nullptr) {
       result = RenderContentOnSurface(layer, args, std::move(surface), density, imageClip,
                                       *inputBounds, contentMatrix);
+    } else if (args.drawControl != nullptr) {
+      // A picture fallback would drop descendant backdrop styles, so a strict draw fails instead.
+      args.drawControl->fail(LayerImageErrorCode::AllocationFailed);
+      return {};
     } else {
       result = RenderContentOnPicture(layer, args, density, imageClip, contentMatrix);
     }
@@ -94,6 +112,11 @@ OffscreenResult OffscreenRenderer::RenderContent(Layer* layer, const DrawArgs& a
   result.image = layer->applyFilters(std::move(result.image), density.getMaxScale(),
                                      inputContentBounds, &filterOffset);
   if (result.image == nullptr) {
+    // A filter that returns no image drops the whole layer content, so a strict draw must fail
+    // instead of delivering an empty result as a success.
+    if (args.drawControl != nullptr) {
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
+    }
     return {};
   }
   result.imageMatrix.preTranslate(filterOffset.x, filterOffset.y);
@@ -109,6 +132,9 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
   }
   auto backdrop = SnapshotOf(parentCanvas);
   if (!backdrop) {
+    if (args.drawControl != nullptr) {
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
+    }
     return {};
   }
   auto parentMatrix = parentCanvas->getMatrix();
@@ -126,6 +152,11 @@ OffscreenResult OffscreenRenderer::RenderPassThrough(Layer* layer, const DrawArg
     if (surface != nullptr) {
       return RenderPassThroughOnSurface(layer, args, std::move(surface), backdrop, parentMatrix,
                                         surfaceRect, *inputBounds);
+    }
+    if (args.drawControl != nullptr) {
+      // The picture variant cannot sample the parent backdrop, so a strict draw fails instead.
+      args.drawControl->fail(LayerImageErrorCode::AllocationFailed);
+      return {};
     }
   }
   return RenderPassThroughOnPicture(layer, args, backdrop, parentMatrix, surfaceRect);
@@ -161,9 +192,15 @@ OffscreenResult OffscreenRenderer::RenderContentOnSurface(
   OffscreenResult result;
   result.image = surface->makeImageSnapshot();
   if (result.image == nullptr) {
+    if (args.drawControl != nullptr) {
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
+    }
     return {};
   }
   if (!localToSurface.invert(&result.imageMatrix)) {
+    if (args.drawControl != nullptr) {
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
+    }
     return {};
   }
   return result;
@@ -247,9 +284,15 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnSurface(
   OffscreenResult result;
   result.image = surface->makeImageSnapshot();
   if (result.image == nullptr) {
+    if (args.drawControl != nullptr) {
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
+    }
     return {};
   }
   if (!localToSurface.invert(&result.imageMatrix)) {
+    if (args.drawControl != nullptr) {
+      args.drawControl->fail(LayerImageErrorCode::DrawFailed);
+    }
     return {};
   }
   return result;

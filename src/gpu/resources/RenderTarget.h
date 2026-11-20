@@ -28,6 +28,10 @@ namespace tgfx {
 class RenderTarget {
  public:
   virtual ~RenderTarget() = default;
+
+  // Sampling mode of the current contents, retained when the proxy is rewrapped from the cache.
+  bool sampleAtPixelCenters = false;
+
   /**
    * Wraps a backend renderTarget into RenderTarget. The caller must ensure the backend renderTarget
    * is valid for the lifetime of the returned RenderTarget. Returns nullptr if the context is

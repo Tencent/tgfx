@@ -39,6 +39,7 @@
 #include "tgfx/core/ImageProvider.h"
 #include "tgfx/core/Mesh.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/layers/DisplayList.h"
@@ -9101,6 +9102,170 @@ TGFX_TEST(LayerTest, TiledDirtyRegionOutsideViewport) {
   displayList->render(surface.get());
   ASSERT_TRUE(surface->readPixels(info, &pixel, 10, 10));
   EXPECT_EQ(pixel, 0xFFFF0000u) << "off-screen tiles kept stale content after scrolling back";
+}
+
+TGFX_TEST(LayerTest, DetachedSubtreeRetainsBackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto scene = Surface::Make(context, 256, 64);
+  auto direct = Surface::Make(context, 64, 64);
+  ASSERT_NE(scene, nullptr);
+  ASSERT_NE(direct, nullptr);
+
+  auto subtree = Layer::Make();
+  subtree->setMatrix(Matrix::MakeTrans(160, 0));
+  auto background = SolidLayer::Make();
+  background->setColor(Color::Red());
+  background->setWidth(32);
+  background->setHeight(64);
+  subtree->addChild(background);
+  auto glass = ShapeLayer::Make();
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(16, 16, 32, 32));
+  glass->setPath(path);
+  glass->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 1)));
+  glass->setLayerStyles({BackgroundBlurStyle::Make(6, 6)});
+  subtree->addChild(glass);
+
+  DisplayList displayList;
+  auto root = displayList.root();
+  ASSERT_TRUE(root->addChild(subtree));
+  displayList.render(scene.get());
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  uint8_t attachedPixel[4] = {};
+  ASSERT_TRUE(scene->readPixels(info, attachedPixel, 192, 32));
+  ASSERT_GT(attachedPixel[3], 1);
+
+  ASSERT_EQ(root->removeChildAt(0), subtree);
+  subtree->draw(direct->getCanvas());
+  uint8_t detachedPixel[4] = {};
+  ASSERT_TRUE(direct->readPixels(info, detachedPixel, 32, 32));
+  EXPECT_NEAR(detachedPixel[0], attachedPixel[0], 2);
+  EXPECT_NEAR(detachedPixel[3], attachedPixel[3], 2);
+}
+
+TGFX_TEST(LayerTest, CanvasDefaultKeepsLargePictureCoordinates) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto content = SolidLayer::Make();
+  content->setColor(Color::Red());
+  content->setWidth(10);
+  content->setHeight(10);
+  constexpr float LargeScale = 1073741824.0f;
+  PictureRecorder recorder = {};
+  auto recording = recorder.beginRecording();
+  recording->scale(LargeScale, LargeScale);
+  content->draw(recording);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+  EXPECT_EQ(picture->getBounds(), Rect::MakeWH(10.0f * LargeScale, 10.0f * LargeScale));
+  auto surface = Surface::Make(context, 10, 10, false, 1, false, 0, ColorSpace::SRGB());
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->scale(1.0f / LargeScale, 1.0f / LargeScale);
+  canvas->drawPicture(picture);
+  auto info = ImageInfo::Make(10, 10, ColorType::RGBA_8888, AlphaType::Premultiplied, 0,
+                              ColorSpace::SRGB());
+  std::vector<uint8_t> pixels(info.byteSize());
+  ASSERT_TRUE(surface->readPixels(info, pixels.data()));
+  auto offset = static_cast<size_t>(5) * info.rowBytes() + 5 * 4;
+  EXPECT_EQ(pixels[offset], 255);
+  EXPECT_EQ(pixels[offset + 1], 0);
+  EXPECT_EQ(pixels[offset + 2], 0);
+  EXPECT_EQ(pixels[offset + 3], 255);
+}
+
+TGFX_TEST(LayerTest, CanvasDrawPreservesAlphaModulationAboveOne) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto content = SolidLayer::Make();
+  auto color = Color::Red();
+  color.alpha = 0.25f;
+  content->setColor(color);
+  content->setWidth(8);
+  content->setHeight(8);
+  auto surface = Surface::Make(context, 8, 8, false, 1, false, 0, ColorSpace::SRGB());
+  ASSERT_TRUE(surface != nullptr);
+  content->draw(surface->getCanvas(), 2.0f);
+  auto info =
+      ImageInfo::Make(8, 8, ColorType::RGBA_8888, AlphaType::Premultiplied, 0, ColorSpace::SRGB());
+  std::vector<uint8_t> pixels(info.byteSize());
+  ASSERT_TRUE(surface->readPixels(info, pixels.data()));
+  auto offset = static_cast<size_t>(4) * info.rowBytes() + 4 * 4;
+  EXPECT_NEAR(pixels[offset], 128, 1);
+  EXPECT_EQ(pixels[offset + 1], 0);
+  EXPECT_EQ(pixels[offset + 2], 0);
+  EXPECT_NEAR(pixels[offset + 3], 128, 1);
+}
+
+static void ExpectLayerDrawMatchesDisplayList(Context* context, bool withBackgroundBlur,
+                                              bool usePicture) {
+  auto content = Layer::Make();
+  auto backdrop = SolidLayer::Make();
+  backdrop->setWidth(48);
+  backdrop->setHeight(48);
+  backdrop->setColor(Color::Blue());
+  content->addChild(backdrop);
+  auto foreground = SolidLayer::Make();
+  foreground->setWidth(24);
+  foreground->setHeight(24);
+  foreground->setColor(Color::Red());
+  foreground->setMatrix(Matrix::MakeTrans(10, 12));
+  foreground->setFilters({BlurFilter::Make(1.5f, 1.5f)});
+  content->addChild(foreground);
+  if (withBackgroundBlur) {
+    auto glass = SolidLayer::Make();
+    glass->setWidth(24);
+    glass->setHeight(20);
+    glass->setColor(Color::FromRGBA(255, 255, 255, 90));
+    glass->setMatrix(Matrix::MakeTrans(24, 23));
+    glass->setLayerStyles({BackgroundBlurStyle::Make(3.0f, 3.0f)});
+    content->addChild(glass);
+  }
+
+  DisplayList displayList;
+  displayList.root()->addChild(content);
+  auto reference = Surface::Make(context, 48, 48, false, 1, false, 0, ColorSpace::SRGB());
+  auto surface = Surface::Make(context, 48, 48, false, 1, false, 0, ColorSpace::SRGB());
+  ASSERT_NE(reference, nullptr);
+  ASSERT_NE(surface, nullptr);
+  displayList.render(reference.get());
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  if (usePicture) {
+    PictureRecorder recorder = {};
+    content->draw(recorder.beginRecording());
+    auto picture = recorder.finishRecordingAsPicture();
+    ASSERT_NE(picture, nullptr);
+    canvas->drawPicture(picture);
+  } else {
+    content->draw(canvas);
+  }
+  auto info = ImageInfo::Make(48, 48, ColorType::RGBA_8888, AlphaType::Premultiplied, 0,
+                              ColorSpace::SRGB());
+  std::vector<uint8_t> expected(info.byteSize());
+  std::vector<uint8_t> pixels(info.byteSize());
+  ASSERT_TRUE(reference->readPixels(info, expected.data()));
+  ASSERT_TRUE(surface->readPixels(info, pixels.data()));
+  EXPECT_EQ(pixels, expected);
+}
+
+TGFX_TEST(LayerTest, CanvasDrawMatchesDisplayList) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  ExpectLayerDrawMatchesDisplayList(context, false, false);
+  ExpectLayerDrawMatchesDisplayList(context, true, false);
+}
+
+TGFX_TEST(LayerTest, PictureCanvasMatchesDisplayList) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  ExpectLayerDrawMatchesDisplayList(context, false, true);
 }
 
 }  // namespace tgfx

@@ -205,9 +205,29 @@ std::shared_ptr<BackgroundSource> BackgroundSource::Make(Context* context, const
   return result;
 }
 
+std::shared_ptr<BackgroundSource> BackgroundSource::MakeWithGeometry(
+    Context* context, const ISize& size, const Matrix& sceneRootToSurface,
+    std::shared_ptr<ColorSpace> colorSpace) {
+  Matrix surfaceToRoot = Matrix::I();
+  if (!sceneRootToSurface.invert(&surfaceToRoot)) {
+    return nullptr;
+  }
+  auto surface = Surface::Make(context, size.width, size.height, false, 1, false, 0, colorSpace);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto coverage = surfaceToRoot.mapRect(Rect::MakeWH(size.width, size.height));
+  auto result = std::make_shared<SurfaceBackgroundSource>(std::move(surface), surfaceToRoot,
+                                                          coverage, 1.0f, std::move(colorSpace));
+  auto* canvas = result->getCanvas();
+  canvas->clear();
+  canvas->setMatrix(sceneRootToSurface);
+  return result;
+}
+
 // ─── Shared parent-merge logic ────────────────────────────────────────────────────────────────
 
-std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
+std::shared_ptr<Image> BackgroundSource::getBackgroundImage(const SamplingOptions& parentSampling) {
   auto ownImage = onGetOwnContents();
   if (parent == nullptr) {
     // Top-level: own contents == full background image.
@@ -237,7 +257,7 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
   std::shared_ptr<Image> subsetImage = nullptr;
   float subsetOffsetX = 0.0f;
   float subsetOffsetY = 0.0f;
-  if (auto parentImage = parent->getBackgroundImage()) {
+  if (auto parentImage = parent->getBackgroundImage(parentSampling)) {
     auto subsetRect = Rect::MakeXYWH(surfaceOffset.x, surfaceOffset.y, static_cast<float>(width),
                                      static_cast<float>(height));
     auto parentBounds = Rect::MakeWH(parentImage->width(), parentImage->height());
@@ -257,7 +277,7 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
   PictureRecorder recorder;
   auto canvas = recorder.beginRecording();
   if (subsetImage) {
-    canvas->drawImage(subsetImage, subsetOffsetX, subsetOffsetY);
+    canvas->drawImage(subsetImage, subsetOffsetX, subsetOffsetY, parentSampling);
   }
   if (ownImage) {
     canvas->concat(ownToSubImage);

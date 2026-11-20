@@ -30,6 +30,27 @@
 namespace tgfx {
 
 /**
+ * Returns true if the given source flags include the requested source type.
+ */
+inline bool HasExtraSource(uint32_t sourceFlags, LayerStyleExtraSourceType type) {
+  return (sourceFlags & static_cast<uint32_t>(type)) != 0;
+}
+
+/**
+ * Returns true if the style samples the already-rendered backdrop.
+ */
+inline bool NeedsBackgroundSource(uint32_t sourceFlags) {
+  return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Background);
+}
+
+/**
+ * Returns true if the style needs the shared contour of its layer.
+ */
+inline bool NeedsContourSource(uint32_t sourceFlags) {
+  return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour);
+}
+
+/**
  * Holds the recordings one excludeChildEffects bucket resolves its styles from. content is null
  * unless some style in the bucket draws from it, contour unless a Contour style needs one or a
  * geometry-less bucket falls back.

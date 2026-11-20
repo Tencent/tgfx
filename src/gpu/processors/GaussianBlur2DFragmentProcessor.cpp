@@ -22,12 +22,17 @@
 namespace tgfx {
 
 GaussianBlur2DFragmentProcessor::GaussianBlur2DFragmentProcessor(
-    PlacementPtr<FragmentProcessor> processor, float sigmaX, float sigmaY, const Point& origin)
-    : FragmentProcessor(ClassID()), origin(origin) {
+    PlacementPtr<FragmentProcessor> processor, float sigmaX, float sigmaY, const Point& origin,
+    bool quantizeHorizontal)
+    : FragmentProcessor(ClassID()), origin(origin), quantizeHorizontal(quantizeHorizontal) {
   registerChildProcessor(std::move(processor));
   // The same half-kernels as the separable blur, so the product weights sum to one as well.
   radiusX = GaussianBlur1DFragmentProcessor::ComputeHalfKernel(sigmaX, kernelX.data(), MAX_RADIUS);
   radiusY = GaussianBlur1DFragmentProcessor::ComputeHalfKernel(sigmaY, kernelY.data(), MAX_RADIUS);
+}
+
+void GaussianBlur2DFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
+  key->write(static_cast<uint32_t>(quantizeHorizontal));
 }
 
 }  // namespace tgfx
