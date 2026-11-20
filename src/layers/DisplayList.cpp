@@ -692,23 +692,23 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     return renderDirect(surface, autoClear);
   }
   auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  std::vector<std::unique_ptr<BackgroundSnapshotMap>> captureMaps = {};
-  std::vector<int> taskCapture = {};
-  captureTileBackgrounds(surface, tileTasks, zoomScale, &captureMaps, &taskCapture);
-  auto dirtyRects = drawTileTasks(tileTasks, captureMaps, taskCapture, surface, zoomScale);
+  std::vector<std::unique_ptr<BackgroundSnapshotMap>> levelSnapshots = {};
+  std::vector<int> taskSnapshotIndex = {};
+  captureBackgroundsByLevel(surface, tileTasks, zoomScale, &levelSnapshots, &taskSnapshotIndex);
+  auto dirtyRects = drawTileTasks(tileTasks, levelSnapshots, taskSnapshotIndex, surface, zoomScale);
   drawScreenTasks(std::move(screenTasks), std::move(skippedRects), surface, autoClear);
   return dirtyRects;
 }
 
-void DisplayList::captureTileBackgrounds(
+void DisplayList::captureBackgroundsByLevel(
     Surface* surface, const std::vector<DrawTask>& tileTasks, float zoomScale,
-    std::vector<std::unique_ptr<BackgroundSnapshotMap>>* captureMaps,
-    std::vector<int>* taskCapture) const {
+    std::vector<std::unique_ptr<BackgroundSnapshotMap>>* levelSnapshots,
+    std::vector<int>* taskSnapshotIndex) const {
   // Each capture serves all tiles of one raster scale, so a tile is captured with the density it
   // is drawn with. That is what lets tree tiles take part: their scale is 2^-level, not the
   // current zoom.
-  captureMaps->clear();
-  taskCapture->assign(tileTasks.size(), -1);
+  levelSnapshots->clear();
+  taskSnapshotIndex->assign(tileTasks.size(), -1);
   if (_root->hasBackgroundStyle()) {
     // Group by level first: one capture transform cannot serve two raster scales.
     std::vector<std::pair<int, std::vector<size_t>>> levels = {};
@@ -739,10 +739,10 @@ void DisplayList::captureTileBackgrounds(
       // style samples inside the rects it covers, so a capture spanning more than the tiles that
       // need it costs the surface, not the drawing.
       auto map = captureBackgrounds(surface, levelRects, Matrix::MakeScale(rasterScale));
-      auto captureIndex = static_cast<int>(captureMaps->size());
-      captureMaps->push_back(std::move(map));
+      auto snapshotIndex = static_cast<int>(levelSnapshots->size());
+      levelSnapshots->push_back(std::move(map));
       for (auto index : levelEntry.second) {
-        (*taskCapture)[index] = captureIndex;
+        (*taskSnapshotIndex)[index] = snapshotIndex;
       }
     }
   }
@@ -750,16 +750,16 @@ void DisplayList::captureTileBackgrounds(
 
 std::vector<Rect> DisplayList::drawTileTasks(
     const std::vector<DrawTask>& tileTasks,
-    const std::vector<std::unique_ptr<BackgroundSnapshotMap>>& captureMaps,
-    const std::vector<int>& taskCapture, Surface* surface, float zoomScale) {
+    const std::vector<std::unique_ptr<BackgroundSnapshotMap>>& levelSnapshots,
+    const std::vector<int>& taskSnapshotIndex, Surface* surface, float zoomScale) {
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   for (size_t taskIndex = 0; taskIndex < tileTasks.size(); ++taskIndex) {
     const auto& task = tileTasks[taskIndex];
     auto isTreeTask = task.treeLevel() != EXACT_LEVEL;
-    auto captureIndex = taskCapture[taskIndex];
+    auto snapshotIndex = taskSnapshotIndex[taskIndex];
     auto* snapshots =
-        captureIndex >= 0 ? captureMaps[static_cast<size_t>(captureIndex)].get() : nullptr;
+        snapshotIndex >= 0 ? levelSnapshots[static_cast<size_t>(snapshotIndex)].get() : nullptr;
     auto hasContent = drawTileTask(task, snapshots);
     if (!hasContent && task.coversTiles()) {
       recycleBlankTiles(task);
