@@ -590,8 +590,8 @@ TGFX_TEST(PathShapeTest, ChainedUnionBuildsEachOperandOnce) {
     rect.addRect(Rect::MakeXYWH(i * 100, 0, 10, 10));
     shapes[i] = std::make_shared<RuleCountingShape>(rect, &pathCalls);
   }
-  auto merged = Shape::Merge(Shape::Merge(shapes[0], shapes[1], PathOp::Union), shapes[2],
-                             PathOp::Union);
+  auto merged =
+      Shape::Merge(Shape::Merge(shapes[0], shapes[1], PathOp::Union), shapes[2], PathOp::Union);
   ASSERT_TRUE(merged != nullptr);
   EXPECT_EQ(merged->getPath().getBounds(), Rect::MakeXYWH(0, 0, 210, 10));
   // A left-deep chain must build each leaf once, not once per ancestor.
