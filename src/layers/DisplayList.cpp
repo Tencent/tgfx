@@ -1046,6 +1046,11 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   }
   if (continuous) {
     dirtyGrids = GenerateGridTiles(startX, endX, startY, endY);
+    // This frame fills the whole grid at once and leaves the fallback levels empty, so keep the loop
+    // alive for the frames that prepare them. Without a budget they can never be filled.
+    if (useFallback && _maxTilesRefinedPerFrame > 0) {
+      hasZoomBlurTiles = true;
+    }
   } else {
     dirtyGrids.reserve(missingGrids.size());
     std::vector<std::pair<int, int>> fallbackGrids = {};

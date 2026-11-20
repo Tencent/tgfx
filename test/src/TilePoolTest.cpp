@@ -258,6 +258,30 @@ TGFX_TEST_PRIVATE(TilePoolTest, FallbackLevelsFillAfterTheExactTiles) {
       EXPECT_NE(displayList->tilePool->find(TileKey::MakeTree(0, 0, level + 2)), nullptr));
 }
 
+// The first frame fills the grid in one go. A platform that only renders while the content changes
+// must still get the frames that prepare the fallback levels for the next zoom.
+TGFX_TEST_PRIVATE(TilePoolTest, FirstFramePreparesFallbackLevels) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 512, 512);
+  ASSERT_NE(surface, nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileUpdateMode(TileUpdateMode::Smooth);
+  displayList->root()->addChild(MakeSolid(4096, 4096, Color::Red()));
+  displayList->render(surface.get());
+  EXPECT_TRUE(displayList->hasContentChanged());
+  for (int i = 0; i < 100 && displayList->hasContentChanged(); ++i) {
+    displayList->render(surface.get());
+  }
+  EXPECT_FALSE(displayList->hasContentChanged());
+  auto level = GetTileLevel(1.0f);
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_NE(displayList->tilePool->find(TileKey::MakeTree(0, 0, level + 1)), nullptr);
+      EXPECT_NE(displayList->tilePool->find(TileKey::MakeTree(0, 0, level + 2)), nullptr));
+}
+
 TGFX_TEST_PRIVATE(TilePoolTest, FallbackLevelsKeepTheLoopAliveOnDirtyFrames) {
   ContextScope scope;
   auto context = scope.getContext();
