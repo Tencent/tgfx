@@ -63,6 +63,37 @@ inline constexpr size_t MaxChainColorSpaceXformSlots = 1;
 // and the texture/YUV tail collectors in AOTChainBuilder.cpp.
 bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node, AOTChainSlot* slot);
 
+// Whether a texture node's parameters describe a leaf the chain kernel samples itself: a resolved
+// plain leaf (RGBAAA included), a device-space leaf, or a tiled leaf whose wrap modes the kernel's
+// single-tap path implements. YUV planes need their own operator. Shared by the slot encoder and
+// the graph route's planner.
+bool IsChainTextureLeaf(const AOTTextureParameters& parameters);
+
+// Whether the texture's sampling needs shader-side wrap/border emulation (the tiled recipe carries
+// a non-None shader mode). Shared by the slot encoder, the binding builder and the graph route's
+// planner, so the three cannot disagree about which leaves tile.
+bool HasShaderTiling(const AOTTextureParameters& parameters);
+
+// The merged coverage graph of a draw's coverage terms (see MergeCoverageTerms): one graph over
+// one geometry-coverage unit, the analytic terms' links chained onto it, and — when a subtree or
+// glyph term exists — its nodes copied over with the term's own unit replaced by the combined one.
+struct ChainCoverageGraph {
+  AOTEffectGraph graph = {};
+  AOTNodeID coverageRoot = AOTNodeID::Invalid();
+  std::vector<AOTNodeID> clipLinks = {};
+  const AOTTextureParameters* mask = nullptr;
+  bool coverageLeafFromUVCoord = false;
+};
+
+// Merges the draw's coverage terms into ONE coverage graph for the layout pipeline: one
+// geometry-coverage unit, the analytic terms' links chained onto it (each term's innermost link
+// continues the previous term's outermost — a pure product), and — when a subtree or glyph term
+// exists — its nodes copied over with the term's own unit replaced by the combined one. The
+// analytic links' node IDs are reported in chain order for the clip channel's rewiring; the
+// DeviceMask term's parameters are reported for the mask child. Returns false when the terms
+// cannot combine (a subtree and a glyph together never lower).
+bool MergeCoverageTerms(const std::vector<AOTCoverageTerm>& terms, ChainCoverageGraph* merged);
+
 // Stage one — Schedule: merges the color and coverage node spaces, admits the pass, then orders
 // the texture leaves ahead of the remaining nodes in topological order.
 bool ScheduleSlots(AOTChainContext* ctx);

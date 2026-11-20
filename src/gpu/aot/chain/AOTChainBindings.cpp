@@ -276,24 +276,11 @@ static bool AppendMaskBinding(const AOTTextureParameters* mask, const ChainPaddi
   return true;
 }
 
-// Merges the draw's coverage terms into ONE coverage graph for the layout pipeline: one
-// geometry-coverage unit, the analytic terms' links chained onto it (each term's innermost link
-// continues the previous term's outermost — a pure product), and — when a subtree or glyph term
-// exists — its nodes copied over with the term's own unit replaced by the combined one. The
-// analytic links' node IDs are reported in chain order for stage seven's rewiring; the DeviceMask
-// term's parameters are reported for the mask child. Returns false when the terms cannot combine
-// (a subtree and a glyph together never lower — the atlas draw's single coverage slot is the
-// glyph, so a subtree beside it has no route today).
-struct ChainCoverageGraph {
-  AOTEffectGraph graph = {};
-  AOTNodeID coverageRoot = AOTNodeID::Invalid();
-  std::vector<AOTNodeID> clipLinks = {};
-  const AOTTextureParameters* mask = nullptr;
-  bool coverageLeafFromUVCoord = false;
-};
-
-static bool MergeCoverageTerms(const std::vector<AOTCoverageTerm>& terms,
-                               ChainCoverageGraph* merged) {
+// Merges the draw's coverage terms into ONE coverage graph for the layout pipeline (the contract
+// and the shape rules live in AOTChainInternal.h): one geometry-coverage unit, the analytic terms'
+// links chained onto it, and — when a subtree or glyph term exists — its nodes copied over with the
+// term's own unit replaced by the combined one.
+bool MergeCoverageTerms(const std::vector<AOTCoverageTerm>& terms, ChainCoverageGraph* merged) {
   AOTNodeBuilder builder = {};
   AOTNodeID unit = AOTNodeID::Invalid();
   if (!builder.addGeometryCoverage(&unit)) {

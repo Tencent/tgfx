@@ -143,7 +143,7 @@ static int MapChainInput(const std::vector<const AOTEffectNode*>& nodes,
 // plain leaf (RGBAAA included), a device-space leaf (sampled through DeviceLeafCoordMatrix), or a
 // tiled leaf whose shader wrap modes the kernel's single-tap path implements. YUV planes need their
 // own kernel.
-static bool IsChainTextureLeaf(const AOTTextureParameters& parameters) {
+bool IsChainTextureLeaf(const AOTTextureParameters& parameters) {
   if ((parameters.textureProxy == nullptr && !parameters.isIntermediate) || parameters.isYUV) {
     return false;
   }
@@ -170,7 +170,7 @@ static bool IsChainTextureLeaf(const AOTTextureParameters& parameters) {
          AOTChainBuilder::IsChainCompatibleTiledMode(recipe->shaderModeY);
 }
 
-static bool HasShaderTiling(const AOTTextureParameters& parameters) {
+bool HasShaderTiling(const AOTTextureParameters& parameters) {
   return parameters.samplingKind == AOTTextureSamplingKind::Tiled &&
          parameters.tiledRecipe.has_value() &&
          (parameters.tiledRecipe->shaderModeX != TiledTextureShaderMode::None ||

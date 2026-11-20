@@ -30,6 +30,7 @@
 namespace tgfx {
 
 class PrecompiledShaderCache;
+struct DrawIR;
 
 /**
  * Where one declared uniform member's value comes from at upload time. The slot names the chain
@@ -188,6 +189,43 @@ struct ChainProgramPlan {
 bool PlanChainProgram(const ChainComposition& composition, const Family& family,
                       const Variant& variant, const PrecompiledShaderCache* cache,
                       ChainProgramPlan* plan);
+
+/**
+ * Plans the same program the composition walk plans, directly from the draw's lowered expression:
+ * the node order the slot pipeline's schedule derives (texture leaves first, then the remaining
+ * nodes in index order, color graph ahead of the merged coverage graph), each node's operator and
+ * selector structure the encoders produce, the register assignment the shared allocator returns,
+ * and the same declaration closure — none of it through the slot encoding. The graph route is the
+ * replacement path for the assembled entry; the composition route stays the serving one until the
+ * parity data says otherwise.
+ * @param ir               The draw's lowered expression (color graph and coverage terms).
+ * @param xpNeedsBlendPass The xfer's advanced-mode fact (the epilogue's blend pass).
+ * @param family           The matched family (the variant walk's input).
+ * @param variant          The matched variant (its geometry, texture count and xfer fact).
+ * @param cache            The loaded bundle, for the slice's availability facts.
+ * @param plan             Receives the plan.
+ * @return                 False when the expression is outside the assembled slice.
+ */
+bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Family& family,
+                               const Variant& variant, const PrecompiledShaderCache* cache,
+                               ChainProgramPlan* plan);
+
+/**
+ * The dual-route parity check: plans the same draw through both routes (the composition walk and
+ * the graph walk) and compares the plans field by field — the calls in instruction order, every
+ * declared member, varying, sampler and binding, and the epilogue registers. A disagreement is
+ * logged and counted (a debug build asserts on the first), because the graph route replaces the
+ * slot route in the assembled path; silence means the two spell the same program.
+ * @param composition      The slot route's shape description of the draw.
+ * @param ir               The draw's lowered expression (the graph route's input).
+ * @param xpNeedsBlendPass The xfer's advanced-mode fact.
+ * @param family           The matched family.
+ * @param variant          The matched variant.
+ * @param cache            The loaded bundle.
+ */
+void CheckChainProgramPlanParity(const ChainComposition& composition, const DrawIR& ir,
+                                 bool xpNeedsBlendPass, const Family& family,
+                                 const Variant& variant, const PrecompiledShaderCache* cache);
 
 /**
  * The plan's per-leaf member-naming rule: a leaf's records carry the base name at leaf 0 and the

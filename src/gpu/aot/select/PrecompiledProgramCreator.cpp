@@ -515,6 +515,13 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
                                     &assembledVs)) {
           vertexDesc.code = std::move(assembledVs);
         }
+        // The dual-route parity check: the same draw planned through the composition and through
+        // its lowered graph must spell one program, because the graph route is the slot route's
+        // replacement. Every disagreement logs and asserts; silence is the acceptance data.
+        const auto* drawIR = programInfo->getCarriedIR();
+        if (drawIR != nullptr) {
+          CheckChainProgramPlanParity(composition, *drawIR, xpPass, chainFamily, variant, cache);
+        }
       }
     }
   }
