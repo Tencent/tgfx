@@ -764,6 +764,9 @@ std::vector<Rect> DisplayList::drawTileTasks(
     if (!hasContent && task.coversTiles()) {
       recycleBlankTiles(task);
     }
+    // A grid task reports its tileRect in the zoom grid, while a tree task reports it in the raster
+    // grid of its own level. Scale the tree rect to the zoom grid first, then shift both by the
+    // content offset to reach surface pixels, which is where this frame reports its dirty rects.
     auto dirtyRect = task.tileRect();
     if (isTreeTask) {
       auto displayScale = zoomScale / GetTileRasterScale(task.treeLevel());
