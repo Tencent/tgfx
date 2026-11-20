@@ -295,7 +295,7 @@ jobs:
         with:
           path: |
             ~/.cache/puppeteer
-          key: autotest-web-puppeteer-${{ hashFiles('web/test/package-lock.json') }}
+          key: autotest-web-puppeteer-${{ hashFiles('web/test/package.json') }}
           restore-keys: autotest-web-puppeteer-
 
       - name: Install Build Tools
@@ -386,7 +386,7 @@ jobs:
         with:
           path: |
             ~/.cache/puppeteer
-          key: autotest-web-puppeteer-${{ hashFiles('web/test/package-lock.json') }}
+          key: autotest-web-puppeteer-${{ hashFiles('web/test/package.json') }}
 
       - name: Upload Result
         if: ${{ failure() }}
@@ -445,7 +445,7 @@ jobs:
         with:
           path: |
             ~/.cache/puppeteer
-          key: autotest-web-puppeteer-${{ hashFiles('web/test/package-lock.json') }}
+          key: autotest-web-puppeteer-${{ hashFiles('web/test/package.json') }}
           restore-keys: autotest-web-puppeteer-
 
       - name: Install Build Tools
@@ -528,7 +528,7 @@ jobs:
         with:
           path: |
             ~/.cache/puppeteer
-          key: autotest-web-puppeteer-${{ hashFiles('web/test/package-lock.json') }}
+          key: autotest-web-puppeteer-${{ hashFiles('web/test/package.json') }}
 
       - name: Upload Result
         if: ${{ failure() }}
