@@ -113,6 +113,30 @@ bool DrawContent::isFullyOpaque() const {
   return shader == nullptr || shader->isOpaque();
 }
 
+bool DrawContent::paintsOpaqueInterior() const {
+  if (!color.has_value() || color->alpha < 1.0f || stroke != nullptr ||
+      blendMode != BlendMode::SrcOver) {
+    return false;
+  }
+  return shader == nullptr || shader->isOpaque();
+}
+
+Rect DrawContent::InnerRect(const RRect& rRect) {
+  const auto& rect = rRect.rect();
+  const auto& radii = rRect.radii();
+  auto horizontal = Rect::MakeLTRB(rect.left + std::max(radii[0].x, radii[3].x), rect.top,
+                                   rect.right - std::max(radii[1].x, radii[2].x), rect.bottom);
+  auto vertical = Rect::MakeLTRB(rect.left, rect.top + std::max(radii[0].y, radii[1].y), rect.right,
+                                 rect.bottom - std::max(radii[2].y, radii[3].y));
+  if (horizontal.isEmpty()) {
+    horizontal.setEmpty();
+  }
+  if (vertical.isEmpty()) {
+    vertical.setEmpty();
+  }
+  return horizontal.area() >= vertical.area() ? horizontal : vertical;
+}
+
 bool DrawContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
   if (!color.has_value() || color->alpha <= 0) {
     return false;

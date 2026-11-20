@@ -20,6 +20,7 @@
 
 #include <optional>
 #include "layers/contents/GeometryContent.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/layers/LayerPaint.h"
 
@@ -49,6 +50,14 @@ class DrawContent : public GeometryContent {
   bool hasPaint() const override;
   bool isFullyOpaque() const override;
 
+  /**
+   * Returns whether the entry paints the interior of its geometry with opaque pixels: an opaque
+   * color or opaque shader, no stroke, drawn with SrcOver. Unlike isFullyOpaque(), which describes
+   * every pixel the entry paints, this describes the area inside the geometry, so a stroke
+   * disqualifies it: it paints on both sides of the outline, including the interior side.
+   */
+  bool paintsOpaqueInterior() const;
+
   const BlendMode& getBlendMode() const {
     return blendMode;
   }
@@ -60,6 +69,12 @@ class DrawContent : public GeometryContent {
  protected:
   void drawContourInternal(Canvas* canvas, bool antiAlias,
                            bool includeUnpaintedGeometry) const override;
+
+  /**
+   * Returns the larger of the two axis-aligned rects inside the rounded rect that avoid every
+   * rounded corner.
+   */
+  static Rect InnerRect(const RRect& rRect);
 
   virtual Rect onGetBounds() const = 0;
   virtual void onDraw(Canvas* canvas, const Paint& paint) const = 0;

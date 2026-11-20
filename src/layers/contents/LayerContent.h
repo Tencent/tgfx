@@ -24,6 +24,15 @@
 
 namespace tgfx {
 
+// Keeps the larger of two opaque rects. A content that paints several disjoint areas can only name
+// one rect for the coverage test, so taking the largest one is a conservative approximation: it
+// never claims more than what is fully painted.
+inline void KeepLargerOpaqueRect(Rect* largest, const Rect& rect) {
+  if (!rect.isEmpty() && rect.area() > largest->area()) {
+    *largest = rect;
+  }
+}
+
 /**
  * LayerContent is the base class for all drawable layer contents. It provides a unified interface
  * for rendering geometries with their fill styles.
@@ -67,6 +76,15 @@ class LayerContent {
    * it includes it, so the answer holds only for a drawContour() given the same flag.
    */
   virtual bool contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const = 0;
+
+  /**
+   * Returns an axis-aligned rect, in content coordinates, that the content fully covers with opaque
+   * pixels, or an empty rect when none is known. With includeForeground false, only the part drawn
+   * below the children counts.
+   */
+  virtual Rect getOpaqueRect(bool /*includeForeground*/) const {
+    return Rect::MakeEmpty();
+  }
 
   /**
    * Returns whether every pixel the content paints is fully opaque: each painted entry draws an
