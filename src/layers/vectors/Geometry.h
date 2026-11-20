@@ -19,10 +19,12 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <vector>
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
 
@@ -111,6 +113,9 @@ class Geometry {
    * The shape content, used for path-based geometries.
    */
   std::shared_ptr<Shape> shape = nullptr;
+
+  // The original smoothed rounded rectangle in the local space of shape.
+  std::optional<RRect> rRect = std::nullopt;
 
   /**
    * The text blob content, used for text-based geometries.

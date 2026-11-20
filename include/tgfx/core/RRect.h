@@ -115,7 +115,7 @@ class RRect {
    * @param rect  bounds of rounded rectangle
    * @param radiusX  x-axis radius of corners
    * @param radiusY  y-axis radius of corners
-   * @param smoothness  corner smoothness applied uniformly to all corners. See setRectRadii() for
+   * @param smoothness corner smoothness applied uniformly to all corners. See setRectRadii() for
    * how it is clamped and reduced.
    */
   void setRectXY(const Rect& rect, float radiusX, float radiusY, float smoothness = 0.0f);
@@ -128,7 +128,7 @@ class RRect {
    * if the corners still overlap at zero smoothness.
    * @param rect  bounds of rounded rectangle
    * @param radii  per-corner radii in the order [top-left, top-right, bottom-right, bottom-left]
-   * @param smoothness  corner smoothness in [0, 1]. Each corner consists of an incoming transition
+   * @param smoothness corner smoothness in [0, 1]. Each corner consists of an incoming transition
    * curve, an elliptical arc and an outgoing transition curve. A value of 0 leaves only the arc.
    * Larger values make the curvature change more gradually: the transition curves take up more
    * of the corner and the arc less, and the points where the corner meets the edges move away

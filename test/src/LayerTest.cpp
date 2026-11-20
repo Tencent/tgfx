@@ -4106,6 +4106,24 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
         {MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
     displayList.root()->addChild(vectorLayer);
   }
+
+  // Case 23: VectorLayer Rect with full corner smoothness, spread=8 (raster)
+  for (int i = 0; i < 2; ++i) {
+    auto vectorLayer = VectorLayer::Make();
+    auto group = VectorGroup::Make();
+    auto rect = Rectangle::Make();
+    rect->setSize({100, 60});
+    rect->setPosition({50, 30});
+    rect->setRoundness(10);
+    rect->setSmoothness(1.0f);
+    group->setElements({rect, FillStyle::Make(SolidColor::Make(Color::Red()))});
+    vectorLayer->setContents({group});
+    vectorLayer->setMatrix(
+        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 7 + gap));
+    vectorLayer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(vectorLayer);
+  }
 }
 
 TGFX_TEST(LayerTest, DropShadow) {

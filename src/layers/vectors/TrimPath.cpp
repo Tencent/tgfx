@@ -154,6 +154,7 @@ static void ApplyTrimContinuous(std::vector<Geometry*>& geometries, float start,
     }
 
     auto* geometry = geometries[index];
+    geometry->rRect = std::nullopt;
     if (hasSegment) {
       auto shape = geometry->shape;
       // When reversed, we need to reverse each shape's path before trimming
@@ -184,6 +185,7 @@ void TrimPath::apply(VectorContext* context) {
   if (_trimType == TrimPathType::Separate) {
     auto trimEffect = PathEffect::MakeTrim(start, end);
     for (auto* geometry : geometries) {
+      geometry->rRect = std::nullopt;
       geometry->shape = Shape::ApplyEffect(geometry->shape, trimEffect);
     }
   } else {

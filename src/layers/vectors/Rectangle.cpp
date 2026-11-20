@@ -99,12 +99,16 @@ void Rectangle::apply(VectorContext* context) {
                                          {_roundness[3], _roundness[3]}}};
     // MakeRectRadii reduces the smoothness first and then scales the radii down proportionally if
     // adjacent corners overflow any edge.
-    const auto rRect = RRect::MakeRectRadii(rect, radii, _smoothness);
-    path.addRRect(rRect, _reversed, 2);
+    _cachedRRect = RRect::MakeRectRadii(rect, radii, _smoothness);
+    path.addRRect(_cachedRRect, _reversed, 2);
     _cachedShape = Shape::MakeFrom(path);
   }
   if (_cachedShape) {
-    context->addShape(_cachedShape);
+    if (_cachedRRect.smoothness() > 0.0f) {
+      context->addShape(_cachedShape, _cachedRRect);
+    } else {
+      context->addShape(_cachedShape);
+    }
   }
 }
 

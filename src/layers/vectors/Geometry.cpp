@@ -39,6 +39,7 @@ std::unique_ptr<Geometry> Geometry::clone() const {
   auto cloned = std::make_unique<Geometry>();
   cloned->matrix = matrix;
   cloned->shape = shape;
+  cloned->rRect = rRect;
   cloned->textBlob = textBlob;
   cloned->glyphs = glyphs;
   cloned->textAnchors = textAnchors;

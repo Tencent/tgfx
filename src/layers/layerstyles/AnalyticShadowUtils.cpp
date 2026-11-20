@@ -29,6 +29,18 @@
 
 namespace tgfx {
 
+// Returns the RRect when the closed-form shadow supports it; nullopt otherwise.
+static inline std::optional<RRect> AsAnalyticRRect(const RRect& rRect) {
+  if (rRect.smoothness() > 0.0f) {
+    // The closed form evaluates circular and elliptical corner arcs, not smoothed corner contours.
+    return std::nullopt;
+  }
+  // The closed form assumes all four corners share the same radii. Supporting per-corner
+  // radii would require a piecewise row-span formula in the shader, whose benefit has not
+  // been validated.
+  return rRect.isComplex() ? std::nullopt : std::make_optional(rRect);
+}
+
 // Returns the path as an RRect when the closed-form shadow supports it; nullopt otherwise.
 static inline std::optional<RRect> AsAnalyticRRect(const Path& path) {
   // Path::isRect, Path::isRRect and Path::isOval each recognize only their own shape kind, so
@@ -39,10 +51,7 @@ static inline std::optional<RRect> AsAnalyticRRect(const Path& path) {
   }
   RRect rRect = {};
   if (path.isRRect(&rRect)) {
-    // The closed form assumes all four corners share the same radii. Supporting per-corner
-    // radii would require a piecewise row-span formula in the shader, whose benefit has not
-    // been validated.
-    return rRect.isComplex() ? std::nullopt : std::make_optional(rRect);
+    return AsAnalyticRRect(rRect);
   }
   if (path.isOval(&rect)) {
     return RRect::MakeOval(rect);
@@ -84,7 +93,8 @@ std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput&
   if (path.isEmpty()) {
     return RRect::MakeRect(Rect::MakeEmpty());
   }
-  auto rRect = AsAnalyticRRect(path);
+  auto rRect =
+      styledShape._rRect.has_value() ? AsAnalyticRRect(*styledShape._rRect) : AsAnalyticRRect(path);
   if (!rRect.has_value()) {
     return std::nullopt;
   }

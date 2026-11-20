@@ -19,6 +19,7 @@
 #pragma once
 
 #include "core/DrawContext.h"
+#include "core/GeometryShape.h"
 #include "core/PlaybackContext.h"
 #include "core/RRectUtils.h"
 
@@ -251,7 +252,13 @@ class DrawRRect : public PictureRecord {
           context->drawPath(path, matrix, clip, brush);
           break;
         }
-        auto shape = Shape::MakeFrom(std::move(path));
+        std::shared_ptr<Shape> shape = nullptr;
+        if (rRect.smoothness() > 0.0f) {
+          // Retain the smoothed RRect identity for stroke measurement.
+          shape = std::make_shared<RRectShape>(rRect, std::move(path));
+        } else {
+          shape = Shape::MakeFrom(std::move(path));
+        }
         if (shape != nullptr) {
           context->drawShape(std::move(shape), matrix, clip, brush, stroke);
         }

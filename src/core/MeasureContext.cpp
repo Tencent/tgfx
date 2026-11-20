@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeasureContext.h"
+#include "core/GeometryShape.h"
 #include "core/utils/Log.h"
 #include "core/utils/StrokeUtils.h"
 #include "tgfx/core/RRect.h"
@@ -58,6 +59,9 @@ void MeasureContext::drawPath(const Path& path, const Matrix& matrix, const Clip
 // are too tight for the dedicated path, and measuring it with the miter would make the recording
 // one and a half stroke widths wider on each side than the layer that drew it.
 static bool HasNoMiterReach(const Shape& shape) {
+  if (RRectShape::IsRRect(shape)) {
+    return true;
+  }
   if (!shape.isSimplePath()) {
     return false;
   }

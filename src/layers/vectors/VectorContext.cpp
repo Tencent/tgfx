@@ -29,6 +29,16 @@ void VectorContext::addShape(std::shared_ptr<Shape> shape) {
   geometries.push_back(std::move(geometry));
 }
 
+void VectorContext::addShape(std::shared_ptr<Shape> shape, const RRect& rRect) {
+  if (shape == nullptr) {
+    return;
+  }
+  auto geometry = std::make_unique<Geometry>();
+  geometry->shape = std::move(shape);
+  geometry->rRect = rRect;
+  geometries.push_back(std::move(geometry));
+}
+
 void VectorContext::addShape(std::shared_ptr<Shape> shape, const Point& position) {
   if (shape == nullptr) {
     return;

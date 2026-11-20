@@ -20,6 +20,7 @@
 #include "core/CanvasState.h"
 #include "core/ClipStack.h"
 #include "core/DrawContext.h"
+#include "core/GeometryShape.h"
 #include "core/LayerUnrollContext.h"
 #include "core/PictureContext.h"
 #include "core/RRectUtils.h"
@@ -305,6 +306,14 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
     case RRectDrawType::Path: {
       Path path = {};
       path.addRRect(rRect);
+      if (rRect.smoothness() > 0.0f && paint.getStroke() != nullptr) {
+        // A smoothed RRect path is not recognizable as an RRect, so retain its identity for
+        // stroke measurement.
+        SaveLayerForImageFilter(paint.getImageFilter());
+        drawContext->drawShape(std::make_shared<RRectShape>(rRect, std::move(path)), _matrix,
+                               *clipStack, paint.getBrush(), paint.getStroke());
+        return;
+      }
       drawPath(path, paint);
       return;
     }
@@ -383,7 +392,7 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   auto drawMatrix = _matrix;
   auto stroke = paint.getStroke();
   Path* path = nullptr;
-  if (shape->type() == Shape::Type::Path) {
+  if (shape->type() == Shape::Type::Path && shape->isSimplePath()) {
     path = &std::static_pointer_cast<PathShape>(shape)->path;
   } else if (stroke == nullptr && shape->type() == Shape::Type::Matrix) {
     auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);

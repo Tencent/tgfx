@@ -18,13 +18,12 @@
 
 #include "core/ClipStack.h"
 #include "core/utils/BlockAllocator.h"
-#include "gpu/DrawingManager.h"
 #include "gpu/OpsCompositor.h"
-#include "gpu/RenderContext.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/SmoothRRectEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/tasks/OpsRenderTask.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Canvas.h"
@@ -70,9 +69,7 @@ static ClipStack MakeDegenerateClip() {
  */
 TGFX_PRIVATE_ACCESS(
     static FragmentProcessor* FlushAndGetLastCoverageFP(const std::shared_ptr<Surface>& surface) {
-      surface->renderContext->flush();
-      auto drawingBuffer = surface->getContext()->drawingManager()->getDrawingBuffer();
-      auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+      auto* task = FlushAndGetLastRenderTask(surface);
       const auto& coverages = task->drawOps.back()->coverages;
       return coverages.empty() ? nullptr : coverages.back().get();
     })
@@ -966,7 +963,7 @@ TGFX_TEST(ClipTest, Overview) {
   constexpr int margin = 50;
   constexpr int cellSize = 200;
   constexpr int columns = 5;
-  constexpr int rows = 4;
+  constexpr int rows = 5;
   constexpr int surfaceWidth = margin * 2 + cellSize * columns;
   constexpr int surfaceHeight = margin * 2 + cellSize * rows;
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
@@ -1283,6 +1280,44 @@ TGFX_TEST(ClipTest, Overview) {
       auto* fp = FlushAndGetLastCoverageFP(surface);
       ASSERT_NE(fp, nullptr);
       EXPECT_NE(fp->classID(), SmoothRRectEffect::ClassID());
+    });
+  }
+
+  const auto elongatedRRect =
+      RRect::MakeRectXY(Rect::MakeXYWH(-200, -600, 400, 1200), 100, 300, 0.9f);
+  EXPECT_FLOAT_EQ(elongatedRRect.smoothness(), 0.9f);
+  // Case 20: An elongated smoothed RRect, AA. The interior of each corner's retained arc stays
+  // covered.
+  {
+    canvas->save();
+    canvas->translate(margin + cellSize / 2, margin + 4 * cellSize + cellSize / 2);
+    canvas->scale(0.15f, 0.15f);
+    canvas->clipRRect(elongatedRRect, true);
+    canvas->resetMatrix();
+    canvas->translate(margin, margin + 4 * cellSize);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+    TGFX_PRIVATE_ACCESS({
+      auto* fp = FlushAndGetLastCoverageFP(surface);
+      ASSERT_NE(fp, nullptr);
+      EXPECT_EQ(fp->classID(), SmoothRRectEffect::ClassID());
+    });
+  }
+
+  // Case 21: Case 20 without AA.
+  {
+    canvas->save();
+    canvas->translate(margin + cellSize + cellSize / 2, margin + 4 * cellSize + cellSize / 2);
+    canvas->scale(0.15f, 0.15f);
+    canvas->clipRRect(elongatedRRect, false);
+    canvas->resetMatrix();
+    canvas->translate(margin + cellSize, margin + 4 * cellSize);
+    canvas->drawRect(cell, fillPaint);
+    canvas->restore();
+    TGFX_PRIVATE_ACCESS({
+      auto* fp = FlushAndGetLastCoverageFP(surface);
+      ASSERT_NE(fp, nullptr);
+      EXPECT_EQ(fp->classID(), SmoothRRectEffect::ClassID());
     });
   }
 

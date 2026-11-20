@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cmath>
 #include "gtest/gtest.h"
 #include "tgfx/core/RRect.h"
 #include "utils/TestUtils.h"
@@ -108,11 +109,13 @@ TGFX_TEST(RRectTest, Scale) {
 }
 
 TGFX_TEST(RRectTest, Smoothness) {
-  // Case 1: Out-of-range smoothness is clamped to [0, 1].
+  // Case 1: Out-of-range smoothness is clamped to [0, 1], and NaN smoothness is reset to 0.
   auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 10, -0.5f);
   EXPECT_FLOAT_EQ(rRect.smoothness(), 0.f);
   rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 10, 2.0f);
   EXPECT_FLOAT_EQ(rRect.smoothness(), 1.f);
+  rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 10, NAN);
+  EXPECT_FLOAT_EQ(rRect.smoothness(), 0.f);
 
   // Case 2: Short edges reduce the smoothness, and the tightest edge determines it.
   rRect =
@@ -130,6 +133,16 @@ TGFX_TEST(RRectTest, Smoothness) {
   rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 0, 0, 0.6f);
   EXPECT_EQ(rRect.type(), RRect::Type::Rect);
   EXPECT_FLOAT_EQ(rRect.smoothness(), 0.f);
+
+  // Case 5: Squaring TL before fitting smoothness stops it from reducing the smoothness to 0;
+  // the right and bottom edges then limit it to 100 / 80 - 1 = 0.25.
+  rRect =
+      RRect::MakeRectRadii(Rect::MakeWH(100, 100), {{{60, 0}, {40, 40}, {40, 40}, {40, 40}}}, 0.5f);
+  EXPECT_EQ(rRect.radii()[0], (Point{0, 0}));
+  EXPECT_EQ(rRect.radii()[1], (Point{40, 40}));
+  EXPECT_EQ(rRect.radii()[2], (Point{40, 40}));
+  EXPECT_EQ(rRect.radii()[3], (Point{40, 40}));
+  EXPECT_FLOAT_EQ(rRect.smoothness(), 0.25f);
 }
 
 }  // namespace tgfx

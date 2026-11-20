@@ -19,6 +19,7 @@
 #pragma once
 
 #include <type_traits>
+#include "core/shapes/PathShape.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
@@ -133,6 +134,28 @@ class GeometryShape {
                 "RRect must remain trivially destructible");
 
   Type _type = Type::Empty;
+};
+
+/**
+ * A PathShape that retains the source RRect of a smoothed rounded rectangle.
+ */
+class RRectShape : public PathShape {
+ public:
+  RRectShape(const RRect& rRect, Path path) : PathShape(std::move(path)), rRect(rRect) {
+  }
+
+  static bool IsRRect(const Shape& shape);
+
+  // Returns false to prevent unwrapping this shape as a generic path.
+  bool isSimplePath() const override {
+    return false;
+  }
+
+  Rect onGetBounds() const override {
+    return rRect.rect();
+  }
+
+  RRect rRect;
 };
 
 }  // namespace tgfx

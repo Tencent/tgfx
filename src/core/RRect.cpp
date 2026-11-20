@@ -45,10 +45,13 @@ static inline void UpdateMinScale(float a, float b, double limit, double& scale)
 // Scales smoothness so that no two adjacent smoothed corners overflow the side they share.
 static inline void ScaleSmoothness(const Rect& rect, const std::array<Point, 4>& radii,
                                    float& smoothness) {
-  smoothness = std::clamp(smoothness, 0.0f, 1.0f);
-  if (smoothness == 0.0f) {
+  // Every comparison with NaN is false, so this check resets NaN to 0 along with negative values.
+  if (!(smoothness > 0.0f)) {
+    smoothness = 0.0f;
     return;
   }
+
+  smoothness = std::min(smoothness, 1.0f);
 
   const auto width = static_cast<double>(rect.width());
   const auto height = static_cast<double>(rect.height());
@@ -59,6 +62,15 @@ static inline void ScaleSmoothness(const Rect& rect, const std::array<Point, 4>&
   UpdateMinScale(radii[2].x, radii[3].x, width, scale);
   UpdateMinScale(radii[3].y, radii[0].y, height, scale);
   smoothness = static_cast<float>(std::max(scale - 1.0, 0.0));
+}
+
+// Zeros both components of a corner when either component is non-positive, making it square.
+static inline void NormalizeRadii(std::array<Point, 4>& radii) {
+  for (auto& r : radii) {
+    if (r.x <= 0 || r.y <= 0) {
+      r = {0, 0};
+    }
+  }
 }
 
 // Scales per-corner radii so that no two adjacent radii overflow the side they share.
@@ -90,13 +102,7 @@ static inline void ScaleRadii(const Rect& rect, std::array<Point, 4>& radii) {
   FlushToZero(radii[2].x, radii[3].x);
   FlushToZero(radii[3].y, radii[0].y);
 
-  // If either component of a corner is zero, the corner is effectively square: the other
-  // component can no longer describe a curve.
-  for (auto& r : radii) {
-    if (r.x <= 0 || r.y <= 0) {
-      r = {0, 0};
-    }
-  }
+  NormalizeRadii(radii);
 }
 
 static inline RRect::Type ComputeType(const Rect& rect, const std::array<Point, 4>& radii) {
@@ -143,11 +149,7 @@ void RRect::setRectRadii(const Rect& rect, const std::array<Point, 4>& radii, fl
   _rect = rect.makeSorted();
   _radii = radii;
   _smoothness = smoothness;
-  for (auto& rad : _radii) {
-    if (rad.x < 0 || rad.y < 0) {
-      rad = {0, 0};
-    }
-  }
+  NormalizeRadii(_radii);
   // Runs before ScaleRadii: radii that do not fit their edges yield a smoothness of exactly zero,
   // while the scaled radii fit their edges only up to rounding error.
   ScaleSmoothness(_rect, _radii, _smoothness);

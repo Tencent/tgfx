@@ -130,6 +130,7 @@ class Rectangle : public VectorElement {
   std::array<float, 4> _roundness = {};
   float _smoothness = 0.0f;
   bool _reversed = false;
+  RRect _cachedRRect = {};
   std::shared_ptr<Shape> _cachedShape = nullptr;
 };
 

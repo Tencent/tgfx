@@ -177,7 +177,9 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
   } else if (!hasFill) {
     type = StyledShapeType::Stroke;
   }
-  return StyledShape::Make(shape, type, strokeWidth, strokeAlign);
+  auto result = StyledShape::Make(shape, type, strokeWidth, strokeAlign);
+  result._rRect = sharedGeometry->rRect;
+  return result;
 }
 
 }  // namespace tgfx

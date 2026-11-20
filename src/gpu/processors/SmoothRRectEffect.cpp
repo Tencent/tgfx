@@ -20,7 +20,6 @@
 
 namespace tgfx {
 
-// needTransform changes the generated code, so it takes part in the key.
 void SmoothRRectEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(_needTransform ? 1 : 0));
 }

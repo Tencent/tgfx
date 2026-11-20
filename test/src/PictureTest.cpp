@@ -565,6 +565,26 @@ TGFX_TEST(PictureTest, RRectPlayback) {
   recorder.beginRecording()->drawRRect(rRect, strokePaint);
   auto picture = recorder.finishRecordingAsPicture();
   ASSERT_TRUE(picture != nullptr);
+  EXPECT_EQ(picture->getBounds(), Rect::MakeXYWH(0, 0, 110, 110));
+
+  // Recording the same RRect under a scale that forces the path fallback measures the same
+  // stroke reach.
+  PictureRecorder fallbackRecorder = {};
+  auto* fallbackCanvas = fallbackRecorder.beginRecording();
+  fallbackCanvas->scale(20, 20);
+  fallbackCanvas->drawRRect(rRect, strokePaint);
+  auto fallbackPicture = fallbackRecorder.finishRecordingAsPicture();
+  ASSERT_TRUE(fallbackPicture != nullptr);
+  EXPECT_EQ(fallbackPicture->getBounds(), Rect::MakeXYWH(0, 0, 2200, 2200));
+
+  // Replaying the dedicated RRect record under that scale uses the same bounds.
+  PictureRecorder playbackRecorder = {};
+  auto* playbackCanvas = playbackRecorder.beginRecording();
+  playbackCanvas->scale(20, 20);
+  playbackCanvas->drawPicture(picture);
+  auto playbackPicture = playbackRecorder.finishRecordingAsPicture();
+  ASSERT_TRUE(playbackPicture != nullptr);
+  EXPECT_EQ(playbackPicture->getBounds(), Rect::MakeXYWH(0, 0, 2200, 2200));
 
   // A stroked smoothed RRect recorded and played back under the identity matrix.
   canvas->drawPicture(picture);
@@ -572,9 +592,14 @@ TGFX_TEST(PictureTest, RRectPlayback) {
     auto* task = FlushAndGetLastRenderTask(surface);
     EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::RRectDrawOp);
   });
-  // The same picture played back under a scale that pushes its stroke reach beyond the distance
-  // limit.
+  // Direct drawing and picture playback under a scale that pushes the stroke reach beyond the
+  // distance limit both fall back to a shape.
   canvas->scale(20, 20);
+  canvas->drawRRect(rRect, strokePaint);
+  TGFX_PRIVATE_ACCESS({
+    auto* task = FlushAndGetLastRenderTask(surface);
+    EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
+  });
   canvas->drawPicture(picture);
   TGFX_PRIVATE_ACCESS({
     auto* task = FlushAndGetLastRenderTask(surface);

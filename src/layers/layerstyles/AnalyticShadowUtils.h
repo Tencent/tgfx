@@ -31,8 +31,8 @@ class AnalyticShadowUtils {
    * shadow is not possible for the given input. The returned shape already has the spread applied:
    * positive values expand it, negative values shrink it. A shrinking spread can collapse the shape
    * to nothing; that case returns an empty RRect rather than nullopt. A complex Fill/FillStroke
-   * path is approximated by its bounding rect; strokes and complex rounded rectangles have no
-   * closed form and return nullopt.
+   * path is approximated by its bounding rect; strokes and rounded rectangles with complex or
+   * smoothed corners have no closed form and return nullopt.
    *
    * The returned RRect is never complex, so all four corners share one radius pair and any entry
    * of radii() describes the shape. It is expressed in the content image's coordinate system:

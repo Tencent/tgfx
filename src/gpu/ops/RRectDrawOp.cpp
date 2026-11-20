@@ -39,7 +39,7 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
   auto allocator = context->drawingAllocator();
   auto drawOp = allocator->make<RRectDrawOp>(allocator, provider.get());
   drawOp->indexBufferProxy = context->globalCache()->getRRectIndexBuffer(
-      provider->hasStroke(), provider->aaType(), provider->hasSmoothness());
+      provider->hasStroke(), provider->aaType(), provider->isSmooth());
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
     renderFlags |= RenderFlags::DisableAsyncTask;
@@ -56,7 +56,7 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
   }
   hasStroke = provider->hasStroke();
   hasComplex = provider->hasComplex();
-  isSmooth = provider->hasSmoothness();
+  isSmooth = provider->isSmooth();
   unscaledGeometry = provider->hasUnscaledGeometry();
   // The elliptical-corner processors only accept geometry with the axis scales baked in.
   DEBUG_ASSERT(isSmooth || !unscaledGeometry);

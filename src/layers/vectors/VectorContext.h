@@ -37,6 +37,11 @@ class VectorContext {
   void addShape(std::shared_ptr<Shape> shape);
 
   /**
+   * Adds a shape geometry and its original smoothed rounded rectangle to the list.
+   */
+  void addShape(std::shared_ptr<Shape> shape, const RRect& rRect);
+
+  /**
    * Adds a shape geometry with the given position to the list.
    */
   void addShape(std::shared_ptr<Shape> shape, const Point& position);

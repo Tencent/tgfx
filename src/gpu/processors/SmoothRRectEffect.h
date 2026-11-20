@@ -41,8 +41,8 @@ class SmoothRRectEffect : public FragmentProcessor {
    *        the boundary; otherwise a hard edge.
    * @return The new effect, or nullptr when the matrix has perspective or its scale components are
    *         zero, when the smoothed extents of a diagonal corner pair overlap along either axis,
-   *         or, with antiAlias enabled, when any corner is too elongated after the matrix's axis
-   *         scales are applied.
+   *         or, with antiAlias enabled, when any corner is too elongated or too small for the
+   *         antialiasing ramp after the matrix's axis scales are applied.
    */
   static PlacementPtr<SmoothRRectEffect> Make(BlockAllocator* allocator, const RRect& rRect,
                                               const Matrix& matrix, bool antiAlias);

@@ -64,7 +64,7 @@ RRect SpreadUtils::MakeSpreadRRect(const RRect& rRect, Point distance) {
     }
   }
   RRect result = {};
-  result.setRectRadii(bounds, radii);
+  result.setRectRadii(bounds, radii, rRect.smoothness());
   return result;
 }
 
@@ -210,7 +210,10 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   auto type = styledShape.type;
   const auto strokeWidth = styledShape.strokeWidth;
   const auto strokeAlign = styledShape.strokeAlign;
-  if (path.isOval(&rect)) {
+  if (styledShape._rRect.has_value()) {
+    // A smoothed RRect path is not recognized by isRRect, so use its preserved geometry.
+    DrawSpreadRRect(recordCanvas, *styledShape._rRect, type, strokeAlign, strokeWidth, spread);
+  } else if (path.isOval(&rect)) {
     DrawSpreadRRect(recordCanvas, RRect::MakeOval(rect), type, strokeAlign, strokeWidth, spread);
   } else if (path.isRRect(&rRect)) {
     DrawSpreadRRect(recordCanvas, rRect, type, strokeAlign, strokeWidth, spread);

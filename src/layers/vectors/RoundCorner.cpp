@@ -49,6 +49,7 @@ void RoundCorner::apply(VectorContext* context) {
   }
   auto geometries = context->getShapeGeometries();
   for (auto& geometry : geometries) {
+    geometry->rRect = std::nullopt;
     geometry->shape = Shape::ApplyEffect(geometry->shape, _cachedEffect);
   }
 }

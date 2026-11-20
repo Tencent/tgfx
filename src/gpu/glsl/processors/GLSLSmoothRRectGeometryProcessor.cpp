@@ -151,6 +151,10 @@ static std::pair<std::string, std::string> EmitCornerFunctions(ShaderBuilder* bu
     const auto& transitionFunc = baseFunctions.bezierNewtonDist();
     // clang-format off
     circleTransitionCode = R"(
+  highp vec2 b0 = c1 ? vec2(transitionStart, 0.0) : pe;
+  highp vec2 b1 = c1 ? vec2(transitionStart - 2.0 * step, 0.0) : vec2(0.0, b2x);
+  highp vec2 b2 = c1 ? vec2(b2x, 0.0) : vec2(0.0, transitionStart - 2.0 * step);
+  highp vec2 b3 = c1 ? ps : vec2(0.0, transitionStart);
   return )" + transitionFunc + R"((q, b0, b1, b2, b3);)";
     // clang-format on
   }
@@ -179,11 +183,7 @@ returnType + circleCornerFunc + R"((highp vec2 q, highp float radius, highp vec4
   if (fs <= 0.0 && fe > 0.0 && q.x <= radius) {)" +
     circleArcCode + R"(
   }
-  bool c1 = fs > 0.0 && (fe > 0.0 || q.x >= q.y);
-  highp vec2 b0 = c1 ? vec2(transitionStart, 0.0) : pe;
-  highp vec2 b1 = c1 ? vec2(transitionStart - 2.0 * step, 0.0) : vec2(0.0, b2x);
-  highp vec2 b2 = c1 ? vec2(b2x, 0.0) : vec2(0.0, transitionStart - 2.0 * step);
-  highp vec2 b3 = c1 ? ps : vec2(0.0, transitionStart);)" +
+  bool c1 = fs > 0.0 && (fe > 0.0 || q.x >= q.y);)" +
   circleTransitionCode + R"(
 }
 )");
@@ -206,8 +206,13 @@ returnType + circleCornerFunc + R"((highp vec2 q, highp float radius, highp vec4
     // enough there.
     const auto& arcFunc =
         nonAAFill ? baseFunctions.ellipseImplicit() : baseFunctions.ellipseSampsonDist();
+    // Within S2, fragments past the ellipse center along either axis are inside the corner
+    // contour and outside the antialiasing ramp, so they only need a negative value.
     // clang-format off
     ellipseArcCode = R"(
+    if (q.x >= rx || q.y >= ry) {
+      return -1.0;
+    }
     return )" + arcFunc + R"((q - radii, radii);
   )";
     // clang-format on
@@ -228,6 +233,10 @@ returnType + circleCornerFunc + R"((highp vec2 q, highp float radius, highp vec4
     const auto& transitionFunc = baseFunctions.bezierNewtonDist();
     // clang-format off
     ellipseTransitionCode = R"(
+  highp vec2 b0 = c1 ? vec2(transitionStart.x, 0.0) : pe;
+  highp vec2 b1 = c1 ? vec2(transitionStart.x - 2.0 * step.x, 0.0) : vec2(0.0, b2xy.y);
+  highp vec2 b2 = c1 ? vec2(b2xy.x, 0.0) : vec2(0.0, transitionStart.y - 2.0 * step.y);
+  highp vec2 b3 = c1 ? ps : vec2(0.0, transitionStart.y);
   return )" + transitionFunc + R"((q, b0, b1, b2, b3);)";
     // clang-format on
   }
@@ -265,11 +274,7 @@ returnType + ellipseCornerFunc + R"((highp vec2 q, highp vec2 radii, highp vec4 
   }
   highp float tsLengthSq = rySq + (rxSq - rySq) * turnCos * turnCos;
   highp float teLengthSq = rxSq + rySq - tsLengthSq;
-  bool c1 = fs > 0.0 && (fe > 0.0 || fe * fe * tsLengthSq <= fs * fs * teLengthSq);
-  highp vec2 b0 = c1 ? vec2(transitionStart.x, 0.0) : pe;
-  highp vec2 b1 = c1 ? vec2(transitionStart.x - 2.0 * step.x, 0.0) : vec2(0.0, b2xy.y);
-  highp vec2 b2 = c1 ? vec2(b2xy.x, 0.0) : vec2(0.0, transitionStart.y - 2.0 * step.y);
-  highp vec2 b3 = c1 ? ps : vec2(0.0, transitionStart.y);)" +
+  bool c1 = fs > 0.0 && (fe > 0.0 || fe * fe * tsLengthSq <= fs * fs * teLengthSq);)" +
   ellipseTransitionCode + R"(
 }
 )");

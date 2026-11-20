@@ -213,7 +213,7 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
     return false;
   }
 
-  bool hasSmoothness() const override {
+  bool isSmooth() const override {
     return false;
   }
 
@@ -370,7 +370,7 @@ class NonAARRectsVertexProvider final : public RRectsVertexProvider {
     return false;
   }
 
-  bool hasSmoothness() const override {
+  bool isSmooth() const override {
     return false;
   }
 
@@ -477,7 +477,7 @@ class AAComplexRRectsVertexProvider final : public RRectsVertexProvider {
     return false;
   }
 
-  bool hasSmoothness() const override {
+  bool isSmooth() const override {
     return false;
   }
 
@@ -604,7 +604,7 @@ class NonAAComplexRRectsVertexProvider final : public RRectsVertexProvider {
     return false;
   }
 
-  bool hasSmoothness() const override {
+  bool isSmooth() const override {
     return false;
   }
 
@@ -733,7 +733,7 @@ class SmoothRRectsVertexProvider final : public RRectsVertexProvider {
     return _hasUnscaledGeometry;
   }
 
-  bool hasSmoothness() const override {
+  bool isSmooth() const override {
     return true;
   }
 

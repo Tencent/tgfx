@@ -398,9 +398,9 @@ static bool HasSharpCorner(const RRect& rRect, const Matrix& viewMatrix) {
   return false;
 }
 
-static bool UseDrawPathForSmoothRRect(const std::array<Point, 4>& radii, bool isComplex,
-                                      const Stroke* stroke, const Matrix& viewMatrix,
-                                      bool antiAlias) {
+static bool UseDrawPathForSmoothRRect(const Rect& rect, const std::array<Point, 4>& radii,
+                                      float smoothness, bool isComplex, const Stroke* stroke,
+                                      const Matrix& viewMatrix, bool antiAlias) {
   const auto scales = viewMatrix.getAxisScales();
   // Axis scales that map the local geometry into the space where the shader evaluates distances.
   auto evalScales = scales;
@@ -448,6 +448,14 @@ static bool UseDrawPathForSmoothRRect(const std::array<Point, 4>& radii, bool is
     }
     const auto xRadius = r.x * evalScales.x;
     const auto yRadius = r.y * evalScales.y;
+    if (stroke != nullptr && xRadius > 0.0f && yRadius > 0.0f) {
+      // A corner region only evaluates its own contour. If an opposite edge is within maxDist of
+      // the region, the stroke along that edge is missed.
+      if (rect.width() * evalScales.x - (1.0f + smoothness) * xRadius < maxDist ||
+          rect.height() * evalScales.y - (1.0f + smoothness) * yRadius < maxDist) {
+        return true;
+      }
+    }
     const auto minRadius = std::min(xRadius, yRadius);
     const auto maxRadius = std::max(xRadius, yRadius);
     // AA fills and all strokes use the fixed-iteration cubic distance solver. The corner's
@@ -559,8 +567,8 @@ bool RRectUtils::UseDrawPath(const RRect& rRect, const Stroke* stroke, const Mat
     return true;
   }
   if (rRect.smoothness() > 0.0f) {
-    return UseDrawPathForSmoothRRect(rRect.radii(), rRect.isComplex(), stroke, viewMatrix,
-                                     antiAlias);
+    return UseDrawPathForSmoothRRect(rRect.rect(), rRect.radii(), rRect.smoothness(),
+                                     rRect.isComplex(), stroke, viewMatrix, antiAlias);
   }
   return UseDrawPathForRRect(rRect.radii(), rRect.isComplex(), stroke, viewMatrix,
                              HasSharpCorner(rRect, viewMatrix));

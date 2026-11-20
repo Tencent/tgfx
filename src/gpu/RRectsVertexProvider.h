@@ -88,7 +88,7 @@ class RRectsVertexProvider : public VertexProvider {
   /**
    * Returns true if the provider holds RRects with corner smoothness.
    */
-  virtual bool hasSmoothness() const = 0;
+  virtual bool isSmooth() const = 0;
 
   /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.

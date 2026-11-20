@@ -18,6 +18,7 @@
 
 #include "GeometryShape.h"
 #include "RRectUtils.h"
+#include "core/utils/Types.h"
 
 namespace tgfx {
 
@@ -197,6 +198,10 @@ void GeometryShape::setPath(const Path& path) {
     setType(Type::Path);
     new (&_path) Path(path);
   }
+}
+
+bool RRectShape::IsRRect(const Shape& shape) {
+  return Types::Get(&shape) == Shape::Type::Path && !shape.isSimplePath();
 }
 
 }  // namespace tgfx

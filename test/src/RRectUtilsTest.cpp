@@ -22,6 +22,7 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Stroke.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -344,6 +345,17 @@ TGFX_TEST(RRectUtilsTest, TryAxisAlignedTransform) {
     EXPECT_EQ(out->type(), RRect::Type::Rect);
     EXPECT_FLOAT_EQ(out->rect().width(), 200.f);
     EXPECT_FLOAT_EQ(out->rect().height(), 40.f);
+  }
+
+  // Case 14: A zero axis scale collapses a stroked smoothed RRect into a line, drawn as a path.
+  {
+    const auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 20, 20, 0.5f);
+    EXPECT_FLOAT_EQ(rRect.smoothness(), 0.5f);
+    const Stroke stroke(4);
+    EXPECT_EQ(RRectUtils::GetDrawType(rRect, &stroke, Matrix::MakeScale(1, 2), true),
+              RRectDrawType::RRect);
+    EXPECT_EQ(RRectUtils::GetDrawType(rRect, &stroke, Matrix::MakeScale(0, 1), true),
+              RRectDrawType::Path);
   }
 }
 

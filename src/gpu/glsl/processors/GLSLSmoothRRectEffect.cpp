@@ -126,6 +126,8 @@ highp float )" + circleCornerFunc + R"((highp vec2 q, highp float radius, highp 
   // fragments beyond their intersection into S2. S2 lies entirely on the vertex side of the
   // intersection, so S2 also requires q.x <= normalIntersectX, the x coordinate of the
   // intersection.
+  // Within S2, fragments past the ellipse center along either axis are inside the corner contour
+  // and outside the antialiasing ramp, so they only need a negative value.
   // In S1, S3 and S4, C3 mirrors across the corner bisector the C1 built with the radii swapped,
   // so the implicit equation evaluates it as that C1 at the swapped point.
   const auto ellipseCornerFunc = builder->getMangledFunctionName("smoothCornerDistEllipse");
@@ -149,6 +151,9 @@ highp float )" + ellipseCornerFunc + R"((highp vec2 q, highp vec2 radii, highp v
   highp float normalIntersectX =
       rx + (rySq - rxSq) * turnSin * turnCos / ((turnSin + turnCos) * rx);
   if (fs <= 0.0 && fe > 0.0 && q.x <= normalIntersectX) {
+    if (q.x >= rx || q.y >= ry) {
+      return -1.0;
+    }
     return antiAlias ? )" + arcDistFunc + R"((q - radii, radii)
                      : )" + arcImplicitFunc + R"((q - radii, radii);
   }

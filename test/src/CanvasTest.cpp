@@ -1428,6 +1428,27 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
     EXPECT_TRUE(op->isSmooth);
   });
 
+  // Case 15: Filled smoothed RRect with elliptical corners whose interior stays fully covered.
+  const auto rect15 = Rect::MakeWH(400, 1200);
+  auto rRect15 = RRect::MakeRectXY(rect15, 100, 300, 0.9f);
+  EXPECT_FLOAT_EQ(rRect15.smoothness(), 0.9f);
+  canvas->save();
+  canvas->translate(margin + 3 * (cellWidth + gap) + cellWidth / 2,
+                    margin + 3 * (cellHeight + gap) + cellHeight / 2);
+  canvas->scale(0.06f, 0.06f);
+  canvas->translate(-200, -600);
+  paint.setColor(Color::Red());
+  canvas->drawRRect(RRect::MakeRectXY(rect15, 100, 300), paint);
+  paint.setColor(Color::White());
+  canvas->drawRRect(rRect15, paint);
+  canvas->restore();
+  TGFX_PRIVATE_ACCESS({
+    auto* task = FlushAndGetLastRenderTask(surface);
+    auto* op = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+    EXPECT_EQ(op->type(), DrawOp::Type::RRectDrawOp);
+    EXPECT_TRUE(op->isSmooth);
+  });
+
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOp"));
 }
@@ -2076,16 +2097,28 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   }
 
   // Case 12: Case 5 under a perspective matrix with a wider stroke falls back to drawPath.
+  strokePaint.setStroke(Stroke(16));
+  strokePaint.setColor(Color::FromRGBA(128, 0, 255));
+  auto rRect12 = RRect::MakeRectRadii(rect, rRect5Radii);
+  EXPECT_EQ(rRect12.type(), RRect::Type::Complex);
+  auto controlSurface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(controlSurface != nullptr);
+  auto controlCanvas = controlSurface->getCanvas();
+  controlCanvas->translate(margin + 5 * (cellWidth + gap) + cellWidth / 2,
+                           margin + cellHeight + gap + cellHeight / 2);
+  controlCanvas->scale(0.8f, 0.8f);
+  controlCanvas->translate(-cellWidth / 2, -cellHeight / 2);
+  controlCanvas->drawRRect(rRect12, strokePaint);
+  {
+    TGFX_PRIVATE_ACCESS(auto* task = FlushAndGetLastRenderTask(controlSurface);
+                        EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::RRectDrawOp));
+  }
   canvas->save();
   canvas->translate(margin + 5 * (cellWidth + gap) + cellWidth / 2,
                     margin + cellHeight + gap + cellHeight / 2);
   canvas->scale(0.8f, 0.8f);
   canvas->concat(Matrix::MakeAll(1, 0, 0, 0, 1, 0, 0, 0.004f, 1));
   canvas->translate(-cellWidth / 2, -cellHeight / 2);
-  strokePaint.setStroke(Stroke(16));
-  strokePaint.setColor(Color::FromRGBA(128, 0, 255));
-  auto rRect12 = RRect::MakeRectRadii(rect, rRect5Radii);
-  EXPECT_EQ(rRect12.type(), RRect::Type::Complex);
   canvas->drawRRect(rRect12, strokePaint);
   canvas->restore();
   {
@@ -2420,6 +2453,54 @@ TGFX_TEST(CanvasTest, AARRectOp) {
     });
   }
 
+  // Case 29: Filled smoothed RRect with elliptical corners whose interior stays fully covered.
+  const auto rect29 = Rect::MakeWH(400, 1200);
+  auto rRect29 = RRect::MakeRectXY(rect29, 100, 300, 0.9f);
+  EXPECT_FLOAT_EQ(rRect29.smoothness(), 0.9f);
+  canvas->save();
+  canvas->translate(margin + 4 * (cellWidth + gap) + cellWidth / 2,
+                    margin + 4 * (cellHeight + gap) + cellHeight / 2);
+  canvas->scale(0.06f, 0.06f);
+  canvas->translate(-200, -600);
+  fillPaint.setColor(Color::Red());
+  canvas->drawRRect(RRect::MakeRectXY(rect29, 100, 300), fillPaint);
+  fillPaint.setColor(Color::White());
+  canvas->drawRRect(rRect29, fillPaint);
+  canvas->restore();
+  {
+    TGFX_PRIVATE_ACCESS({
+      auto* task = FlushAndGetLastRenderTask(surface);
+      auto* op = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+      EXPECT_EQ(op->type(), DrawOp::Type::RRectDrawOp);
+      EXPECT_TRUE(op->isSmooth);
+    });
+  }
+
+  // Case 30: Stroked smoothed RRect whose corner region would cover the opposite stroke falls back
+  // to drawPath.
+  const auto rect30 = Rect::MakeWH(200, 100);
+  const auto radii30 = std::array<Point, 4>{{{60, 60}, {0, 0}, {0, 0}, {0, 0}}};
+  auto rRect30 = RRect::MakeRectRadii(rect30, radii30, 0.5f);
+  EXPECT_EQ(rRect30.type(), RRect::Type::Complex);
+  EXPECT_FLOAT_EQ(rRect30.smoothness(), 0.5f);
+  canvas->save();
+  canvas->translate(margin + 5 * (cellWidth + gap) + cellWidth / 2,
+                    margin + 4 * (cellHeight + gap) + cellHeight / 2);
+  canvas->scale(0.5f, 0.5f);
+  canvas->translate(-100, -50);
+  strokePaint.setStroke(Stroke(30));
+  strokePaint.setColor(Color::Red());
+  canvas->drawRRect(RRect::MakeRectRadii(rect30, radii30), strokePaint);
+  strokePaint.setColor(Color::White());
+  canvas->drawRRect(rRect30, strokePaint);
+  canvas->restore();
+  {
+    TGFX_PRIVATE_ACCESS({
+      auto* task = FlushAndGetLastRenderTask(surface);
+      EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
+    });
+  }
+
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AARRectOp"));
 }
 
@@ -2494,6 +2575,32 @@ TGFX_TEST(CanvasTest, RRectOpBatch) {
       EXPECT_EQ(op->aaType != AAType::None, expectAntiAlias[i]);
       EXPECT_EQ(op->unscaledGeometry, expectUnscaledGeometry[i]);
     }
+  });
+
+  // Baked and unscaled AA smooth strokes batch into one op.
+  auto aaStrokeSurface = Surface::Make(context, 100, 50);
+  ASSERT_TRUE(aaStrokeSurface != nullptr);
+  auto aaStrokeCanvas = aaStrokeSurface->getCanvas();
+  Paint aaStrokePaint;
+  aaStrokePaint.setStyle(PaintStyle::Stroke);
+  aaStrokePaint.setStroke(Stroke(2));
+  aaStrokeCanvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(10, 10, 20, 20), 4, 4, 1.0f),
+                            aaStrokePaint);
+  aaStrokeCanvas->save();
+  aaStrokeCanvas->translate(50, 10);
+  aaStrokeCanvas->scale(1.5f, 1.0f);
+  aaStrokeCanvas->drawRRect(RRect::MakeRectXY(Rect::MakeWH(20, 20), 4, 4, 1.0f), aaStrokePaint);
+  aaStrokeCanvas->restore();
+  TGFX_PRIVATE_ACCESS({
+    auto* task = FlushAndGetLastRenderTask(aaStrokeSurface);
+    ASSERT_EQ(task->drawOps.size(), 1u);
+    auto* op = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+    EXPECT_EQ(op->type(), DrawOp::Type::RRectDrawOp);
+    EXPECT_EQ(op->rectCount, 2u);
+    EXPECT_TRUE(op->isSmooth);
+    EXPECT_TRUE(op->hasStroke);
+    EXPECT_NE(op->aaType, AAType::None);
+    EXPECT_TRUE(op->unscaledGeometry);
   });
 }
 

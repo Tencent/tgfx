@@ -19,6 +19,8 @@
 #pragma once
 
 #include <memory>
+#include <optional>
+#include "tgfx/core/RRect.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/StrokeAlign.h"
 
@@ -81,6 +83,14 @@ struct StyledShape {
    * The stroke alignment. Valid when type is Stroke or FillStroke.
    */
   StrokeAlign strokeAlign = StrokeAlign::Center;
+
+ private:
+  // The original smoothed rounded rectangle in the local space of shape.
+  std::optional<RRect> _rRect = std::nullopt;
+
+  friend class VectorLayer;
+  friend class SpreadUtils;
+  friend class AnalyticShadowUtils;
 };
 
 }  // namespace tgfx
