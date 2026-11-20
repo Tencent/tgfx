@@ -915,7 +915,9 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   Rect renderRect = {};
   std::vector<Rect> renderRectsVec = {};
   if (_root && canInvert) {
-    _root->updateRenderBounds();
+    // The bounds the background styles need depend on the alpha that reaches them, so pass the
+    // draw alpha down instead of assuming an opaque draw.
+    _root->updateRenderBounds(nullptr, false, alpha);
     renderRect = localToGlobalMatrix.mapRect(clippedBounds);
     renderRectsVec = {renderRect};
     args.renderRects = &renderRectsVec;
@@ -957,7 +959,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       Layer* captureRoot = _root ? _root : this;
       Rect captureRect = _root ? renderRect : clippedBounds;
       BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), &snapshotMap, {captureRect},
-                              {captureRect});
+                              {captureRect}, alpha);
       snapshotsPtr = &snapshotMap;
     }
   }
@@ -1414,6 +1416,12 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, float 
   if (subtreeCache) {
     if (subtreeCache->maxSize() != args.subtreeCacheMaxSize) {
       subtreeCache = std::make_unique<SubtreeCache>(args.subtreeCacheMaxSize);
+    }
+    // The cached image holds only the styles that were visible when it was recorded. A fade lowers
+    // the alpha that reaches the subtree, which brings back a background style that opaque content
+    // used to hide, so such a frame cannot be served from the cache.
+    if (alpha < 1.0f && hasBackgroundStyle(alpha)) {
+      return false;
     }
     return true;
   }
@@ -2373,7 +2381,9 @@ bool Layer::hasOwnBackgroundStyle(float alpha) const {
 }
 
 bool Layer::hasBackgroundStyle(float alpha) {
-  if (!bitFields.dirtyDescendents) {
+  // maxBackgroundOutset is accumulated with the alpha that reached each layer when the bounds were
+  // last built, so it answers the question only for an opaque draw.
+  if (alpha >= 1.0f && !bitFields.dirtyDescendents) {
     return maxBackgroundOutset > 0;
   }
   return hasOwnBackgroundStyle(alpha) || hasDescendantBackgroundStyle(alpha);
@@ -2390,12 +2400,13 @@ bool Layer::hasDescendantBackgroundStyle(float alpha) {
 
 bool Layer::isSubtreeOpaque() const {
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
-  const bool maskComposesOffscreen =
-      hasValidMask() && maskType != LayerMaskType::Alpha && maskType != LayerMaskType::Contour;
+  // A contour mask clips with a path, while the other mask types can fall back to a per-pixel mask
+  // filter that attenuates the subtree and lets a background style show through.
+  const bool maskAttenuates = hasValidMask() && maskType != LayerMaskType::Contour;
   // A layer style can paint past its content (a drop shadow, a blur), so the subtree does not
   // cover what sits below it there.
   return _alpha >= 1.0f && static_cast<BlendMode>(bitFields.blendMode) == BlendMode::SrcOver &&
-         _filters.empty() && _layerStyles.empty() && !maskComposesOffscreen && !canPreserve3D() &&
+         _filters.empty() && _layerStyles.empty() && !maskAttenuates && !canPreserve3D() &&
          bitFields.contentOpaque && bitFields.childrenOpaque;
 }
 

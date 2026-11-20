@@ -728,7 +728,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool hasOwnBackgroundStyle(float alpha) const;
 
   // Whether everything the subtree paints is fully opaque and composited in place: the content and
-  // every visible child are opaque, and no filter, layer style, offscreen mask, 3D context, group
+  // every visible child are opaque, and no filter, layer style, attenuating mask, 3D context, group
   // alpha or non-SrcOver blend breaks it up. Reads the layer's own compositing state live and the
   // content and children as of the last render bounds update.
   bool isSubtreeOpaque() const;
