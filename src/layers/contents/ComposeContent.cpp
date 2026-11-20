@@ -89,6 +89,15 @@ bool ComposeContent::contourEqualsOpaqueContent(bool includeUnpaintedGeometry) c
   return true;
 }
 
+bool ComposeContent::isFullyOpaque() const {
+  for (const auto& content : contents) {
+    if (!content->isFullyOpaque()) {
+      return false;
+    }
+  }
+  return true;
+}
+
 bool ComposeContent::hasBlendMode() const {
   for (const auto& content : contents) {
     if (content->hasBlendMode()) {
