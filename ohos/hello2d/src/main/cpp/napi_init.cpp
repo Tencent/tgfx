@@ -186,7 +186,6 @@ static std::shared_ptr<hello2d::AppHost> CreateAppHost() {
   auto appHost = std::make_shared<hello2d::AppHost>();
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
-  displayList.setMaxTileCount(512);
   static const std::string FallbackFontFileNames[] = {"/system/fonts/HarmonyOS_Sans.ttf",
                                                       "/system/fonts/HarmonyOS_Sans_SC.ttf",
                                                       "/system/fonts/HarmonyOS_Sans_TC.ttf"};

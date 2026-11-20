@@ -28,7 +28,7 @@
 #include "layers/OpaqueContext.h"
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
-#include "layers/TileCache.h"
+#include "layers/TilePool.h"
 #include "layers/compositing3d/Render3DContext.h"
 #include "layers/contents/ComposeContent.h"
 #include "layers/contents/MatrixContent.h"
@@ -6927,11 +6927,15 @@ TGFX_TEST(LayerTest, GroupBlurTiledZoom) {
   CenterTiledContent(&displayList, *surface, contentCenter, 36.505f);
   // Refine one tile per frame until every tile is rasterized at the target zoom; a fixed frame
   // count would leave the last tiles at the stale zoom and make the image depend on scheduling.
+  // A zoom of 36.505 covers 8x4 exact tiles here, and the tree levels on top of them take the
+  // refinement to just over 200 frames at one tile per frame, so the bound only has to stay well
+  // clear of that while still failing a refinement that never ends.
+  constexpr int MaxFrames = 400;
   int frames = 0;
   do {
     displayList.render(surface.get());
     ++frames;
-  } while (displayList.hasContentChanged() && frames < 200);
+  } while (displayList.hasContentChanged() && frames < MaxFrames);
   ASSERT_FALSE(displayList.hasContentChanged()) << "tile refinement did not settle";
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GroupBlurTiledZoom"));
 }
@@ -9074,9 +9078,8 @@ TGFX_TEST(LayerTest, TiledDirtyRegionOutsideViewport) {
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Tiled);
   displayList->setTileSize(64);
-  // A large tile pool keeps the tiles covering the first viewport cached while the viewport moves,
-  // so a missing invalidation shows up as stale pixels instead of a reclaimed tile.
-  displayList->setMaxTileCount(400);
+  // The tile pool is large enough to keep the tiles covering the first viewport cached while the
+  // viewport moves, so a missing invalidation shows up as stale pixels instead of a reclaimed tile.
   auto solidLayer = SolidLayer::Make();
   solidLayer->setColor(Color::Red());
   solidLayer->setWidth(400);

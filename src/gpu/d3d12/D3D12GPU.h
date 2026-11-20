@@ -363,11 +363,18 @@ class D3D12GPU : public GPU {
   // life of the GPU instance) and therefore does not need a ring tail pointer.
   static constexpr uint32_t SRV_RING_CAPACITY = 64 * 1024;
   static constexpr uint32_t SAMPLER_HEAP_CAPACITY = 2048;
-  // RTV / DSV rings replace the per-render-pass CreateDescriptorHeap calls. Sized to handle a
-  // few dozen passes per frame with MAX_FRAMES_IN_FLIGHT outstanding; well under D3D12's hard
-  // 1024-RTV / 1024-DSV per-heap caps.
-  static constexpr uint32_t RTV_RING_CAPACITY = 512;
-  static constexpr uint32_t DSV_RING_CAPACITY = 64;
+  // RTV / DSV rings replace the per-render-pass CreateDescriptorHeap calls. A slot can only be
+  // recycled once the fence of the submission that allocated it completes, so the ring has to
+  // hold every pass encoded into one command buffer plus the passes of the other inflight
+  // submissions (MAX_FRAMES_IN_FLIGHT). That is not a small number: a tiled DisplayList keeps
+  // recording into a single drawing buffer until the next flush, so one flush can encode well
+  // over a thousand passes because every tile a frame refines needs its own render pass, and a
+  // stencil pass costs one DSV slot as well. Running out silently drops whole passes, so the
+  // rings are sized with headroom. Neither heap is ever shader visible, and D3D12 has no small
+  // per-heap cap for them; the documented per-heap limits only apply to shader-visible
+  // CBV/SRV/UAV and Sampler heaps.
+  static constexpr uint32_t RTV_RING_CAPACITY = 4096;
+  static constexpr uint32_t DSV_RING_CAPACITY = 512;
   D3D12DescriptorRing _srvRing;
   D3D12DescriptorRing _rtvRing;
   D3D12DescriptorRing _dsvRing;
