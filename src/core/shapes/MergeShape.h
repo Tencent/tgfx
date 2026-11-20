@@ -45,5 +45,8 @@ class MergeShape : public UniqueKeyShape {
   }
 
   Path onGetPath(float resolutionScale) const override;
+
+ private:
+  bool unionConcatenates(const Path& firstPath, const Path& secondPath) const;
 };
 }  // namespace tgfx

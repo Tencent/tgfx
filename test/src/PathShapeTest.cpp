@@ -18,12 +18,15 @@
 
 #include "core/PathRef.h"
 #include "core/shapes/AppendShape.h"
+#include "gpu/resources/ResourceKey.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/PathEffect.h"
+#include "tgfx/core/PathProvider.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
@@ -391,11 +394,14 @@ TGFX_TEST(PathShapeTest, inverseFillType) {
   shape = Shape::ApplyMatrix(firstShape, Matrix::MakeScale(2.0f));
   EXPECT_TRUE(shape->isInverseFillType());
   shape = Shape::ApplyStroke(firstShape, &stroke);
+  // The stroker preserves the inverse flag even though it replaces the outline with its own
+  // winding boundary.
   EXPECT_TRUE(shape->isInverseFillType());
 }
 
 TGFX_TEST_PRIVATE(PathShapeTest, MergeShapeFillType) {
-  // MergeShape always produces EvenOdd fill type regardless of input fill types.
+  // These outlines overlap, so every operation runs the boolean path and the result is even-odd
+  // regardless of the input rules; a union of disjoint outlines concatenates and keeps their rule.
   Path rectPath;
   rectPath.addRect(Rect::MakeXYWH(0, 0, 100, 100));
   Path ovalPath;
@@ -409,6 +415,10 @@ TGFX_TEST_PRIVATE(PathShapeTest, MergeShapeFillType) {
 
   auto merged = Shape::Merge(shape1, shape2, PathOp::Union);
   EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  // The rule a merge reports and the rule the outline it produces carries have to be the same one:
+  // the outline is read by the reported rule, so a disagreement punches a hole where the areas
+  // overlap. fillType() derives the rule without building the path, which is where they can drift.
+  EXPECT_EQ(merged->getPath().getFillType(), merged->fillType());
   merged = Shape::Merge(shape1, shape2, PathOp::Intersect);
   EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
   merged = Shape::Merge(shape1, shape2, PathOp::Difference);
@@ -472,6 +482,316 @@ TGFX_TEST_PRIVATE(PathShapeTest, MergeShapeFillType) {
   TGFX_PRIVATE_ACCESS(EXPECT_EQ(fillTypeMatrixShape->type(), Shape::Type::Matrix);)
   EXPECT_EQ(fillTypeMatrixShape->fillType(), PathFillType::EvenOdd);
   EXPECT_EQ(fillTypeMatrixShape->getBounds(), matrixShape->getBounds());
+}
+
+class RuleCountingShape : public Shape {
+ public:
+  RuleCountingShape(Path outline, int* pathCalls)
+      : outline(std::move(outline)), pathCalls(pathCalls) {
+  }
+
+  PathFillType fillType() const override {
+    return getPath().getFillType();
+  }
+
+  bool isInverseFillType() const override {
+    return outline.isInverseFillType();
+  }
+
+ protected:
+  Type type() const override {
+    return Type::Path;
+  }
+
+  UniqueKey getUniqueKey() const override {
+    return {};
+  }
+
+  Rect onGetBounds() const override {
+    return outline.getBounds();
+  }
+
+  Path onGetPath(float /*resolutionScale*/) const override {
+    ++*pathCalls;
+    return outline;
+  }
+
+ private:
+  Path outline = {};
+  int* pathCalls = nullptr;
+};
+
+TGFX_TEST(PathShapeTest, MergeInverseQueryMatchesOutlineRule) {
+  struct MergeCase {
+    PathOp op;
+    bool expected[4];
+  };
+  const MergeCase cases[] = {{PathOp::Union, {false, true, true, true}},
+                             {PathOp::Intersect, {false, false, false, true}},
+                             {PathOp::Difference, {false, false, true, false}},
+                             {PathOp::XOR, {false, true, true, false}}};
+  for (const auto& testCase : cases) {
+    for (size_t i = 0; i < 4; ++i) {
+      Path firstPath = {};
+      firstPath.addRect(Rect::MakeWH(10, 10));
+      firstPath.setFillType(i >= 2 ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd);
+      Path secondPath = firstPath;
+      secondPath.setFillType(i % 2 != 0 ? PathFillType::InverseWinding : PathFillType::Winding);
+      int pathCalls = 0;
+      auto first = std::make_shared<RuleCountingShape>(firstPath, &pathCalls);
+      auto second = std::make_shared<RuleCountingShape>(secondPath, &pathCalls);
+      auto merged = Shape::Merge(first, second, testCase.op);
+      ASSERT_NE(merged, nullptr);
+      EXPECT_EQ(merged->isInverseFillType(), testCase.expected[i]);
+      EXPECT_EQ(merged->isInverseFillType(), testCase.expected[i]);
+      // The query now reads operand outlines, but the cached path of each operand is built once.
+      EXPECT_LE(pathCalls, 2);
+      EXPECT_EQ(merged->getPath().isInverseFillType(), testCase.expected[i]);
+    }
+  }
+}
+
+TGFX_TEST(PathShapeTest, AppendInverseQueryUsesOnlyNecessaryPaths) {
+  for (bool emptyFirst : {false, true}) {
+    for (bool firstInverse : {false, true}) {
+      for (bool secondInverse : {false, true}) {
+        Path firstPath = {};
+        if (!emptyFirst) {
+          firstPath.addRect(Rect::MakeWH(10, 10));
+        }
+        firstPath.setFillType(firstInverse ? PathFillType::InverseWinding : PathFillType::Winding);
+        Path secondPath = {};
+        secondPath.addRect(Rect::MakeWH(20, 20));
+        secondPath.setFillType(secondInverse ? PathFillType::InverseEvenOdd
+                                             : PathFillType::EvenOdd);
+        int firstCalls = 0;
+        int secondCalls = 0;
+        auto first = std::make_shared<RuleCountingShape>(firstPath, &firstCalls);
+        auto second = std::make_shared<RuleCountingShape>(secondPath, &secondCalls);
+        auto appended = Shape::Merge(first, second);
+        ASSERT_NE(appended, nullptr);
+        bool expected = firstInverse || (emptyFirst && secondInverse);
+        EXPECT_EQ(appended->isInverseFillType(), expected);
+        EXPECT_EQ(appended->isInverseFillType(), expected);
+        // fillType() reads the first outline and stops there unless it is empty and non-inverse.
+        EXPECT_EQ(firstCalls, 1);
+        EXPECT_EQ(secondCalls, emptyFirst && !firstInverse ? 1 : 0);
+        EXPECT_EQ(appended->getPath().isInverseFillType(), expected);
+      }
+    }
+  }
+}
+
+TGFX_TEST(PathShapeTest, ChainedUnionBuildsEachOperandOnce) {
+  int pathCalls = 0;
+  std::shared_ptr<Shape> shapes[3] = {};
+  for (int i = 0; i < 3; ++i) {
+    Path rect = {};
+    rect.addRect(Rect::MakeXYWH(i * 100, 0, 10, 10));
+    shapes[i] = std::make_shared<RuleCountingShape>(rect, &pathCalls);
+  }
+  auto merged =
+      Shape::Merge(Shape::Merge(shapes[0], shapes[1], PathOp::Union), shapes[2], PathOp::Union);
+  ASSERT_TRUE(merged != nullptr);
+  EXPECT_EQ(merged->getPath().getBounds(), Rect::MakeXYWH(0, 0, 210, 10));
+  // A left-deep chain must build each leaf once, not once per ancestor.
+  EXPECT_EQ(pathCalls, 3);
+}
+
+// A PathProvider is allowed to report bounds that only contain its outlines - that is what a text
+// run does with its em box. Two such shapes whose reported bounds overlap but whose outlines sit
+// apart are the case where a union has to be resolved: deciding the fast path from the tighter
+// outline bounds would concatenate them and hand out an outline carrying a rule the shape does not
+// report.
+class LooseBoundsProvider final : public PathProvider {
+ public:
+  LooseBoundsProvider(const Rect& outline, const Rect& bounds) : outline(outline), bounds(bounds) {
+  }
+
+  Path getPath() const override {
+    Path path = {};
+    path.addRect(outline);
+    return path;
+  }
+
+  Rect getBounds() const override {
+    return bounds;
+  }
+
+ private:
+  Rect outline = {};
+  Rect bounds = {};
+};
+
+TGFX_TEST(PathShapeTest, MergedUnionWithOverlappingBoundsIsResolved) {
+  auto first = Shape::MakeFrom(std::make_shared<LooseBoundsProvider>(
+      Rect::MakeXYWH(0, 0, 10, 10), Rect::MakeXYWH(-50, -50, 120, 120)));
+  auto second = Shape::MakeFrom(std::make_shared<LooseBoundsProvider>(
+      Rect::MakeXYWH(50, 0, 10, 10), Rect::MakeXYWH(-50, -50, 120, 120)));
+  auto merged = Shape::Merge(first, second, PathOp::Union);
+  ASSERT_TRUE(merged != nullptr);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  EXPECT_EQ(merged->getPath().getFillType(), PathFillType::EvenOdd);
+  // The union still covers both outlines: resolving the areas must not drop either of them.
+  EXPECT_EQ(merged->getPath().getBounds(), Rect::MakeXYWH(0, 0, 60, 10));
+}
+
+static void ExpectRuleMatchesOutline(const std::shared_ptr<Shape>& shape, const char* name) {
+  // MergeShape and AppendShape derive their rule from operands rather than from the outline they
+  // hand out, so the reported rule and the outline rule are separate computations that have to
+  // agree - the renderer reads the outline with the reported rule. EffectShape and ProviderShape
+  // derive their rule from operands as well and still have known deviations, which this helper
+  // does not assert.
+  EXPECT_EQ(shape->getPath().getFillType(), shape->fillType()) << name;
+}
+
+TGFX_TEST(PathShapeTest, ShapeFillTypeMatchesOutline) {
+  Path rectPath;
+  rectPath.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  Path ovalPath;
+  ovalPath.addOval(Rect::MakeXYWH(50, 50, 100, 100));
+  auto rect = Shape::MakeFrom(rectPath);
+  auto oval = Shape::MakeFrom(ovalPath);
+  auto evenOddRect = Shape::ApplyFillType(rect, PathFillType::EvenOdd);
+  auto inverseRect = Shape::ApplyFillType(rect, PathFillType::InverseWinding);
+  auto inverseOval = Shape::ApplyFillType(oval, PathFillType::InverseWinding);
+
+  // Overlapping areas: the merge has to run a boolean operation, which writes its own rule.
+  ExpectRuleMatchesOutline(Shape::Merge(rect, oval, PathOp::Union), "union rect+oval");
+  ExpectRuleMatchesOutline(Shape::Merge(rect, oval, PathOp::Intersect), "intersect rect+oval");
+  ExpectRuleMatchesOutline(Shape::Merge(rect, oval, PathOp::Difference), "difference rect+oval");
+  ExpectRuleMatchesOutline(Shape::Merge(rect, oval, PathOp::XOR), "xor rect+oval");
+  ExpectRuleMatchesOutline(Shape::Merge(evenOddRect, oval, PathOp::Union), "union evenodd+oval");
+  ExpectRuleMatchesOutline(Shape::Merge(inverseRect, oval, PathOp::Union),
+                           "union inverseRect+oval");
+  ExpectRuleMatchesOutline(Shape::Merge(rect, inverseOval, PathOp::Union),
+                           "union rect+inverseOval");
+  ExpectRuleMatchesOutline(Shape::Merge(inverseRect, inverseOval, PathOp::Union),
+                           "union inverseRect+inverseOval");
+  ExpectRuleMatchesOutline(Shape::Merge(inverseRect, oval, PathOp::Intersect),
+                           "intersect inverseRect+oval");
+  ExpectRuleMatchesOutline(Shape::Merge(inverseRect, oval, PathOp::Difference),
+                           "difference inverseRect+oval");
+
+  // Disjoint areas: the union concatenates instead, and keeps the rule both sources share.
+  auto farRect = Shape::ApplyMatrix(rect, Matrix::MakeTrans(1000, 1000));
+  ExpectRuleMatchesOutline(Shape::Merge(rect, farRect, PathOp::Union), "union disjoint winding");
+  auto farEvenOddRect = Shape::ApplyFillType(farRect, PathFillType::EvenOdd);
+  ExpectRuleMatchesOutline(Shape::Merge(evenOddRect, farEvenOddRect, PathOp::Union),
+                           "union disjoint evenodd");
+
+  // Append: an empty operand drops out, and an empty inverse one fills the whole plane.
+  Path emptyPath = {};
+  auto empty = Shape::MakeFrom(emptyPath);
+  auto inverseEmpty = Shape::ApplyFillType(empty, PathFillType::InverseWinding);
+  ExpectRuleMatchesOutline(Shape::Merge(empty, evenOddRect, PathOp::Append),
+                           "append empty+evenodd");
+  ExpectRuleMatchesOutline(Shape::Merge(evenOddRect, empty, PathOp::Append),
+                           "append evenodd+empty");
+  ExpectRuleMatchesOutline(Shape::Merge(inverseEmpty, rect, PathOp::Append), "append inverseEmpty");
+  ExpectRuleMatchesOutline(Shape::Merge(rect, evenOddRect, PathOp::Append), "append rect+evenodd");
+
+  // Strokes replace the outline, so both regular and hairline strokes report the rule their outline
+  // carries.
+  Stroke stroke(10.0f);
+  ExpectRuleMatchesOutline(Shape::ApplyStroke(evenOddRect, &stroke), "stroked evenodd");
+  Stroke hairline(0.0f);
+  ExpectRuleMatchesOutline(Shape::ApplyStroke(evenOddRect, &hairline), "hairline evenodd stroke");
+
+  // Known deviations: EffectShape and ProviderShape report their operand's rule instead of the rule
+  // of the outline they hand out. Assert the deviation so this gap is explicit rather than implied.
+  auto provider = Shape::MakeFrom(PathProvider::Wrap(evenOddRect->getPath()));
+  ASSERT_TRUE(provider != nullptr);
+  EXPECT_NE(provider->getPath().getFillType(), provider->fillType());
+  auto trimmed = Shape::ApplyEffect(inverseRect, PathEffect::MakeTrim(0.5f, 0.5f));
+  ASSERT_TRUE(trimmed != nullptr);
+  EXPECT_NE(trimmed->getPath().getFillType(), trimmed->fillType());
+}
+
+static std::shared_ptr<Shape> MakeEvenOddProviderShape(int x) {
+  Path path = {};
+  path.addRect(Rect::MakeXYWH(x, 0, 10, 10));
+  path.setFillType(PathFillType::EvenOdd);
+  return Shape::MakeFrom(PathProvider::Wrap(path));
+}
+
+TGFX_TEST(PathShapeTest, ProviderShapeUnionReportsOutlineRule) {
+  auto first = MakeEvenOddProviderShape(0);
+  auto second = MakeEvenOddProviderShape(100);
+  ASSERT_TRUE(first != nullptr);
+  ASSERT_TRUE(second != nullptr);
+  EXPECT_EQ(first->fillType(), PathFillType::Winding);
+  auto merged = Shape::Merge(first, second, PathOp::Union);
+  ASSERT_TRUE(merged != nullptr);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  EXPECT_EQ(merged->getPath().getFillType(), merged->fillType());
+}
+
+static std::shared_ptr<Shape> MakeInverseProviderShape(int x, bool empty) {
+  Path path = {};
+  if (!empty) {
+    path.addRect(Rect::MakeXYWH(x, 0, 10, 10));
+  }
+  path.setFillType(PathFillType::InverseWinding);
+  return Shape::MakeFrom(PathProvider::Wrap(path));
+}
+
+static void ExpectInverseProviderUnion(const std::shared_ptr<Shape>& first,
+                                       const std::shared_ptr<Shape>& second) {
+  auto merged = Shape::Merge(first, second, PathOp::Union);
+  ASSERT_TRUE(merged != nullptr);
+  EXPECT_TRUE(merged->isInverseFillType());
+  EXPECT_EQ(merged->fillType(), merged->getPath().getFillType());
+  EXPECT_TRUE(merged->getPath().isInverseFillType());
+  // The inverse operand already fills the plane outside its rect, so the disjoint rect adds no
+  // contour; concatenating it would wrongly leave a second hole in the result.
+  EXPECT_FALSE(Rect::Intersects(merged->getPath().getBounds(), Rect::MakeXYWH(100, 0, 10, 10)));
+}
+
+TGFX_TEST(PathShapeTest, InverseProviderUnionFallsBackToBoolean) {
+  auto inverse = MakeInverseProviderShape(0, false);
+  Path plainPath = {};
+  plainPath.addRect(Rect::MakeXYWH(100, 0, 10, 10));
+  auto plain = Shape::MakeFrom(plainPath);
+  ASSERT_TRUE(inverse != nullptr);
+  ASSERT_TRUE(plain != nullptr);
+  // PathProvider::Wrap does not override fillType(), so the operand reports Winding while its
+  // outline is inverse.
+  EXPECT_EQ(inverse->fillType(), PathFillType::Winding);
+  EXPECT_EQ(inverse->getPath().getFillType(), PathFillType::InverseWinding);
+  ExpectInverseProviderUnion(inverse, plain);
+  ExpectInverseProviderUnion(plain, inverse);
+}
+
+TGFX_TEST(PathShapeTest, InverseProviderAppendReportsInverseRule) {
+  auto inverseEmpty = MakeInverseProviderShape(0, true);
+  Path plainPath = {};
+  plainPath.addRect(Rect::MakeXYWH(100, 0, 10, 10));
+  auto plain = Shape::MakeFrom(plainPath);
+  ASSERT_TRUE(inverseEmpty != nullptr);
+  ASSERT_TRUE(plain != nullptr);
+  EXPECT_FALSE(inverseEmpty->isInverseFillType());
+  auto appended = Shape::Merge(inverseEmpty, plain);
+  ASSERT_TRUE(appended != nullptr);
+  EXPECT_TRUE(appended->isInverseFillType());
+  EXPECT_EQ(appended->fillType(), PathFillType::InverseWinding);
+  EXPECT_EQ(appended->getPath().getFillType(), appended->fillType());
+  EXPECT_TRUE(appended->getPath().isInverseFillType());
+}
+
+TGFX_TEST(PathShapeTest, InverseProviderStrokeReportsInverseRule) {
+  auto inverse = MakeInverseProviderShape(0, false);
+  ASSERT_TRUE(inverse != nullptr);
+  Stroke stroke(2.0f);
+  auto stroked = Shape::ApplyStroke(inverse, &stroke);
+  ASSERT_TRUE(stroked != nullptr);
+  EXPECT_EQ(stroked->fillType(), PathFillType::InverseWinding);
+  EXPECT_TRUE(stroked->isInverseFillType());
+  EXPECT_EQ(stroked->getPath().getFillType(), stroked->fillType());
+}
+
+TGFX_TEST(PathShapeTest, MergeVectorWithOnlyNullptrReturnsNull) {
+  EXPECT_EQ(Shape::Merge({nullptr, nullptr}), nullptr);
 }
 
 TGFX_TEST_PRIVATE(PathShapeTest, ReverseShape) {
@@ -1191,6 +1511,73 @@ TGFX_TEST(PathShapeTest, RRectPathRoundTrip) {
   ovalPath.addRRect(ovalIn);
   EXPECT_FALSE(ovalPath.isRRect(nullptr));
   EXPECT_TRUE(ovalPath.isOval(nullptr));
+}
+
+TGFX_TEST(PathShapeTest, AppendKeepsAnEmptyInverseShapeFillingThePlane) {
+  // A path with no contour but an inverse rule fills the whole plane. Appending to it must not
+  // treat it as an empty operand and overwrite it, which would drop the plane.
+  Path plane = {};
+  plane.setFillType(PathFillType::InverseEvenOdd);
+  auto planeShape = Shape::MakeFrom(std::move(plane));
+  ASSERT_TRUE(planeShape != nullptr);
+  ASSERT_TRUE(planeShape->isInverseFillType());
+  Path rectPath = {};
+  rectPath.addRect(Rect::MakeLTRB(0, 0, 100, 100));
+  auto rectShape = Shape::MakeFrom(rectPath);
+  ASSERT_TRUE(rectShape != nullptr);
+  auto merged = Shape::Merge(planeShape, rectShape);
+  ASSERT_TRUE(merged != nullptr);
+  // The rule has to agree with the path the shape hands back.
+  EXPECT_TRUE(merged->isInverseFillType());
+  auto path = merged->getPath();
+  EXPECT_EQ(path.getFillType(), PathFillType::InverseEvenOdd);
+  // The rectangle is the hole; everything outside it is still filled.
+  EXPECT_TRUE(path.contains(1000.0f, 1000.0f));
+  EXPECT_FALSE(path.contains(50.0f, 50.0f));
+}
+
+TGFX_TEST(PathShapeTest, StrokeShapeReportsWindingRule) {
+  Path path = {};
+  path.addRect(Rect::MakeLTRB(0, 0, 100, 100));
+  path.setFillType(PathFillType::EvenOdd);
+  auto shape = Shape::MakeFrom(path);
+  ASSERT_TRUE(shape != nullptr);
+
+  Stroke stroke(10.0f);
+  auto stroked = Shape::ApplyStroke(shape, &stroke);
+  ASSERT_TRUE(stroked != nullptr);
+  EXPECT_EQ(stroked->fillType(), PathFillType::Winding);
+
+  Stroke hairline(0.0f);
+  auto hairlined = Shape::ApplyStroke(shape, &hairline);
+  ASSERT_TRUE(hairlined != nullptr);
+  EXPECT_EQ(hairlined->fillType(), PathFillType::Winding);
+  EXPECT_EQ(hairlined->getPath().getFillType(), hairlined->fillType());
+}
+
+TGFX_TEST(PathShapeTest, StrokeShapePreservesInverseFillRule) {
+  Path path = {};
+  path.addRect(Rect::MakeLTRB(0, 0, 100, 100));
+  path.setFillType(PathFillType::InverseEvenOdd);
+  auto shape = Shape::MakeFrom(path);
+  ASSERT_TRUE(shape != nullptr);
+
+  Stroke stroke(10.0f);
+  auto stroked = Shape::ApplyStroke(shape, &stroke);
+  ASSERT_TRUE(stroked != nullptr);
+  EXPECT_EQ(stroked->getPath().getFillType(), PathFillType::InverseWinding);
+  EXPECT_EQ(stroked->fillType(), stroked->getPath().getFillType());
+}
+
+TGFX_TEST(PathShapeTest, DashEffectKeepsInputFillRule) {
+  Path path = {};
+  path.addRect(Rect::MakeLTRB(0, 0, 100, 100));
+  path.setFillType(PathFillType::EvenOdd);
+  float intervals[] = {10.0f, 5.0f};
+  auto effect = PathEffect::MakeDash(intervals, 2, 0.0f);
+  ASSERT_TRUE(effect != nullptr);
+  ASSERT_TRUE(effect->filterPath(&path));
+  EXPECT_EQ(path.getFillType(), PathFillType::EvenOdd);
 }
 
 }  // namespace tgfx
