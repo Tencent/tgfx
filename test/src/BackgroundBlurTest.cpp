@@ -1388,6 +1388,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleShareCompactGate){TGFX_PRIVATE_ACCESS
   DisplayList displayList;
   displayList.setBackgroundColor(Color::White());
   auto blurLayer = SolidLayer::Make();
+  blurLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
   blurLayer->setWidth(400);
   blurLayer->setHeight(400);
   blurLayer->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
@@ -1400,19 +1401,19 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleShareCompactGate){TGFX_PRIVATE_ACCESS
   // which is the gate's boundary, and the boundary itself still shares.
   auto atBoundary = displayList.captureBackgrounds(
       surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(100, 100, 100, 100)});
-  EXPECT_TRUE(atBoundary != nullptr);
+  ASSERT_TRUE(atBoundary != nullptr);
   EXPECT_TRUE(atBoundary->styleShareCompact);
 
   // One pixel further apart and the union grows past the boundary.
   auto pastBoundary = displayList.captureBackgrounds(
       surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(101, 100, 100, 100)});
-  EXPECT_TRUE(pastBoundary != nullptr);
+  ASSERT_TRUE(pastBoundary != nullptr);
   EXPECT_FALSE(pastBoundary->styleShareCompact);
 
   // Opposite corners of the surface: the union is the whole surface.
   auto scattered = displayList.captureBackgrounds(
       surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(300, 300, 100, 100)});
-  EXPECT_TRUE(scattered != nullptr);
+  ASSERT_TRUE(scattered != nullptr);
   EXPECT_FALSE(scattered->styleShareCompact);
 
   // Submitting flushes the render tasks these captures queued, so they do not leak into the next
@@ -1522,7 +1523,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CullFootprintsCoverTheSampledArea) {
         Matrix3D::MakeTranslate(120, 120, 0) * projection * Matrix3D::MakeRotate({0, 1, 0}, 30);
     ASSERT_TRUE(matrix3D.asMatrix().hasPerspective());
     perspective->setPath(rect);
-    perspective->setFillStyle(ShapeStyle::Make(Color::Blue()));
+    perspective->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 255, 128)));
     perspective->setMatrix3D(matrix3D);
     perspective->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
     displayList->root()->addChild(perspective);
@@ -3081,11 +3082,16 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, OpaqueContentHidesBackgroundBlur) {
     displayList.render(surface.get());
     EXPECT_TRUE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
 
-    // And a mask that includes the children's effects, which opaque content does not cover.
+    // Whichever source bucket the blur samples, the opaque fill still covers it.
     card->setColor(Color::FromRGBA(30, 120, 220, 255));
     displayList.render(surface.get());
     EXPECT_FALSE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
     blur->setExcludeChildEffects(false);
+    EXPECT_FALSE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
+
+    // A child effect can paint past the opaque fill, and the blur mask follows it there.
+    child->setLayerStyles({DropShadowStyle::Make(0, 20, 0, 0, Color::FromRGBA(0, 0, 0, 128))});
+    displayList.render(surface.get());
     EXPECT_TRUE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
     context->flushAndSubmit();
   });

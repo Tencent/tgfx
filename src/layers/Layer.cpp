@@ -2392,8 +2392,10 @@ bool Layer::isSubtreeOpaque() const {
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   const bool maskComposesOffscreen =
       hasValidMask() && maskType != LayerMaskType::Alpha && maskType != LayerMaskType::Contour;
+  // A layer style can paint past its content (a drop shadow, a blur), so the subtree does not
+  // cover what sits below it there.
   return _alpha >= 1.0f && static_cast<BlendMode>(bitFields.blendMode) == BlendMode::SrcOver &&
-         _filters.empty() && !maskComposesOffscreen && !canPreserve3D() &&
+         _filters.empty() && _layerStyles.empty() && !maskComposesOffscreen && !canPreserve3D() &&
          bitFields.contentOpaque && bitFields.childrenOpaque;
 }
 

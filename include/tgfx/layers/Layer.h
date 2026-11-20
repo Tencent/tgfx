@@ -728,14 +728,15 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool hasOwnBackgroundStyle(float alpha) const;
 
   // Whether everything the subtree paints is fully opaque and composited in place: the content and
-  // every visible child are opaque, and no filter, offscreen mask, 3D context, group alpha or
-  // non-SrcOver blend breaks it up. Reads the layer's own compositing state live and the content and
-  // children as of the last render bounds update.
+  // every visible child are opaque, and no filter, layer style, offscreen mask, 3D context, group
+  // alpha or non-SrcOver blend breaks it up. Reads the layer's own compositing state live and the
+  // content and children as of the last render bounds update.
   bool isSubtreeOpaque() const;
 
   // Whether the style still samples the background when the given alpha reaches the layer. False
-  // when every pixel it would draw is already hidden: the style paints only over its input, that
-  // input is the layer's content including its descendants, and both are fully opaque.
+  // when every pixel it would draw is already hidden: the style paints only inside the input it
+  // draws, and that input — the layer's content with its descendants — paints opaquely wherever it
+  // paints.
   bool needsBackgroundStyleOutput(const LayerStyle* style, float alpha) const;
 
   bool hasDescendantBackgroundStyle(float alpha);

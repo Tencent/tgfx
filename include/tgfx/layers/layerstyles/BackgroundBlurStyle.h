@@ -73,7 +73,7 @@ class BackgroundBlurStyle : public LayerStyle {
   void setTileMode(TileMode tileMode);
 
   bool isHiddenByOpaqueInput() const override {
-    return position() == LayerStylePosition::Below && excludeChildEffects();
+    return true;
   }
 
   LayerStylePosition position() const override {
