@@ -7,7 +7,7 @@
 
 #define HAS_COVERAGE 1
 #define HAS_UV_COORD 0
-#define HAS_SUBSET SUBSET
+#define HAS_SUBSET ChainRectGeometry_SUBSET
 
 void ChainRectGeometry_vertex(inout Vertex v) {
   highp vec2 position = (ChainRectGeometry_Matrix * vec3(ChainRectGeometry_Position, 1.0)).xy;

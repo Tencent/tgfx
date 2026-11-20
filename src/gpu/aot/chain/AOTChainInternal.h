@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstddef>
+#include <set>
 #include <vector>
 #include "gpu/CoordTransform.h"
 #include "gpu/aot/AOTResourceProfile.h"
@@ -106,6 +107,9 @@ struct AOTChainGraphLayout {
   /// the resource records the binding table and the profile derivation read.
   std::vector<const AOTEffectNode*> leafNodes = {};
   std::vector<int> deviceLeafIndices = {};
+  /// The leaf indices whose recipe names a shader-side tiled sample: their fetch maps the
+  /// coordinate through the tiled math and applies the seam blend and border passes.
+  std::set<int> tiledLeafSlots = {};
   const AOTPerlinNoiseParameters* noise = nullptr;
   const AOTGradientParameters* lutGradient = nullptr;
   /// Bit k is set when leaf k samples in destination device space; the coord-source mask for the

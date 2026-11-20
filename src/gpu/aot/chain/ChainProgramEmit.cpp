@@ -349,6 +349,13 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   }
 #if defined(TGFX_HAS_CHAIN_CATALOG)
   std::set<std::string> catalogEmitted = {};
+  // A shader-tiled leaf's fetch maps through the tiled catalog functions: the map and the border
+  // pass always, the seam blend with them.
+  if (!plan.tiledLeafSlots.empty()) {
+    AppendCatalogFunction("tiledMapCoord", &catalogEmitted, &pieces);
+    AppendCatalogFunction("tiledApplyBorder", &catalogEmitted, &pieces);
+    AppendCatalogFunction("tiledSeamBlend", &catalogEmitted, &pieces);
+  }
 #endif
   for (int op : plan.usedOps) {
     const auto* def = FindFragment(op);
@@ -374,20 +381,46 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
     }
   }
 
-  // The prefetches: one per texture leaf the composition samples, in slot order.
+  // The prefetches: one per texture leaf the composition samples, in slot order. A tiled leaf's
+  // coordinate maps through the tiled catalog functions with its own recipe members, and its
+  // sampled color takes the seam blend and border passes.
   const std::string texSubsetVarying = varyingByNameSuffix("_vTexSubset");
   std::string prefetch = {};
   for (int leaf : plan.leafSlots) {
     const std::string suffix = std::to_string(leaf);
     const bool applyQuad = plan.hasSubset && leaf == 0;
-    prefetch += "  chainLeafTex[" + suffix + "] = chainLeafFetch(TransformedCoords_" + suffix +
-                ", " + ChainLeafMemberName("Subset", leaf) + ", " +
-                ChainLeafMemberName("AlphaStart", leaf) + ", " +
-                ChainLeafMemberName("HasRgbaaa", leaf) + ", " +
-                ChainLeafMemberName("SubsetClampOn", leaf) + ", " + suffix +
-                ", DeviceLeafMask, DeviceLeafCoordMatrix[" + suffix + "], LeafReadSwizzles[" +
-                suffix + "], gl_FragCoord.xy, " + (applyQuad ? "1" : "0") + ", " +
-                (applyQuad ? texSubsetVarying : "vec4(0.0)") + ");\n";
+    const std::string fetch =
+        "chainLeafFetch(" +
+        (plan.tiledLeafSlots.count(leaf) != 0 ? "tiledCoord_" + suffix
+                                              : "TransformedCoords_" + suffix) +
+        ", " + ChainLeafMemberName("Subset", leaf) + ", " +
+        ChainLeafMemberName("AlphaStart", leaf) + ", " + ChainLeafMemberName("HasRgbaaa", leaf) +
+        ", " + ChainLeafMemberName("SubsetClampOn", leaf) + ", " + suffix +
+        ", DeviceLeafMask, DeviceLeafCoordMatrix[" + suffix + "], LeafReadSwizzles[" + suffix +
+        "], gl_FragCoord.xy, " + (applyQuad ? "1" : "0") + ", " +
+        (applyQuad ? texSubsetVarying : "vec4(0.0)") + ")";
+    if (plan.tiledLeafSlots.count(leaf) == 0) {
+      prefetch += "  chainLeafTex[" + suffix + "] = " + fetch + ";\n";
+      continue;
+    }
+    const std::string tiled = "_" + suffix;
+    prefetch += "  highp vec2 tiledIn" + tiled + ";\n";
+    prefetch += "  highp vec2 tiledSubset" + tiled + ";\n";
+    prefetch += "  highp vec2 tiledClamped" + tiled + ";\n";
+    prefetch += "  highp vec3 tiledCoord_" + suffix + ";\n";
+    prefetch += "  tiledCoord_" + suffix + " = tiledMapCoord(TransformedCoords_" + suffix +
+                ", TiledStrict" + tiled + " != 0, TiledModeX" + tiled + ", TiledModeY" + tiled +
+                ", TiledSubset" + tiled + ", TiledClamp" + tiled + ", TiledDimension" + tiled +
+                ", tiledIn" + tiled + ", tiledSubset" + tiled + ", tiledClamped" + tiled + ");\n";
+    prefetch += "  chainLeafTex[" + suffix + "] = " + fetch + ";\n";
+    prefetch += "  chainLeafTex[" + suffix + "] = tiledSeamBlend(TextureSampler_" + suffix +
+                ", chainLeafTex[" + suffix + "], TiledModeX" + tiled + ", TiledModeY" + tiled +
+                ", TiledClamp" + tiled + ", TiledDimension" + tiled + ", tiledIn" + tiled +
+                ", tiledSubset" + tiled + ", tiledClamped" + tiled + ", LeafReadSwizzles[" +
+                suffix + "]);\n";
+    prefetch += "  chainLeafTex[" + suffix + "] = tiledApplyBorder(chainLeafTex[" + suffix +
+                "], TiledModeX" + tiled + ", TiledModeY" + tiled + ", TiledSubset" + tiled +
+                ", tiledIn" + tiled + ", tiledSubset" + tiled + ", tiledClamped" + tiled + ");\n";
   }
 
   // The straight-line body: one local per call, the registers an argument names spelled by the
@@ -707,6 +740,7 @@ bool AssembleChainVertexGLSL(const ChainBindings& bindings, const std::string& s
     return false;
   }
   out.insert(positionAt, hookBody);
+
   *code = out;
   return true;
 }

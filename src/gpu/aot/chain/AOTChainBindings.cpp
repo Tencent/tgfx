@@ -75,6 +75,7 @@ static bool BuildTextureLeafBinding(const AOTEffectNode* node, AOTBinding* bindi
     args.sampleArea = Rect::MakeLTRB(-1e9f, -1e9f, 1e9f, 1e9f);
     binding->args = args;
     binding->uvMatrix = parameters->uvMatrix;
+    binding->tiledRecipe = recipe;
     return true;
   }
   SamplingOptions sampling(parameters->samplerState.minFilterMode,

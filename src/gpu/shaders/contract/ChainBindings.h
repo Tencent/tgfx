@@ -108,6 +108,13 @@ enum class ChainBindingSource : uint8_t {
   DeviceMaskSubset,
   DeviceLeafMask,
   DeviceLeafCoordMatrix,
+  // The shader-tiled leaves' recipes (per leaf, indexed by the leaf's own index).
+  TiledShaderModeX,
+  TiledShaderModeY,
+  TiledSubset,
+  TiledClamp,
+  TiledDimension,
+  TiledStrict,
 };
 
 }  // namespace tgfx

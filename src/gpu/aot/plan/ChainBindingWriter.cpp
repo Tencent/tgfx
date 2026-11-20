@@ -159,6 +159,53 @@ bool ReadLeafRecord(const ReadContext& ctx, int leaf, ChainBindingSource source,
       Store(out, clampOn);
       return true;
     }
+    case ChainBindingSource::TiledShaderModeX:
+      if (!binding->tiledRecipe.has_value()) {
+        return false;
+      }
+      Store(out, static_cast<int>(binding->tiledRecipe->shaderModeX));
+      return true;
+    case ChainBindingSource::TiledShaderModeY:
+      if (!binding->tiledRecipe.has_value()) {
+        return false;
+      }
+      Store(out, static_cast<int>(binding->tiledRecipe->shaderModeY));
+      return true;
+    case ChainBindingSource::TiledSubset: {
+      if (!binding->tiledRecipe.has_value()) {
+        return false;
+      }
+      const float rect[4] = {
+          binding->tiledRecipe->shaderSubset.left, binding->tiledRecipe->shaderSubset.top,
+          binding->tiledRecipe->shaderSubset.right, binding->tiledRecipe->shaderSubset.bottom};
+      std::memcpy(out, rect, sizeof(rect));
+      return true;
+    }
+    case ChainBindingSource::TiledClamp: {
+      if (!binding->tiledRecipe.has_value()) {
+        return false;
+      }
+      const float rect[4] = {
+          binding->tiledRecipe->shaderClamp.left, binding->tiledRecipe->shaderClamp.top,
+          binding->tiledRecipe->shaderClamp.right, binding->tiledRecipe->shaderClamp.bottom};
+      std::memcpy(out, rect, sizeof(rect));
+      return true;
+    }
+    case ChainBindingSource::TiledDimension: {
+      if (!binding->tiledRecipe.has_value()) {
+        return false;
+      }
+      const float size[2] = {binding->tiledRecipe->shaderDimensions.x,
+                             binding->tiledRecipe->shaderDimensions.y};
+      std::memcpy(out, size, sizeof(size));
+      return true;
+    }
+    case ChainBindingSource::TiledStrict:
+      if (!binding->tiledRecipe.has_value()) {
+        return false;
+      }
+      Store(out, binding->tiledRecipe->strict ? 1 : 0);
+      return true;
     case ChainBindingSource::LeafAlphaStart: {
       if (binding->alphaStart == Point::Zero()) {
         return false;
@@ -666,6 +713,12 @@ bool ReadBinding(const ReadContext& ctx, const ChainBinding& binding, uint8_t* o
     case ChainBindingSource::LeafSubsetClampOn:
     case ChainBindingSource::LeafAlphaStart:
     case ChainBindingSource::LeafHasRgbaaa:
+    case ChainBindingSource::TiledShaderModeX:
+    case ChainBindingSource::TiledShaderModeY:
+    case ChainBindingSource::TiledSubset:
+    case ChainBindingSource::TiledClamp:
+    case ChainBindingSource::TiledDimension:
+    case ChainBindingSource::TiledStrict:
       return ReadLeafRecord(ctx, binding.index, binding.source, out);
     case ChainBindingSource::LeafReadSwizzles: {
       // The plain-fetch leaves read through their view's swizzle mode; the leaf slots the body

@@ -42,6 +42,9 @@ struct AOTBinding {
   /// The RGBAAA dual-plane alpha offset, as the child TextureEffect carries it; Point::Zero() for
   /// a single-plane source (matching TextureEffect::hasRGBAAA).
   Point alphaStart = Point::Zero();
+  /// A shader-tiled leaf's recipe: the assembled text maps its coordinate through these tiling
+  /// facts (the interpreter carried them as the Tiled* uniforms).
+  std::optional<TiledTextureSampling> tiledRecipe = std::nullopt;
 };
 
 /// One chain leaf that samples in destination device space, as a DeviceSpaceTextureEffect does: its

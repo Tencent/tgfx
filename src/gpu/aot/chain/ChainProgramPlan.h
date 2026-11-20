@@ -191,6 +191,9 @@ struct ChainProgramPlan {
   /// The leaves the body samples and the operator set it reaches, both for the pack entries.
   std::set<int> leafSlots = {};
   std::set<int> usedOps = {};
+  /// The leaves whose recipe names a shader-side tiled sample: the printer maps their fetch
+  /// through the tiled catalog functions with the recipe's own uniforms.
+  std::set<int> tiledLeafSlots = {};
   /// The variant's geometry index: a per-pixel-coverage geometry (anything but the rect layouts)
   /// makes the walk declare the geometry's own varyings and ChainColorParams switches, and the
   /// printer spell the edge-coverage call ahead of the body.

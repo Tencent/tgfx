@@ -1005,6 +1005,15 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
     // gates it adds.
     std::set<std::string> gatesStubValidated;
     for (const auto& variant : variants) {
+      if (std::string(family.name) == "Chain") {
+        fprintf(stderr, "BUILD Chain variant=%u geo=%u subset=%u profile=%u gp=%u xp=%u\n",
+                VariantIdOf(static_cast<uint16_t>(familyIndex), variant.ordinal),
+                static_cast<unsigned>(variant.geometry),
+                static_cast<unsigned>(DimValueOf(family, variant, 1, 0)),
+                static_cast<unsigned>(DimValueOf(family, variant, 2, 0)),
+                static_cast<unsigned>(DimValueOf(family, variant, 2, 1)),
+                static_cast<unsigned>(DimValueOf(family, variant, 3, 0)));
+      }
       const auto assembled = AssembleVariant(family, variant);
       // The assembled text carries module #includes; the compiler never sees one, so the same
       // expansion the handwritten files get runs here first.

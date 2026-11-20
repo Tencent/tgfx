@@ -389,6 +389,9 @@ void RegisterVertexMember(ChainBindings* bindings, const Layout& layout, const s
 /// xfer's blend-pass fact.
 struct ChainWalkFrame {
   std::vector<AOTChainCallSite> sites = {};
+  /// The leaves whose recipe names a shader-side tiled sample (their fetch maps through the
+  /// tiled catalog functions with the recipe's own members).
+  std::set<int> tiledLeafSlots = {};
   int rootRegister = 0;
   int coverageRootRegister = -1;
   int clipCoverageRegister = -1;
@@ -708,6 +711,24 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
       return false;
     }
     RegisterLeafMembers(&registry, leaf);
+    if (frame.tiledLeafSlots.count(leaf) != 0) {
+      // The tiled recipe rides the call arguments: each tiled leaf spells its mode pair, subset,
+      // clamp rect and dimension as its own members, so one assembly serves any draw's recipe.
+      const std::string suffix = "_" + std::to_string(leaf);
+      registry.setNode(nullptr);
+      registry.uniform("TiledModeX" + suffix, FragmentType::Int,
+                       ChainBindingSource::TiledShaderModeX, -1, leaf);
+      registry.uniform("TiledModeY" + suffix, FragmentType::Int,
+                       ChainBindingSource::TiledShaderModeY, -1, leaf);
+      registry.uniform("TiledSubset" + suffix, FragmentType::Float4,
+                       ChainBindingSource::TiledSubset, -1, leaf);
+      registry.uniform("TiledClamp" + suffix, FragmentType::Float4, ChainBindingSource::TiledClamp,
+                       -1, leaf);
+      registry.uniform("TiledDimension" + suffix, FragmentType::Float2,
+                       ChainBindingSource::TiledDimension, -1, leaf);
+      registry.uniform("TiledStrict" + suffix, FragmentType::Int, ChainBindingSource::TiledStrict,
+                       -1, leaf);
+    }
   }
   if (!leafSlots.empty()) {
     // The plain fetch reads the swizzle table and the device-space switch; the strict form also
@@ -831,6 +852,7 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
   plan->coverageRootRegister = frame.coverageRootRegister;
   plan->xpNeedsBlendPass = frame.xpNeedsBlendPass;
   plan->leafSlots = std::move(leafSlots);
+  plan->tiledLeafSlots = frame.tiledLeafSlots;
   plan->usedOps = std::move(usedOps);
   plan->geometry = variant.geometry;
   plan->bindings.fragment = registry.bindings();
@@ -1176,7 +1198,6 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
   std::vector<AOTChainCallSite> sites(ordered.size());
   bool hasGradient = false;
   bool noiseSeen = false;
-  bool hasShaderTiledLeaf = false;
   size_t colorSpaceXformCount = 0;
   layout->coordSourceMask = coverage.coverageLeafFromUVCoord ? 0u : ~0u;
   const auto mapInput = [&](size_t inputBase, AOTNodeID input) {
@@ -1269,8 +1290,8 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
           layout->coordSourceMask |= 1u << static_cast<uint32_t>(layout->leafNodes.size());
         }
         if (HasShaderTiling(*parameters)) {
-          hasShaderTiledLeaf = true;
           ++layout->tiledRecipeCount;
+          layout->tiledLeafSlots.insert(static_cast<int>(layout->leafNodes.size()));
         }
         if (parameters->samplingKind == AOTTextureSamplingKind::Device) {
           // Every color leaf may sample in device space through its own coordinate matrix; a
@@ -1415,11 +1436,8 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
       return false;
     }
   }
-  // Shader-tiled leaves need the tiling module's runtime loops, which the assembled text does not
-  // spell.
-  if (hasShaderTiledLeaf) {
-    return false;
-  }
+  // The shader-tiled leaves' recipes are spelled per leaf by the assembled text (the tiled catalog
+  // functions), so no tiling module or runtime loop is needed here.
   // The successful shapes' cross-node constraints: a LUT gradient shares the leaf budget with at
   // most one leaf, and the noise family's budgets cover two leaves beside its own lookup tables,
   // no gradient and no atlas glyph.
@@ -1567,6 +1585,7 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
 
   ChainWalkFrame frame = {};
   frame.sites = std::move(layout.sites);
+  frame.tiledLeafSlots = layout.tiledLeafSlots;
   frame.rootRegister = assignment.rootRegister;
   frame.coverageRootRegister = assignment.coverageRootRegister;
   frame.clipCoverageRegister = assignment.clipCoverageRegister;
@@ -1600,6 +1619,10 @@ void AppendChainPlanKey(const ChainProgramPlan& plan, BytesKey* key) {
   key->write(static_cast<uint32_t>(plan.geometry));
   key->write(static_cast<uint32_t>(plan.leafSlots.size()));
   for (int leaf : plan.leafSlots) {
+    key->write(static_cast<uint32_t>(leaf));
+  }
+  key->write(static_cast<uint32_t>(plan.tiledLeafSlots.size()));
+  for (int leaf : plan.tiledLeafSlots) {
     key->write(static_cast<uint32_t>(leaf));
   }
 }

@@ -238,6 +238,7 @@ void GLRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCount,
   auto gl = _gpu->functions();
   unsigned indexType = (indexFormat == IndexFormat::UInt16) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
   size_t indexSize = (indexFormat == IndexFormat::UInt16) ? sizeof(uint16_t) : sizeof(uint32_t);
+
   if (instanceCount <= 1) {
     gl->drawElements(PrimitiveTypes[static_cast<int>(primitiveType)], static_cast<int>(indexCount),
                      indexType, reinterpret_cast<void*>(firstIndex * indexSize));

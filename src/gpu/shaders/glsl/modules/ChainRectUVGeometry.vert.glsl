@@ -7,7 +7,7 @@
 
 #define HAS_COVERAGE 1
 #define HAS_UV_COORD 1
-#define HAS_SUBSET SUBSET
+#define HAS_SUBSET ChainRectUVGeometry_SUBSET
 #define CHAIN_UV_COORD_SOURCE 1
 
 void ChainRectUVGeometry_vertex(inout Vertex v) {
