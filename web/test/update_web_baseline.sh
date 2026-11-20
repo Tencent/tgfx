@@ -31,9 +31,10 @@ if node "$SCRIPT_DIR/reference_cache.js" --check "$BACKEND" "$REFERENCE_COMMIT";
     exit 0
 fi
 
-# Reuse installed dependencies only when their definitions match the pinned source.
-if ! git diff --quiet "$REFERENCE_COMMIT" -- DEPS web/package.json web/package-lock.json; then
-    echo "Error: Dependency definitions differ from origin/main. Install matching dependencies first."
+# Reuse installed dependencies only when their declarations match the pinned source. The
+# lockfiles are not tracked by git, so only DEPS and web/package.json can be compared here.
+if ! git diff --quiet "$REFERENCE_COMMIT" -- DEPS web/package.json; then
+    echo "Error: Dependency declarations differ from origin/main. Install matching dependencies first."
     exit 1
 fi
 if [ ! -d "$PROJECT_ROOT/third_party/vendor_tools" ] || [ ! -f "$PROJECT_ROOT/web/node_modules/rollup/dist/bin/rollup" ]; then
