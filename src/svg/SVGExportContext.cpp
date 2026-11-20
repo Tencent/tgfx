@@ -292,6 +292,7 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       if (exportImageAsRaster(image, matrix, clip, brush)) {
         return;
       }
+      LOGE("SVGExportContext: failed to rasterize texture image filter.");
       auto sourceMatrix = matrix;
       sourceMatrix.preTranslate(-filterImage->bounds.left, -filterImage->bounds.top);
       drawImage(filterImage->source, sampling, sourceMatrix, clip, brush);
@@ -821,6 +822,9 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
           }
         }
       }
+    }
+    if (!pictureBounds.isEmpty()) {
+      LOGE("SVGExportContext: failed to rasterize texture image filter.");
     }
     picture->playback(this, matrix, clip);
     return;

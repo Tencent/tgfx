@@ -1557,6 +1557,25 @@ TGFX_TEST(SVGExportTest, TextureFilterLayerParametersNativeSVG) {
   EXPECT_EQ(zeroSize.find("<feTurbulence"), std::string::npos);
   EXPECT_EQ(zeroSize.find("<feDisplacementMap"), std::string::npos);
   EXPECT_EQ(zeroSize.find("inf"), std::string::npos);
+
+  auto largeSize = exportLayer(Rect::MakeWH(240, 160), Matrix::I(), Rect::MakeWH(200.0f, 120.0f),
+                               Color::Red(), 30000.0f, 25000.0f);
+  auto largeFrequencyStart = largeSize.find(frequencyPrefix);
+  ASSERT_NE(largeFrequencyStart, std::string::npos);
+  largeFrequencyStart += frequencyPrefix.size();
+  auto largeFrequencyEnd = largeSize.find('"', largeFrequencyStart);
+  ASSERT_NE(largeFrequencyEnd, std::string::npos);
+  auto largeFrequencyValue =
+      largeSize.substr(largeFrequencyStart, largeFrequencyEnd - largeFrequencyStart);
+  parseEnd = nullptr;
+  auto largeFrequencyX = std::strtof(largeFrequencyValue.c_str(), &parseEnd);
+  ASSERT_NE(parseEnd, largeFrequencyValue.c_str());
+  auto largeFrequencyY = std::strtof(parseEnd, &parseEnd);
+  EXPECT_GT(largeFrequencyX, 0.0f);
+  EXPECT_GT(largeFrequencyY, 0.0f);
+  EXPECT_NEAR(largeFrequencyX, 1.0f / 30000.0f, 1e-10f);
+  EXPECT_NEAR(largeFrequencyY, 1.0f / 25000.0f, 1e-10f);
+  EXPECT_NE(largeSize.find("<feTurbulence"), std::string::npos);
 }
 
 TGFX_TEST(SVGExportTest, TextureFilterDrawLayerNativeSVG) {

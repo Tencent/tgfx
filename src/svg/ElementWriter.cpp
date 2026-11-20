@@ -18,6 +18,9 @@
 
 #include "ElementWriter.h"
 #include <cmath>
+#include <iomanip>
+#include <limits>
+#include <sstream>
 #include "SVGExportContext.h"
 #include "SVGUtils.h"
 #include "core/codecs/jpeg/JpegCodec.h"
@@ -76,6 +79,17 @@ const std::string& TextureClipAlphaTable() {
   return table;
 }
 
+std::string TextureFrequencyToString(float value) {
+  auto result = FloatToString(value);
+  if (result != "0") {
+    return result;
+  }
+  // Preserve positives that the standard four-decimal SVG format would erase.
+  std::ostringstream stream;
+  stream << std::setprecision(std::numeric_limits<float>::max_digits10) << value;
+  return stream.str();
+}
+
 void WriteTextureImageFilter(XMLWriter* writer, const TextureImageFilter* filter,
                              const Rect& sourceBounds, float userScale) {
   const auto& params = filter->getParams();
@@ -96,8 +110,8 @@ void WriteTextureImageFilter(XMLWriter* writer, const TextureImageFilter* filter
   {
     ElementWriter turbulenceElement("feTurbulence", writer);
     turbulenceElement.addAttribute("type", "fractalNoise");
-    turbulenceElement.addAttribute(
-        "baseFrequency", FloatToString(baseFrequencyX) + " " + FloatToString(baseFrequencyY));
+    turbulenceElement.addAttribute("baseFrequency", TextureFrequencyToString(baseFrequencyX) + " " +
+                                                        TextureFrequencyToString(baseFrequencyY));
     turbulenceElement.addAttribute("numOctaves", TextureGrainOctaveCount);
     turbulenceElement.addAttribute("seed", std::to_string(ToSVGTextureSeed(params.seed)));
     turbulenceElement.addAttribute("data-pagx-seed", std::to_string(params.seed));
