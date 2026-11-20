@@ -82,7 +82,8 @@ std::optional<uint8_t> DimValueOf(DimFact fact, const DrawShape& shape) {
         return std::nullopt;
       }
       AOTChainBuilder::AOTTextureTailShape tail = {};
-      if (!AOTChainBuilder::CollectYUVTail(shape.ir->color, &tail) || tail.leaf == nullptr) {
+      if (!AOTChainBuilder::CollectTextureTail(shape.ir->color, &tail) || tail.leaf == nullptr ||
+          !tail.leaf->isYUV) {
         return std::nullopt;
       }
       if (tail.leaf->yuvFormat >= 0) {

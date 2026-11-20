@@ -17,14 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/write/ModuleWriter.h"
-#include "gpu/aot/write/modules/ChainWrite.h"
 #include "gpu/aot/write/modules/ClipWrite.h"
 #include "gpu/aot/write/modules/Effects.h"
 #include "gpu/aot/write/modules/Frame.h"
 #include "gpu/aot/write/modules/Geometry.h"
 #include "gpu/aot/write/modules/Textures.h"
 #include "gpu/aot/write/modules/Xfer.h"
-#include "gpu/aot/write/modules/YuvTail.h"
 #include "gpu/shaders/modules/Frame.h"
 #include "gpu/shaders/modules/Xfer.h"
 
@@ -37,14 +35,8 @@ ModuleWriter WriterOf(const Module& module) {
   if (&module == &XferModule()) {
     return WriteXferModule;
   }
-  if (const auto writer = ChainWriterOf(module)) {
-    return writer;
-  }
   // The geometry and texture-source modules each share one file: they are kinds of things, not
   // independent features.
-  if (const auto writer = ChainGeometryWriterOf(module)) {
-    return writer;
-  }
   if (const auto writer = GeometryWriterOf(module)) {
     return writer;
   }
@@ -54,10 +46,7 @@ ModuleWriter WriterOf(const Module& module) {
   if (const auto writer = EffectsWriterOf(module)) {
     return writer;
   }
-  if (const auto writer = ClipWriterOf(module)) {
-    return writer;
-  }
-  return YuvTailWriterOf(module);
+  return ClipWriterOf(module);
 }
 
 }  // namespace tgfx

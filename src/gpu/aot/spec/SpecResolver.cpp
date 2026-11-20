@@ -17,11 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/spec/SpecResolver.h"
-#include "gpu/ProgramInfo.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/aot/chain/AOTChainBuilder.h"
-#include "gpu/aot/chain/AOTChainSpec.h"
-#include "gpu/aot/spec/SpecInjector.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/Layout.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
@@ -62,31 +58,6 @@ ShaderCodeFormat SpecFormatForBackend(Backend backend, uint16_t payloadFormat) {
     default:
       return ShaderCodeFormat::GLSL;
   }
-}
-
-SpecValues SpecResolver::Resolve(PrecompiledShaderCache* cache, Backend backend,
-                                 const Variant& variant, const AOTProgram* chain,
-                                 bool needsBlendMath) {
-  if (cache == nullptr || !cache->specializationEnabled() || !cache->isLoaded()) {
-    return {};
-  }
-  // A format without an injector cannot consume the values, so capturing for it would only cost
-  // the draw a scratch write. The gate is the registry, not a backend list.
-  if (FindSpecInjector(SpecFormatForBackend(backend, cache->payloadFormat())) == nullptr) {
-    return {};
-  }
-  // The values come straight off the compiled program (the same fields the runtime binder
-  // uploads); the declaration supplies the order and the array lengths.
-  const auto fields = DeriveSpecFieldInfos(variant);
-  if (fields.empty()) {
-    return {};
-  }
-  if (chain == nullptr) {
-    return {};
-  }
-  auto values = ResolveChainSpec(*chain, fields, needsBlendMath);
-  cache->recordSpecCapture(values);
-  return values;
 }
 
 }  // namespace tgfx

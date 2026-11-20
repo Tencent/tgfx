@@ -59,10 +59,13 @@ bool LinkChainSPIRV(const std::vector<std::vector<uint32_t>>& modules, std::vect
 bool ValidateSPIRVModule(const std::vector<uint32_t>& words, std::string* error);
 
 /**
- * The route's coverage gate: true when every operator the composition uses has a linkable module
- * and the variant carries no feature the body does not spell yet (the xfer legs, the device mask
- * and the texture leaves still run through the interpreter).
+ * The route's coverage gate: true when every operator the planned program uses has a linkable
+ * module and the variant carries no feature the body does not spell yet (the framebuffer-fetch
+ * xfer leg stays outside).
+ * @param usedOps  The plan's operator set (ChainISA values).
+ * @param layout   The variant's derived layout.
+ * @param hasXp    The variant's xfer fact (1 reads the dst through a texture).
  */
-bool ChainSPIRVBodySupported(const ChainComposition& composition, const Layout& layout, int hasXp);
+bool ChainSPIRVBodySupported(const std::set<int>& usedOps, const Layout& layout, int hasXp);
 
 }  // namespace tgfx

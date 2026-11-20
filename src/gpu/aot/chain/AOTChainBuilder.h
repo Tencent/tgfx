@@ -4,14 +4,14 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  License is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the License for the specific language governing permissions
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,11 +28,11 @@ namespace tgfx {
 class ProgramInfo;
 
 /**
- * Compiles the interpreter's programs from a decomposed AOT plan: the fused chain kernel for
- * every plan pass (a multi-pass plan's passes are built as cut segments through BuildCutSegment)
- * and the YUV family's color-grade tail. Used by AOTPlanner's task assembly and by the
- * re-expressing kernel's per-draw view of an unmodified ProgramInfo (ResolveChainProgram /
- * ResolveYUVProgram).
+ * The chain kernel's graph-side build and match entries: the fused-pass planning the record-time
+ * route asks, the texture-tail shape walk the texture families' rules share, the cut-segment
+ * builder the multi-pass planner runs, and the per-draw program resolution (the binding table
+ * the assembled writer and the variant derivation read). BuildChainProgram (AOTChainInternal.h)
+ * is the one build entry; this class owns its callers' entrances.
  */
 class AOTChainBuilder {
  public:
@@ -47,88 +47,18 @@ class AOTChainBuilder {
   static bool PlanFusedPass(const AOTEffectGraph& graph, PassIR* pass);
 
   /**
-   * A fit probe, not an admission: runs the chain planner (slot encoding, closure, budget,
-   * profile, register allocation) without building the binding table. The decomposer uses it to
-   * decide whether a cut fits before any program exists; every serving decision goes through
-   * Compile below, so a probe success never stands in for a build success. outProfile, when not
-   * null, receives the resource profile the pass needs.
-   */
-  static bool FitsChainPlan(const AOTEffectGraph& graph, const PassIR& pass,
-                            AOTResourceProfile* outProfile = nullptr);
-
-  /**
-   * The one compile entry: the pass's register-allocated program plus, when given, the draw's
-   * classified coverage terms and their sampler binding table. Admission
-   * (AOTPlanner::Validate) and every build site call exactly this, so an admitted pass is
-   * by construction a buildable one — the binding stage's resource failures surface at admission
-   * instead of at prepare. coverageTerms is null or empty for a plan pass (plan passes carry no
-   * draw coverage).
-   */
-  static bool Compile(const AOTEffectGraph& graph, const PassIR& pass,
-                      const std::vector<AOTCoverageTerm>* coverageTerms, AOTProgram* out);
-
-  /**
-   * Compiles a draw's whole color expression into the fused chain program: the single pass the DAG
-   * planner would build, derived from the graph. Returns false when the graph is not a single fused
-   * pass, so a caller can use it as the serving decision instead of planning first.
-   */
-  static bool CompileGraph(const AOTEffectGraph& graph,
-                           const std::vector<AOTCoverageTerm>* coverageTerms, AOTProgram* out);
-
-  /**
-   * Compiles one plan segment's IR into the fused chain program: a segment graph is its own pass,
-   * so nothing is re-planned here. Returns false when the segment does not fit one fused pass.
-   */
-  static bool CompileSegment(const DrawIR& segmentIR, AOTProgram* out);
-
-  /**
-   * Validates an encoded instruction array (register domains, opcodes, selector fields, leaf
-   * layout, per-kind parameter blocks) and resolves its resource profile against the profile
-   * capacities, without looking at any child processor. The planner runs it while planning
-   * (AOTPlanner::Validate) and the compile runs it again on the same data, so planning and
-   * compilation cannot disagree on a slot rule or a budget. leafCount is the number of real DAG
-   * texture leaves (slots [0, leafCount) must be OP_TEXTURE), hasLUT whether a LUT gradient child
-   * follows them, and tiledLeafIndices the leaves carrying a shader-side tiling recipe. On success
-   * *profile holds the resolved (non-Automatic) profile.
-   */
-  static bool ValidateSlots(const std::vector<AOTChainSlot>& slots, size_t rootSlot,
-                            int coverageRootSlot, int clipCoverageRegister, size_t leafCount,
-                            bool hasLUT, const std::vector<int>& tiledLeafIndices,
-                            AOTResourceProfile* profile);
-
-  /**
    * The color graph's linear texture-tail shape: a single texture leaf fed by the geometry
    * color, with a chain of unary pointwise operators above it (application order, leaf-side
-   * first). One walk serves the texture families' table rows and the YUV tail's checks below —
-   * the shared shape authority. Fails on any non-pointwise node (a blend is not unary), an
-   * operator the slot encoding cannot express, or a shape that is not linear (a second source,
-   * an unaccounted branch). Budget and leaf-kind policies stay with the callers.
+   * first). One walk serves the texture families' table rows — the shared shape authority. Fails
+   * on any non-pointwise node (a blend is not unary), an operator the chain walk cannot express,
+   * or a shape that is not linear (a second source, an unaccounted branch). Budget and leaf-kind
+   * policies stay with the callers.
    */
   struct AOTTextureTailShape {
     const AOTTextureParameters* leaf = nullptr;
     std::vector<AOTNodeID> ops = {};
   };
   static bool CollectTextureTail(const AOTEffectGraph& graph, AOTTextureTailShape* shape);
-
-  /**
-   * The servable YUV tail of a color graph: the texture tail above, restricted to a multi-plane
-   * source and the YUV kernel's own contract. One walk serves the family's matching, the plan's
-   * admission and the tail's compilation, so the three cannot disagree about what a servable tail
-   * is. Fails on every CollectTextureTail rejection plus a second color-space transform (the
-   * kernel's CS parameters are one shared block, like the interpreter's), a non-YUV / non-Plain
-   * leaf, an unsupported color-space step, or a tail over the YUV chain tail's declared capacity.
-   */
-  static bool CollectYUVTail(const AOTEffectGraph& graph, AOTTextureTailShape* shape);
-
-  /**
-   * The YUV family's compiled color-grade tail, resolved at most once and memoized on the draw's
-   * IR the same way ResolveChainProgram memoizes the chain program: the operators above the
-   * multi-plane source leaf, in application order, as chain instruction records (the same slot
-   * encoding the interpreter reads). The terminal needs no rebuilt processor — the family matches
-   * off the IR and this program drives the tail's uniform upload. Returns null when the info
-   * carries no IR or the tail is not servable.
-   */
-  static const AOTProgram* ResolveYUVProgram(const ProgramInfo* programInfo);
 
   /**
    * The source a later pass of a multi-pass plan reads: its predecessor's RGBA intermediate,
@@ -162,12 +92,13 @@ class AOTChainBuilder {
 
   /**
    * The draw's compiled chain program, resolved at most once: a plan pass or an earlier match
-   * already carries it on the IR, and the first caller that needs it compiles it there (the
+   * already carries it on the IR, and the first caller that needs it builds it there (the
    * single-pass decomposition plans the color side, the classified coverage terms merge into the
-   * program) and memoizes it. This is the one entry both the interpreter family's matching and the
-   * writer's chain path consult; there is no second compile site. Returns null when the expression
-   * does not reduce onto the chain kernel (a missing IR, an over-budget shape, a coverage form the
-   * chain cannot carry).
+   * program) and memoizes it. The program is the graph layout's binding table — the sampler
+   * children, the leaf records and the profile the writer and the variant derivation read; the
+   * operators themselves are planned per draw by the assembled walk. Returns null when the
+   * expression does not reduce onto the chain kernel (a missing IR, an over-budget shape, a
+   * coverage form the chain cannot carry).
    */
   static const AOTProgram* ResolveChainProgram(const ProgramInfo* programInfo);
 };

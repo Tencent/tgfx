@@ -20,15 +20,15 @@
 #include <array>
 #include <cstdlib>
 #include "core/utils/Log.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/YUVFormat.h"
 #include "gpu/aot/AOTResourceProfile.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/select/DimFacts.h"
 #include "gpu/aot/select/DrawFacts.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
-#include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/KernelContract.h"
@@ -602,60 +602,13 @@ bool MatchQuadTexture(const ProgramInfo* /*info*/, const DrawShape& shape,
   return true;
 }
 
-/// The YUVTexture family's rule: the QuadPerEdgeAA
-/// geometry with exactly one multi-plane leaf, at most the bounded operator tail above it and no
-/// coverage processors, and any xfer. The tail itself is served by the YUVChainTail module, whose
-/// declared slot capacity the acceptance below enforces. The flattened dims are
-/// [UV_COORD, SUBSET=0, FORMAT, HAS_XP], so the ordinal is UV_COORD + 4*FORMAT + 8*HAS_XP.
-bool MatchYUVTexture(const ProgramInfo* info, const DrawShape& shape, FamilyMatchResult* result) {
-  // Retired in favor of the Chain family's assembled YUV operator: the multi-plane source is a
-  // first-class graph node there (planned straight from the IR, its three planes bound as leaf
-  // samplers), so this dedicated family no longer accepts and every YUV draw falls through to the
-  // chain's own rule.
+/// The YUVTexture family's rule: retired in favor of the Chain family's assembled YUV operator
+/// (the multi-plane source is a first-class graph node there, planned straight from the IR, its
+/// three planes bound as leaf samplers), so this dedicated family no longer accepts and every YUV
+/// draw falls through to the chain's own rule.
+bool MatchYUVTexture(const ProgramInfo* /*info*/, const DrawShape& /*shape*/,
+                     FamilyMatchResult* /*result*/) {
   return false;
-  // The acceptance: the QuadPerEdgeAA quad without a subset,
-  // the color graph is the multi-plane source with at most the tail's operators above it, and the
-  // staleness guard keeps the tree and the graph in agreement.
-  if (shape.geometry->kind != GeometryKind::QuadPerEdgeAA || shape.geometry->hasSubset ||
-      shape.colorFPCount < 1 || shape.colorFPCount != shape.fragmentCount ||
-      shape.xpType() < XP_NONE || shape.ir == nullptr) {
-    return false;
-  }
-  // ServesAlphaOnly is false: the YUV kernel has no write swizzle, so an
-  // alpha-only target keeps the runtime path.
-  if (RejectsAlphaOnlyTarget(/*servesAlphaOnly=*/false, info)) {
-    return false;
-  }
-  AOTChainBuilder::AOTTextureTailShape tail = {};
-  if (!AOTChainBuilder::CollectYUVTail(shape.ir->color, &tail) ||
-      shape.colorFPCount > 1 + tail.ops.size()) {
-    return false;
-  }
-  // The tail's slot budget is the compiled program's: the bound the shared capacity enforces, so a
-  // shape that overflows stays refused.
-  if (info == nullptr || AOTChainBuilder::ResolveYUVProgram(info) == nullptr) {
-    return false;
-  }
-  int format = tail.leaf->yuvFormat;
-  if (format < 0) {
-    auto textureView =
-        tail.leaf->textureProxy != nullptr ? tail.leaf->textureProxy->getTextureView() : nullptr;
-    if (textureView == nullptr || !textureView->isYUV()) {
-      return false;
-    }
-    auto* yuvView = static_cast<const YUVTextureView*>(textureView.get());
-    if (yuvView->yuvFormat() == YUVFormat::I420) {
-      format = 0;
-    } else if (yuvView->yuvFormat() == YUVFormat::NV12) {
-      format = 1;
-    } else {
-      return false;
-    }
-  }
-  // The writer's data source: the multi-plane leaf the tail is built over (the same field the
-  // chain family carries its leaf in).
-  result->tiledLeaf = tail.leaf;
-  return EncodeMatchFromFacts(YUVTextureIndex, 0, shape, &result->variant);
 }
 
 /// The AtlasText family's rule: the atlas
@@ -681,11 +634,13 @@ bool MatchAtlasText(const ProgramInfo* /*info*/, const DrawShape& shape,
   return EncodeMatchFromFacts(AtlasTextIndex, 0, shape, &result->variant);
 }
 
-/// Derives the cell a compiled chain program resolves to. Every gate below is an acceptance rule:
-/// the draw's geometry
-/// classification and the program's expression shape either place it in the declared dims or make
-/// it fall to another family, so the chain never compiles a kernel it cannot feed.
-bool DeriveChainCell(const AOTProgram& program, const ProgramInfo* info, ChainCell* cell) {
+/// Derives the cell a draw's chain expression resolves to. Every gate below is an acceptance
+/// rule: the draw's geometry classification and the expression's shape either place it in the
+/// declared dims or make it fall to another family, so the chain never compiles a kernel it cannot
+/// feed. The expression's structure comes off the graph, the resource counts off the compiled
+/// program's binding table (BuildChainProgram's own derivation of the same graph).
+bool DeriveChainCell(const DrawIR& ir, const AOTProgram& program, const ProgramInfo* info,
+                     ChainCell* cell) {
   // The gpKind axis comes from the one geometry classification (ExtractDrawShape), so the
   // family's vertex-layout choice and the matcher's facts cannot disagree.
   auto gpKind = PointwiseGpKind(GeometryFactsOf(info->getGeometryLayout()));
@@ -696,42 +651,45 @@ bool DeriveChainCell(const AOTProgram& program, const ProgramInfo* info, ChainCe
   if (program.samplerChildCount != 0 && program.samplerChildCount != 4) {
     return false;
   }
-  // Color-space transforms and gradients each share one chain-wide parameter block.
+  // Color-space transforms and gradients each share one chain-wide parameter block; a multi-plane
+  // source is a first-class YUV node, so it is counted alongside the structural facts.
   int colorSpaceXformCount = 0;
   int gradientCount = 0;
-  for (const auto& slot : program.slots) {
-    if (slot.op == AOTChainOp::ColorSpaceXform) {
+  bool hasYuvOperator = false;
+  for (uint32_t index = 1; index < ir.color.nodeCount(); ++index) {
+    auto* node = ir.color.nodeAt(AOTNodeID(index));
+    if (node == nullptr) {
+      return false;
+    }
+    if (node->kind == AOTEffectKind::ColorSpaceXform) {
       ++colorSpaceXformCount;
-    } else if (slot.op == AOTChainOp::Gradient) {
+    } else if (node->kind == AOTEffectKind::GradientSource) {
       ++gradientCount;
+    } else if (node->kind == AOTEffectKind::TextureSource) {
+      auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
+      hasYuvOperator |= parameters != nullptr && parameters->isYUV;
     }
   }
   if (colorSpaceXformCount > 1 || gradientCount > 1) {
     return false;
   }
   for (const auto& binding : program.bindings) {
-    // Every leaf binding is a plain sampled texture: the planner refuses multi-plane, swizzled and
+    // Every leaf binding is a plain sampled texture: the layout refuses multi-plane, swizzled and
     // non-TileMode sources before a leaf reaches the program. The one exception is the multi-plane
-    // source itself — its YUV operator owns three leaf bindings that share the source's proxy — so
-    // a YUV view is only acceptable when a YUV slot produced it. A deferred (task-local) proxy has
+    // source itself — its YUV node owns three leaf bindings that share the source's proxy — so
+    // a YUV view is only acceptable when a YUV node produced it. A deferred (task-local) proxy has
     // no view yet and always binds one sampler once it is instantiated (a lazy proxy is internally
     // rendered, hence never multi-plane YUV), so only a view that resolves multi-plane is refused.
     // A leaf subset is a runtime uniform (the kernel always clamps, full bounds when absent), an
-    // alpha-only leaf splats .r through its slot selector bit, and an RGBAAA leaf reads its alpha
+    // alpha-only leaf splats .r through its selector bit, and an RGBAAA leaf reads its alpha
     // area through the per-leaf AlphaStart / HasRgbaaa uniforms, so none needs a variant.
     // Perspective transforms are served: leaf coordinates carry w and divide per-pixel.
     if (binding.kind != AOTBinding::Kind::Leaf || binding.textureProxy == nullptr) {
       continue;
     }
     auto textureView = binding.textureProxy->getTextureView();
-    if (textureView != nullptr && textureView->isYUV()) {
-      bool hasYuvOperator = false;
-      for (const auto& slot : program.slots) {
-        hasYuvOperator |= slot.op == AOTChainOp::YUV;
-      }
-      if (!hasYuvOperator) {
-        return false;
-      }
+    if (textureView != nullptr && textureView->isYUV() && !hasYuvOperator) {
+      return false;
     }
   }
   const int textureCount = program.samplerChildCount == 0 ? 0 : 1;
@@ -886,16 +844,25 @@ std::vector<uint8_t> ChainCellValues(const ChainCell& cell, uint8_t geometry) {
 
 bool MatchChain(const ProgramInfo* info, const DrawShape& /*shape*/, FamilyMatchResult* result) {
   if (info == nullptr) {
-    // The exclusivity test matches shapes without a program; the interpreter's acceptance needs
+    // The exclusivity test matches shapes without a program; the chain's acceptance needs
     // the compiled IR.
     return false;
   }
+  auto* context = info->getContext();
+  auto* cache = context != nullptr ? ContextCacheAccess::Cache(context) : nullptr;
+  if (cache == nullptr || !AssembledChainEnabledForProfile(cache->profileTag())) {
+    // The assembled walk is the chain's one serving path: a profile without it has no chain
+    // service, so its chain draws keep the runtime path instead of matching a variant whose
+    // program nothing could serve.
+    return false;
+  }
+  auto* ir = info->getCarriedIR();
   const auto* program = AOTChainBuilder::ResolveChainProgram(info);
-  if (program == nullptr) {
+  if (ir == nullptr || program == nullptr) {
     return false;
   }
   ChainCell cell = {};
-  if (!DeriveChainCell(*program, info, &cell)) {
+  if (!DeriveChainCell(*ir, *program, info, &cell)) {
     return false;
   }
   result->chain = program;
@@ -997,12 +964,13 @@ std::optional<FamilyMatchResult> MatchChainProgram(const ProgramInfo* info) {
   return result;
 }
 
-std::optional<Variant> MatchChainVariant(const AOTProgram& program, const ProgramInfo* info) {
+std::optional<Variant> MatchChainVariant(const DrawIR& ir, const AOTProgram& program,
+                                         const ProgramInfo* info) {
   if (info == nullptr) {
     return std::nullopt;
   }
   ChainCell cell = {};
-  if (!DeriveChainCell(program, info, &cell)) {
+  if (!DeriveChainCell(ir, program, info, &cell)) {
     return std::nullopt;
   }
   const auto geometry = ChainGeometryOfCell(cell);

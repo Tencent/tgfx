@@ -29,8 +29,8 @@
 #include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/aot/chain/ChainBodyEmitter.h"
 #include "gpu/aot/chain/ChainProgramEmit.h"
+#include "gpu/aot/chain/ChainProgramPlan.h"
 #include "gpu/aot/chain/ChainSPIRVBody.h"
 #include "gpu/aot/chain/ChainSPIRVToMSL.h"
 #include "gpu/aot/ir/DrawIR.h"
@@ -40,7 +40,6 @@
 #include "gpu/aot/select/PrecompiledDiagnostics.h"
 #include "gpu/aot/select/ProgramKey.h"
 #include "gpu/aot/select/ProgramSelection.h"
-#include "gpu/aot/spec/SpecInjector.h"
 #include "gpu/aot/spec/SpecResolver.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
@@ -53,39 +52,21 @@
 namespace tgfx {
 
 namespace {
-/// How many times a draw that carried spec values fell back to the generic form. Non-zero is a
-/// bug signal (declaration drift), not a statistic to tolerate; debug builds assert on the first.
-std::atomic<uint64_t> specInjectionFailures = {0};
 
-/// Whether the composed chain executor is active: an experiment switch, off by default, so the
-/// interpreter loop stays the serving path until the pixel-parity data says otherwise.
-bool ComposedChainEnabled() {
-  static const bool enabled = std::getenv("TGFX_COMPOSED_CHAIN") != nullptr;
-  return enabled;
-}
-
-/// Whether the assembled route is active for a profile. The default is per profile: a profile joins
-/// the list only once its assembled run matches its interpreter run (same failure set, no crash).
-/// TGFX_ASSEMBLED_CHAIN forces every profile on and TGFX_NO_ASSEMBLED_CHAIN forces every profile
-/// off, so a profile that is not listed stays reachable for the work that unlocks it.
+/// Whether the assembled route is active for a profile: the per-profile whitelist plus the two
+/// forcing switches (see AssembledChainEnabledForProfile).
 bool AssembledChainEnabled(const std::string& profileTag) {
-  static const bool forcedOn = std::getenv("TGFX_ASSEMBLED_CHAIN") != nullptr;
-  static const bool forcedOff = std::getenv("TGFX_NO_ASSEMBLED_CHAIN") != nullptr;
-  if (forcedOff) {
-    return false;
-  }
-  if (forcedOn) {
-    return true;
-  }
-  return profileTag == "opengl";
+  return AssembledChainEnabledForProfile(profileTag);
 }
+
 }  // namespace
 
-// The assembled chain text spells the draw's composition, so a program's identity must carry it:
-// the generic interpreter text serves every shape of a variant, while the emitted text serves
-// exactly the shape it was emitted for. A specialized program is already separated by its spec
-// values, but a spec-less route (the export paths run with specialization off, for one) would
-// otherwise reuse one shape's program for another.
+// The assembled chain text spells the draw's expression, so a program's identity must carry it:
+// the text serves exactly the shape it was planned for. The key folds the plan itself — the calls
+// in instruction order and the epilogue facts — so a structural fact the text derives from cannot
+// miss the way a hand-rolled shape digest could. A shape the assembled walk declines keeps the
+// declined marker: its program is the variant's generic payload, distinct from every assembled
+// program of the same variant.
 static void AppendAssembledChainKey(Context* context, const ProgramInfo& info,
                                     const DrawPlan& resolved, BytesKey* key) {
   auto cache = ContextCacheAccess::Cache(context);
@@ -100,15 +81,23 @@ static void AppendAssembledChainKey(Context* context, const ProgramInfo& info,
       payloadFormat != ShaderCodeFormat::METALLIB && payloadFormat != ShaderCodeFormat::MSL) {
     return;
   }
+  const auto* ir = info.getCarriedIR();
+  if (ir == nullptr) {
+    return;
+  }
   // The assembled text carries only the draw's blend mode, so the program identity must separate
   // modes even when the rest of the shape agrees.
   key->write(static_cast<uint32_t>(info.getBlendMode()));
   const bool xpPass =
       XpNeedsAdvancedMath(info.getXferFacts().shaderBlend(), static_cast<int>(info.getBlendMode()));
-  const ChainComposition composition = DescribeChainComposition(*resolved.sources.chain, xpPass);
-  const uint64_t structure = ChainCompositionKey(resolved.variant.id(), composition);
-  key->write(static_cast<uint32_t>(structure >> 32));
-  key->write(static_cast<uint32_t>(structure & 0xFFFFFFFFu));
+  ChainProgramPlan plan = {};
+  if (!PlanChainProgramFromGraph(*ir, xpPass, Families()[resolved.variant.family], resolved.variant,
+                                 cache, &plan)) {
+    key->write(0u);
+    return;
+  }
+  key->write(1u);
+  AppendChainPlanKey(plan, key);
 }
 
 // Which descriptor field carries the blob. Derived from the format rather than from the bundle's
@@ -277,8 +266,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   if (auto cached = context->globalCache()->findProgram(key)) {
     return cached;
   }
-  auto program = CreateProgramForVariant(context, programInfo, resolved.variant,
-                                         resolved.spec.empty() ? nullptr : &resolved.spec);
+  auto program = CreateProgramForVariant(context, programInfo, resolved.variant);
   if (program != nullptr) {
     // A specialization that failed to build still returns the generic form (see the fallback in
     // CreateProgramForVariant); caching it under this key keeps the failing compile from being
@@ -290,48 +278,30 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
 
 namespace {
 
-// The specialization's flat values mapped onto the constant ids, mirroring the injector's value
-// walk: the master switch is values[0], then each field's words in declaration order.
-std::vector<std::pair<uint32_t, int32_t>> SpecIdValuesOf(const std::vector<SpecFieldInfo>& fields,
-                                                         const SpecValues& spec) {
-  std::vector<std::pair<uint32_t, int32_t>> idValues = {};
-  size_t next = 1;
-  for (const auto& field : fields) {
-    const auto words = field.arraySize == 1 ? 1u : field.arraySize * 4u;
-    for (uint32_t word = 0; word < words; ++word) {
-      const auto value = next < spec.values.size() ? spec.values[next] : 0;
-      ++next;
-      idValues.emplace_back(field.firstId + word, value);
-    }
-  }
-  return idValues;
-}
-
-// The one fallback: a specialization that failed to build must not drop the draw, and the generic
-// text of the same variant always built, so re-enter without values (this recursion carries no
-// spec and cannot loop). The caller caches the returned program under the specialization-bearing
-// key, so this shape never retries the failing compile.
-std::shared_ptr<Program> FallbackToGeneric(Context* context, const ProgramInfo* programInfo,
-                                           const Variant& variant, const char* stage) {
+// The one fallback: an assembled program whose module or pipeline failed to build must not drop
+// the draw silently — with the interpreter retired there is no generic precompiled form to fall
+// back to, so the null program sends the draw down the runtime path and the failure keeps its
+// record.
+void ReportAssembledBuildFailure(Context* context, const ProgramInfo* programInfo,
+                                 const Variant& variant, const char* stage) {
+  auto cache = ContextCacheAccess::Cache(context);
   LOGE(
-      "PrecompiledProgramCreator: the specialized %s of %s[variant=%u] failed to build; falling "
-      "back to the generic form",
+      "PrecompiledProgramCreator: the assembled %s of %s[variant=%u] failed to build; the draw "
+      "keeps its runtime path",
       stage, Families()[variant.family].name, variant.id());
-  return PrecompiledProgramCreator::CreateProgramForVariantInternal(context, programInfo, variant,
-                                                                    nullptr, false);
+  cache->recordFailure(AOTFailure::PipelineCreationFailed,
+                       MakeFallbackRecord(cache, programInfo, &variant));
 }
 
 }  // namespace
 
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariant(
-    Context* context, const ProgramInfo* programInfo, const Variant& variant,
-    const SpecValues* spec) {
-  return CreateProgramForVariantInternal(context, programInfo, variant, spec, true);
+    Context* context, const ProgramInfo* programInfo, const Variant& variant) {
+  return CreateProgramForVariantInternal(context, programInfo, variant, true);
 }
 
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInternal(
-    Context* context, const ProgramInfo* programInfo, const Variant& variant,
-    const SpecValues* spec, bool allowComposed) {
+    Context* context, const ProgramInfo* programInfo, const Variant& variant, bool allowComposed) {
   auto cache = ContextCacheAccess::Cache(context);
   // The callers hold their own resolved variant in hand (CreateProgram just ran the walk; the AOT
   // route derives its variant from the compiled program), so this entry starts past the match.
@@ -385,9 +355,10 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   } else {
     fragmentDesc.code = std::string(fragBlob->data.begin(), fragBlob->data.end());
   }
-  // The assembled executor: the JIT-style walk — the emit declares exactly the members the
-  // composition reads, the body is the pack's per-op entries, and the writer walks the emit's own
-  // tables. Its own experiment switch; every decline keeps the paths below untouched.
+  // The assembled executor: the graph walk — the emit declares exactly the members the
+  // expression reads, the body is the pack's per-op entries, and the writer walks the emit's own
+  // tables. A shape the walk declines has no assembled program; with the interpreter retired the
+  // draw then keeps its runtime path (the caller treats the null program as a miss).
   bool assembledAttempt = false;
   ChainBindings chainBindings = {};
   const bool assembledVulkan = format == ShaderCodeFormat::SPIRV;
@@ -396,20 +367,32 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
       (format == ShaderCodeFormat::GLSL || assembledVulkan || assembledMetal) &&
       strcmp(Families()[variant.family].name, "Chain") == 0) {
     const auto* assembledSources = programInfo->getSources();
-    if (assembledSources != nullptr && assembledSources->chain != nullptr) {
+    const auto* assembledIR = programInfo->getCarriedIR();
+    if (assembledSources != nullptr && assembledSources->chain != nullptr &&
+        assembledIR != nullptr) {
       const Family& chainFamily = Families()[variant.family];
       const bool xpPass = XpNeedsAdvancedMath(programInfo->getXferFacts().shaderBlend(),
                                               static_cast<int>(programInfo->getBlendMode()));
-      const ChainComposition composition =
-          DescribeChainComposition(*assembledSources->chain, xpPass);
-      if (assembledVulkan || assembledMetal) {
-        // The linking route: the precompiled frame's entry calls a body emitted here, linked
-        // with the op modules the plan reaches. Shapes outside the linkable slice keep the
-        // interpreter's precompiled payload.
-        const int hasXp = XferDimValue(chainFamily, variant);
-        if (ChainSPIRVBodySupported(composition, layout, hasXp)) {
-          ChainProgramPlan plan = {};
-          if (PlanChainProgram(composition, chainFamily, variant, cache, &plan)) {
+      ChainProgramPlan plan = {};
+      const bool planOk =
+          PlanChainProgramFromGraph(*assembledIR, xpPass, chainFamily, variant, cache, &plan);
+      if (!planOk) {
+        // The assembled walk is the chain's one serving path: a shape it declines has no
+        // precompiled program (the interpreter is retired), so the draw keeps its runtime path
+        // instead of serving a payload nothing could upload.
+        LOGE("AssembledChain: the plan declined %s[variant=%u]; the draw keeps its runtime path",
+             shaderName, variantId);
+        cache->recordFailure(AOTFailure::NoMatchingRule,
+                             MakeFallbackRecord(cache, programInfo, &variant));
+        return nullptr;
+      }
+      {
+        if (assembledVulkan || assembledMetal) {
+          // The linking route: the precompiled frame's entry calls a body emitted here, linked
+          // with the op modules the plan reaches. Shapes outside the linkable slice keep their
+          // runtime path.
+          const int hasXp = XferDimValue(chainFamily, variant);
+          if (ChainSPIRVBodySupported(plan.usedOps, layout, hasXp)) {
             std::vector<uint32_t> body = {};
             std::string emitError;
             if (EmitChainBodySPIRV(plan, layout, &body, &emitError)) {
@@ -499,64 +482,23 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
                    variantId, emitError.c_str());
             }
           }
+        } else if (EmitChainProgramGLSL(*assembledIR, xpPass, chainFamily, variant, cache,
+                                        &fragmentDesc.code, &chainBindings,
+                                        cache->profileTag() == "opengles",
+                                        static_cast<int>(programInfo->getBlendMode()))) {
+          assembledAttempt = true;
+          LOGI("AssembledChain: assembled entry for %s[variant=%u] (%zu bytes, %zu blocks)",
+               shaderName, variantId, fragmentDesc.code.size(), chainBindings.fragment.size());
+          // The vertex stage follows the same contract: the stored text's interface (attributes,
+          // vertex block, geometry hook) stays, and the varying set bends to the expression's
+          // leaves and resource reads.
+          std::string assembledVs;
+          if (AssembleChainVertexGLSL(chainBindings,
+                                      std::string(vertBlob->data.begin(), vertBlob->data.end()),
+                                      &assembledVs)) {
+            vertexDesc.code = std::move(assembledVs);
+          }
         }
-      } else if (programInfo->getCarriedIR() != nullptr &&
-                 EmitChainProgramGLSL(*programInfo->getCarriedIR(), xpPass, chainFamily, variant,
-                                      cache, &fragmentDesc.code, &chainBindings,
-                                      cache->profileTag() == "opengles",
-                                      static_cast<int>(programInfo->getBlendMode()))) {
-        assembledAttempt = true;
-        LOGI("AssembledChain: assembled entry for %s[variant=%u] (%zu bytes, %zu blocks)",
-             shaderName, variantId, fragmentDesc.code.size(), chainBindings.fragment.size());
-        // The vertex stage follows the same contract: the stored text's interface (attributes,
-        // vertex block, geometry hook) stays, and the varying set bends to the composition's
-        // leaves and resource reads.
-        std::string assembledVs;
-        if (AssembleChainVertexGLSL(chainBindings,
-                                    std::string(vertBlob->data.begin(), vertBlob->data.end()),
-                                    &assembledVs)) {
-          vertexDesc.code = std::move(assembledVs);
-        }
-        // The dual-route parity check: the same draw planned through the graph (the serving route
-        // above) and through the composition (the slot route's shape) must spell one program.
-        // Every disagreement logs and asserts; silence is the acceptance data.
-        CheckChainProgramPlanParity(composition, *programInfo->getCarriedIR(), xpPass, chainFamily,
-                                    variant, cache);
-      }
-    }
-  }
-  bool composedAttempt = false;
-  // The composed executor: a specialized GLSL chain draw trades the interpreter loop for one
-  // straight-line evaluation. The lookup runs first — the bundle's pre-composed payload for this
-  // exact shape is the stored text the build produced by running the same two operations — and a
-  // miss with the switch on splices the same body here, so hit and miss serve byte-identical text.
-  // Every decline keeps the injector path below; the uniforms, the layout and the key are
-  // unchanged either way, because the body reads the same pool through the same per-operator
-  // functions.
-  const bool composedEligible = allowComposed && !assembledAttempt &&
-                                format == ShaderCodeFormat::GLSL && ComposedChainEnabled() &&
-                                strcmp(Families()[variant.family].name, "Chain") == 0;
-  const auto* sources = programInfo->getSources();
-  if (composedEligible && sources != nullptr && sources->chain != nullptr) {
-    const bool xpNeedsBlendPass = XpNeedsAdvancedMath(
-        programInfo->getXferFacts().shaderBlend(), static_cast<int>(programInfo->getBlendMode()));
-    const ChainComposition composition =
-        DescribeChainComposition(*sources->chain, xpNeedsBlendPass);
-    const auto* composedBlob = cache->findComposed(ComposedFragmentId(variantId, composition));
-    if (composedBlob != nullptr) {
-      fragmentDesc.code = std::string(composedBlob->data.begin(), composedBlob->data.end());
-      composedAttempt = true;
-      LOGI("ComposedChain: precomposed payload for %s[variant=%u]", shaderName, variantId);
-    } else if (spec != nullptr && !spec->empty()) {
-      std::string attempted = std::string(fragBlob->data.begin(), fragBlob->data.end());
-      if (PrependChainSpecDefinesGLSL(&attempted,
-                                      SpecIdValuesOf(DeriveSpecFieldInfos(variant), *spec)) &&
-          ComposeChainFragmentGLSL(composition, &attempted)) {
-        fragmentDesc.code = std::move(attempted);
-        composedAttempt = true;
-        LOGI("ComposedChain: straight-line executor for %s[variant=%u] (key=0x%016llx)", shaderName,
-             variantId,
-             static_cast<unsigned long long>(ChainCompositionKey(variantId, composition)));
       }
     }
   }
@@ -564,32 +506,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   // generated TGFX_SPEC_<id> declarations (the driver's compiler then folds every accessor read
   // and the unrolled executor's guards), the container formats append the pipeline's constant
   // table. A format without a registered injector serves the generic form.
-  bool specInjected = false;
   std::vector<std::pair<std::string, double>> specConstants = {};
-  if (!composedAttempt && !assembledAttempt && spec != nullptr && !spec->empty()) {
-    if (const auto* injector = FindSpecInjector(format)) {
-      SpecInjection injection = {};
-      if (injector->Apply(fragmentDesc.code, DeriveSpecFieldInfos(variant), *spec, &injection)) {
-        if (!injection.code.empty()) {
-          fragmentDesc.code = std::move(injection.code);
-        }
-        specConstants = std::move(injection.constants);
-        specInjected = true;
-      } else {
-        // Reaching here means the draw carried spec values and an injector exists, but the text had
-        // none of the declarations it rewrites: the specialization silently degraded to the generic
-        // form. That is a build/runtime drift, never a normal path, so it is counted and asserts in
-        // debug instead of scrolling past as one log line.
-        const auto failures = specInjectionFailures.fetch_add(1, std::memory_order_relaxed) + 1;
-        LOGE(
-            "PrecompiledProgramCreator: specialization injection found no TGFX_SPEC declarations "
-            "for %s[variant=%u, fields=%zu, values=%zu]; serving the generic form (failures=%llu)",
-            shaderName, variantId, DeriveSpecFieldInfos(variant).size(), spec->values.size(),
-            static_cast<unsigned long long>(failures));
-        DEBUG_ASSERT(false);
-      }
-    }
-  }
   // The assembled text declares its own fragment block; every other route keeps the variant's
   // derived one.
   const uint32_t fragmentBlockSize =
@@ -611,8 +528,9 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
   cache->recordAOTStage(PrecompiledAOTStage::VertexModuleCreated);
   auto fragmentShader = shaderCache->findOrCreateModule(fragmentDesc);
   if (fragmentShader == nullptr) {
-    if (specInjected || composedAttempt || assembledAttempt) {
-      return FallbackToGeneric(context, programInfo, variant, "fragment module");
+    if (assembledAttempt) {
+      ReportAssembledBuildFailure(context, programInfo, variant, "fragment module");
+      return nullptr;
     }
     cache->recordFailure(AOTFailure::FragmentModuleCreationFailed,
                          MakeFallbackRecord(cache, programInfo, &variant));
@@ -755,8 +673,9 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
 
   auto pipeline = shaderCache->findOrCreatePipeline(descriptor);
   if (pipeline == nullptr) {
-    if (specInjected || composedAttempt || assembledAttempt) {
-      return FallbackToGeneric(context, programInfo, variant, "pipeline");
+    if (assembledAttempt) {
+      ReportAssembledBuildFailure(context, programInfo, variant, "pipeline");
+      return nullptr;
     }
     // The same shader variant (identical vert/frag artifact) can create successfully for
     // some draws and fail for others, so the mismatch lives in the runtime-derived pipeline

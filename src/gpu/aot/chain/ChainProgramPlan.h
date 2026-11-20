@@ -22,10 +22,11 @@
 #include <set>
 #include <string>
 #include <vector>
+#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/shaders/Family.h"
 #include "gpu/shaders/contract/ChainBindings.h"
-#include "gpu/shaders/contract/ChainComposition.h"
 #include "gpu/shaders/contract/FragmentLibrary.h"
+#include "tgfx/core/BytesKey.h"
 
 namespace tgfx {
 
@@ -40,13 +41,18 @@ struct DrawIR;
 // ChainBindingSource lives in the contract area: the operator table and the build tool read it
 // too.
 
-/// One declared uniform member: its std140 placement and the reader the upload walks.
+struct AOTEffectNode;
+
+/// One declared uniform member: its std140 placement and the reader the upload walks. The node is
+/// the graph site the member's operator was encoded from — the parameter readers address their
+/// values through it instead of any intermediate instruction encoding.
 struct ChainBinding {
   ChainBindingSource source = ChainBindingSource::OutputSwizzle;
   int slot = -1;
   int index = -1;
   uint32_t offset = 0;
   uint32_t size = 0;
+  const AOTEffectNode* node = nullptr;
 };
 
 /// Which sampler-binding child one declared sampler reads.
@@ -119,7 +125,8 @@ struct ChainCall {
 };
 
 /// One declared uniform member in declaration order: its spelling, its std140 placement, and the
-/// reader the upload walks. The offsets are the single layout every backend reads.
+/// reader the upload walks. The offsets are the single layout every backend reads. The node names
+/// the graph site the member's operator was encoded from (see ChainBinding).
 struct ChainUniformMember {
   std::string name = {};
   FragmentType type = FragmentType::Float;
@@ -129,6 +136,7 @@ struct ChainUniformMember {
   int index = -1;
   uint32_t offset = 0;
   uint32_t size = 0;
+  const AOTEffectNode* node = nullptr;
 };
 
 /// One declared fragment input in declaration order. The spelling is the GLSL name; the location
@@ -175,35 +183,12 @@ struct ChainProgramPlan {
 };
 
 /**
- * Walks the composition into the neutral plan: one pass registers every uniform, varying and
- * sampler the shape reads (the declaration closure), resolves every argument, and collects the
- * facts a printer or a linker needs. The walk declines the same shapes the GLSL emit declined.
- * @param composition  The shape to plan.
- * @param family       The matched family (the variant walk's input).
- * @param variant      The matched variant (its geometry, texture count and xfer fact).
- * @param cache        The loaded bundle, for the slice's availability facts.
- * @param plan         Receives the plan.
- * @return             False when the shape is outside the assembled slice; the caller keeps its
- *                     other paths.
- */
-bool PlanChainProgram(const ChainComposition& composition, const Family& family,
-                      const Variant& variant, const PrecompiledShaderCache* cache,
-                      ChainProgramPlan* plan);
-
-/**
- * Plans the chain program directly from the draw's lowered expression: the node order the slot
- * pipeline's schedule derives (texture leaves first, then the remaining nodes in index order,
- * color graph ahead of the merged coverage graph), each node's operator and selector structure
- * the encoders produce, the register assignment the shared allocator returns, and the same
- * declaration closure — none of it through the slot encoding. The graph route is the assembled
- * entry's serving path; the composition walk stays beside it as the parity reference until the
- * slot system retires.
- *
- * The walk runs behind the match, which already compiled this expression through the slot
- * pipeline (ResolveChainProgram): the slot encoding's cross-slot validation (ValidateSlots — the
- * selector domains, the leaf-slot alignment, the profile capacities) has therefore accepted this
- * expression, so this walk re-derives only what the encoding layer derives per node and leaves
- * the cross-slot validation where it runs.
+ * Plans the chain program directly from the draw's lowered expression: the node order the layout
+ * derives (texture leaves first, then the remaining nodes in index order, color graph ahead of the
+ * merged coverage graph), each node's operator and selector structure, the register assignment
+ * the shared allocator returns, and the declaration closure. This is the assembled entry's one
+ * and only serving path; the uniform members carry the graph nodes their operators were encoded
+ * from, so the upload reads every parameter straight off the node.
  * @param ir               The draw's lowered expression (color graph and coverage terms).
  * @param xpNeedsBlendPass The xfer's advanced-mode fact (the epilogue's blend pass).
  * @param family           The matched family (the variant walk's input).
@@ -215,23 +200,6 @@ bool PlanChainProgram(const ChainComposition& composition, const Family& family,
 bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Family& family,
                                const Variant& variant, const PrecompiledShaderCache* cache,
                                ChainProgramPlan* plan);
-
-/**
- * The dual-route parity check: plans the same draw through both routes (the composition walk and
- * the graph walk) and compares the plans field by field — the calls in instruction order, every
- * declared member, varying, sampler and binding, and the epilogue registers. A disagreement is
- * logged and counted (a debug build asserts on the first), because the graph route replaces the
- * slot route in the assembled path; silence means the two spell the same program.
- * @param composition      The slot route's shape description of the draw.
- * @param ir               The draw's lowered expression (the graph route's input).
- * @param xpNeedsBlendPass The xfer's advanced-mode fact.
- * @param family           The matched family.
- * @param variant          The matched variant.
- * @param cache            The loaded bundle.
- */
-void CheckChainProgramPlanParity(const ChainComposition& composition, const DrawIR& ir,
-                                 bool xpNeedsBlendPass, const Family& family,
-                                 const Variant& variant, const PrecompiledShaderCache* cache);
 
 /**
  * The plan's per-leaf member-naming rule: a leaf's records carry the base name at leaf 0 and the
@@ -251,5 +219,17 @@ std::string ChainLeafMemberName(const char* base, int leaf);
  * @return       The entry's text, or empty when the bundle carries no such entry.
  */
 std::string ChainPackText(const PrecompiledShaderCache* cache, uint32_t id);
+
+/**
+ * Folds the plan's structure into a program key: the calls in instruction order, the epilogue
+ * registers and the interface facts the spelling follows — everything the assembled text derives
+ * from, and nothing else. The assembled text carries no parameter values (the upload reads those
+ * through the binding table), so two draws of one variant share a program exactly when their
+ * plans agree; folding the plan here cannot miss a structural fact the way a hand-rolled shape
+ * digest could.
+ * @param plan  The planned program.
+ * @param key   The key to append to.
+ */
+void AppendChainPlanKey(const ChainProgramPlan& plan, BytesKey* key);
 
 }  // namespace tgfx

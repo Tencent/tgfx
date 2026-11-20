@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/chain/AOTChainRegisterAllocator.h"
-#include "gpu/aot/chain/AOTChainInternal.h"
-#include "gpu/aot/chain/ChainContext.h"
 
 namespace tgfx {
 
@@ -104,38 +102,6 @@ bool AllocateChainRegisters(const std::vector<std::vector<int>>& instructionInpu
       clipCoverageInstruction >= 0
           ? assignment->outRegister[static_cast<size_t>(clipCoverageInstruction)]
           : -1;
-  return true;
-}
-
-bool AllocateRegisters(AOTChainContext* ctx) {
-  if (ctx->slots.size() > MaxChainSlots) {
-    return false;
-  }
-  std::vector<std::vector<int>> instructionInputs(ctx->slots.size());
-  for (size_t index = 0; index < ctx->slots.size(); ++index) {
-    for (int input : {ctx->slots[index].in0, ctx->slots[index].in1}) {
-      if (input >= 0) {
-        instructionInputs[index].push_back(input);
-      }
-    }
-  }
-  ctx->assignment = {};
-  if (!AllocateChainRegisters(instructionInputs, static_cast<int>(ctx->rootIndex),
-                              ctx->coverageRootSlot, ctx->clipCoverageSlot, MaxChainRegisters,
-                              &ctx->assignment)) {
-    return false;
-  }
-  for (size_t index = 0; index < ctx->slots.size(); ++index) {
-    if (ctx->slots[index].in0 >= 0) {
-      ctx->slots[index].in0 =
-          ctx->assignment.outRegister[static_cast<size_t>(ctx->slots[index].in0)];
-    }
-    if (ctx->slots[index].in1 >= 0) {
-      ctx->slots[index].in1 =
-          ctx->assignment.outRegister[static_cast<size_t>(ctx->slots[index].in1)];
-    }
-    ctx->slots[index].outRegister = ctx->assignment.outRegister[index];
-  }
   return true;
 }
 

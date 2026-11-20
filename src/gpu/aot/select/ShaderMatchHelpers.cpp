@@ -289,11 +289,8 @@ bool IsChainQuadSubsetServable(const AOTGeometryParameters& quad, const AOTProgr
   if (program.samplerChildCount == 0 || quad.hasUVPerspective) {
     return false;
   }
-  for (const auto& tiled : program.tiledLeaves) {
-    if (tiled.leafIndex == 0 || tiled.recipe.strict) {
-      return false;
-    }
-  }
+  // Shader-tiled leaves cannot reach a compiled chain program (the graph layout declines them),
+  // so the strict-tile exclusion the slot encoding carried is structural now.
   for (const auto& deviceLeaf : program.deviceLeaves) {
     if (deviceLeaf.leafIndex == 0) {
       return false;

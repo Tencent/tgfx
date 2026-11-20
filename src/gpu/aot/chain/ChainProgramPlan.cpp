@@ -9,22 +9,20 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  unless required by applicable law or agreed to in writing, software distributed under the
 //  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions
+//  either express or implied. see the License for the specific language governing permissions
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/chain/ChainProgramPlan.h"
-#include <atomic>
 #include <map>
 #include <set>
 #include <string>
-#include <unordered_map>
-#include <utility>
 #include "core/utils/Log.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/chain/AOTChainInternal.h"
 #include "gpu/aot/chain/AOTChainRegisterAllocator.h"
 #include "gpu/aot/chain/AOTShapeRules.h"
@@ -53,8 +51,8 @@ namespace {
 
 // The assembled slice's operator vocabulary: the pointwise color operators, Blend, the inline
 // expressions, the analytic coverage operators, plain texture leaves and the resource evaluators
-// (gradients, noise). Tiled recipes keep the interpreter's path until their entry material is
-// packed too.
+// (gradients, noise). Tiled recipes keep the runtime path until their entry material is packed
+// too.
 bool OpAssembles(int op) {
   switch (op) {
     case ChainISA::None:
@@ -180,12 +178,18 @@ bool LayoutDeclaresVarying(const Layout& layout, const char* name) {
 
 /**
  * The plan's declaration handler: every uniform, varying and sampler is registered as the walk
- * that reads it runs, so the declarations are the plan's closure — what the composition does not
+ * that reads it runs, so the declarations are the plan's closure — what the expression does not
  * read does not exist. `uniform` returns the member's index into the plan's table, so a call
- * argument can name the member without re-spelling it.
+ * argument can name the member without re-spelling it. The current node names the graph site the
+ * next registrations belong to: the walk sets it before it registers an operator's members, so
+ * every member and binding carries the node its parameter reader addresses.
  */
 class PlanRegistry {
  public:
+  void setNode(const AOTEffectNode* node) {
+    currentNode = node;
+  }
+
   int uniform(const std::string& name, FragmentType type, ChainBindingSource source, int slot,
               int index = -1, uint16_t count = 1) {
     const auto found = memberIndex.find(name);
@@ -202,6 +206,7 @@ class PlanRegistry {
       binding.index = count > 1 ? static_cast<int>(element) : index;
       binding.offset = offset + stride * element;
       binding.size = Std140Size(type);
+      binding.node = currentNode;
       entries.push_back(binding);
     }
     ChainUniformMember member = {};
@@ -213,6 +218,7 @@ class PlanRegistry {
     member.index = index;
     member.offset = offset;
     member.size = Std140Size(type);
+    member.node = currentNode;
     memberIndex[name] = members.size();
     members.push_back(std::move(member));
     cursor = offset + stride * count;
@@ -261,6 +267,7 @@ class PlanRegistry {
   }
 
  private:
+  const AOTEffectNode* currentNode = nullptr;
   std::vector<ChainUniformMember> members = {};
   std::map<std::string, size_t> memberIndex = {};
   std::vector<ChainVaryingDecl> varyings = {};
@@ -272,7 +279,7 @@ class PlanRegistry {
 };
 
 // The gradient evaluator's named block: the members the packed text reads, registered only when the
-// composition reaches the evaluator. The LUT branch indexes the leaf samplers, so it exists only on
+// expression reaches the evaluator. The LUT branch indexes the leaf samplers, so it exists only on
 // a variant that declares them.
 void RegisterGradientMembers(PlanRegistry* registry, bool lutForm) {
   // The members derive from the gradient entry's GLSL annotations: shader_build_tool --catalog writes
@@ -297,11 +304,11 @@ void RegisterNoiseMembers(PlanRegistry* registry) {
 #undef TGFX_REGISTER_evalNoiseSlot
 #else
   (void)registry;
-  (void)lutForm;
 #endif
 }
 
-// The color-space transform's one chain-wide block, shared by every slot (the matcher admits one).
+// The color-space transform's one chain-wide block, shared by every operator (the matcher admits
+// one).
 void RegisterColorSpaceMembers(PlanRegistry* registry) {
   // The members derive from the entry's GLSL annotations (see ChainOpRegistry.inc).
 #if defined(TGFX_EMBED_SHADER_BUNDLES)
@@ -314,8 +321,8 @@ void RegisterColorSpaceMembers(PlanRegistry* registry) {
 }
 
 // The YUV source's members: the names match the generated registration (the signature's derived
-// spelling), but each carries the operator's own slot, so the reader finds the slot's record. The
-// three planes ride the leaf-sampler bindings at the slot's own index and the two above it; the
+// spelling), but each carries the operator's own slot, so the reader finds the site's record. The
+// three planes ride the leaf-sampler bindings at the site's own index and the two above it; the
 // coordinate is the assembly's own SourceCoords (the same varying the noise reads).
 void RegisterYUVMembers(PlanRegistry* registry, int slot) {
   const int plane[3] = {slot, slot + 1, slot + 2};
@@ -363,35 +370,14 @@ void RegisterVertexMember(ChainBindings* bindings, const Layout& layout, const s
     binding.offset = layout.fields[fieldIndex].offset;
     binding.size = layout.fields[fieldIndex].size;
     bindings->vertex.push_back(binding);
-    return;
   }
 }
-
-/// One planned call site as the shared walk consumes it: the operator, its two resolved inputs (a
-/// designator or a result register), the result register, and the operator's small selector values.
-/// Both producers — the slot route over the composition and the graph route over the draw's IR —
-/// normalize their shape into this view, so the argument marshalling and the declaration closure
-/// exist exactly once and the two routes cannot drift in the walk itself.
-struct ChainCallSite {
-  int op = ChainISA::None;
-  int in0 = -2;
-  int in1 = -2;
-  int outRegister = -1;
-  /// Blend's mode and selector bit; ConstColor's input mode; Texture's low selector bits;
-  /// TexModulate's raw-sampling leaf and alpha-only flag.
-  int blendMode = 0;
-  bool multiplyInputAlpha = false;
-  int inputMode = 0;
-  int textureFlags = 0;
-  int texModulateSourceSlot = -1;
-  bool texModulateAlphaOnly = false;
-};
 
 /// The shared walk's frame: the sites in instruction order (dead instructions keep their place —
 /// the numbering is the plan's member-naming input), the epilogue registers the tail reads, and the
 /// xfer's blend-pass fact.
 struct ChainWalkFrame {
-  std::vector<ChainCallSite> sites = {};
+  std::vector<AOTChainCallSite> sites = {};
   int rootRegister = 0;
   int coverageRootRegister = -1;
   int clipCoverageRegister = -1;
@@ -402,7 +388,7 @@ struct ChainWalkFrame {
  * The shared plan walk: resolves every argument against the frame's designators and registers,
  * registers every uniform, varying and sampler the body reads (the declaration closure), and
  * collects the interface facts the printer and the linker spell from. The walk is a pure function
- * of the frame and the variant, so the two routes that build the frame spell one plan.
+ * of the frame and the variant, so the graph layout that builds the frame spells one plan.
  */
 bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const Variant& variant,
                       ChainProgramPlan* plan) {
@@ -512,6 +498,9 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
     if (def == nullptr) {
       return false;
     }
+    // Every member this site registers carries its graph node: the upload-time readers address
+    // the operator's parameter block through it.
+    registry.setNode(site.node);
     ChainCall call = {};
     call.op = site.op;
     call.outRegister = site.outRegister;
@@ -574,7 +563,7 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
         break;
       }
       case ChainISA::Texture:
-        // The plan owns the prefetch, so the slot only modulates the fetched leaf.
+        // The plan owns the prefetch, so the site only modulates the fetched leaf.
         geomColorUsed = true;
         unitCoverageUsed = true;
         leafSlots.insert(static_cast<int>(slotIndex));
@@ -694,7 +683,8 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
     return false;
   }
 
-  // The leaves the body samples, in slot order, each registering its own declarations.
+  // The leaves the body samples, in slot order, each registering its own declarations. The leaf
+  // records read the program's binding table, so they carry no node.
   for (int leaf : leafSlots) {
     if (leaf < 0 || leaf >= 4) {
       return false;
@@ -704,6 +694,7 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
   if (!leafSlots.empty()) {
     // The plain fetch reads the swizzle table and the device-space switch; the strict form also
     // reads the per-quad subset varying the variant declares.
+    registry.setNode(nullptr);
     registry.uniform("LeafReadSwizzles", FragmentType::Int4, ChainBindingSource::LeafReadSwizzles,
                      -1);
     registry.uniform("DeviceLeafMask", FragmentType::Int, ChainBindingSource::DeviceLeafMask, -1);
@@ -762,7 +753,7 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
   }
 
   // The stored vertex stage's members: the block the stored text declares, filled from the same
-  // geometry and program facts the interpreter's writer reads.
+  // geometry and program facts the writer reads.
   RegisterVertexMember(&plan->bindings, layout, "RTAdjust", ChainBindingSource::RTAdjust);
   RegisterVertexMember(&plan->bindings, layout, "Matrix", ChainBindingSource::VertexMatrix);
   RegisterVertexMember(&plan->bindings, layout, "InTexSubsetMatrix",
@@ -813,65 +804,119 @@ std::string ChainLeafMemberName(const char* base, int leaf) {
   return leaf == 0 ? std::string(base) : std::string(base) + "_" + std::to_string(leaf);
 }
 
-bool PlanChainProgram(const ChainComposition& composition, const Family& family,
-                      const Variant& variant, const PrecompiledShaderCache* cache,
-                      ChainProgramPlan* plan) {
-  if (cache == nullptr || plan == nullptr) {
+// The shared kind-to-op mapping and parameter admission for the unary pointwise operators: the op
+// and the checks only — the values ride the upload-time readers off the node itself.
+bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node, int* op) {
+  if (node == nullptr || op == nullptr) {
     return false;
   }
-  // The rect-geometry slice: the aliased rect layout whose color and coverage arrive as varyings.
-  // The declared geometries (their own modules' fragment hooks) come with the geometry prelude
-  // table, not this slice.
-  if (variant.geometry != 0) {
-    return false;
-  }
-  // Shader-tiled leaves need the tiling module's runtime loops, which the pack does not spell.
-  if ((composition.textureFlags & 2) != 0) {
-    return false;
-  }
-  for (const auto& slot : composition.slots) {
-    if (!OpAssembles(slot.op)) {
+  if (node->kind == AOTEffectKind::ConstColor) {
+    auto parameters = std::get_if<AOTConstColorParameters>(&node->parameters);
+    if (parameters == nullptr || node->inputs.size() != 1) {
       return false;
     }
+    *op = ChainISA::ConstColor;
+    return true;
   }
-  // The described slots normalize into the walk's frame: the selector's small values unpack into
-  // their named fields, so the walk reads semantics instead of bit positions.
-  ChainWalkFrame frame = {};
-  frame.sites.reserve(composition.slots.size());
-  for (const auto& slot : composition.slots) {
-    ChainCallSite site = {};
-    site.op = slot.op;
-    site.in0 = slot.in0;
-    site.in1 = slot.in1;
-    site.outRegister = slot.outRegister;
-    site.blendMode = slot.blendMode;
-    site.multiplyInputAlpha = slot.multiplyInputAlpha;
-    site.inputMode = slot.inputMode;
-    site.textureFlags = slot.selector & 0x1F;
-    site.texModulateSourceSlot = (slot.selector >> 16) & 0xF;
-    site.texModulateAlphaOnly = (slot.selector & 1) != 0;
-    frame.sites.push_back(site);
+  if (node->kind == AOTEffectKind::Blend) {
+    auto parameters = std::get_if<AOTBlendParameters>(&node->parameters);
+    if (parameters == nullptr || parameters->childType == 2 || node->inputs.size() != 2) {
+      return false;
+    }
+    auto* srcNode = graph.nodeAt(node->inputs[0]);
+    auto* dstNode = graph.nodeAt(node->inputs[1]);
+    const AOTEffectNode* constNode = nullptr;
+    if (srcNode != nullptr && srcNode->kind == AOTEffectKind::ConstColor) {
+      constNode = srcNode;
+    } else if (dstNode != nullptr && dstNode->kind == AOTEffectKind::ConstColor) {
+      constNode = dstNode;
+    } else {
+      return false;
+    }
+    // The blend uploads the constant as-is (its input mode is not applied), which is only correct
+    // when the constant does not depend on its input edge.
+    if (!AOTConstColorIsInputIndependent(graph, constNode)) {
+      return false;
+    }
+    *op = ChainISA::Blend;
+    return true;
   }
-  frame.rootRegister = composition.rootRegister;
-  frame.coverageRootRegister = composition.coverageRootRegister;
-  frame.clipCoverageRegister = composition.clipCoverageRegister;
-  frame.xpNeedsBlendPass = composition.xpNeedsBlendPass;
-  return WalkChainProgram(frame, family, variant, plan);
+  if (node->kind == AOTEffectKind::ColorMatrix) {
+    auto parameters = std::get_if<AOTColorMatrixParameters>(&node->parameters);
+    if (parameters == nullptr) {
+      return false;
+    }
+    *op = ChainISA::ColorMatrix;
+    return true;
+  }
+  if (node->kind == AOTEffectKind::Luma) {
+    auto parameters = std::get_if<ChainISA::LumaData>(&node->parameters);
+    if (parameters == nullptr) {
+      return false;
+    }
+    *op = ChainISA::Luma;
+    return true;
+  }
+  if (node->kind == AOTEffectKind::AlphaThreshold) {
+    auto parameters = std::get_if<ChainISA::AlphaThresholdData>(&node->parameters);
+    if (parameters == nullptr) {
+      return false;
+    }
+    *op = ChainISA::AlphaThreshold;
+    return true;
+  }
+  if (node->kind == AOTEffectKind::ColorSpaceXform) {
+    auto parameters = std::get_if<AOTColorSpaceXformParameters>(&node->parameters);
+    if (parameters == nullptr || parameters->steps == nullptr) {
+      return false;
+    }
+    *op = ChainISA::ColorSpaceXform;
+    return true;
+  }
+  return false;
 }
 
-bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Family& family,
-                               const Variant& variant, const PrecompiledShaderCache* cache,
-                               ChainProgramPlan* plan) {
-  if (cache == nullptr || plan == nullptr) {
+// Whether a texture node's parameters describe a leaf the chain kernel samples itself: a resolved
+// plain leaf (RGBAAA included), a device-space leaf (sampled through DeviceLeafCoordMatrix), or a
+// tiled leaf whose shader wrap modes the kernel's single-tap path implements. YUV planes need their
+// own kernel.
+bool IsChainTextureLeaf(const AOTTextureParameters& parameters) {
+  if ((parameters.textureProxy == nullptr && !parameters.isIntermediate) || parameters.isYUV) {
     return false;
   }
-  // The rect-geometry slice: the same acceptance the composition walk runs, so the two routes
-  // serve the same shapes.
-  if (variant.geometry != 0) {
+  if (parameters.samplingKind == AOTTextureSamplingKind::Plain) {
+    // The kernel splats an alpha-only leaf's .r after the RGBAAA merge, while the runtime reads
+    // the merged .a; an RGBAAA image is never alpha-only (RGBAAAImage::MakeFrom), so the
+    // combination is refused instead of implemented.
+    return !(parameters.hasRGBAAA && parameters.isAlphaOnly);
+  }
+  if (parameters.hasRGBAAA) {
     return false;
   }
+  if (parameters.samplingKind == AOTTextureSamplingKind::Device) {
+    // An alpha-only source takes the same selector bits as a plain alpha-only leaf. The kernel,
+    // like the runtime effect, uses the mapped coordinate without a perspective divide, and the
+    // leaf keeps refusing projective matrices.
+    return !parameters.hasPerspective;
+  }
+  if (parameters.samplingKind != AOTTextureSamplingKind::Tiled) {
+    return false;
+  }
+  const auto& recipe = parameters.tiledRecipe;
+  return recipe.has_value() && AOTChainBuilder::IsChainCompatibleTiledMode(recipe->shaderModeX) &&
+         AOTChainBuilder::IsChainCompatibleTiledMode(recipe->shaderModeY);
+}
+
+bool HasShaderTiling(const AOTTextureParameters& parameters) {
+  return parameters.samplingKind == AOTTextureSamplingKind::Tiled &&
+         parameters.tiledRecipe.has_value() &&
+         (parameters.tiledRecipe->shaderModeX != TiledTextureShaderMode::None ||
+          parameters.tiledRecipe->shaderModeY != TiledTextureShaderMode::None);
+}
+
+bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout* layout) {
   const auto& graph = ir.color;
-  if (graph.nodeCount() < 2 || !graph.root().isValid() ||
+  if (layout == nullptr || graph.nodeCount() < 2 || !graph.root().isValid() ||
       graph.root().index() >= graph.nodeCount()) {
     return false;
   }
@@ -880,46 +925,59 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
     return false;
   }
 
-  // The pass node set, derived the way the slot pipeline's own planner derives it: every color node
-  // beyond the root, filtered to the root-reachable set when the graph carries a noise source (the
-  // noise family's budgets cover the reachable space only).
-  bool containsNoise = false;
-  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
-    containsNoise |= graph.nodeAt(AOTNodeID(index))->kind == AOTEffectKind::PerlinNoiseSource;
+  // The pass node set: the caller's planned one, or the whole-graph derivation (every color node
+  // beyond the root, filtered to the root-reachable set when the graph carries a noise source —
+  // the noise family's budgets cover the reachable space only).
+  std::vector<bool> inPass(graph.nodeCount(), false);
+  if (pass != nullptr) {
+    if (pass->nodes.empty() || !pass->output.isValid() ||
+        pass->output.index() >= graph.nodeCount()) {
+      return false;
+    }
+    for (auto nodeID : pass->nodes) {
+      if (nodeID.index() >= graph.nodeCount() || inPass[nodeID.index()]) {
+        return false;
+      }
+      inPass[nodeID.index()] = true;
+    }
+    if (!inPass[pass->output.index()]) {
+      return false;
+    }
+  } else {
+    bool containsNoise = false;
+    for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+      containsNoise |= graph.nodeAt(AOTNodeID(index))->kind == AOTEffectKind::PerlinNoiseSource;
+    }
+    std::vector<bool> reachable(graph.nodeCount(), !containsNoise);
+    if (containsNoise && !CollectReachableNodes(graph, graph.root(), &reachable)) {
+      return false;
+    }
+    for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+      inPass[index] = reachable[index];
+    }
   }
-  std::vector<bool> reachable(graph.nodeCount(), !containsNoise);
-  if (containsNoise && !CollectReachableNodes(graph, graph.root(), &reachable)) {
-    return false;
-  }
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
-    if (reachable[index] && !TraitsOf(graph.nodeAt(AOTNodeID(index))->kind).chainFusable) {
+    if (inPass[index] && !TraitsOf(graph.nodeAt(AOTNodeID(index))->kind).chainFusable) {
       return false;
     }
   }
-  std::vector<uint32_t> passNodes = {};
-  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
-    auto node = graph.nodeAt(AOTNodeID(index));
-    if (reachable[index] && !TraitsOf(node->kind).isInputDesignator()) {
-      passNodes.push_back(index);
-    }
-  }
 
-  // The merged node space: the color graph's nodes, then the merged coverage graph's — the same
-  // space the slot pipeline's schedule merges, so node indices mean the same thing on both routes.
+  // The merged coverage terms: one graph over one geometry-coverage unit, the analytic links
+  // chained onto it and the mask fact reported for the binding table's mask slot.
   ChainCoverageGraph coverage = {};
-  const AOTEffectGraph* coverageGraph = nullptr;
   if (!ir.coverage.empty()) {
     if (!MergeCoverageTerms(ir.coverage, &coverage)) {
       return false;
     }
-    coverageGraph = &coverage.graph;
   }
   const size_t colorCount = graph.nodeCount();
-  const size_t covCount = coverageGraph != nullptr ? coverageGraph->nodeCount() : 0;
-  if (coverageGraph != nullptr && coverage.coverageRoot.isValid() &&
-      coverage.coverageRoot.index() >= covCount) {
+  const size_t covCount = coverage.graph.nodeCount();
+  if (coverage.coverageRoot.isValid() && coverage.coverageRoot.index() >= covCount) {
     return false;
   }
+
+  // The merged node space: the color graph's nodes, then the merged coverage graph's — the same
+  // space the schedule order derives, so node indices mean the same thing everywhere.
   std::vector<const AOTEffectNode*> nodes = {};
   nodes.reserve(colorCount + covCount);
   for (size_t index = 0; index < colorCount; ++index) {
@@ -930,7 +988,7 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
     nodes.push_back(node);
   }
   for (size_t index = 0; index < covCount; ++index) {
-    auto* node = coverageGraph->nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
+    auto* node = coverage.graph.nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
     if (node == nullptr) {
       return false;
     }
@@ -938,10 +996,10 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
   }
   const size_t nodeTotal = nodes.size();
 
-  // The instruction order the slot pipeline's schedule derives: texture leaves first (color pass,
-  // then coverage subtree — a leaf-owning slot must sit exactly where its leaf record starts), then
-  // the remaining nodes in index order. A computed-input texture occupies both phases: a raw
-  // sampling slot in the leading block and the modulate instruction in the op phase.
+  // The instruction order: texture leaves first (color pass, then coverage subtree — a leaf-owning
+  // site must sit exactly where its leaf record starts), then the remaining nodes in index order. A
+  // computed-input texture occupies both phases: a raw sampling site in the leading block and the
+  // modulate instruction in the op phase.
   std::vector<size_t> slotOf(nodeTotal, SIZE_MAX);
   std::vector<size_t> rawSlotOf(nodeTotal, SIZE_MAX);
   std::vector<size_t> ordered = {};
@@ -975,8 +1033,10 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
     }
   };
   for (bool texturePhase : {true, false}) {
-    for (auto nodeIndex : passNodes) {
-      collectNode(nodeIndex, texturePhase);
+    for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+      if (inPass[index]) {
+        collectNode(index, texturePhase);
+      }
     }
     for (size_t index = 1; index < covCount; ++index) {
       auto kind = nodes[colorCount + index]->kind;
@@ -990,15 +1050,15 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
     return false;
   }
 
-  // The per-kind structure the slot encoders produce, spelled straight onto the walk's sites: the
-  // operator, the mapped input designators and the selector's small values. Parameter values ride
-  // the upload-time readers, so nothing here copies them.
-  std::vector<ChainCallSite> sites(ordered.size());
+  // The per-kind structure, spelled straight onto the layout's sites: the operator, the mapped
+  // input designators and the selector's small values. Parameter values ride the upload-time
+  // readers, so nothing here copies them.
+  std::vector<AOTChainCallSite> sites(ordered.size());
   bool hasGradient = false;
-  bool hasLutGradient = false;
   bool noiseSeen = false;
-  size_t leafCount = 0;
   bool hasShaderTiledLeaf = false;
+  size_t colorSpaceXformCount = 0;
+  layout->coordSourceMask = coverage.coverageLeafFromUVCoord ? 0u : ~0u;
   const auto mapInput = [&](size_t inputBase, AOTNodeID input) {
     auto* node = nodes[inputBase + input.index()];
     auto designator = static_cast<int>(TraitsOf(node->kind).designator);
@@ -1017,7 +1077,8 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
         return false;
       }
     }
-    ChainCallSite& site = sites[index];
+    AOTChainCallSite& site = sites[index];
+    site.node = node;
     switch (node->kind) {
       case AOTEffectKind::TextureSource: {
         auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
@@ -1032,7 +1093,9 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
             return false;
           }
           site.op = ChainISA::YUV;
-          leafCount += 3;
+          layout->leafNodes.push_back(node);
+          layout->leafNodes.push_back(node);
+          layout->leafNodes.push_back(node);
           break;
         }
         if (!IsChainTextureLeaf(*parameters)) {
@@ -1080,13 +1143,24 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
           site.textureFlags = modulate | (alphaOnly << 1) | (modulateUnit << 2) |
                               (modulateGeometryRGB << 3) | (modulateFullInput << 4);
         }
+        if (coverage.coverageLeafFromUVCoord && inputBase != 0) {
+          // Atlas text: the coverage leaf sources its coordinates from the maskCoord attribute
+          // (the uvCoord slot), while color leaves and gradients keep the position source.
+          layout->coordSourceMask |= 1u << static_cast<uint32_t>(layout->leafNodes.size());
+        }
         if (HasShaderTiling(*parameters)) {
           hasShaderTiledLeaf = true;
+          ++layout->tiledRecipeCount;
         }
-        if (parameters->samplingKind == AOTTextureSamplingKind::Device && inputBase != 0) {
-          return false;
+        if (parameters->samplingKind == AOTTextureSamplingKind::Device) {
+          // Every color leaf may sample in device space through its own coordinate matrix; a
+          // device-space coverage texture becomes the mask child instead.
+          if (inputBase != 0) {
+            return false;
+          }
+          layout->deviceLeafIndices.push_back(static_cast<int>(layout->leafNodes.size()));
         }
-        ++leafCount;
+        layout->leafNodes.push_back(node);
         break;
       }
       case AOTEffectKind::PerlinNoiseSource: {
@@ -1096,6 +1170,7 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
           return false;
         }
         noiseSeen = true;
+        layout->noise = parameters;
         site.op = ChainISA::PerlinNoise;
         break;
       }
@@ -1116,14 +1191,18 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
         if (node->inputs.size() != 1) {
           return false;
         }
-        // The shared kind-to-op mapping and parameter admission, the same definition the YUV tail
-        // consumes (BuildPointwiseSlot); only the op and the checks matter here — the values ride
-        // the upload-time readers.
-        AOTChainSlot slot = {};
-        if (!BuildPointwiseSlot(graph, node, &slot)) {
+        // The color-space parameters are one shared chain-wide block, so at most one transform
+        // per pass (the same single-block budget the variant derivation reads).
+        if (node->kind == AOTEffectKind::ColorSpaceXform &&
+            ++colorSpaceXformCount > MaxChainColorSpaceXformSlots) {
           return false;
         }
-        site.op = static_cast<int>(slot.op);
+        // The shared kind-to-op mapping and parameter admission, the same definition the walk
+        // consumes; only the op and the checks matter here — the values ride the upload-time
+        // readers off the node.
+        if (!BuildPointwiseSlot(graph, node, &site.op)) {
+          return false;
+        }
         site.in0 = mapInput(inputBase, node->inputs[0]);
         break;
       }
@@ -1194,7 +1273,7 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
           if (parameters->lutProxy == nullptr) {
             return false;
           }
-          hasLutGradient = true;
+          layout->lutGradient = parameters;
         }
         site.op = ChainISA::Gradient;
         site.in0 = mapInput(inputBase, node->inputs[0]);
@@ -1215,31 +1294,32 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
       return false;
     }
   }
-  // Shader-tiled leaves need the tiling module's runtime loops, which the pack does not spell.
+  // Shader-tiled leaves need the tiling module's runtime loops, which the assembled text does not
+  // spell.
   if (hasShaderTiledLeaf) {
     return false;
   }
-  // The successful shapes' cross-node constraints the slot pipeline's profile resolution enforces:
-  // a LUT gradient shares the leaf budget with at most one leaf, and the noise family's budgets
-  // cover two leaves beside its own lookup tables, no gradient and no atlas glyph.
-  if ((hasLutGradient && leafCount >= 2) ||
+  // The successful shapes' cross-node constraints: a LUT gradient shares the leaf budget with at
+  // most one leaf, and the noise family's budgets cover two leaves beside its own lookup tables,
+  // no gradient and no atlas glyph.
+  const size_t leafCount = layout->leafNodes.size();
+  if ((layout->lutGradient != nullptr && leafCount >= 2) ||
       (noiseSeen && (hasGradient || leafCount > 2 || coverage.coverageLeafFromUVCoord))) {
     return false;
   }
 
-  // The coverage subtree's root slot, derived the way the encode stage derives it: the subtree's
-  // root names the register the tail's final-coverage expression reads, and the atlas glyph — true
-  // coverage for an alpha-only atlas — reroutes through the clip-coverage channel instead. The
-  // analytic clip links chain onto the clip channel in chain order, each link consuming the
-  // previous one's slot.
-  const size_t rootIndex = slotOf[graph.root().index()];
+  // The coverage subtree's root slot: the subtree's root names the register the tail's
+  // final-coverage expression reads, and the atlas glyph — true coverage for an alpha-only atlas —
+  // reroutes through the clip-coverage channel instead. The analytic clip links chain onto the clip
+  // channel in chain order, each link consuming the previous one's slot.
+  const size_t rootIndex = slotOf[(pass != nullptr ? pass->output : graph.root()).index()];
   if (rootIndex == SIZE_MAX) {
     return false;
   }
   int coverageRootSlot = -1;
   int clipCoverageSlot = -1;
   int clipChainInput = -4;
-  if (coverageGraph != nullptr && coverage.coverageRoot.isValid()) {
+  if (covCount != 0 && coverage.coverageRoot.isValid()) {
     const size_t covRootCombined = colorCount + coverage.coverageRoot.index();
     auto* covRootNode = nodes[covRootCombined];
     const bool rootIsBlend = covRootNode->kind == AOTEffectKind::Blend;
@@ -1307,34 +1387,70 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
     clipCoverageSlot = static_cast<int>(slot);
   }
 
-  // The register assignment: the same last-use recycler the slot pipeline runs, over the same
-  // instruction inputs and the same three out-of-loop roots, after which every input edge holds
-  // either a designator or a result register.
-  std::vector<std::vector<int>> instructionInputs(sites.size());
-  for (size_t index = 0; index < sites.size(); ++index) {
-    for (int input : {sites[index].in0, sites[index].in1}) {
+  layout->nodes = std::move(nodes);
+  layout->colorCount = colorCount;
+  layout->covCount = covCount;
+  layout->slotOf = std::move(slotOf);
+  layout->rawSlotOf = std::move(rawSlotOf);
+  layout->ordered = std::move(ordered);
+  layout->sites = std::move(sites);
+  layout->rootIndex = rootIndex;
+  layout->coverageRootSlot = coverageRootSlot;
+  layout->clipCoverageSlot = clipCoverageSlot;
+  layout->instructionCount = layout->ordered.size();
+  layout->coverage = std::move(coverage);
+  layout->coverageGraph =
+      layout->coverage.graph.nodeCount() == 0 ? nullptr : &layout->coverage.graph;
+  return true;
+}
+
+bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Family& family,
+                               const Variant& variant, const PrecompiledShaderCache* cache,
+                               ChainProgramPlan* plan) {
+  if (cache == nullptr || plan == nullptr) {
+    return false;
+  }
+  // The rect-geometry slice: the stored variant texts the assembler splices are the rect
+  // layouts' own, so the other geometry modules' variants keep their runtime paths.
+  if (variant.geometry != 0) {
+    return false;
+  }
+  AOTChainGraphLayout layout = {};
+  if (!LayoutChainGraph(ir, nullptr, &layout)) {
+    return false;
+  }
+
+  // The register assignment: the last-use recycler over the instruction inputs and the three
+  // out-of-loop roots, after which every input edge holds either a designator or a result
+  // register.
+  std::vector<std::vector<int>> instructionInputs(layout.sites.size());
+  for (size_t index = 0; index < layout.sites.size(); ++index) {
+    for (int input : {layout.sites[index].in0, layout.sites[index].in1}) {
       if (input >= 0) {
         instructionInputs[index].push_back(input);
       }
     }
   }
   AOTChainRegisterAssignment assignment = {};
-  if (!AllocateChainRegisters(instructionInputs, static_cast<int>(rootIndex), coverageRootSlot,
-                              clipCoverageSlot, MaxChainRegisters, &assignment)) {
+  if (!AllocateChainRegisters(instructionInputs, static_cast<int>(layout.rootIndex),
+                              layout.coverageRootSlot, layout.clipCoverageSlot, MaxChainRegisters,
+                              &assignment)) {
     return false;
   }
-  for (size_t index = 0; index < sites.size(); ++index) {
-    if (sites[index].in0 >= 0) {
-      sites[index].in0 = assignment.outRegister[static_cast<size_t>(sites[index].in0)];
+  for (size_t index = 0; index < layout.sites.size(); ++index) {
+    if (layout.sites[index].in0 >= 0) {
+      layout.sites[index].in0 =
+          assignment.outRegister[static_cast<size_t>(layout.sites[index].in0)];
     }
-    if (sites[index].in1 >= 0) {
-      sites[index].in1 = assignment.outRegister[static_cast<size_t>(sites[index].in1)];
+    if (layout.sites[index].in1 >= 0) {
+      layout.sites[index].in1 =
+          assignment.outRegister[static_cast<size_t>(layout.sites[index].in1)];
     }
-    sites[index].outRegister = assignment.outRegister[index];
+    layout.sites[index].outRegister = assignment.outRegister[index];
   }
 
   ChainWalkFrame frame = {};
-  frame.sites = std::move(sites);
+  frame.sites = std::move(layout.sites);
   frame.rootRegister = assignment.rootRegister;
   frame.coverageRootRegister = assignment.coverageRootRegister;
   frame.clipCoverageRegister = assignment.clipCoverageRegister;
@@ -1342,250 +1458,32 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
   return WalkChainProgram(frame, family, variant, plan);
 }
 
-namespace {
-
-// The parity check's field-by-field comparison: the first differing field names itself (with the
-// index it sits at), so the log line points at the drift instead of a bare inequality.
-bool ChainProgramPlansEqual(const ChainProgramPlan& expected, const ChainProgramPlan& actual,
-                            std::string* firstDifference) {
-  const auto differ = [&](const std::string& field) {
-    *firstDifference = field;
-    return false;
-  };
-  if (expected.calls.size() != actual.calls.size()) {
-    return differ("calls.size");
-  }
-  for (size_t index = 0; index < expected.calls.size(); ++index) {
-    const auto& expectedCall = expected.calls[index];
-    const auto& actualCall = actual.calls[index];
-    if (expectedCall.op != actualCall.op) {
-      return differ("calls[" + std::to_string(index) + "].op");
-    }
-    if (expectedCall.outRegister != actualCall.outRegister) {
-      return differ("calls[" + std::to_string(index) + "].outRegister");
-    }
-    if (expectedCall.multiplyInputAlpha != actualCall.multiplyInputAlpha) {
-      return differ("calls[" + std::to_string(index) + "].multiplyInputAlpha");
-    }
-    if (expectedCall.args.size() != actualCall.args.size()) {
-      return differ("calls[" + std::to_string(index) + "].args.size");
-    }
-    for (size_t arg = 0; arg < expectedCall.args.size(); ++arg) {
-      if (expectedCall.args[arg].kind != actualCall.args[arg].kind) {
-        return differ("calls[" + std::to_string(index) + "].args[" + std::to_string(arg) +
-                      "].kind");
-      }
-      if (expectedCall.args[arg].index != actualCall.args[arg].index) {
-        return differ("calls[" + std::to_string(index) + "].args[" + std::to_string(arg) +
-                      "].index");
-      }
+void AppendChainPlanKey(const ChainProgramPlan& plan, BytesKey* key) {
+  // The calls in instruction order are the text's direct input: the operators, their argument
+  // structure and the result registers spell the body, and the declaration tables are the calls'
+  // closure over the variant (which the key already separates). The epilogue registers and the
+  // interface facts follow, so a plan field the printer reads cannot miss from the key.
+  key->write(static_cast<uint32_t>(plan.calls.size()));
+  for (const auto& call : plan.calls) {
+    key->write(static_cast<uint32_t>(call.op));
+    key->write(static_cast<uint32_t>(call.outRegister));
+    key->write(call.multiplyInputAlpha ? 1u : 0u);
+    key->write(static_cast<uint32_t>(call.args.size()));
+    for (const auto& arg : call.args) {
+      key->write(static_cast<uint32_t>(arg.kind));
+      key->write(static_cast<uint32_t>(arg.index));
     }
   }
-  if (expected.uniforms.size() != actual.uniforms.size()) {
-    return differ("uniforms.size");
-  }
-  for (size_t index = 0; index < expected.uniforms.size(); ++index) {
-    const auto& expectedMember = expected.uniforms[index];
-    const auto& actualMember = actual.uniforms[index];
-    if (expectedMember.name != actualMember.name) {
-      return differ("uniforms[" + std::to_string(index) + "].name");
-    }
-    if (expectedMember.type != actualMember.type) {
-      return differ("uniforms[" + std::to_string(index) + "].type");
-    }
-    if (expectedMember.count != actualMember.count) {
-      return differ("uniforms[" + std::to_string(index) + "].count");
-    }
-    if (expectedMember.source != actualMember.source) {
-      return differ("uniforms[" + std::to_string(index) + "].source");
-    }
-    if (expectedMember.slot != actualMember.slot) {
-      return differ("uniforms[" + std::to_string(index) + "].slot");
-    }
-    if (expectedMember.index != actualMember.index) {
-      return differ("uniforms[" + std::to_string(index) + "].index");
-    }
-    if (expectedMember.offset != actualMember.offset) {
-      return differ("uniforms[" + std::to_string(index) + "].offset");
-    }
-    if (expectedMember.size != actualMember.size) {
-      return differ("uniforms[" + std::to_string(index) + "].size");
-    }
-  }
-  if (expected.varyings.size() != actual.varyings.size()) {
-    return differ("varyings.size");
-  }
-  for (size_t index = 0; index < expected.varyings.size(); ++index) {
-    if (expected.varyings[index].name != actual.varyings[index].name) {
-      return differ("varyings[" + std::to_string(index) + "].name");
-    }
-    if (expected.varyings[index].type != actual.varyings[index].type) {
-      return differ("varyings[" + std::to_string(index) + "].type");
-    }
-  }
-  if (expected.samplers.size() != actual.samplers.size()) {
-    return differ("samplers.size");
-  }
-  for (size_t index = 0; index < expected.samplers.size(); ++index) {
-    if (expected.samplers[index].name != actual.samplers[index].name) {
-      return differ("samplers[" + std::to_string(index) + "].name");
-    }
-    if (expected.samplers[index].source != actual.samplers[index].source) {
-      return differ("samplers[" + std::to_string(index) + "].source");
-    }
-    if (expected.samplers[index].index != actual.samplers[index].index) {
-      return differ("samplers[" + std::to_string(index) + "].index");
-    }
-  }
-  if (expected.geomColorUsed != actual.geomColorUsed) {
-    return differ("geomColorUsed");
-  }
-  if (expected.opaqueColorUsed != actual.opaqueColorUsed) {
-    return differ("opaqueColorUsed");
-  }
-  if (expected.unitCoverageUsed != actual.unitCoverageUsed) {
-    return differ("unitCoverageUsed");
-  }
-  if (expected.needsSourceCoords != actual.needsSourceCoords) {
-    return differ("needsSourceCoords");
-  }
-  if (expected.hasColorVarying != actual.hasColorVarying) {
-    return differ("hasColorVarying");
-  }
-  if (expected.hasSubset != actual.hasSubset) {
-    return differ("hasSubset");
-  }
-  if (expected.hasLeafSamplers != actual.hasLeafSamplers) {
-    return differ("hasLeafSamplers");
-  }
-  if (expected.hasMaskSampler != actual.hasMaskSampler) {
-    return differ("hasMaskSampler");
-  }
-  if (expected.gradientLutForm != actual.gradientLutForm) {
-    return differ("gradientLutForm");
-  }
-  if (expected.hasXp != actual.hasXp) {
-    return differ("hasXp");
-  }
-  if (expected.rootRegister != actual.rootRegister) {
-    return differ("rootRegister");
-  }
-  if (expected.clipCoverageRegister != actual.clipCoverageRegister) {
-    return differ("clipCoverageRegister");
-  }
-  if (expected.coverageRootRegister != actual.coverageRootRegister) {
-    return differ("coverageRootRegister");
-  }
-  if (expected.xpNeedsBlendPass != actual.xpNeedsBlendPass) {
-    return differ("xpNeedsBlendPass");
-  }
-  if (expected.leafSlots != actual.leafSlots) {
-    return differ("leafSlots");
-  }
-  if (expected.usedOps != actual.usedOps) {
-    return differ("usedOps");
-  }
-  if (expected.bindings.vertex.size() != actual.bindings.vertex.size()) {
-    return differ("bindings.vertex.size");
-  }
-  for (size_t index = 0; index < expected.bindings.vertex.size(); ++index) {
-    const auto& expectedBinding = expected.bindings.vertex[index];
-    const auto& actualBinding = actual.bindings.vertex[index];
-    if (expectedBinding.source != actualBinding.source) {
-      return differ("bindings.vertex[" + std::to_string(index) + "].source");
-    }
-    if (expectedBinding.slot != actualBinding.slot) {
-      return differ("bindings.vertex[" + std::to_string(index) + "].slot");
-    }
-    if (expectedBinding.index != actualBinding.index) {
-      return differ("bindings.vertex[" + std::to_string(index) + "].index");
-    }
-    if (expectedBinding.offset != actualBinding.offset) {
-      return differ("bindings.vertex[" + std::to_string(index) + "].offset");
-    }
-    if (expectedBinding.size != actualBinding.size) {
-      return differ("bindings.vertex[" + std::to_string(index) + "].size");
-    }
-  }
-  if (expected.bindings.fragment.size() != actual.bindings.fragment.size()) {
-    return differ("bindings.fragment.size");
-  }
-  for (size_t index = 0; index < expected.bindings.fragment.size(); ++index) {
-    const auto& expectedBinding = expected.bindings.fragment[index];
-    const auto& actualBinding = actual.bindings.fragment[index];
-    if (expectedBinding.source != actualBinding.source) {
-      return differ("bindings.fragment[" + std::to_string(index) + "].source");
-    }
-    if (expectedBinding.slot != actualBinding.slot) {
-      return differ("bindings.fragment[" + std::to_string(index) + "].slot");
-    }
-    if (expectedBinding.index != actualBinding.index) {
-      return differ("bindings.fragment[" + std::to_string(index) + "].index");
-    }
-    if (expectedBinding.offset != actualBinding.offset) {
-      return differ("bindings.fragment[" + std::to_string(index) + "].offset");
-    }
-    if (expectedBinding.size != actualBinding.size) {
-      return differ("bindings.fragment[" + std::to_string(index) + "].size");
-    }
-  }
-  if (expected.bindings.samplers.size() != actual.bindings.samplers.size()) {
-    return differ("bindings.samplers.size");
-  }
-  for (size_t index = 0; index < expected.bindings.samplers.size(); ++index) {
-    if (expected.bindings.samplers[index].name != actual.bindings.samplers[index].name) {
-      return differ("bindings.samplers[" + std::to_string(index) + "].name");
-    }
-    if (expected.bindings.samplers[index].source != actual.bindings.samplers[index].source) {
-      return differ("bindings.samplers[" + std::to_string(index) + "].source");
-    }
-    if (expected.bindings.samplers[index].index != actual.bindings.samplers[index].index) {
-      return differ("bindings.samplers[" + std::to_string(index) + "].index");
-    }
-  }
-  if (expected.bindings.leafVaryings != actual.bindings.leafVaryings) {
-    return differ("bindings.leafVaryings");
-  }
-  if (expected.bindings.needsSourceCoords != actual.bindings.needsSourceCoords) {
-    return differ("bindings.needsSourceCoords");
-  }
-  if (expected.bindings.leafTransformShift != actual.bindings.leafTransformShift) {
-    return differ("bindings.leafTransformShift");
-  }
-  if (expected.bindings.fragmentBlockSize != actual.bindings.fragmentBlockSize) {
-    return differ("bindings.fragmentBlockSize");
-  }
-  return true;
-}
-
-}  // namespace
-
-void CheckChainProgramPlanParity(const ChainComposition& composition, const DrawIR& ir,
-                                 bool xpNeedsBlendPass, const Family& family,
-                                 const Variant& variant, const PrecompiledShaderCache* cache) {
-  // How many draws the two planners disagreed on. Non-zero is a route-drift signal, not a
-  // statistic to tolerate; debug builds assert on the first disagreement.
-  static std::atomic<uint64_t> failures = {0};
-  ChainProgramPlan slotPlan = {};
-  ChainProgramPlan graphPlan = {};
-  const bool slotOk = PlanChainProgram(composition, family, variant, cache, &slotPlan);
-  const bool graphOk =
-      PlanChainProgramFromGraph(ir, xpNeedsBlendPass, family, variant, cache, &graphPlan);
-  if (!slotOk || !graphOk) {
-    const auto count = failures.fetch_add(1, std::memory_order_relaxed) + 1;
-    LOGE("ChainPlanParity: route disagreement #%llu for variant %u: slot route %s, graph route %s",
-         static_cast<unsigned long long>(count), variant.id(), slotOk ? "succeeded" : "declined",
-         graphOk ? "succeeded" : "declined");
-    DEBUG_ASSERT(false);
-    return;
-  }
-  std::string difference = {};
-  if (!ChainProgramPlansEqual(slotPlan, graphPlan, &difference)) {
-    const auto count = failures.fetch_add(1, std::memory_order_relaxed) + 1;
-    LOGE("ChainPlanParity: plan mismatch #%llu for variant %u at %s (%zu vs %zu calls)",
-         static_cast<unsigned long long>(count), variant.id(), difference.c_str(),
-         slotPlan.calls.size(), graphPlan.calls.size());
-    DEBUG_ASSERT(false);
+  key->write(static_cast<uint32_t>(plan.rootRegister));
+  key->write(static_cast<uint32_t>(plan.clipCoverageRegister));
+  key->write(static_cast<uint32_t>(plan.coverageRootRegister));
+  key->write(static_cast<uint32_t>(plan.hasXp));
+  key->write(plan.xpNeedsBlendPass ? 1u : 0u);
+  key->write(plan.gradientLutForm ? 1u : 0u);
+  key->write(plan.hasMaskSampler ? 1u : 0u);
+  key->write(static_cast<uint32_t>(plan.leafSlots.size()));
+  for (int leaf : plan.leafSlots) {
+    key->write(static_cast<uint32_t>(leaf));
   }
 }
 

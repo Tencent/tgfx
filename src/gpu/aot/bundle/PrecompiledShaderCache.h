@@ -539,4 +539,13 @@ class PrecompiledShaderCache {
   AOTDrawStats _drawStats = {};
 };
 
+/// Whether the assembled chain route is active for a profile. The default is per profile: a
+/// profile joins the list only once its assembled run matches its previous run (same failure
+/// set, no crash). TGFX_ASSEMBLED_CHAIN forces every profile on and TGFX_NO_ASSEMBLED_CHAIN
+/// forces every profile off, so a profile that is not listed stays reachable for the work that
+/// unlocks it. The Chain family's matcher consults this too: with the interpreter retired, a
+/// profile without the assembled route has no chain service at all and its chain draws keep the
+/// runtime path.
+bool AssembledChainEnabledForProfile(const std::string& profileTag);
+
 }  // namespace tgfx

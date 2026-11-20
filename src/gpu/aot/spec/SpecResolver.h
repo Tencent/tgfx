@@ -26,34 +26,9 @@
 
 namespace tgfx {
 
-class PrecompiledShaderCache;
-class ProgramInfo;
-struct AOTProgram;
-
 /// The variant's specialization table, derived from its declaration: the same order, names and id
-/// assignment the assembler declares them with, so the injector addresses the constants without
-/// reading the bundle's table.
+/// assignment the assembler declares them with.
 std::vector<SpecFieldInfo> DeriveSpecFieldInfos(const Variant& variant);
-
-/// The one entry point for "can this draw specialize, and with which values". Both routes (the
-/// plain processor-tree route and the pass-IR route) call it, so the enable switch, the format
-/// gate and the capture live in one place: the two routes cannot drift into one specializing
-/// while the other serves the generic form for the same variant.
-class SpecResolver {
- public:
-  /**
-   * Resolves the specialization values of one draw.
-   * @param cache     The artifact store that owns the enable switch and the capture accounting.
-   * @param backend   The backend whose injector decides whether the values are consumable.
-   * @param variant   The matched variant; its declaration derives the spec table.
-   * @param chain     The interpreter program the match compiled (null for the declared families):
-   *                  the values are read out of it.
-   * @return          The values in spec-table order (the master switch first), or an empty set
-   *                  when the draw serves the generic form.
-   */
-  static SpecValues Resolve(PrecompiledShaderCache* cache, Backend backend, const Variant& variant,
-                            const AOTProgram* chain, bool needsBlendMath);
-};
 
 /// The code format a backend's payload arrives in. The backend picks the dialect and the bundle
 /// header says whether that dialect arrives as driver source text or as a precompiled container;

@@ -35,6 +35,7 @@
 #include "gpu/aot/bundle/EmbeddedShaderBundles.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
+#include "gpu/aot/chain/AOTChainInternal.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/select/FamilyMatch.h"
@@ -184,90 +185,93 @@ TGFX_TEST(ShaderPermutationTest, ProgramMatchRejectsOverBudgetWithoutFailureSink
   ASSERT_NE(renderTargetProxy, nullptr);
   auto renderTarget = renderTargetProxy->getRenderTarget();
   ASSERT_NE(renderTarget, nullptr);
-  BlockAllocator allocator;
   auto gp = MakeSingleIntervalGeometry(0, false);
-  AOTProgram program = {};
-  AOTChainSlot gradientSlot = {};
-  gradientSlot.op = AOTChainOp::Gradient;
-  program.slots.push_back(gradientSlot);
-  program.slots.push_back(gradientSlot);
+  // Two gradient sources exceed the one-gradient budget: the graph build refuses the expression,
+  // so the shape has no program and no declared variant.
+  AOTNodeBuilder builder = {};
+  AOTNodeID geometry = AOTNodeID::Invalid();
+  ASSERT_TRUE(builder.addGeometryColor(&geometry));
+  AOTNodeID texture = AOTNodeID::Invalid();
+  AOTTextureParameters textureParameters = {};
+  textureParameters.textureProxy =
+      context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::RGBA_8888);
+  ASSERT_NE(textureParameters.textureProxy, nullptr);
+  ASSERT_TRUE(builder.addTextureSource(geometry, textureParameters, &texture));
+  AOTGradientParameters gradientParameters = {};
+  gradientParameters.colorizerKind = 0;
+  AOTNodeID firstGradient = AOTNodeID::Invalid();
+  AOTNodeID secondGradient = AOTNodeID::Invalid();
+  ASSERT_TRUE(builder.addGradientSource(texture, gradientParameters, &firstGradient));
+  ASSERT_TRUE(builder.addGradientSource(firstGradient, gradientParameters, &secondGradient));
+  DrawIR ir = {};
+  ASSERT_TRUE(builder.finish(secondGradient, &ir.color));
   ProgramInfo programInfo(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, false);
-  // Two gradient slots exceed the one-gradient budget: the shape has no declared variant.
-  EXPECT_FALSE(MatchChainVariant(program, &programInfo).has_value());
+  programInfo.setCarriedIR(&ir);
+  EXPECT_EQ(AOTChainBuilder::ResolveChainProgram(&programInfo), nullptr);
+  EXPECT_FALSE(MatchChainProgram(&programInfo).has_value());
 }
 
 TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
-  auto* cache = ContextCacheAccess::Cache(context);
-  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
   ASSERT_NE(renderTargetProxy, nullptr);
   auto renderTarget = renderTargetProxy->getRenderTarget();
   ASSERT_NE(renderTarget, nullptr);
   for (int lutLeaf = 0; lutLeaf < 4; ++lutLeaf) {
     SCOPED_TRACE(lutLeaf);
-    BlockAllocator allocator;
-    std::vector<std::shared_ptr<TextureProxy>> leafProxies;
-    std::vector<AOTChainSlot> slots(static_cast<size_t>(lutLeaf) + 1);
-    for (int index = 0; index < lutLeaf; ++index) {
-      auto proxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::RGBA_8888);
-      ASSERT_NE(proxy, nullptr);
-      leafProxies.push_back(proxy);
-      slots[static_cast<size_t>(index)].op = AOTChainOp::Texture;
-      slots[static_cast<size_t>(index)].outRegister = index;
-    }
     auto lutProxy = context->proxyProvider()->createTextureProxy({}, 8, 1, PixelFormat::RGBA_8888);
     ASSERT_NE(lutProxy, nullptr);
     auto maskProxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::ALPHA_8);
     ASSERT_NE(maskProxy, nullptr);
-    auto& gradient = slots.back();
-    gradient.op = AOTChainOp::Gradient;
-    gradient.in0 = -1;
-    gradient.outRegister = lutLeaf;
-    gradient.gradient.colorizerKind = 3;
-    gradient.gradient.lutProxy = lutProxy;
-    gradient.gradient.coordMatrix = Matrix::MakeTrans(4, 6);
+    // The graph the build compiles: the geometry color feeding lutLeaf plain leaves and a LUT
+    // gradient (colorizerKind 3) on top, with a device-space mask as the draw's coverage term.
+    AOTNodeBuilder builder = {};
+    AOTNodeID geometry = AOTNodeID::Invalid();
+    ASSERT_TRUE(builder.addGeometryColor(&geometry));
+    AOTNodeID input = geometry;
+    for (int index = 0; index < lutLeaf; ++index) {
+      AOTTextureParameters leafParameters = {};
+      leafParameters.textureProxy =
+          context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::RGBA_8888);
+      ASSERT_NE(leafParameters.textureProxy, nullptr);
+      AOTNodeID leaf = AOTNodeID::Invalid();
+      ASSERT_TRUE(builder.addTextureSource(input, leafParameters, &leaf));
+      input = leaf;
+    }
+    AOTGradientParameters gradientParameters = {};
+    gradientParameters.colorizerKind = 3;
+    gradientParameters.lutProxy = lutProxy;
+    gradientParameters.coordMatrix = Matrix::MakeTrans(4, 6);
+    AOTNodeID gradient = AOTNodeID::Invalid();
+    ASSERT_TRUE(builder.addGradientSource(input, gradientParameters, &gradient));
+    DrawIR ir = {};
+    ASSERT_TRUE(builder.finish(gradient, &ir.color));
+    AOTCoverageTerm maskTerm = {};
+    maskTerm.kind = AOTCoverageTermKind::DeviceMask;
+    maskTerm.mask.textureProxy = maskProxy;
+    ir.coverage.push_back(maskTerm);
     AOTProgram program = {};
-    program.slots = slots;
-    program.rootRegister = static_cast<size_t>(lutLeaf);
-    program.lutLeafIndex = lutLeaf;
-    program.hasMaskTexture = true;
-    for (const auto& proxy : leafProxies) {
-      program.bindings.push_back({AOTBinding::Kind::Leaf, proxy, {}, Matrix::I(), {}});
-    }
-    program.bindings.push_back({AOTBinding::Kind::Lut, lutProxy, {}, Matrix::I(), {}});
-    while (program.bindings.size() < 4) {
-      program.bindings.push_back({AOTBinding::Kind::Padding, lutProxy, {}, Matrix::I(), {}});
-    }
-    program.bindings.push_back({AOTBinding::Kind::Mask, maskProxy, {}, Matrix::I(), {}});
-    program.samplerChildCount = 4;
-    // The admission the compile runs on the same data: an Automatic profile resolves onto the
-    // gradient-carrying extended kind, and the slot rules accept the layout.
-    AOTResourceProfile profile = AOTResourceProfile::Automatic;
-    std::vector<int> tiledLeafIndices = {};
-    ASSERT_TRUE(AOTChainBuilder::ValidateSlots(
-        program.slots, program.rootRegister, program.coverageRootRegister,
-        program.clipCoverageRegister, leafProxies.size(), true, tiledLeafIndices, &profile));
-    program.profile = profile;
+    ASSERT_TRUE(BuildChainProgram(ir, nullptr, &program));
+    // The Automatic profile resolves onto the gradient-carrying extended kind.
     EXPECT_EQ(program.profile, AOTResourceProfile::TiledGraph);
     EXPECT_EQ(program.lutLeafIndex, lutLeaf);
     EXPECT_TRUE(program.hasMaskTexture);
     EXPECT_EQ(program.samplerChildCount, 4u);
-    auto transforms = BuildChainCoordTransforms(program);
+    auto transforms = BuildChainCoordTransforms(ir, program);
     // The chain-wide gradient matrix first, then one per sampler-binding child (the real device
     // mask contributes none).
     ASSERT_EQ(transforms.size(), 1u + program.bindings.size() - (program.hasMaskTexture ? 1u : 0u));
-    EXPECT_EQ(transforms[0].matrix, gradient.gradient.coordMatrix);
+    EXPECT_EQ(transforms[0].matrix, gradientParameters.coordMatrix);
     EXPECT_EQ(
         program.bindings[static_cast<size_t>(lutLeaf)].textureProxy->getTextureView()->getTexture(),
         lutProxy->getTextureView()->getTexture());
     auto gp = MakeSingleIntervalGeometry(1, true);
     ProgramInfo programInfo(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, false);
-    // The interpreter's own match: a program-holding draw resolves through the variant
-    // derivation, not the family walk (whose dedicated families claim the empty processor list).
-    auto match = MatchChainVariant(program, &programInfo);
+    // The chain's own match: a program-holding draw resolves through the variant derivation, not
+    // the family walk (whose dedicated families claim the empty processor list).
+    auto match = MatchChainVariant(ir, program, &programInfo);
     ASSERT_TRUE(match.has_value());
     // The Chain body's module slot carries PROFILE: 5 is the gradient kind with the four leaf
     // slots (the legacy TEXTURE_COUNT=1 / RESOURCE_KIND=1 cell).

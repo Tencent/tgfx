@@ -19,22 +19,11 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include "gpu/ProgramInfo.h"
-#include "gpu/ProxyProvider.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/chain/AOTChainInternal.h"
-#include "gpu/aot/chain/AOTChainRegisterAllocator.h"
 #include "gpu/aot/chain/AOTShapeRules.h"
-#include "gpu/aot/chain/ChainContext.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/NodeContract.h"
-#include "gpu/processors/ComposeFragmentProcessor.h"
-#include "gpu/processors/ConstColorProcessor.h"
-#include "gpu/processors/DeviceSpaceTextureEffect.h"
-#include "gpu/processors/PerlinNoiseFragmentProcessor.h"
-#include "gpu/processors/RRectEffect.h"
-#include "gpu/processors/RectEffect.h"
-#include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
 
@@ -188,7 +177,9 @@ bool DeriveWholeGraphPass(const AOTEffectGraph& graph, PassIR* pass) {
     return false;
   }
   AOTResourceProfile profile = AOTResourceProfile::Automatic;
-  if (!AOTChainBuilder::FitsChainPlan(graph, result, &profile)) {
+  DrawIR fitIR = {};
+  fitIR.color = graph;
+  if (!ChainProgramFits(fitIR, result, &profile)) {
     return false;
   }
   result.resourceProfile = profile;

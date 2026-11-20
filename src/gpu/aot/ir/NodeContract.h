@@ -23,10 +23,6 @@
 
 namespace tgfx {
 
-struct AOTChainContext;
-struct AOTResourceDemand;
-class UniformData;
-
 /// The chain input designator a kind maps to when it appears as an op input. None marks every
 /// scheduled kind; the four designator kinds are never slots, and the two roots are never copied.
 enum class AOTDesignator : int {
@@ -57,7 +53,7 @@ struct AOTKindTraits {
   /// are the only kinds excluded; a future non-pointwise kind defaults to false here until its
   /// contract row says otherwise, which keeps it out of fused passes until deliberately admitted.
   bool chainFusable = false;
-  /// The op-input designator the kind maps to (see MapChainInput); None for scheduled kinds.
+  /// The op-input designator the kind maps to; None for scheduled kinds.
   AOTDesignator designator = AOTDesignator::None;
   /// One of the four unary pointwise operators sharing the OP_* ABI values.
   bool unaryPointwise = false;
@@ -68,45 +64,6 @@ struct AOTKindTraits {
     return designator != AOTDesignator::None;
   }
 };
-
-// The contract implementations' signatures. A kind's encoder turns one scheduled node into its
-// chain slot(s) (0..2 — a computed-input texture emits the raw sample plus a modulate, so the
-// kind-to-op mapping is the encoder's business, never the table's); its demand adds the node's
-// resource demand to the tally.
-using AOTNodeEncoder = bool (*)(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-using AOTNodeDemand = void (*)(const AOTEffectNode* node, AOTResourceDemand* demand);
-
-/**
- * One contract row of the expression vocabulary (indexed by AOTEffectKind): the kind's traits,
- * its encoder and its resource demand. A new kind adds one row here, and the directional asserts
- * in NodeContract.cpp fail the build when a fusable kind has no encoder.
- */
-struct AOTNodeContract {
-  AOTKindTraits traits = {};
-  AOTNodeEncoder encode = nullptr;
-  AOTNodeDemand demand = nullptr;
-};
-
-// The per-kind contract implementations the node contract table registers: each encoder turns one
-// scheduled node into its chain slot (0..2 slots — a computed-input texture emits the raw sample
-// and a modulate), and each demand adds the node's resource demand to the profile tally.
-bool EncodeTextureSourceSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodePerlinNoiseSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodeConstColorSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-// Shared by the four unary pointwise kinds (the single pointwise op ABI value picks the math).
-bool EncodeUnaryPointwiseSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodeInputOpaqueSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodeMulAlphaSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodeBlendSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodeRectCoverageSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodeRRectCoverageSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodeGradientSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-
-void DemandTextureSource(const AOTEffectNode* node, AOTResourceDemand* demand);
-void DemandGradientSource(const AOTEffectNode* node, AOTResourceDemand* demand);
-
-/** Returns the contract row of one node kind; the table is the single place its facts live. */
-const AOTNodeContract& NodeContractOf(AOTEffectKind kind);
 
 /** Returns the traits row of one kind; the table is the single place a kind's facts live. */
 const AOTKindTraits& TraitsOf(AOTEffectKind kind);

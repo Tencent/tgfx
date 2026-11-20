@@ -25,6 +25,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/aot/AOTDiagnostics.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
+#include "gpu/aot/chain/AOTChainInternal.h"
 #include "gpu/aot/chain/AOTShapeRules.h"
 #include "gpu/aot/plan/AOTRenderPlan.h"
 #include "gpu/ops/StandardDrawOp.h"
@@ -297,7 +298,7 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
     // The pass program is built here, once, and travels on the IR's chain slot: prepare never
     // compiles.
     AOTProgram passProgram = {};
-    if (!AOTChainBuilder::CompileSegment(passIR, &passProgram)) {
+    if (!BuildChainProgram(passIR, nullptr, &passProgram)) {
       return false;
     }
     passIR.chainProgram = std::move(passProgram);
@@ -339,8 +340,7 @@ static bool BuildPassIRs(Context* context, uint32_t renderFlags, const AOTEffect
     if (terminalCoverage != nullptr) {
       passIR.coverage = *terminalCoverage;
     }
-    if (!AOTChainBuilder::Compile(graph, plan.passes[0], terminalCoverage,
-                                  &passIR.chainProgram.emplace())) {
+    if (!BuildChainProgram(passIR, &plan.passes[0], &passIR.chainProgram.emplace())) {
       return false;
     }
     renderPlan->terminalIR = allocator->make<DrawIR>(std::move(passIR));
@@ -407,11 +407,16 @@ bool AOTPlanner::Validate(const AOTEffectGraph& graph, const Plan& plan,
       pass.materializesOutput) {
     return false;
   }
-  // A single pass fuses the whole DAG. Validation runs the builder's one compile entry with the
-  // plan's terminal coverage: the same slot encoding, parameter blocks, register allocation and
-  // binding table the build runs, so a validated pass is by construction buildable.
+  // A single pass fuses the whole DAG. Validation runs the graph build with the plan's terminal
+  // coverage: the same layout and binding derivation the serving build runs, so a validated pass
+  // is by construction buildable.
+  DrawIR validateIR = {};
+  validateIR.color = graph;
+  if (terminalCoverage != nullptr) {
+    validateIR.coverage = *terminalCoverage;
+  }
   AOTProgram program = {};
-  return AOTChainBuilder::Compile(graph, pass, terminalCoverage, &program);
+  return BuildChainProgram(validateIR, &pass, &program);
 }
 
 bool AOTPlanner::NeedsLocalRemap(const AOTEffectGraph& graph, const Plan& plan) {

@@ -21,6 +21,7 @@
 #include <array>
 #include <cstdint>
 #include "gpu/aot/bind/Binder.h"
+#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/write/ParamBuffer.h"
 #include "gpu/shaders/Module.h"
 

@@ -601,7 +601,7 @@ uint32_t ResolveArg(BodyState* state, const ChainProgramPlan& plan, const ChainA
 
 }  // namespace
 
-bool ChainSPIRVBodySupported(const ChainComposition& composition, const Layout& layout, int hasXp) {
+bool ChainSPIRVBodySupported(const std::set<int>& usedOps, const Layout& layout, int hasXp) {
   if (hasXp != 0 && hasXp != 1) {
     return false;  // the framebuffer-fetch blend pass needs the frame's subpass input
   }
@@ -616,8 +616,8 @@ bool ChainSPIRVBodySupported(const ChainComposition& composition, const Layout& 
       return false;
     }
   }
-  for (const auto& slot : composition.slots) {
-    const OpTable::Row* row = OpTable::FindRow(slot.op);
+  for (int op : usedOps) {
+    const OpTable::Row* row = OpTable::FindRow(op);
     if (row == nullptr || !row->admitted) {
       return false;
     }
@@ -1485,7 +1485,7 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
 
 namespace tgfx {
 
-bool ChainSPIRVBodySupported(const ChainComposition&, const Layout&, int) {
+bool ChainSPIRVBodySupported(const std::set<int>&, const Layout&, int) {
   return false;
 }
 

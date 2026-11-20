@@ -122,22 +122,8 @@ bool ProvideTextures(WriteContext& context, const Module& module) {
                                   SamplerState(TileMode::Decal, TileMode::Decal));
   }
   if (&module == &Chain) {
-    // The interpreter's declared slots are its sampler children in binding order (leaves, the LUT,
-    // the noise tables, the phantom padding), then the mask slot: the compiled program's budget
-    // keeps that count equal to the declaration's.
-    const auto* program = context.sources.chain;
-    if (program == nullptr) {
-      return false;
-    }
-    for (const auto& binding : program->bindings) {
-      if (!textures->nextIsFor(module)) {
-        return false;
-      }
-      SamplerState state(binding.args.tileModeX, binding.args.tileModeY, binding.args.sampling);
-      if (!textures->pushProxyFor(module, binding.textureProxy.get(), state)) {
-        return false;
-      }
-    }
+    // The assembled writer binds the program's samplers itself (ChainBindingWriter), so the
+    // module-level provider carries no texture for the Chain body.
     return true;
   }
   if (&module == &XferModule()) {

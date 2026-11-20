@@ -294,28 +294,6 @@ TEST(SpecGateTest, NormalizeAcceptsTheCanonicalForms) {
   EXPECT_FALSE(NormalizeGateCondition(&zero, entries));
 }
 
-TEST(SpecGateTest, FeatureMasksFollowTheSlots) {
-  AOTProgram program = {};
-  AOTChainSlot blend = {};
-  blend.op = AOTChainOp::Blend;
-  blend.blend.blendMode = 5;  // tgfx::BlendMode::SrcIn
-  AOTChainSlot gradient = {};
-  gradient.op = AOTChainOp::Gradient;
-  gradient.gradient.colorizerKind = 2;
-  gradient.gradient.layoutType = 1;
-  program.slots = {blend, gradient};
-  const auto masks = ChainFeatureMasksOf(program);
-  EXPECT_NE(masks.usedOps & (1u << static_cast<uint32_t>(AOTChainOp::Blend)), 0u);
-  EXPECT_NE(masks.usedOps & (1u << static_cast<uint32_t>(AOTChainOp::Gradient)), 0u);
-  EXPECT_EQ(masks.usedOps & (1u << static_cast<uint32_t>(AOTChainOp::PerlinNoise)), 0u);
-  EXPECT_EQ(masks.blendModes, 1u << 5u);
-  EXPECT_EQ(masks.gradientKinds, (1u << 2u) | (1u << 9u));
-  EXPECT_EQ(masks.textureFlags, 0u);
-  // The tiled and device-space facts live on the leaf records, not the slots.
-  program.tiledLeaves.push_back({});
-  EXPECT_EQ(ChainFeatureMasksOf(program).textureFlags, 0x2u);
-}
-
 TEST(SpecGateTest, StubOutReplacesTheBodies) {
   const std::string source = "vec4 a() { return vec4(1.0); }\nint b() { return 1; }\n";
   const auto stubbed = StubOutGatedFunctions(source, {{"A", "true", "a"}, {"B", "true", "b"}});

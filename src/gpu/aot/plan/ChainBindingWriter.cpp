@@ -9,7 +9,7 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  unless required by applicable law or agreed to in writing, software distributed under the
 //  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the License for the specific language governing permissions
 //  and limitations under the License.
@@ -29,12 +29,16 @@
 #include "gpu/Swizzle.h"
 #include "gpu/YUVColorConversion.h"
 #include "gpu/aot/bind/Binder.h"
+#include "gpu/aot/chain/AOTChainInternal.h"
+#include "gpu/aot/ir/ChainLayoutMath.h"
+#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/aot/ir/Program.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/resources/TextureView.h"
 #include "gpu/resources/YUVTextureView.h"
+#include "gpu/shaders/contract/ChainISA.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Texture.h"
@@ -42,12 +46,16 @@
 namespace tgfx {
 namespace {
 
-// Everything the readers address: the draw's selection, the compiled program, the geometry facts
-// and the coordinate transforms the stored vertex stage consumes.
+// Everything the readers address: the draw's selection, the compiled program's binding table, the
+// geometry facts and the coordinate transforms the stored vertex stage consumes. The operator
+// parameters ride the graph nodes the plan's members carry, so no intermediate instruction
+// encoding exists at this layer.
 struct ReadContext {
   const ProgramInfo* info = nullptr;
   const AOTProgram* program = nullptr;
   const AOTGeometryParameters* geometry = nullptr;
+  /// The emit's own binding tables (the leaf slots the body samples feed the swizzle reader).
+  const ChainBindings* table = nullptr;
   std::vector<CoordTransform> transforms = {};
 };
 
@@ -65,27 +73,11 @@ void StoreMatrix3(uint8_t* out, const Matrix& matrix) {
   std::memcpy(out, data, sizeof(data));
 }
 
-// The row-major 9-element matrix the coverage slots carry, in the same column-major spelling.
+// The row-major 9-element matrix the coverage parameters carry, in the same column-major spelling.
 void StoreMatrix3(uint8_t* out, const std::array<float, 9>& matrix) {
   const float data[12] = {matrix[0], matrix[3], matrix[6], 0.0f,      matrix[1], matrix[4],
                           matrix[7], 0.0f,      matrix[2], matrix[5], matrix[8], 0.0f};
   std::memcpy(out, data, sizeof(data));
-}
-
-const AOTChainSlot* SlotOf(const ReadContext& ctx, int slot) {
-  if (slot < 0 || static_cast<size_t>(slot) >= ctx.program->slots.size()) {
-    return nullptr;
-  }
-  return &ctx.program->slots[static_cast<size_t>(slot)];
-}
-
-const AOTChainSlot* SlotWithOp(const ReadContext& ctx, AOTChainOp op) {
-  for (const auto& slot : ctx.program->slots) {
-    if (slot.op == op) {
-      return &slot;
-    }
-  }
-  return nullptr;
 }
 
 const AOTBinding* LeafBindingOf(const ReadContext& ctx, int leaf) {
@@ -115,14 +107,25 @@ Matrix TransformBaseMatrix(const ReadContext& ctx) {
   return parameters.uvMatrix;
 }
 
-bool ReadSlotColorMatrix(const ReadContext& ctx, int slot, bool linear, uint8_t* out) {
-  const auto* chainSlot = SlotOf(ctx, slot);
-  if (chainSlot == nullptr) {
+// One node's parameter block, typed: a member the walk registered addresses its operator's graph
+// node, so the reader resolves the parameters off the node itself.
+template <typename Parameters>
+const Parameters* NodeParameters(const ChainBinding& binding, AOTEffectKind kind) {
+  if (binding.node == nullptr || binding.node->kind != kind) {
+    return nullptr;
+  }
+  return std::get_if<Parameters>(&binding.node->parameters);
+}
+
+bool ReadSlotColorMatrix(const ChainBinding& binding, bool linear, uint8_t* out) {
+  const auto* parameters =
+      NodeParameters<AOTColorMatrixParameters>(binding, AOTEffectKind::ColorMatrix);
+  if (parameters == nullptr) {
     return false;
   }
   float linearData[16] = {};
   float translate[4] = {};
-  PackAOTColorMatrix(chainSlot->colorMatrix.matrix, linearData, translate);
+  PackAOTColorMatrix(parameters->matrix, linearData, translate);
   if (linear) {
     std::memcpy(out, linearData, sizeof(linearData));
   } else {
@@ -175,85 +178,87 @@ bool ReadLeafRecord(const ReadContext& ctx, int leaf, ChainBindingSource source,
   }
 }
 
-bool ReadGradient(const ReadContext& ctx, ChainBindingSource source, int index, uint8_t* out) {
-  const auto* chainSlot = SlotWithOp(ctx, AOTChainOp::Gradient);
-  if (chainSlot == nullptr) {
+bool ReadGradient(const ReadContext& ctx, const ChainBinding& binding, ChainBindingSource source,
+                  int index, uint8_t* out) {
+  const auto* gradient =
+      NodeParameters<AOTGradientParameters>(binding, AOTEffectKind::GradientSource);
+  if (gradient == nullptr) {
     return false;
   }
-  const auto& gradient = chainSlot->gradient;
   switch (source) {
     case ChainBindingSource::GradientLayoutType:
-      Store(out, gradient.layoutType);
+      Store(out, gradient->layoutType);
       return true;
     case ChainBindingSource::GradientColorizerKind:
-      Store(out, gradient.colorizerKind);
+      Store(out, gradient->colorizerKind);
       return true;
     case ChainBindingSource::GradientLutLeaf:
       Store(out, ctx.program->lutLeafIndex);
       return true;
     case ChainBindingSource::GradientLeftBorder:
-      std::memcpy(out, gradient.leftBorder.data(), sizeof(float) * 4);
+      std::memcpy(out, gradient->leftBorder.data(), sizeof(float) * 4);
       return true;
     case ChainBindingSource::GradientRightBorder:
-      std::memcpy(out, gradient.rightBorder.data(), sizeof(float) * 4);
+      std::memcpy(out, gradient->rightBorder.data(), sizeof(float) * 4);
       return true;
     case ChainBindingSource::GradientStart:
-      std::memcpy(out, gradient.start.data(), sizeof(float) * 4);
+      std::memcpy(out, gradient->start.data(), sizeof(float) * 4);
       return true;
     case ChainBindingSource::GradientEnd:
-      std::memcpy(out, gradient.end.data(), sizeof(float) * 4);
+      std::memcpy(out, gradient->end.data(), sizeof(float) * 4);
       return true;
     case ChainBindingSource::GradientScale01:
-      std::memcpy(out, gradient.scale01.data(), sizeof(float) * 4);
+      std::memcpy(out, gradient->scale01.data(), sizeof(float) * 4);
       return true;
     case ChainBindingSource::GradientBias01:
-      std::memcpy(out, gradient.bias01.data(), sizeof(float) * 4);
+      std::memcpy(out, gradient->bias01.data(), sizeof(float) * 4);
       return true;
     case ChainBindingSource::GradientScale23:
-      std::memcpy(out, gradient.scale23.data(), sizeof(float) * 4);
+      std::memcpy(out, gradient->scale23.data(), sizeof(float) * 4);
       return true;
     case ChainBindingSource::GradientBias23:
-      std::memcpy(out, gradient.bias23.data(), sizeof(float) * 4);
+      std::memcpy(out, gradient->bias23.data(), sizeof(float) * 4);
       return true;
     case ChainBindingSource::GradientThreshold:
-      Store(out, gradient.threshold);
+      Store(out, gradient->threshold);
       return true;
     case ChainBindingSource::GradientBias:
-      Store(out, gradient.bias);
+      Store(out, gradient->bias);
       return true;
     case ChainBindingSource::GradientScale:
-      Store(out, gradient.scale);
+      Store(out, gradient->scale);
       return true;
     case ChainBindingSource::GradientThresholds1_7:
-      std::memcpy(out, gradient.thresholds1_7.data(), sizeof(float) * 4);
+      std::memcpy(out, gradient->thresholds1_7.data(), sizeof(float) * 4);
       return true;
     case ChainBindingSource::GradientThresholds9_13:
-      std::memcpy(out, gradient.thresholds9_13.data(), sizeof(float) * 4);
+      std::memcpy(out, gradient->thresholds9_13.data(), sizeof(float) * 4);
       return true;
     case ChainBindingSource::GradientScales:
       if (index < 0 || index >= 8) {
         return false;
       }
-      std::memcpy(out, gradient.scales[static_cast<size_t>(index)].data(), sizeof(float) * 4);
+      std::memcpy(out, gradient->scales[static_cast<size_t>(index)].data(), sizeof(float) * 4);
       return true;
     case ChainBindingSource::GradientBiases:
       if (index < 0 || index >= 8) {
         return false;
       }
-      std::memcpy(out, gradient.biases[static_cast<size_t>(index)].data(), sizeof(float) * 4);
+      std::memcpy(out, gradient->biases[static_cast<size_t>(index)].data(), sizeof(float) * 4);
       return true;
     default:
       return false;
   }
 }
 
-bool ReadColorSpace(const ReadContext& ctx, ChainBindingSource source, uint8_t* out) {
-  const auto* chainSlot = SlotWithOp(ctx, AOTChainOp::ColorSpaceXform);
-  if (chainSlot == nullptr || chainSlot->colorSpaceXform.steps == nullptr) {
+bool ReadColorSpace(const ChainBinding& binding, ChainBindingSource source, uint8_t* out) {
+  const auto* parameters =
+      NodeParameters<AOTColorSpaceXformParameters>(binding, AOTEffectKind::ColorSpaceXform);
+  if (parameters == nullptr || parameters->steps == nullptr) {
     return false;
   }
   ColorSpaceXformValues values = {};
-  ResolveColorSpaceXformValues(chainSlot->colorSpaceXform.steps.get(), &values);
+  ResolveColorSpaceXformValues(parameters->steps.get(), &values);
   switch (source) {
     case ChainBindingSource::ChainFlags:
       Store(out, values.flags);
@@ -300,35 +305,36 @@ const YUVTextureView* YUVViewOf(const std::shared_ptr<TextureProxy>& proxy) {
   return static_cast<const YUVTextureView*>(view.get());
 }
 
-// The YUV source's members (op 16): the structural facts come off the slot's record; the
-// conversion matrix and the limited-range flag resolve off the view here, at upload time — the
-// same read the YUVTexture writer made, so a lazy view and the runtime's own values agree.
-bool ReadYUV(const ReadContext& ctx, int slotIndex, ChainBindingSource source, uint8_t* out) {
-  const auto* chainSlot = SlotOf(ctx, slotIndex);
-  if (chainSlot == nullptr) {
+// The YUV source's members: the structural facts come off the multi-plane node's own parameters
+// and the leaf binding at the site's own index (the source's subset and sampler state — the
+// multi-plane source owns it); the conversion matrix and the limited-range flag resolve off the
+// view here, at upload time — the same read the runtime path makes, so a lazy view and the
+// runtime's own values agree.
+bool ReadYUV(const ReadContext& ctx, const ChainBinding& binding, ChainBindingSource source,
+             uint8_t* out) {
+  const auto* parameters =
+      NodeParameters<AOTTextureParameters>(binding, AOTEffectKind::TextureSource);
+  if (parameters == nullptr || !parameters->isYUV) {
     return false;
   }
-  const auto& yuv = chainSlot->yuv;
   switch (source) {
     case ChainBindingSource::YuvSubset: {
-      // The slot's record carries the source-space rect; the kernel clamps in normalized texture
+      // The node's record carries the source-space rect; the kernel clamps in normalized texture
       // coordinates, so the rect goes through the same sampler-aware normalization the plain leaf
-      // records read (the leaf binding at the slot's own index carries the source's subset and
-      // sampler state — the multi-plane source owns it).
-      const auto* binding = LeafBindingOf(ctx, slotIndex);
-      if (binding == nullptr) {
+      // records read.
+      const auto* leaf = LeafBindingOf(ctx, binding.slot);
+      if (leaf == nullptr) {
         return false;
       }
       const auto view =
-          binding->textureProxy != nullptr ? binding->textureProxy->getTextureView() : nullptr;
+          leaf->textureProxy != nullptr ? leaf->textureProxy->getTextureView() : nullptr;
       if (view == nullptr) {
         return false;
       }
-      const SamplerState sampling(binding->args.tileModeX, binding->args.tileModeY,
-                                  binding->args.sampling);
+      const SamplerState sampling(leaf->args.tileModeX, leaf->args.tileModeY, leaf->args.sampling);
       float rect[4] = {};
-      LeafSubsetRectForSampler(binding->textureProxy, view.get(), binding->args.sampleArea,
-                               sampling, rect);
+      LeafSubsetRectForSampler(leaf->textureProxy, view.get(), leaf->args.sampleArea, sampling,
+                               rect);
       std::memcpy(out, rect, sizeof(rect));
       return true;
     }
@@ -336,25 +342,26 @@ bool ReadYUV(const ReadContext& ctx, int slotIndex, ChainBindingSource source, u
       // The RGBAAA alpha-plane offset rides in source pixels; the kernel adds it to a normalized
       // coordinate, so it resolves through the view here — the same read the plain leaf's
       // AlphaStart record makes.
-      if (yuv.alphaStart[0] == 0.0f && yuv.alphaStart[1] == 0.0f) {
+      if (parameters->alphaStart == Point::Zero()) {
         return false;
       }
-      const auto* yuvView = YUVViewOf(yuv.textureProxy);
+      const auto* yuvView = YUVViewOf(parameters->textureProxy);
       if (yuvView == nullptr) {
         return false;
       }
-      const auto coord = yuvView->getTextureCoord(yuv.alphaStart[0], yuv.alphaStart[1]);
+      const auto coord =
+          yuvView->getTextureCoord(parameters->alphaStart.x, parameters->alphaStart.y);
       const float alphaStart[2] = {coord.x, coord.y};
       std::memcpy(out, alphaStart, sizeof(alphaStart));
       return true;
     }
     case ChainBindingSource::YuvHasRgbaaa:
-      Store(out, yuv.hasRgbaaa);
+      Store(out, parameters->hasRGBAAA ? 1 : 0);
       return true;
     case ChainBindingSource::YuvFormat: {
-      int format = yuv.format;
+      int format = parameters->yuvFormat;
       if (format < 0) {
-        const auto* yuvView = YUVViewOf(yuv.textureProxy);
+        const auto* yuvView = YUVViewOf(parameters->textureProxy);
         if (yuvView == nullptr) {
           return false;
         }
@@ -370,7 +377,7 @@ bool ReadYUV(const ReadContext& ctx, int slotIndex, ChainBindingSource source, u
       return true;
     }
     case ChainBindingSource::YuvLimitedRange: {
-      const auto* yuvView = YUVViewOf(yuv.textureProxy);
+      const auto* yuvView = YUVViewOf(parameters->textureProxy);
       if (yuvView == nullptr) {
         return false;
       }
@@ -378,7 +385,7 @@ bool ReadYUV(const ReadContext& ctx, int slotIndex, ChainBindingSource source, u
       return true;
     }
     case ChainBindingSource::YuvColorConversion: {
-      const auto* yuvView = YUVViewOf(yuv.textureProxy);
+      const auto* yuvView = YUVViewOf(parameters->textureProxy);
       if (yuvView == nullptr) {
         return false;
       }
@@ -398,24 +405,25 @@ bool ReadBinding(const ReadContext& ctx, const ChainBinding& binding, uint8_t* o
   const auto& geometry = *ctx.geometry;
   switch (binding.source) {
     case ChainBindingSource::SlotColorMatrixLinear:
-      return ReadSlotColorMatrix(ctx, binding.slot, true, out);
+      return ReadSlotColorMatrix(binding, true, out);
     case ChainBindingSource::SlotColorMatrixTranslate:
-      return ReadSlotColorMatrix(ctx, binding.slot, false, out);
+      return ReadSlotColorMatrix(binding, false, out);
     case ChainBindingSource::SlotLumaCoefficients: {
-      const auto* chainSlot = SlotOf(ctx, binding.slot);
-      if (chainSlot == nullptr) {
+      const auto* parameters = NodeParameters<ChainISA::LumaData>(binding, AOTEffectKind::Luma);
+      if (parameters == nullptr) {
         return false;
       }
-      const float coefficients[3] = {chainSlot->luma.kr, chainSlot->luma.kg, chainSlot->luma.kb};
+      const float coefficients[3] = {parameters->kr, parameters->kg, parameters->kb};
       std::memcpy(out, coefficients, sizeof(coefficients));
       return true;
     }
     case ChainBindingSource::SlotAlphaThreshold: {
-      const auto* chainSlot = SlotOf(ctx, binding.slot);
-      if (chainSlot == nullptr) {
+      const auto* parameters =
+          NodeParameters<ChainISA::AlphaThresholdData>(binding, AOTEffectKind::AlphaThreshold);
+      if (parameters == nullptr) {
         return false;
       }
-      Store(out, chainSlot->alphaThreshold.threshold);
+      Store(out, parameters->threshold);
       return true;
     }
     case ChainBindingSource::YuvSubset:
@@ -424,82 +432,91 @@ bool ReadBinding(const ReadContext& ctx, const ChainBinding& binding, uint8_t* o
     case ChainBindingSource::YuvLimitedRange:
     case ChainBindingSource::YuvHasRgbaaa:
     case ChainBindingSource::YuvFormat:
-      return ReadYUV(ctx, binding.slot, binding.source, out);
+      return ReadYUV(ctx, binding, binding.source, out);
     case ChainBindingSource::SlotConstColor: {
-      const auto* chainSlot = SlotOf(ctx, binding.slot);
-      if (chainSlot == nullptr) {
+      const auto* parameters =
+          NodeParameters<AOTConstColorParameters>(binding, AOTEffectKind::ConstColor);
+      if (parameters == nullptr) {
         return false;
       }
-      std::memcpy(out, chainSlot->constColor.color.data(), sizeof(float) * 4);
+      std::memcpy(out, parameters->color.data(), sizeof(float) * 4);
       return true;
     }
     case ChainBindingSource::SlotAARect: {
-      const auto* chainSlot = SlotOf(ctx, binding.slot);
-      if (chainSlot == nullptr) {
+      const auto* parameters =
+          NodeParameters<AOTRectCoverageParameters>(binding, AOTEffectKind::RectCoverage);
+      if (parameters == nullptr) {
         return false;
       }
       // The AA math evaluates to 0 at the rect coordinates, so the interpreter outsets by 0.5 to
       // interpolate from 0 at a half-pixel inset to 1 at a half-pixel outset. The pure fragment
       // takes the same input, so the assembled text must give it the same outset rect.
-      const auto& rect = chainSlot->rectCoverage.rect;
+      const auto& rect = parameters->rect;
       const float outset[4] = {rect[0] - 0.5f, rect[1] - 0.5f, rect[2] + 0.5f, rect[3] + 0.5f};
       std::memcpy(out, outset, sizeof(outset));
       return true;
     }
     case ChainBindingSource::SlotLocalRect: {
-      const auto* chainSlot = SlotOf(ctx, binding.slot);
-      if (chainSlot == nullptr) {
+      const auto* parameters =
+          NodeParameters<AOTRectCoverageParameters>(binding, AOTEffectKind::RectCoverage);
+      if (parameters == nullptr) {
         return false;
       }
-      std::memcpy(out, chainSlot->localRectCoverage.rect.data(), sizeof(float) * 4);
+      std::memcpy(out, parameters->rect.data(), sizeof(float) * 4);
       return true;
     }
     case ChainBindingSource::SlotLocalRectMatrix: {
-      const auto* chainSlot = SlotOf(ctx, binding.slot);
-      if (chainSlot == nullptr) {
+      const auto* parameters =
+          NodeParameters<AOTRectCoverageParameters>(binding, AOTEffectKind::RectCoverage);
+      if (parameters == nullptr) {
         return false;
       }
-      StoreMatrix3(out, chainSlot->localRectCoverage.deviceToLocal);
+      StoreMatrix3(out, parameters->deviceToLocal);
       return true;
     }
     case ChainBindingSource::SlotRRect: {
-      const auto* chainSlot = SlotOf(ctx, binding.slot);
-      if (chainSlot == nullptr) {
+      const auto* parameters =
+          NodeParameters<AOTRRectCoverageParameters>(binding, AOTEffectKind::RRectCoverage);
+      if (parameters == nullptr) {
         return false;
       }
-      std::memcpy(out, chainSlot->rrectCoverage.rect.data(), sizeof(float) * 4);
+      std::memcpy(out, parameters->rect.data(), sizeof(float) * 4);
       return true;
     }
     case ChainBindingSource::SlotRRectRadiiX: {
-      const auto* chainSlot = SlotOf(ctx, binding.slot);
-      if (chainSlot == nullptr) {
+      const auto* parameters =
+          NodeParameters<AOTRRectCoverageParameters>(binding, AOTEffectKind::RRectCoverage);
+      if (parameters == nullptr) {
         return false;
       }
-      std::memcpy(out, chainSlot->rrectCoverage.radiiX.data(), sizeof(float) * 4);
+      std::memcpy(out, parameters->radiiX.data(), sizeof(float) * 4);
       return true;
     }
     case ChainBindingSource::SlotRRectRadiiY: {
-      const auto* chainSlot = SlotOf(ctx, binding.slot);
-      if (chainSlot == nullptr) {
+      const auto* parameters =
+          NodeParameters<AOTRRectCoverageParameters>(binding, AOTEffectKind::RRectCoverage);
+      if (parameters == nullptr) {
         return false;
       }
-      std::memcpy(out, chainSlot->rrectCoverage.radiiY.data(), sizeof(float) * 4);
+      std::memcpy(out, parameters->radiiY.data(), sizeof(float) * 4);
       return true;
     }
     case ChainBindingSource::SlotRRectAntiAlias: {
-      const auto* chainSlot = SlotOf(ctx, binding.slot);
-      if (chainSlot == nullptr) {
+      const auto* parameters =
+          NodeParameters<AOTRRectCoverageParameters>(binding, AOTEffectKind::RRectCoverage);
+      if (parameters == nullptr) {
         return false;
       }
-      Store(out, chainSlot->rrectCoverage.antiAlias);
+      Store(out, parameters->antiAlias);
       return true;
     }
     case ChainBindingSource::SlotRRectMatrix: {
-      const auto* chainSlot = SlotOf(ctx, binding.slot);
-      if (chainSlot == nullptr) {
+      const auto* parameters =
+          NodeParameters<AOTRRectCoverageParameters>(binding, AOTEffectKind::RRectCoverage);
+      if (parameters == nullptr) {
         return false;
       }
-      StoreMatrix3(out, chainSlot->rrectCoverage.deviceToLocal);
+      StoreMatrix3(out, parameters->deviceToLocal);
       return true;
     }
     case ChainBindingSource::GeometryColor: {
@@ -610,26 +627,26 @@ bool ReadBinding(const ReadContext& ctx, const ChainBinding& binding, uint8_t* o
     case ChainBindingSource::GradientThresholds9_13:
     case ChainBindingSource::GradientScales:
     case ChainBindingSource::GradientBiases:
-      return ReadGradient(ctx, binding.source, binding.index, out);
+      return ReadGradient(ctx, binding, binding.source, binding.index, out);
     case ChainBindingSource::NoiseFrequencyStitch: {
-      const auto* chainSlot = SlotWithOp(ctx, AOTChainOp::PerlinNoise);
-      if (chainSlot == nullptr) {
+      const auto* noise =
+          NodeParameters<AOTPerlinNoiseParameters>(binding, AOTEffectKind::PerlinNoiseSource);
+      if (noise == nullptr) {
         return false;
       }
-      const auto& noise = chainSlot->noise;
-      const float frequencyStitch[4] = {noise.baseFrequencyX, noise.baseFrequencyY,
-                                        static_cast<float>(noise.stitchWidth),
-                                        static_cast<float>(noise.stitchHeight)};
+      const float frequencyStitch[4] = {noise->baseFrequencyX, noise->baseFrequencyY,
+                                        static_cast<float>(noise->stitchWidth),
+                                        static_cast<float>(noise->stitchHeight)};
       std::memcpy(out, frequencyStitch, sizeof(frequencyStitch));
       return true;
     }
     case ChainBindingSource::NoiseModeOctaves: {
-      const auto* chainSlot = SlotWithOp(ctx, AOTChainOp::PerlinNoise);
-      if (chainSlot == nullptr) {
+      const auto* noise =
+          NodeParameters<AOTPerlinNoiseParameters>(binding, AOTEffectKind::PerlinNoiseSource);
+      if (noise == nullptr) {
         return false;
       }
-      const auto& noise = chainSlot->noise;
-      const int modeOctaves[4] = {noise.noiseType, noise.numOctaves, noise.stitchTiles ? 1 : 0,
+      const int modeOctaves[4] = {noise->noiseType, noise->numOctaves, noise->stitchTiles ? 1 : 0,
                                   ctx.program->noiseSamplerBase};
       std::memcpy(out, modeOctaves, sizeof(modeOctaves));
       return true;
@@ -644,17 +661,19 @@ bool ReadBinding(const ReadContext& ctx, const ChainBinding& binding, uint8_t* o
     case ChainBindingSource::ChainDstTF0:
     case ChainBindingSource::ChainDstTF1:
     case ChainBindingSource::ChainDstTFType:
-      return ReadColorSpace(ctx, binding.source, out);
+      return ReadColorSpace(binding, binding.source, out);
     case ChainBindingSource::LeafSubset:
     case ChainBindingSource::LeafSubsetClampOn:
     case ChainBindingSource::LeafAlphaStart:
     case ChainBindingSource::LeafHasRgbaaa:
       return ReadLeafRecord(ctx, binding.index, binding.source, out);
     case ChainBindingSource::LeafReadSwizzles: {
+      // The plain-fetch leaves read through their view's swizzle mode; the leaf slots the body
+      // samples are exactly the plan's leaf varyings (a multi-plane source owns its three samplers
+      // but reads them through the YUV operator, not the plain fetch).
       int readSwizzles[4] = {};
       for (size_t index = 0; index < ctx.program->bindings.size() && index < 4; ++index) {
-        if (index >= ctx.program->slots.size() ||
-            ctx.program->slots[index].op != AOTChainOp::Texture ||
+        if (ctx.table->leafVaryings.count(static_cast<int>(index)) == 0 ||
             ctx.program->bindings[index].kind != AOTBinding::Kind::Leaf) {
           continue;
         }
@@ -669,15 +688,15 @@ bool ReadBinding(const ReadContext& ctx, const ChainBinding& binding, uint8_t* o
       return true;
     }
     case ChainBindingSource::DeviceCoordMatrix: {
-      const auto* binding = MaskBindingOf(ctx);
-      if (binding == nullptr || binding->textureProxy == nullptr) {
+      const auto* binding2 = MaskBindingOf(ctx);
+      if (binding2 == nullptr || binding2->textureProxy == nullptr) {
         return false;
       }
-      const auto view = binding->textureProxy->getTextureView();
+      const auto view = binding2->textureProxy->getTextureView();
       if (view == nullptr) {
         return false;
       }
-      StoreMatrix3(out, DeviceMaskCoordMatrix(binding->uvMatrix, *view));
+      StoreMatrix3(out, DeviceMaskCoordMatrix(binding2->uvMatrix, *view));
       return true;
     }
     case ChainBindingSource::HasMaskTexture: {
@@ -686,11 +705,11 @@ bool ReadBinding(const ReadContext& ctx, const ChainBinding& binding, uint8_t* o
       return true;
     }
     case ChainBindingSource::DeviceMaskSubset: {
-      const auto* binding = MaskBindingOf(ctx);
-      if (binding == nullptr || binding->textureProxy == nullptr) {
+      const auto* binding2 = MaskBindingOf(ctx);
+      if (binding2 == nullptr || binding2->textureProxy == nullptr) {
         return false;
       }
-      const auto view = binding->textureProxy->getTextureView();
+      const auto view = binding2->textureProxy->getTextureView();
       if (view == nullptr) {
         return false;
       }
@@ -794,7 +813,8 @@ void ChainBindingWriter::writeUniforms(const ProgramInfo& info, UniformData* ver
                                        UniformData* fragmentUniformData) const {
   const auto* sources = info.getSources();
   const AOTProgram* program = sources != nullptr ? sources->chain : nullptr;
-  if (program == nullptr) {
+  auto* ir = info.getCarriedIR();
+  if (program == nullptr || ir == nullptr) {
     LOGE("ChainBindingWriter: the draw carries no compiled chain program; uniforms stay unwritten");
     return;
   }
@@ -802,7 +822,8 @@ void ChainBindingWriter::writeUniforms(const ProgramInfo& info, UniformData* ver
   ctx.info = &info;
   ctx.program = program;
   ctx.geometry = &info.getGeometryLayout().parameters;
-  ctx.transforms = BuildChainCoordTransforms(*program);
+  ctx.table = &bindings;
+  ctx.transforms = BuildChainCoordTransforms(*ir, *program);
   auto* vertexBytes = vertexUniformData != nullptr ? vertexUniformData->writableBytes() : nullptr;
   if (vertexBytes != nullptr) {
     const size_t size = vertexUniformData->size();
