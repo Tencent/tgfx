@@ -251,3 +251,291 @@ jobs:
           name: win_d3d12_warp_result
           path: result
 
+  web-webgl:
+    name: web (webgl)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Get Environment Cache
+        id: environment-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            web/emsdk
+            web/node_modules
+          key: tgfx-environment-web-linux-20260608
+          restore-keys: tgfx-environment-web-linux-
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-web-
+
+      - name: Get Reference Cache
+        id: reference-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            test/baseline/.cache/webgl
+          key: autotest-web-webgl-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: autotest-web-webgl-
+
+      - name: Get Browser Cache
+        id: browser-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/puppeteer
+          key: autotest-web-puppeteer-${{ hashFiles('web/test/package.json') }}
+          restore-keys: autotest-web-puppeteer-
+
+      - name: Install Build Tools
+        if: ${{ (steps.environment-cache.outputs.cache-hit != 'true') }}
+        run: |
+          cd web
+          npm install
+          if [ ! -d "emsdk" ]; then
+            git clone https://github.com/emscripten-core/emsdk.git
+          else
+            cd emsdk
+            git pull
+            cd ..
+          fi
+          cd emsdk
+          ./emsdk install 4.0.15
+          ./emsdk activate 4.0.15
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+
+      - name: Install Web Test Dependencies
+        run: |
+          cd web/test
+          npm install
+
+      - name: Run Web Test Runner Unit Tests
+        run: |
+          cd web/test
+          npm run test:runner
+
+      # The reference cache is generated from a pinned origin/main snapshot and must exist before
+      # the test build below, because CMake preloads it into the WASM file system at link time.
+      # A restore only counts when the primary key matches, so a stale fallback or a cold start
+      # regenerates the reference on pull requests too; only main pushes save it back for reuse.
+      - name: Update Reference Cache
+        if: ${{ steps.reference-cache.outputs.cache-hit != 'true' }}
+        run: |
+          source web/emsdk/emsdk_env.sh
+          bash update_baseline.sh USE_WEBGL --skip-images
+
+      - name: Build Web Bindings
+        run: |
+          cd web
+          npm run build:tgfx
+
+      - name: Build WebGL Tests
+        run: |
+          source web/emsdk/emsdk_env.sh
+          cd web/test
+          npm run build:webgl
+
+      - name: Run WebGL Tests
+        run: |
+          cd web/test
+          npm run autotest:webgl
+
+      - name: Save Environment Cache
+        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            web/emsdk
+            web/node_modules
+          key: tgfx-environment-web-linux-20260608
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Save Reference Cache
+        if: ${{ (github.event_name == 'push') && (steps.reference-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            test/baseline/.cache/webgl
+          key: autotest-web-webgl-${{ hashFiles('test/baseline/version.json') }}
+
+      - name: Save Browser Cache
+        if: ${{ (github.event_name == 'push') && (steps.browser-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/puppeteer
+          key: autotest-web-puppeteer-${{ hashFiles('web/test/package.json') }}
+
+      - name: Upload Result
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: web_webgl_result
+          path: |
+            test/out
+            test/baseline-out
+
+  web-webgpu:
+    # GitHub-hosted Linux runners have no GPU. TGFX_WEBGPU_SWIFTSHADER makes run_test.js force
+    # the SwiftShader WebGPU adapter, for both reference generation and verification.
+    name: web (webgpu)
+    runs-on: ubuntu-latest
+    env:
+      TGFX_WEBGPU_SWIFTSHADER: 1
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Get Environment Cache
+        id: environment-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            web/emsdk
+            web/node_modules
+          key: tgfx-environment-web-linux-20260608
+          restore-keys: tgfx-environment-web-linux-
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-web-webgpu-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-web-webgpu-
+
+      - name: Get Reference Cache
+        id: reference-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            test/baseline/.cache/webgpu
+          key: autotest-web-webgpu-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: autotest-web-webgpu-
+
+      - name: Get Browser Cache
+        id: browser-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/puppeteer
+          key: autotest-web-puppeteer-${{ hashFiles('web/test/package.json') }}
+          restore-keys: autotest-web-puppeteer-
+
+      - name: Install Build Tools
+        if: ${{ (steps.environment-cache.outputs.cache-hit != 'true') }}
+        run: |
+          cd web
+          npm install
+          if [ ! -d "emsdk" ]; then
+            git clone https://github.com/emscripten-core/emsdk.git
+          else
+            cd emsdk
+            git pull
+            cd ..
+          fi
+          cd emsdk
+          ./emsdk install 4.0.15
+          ./emsdk activate 4.0.15
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+
+      - name: Install Web Test Dependencies
+        run: |
+          cd web/test
+          npm install
+
+      # See the web-webgl job for the reference cache regeneration rule and the restore ordering.
+      - name: Update Reference Cache
+        if: ${{ steps.reference-cache.outputs.cache-hit != 'true' }}
+        run: |
+          source web/emsdk/emsdk_env.sh
+          bash update_baseline.sh USE_WEBGPU --skip-images
+
+      - name: Build Web Bindings
+        run: |
+          cd web
+          npm run build:tgfx
+
+      - name: Build WebGPU Tests
+        run: |
+          source web/emsdk/emsdk_env.sh
+          cd web/test
+          npm run build:webgpu
+
+      - name: Run WebGPU Tests
+        run: |
+          cd web/test
+          npm run autotest:webgpu
+
+      - name: Save Environment Cache
+        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            web/emsdk
+            web/node_modules
+          key: tgfx-environment-web-linux-20260608
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-web-webgpu-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Save Reference Cache
+        if: ${{ (github.event_name == 'push') && (steps.reference-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            test/baseline/.cache/webgpu
+          key: autotest-web-webgpu-${{ hashFiles('test/baseline/version.json') }}
+
+      - name: Save Browser Cache
+        if: ${{ (github.event_name == 'push') && (steps.browser-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/puppeteer
+          key: autotest-web-puppeteer-${{ hashFiles('web/test/package.json') }}
+
+      - name: Upload Result
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: web_webgpu_result
+          path: |
+            test/out
+            test/baseline-out
+
