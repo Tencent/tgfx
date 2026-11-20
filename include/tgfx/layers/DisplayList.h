@@ -314,8 +314,8 @@ class DisplayList {
   int lastSurfaceHeight = 0;
   size_t minTreeTileCount = 0;
   std::vector<std::shared_ptr<Surface>> surfaceCaches = {};
-  std::unique_ptr<TilePool> tilePool = nullptr;
-  std::unique_ptr<BlankTileSet> blankTiles = nullptr;
+  std::unique_ptr<TilePool> tilePool;
+  std::unique_ptr<BlankTileSet> blankTiles;
   std::vector<std::shared_ptr<Tile>> emptyTiles = {};
   std::deque<std::vector<Rect>> lastDirtyRegions = {};
 
