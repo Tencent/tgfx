@@ -17,6 +17,8 @@ function RunScenario(options) {
     const extracted = [];
     const mutations = [];
     const published = [];
+    const spawnCalls = [];
+    const serverSignals = [];
     const backend = options.backend || 'webgpu';
     const mode = options.mode || 'verify';
     const commit = 'a'.repeat(40);
@@ -42,7 +44,10 @@ function RunScenario(options) {
     const server = new EventEmitter();
     server.stdout = new EventEmitter();
     server.stderr = new EventEmitter();
-    server.kill = function() {};
+    server.kill = function(signal) {
+      serverSignals.push(signal);
+      queueMicrotask(function() { server.emit('exit', 0, signal); });
+    };
     client.send = async function(method, parameters) {
       assert.equal(method, 'Browser.setDownloadBehavior');
       assert.equal(parameters.eventsEnabled, true);
@@ -84,7 +89,8 @@ function RunScenario(options) {
     let launchOptions = null;
     const modules = {
       child_process: {
-        spawn() {
+        spawn(command, args) {
+          spawnCalls.push([command, args]);
           queueMicrotask(function() { server.stdout.emit('data', 'Hit CTRL-C to stop'); });
           return server;
         },
@@ -117,8 +123,11 @@ function RunScenario(options) {
           mode === 'reference' ? [`--reference-commit=${commit}`,
             `--web-root=${path.join(__dirname, `build-reference-${backend}`, 'session/runtime')}`] : []),
         platform: 'darwin',
+        execPath: process.execPath,
         env: options.env || {},
-        exit(code) { resolve({ code, output, extracted, mutations, published, launchOptions }); },
+        exit(code) {
+          resolve({ code, output, extracted, mutations, published, launchOptions, spawnCalls, serverSignals });
+        },
       },
       console: {
         log(...args) { output.push(args.join(' ')); },
@@ -289,3 +298,14 @@ for (const [name, backend, env, forced] of LAUNCH_ARG_CASES) {
     assert.equal(result.launchOptions.args.includes('--use-webgpu-adapter=swiftshader'), forced);
   });
 }
+
+test('http server runs without npx and is stopped before the runner exits', { timeout: 2000 },
+  async function() {
+    const result = await RunScenario({ backend: 'webgl', messages: [SUCCESS, DONE] });
+    assert.equal(result.code, 0, result.output.join('\n'));
+    assert.equal(result.spawnCalls.length, 1);
+    const [command, args] = result.spawnCalls[0];
+    assert.equal(command, process.execPath);
+    assert.ok(args[0].endsWith(path.join('http-server', 'bin', 'http-server')));
+    assert.deepEqual(result.serverSignals, ['SIGTERM']);
+  });

@@ -41,9 +41,13 @@ const ZIP_DESTINATIONS = {
   'test-out.zip': path.join(OUTPUT_ROOT, 'out'),
 };
 
+const HTTP_SERVER_BIN = path.join(__dirname, 'node_modules', 'http-server', 'bin', 'http-server');
+
 function startHttpServer() {
   return new Promise((resolve, reject) => {
-    const server = spawn('npx', ['http-server', '-p', String(PORT), '--cors', '-c-1'], {
+    // Spawn the server directly instead of through npx. npx does not forward SIGTERM to its
+    // child, so killing it left an orphan holding the port and broke the next run in the same job.
+    const server = spawn(process.execPath, [HTTP_SERVER_BIN, '-p', String(PORT), '--cors', '-c-1'], {
       cwd: WEB_TEST_DIR,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -63,6 +67,17 @@ function startHttpServer() {
         reject(new Error('http-server failed to start within 10 seconds'));
       }
     }, 10000);
+  });
+}
+
+function stopHttpServer(server) {
+  return new Promise(function(resolve) {
+    if (server.exitCode != null || server.signalCode != null) {
+      resolve();
+      return;
+    }
+    server.once('exit', function() { resolve(); });
+    server.kill('SIGTERM');
   });
 }
 
@@ -240,7 +255,7 @@ async function run() {
     if (browser) {
       await browser.close();
     }
-    server.kill('SIGTERM');
+    await stopHttpServer(server);
   }
 
   console.log('\nExtracting downloaded files...');
