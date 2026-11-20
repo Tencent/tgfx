@@ -608,6 +608,11 @@ bool MatchQuadTexture(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// declared slot capacity the acceptance below enforces. The flattened dims are
 /// [UV_COORD, SUBSET=0, FORMAT, HAS_XP], so the ordinal is UV_COORD + 4*FORMAT + 8*HAS_XP.
 bool MatchYUVTexture(const ProgramInfo* info, const DrawShape& shape, FamilyMatchResult* result) {
+  // Retired in favor of the Chain family's assembled YUV operator: the multi-plane source is a
+  // first-class graph node there (planned straight from the IR, its three planes bound as leaf
+  // samplers), so this dedicated family no longer accepts and every YUV draw falls through to the
+  // chain's own rule.
+  return false;
   // The acceptance: the QuadPerEdgeAA quad without a subset,
   // the color graph is the multi-plane source with at most the tail's operators above it, and the
   // staleness guard keeps the tree and the graph in agreement.
@@ -706,8 +711,10 @@ bool DeriveChainCell(const AOTProgram& program, const ProgramInfo* info, ChainCe
   }
   for (const auto& binding : program.bindings) {
     // Every leaf binding is a plain sampled texture: the planner refuses multi-plane, swizzled and
-    // non-TileMode sources before a leaf reaches the program. A deferred (task-local) proxy has no
-    // view yet and always binds one sampler once it is instantiated (a lazy proxy is internally
+    // non-TileMode sources before a leaf reaches the program. The one exception is the multi-plane
+    // source itself — its YUV operator owns three leaf bindings that share the source's proxy — so
+    // a YUV view is only acceptable when a YUV slot produced it. A deferred (task-local) proxy has
+    // no view yet and always binds one sampler once it is instantiated (a lazy proxy is internally
     // rendered, hence never multi-plane YUV), so only a view that resolves multi-plane is refused.
     // A leaf subset is a runtime uniform (the kernel always clamps, full bounds when absent), an
     // alpha-only leaf splats .r through its slot selector bit, and an RGBAAA leaf reads its alpha
@@ -718,7 +725,13 @@ bool DeriveChainCell(const AOTProgram& program, const ProgramInfo* info, ChainCe
     }
     auto textureView = binding.textureProxy->getTextureView();
     if (textureView != nullptr && textureView->isYUV()) {
-      return false;
+      bool hasYuvOperator = false;
+      for (const auto& slot : program.slots) {
+        hasYuvOperator |= slot.op == AOTChainOp::YUV;
+      }
+      if (!hasYuvOperator) {
+        return false;
+      }
     }
   }
   const int textureCount = program.samplerChildCount == 0 ? 0 : 1;

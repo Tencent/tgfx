@@ -73,6 +73,7 @@ bool OpAssembles(int op) {
     case ChainISA::Gradient:
     case ChainISA::PerlinNoise:
     case ChainISA::ColorSpaceXform:
+    case ChainISA::YUV:
       return true;
     default:
       return false;
@@ -672,9 +673,15 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
       case ChainISA::YUV: {
         RegisterYUVMembers(&registry, static_cast<int>(slotIndex));
         needsSourceCoords = true;
+        geomColorUsed = true;
         ChainArg geom = {};
         geom.kind = ChainArgKind::GeomColor;
         push(geom);
+        // The three planes ride the leaf samplers at the call's own slot and the two above it.
+        ChainArg planes = {};
+        planes.kind = ChainArgKind::LeafTex;
+        planes.index = static_cast<int>(slotIndex);
+        push(planes);
         break;
       }
       default:

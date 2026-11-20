@@ -463,6 +463,17 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
             "evalNoiseSlot(SourceCoords, NoiseFrequencyStitch, NoiseModeOctaves, TextureSampler_0, "
             "TextureSampler_1, TextureSampler_2, TextureSampler_3)";
         break;
+      case ChainISA::YUV: {
+        // The multi-plane source: the three planes ride the leaf samplers at the call's own slot
+        // and the two above it (the LeafTex argument carries the slot), and the conversion facts
+        // are the members the walk registered from the slot's record.
+        const std::string plane = std::to_string(a[1].index);
+        expr = "pmApplyYUV(" + spellArg(a[0]) + ", SourceCoords, YuvSubset, YuvColorConversion, " +
+               "YuvLimitedRange, YuvAlphaStart, YuvHasRgbaaa, YuvFormat, TextureSampler_" + plane +
+               ", TextureSampler_" + std::to_string(a[1].index + 1) + ", TextureSampler_" +
+               std::to_string(a[1].index + 2) + ")";
+        break;
+      }
       default:
         return false;
     }
@@ -624,6 +635,16 @@ bool AssembleChainVertexGLSL(const ChainBindings& bindings, const std::string& s
   }
   if (bindings.needsSourceCoords) {
     hookBody += "  SourceCoords = (CoordTransformMatrix_0 * vec3(v.localCoord, 1.0)).xyz;\n";
+  }
+  if (bindings.needsSourceCoords && out.find("out vec3 SourceCoords;") == std::string::npos) {
+    // The stored variant carries no source-coordinate varying (a plain profile declares none),
+    // but this composition reads one — the YUV source samples through it. The declaration joins
+    // the text at the top level, ahead of the hook that writes it.
+    const auto insertAt = out.find("void Chain_vertex(inout Vertex v) {");
+    if (insertAt == std::string::npos) {
+      return false;
+    }
+    out.insert(insertAt, "out vec3 SourceCoords;\n");
   }
   const auto hookAt = out.find("void Chain_vertex(inout Vertex v) {");
   if (hookAt == std::string::npos) {

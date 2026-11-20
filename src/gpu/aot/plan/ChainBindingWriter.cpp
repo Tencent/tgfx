@@ -310,12 +310,44 @@ bool ReadYUV(const ReadContext& ctx, int slotIndex, ChainBindingSource source, u
   }
   const auto& yuv = chainSlot->yuv;
   switch (source) {
-    case ChainBindingSource::YuvSubset:
-      std::memcpy(out, yuv.subset.data(), sizeof(float) * 4);
+    case ChainBindingSource::YuvSubset: {
+      // The slot's record carries the source-space rect; the kernel clamps in normalized texture
+      // coordinates, so the rect goes through the same sampler-aware normalization the plain leaf
+      // records read (the leaf binding at the slot's own index carries the source's subset and
+      // sampler state — the multi-plane source owns it).
+      const auto* binding = LeafBindingOf(ctx, slotIndex);
+      if (binding == nullptr) {
+        return false;
+      }
+      const auto view =
+          binding->textureProxy != nullptr ? binding->textureProxy->getTextureView() : nullptr;
+      if (view == nullptr) {
+        return false;
+      }
+      const SamplerState sampling(binding->args.tileModeX, binding->args.tileModeY,
+                                  binding->args.sampling);
+      float rect[4] = {};
+      LeafSubsetRectForSampler(binding->textureProxy, view.get(), binding->args.sampleArea,
+                               sampling, rect);
+      std::memcpy(out, rect, sizeof(rect));
       return true;
-    case ChainBindingSource::YuvAlphaStart:
-      std::memcpy(out, yuv.alphaStart.data(), sizeof(float) * 2);
+    }
+    case ChainBindingSource::YuvAlphaStart: {
+      // The RGBAAA alpha-plane offset rides in source pixels; the kernel adds it to a normalized
+      // coordinate, so it resolves through the view here — the same read the plain leaf's
+      // AlphaStart record makes.
+      if (yuv.alphaStart[0] == 0.0f && yuv.alphaStart[1] == 0.0f) {
+        return false;
+      }
+      const auto* yuvView = YUVViewOf(yuv.textureProxy);
+      if (yuvView == nullptr) {
+        return false;
+      }
+      const auto coord = yuvView->getTextureCoord(yuv.alphaStart[0], yuv.alphaStart[1]);
+      const float alphaStart[2] = {coord.x, coord.y};
+      std::memcpy(out, alphaStart, sizeof(alphaStart));
       return true;
+    }
     case ChainBindingSource::YuvHasRgbaaa:
       Store(out, yuv.hasRgbaaa);
       return true;
@@ -822,11 +854,30 @@ bool ChainBindingWriter::writeSamplers(const ProgramInfo& info, Program* program
                              cache->getOrCreateDummyTexture(), cache->getOrCreateDummySampler());
       continue;
     }
+    // The multi-plane source binds one texture per plane: the leaf index the sampler carries
+    // addresses the YUV view's plane textures (Y, U-or-UV, V). An interleaved layout declares the
+    // third sampler but never samples it, so a plane past the view's texture count keeps the
+    // dummy binding below.
+    std::shared_ptr<Texture> texture;
+    if (view->isYUV()) {
+      const auto* yuvView = static_cast<const YUVTextureView*>(view.get());
+      const auto plane = static_cast<size_t>(bindings.samplers[index].index);
+      if (plane < yuvView->textureCount()) {
+        texture = yuvView->getTextureAt(plane);
+      }
+    } else {
+      texture = view->getTexture();
+    }
+    if (texture == nullptr) {
+      renderPass->setTexture(program->getTextureBinding(static_cast<unsigned>(index)),
+                             cache->getOrCreateDummyTexture(), cache->getOrCreateDummySampler());
+      continue;
+    }
     const auto& state = resolved.state;
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                  state.minFilterMode, state.magFilterMode, state.mipmapMode);
-    renderPass->setTexture(program->getTextureBinding(static_cast<unsigned>(index)),
-                           view->getTexture(), gpu->createSampler(descriptor));
+    renderPass->setTexture(program->getTextureBinding(static_cast<unsigned>(index)), texture,
+                           gpu->createSampler(descriptor));
   }
   // The modules statically reference every sampler the variant declares (the leaf fetch's index
   // dispatch), so the slots the composition leaves unused still need a valid binding at draw.
