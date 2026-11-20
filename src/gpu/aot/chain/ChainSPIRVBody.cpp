@@ -838,6 +838,30 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   writer.Inst(kOpDecorate, {state.uboId, kDecorationBinding, FRAGMENT_UBO_BINDING_POINT});
   writer.Sink(&writer.decl);
 
+  // The four leaf samplers: the body owns every descriptor declaration, and the operators that
+  // sample take them as arguments, so the linked module carries one variable per location.
+  uint32_t leafSamplerVars[4] = {0, 0, 0, 0};
+  {
+    uint32_t leafBindings[4] = {8, 9, 10, 11};
+    for (const auto& texture : layout.textures) {
+      for (int leaf = 0; leaf < 4; ++leaf) {
+        if (texture.name == "TextureSampler_" + std::to_string(leaf)) {
+          leafBindings[leaf] = texture.binding;
+        }
+      }
+    }
+    for (int leaf = 0; leaf < 4; ++leaf) {
+      const uint32_t samplerPointer = UniformConstantPtrTo(&state, types.sampledImage);
+      const uint32_t variableId = writer.NewId();
+      writer.Inst(kOpVariable, {samplerPointer, variableId, kStorageUniformConstant});
+      writer.Sink(&writer.ann);
+      writer.Inst(kOpDecorate, {variableId, kDecorationDescriptorSet, TEXTURE_DESCRIPTOR_SET});
+      writer.Inst(kOpDecorate, {variableId, kDecorationBinding, leafBindings[leaf]});
+      writer.Sink(&writer.decl);
+      leafSamplerVars[leaf] = variableId;
+    }
+  }
+
   // The mask sampler is the body's own variable (the frame declares none): the tail samples it
   // inside the HasMaskTexture branch, so a draw without a mask never touches the descriptor.
   uint32_t maskSamplerVar = 0;
@@ -1239,6 +1263,9 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
             value = memberIndex < 0 ? 0 : ArrayElement(&state, plan, memberIndex, spec.b);
             break;
           }
+          case OpTable::Source::LeafSampler:
+            value = leafSamplerVars[spec.a];
+            break;
           case OpTable::Source::Varying:
             value = varyingValue(spec.a == 0 ? "SourceCoords" : "vTexSubset");
             break;
@@ -1262,7 +1289,8 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     std::vector<uint32_t> arguments = {};
     for (size_t argIndex = 0; argIndex < values.size(); ++argIndex) {
       if (signature != nullptr && argIndex < signature->params.size() &&
-          argumentVariables[callIndex][argIndex] != 0) {
+          argumentVariables[callIndex][argIndex] != 0 &&
+          signature->params[argIndex] != kSampledImage) {
         writer.Inst(kOpStore, {argumentVariables[callIndex][argIndex], values[argIndex]});
         arguments.push_back(argumentVariables[callIndex][argIndex]);
       } else {

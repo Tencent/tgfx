@@ -874,6 +874,17 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       if (row.prelude != nullptr) {
         text += row.prelude;
       }
+      bool needsDummySampler = false;
+      for (size_t argument = 0; argument < row.argCount; ++argument) {
+        if (row.args[argument].type == OpTable::Param::SampledImage) {
+          needsDummySampler = true;
+        }
+      }
+      const bool dummyDstDeclared =
+          row.special != nullptr && std::strcmp(row.special, "porterDuff") == 0;
+      if (needsDummySampler && !dummyDstDeclared) {
+        text += "layout(set = 2, binding = 15) uniform sampler2D dummyLeafTex;\n";
+      }
       if (row.leafSamplers) {
         for (int sampler = 0; sampler < 4; ++sampler) {
           text += "layout(set = 2, binding = " + std::to_string(sampler) +
@@ -924,7 +935,7 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
             text += "ivec4(0)";
             break;
           case OpTable::Param::SampledImage:
-            text += "dummyDstTex";
+            text += dummyDstDeclared ? "dummyDstTex" : "dummyLeafTex";
             break;
           case OpTable::Param::Vec4Array8:
             text +=

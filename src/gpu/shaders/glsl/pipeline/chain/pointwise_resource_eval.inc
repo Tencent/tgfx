@@ -41,7 +41,8 @@ bool evalResourceSlot(ivec4 Packed, vec4 in0, int dataAt, out vec4 value) {
     value = vec4(0.0);
     return false;
   }
-  value = evalNoiseSlot(SourceCoords, NoiseFrequencyStitch, NoiseModeOctaves);
+  value = evalNoiseSlot(SourceCoords, NoiseFrequencyStitch, NoiseModeOctaves, TextureSampler_0,
+                        TextureSampler_1, TextureSampler_2, TextureSampler_3);
   return true;
 }
 #else

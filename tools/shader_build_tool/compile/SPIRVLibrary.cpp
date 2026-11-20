@@ -33,6 +33,7 @@ constexpr uint16_t kOpMemberName = 6;
 constexpr uint16_t kOpDecorate = 71;
 constexpr uint16_t kOpCapability = 17;
 constexpr uint16_t kOpFunction = 54;
+constexpr uint16_t kOpVariable = 59;
 constexpr uint16_t kOpFunctionParameter = 55;
 constexpr uint16_t kOpTypeInt = 21;
 constexpr uint16_t kOpTypeFloat = 22;
@@ -222,6 +223,72 @@ std::vector<uint32_t> ExportSPIRVFunctionForLinking(const std::vector<uint32_t>&
   return out;
 }
 
+namespace {
+
+// The dummy entry's sampler exists only so the wrapper compiles; the entry is dropped with the
+// export patch and the variable must go with it (a sampler at a fixed binding in every module would
+// collide after linking).
+bool IsDummySamplerName(const std::string& name) {
+  return name == "dummyLeafTex" || name == "dummyDstTex";
+}
+
+std::vector<uint32_t> DropDummySamplers(const std::vector<uint32_t>& words, std::string* error) {
+  const auto instructions = Parse(words);
+  if (instructions.empty()) {
+    *error = "the module's instructions do not parse";
+    return {};
+  }
+  std::unordered_map<uint32_t, std::string> names = {};
+  for (const auto& instruction : instructions) {
+    if (instruction.opcode != kOpName || instruction.wordCount < 3) {
+      continue;
+    }
+    const uint32_t targetId = words[instruction.offset + 1];
+    std::string name = {};
+    for (size_t word = instruction.offset + 2; word < instruction.offset + instruction.wordCount;
+         ++word) {
+      const uint32_t value = words[word];
+      for (int byte = 0; byte < 4; ++byte) {
+        const char c = static_cast<char>((value >> (byte * 8)) & 0xFFu);
+        if (c == '\0') {
+          break;
+        }
+        name.push_back(c);
+      }
+    }
+    names[targetId] = name;
+  }
+  std::set<uint32_t> drop = {};
+  for (const auto& pair : names) {
+    if (IsDummySamplerName(pair.second)) {
+      drop.insert(pair.first);
+    }
+  }
+  if (drop.empty()) {
+    return words;
+  }
+  std::vector<uint32_t> out = {};
+  out.reserve(words.size());
+  out.insert(out.end(), words.begin(), words.begin() + 5);
+  for (const auto& instruction : instructions) {
+    const uint32_t firstOperand = instruction.wordCount >= 2 ? words[instruction.offset + 1] : 0;
+    if (instruction.opcode == kOpVariable) {
+      const uint32_t resultId = instruction.wordCount >= 3 ? words[instruction.offset + 2] : 0;
+      if (drop.count(resultId) != 0) {
+        continue;
+      }
+    }
+    if ((instruction.opcode == kOpDecorate || instruction.opcode == kOpName) &&
+        drop.count(firstOperand) != 0) {
+      continue;
+    }
+    AppendWords(&out, words, instruction.offset, instruction.wordCount);
+  }
+  return out;
+}
+
+}  // namespace
+
 std::vector<uint32_t> CompileSPIRVLibraryModule(const std::string& wrapperSource,
                                                 const char* functionName, const char* shaderName,
                                                 std::string* error) {
@@ -233,8 +300,14 @@ std::vector<uint32_t> CompileSPIRVLibraryModule(const std::string& wrapperSource
   if (compiled.empty()) {
     return {};
   }
+  std::string dummyError;
+  auto withoutDummy = DropDummySamplers(compiled, &dummyError);
+  if (withoutDummy.empty()) {
+    *error = dummyError;
+    return {};
+  }
   std::string patchError;
-  auto patched = ExportSPIRVFunctionForLinking(compiled, functionName, &patchError);
+  auto patched = ExportSPIRVFunctionForLinking(withoutDummy, functionName, &patchError);
   if (patched.empty()) {
     *error = patchError;
     return {};

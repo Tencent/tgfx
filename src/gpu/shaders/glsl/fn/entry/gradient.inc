@@ -19,7 +19,12 @@ vec4 evalGradientSlot(vec4 in0 /*@in*/, vec3 sourceCoords /*@in*/, int layoutTyp
     // texture at the computed t. The LUT child occupies a leaf slot for sampler binding only;
     // lutLeaf selects it with static indices. Unreachable when NTEX == 0 (a LUT chain always
     // carries the child), but the branch must still compile for those variants.
-    gradColor = gradientColorizeLut(lutLeaf, gradT);
+#if NTEX > 0
+    gradColor = gradientColorizeLut(lutLeaf, gradT, TextureSampler_0, TextureSampler_1,
+                                    TextureSampler_2, TextureSampler_3);
+#else
+    gradColor = vec4(0.0);
+#endif
   } else {
     gradColor = gradientColorizeUnrolled(gradT, thresholds1_7, thresholds9_13, scales, biases);
   }

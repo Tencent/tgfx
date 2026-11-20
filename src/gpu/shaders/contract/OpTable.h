@@ -63,6 +63,8 @@ enum class Source : uint8_t {
   FragCoord,
   /// A value the row's special recipe builds (only leaf fetch and porter-duff use it).
   Special,
+  /// The i-th leaf sampler the body declares (a is 0..3).
+  LeafSampler,
 };
 
 struct Arg {
@@ -230,6 +232,10 @@ inline constexpr Arg kPerlinNoiseArgs[] = {
     {Param::Vec3, Source::Varying, 0},
     {Param::Vec4, Source::Member, ChainBindingSource::NoiseFrequencyStitch},
     {Param::IVec4, Source::Member, ChainBindingSource::NoiseModeOctaves},
+    {Param::SampledImage, Source::LeafSampler, 0},
+    {Param::SampledImage, Source::LeafSampler, 1},
+    {Param::SampledImage, Source::LeafSampler, 2},
+    {Param::SampledImage, Source::LeafSampler, 3},
 };
 inline constexpr const char* kPerlinNoiseIncludes[] = {"pipeline/chain/pointwise_noise.inc"};
 
@@ -287,10 +293,10 @@ inline constexpr Row kRows[] = {
      false, true, "", kLocalRectCoverageArgs, 4},
     {ChainISA::RRectCoverage, "tgfxOpRRectCoverage", "", kRRectCoverageIncludes, 2, false, true, "",
      kRRectCoverageArgs, 7},
-    {ChainISA::Gradient, "evalGradientSlot", "#define NTEX 4\n", kGradientIncludes, 1, true, true,
+    {ChainISA::Gradient, "evalGradientSlot", "#define NTEX 0\n", kGradientIncludes, 1, false, true,
      "", kGradientArgs, 20},
-    {ChainISA::PerlinNoise, "evalNoiseSlot", "", kPerlinNoiseIncludes, 1, true, true, "",
-     kPerlinNoiseArgs, 3},
+    {ChainISA::PerlinNoise, "evalNoiseSlot", "", kPerlinNoiseIncludes, 1, false, true, "",
+     kPerlinNoiseArgs, 7},
     {ChainISA::ColorSpaceXform, "chainApplyColorSpaceXform", "", kColorSpaceXformIncludes, 1, false,
      true, "", kColorSpaceXformArgs, 11},
     {LeafFetchId, "chainLeafFetch", "", kLeafFetchIncludes, 2, true, true, "leafFetch",

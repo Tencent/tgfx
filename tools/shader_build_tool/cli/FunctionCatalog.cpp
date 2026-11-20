@@ -419,6 +419,9 @@ bool WriteFunctionCatalog(const std::string& shaderDir, const std::string& outPa
         continue;
       }
       const std::string& paramName = params[index].second;
+      if (glslType.rfind("sampler", 0) == 0) {
+        continue;  // a texture is an argument, not a uniform member
+      }
       size_t arrayCount = 0;
       const auto bracket = glslType.find('[');
       if (bracket != std::string::npos) {

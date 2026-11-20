@@ -422,7 +422,9 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
         break;
       }
       case ChainISA::PerlinNoise:
-        expr = "evalNoiseSlot(SourceCoords, NoiseFrequencyStitch, NoiseModeOctaves)";
+        expr =
+            "evalNoiseSlot(SourceCoords, NoiseFrequencyStitch, NoiseModeOctaves, TextureSampler_0, "
+            "TextureSampler_1, TextureSampler_2, TextureSampler_3)";
         break;
       default:
         return false;
