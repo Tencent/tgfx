@@ -329,12 +329,12 @@ jobs:
           cd web/test
           npm run test:runner
 
-      # The reference cache is generated from a pinned origin/main snapshot. Pull requests only
-      # restore it (a stale fallback still compares correctly via version semantics); main pushes
-      # regenerate it on a cache miss. The cache must exist before the test build below, because
-      # CMake preloads it into the WASM file system at link time.
+      # The reference cache is generated from a pinned origin/main snapshot and must exist before
+      # the test build below, because CMake preloads it into the WASM file system at link time.
+      # A restore only counts when the primary key matches, so a stale fallback or a cold start
+      # regenerates the reference on pull requests too; only main pushes save it back for reuse.
       - name: Update Reference Cache
-        if: ${{ (github.event_name == 'push') && (steps.reference-cache.outputs.cache-hit != 'true') }}
+        if: ${{ steps.reference-cache.outputs.cache-hit != 'true' }}
         run: |
           source web/emsdk/emsdk_env.sh
           bash update_baseline.sh USE_WEBGL --skip-images
@@ -474,10 +474,9 @@ jobs:
           cd web/test
           npm install
 
-      # See the web-webgl job for why pull requests never regenerate the reference cache and why
-      # the cache must be restored before the test build.
+      # See the web-webgl job for the reference cache regeneration rule and the restore ordering.
       - name: Update Reference Cache
-        if: ${{ (github.event_name == 'push') && (steps.reference-cache.outputs.cache-hit != 'true') }}
+        if: ${{ steps.reference-cache.outputs.cache-hit != 'true' }}
         run: |
           source web/emsdk/emsdk_env.sh
           bash update_baseline.sh USE_WEBGPU --skip-images
