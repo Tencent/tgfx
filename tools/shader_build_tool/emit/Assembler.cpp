@@ -133,6 +133,20 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
       continue;
     }
     const uint8_t dimBase = DimOffsetOf(family, variant, slot);
+    // The chain's geometry hooks carry their leaf and source coordinates in place, so the leaf
+    // count and the procedural-source presence fold into the defines ahead of the text: the
+    // profile dim's own value spells both (four-leaf profiles 2/5/6, source profiles 3..6).
+    if (family.fallback && module->dimCount > 0 && module->name == std::string("Chain")) {
+      const auto profile = variant.values[dimBase];
+      if (profile == 2 || profile == 5 || profile == 6) {
+        assembled.vertDefines.push_back("NTEX=4");
+      } else {
+        assembled.vertDefines.push_back("NTEX=0");
+      }
+      if (profile >= 3) {
+        assembled.vertDefines.push_back("HAS_SOURCE_COORDS=1");
+      }
+    }
     for (uint8_t dim = 0; dim < module->dimCount; ++dim) {
       const std::string define =
           DimMacro(module, module->dims[dim]) + "=" + std::to_string(variant.values[dimBase + dim]);

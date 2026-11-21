@@ -1,6 +1,5 @@
 // EllipseGeometry vertex hook: the ellipse data forwarded to the fragment stage. The expressions
 // are bit-exact by contract.
-#include "pipeline/chain/pointwise_declared_config.inc"
 
 void EllipseGeometry_vertex(inout Vertex v) {
   v.position = EllipseGeometry_Position;
@@ -11,11 +10,22 @@ void EllipseGeometry_vertex(inout Vertex v) {
   EllipseGeometry_vRadii = EllipseGeometry_InEllipseRadii;
   EllipseGeometry_vColor = EllipseGeometry_InColor;
 
-// The leaf and procedural-source coordinate transforms, the chain body's contract: the macros name
-// this geometry's own coordinate source, the shared include spells the transforms once.
-#define CHAIN_LEAF_SOURCE(k) v.localCoord
-#define CHAIN_SOURCE_COORDS v.localCoord
-#include "pipeline/chain/pointwise_vertex_coords.inc"
-#undef CHAIN_LEAF_SOURCE
-#undef CHAIN_SOURCE_COORDS
+// The leaf and procedural-source coordinate transforms, the chain body's contract, spelled in
+// place: the tools fold NTEX/HAS_SOURCE_COORDS from the profile dim at bake time.
+#if defined(HAS_SOURCE_COORDS)
+#if NTEX > 0
+  TransformedCoords_0 = (CoordTransformMatrix_1 * vec3(v.localCoord, 1.0)).xyz;
+  TransformedCoords_1 = (CoordTransformMatrix_2 * vec3(v.localCoord, 1.0)).xyz;
+  TransformedCoords_2 = (CoordTransformMatrix_3 * vec3(v.localCoord, 1.0)).xyz;
+  TransformedCoords_3 = (CoordTransformMatrix_4 * vec3(v.localCoord, 1.0)).xyz;
+#endif
+  SourceCoords = (CoordTransformMatrix_0 * vec3(v.localCoord, 1.0)).xyz;
+#else
+#if NTEX > 0
+  TransformedCoords_0 = (CoordTransformMatrix_0 * vec3(v.localCoord, 1.0)).xyz;
+  TransformedCoords_1 = (CoordTransformMatrix_1 * vec3(v.localCoord, 1.0)).xyz;
+  TransformedCoords_2 = (CoordTransformMatrix_2 * vec3(v.localCoord, 1.0)).xyz;
+  TransformedCoords_3 = (CoordTransformMatrix_3 * vec3(v.localCoord, 1.0)).xyz;
+#endif
+#endif
 }
