@@ -819,6 +819,8 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
   // geometry and program facts the writer reads. The geometry module's own uniforms carry its
   // prefix; the chain contract members stay bare.
   RegisterVertexMember(&plan->bindings, layout, "RTAdjust", "", ChainBindingSource::RTAdjust);
+  RegisterVertexMember(&plan->bindings, layout, "CoordSourceMask", geometryPrefix,
+                       ChainBindingSource::CoordSourceMask);
   RegisterVertexMember(&plan->bindings, layout, "Matrix", geometryPrefix,
                        ChainBindingSource::VertexMatrix);
   RegisterVertexMember(&plan->bindings, layout, "InTexSubsetMatrix", geometryPrefix,

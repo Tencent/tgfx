@@ -647,6 +647,9 @@ bool ReadBinding(const ReadContext& ctx, const ChainBinding& binding, uint8_t* o
       std::memcpy(out, adjust.data(), sizeof(float) * 4);
       return true;
     }
+    case ChainBindingSource::CoordSourceMask:
+      Store(out, static_cast<int>(ctx.program->coordSourceMask));
+      return true;
     case ChainBindingSource::CoordTransform: {
       if (binding.index < 0 || static_cast<size_t>(binding.index) >= ctx.transforms.size()) {
         return false;

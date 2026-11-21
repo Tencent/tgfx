@@ -57,6 +57,7 @@ enum class ChainBindingSource : uint8_t {
   VertexMatrix,
   VertexTexSubsetMatrix,
   RTAdjust,
+  CoordSourceMask,
   CoordTransform,
   // The gradient source's named block.
   GradientLayoutType,
