@@ -257,7 +257,9 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   std::string geometryFormulas = {};
   std::string unitCoverageExpr = varyingByNameSuffix("_vCoverage");
   if (unitCoverageExpr.empty()) {
-    unitCoverageExpr = "vCoverage";
+    // A geometry with no coverage varying supplies the constant: the atlas layout's glyph mask
+    // reaches the composite through the clip-coverage register instead.
+    unitCoverageExpr = "vec4(1.0)";
   }
   if (const auto* coverage = ChainGeometryCoverageOf(plan.geometry)) {
 #if defined(TGFX_HAS_CHAIN_CATALOG)

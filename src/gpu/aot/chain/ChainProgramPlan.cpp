@@ -810,7 +810,8 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
       }
     }
   }
-  if (unitCoverageUsed && geometryCoverage == nullptr) {
+  if (unitCoverageUsed && geometryCoverage == nullptr &&
+      LayoutDeclaresVarying(layout, (geometryPrefix + "vCoverage").c_str())) {
     registry.varying(geometryPrefix + "vCoverage", FragmentType::Float);
   }
 
