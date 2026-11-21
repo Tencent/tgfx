@@ -204,6 +204,11 @@ bool MatchQuadColor(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// rounded rect, at most one fragment (a sole analytic clip riding the runtime contract, or the
 /// single-tap tiled fill), never alpha-only, any xfer.
 bool MatchRRect(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchResult* result) {
+  // Retired with the shape families: a dedicated variant carries one coverage and no clip
+  // composition, so a draw with a combined clip matched it and rendered nothing. The assembled
+  // chain serves every geometry with the full coverage tree; this rule stays off.
+  return false;
+
   if (shape.geometry->kind != GeometryKind::NonAARRect || shape.alphaOnlyTarget) {
     return false;
   }
@@ -473,6 +478,11 @@ bool MatchGlassRefractionQuad(const ProgramInfo* /*info*/, const DrawShape& shap
 /// runtime StrokeEnabled uniform, so the ordinal is HAS_XP alone.
 bool MatchComplexRRect(const ProgramInfo* /*info*/, const DrawShape& shape,
                        FamilyMatchResult* result) {
+  // Retired with the shape families: a dedicated variant carries one coverage and no clip
+  // composition, so a draw with a combined clip matched it and rendered nothing. The assembled
+  // chain serves every geometry with the full coverage tree; this rule stays off.
+  return false;
+
   if (shape.geometry->kind != GeometryKind::ComplexNonAARRect || shape.fragmentCount != 0 ||
       shape.xpType() < XP_NONE) {
     return false;
@@ -503,12 +513,22 @@ bool MatchHairline(const ProgramInfo* /*info*/, const DrawShape& shape, Geometry
 /// The shared hairline rule's two table entries, one per family row.
 bool MatchHairlineLine(const ProgramInfo* /*info*/, const DrawShape& shape,
                        FamilyMatchResult* result) {
+  // Retired with the shape families: a dedicated variant carries one coverage and no clip
+  // composition, so a draw with a combined clip matched it and rendered nothing. The assembled
+  // chain serves every geometry with the full coverage tree; this rule stays off.
+  return false;
+
   return MatchHairline(/*info=*/nullptr, shape, GeometryKind::HairlineLine, HairlineLineIndex,
                        result);
 }
 
 bool MatchHairlineQuad(const ProgramInfo* /*info*/, const DrawShape& shape,
                        FamilyMatchResult* result) {
+  // Retired with the shape families: a dedicated variant carries one coverage and no clip
+  // composition, so a draw with a combined clip matched it and rendered nothing. The assembled
+  // chain serves every geometry with the full coverage tree; this rule stays off.
+  return false;
+
   return MatchHairline(/*info=*/nullptr, shape, GeometryKind::HairlineQuad, HairlineQuadIndex,
                        result);
 }
@@ -517,6 +537,11 @@ bool MatchHairlineQuad(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// with no color processor, a coverage that is anything but a local mask, and any xfer. DeviceMask
 /// carries PRESENT, so the ordinal is PRESENT + 2 * HAS_XP.
 bool MatchEllipse(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchResult* result) {
+  // Retired with the shape families: a dedicated variant carries one coverage and no clip
+  // composition, so a draw with a combined clip matched it and rendered nothing. The assembled
+  // chain serves every geometry with the full coverage tree; this rule stays off.
+  return false;
+
   if (shape.geometry->kind != GeometryKind::Ellipse || shape.colorFPCount != 0 ||
       !shape.coverage.has_value() || *shape.coverage == Coverage::LocalMask ||
       shape.xpType() < XP_NONE) {
@@ -531,6 +556,11 @@ bool MatchEllipse(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMat
 /// STROKE + 2 * PRESENT + 4 * HAS_XP.
 bool MatchComplexEllipse(const ProgramInfo* /*info*/, const DrawShape& shape,
                          FamilyMatchResult* result) {
+  // Retired with the shape families: a dedicated variant carries one coverage and no clip
+  // composition, so a draw with a combined clip matched it and rendered nothing. The assembled
+  // chain serves every geometry with the full coverage tree; this rule stays off.
+  return false;
+
   if (shape.geometry->kind != GeometryKind::ComplexEllipse || shape.colorFPCount != 0 ||
       !shape.coverage.has_value() || *shape.coverage == Coverage::LocalMask ||
       shape.xpType() < XP_NONE) {
@@ -545,6 +575,11 @@ bool MatchComplexEllipse(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// is UV_MATRIX + 2 * HAS_XP.
 bool MatchRoundStrokeRect(const ProgramInfo* /*info*/, const DrawShape& shape,
                           FamilyMatchResult* result) {
+  // Retired with the shape families: a dedicated variant carries one coverage and no clip
+  // composition, so a draw with a combined clip matched it and rendered nothing. The assembled
+  // chain serves every geometry with the full coverage tree; this rule stays off.
+  return false;
+
   if (shape.geometry->kind != GeometryKind::RoundStrokeRect) {
     return false;
   }
@@ -617,6 +652,11 @@ bool MatchYUVTexture(const ProgramInfo* /*info*/, const DrawShape& /*shape*/,
 /// flatten in that order, so the ordinal is HAS_COVERAGE + 2 * HAS_XP.
 bool MatchAtlasText(const ProgramInfo* /*info*/, const DrawShape& shape,
                     FamilyMatchResult* result) {
+  // Retired with the shape families: a dedicated variant carries one coverage and no clip
+  // composition, so a draw with a combined clip matched it and rendered nothing. The assembled
+  // chain serves every geometry with the full coverage tree; this rule stays off.
+  return false;
+
   if (shape.geometry->kind != GeometryKind::AtlasText || shape.colorFPCount != 0 ||
       shape.fragmentCount > 1 || shape.xpType() < XP_NONE) {
     return false;
@@ -645,10 +685,12 @@ bool DeriveChainCell(const DrawIR& ir, const AOTProgram& program, const ProgramI
   // family's vertex-layout choice and the matcher's facts cannot disagree.
   auto gpKind = PointwiseGpKind(GeometryFactsOf(info->getGeometryLayout()));
   if (!gpKind.has_value()) {
+    LOGE("CR #1", 1);
     return false;
   }
   // Sampler-only padding makes every non-empty chain present exactly four sampler children.
   if (program.samplerChildCount != 0 && program.samplerChildCount != 4) {
+    LOGE("CR #2", 2);
     return false;
   }
   // Color-space transforms and gradients each share one chain-wide parameter block; a multi-plane
@@ -659,6 +701,7 @@ bool DeriveChainCell(const DrawIR& ir, const AOTProgram& program, const ProgramI
   for (uint32_t index = 1; index < ir.color.nodeCount(); ++index) {
     auto* node = ir.color.nodeAt(AOTNodeID(index));
     if (node == nullptr) {
+      LOGE("CR #3", 3);
       return false;
     }
     if (node->kind == AOTEffectKind::ColorSpaceXform) {
@@ -671,6 +714,7 @@ bool DeriveChainCell(const DrawIR& ir, const AOTProgram& program, const ProgramI
     }
   }
   if (colorSpaceXformCount > 1 || gradientCount > 1) {
+    LOGE("CR #4", 4);
     return false;
   }
   for (const auto& binding : program.bindings) {
@@ -689,6 +733,7 @@ bool DeriveChainCell(const DrawIR& ir, const AOTProgram& program, const ProgramI
     }
     auto textureView = binding.textureProxy->getTextureView();
     if (textureView != nullptr && textureView->isYUV() && !hasYuvOperator) {
+      LOGE("CR #5", 5);
       return false;
     }
   }
@@ -706,6 +751,7 @@ bool DeriveChainCell(const DrawIR& ir, const AOTProgram& program, const ProgramI
       hasUVCoord = geometry.hasUVMatrix ? 0 : 1;
       if (geometry.hasSubset) {
         if (!IsChainQuadSubsetServable(geometry, program)) {
+          LOGE("CR #6", 6);
           return false;
         }
         hasSubset = true;
@@ -731,12 +777,21 @@ bool DeriveChainCell(const DrawIR& ir, const AOTProgram& program, const ProgramI
     case GpKind::HairlineQuad:
       // Per-pixel edge coverage laid out ahead of the chain: no coverage or uvCoord attribute.
       break;
+    case GpKind::RoundStrokeRect:
+      // The round-capped stroke segment carries its own per-vertex coverage ramp attribute. The
+      // uvCoord slot exists only without a uv matrix, which is also the module's UV_MATRIX dim:
+      // cell.uvCoord carries the dim value (1 = matrix, the attribute is gone), not the
+      // attribute's presence.
+      hasCoverage = 1;
+      hasUVCoord = geometry.hasUVMatrix ? 1 : 0;
+      break;
     case GpKind::Default:
       // The DefaultGP's coverage attribute is unconditional (the non-AA path triangles carry a
       // constant 1.0 slot), so it always reports coverage.
       hasCoverage = 1;
       break;
     default:
+      LOGE("CR #7", 7);
       return false;
   }
   int resource = 0;
@@ -744,26 +799,31 @@ bool DeriveChainCell(const DrawIR& ir, const AOTProgram& program, const ProgramI
     resource = 2;
     if (!hasNoise || hasGradient || *gpKind != GpKind::QuadPerEdgeAA || hasCoverage == 0 ||
         hasUVCoord != 0 || textureCount != 1) {
+      LOGE("CR #8", 8);
       return false;
     }
   } else if (program.profile == AOTResourceProfile::TiledGraph) {
     resource = 1;
     if (hasNoise) {
+      LOGE("CR #9", 9);
       return false;
     }
   } else if (hasNoise || hasGradient ||
              (program.profile != AOTResourceProfile::Automatic &&
               program.profile != AOTResourceProfile::Chain)) {
+    LOGE("CR #10", 10);
     return false;
   }
   // The extended resource kinds carry no per-quad subset branch.
   if (resource != 0 && hasSubset) {
+    LOGE("CR #11", 11);
     return false;
   }
   int gpLayout = 0;
   switch (*gpKind) {
     case GpKind::Default:
       if (hasUVCoord != 0) {
+        LOGE("CR #12", 12);
         return false;
       }
       break;
@@ -774,6 +834,7 @@ bool DeriveChainCell(const DrawIR& ir, const AOTProgram& program, const ProgramI
       // The atlas route exists to sample the atlas coverage leaf: the decomposer always attaches
       // it, so a leaf-free atlas chain is structurally producible but semantically vacuous.
       if (textureCount == 0) {
+        LOGE("CR #13", 13);
         return false;
       }
       break;
@@ -795,18 +856,24 @@ bool DeriveChainCell(const DrawIR& ir, const AOTProgram& program, const ProgramI
     case GpKind::HairlineQuad:
       gpLayout = 9;
       break;
+    case GpKind::RoundStrokeRect:
+      gpLayout = 8;
+      break;
     default:
+      LOGE("CR #14", 14);
       return false;
   }
   // Four-leaf variants apply the mask through a runtime uniform, so the compile-time mask
   // dimension exists only for leaf-free chains, and those stay on layouts without quad attributes.
   const int mask = textureCount == 0 && hasMask ? 1 : 0;
   if (mask != 0 && (gpLayout == 1 || hasUVCoord != 0)) {
+    LOGE("CR #15", 15);
     return false;
   }
   // The per-quad subset is a QuadPerEdgeAAGP attribute that clamps a texture leaf, so it exists
   // only on the quad profile with the four-leaf slots.
   if (hasSubset && (*gpKind != GpKind::QuadPerEdgeAA || textureCount != 1)) {
+    LOGE("CR #16", 16);
     return false;
   }
   cell->gpLayout = gpLayout;
@@ -832,7 +899,9 @@ namespace {
 std::vector<uint8_t> ChainCellValues(const ChainCell& cell, uint8_t geometry) {
   std::vector<uint8_t> values = {};
   if (Families()[ChainIndex].geometries[geometry]->dimCount != 0) {
-    values.push_back(static_cast<uint8_t>(cell.subset));
+    // The rect modules' dim is SUBSET (the per-quad subset attribute); the round-stroke-rect's is
+    // UV_MATRIX (the uvCoord attribute's presence) — the same slot, the geometry's own fact.
+    values.push_back(static_cast<uint8_t>(geometry == 9 ? cell.uvCoord : cell.subset));
   }
   values.push_back(ChainProfileOfCell(cell));
   values.push_back(static_cast<uint8_t>(cell.gpLayout));

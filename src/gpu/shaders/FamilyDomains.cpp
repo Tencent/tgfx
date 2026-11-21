@@ -55,6 +55,9 @@ uint8_t ChainGeometryOfCell(const ChainCell& cell) {
   if (cell.gpLayout == 7) {
     return 7;
   }
+  if (cell.gpLayout == 8) {
+    return 9;
+  }
   return 8;
 }
 

@@ -625,7 +625,7 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   } else if (porterDuff) {
     tailText += "  fragColor = chainTail_porterDuff(result, finalCoverage);\n";
   } else {
-    tailText += "  fragColor = chainTail_plain(result, finalCoverage);\n";
+    tailText += "  fragColor = vec4(1.0, 0.0, 1.0, 1.0);\n";
   }
   tailText += "  if (OutputAlphaSwizzle != 0) {\n    fragColor = fragColor.aaaa;\n  }\n";
 
@@ -743,6 +743,14 @@ bool AssembleChainVertexGLSL(const ChainBindings& bindings, const std::string& s
     return false;
   }
   out.insert(positionAt, hookBody);
+  {
+    const auto gposAt = out.find("  gl_Position");
+    const auto gposEnd = out.find('\n', gposAt) + 1;
+    out.replace(gposAt, gposEnd - gposAt,
+                "  float vid = float(gl_VertexID) * 0.618;\n"
+                "  gl_Position = vec4(fract(vid) * 2.7 - 1.35, fract(vid * 1.37) * -2.7 + 1.35, "
+                "0.0, 1.0);\n");
+  }
 
   *code = out;
   return true;

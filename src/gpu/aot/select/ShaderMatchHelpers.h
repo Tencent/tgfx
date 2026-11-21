@@ -58,6 +58,7 @@ inline constexpr int ComplexEllipse = 6;
 inline constexpr int NonAARRect = 7;
 inline constexpr int ComplexRRect = 8;
 inline constexpr int HairlineQuad = 9;
+inline constexpr int RoundStrokeRect = 10;
 }  // namespace GpKind
 
 /// Maps the one geometry classification onto the chain's gpKind axis; nullopt when the chain has no

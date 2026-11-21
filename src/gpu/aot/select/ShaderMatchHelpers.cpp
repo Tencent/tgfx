@@ -253,6 +253,8 @@ std::optional<int> PointwiseGpKind(const AOTGeometryParameters& geometry) {
       return GpKind::NonAARRect;
     case GeometryKind::ComplexNonAARRect:
       return GpKind::ComplexRRect;
+    case GeometryKind::RoundStrokeRect:
+      return GpKind::RoundStrokeRect;
     case GeometryKind::HairlineQuad:
       return GpKind::HairlineQuad;
     default:

@@ -265,7 +265,7 @@ inline constexpr const Module* ChainGeometries[] = {
     // The ellipse reuses the declared geometry: its interface and vertex math are identical, and
     // the chain body addresses the prefixed varyings through the CHAIN_GEOMETRY alias block.
     &EllipseGeometry, &HairlineLineGeometry, &ComplexEllipseGeometry, &RRectGeometry,
-    &ComplexRRectGeometry, &HairlineQuadGeometry};
+    &ComplexRRectGeometry, &HairlineQuadGeometry, &RoundStrokeRectGeometry};
 
 // The chain family's body order is the slot order: Frame(0), geometry(1), Chain(2),
 // ChainColorParams(3, no dims), Xfer(4). Readers that address a module by slot must use these
@@ -286,7 +286,7 @@ inline bool ChainVariantAllowed(const Variant& variant, const Family& family) {
   // numbering (0 rect, 1 ellipse, 2 hairline, 3 complex-ellipse, 5 non-AA rrect, 7 complex rrect,
   // 9 hairline quad) that the body branches and the compiled variants share. A variant pairing a geometry with another class would
   // assemble a body whose branches disagree with the geometry's interface.
-  static constexpr uint8_t GeometryLayouts[] = {0, 0, 0, 1, 2, 3, 5, 7, 9};
+  static constexpr uint8_t GeometryLayouts[] = {0, 0, 0, 1, 2, 3, 5, 7, 9, 8};
   if (DimValueOf(family, variant, 2, 1) != GeometryLayouts[variant.geometry]) {
     return false;
   }
@@ -309,6 +309,11 @@ inline bool ChainVariantAllowed(const Variant& variant, const Family& family) {
       // The ellipse layout has no coverage or uvCoord attribute, so the
       // mask-only profiles and noise are unreachable.
       return subset == 0 && (profile == 0 || profile == 2 || profile == 3 || profile == 5);
+    case 9:
+      // RoundStrokeRectGeometry: the geometry slot's dim is UV_MATRIX (not SUBSET), and both of
+      // its values are reachable — the attribute form (no matrix) and the matrix form. The
+      // coverage is the analytic round-stroke SDF, so the mask is reachable, noise is not.
+      return profile != 6;
     default:
       // The per-pixel coverage layouts (hairline line, complex rounded rect, the two non-AA
       // rounded rects and the hairline quad): the mask is reachable, noise is not.
@@ -343,7 +348,7 @@ inline constexpr Family FamilyTableStorage[] = {
     {"GlassUDFTentBlur", GlassUDFTentBlurGeometries, 1, GlassUDFTentBlurBody, 3},
     {"GlassRefraction", GlassRefractionGeometries, 1, GlassRefractionBody, 2},
     {"GlassRefractionQuad", GlassRefractionQuadGeometries, 1, GlassRefractionQuadBody, 3},
-    {"Chain", ChainGeometries, 9, ChainBody, 2, ChainVariantAllowed, /*bodyOwnsOutput=*/true,
+    {"Chain", ChainGeometries, 10, ChainBody, 2, ChainVariantAllowed, /*bodyOwnsOutput=*/true,
      /*fallback=*/true, /*textureReads=*/ShaderTextureReadSwizzle},
 };
 

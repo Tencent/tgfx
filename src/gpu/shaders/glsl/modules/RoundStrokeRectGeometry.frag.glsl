@@ -10,7 +10,6 @@ void RoundStrokeRectGeometry_fragment(inout Fragment f) {
   }
   highp float coverage =
       roundStrokeRectCoverage(RoundStrokeRectGeometry_vOffsets, RoundStrokeRectGeometry_vRadii,
-                              RoundStrokeRectGeometry_vCoverage,
-                              RoundStrokeRectGeometry_AAEnabled != 0);
+                              RoundStrokeRectGeometry_vCoverage, RoundStrokeRectGeometry_AAEnabled);
   f.coverage = vec4(coverage);
 }

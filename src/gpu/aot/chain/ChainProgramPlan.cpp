@@ -701,7 +701,7 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
   // modules all spell their own members as <Module>_<name> (ElementNameOf's rule), so one prefix
   // serves the geometry-owned varyings and vertex uniforms alike.
   const std::string geometryPrefix =
-      variant.geometry < 9 && ChainGeometries[variant.geometry] != nullptr
+      variant.geometry < 10 && ChainGeometries[variant.geometry] != nullptr
           ? std::string(ChainGeometries[variant.geometry]->name) + "_"
           : std::string();
   // The leaves the body samples, in slot order, each registering its own declarations. The leaf
@@ -892,6 +892,12 @@ constexpr ChainGeometryCoverageArg ComplexEllipseCoverageArgs[] = {
     {"ComplexEllipseGeometry_vStrokeWidth", FragmentType::Float2},
     {"ChainColorParams_StrokeEnabled", FragmentType::Int, true, ChainBindingSource::GeometryStroke},
 };
+constexpr ChainGeometryCoverageArg RoundStrokeRectCoverageArgs[] = {
+    {"RoundStrokeRectGeometry_vOffsets", FragmentType::Float2},
+    {"RoundStrokeRectGeometry_vRadii", FragmentType::Float2},
+    {"RoundStrokeRectGeometry_vCoverage", FragmentType::Float},
+    {"RoundStrokeRectGeometry_AAEnabled", FragmentType::Int, true, ChainBindingSource::GeometryAA},
+};
 constexpr ChainGeometryCoverageArg NonAARRectCoverageArgs[] = {
     {"RRectGeometry_vLocalCoord", FragmentType::Float2},
     {"RRectGeometry_vRectBounds", FragmentType::Float4},
@@ -926,6 +932,8 @@ constexpr ChainGeometryCoverageCall GeometryCoverageCalls[] = {
      sizeof(ComplexRRectCoverageArgs) / sizeof(ComplexRRectCoverageArgs[0])},
     {8, "hairlineQuadEdgeCoverage", HairlineQuadCoverageArgs,
      sizeof(HairlineQuadCoverageArgs) / sizeof(HairlineQuadCoverageArgs[0])},
+    {9, "roundStrokeRectCoverage", RoundStrokeRectCoverageArgs,
+     sizeof(RoundStrokeRectCoverageArgs) / sizeof(RoundStrokeRectCoverageArgs[0])},
 };
 
 }  // namespace
@@ -1057,10 +1065,12 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
   const auto& graph = ir.color;
   if (layout == nullptr || graph.nodeCount() < 2 || !graph.root().isValid() ||
       graph.root().index() >= graph.nodeCount()) {
+    LOGE("LR #1", 1);
     return false;
   }
   auto geometryNode = graph.nodeAt(AOTNodeID(0));
   if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor) {
+    LOGE("LR #2", 2);
     return false;
   }
 
@@ -1071,15 +1081,18 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
   if (pass != nullptr) {
     if (pass->nodes.empty() || !pass->output.isValid() ||
         pass->output.index() >= graph.nodeCount()) {
+      LOGE("LR #3", 3);
       return false;
     }
     for (auto nodeID : pass->nodes) {
       if (nodeID.index() >= graph.nodeCount() || inPass[nodeID.index()]) {
+        LOGE("LR #4", 4);
         return false;
       }
       inPass[nodeID.index()] = true;
     }
     if (!inPass[pass->output.index()]) {
+      LOGE("LR #5", 5);
       return false;
     }
   } else {
@@ -1089,6 +1102,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
     }
     std::vector<bool> reachable(graph.nodeCount(), !containsNoise);
     if (containsNoise && !CollectReachableNodes(graph, graph.root(), &reachable)) {
+      LOGE("LR #6", 6);
       return false;
     }
     for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
@@ -1097,6 +1111,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
   }
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
     if (inPass[index] && !TraitsOf(graph.nodeAt(AOTNodeID(index))->kind).chainFusable) {
+      LOGE("LR #7", 7);
       return false;
     }
   }
@@ -1106,12 +1121,14 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
   ChainCoverageGraph coverage = {};
   if (!ir.coverage.empty()) {
     if (!MergeCoverageTerms(ir.coverage, &coverage)) {
+      LOGE("LR #8", 8);
       return false;
     }
   }
   const size_t colorCount = graph.nodeCount();
   const size_t covCount = coverage.graph.nodeCount();
   if (coverage.coverageRoot.isValid() && coverage.coverageRoot.index() >= covCount) {
+    LOGE("LR #9", 9);
     return false;
   }
 
@@ -1122,6 +1139,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
   for (size_t index = 0; index < colorCount; ++index) {
     auto* node = graph.nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
     if (node == nullptr) {
+      LOGE("LR #10", 10);
       return false;
     }
     nodes.push_back(node);
@@ -1129,6 +1147,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
   for (size_t index = 0; index < covCount; ++index) {
     auto* node = coverage.graph.nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
     if (node == nullptr) {
+      LOGE("LR #11", 11);
       return false;
     }
     nodes.push_back(node);
@@ -1145,11 +1164,13 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
   const auto isComputedTextureInput = [&](size_t combined) {
     auto* node = nodes[combined];
     if (node->kind != AOTEffectKind::TextureSource || node->inputs.empty()) {
+      LOGE("LR #12", 12);
       return false;
     }
     const size_t inputBase = combined < colorCount ? 0 : colorCount;
     const size_t inputIndex = inputBase + node->inputs[0].index();
     if (inputIndex >= nodeTotal) {
+      LOGE("LR #13", 13);
       return false;
     }
     return !TraitsOf(nodes[inputIndex]->kind).isInputDesignator();
@@ -1190,6 +1211,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
     }
   }
   if (ordered.size() > MaxChainSlots) {
+    LOGE("LR #14", 14);
     return false;
   }
 
@@ -1216,6 +1238,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
     const size_t inputBase = combined < colorCount ? 0 : colorCount;
     for (auto input : node->inputs) {
       if (inputBase + input.index() >= (combined < colorCount ? colorCount : nodeTotal)) {
+        LOGE("LR #15", 15);
         return false;
       }
     }
@@ -1225,6 +1248,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
       case AOTEffectKind::TextureSource: {
         auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
         if (parameters == nullptr) {
+          LOGE("LR #16", 16);
           return false;
         }
         if (parameters->isYUV) {
@@ -1232,6 +1256,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
           // and the limited-range flag are upload-time reads off the view).
           if (parameters->samplingKind != AOTTextureSamplingKind::Plain || inputBase != 0 ||
               parameters->hasPerspective) {
+            LOGE("LR #17", 17);
             return false;
           }
           site.op = ChainISA::YUV;
@@ -1241,6 +1266,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
           break;
         }
         if (!IsChainTextureLeaf(*parameters)) {
+          LOGE("LR #18", 18);
           return false;
         }
         if (index != rawSlotOf[combined]) {
@@ -1252,6 +1278,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
           site.texModulateSourceSlot = static_cast<int>(rawSlotOf[combined]);
           site.texModulateAlphaOnly = parameters->isAlphaOnly;
           if (site.in0 < 0 || site.texModulateSourceSlot >= MaxFusedAOTSamplers) {
+            LOGE("LR #19", 19);
             return false;
           }
           break;
@@ -1298,6 +1325,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
           // Every color leaf may sample in device space through its own coordinate matrix; a
           // device-space coverage texture becomes the mask child instead.
           if (inputBase != 0) {
+            LOGE("LR #20", 20);
             return false;
           }
           layout->deviceLeafIndices.push_back(static_cast<int>(layout->leafNodes.size()));
@@ -1309,6 +1337,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
         auto parameters = std::get_if<AOTPerlinNoiseParameters>(&node->parameters);
         if (parameters == nullptr || noiseSeen || inputBase != 0 ||
             parameters->permutationsView == nullptr || parameters->noiseView == nullptr) {
+          LOGE("LR #21", 21);
           return false;
         }
         noiseSeen = true;
@@ -1319,6 +1348,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
       case AOTEffectKind::ConstColor: {
         auto parameters = std::get_if<AOTConstColorParameters>(&node->parameters);
         if (parameters == nullptr || node->inputs.size() != 1) {
+          LOGE("LR #22", 22);
           return false;
         }
         site.op = ChainISA::ConstColor;
@@ -1331,18 +1361,21 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
       case AOTEffectKind::AlphaThreshold:
       case AOTEffectKind::ColorSpaceXform: {
         if (node->inputs.size() != 1) {
+          LOGE("LR #23", 23);
           return false;
         }
         // The color-space parameters are one shared chain-wide block, so at most one transform
         // per pass (the same single-block budget the variant derivation reads).
         if (node->kind == AOTEffectKind::ColorSpaceXform &&
             ++colorSpaceXformCount > MaxChainColorSpaceXformSlots) {
+          LOGE("LR #24", 24);
           return false;
         }
         // The shared kind-to-op mapping and parameter admission, the same definition the walk
         // consumes; only the op and the checks matter here — the values ride the upload-time
         // readers off the node.
         if (!BuildPointwiseSlot(graph, node, &site.op)) {
+          LOGE("LR #25", 25);
           return false;
         }
         site.in0 = mapInput(inputBase, node->inputs[0]);
@@ -1351,11 +1384,13 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
       case AOTEffectKind::Blend: {
         auto parameters = std::get_if<AOTBlendParameters>(&node->parameters);
         if (parameters == nullptr || node->inputs.size() != 2) {
+          LOGE("LR #26", 26);
           return false;
         }
         // Two-child blends lower their children with the opaque-alpha geometry input, which only
         // the color graph carries.
         if (parameters->childType == 2 && inputBase != 0) {
+          LOGE("LR #27", 27);
           return false;
         }
         site.op = ChainISA::Blend;
@@ -1367,6 +1402,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
       }
       case AOTEffectKind::InputOpaque: {
         if (node->inputs.size() != 1) {
+          LOGE("LR #28", 28);
           return false;
         }
         site.op = ChainISA::InputOpaque;
@@ -1375,6 +1411,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
       }
       case AOTEffectKind::MulAlpha: {
         if (node->inputs.size() != 2) {
+          LOGE("LR #29", 29);
           return false;
         }
         site.op = ChainISA::MulAlpha;
@@ -1385,6 +1422,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
       case AOTEffectKind::RectCoverage: {
         auto parameters = std::get_if<AOTRectCoverageParameters>(&node->parameters);
         if (parameters == nullptr || node->inputs.size() != 1) {
+          LOGE("LR #30", 30);
           return false;
         }
         site.op = IsIdentityMat3RowMajor(parameters->deviceToLocal) ? ChainISA::AARectCoverage
@@ -1395,6 +1433,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
       case AOTEffectKind::RRectCoverage: {
         auto parameters = std::get_if<AOTRRectCoverageParameters>(&node->parameters);
         if (parameters == nullptr || node->inputs.size() != 1) {
+          LOGE("LR #31", 31);
           return false;
         }
         site.op = ChainISA::RRectCoverage;
@@ -1404,15 +1443,18 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
       case AOTEffectKind::GradientSource: {
         auto parameters = std::get_if<AOTGradientParameters>(&node->parameters);
         if (parameters == nullptr || node->inputs.size() != 1) {
+          LOGE("LR #32", 32);
           return false;
         }
         // Single-authority budget: the kernel carries one chain-wide gradient parameter block.
         if (hasGradient) {
+          LOGE("LR #33", 33);
           return false;
         }
         hasGradient = true;
         if (parameters->colorizerKind == 3) {
           if (parameters->lutProxy == nullptr) {
+            LOGE("LR #34", 34);
             return false;
           }
           layout->lutGradient = parameters;
@@ -1423,6 +1465,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
       }
       default:
         LOGE("Layout reject #35 kind=%d", static_cast<int>(node->kind));
+        LOGE("LR #35", 35);
         return false;
     }
     // An input edge whose producer is outside the pass: the expression omitted a node it depends
@@ -1431,9 +1474,11 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
         site.op != ChainISA::YUV &&
         (site.in0 == -2 ||
          ((site.op == ChainISA::Blend || site.op == ChainISA::MulAlpha) && site.in1 == -2))) {
+      LOGE("LR #36", 36);
       return false;
     }
     if (!OpAssembles(site.op)) {
+      LOGE("LR #37", 37);
       return false;
     }
   }
@@ -1445,6 +1490,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
   const size_t leafCount = layout->leafNodes.size();
   if ((layout->lutGradient != nullptr && leafCount >= 2) ||
       (noiseSeen && (hasGradient || leafCount > 2 || coverage.coverageLeafFromUVCoord))) {
+    LOGE("LR #38", 38);
     return false;
   }
 
@@ -1454,6 +1500,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
   // channel in chain order, each link consuming the previous one's slot.
   const size_t rootIndex = slotOf[(pass != nullptr ? pass->output : graph.root()).index()];
   if (rootIndex == SIZE_MAX) {
+    LOGE("LR #39", 39);
     return false;
   }
   int coverageRootSlot = -1;
@@ -1469,6 +1516,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
     const bool rootIsAnalytic = covRootNode->kind == AOTEffectKind::RectCoverage ||
                                 covRootNode->kind == AOTEffectKind::RRectCoverage;
     if (!rootIsBlend && !rootIsTexture && !rootIsGradient && !rootIsConstant && !rootIsAnalytic) {
+      LOGE("LR #40", 40);
       return false;
     }
     int coverageBlendCount = 0;
@@ -1490,6 +1538,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
             node->kind != AOTEffectKind::GradientSource &&
             node->kind != AOTEffectKind::RectCoverage &&
             node->kind != AOTEffectKind::RRectCoverage) {
+          LOGE("LR #41", 41);
           return false;
         }
       }
@@ -1498,10 +1547,12 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
     // still transmits the unit coverage transitively, so only analytic roots may omit a direct
     // unit input.
     if (coverageBlendCount != (rootIsBlend ? 1 : 0) || (!rootConsumesUnit && !rootIsAnalytic)) {
+      LOGE("LR #42", 42);
       return false;
     }
     auto covSlot = slotOf[covRootCombined];
     if (covSlot == SIZE_MAX) {
+      LOGE("LR #43", 43);
       return false;
     }
     coverageRootSlot = static_cast<int>(covSlot);
@@ -1510,6 +1561,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
       // coverage input with the unpremultiplied source; a draw clip then chains on top of the
       // glyph.
       if (clipCoverageSlot >= 0) {
+        LOGE("LR #44", 44);
         return false;
       }
       clipCoverageSlot = coverageRootSlot;

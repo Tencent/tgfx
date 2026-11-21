@@ -8,9 +8,9 @@
 
 //@function roundStrokeRectCoverage
 
-float roundStrokeRectCoverage(vec2 offsets, vec2 ellipseRadii, float vertexCoverage, bool aa) {
+float roundStrokeRectCoverage(vec2 offsets, vec2 ellipseRadii, float vertexCoverage, int aa) {
   highp vec2 offset = offsets;
-  if (!aa) {
+  if (aa == 0) {
     highp float test = dot(offset, offset);
     return step(test, 1.0);
   }
