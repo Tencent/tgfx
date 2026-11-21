@@ -69,6 +69,7 @@ bool OpAssembles(int op) {
     case ChainISA::RRectCoverage:
     case ChainISA::Texture:
     case ChainISA::TexModulate:
+    case ChainISA::GaussianBlur1D:
     case ChainISA::Gradient:
     case ChainISA::PerlinNoise:
     case ChainISA::ColorSpaceXform:
@@ -660,6 +661,40 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
         ChainArg frag = {};
         frag.kind = ChainArgKind::FragCoord;
         push(frag);
+        break;
+      }
+      case ChainISA::GaussianBlur1D: {
+        // The blur's own record-time facts ride the node's parameters; the subset rect reuses
+        // the child leaf's binding (its texture parameters carry it).
+        registry.setNode(site.node);
+        registry.uniform("BlurStep", FragmentType::Float2, ChainBindingSource::BlurStep, -1);
+        registry.uniform("BlurRadius", FragmentType::Int, ChainBindingSource::BlurRadius, -1);
+        registry.uniform("BlurKernel", FragmentType::Float4, ChainBindingSource::BlurKernel, -1, -1,
+                         17);
+        registry.uniform("BlurSubset", FragmentType::Float4, ChainBindingSource::LeafSubset, -1,
+                         site.in1);
+        // The tiled recipe members always declare: a plain child uploads zeros and the tiled
+        // branch stays dead (the driver folds it away), so one function text serves both.
+        registry.uniform("BlurTiledModeX", FragmentType::Int, ChainBindingSource::TiledShaderModeX,
+                         -1, site.in1);
+        registry.uniform("BlurTiledModeY", FragmentType::Int, ChainBindingSource::TiledShaderModeY,
+                         -1, site.in1);
+        registry.uniform("BlurTiledSubset", FragmentType::Float4, ChainBindingSource::TiledSubset,
+                         -1, site.in1);
+        registry.uniform("BlurTiledClamp", FragmentType::Float4, ChainBindingSource::TiledClamp, -1,
+                         site.in1);
+        registry.uniform("BlurTiledDimension", FragmentType::Float2,
+                         ChainBindingSource::TiledDimension, -1, site.in1);
+        registry.uniform("BlurTiledChild", FragmentType::Int, ChainBindingSource::BlurTiledChild,
+                         -1, site.in1);
+        ChainArg sampler = {};
+        sampler.kind = ChainArgKind::LeafSampler;
+        sampler.index = site.in1;
+        push(sampler);
+        ChainArg coord = {};
+        coord.kind = ChainArgKind::LeafCoord;
+        coord.index = site.in1;
+        push(coord);
         break;
       }
       case ChainISA::ColorSpaceXform:
@@ -1447,6 +1482,42 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
         }
         site.op = ChainISA::RRectCoverage;
         site.in0 = mapInput(inputBase, node->inputs[0]);
+        break;
+      }
+      case AOTEffectKind::OpaqueKernel: {
+        // The Gaussian blur rides the chain as one catalog function: the packed half-kernel and
+        // the radius are record-time uniforms, the step is derived at upload. The glass kernels
+        // keep their dedicated families (their own samplers and geometry children).
+        auto parameters = std::get_if<AOTOpaqueKernelParameters>(&node->parameters);
+        if (parameters == nullptr || node->inputs.size() != 1 ||
+            parameters->kernel != AOTOpaqueKernel::GaussianBlur1D) {
+          LOGE("LR #45", 45);
+          return false;
+        }
+        if (inputBase != 0 || node->inputs[0].index() == 0) {
+          // The blur rides the color tree over a real child leaf; a coverage-side blur or one fed
+          // the geometry color directly has no place on the assembled route.
+          LOGE("LR #46", 46);
+          return false;
+        }
+        {
+          const auto* child = nodes[inputBase + node->inputs[0].index()];
+          const auto* childParameters = std::get_if<AOTTextureParameters>(&child->parameters);
+          if (child->kind != AOTEffectKind::TextureSource || childParameters == nullptr ||
+              childParameters->samplingKind == AOTTextureSamplingKind::Device ||
+              childParameters->isAlphaOnly || childParameters->isYUV) {
+            LOGE("LR #47", 47);
+            return false;
+          }
+          const auto leafAt = std::find(layout->leafNodes.begin(), layout->leafNodes.end(), child);
+          if (leafAt == layout->leafNodes.end()) {
+            LOGE("LR #48", 48);
+            return false;
+          }
+          site.op = ChainISA::GaussianBlur1D;
+          site.in0 = mapInput(inputBase, node->inputs[0]);
+          site.in1 = static_cast<int>(leafAt - layout->leafNodes.begin());
+        }
         break;
       }
       case AOTEffectKind::GradientSource: {

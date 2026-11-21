@@ -27,9 +27,10 @@ constexpr AOTKindTraits KindTraits[] = {
     {true, AOTDesignator::WhiteInput},   // GeometryWhiteInput
     {true},
     {true},
-    // The opaque-kernel barrier (blur, glass): the planner refuses a graph containing one, so the
-    // row is never fusable — the dedicated family reads the node's facts.
-    {false},
+    // The opaque-kernel node: the Gaussian blur is chain-fused (one catalog function with the
+    // packed kernel riding uniforms); the glass kernels still take the dedicated families, and
+    // the layout itself rejects them.
+    {true},
 };
 
 constexpr size_t KindTraitCount = sizeof(KindTraits) / sizeof(AOTKindTraits);

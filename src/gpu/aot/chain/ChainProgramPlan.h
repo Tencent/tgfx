@@ -118,6 +118,8 @@ enum class ChainArgKind : uint8_t {
   White,
   Black,
   LeafTex,
+  LeafCoord,
+  LeafSampler,
   FragCoord,
   Uniform,
   Literal,

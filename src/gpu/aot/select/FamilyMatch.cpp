@@ -362,6 +362,11 @@ bool MatchShapeInstancedTextureCoverage(const ProgramInfo* /*info*/, const DrawS
 /// The GaussianBlur family's rule
 bool MatchGaussianBlur(const ProgramInfo* /*info*/, const DrawShape& shape,
                        FamilyMatchResult* result) {
+  // Retired with the dedicated families: the assembled chain spells the Gaussian blur as one
+  // catalog function (gaussianBlur1D) with the packed kernel riding uniforms, so the dedicated
+  // variant set stays dark.
+  return false;
+
   if (shape.geometry->kind != GeometryKind::Default &&
       shape.geometry->kind != GeometryKind::QuadPerEdgeAA) {
     return false;

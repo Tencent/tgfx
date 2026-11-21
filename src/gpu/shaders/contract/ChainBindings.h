@@ -116,6 +116,11 @@ enum class ChainBindingSource : uint8_t {
   TiledClamp,
   TiledDimension,
   TiledStrict,
+  // The Gaussian blur's own record-time facts (AOTOpaqueKernelParameters).
+  BlurStep,
+  BlurRadius,
+  BlurKernel,
+  BlurTiledChild,
 };
 
 }  // namespace tgfx

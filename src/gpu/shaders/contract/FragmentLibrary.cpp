@@ -173,6 +173,13 @@ const std::vector<FragmentDef>& Table() {
        {Param("Yuv.block", FragmentType::Float4, 6, /*programLevel=*/false)},
        {Arg(FragmentArgKind::Input0)},
        {"fn/entry/yuv.inc"}},
+      {ChainISA::GaussianBlur1D,
+       FragmentKind::Function,
+       "gaussianBlur1D",
+       "fn/source/gaussianBlur1D.inc",
+       {},
+       {},
+       {}},
       {ChainISA::None, FragmentKind::Expression, "", nullptr, {}, {}, {}},
   };
   return table;

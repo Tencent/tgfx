@@ -363,6 +363,10 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
         return "vec4(0.0)";
       case ChainArgKind::LeafTex:
         return "chainLeafTex[" + std::to_string(arg.index) + "]";
+      case ChainArgKind::LeafCoord:
+        return "TransformedCoords_" + std::to_string(arg.index);
+      case ChainArgKind::LeafSampler:
+        return "TextureSampler_" + std::to_string(arg.index);
       case ChainArgKind::FragCoord:
         return "gl_FragCoord.xy";
       case ChainArgKind::Uniform:
@@ -381,6 +385,9 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
       case ChainISA::ConstColor:
         expr = "pmApplyConstColor(" + spellArg(a[0]) + ", " + spellArg(a[1]) + ", " +
                spellArg(a[2]) + ")";
+        break;
+      case ChainISA::GaussianBlur1D:
+        expr = "gaussianBlur1D(" + spellArg(a[0]) + ", " + spellArg(a[1]) + ")";
         break;
       case ChainISA::ColorMatrix:
         expr = "pmApplyColorMatrix(" + spellArg(a[0]) + ", " + spellArg(a[1]) + ", " +

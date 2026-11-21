@@ -722,6 +722,46 @@ bool ReadBinding(const ReadContext& ctx, const ChainBinding& binding, uint8_t* o
     case ChainBindingSource::TiledSubset:
     case ChainBindingSource::TiledClamp:
     case ChainBindingSource::TiledDimension:
+    case ChainBindingSource::BlurStep: {
+      if (binding.node == nullptr || binding.node->kind != AOTEffectKind::OpaqueKernel) {
+        return false;
+      }
+      const auto* parameters = std::get_if<AOTOpaqueKernelParameters>(&binding.node->parameters);
+      if (parameters == nullptr) {
+        return false;
+      }
+      const float step[2] = {parameters->stepLength * (parameters->vertical ? 0.0f : 1.0f),
+                             parameters->stepLength * (parameters->vertical ? 1.0f : 0.0f)};
+      std::memcpy(out, step, sizeof(step));
+      return true;
+    }
+    case ChainBindingSource::BlurRadius: {
+      if (binding.node == nullptr || binding.node->kind != AOTEffectKind::OpaqueKernel) {
+        return false;
+      }
+      const auto* parameters = std::get_if<AOTOpaqueKernelParameters>(&binding.node->parameters);
+      if (parameters == nullptr) {
+        return false;
+      }
+      Store(out, parameters->kernelRadius);
+      return true;
+    }
+    case ChainBindingSource::BlurKernel: {
+      if (binding.node == nullptr || binding.node->kind != AOTEffectKind::OpaqueKernel) {
+        return false;
+      }
+      const auto* parameters = std::get_if<AOTOpaqueKernelParameters>(&binding.node->parameters);
+      if (parameters == nullptr) {
+        return false;
+      }
+      std::memcpy(out, parameters->packedKernel.data(), sizeof(float) * 68);
+      return true;
+    }
+    case ChainBindingSource::BlurTiledChild: {
+      const auto* childBinding = LeafBindingOf(ctx, binding.index);
+      Store(out, childBinding != nullptr && childBinding->tiledRecipe.has_value() ? 1 : 0);
+      return true;
+    }
     case ChainBindingSource::TiledStrict:
       return ReadLeafRecord(ctx, binding.index, binding.source, out);
     case ChainBindingSource::LeafReadSwizzles: {
