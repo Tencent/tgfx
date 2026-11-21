@@ -16,8 +16,7 @@
 // the chain-only defines are simply unreferenced here.
 
 // OP_BLEND needs the shared PorterDuff blend math regardless of the kernel's XP state; the
-// include is guarded, so the repeated inclusions of this file stay harmless.
-#include "xp/xp_blend_colors.inc"
+// consumer's xp support include provides it ahead of this file.
 #include "operator/pointwise_math.inc"
 #include "operator/pointwise_color_dispatch.inc"
 

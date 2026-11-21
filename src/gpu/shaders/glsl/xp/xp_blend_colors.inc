@@ -13,8 +13,6 @@
 // (zero replaced with one) only on lanes whose result the select discards, keeping every
 // evaluated lane finite; the per-lane arithmetic mirrors the original expression trees exactly,
 // so selected lanes produce bit-identical results.
-#ifndef TGFX_XP_BLEND_COLORS_INC
-#define TGFX_XP_BLEND_COLORS_INC
 
 #include "fn/xp/xpLuminance.inc"
 #include "fn/xp/xpSaturation.inc"
@@ -162,7 +160,6 @@ vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
   return S;
 }
 
-#define XP_FIRST_ADVANCED_MODE 15
 #define XP_COMPOSITE_WITH_COVERAGE(ADVANCED_BLEND) \
   if (mode == 0) { \
     return xpBlend_Clear_coverage(S, D, C); \
@@ -218,4 +215,3 @@ vec4 xpBlendWithCoverage(vec4 S, vec4 D, vec4 C, int mode) {
 }
 #endif
 
-#endif  // TGFX_XP_BLEND_COLORS_INC

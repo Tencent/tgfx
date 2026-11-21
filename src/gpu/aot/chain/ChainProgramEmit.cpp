@@ -408,10 +408,11 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
     prefetch += "  highp vec2 tiledSubset" + tiled + ";\n";
     prefetch += "  highp vec2 tiledClamped" + tiled + ";\n";
     prefetch += "  highp vec3 tiledCoord_" + suffix + ";\n";
-    prefetch += "  tiledCoord_" + suffix + " = tiledMapCoord(TransformedCoords_" + suffix +
+    prefetch += "  tiledCoord_" + suffix + " = vec3(tiledMapCoord(TransformedCoords_" + suffix +
                 ", TiledStrict" + tiled + " != 0, TiledModeX" + tiled + ", TiledModeY" + tiled +
                 ", TiledSubset" + tiled + ", TiledClamp" + tiled + ", TiledDimension" + tiled +
-                ", tiledIn" + tiled + ", tiledSubset" + tiled + ", tiledClamped" + tiled + ");\n";
+                ", tiledIn" + tiled + ", tiledSubset" + tiled + ", tiledClamped" + tiled +
+                "), 1.0);\n";
     prefetch += "  chainLeafTex[" + suffix + "] = " + fetch + ";\n";
     prefetch += "  chainLeafTex[" + suffix + "] = tiledSeamBlend(TextureSampler_" + suffix +
                 ", chainLeafTex[" + suffix + "], TiledModeX" + tiled + ", TiledModeY" + tiled +

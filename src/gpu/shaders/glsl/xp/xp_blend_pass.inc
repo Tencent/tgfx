@@ -15,8 +15,6 @@
 // reads one value no fragment output depends on.
 //
 // Include after xp_porter_duff.inc and xp_porter_duff_fbf.inc.
-#ifndef TGFX_XP_BLEND_PASS_INC
-#define TGFX_XP_BLEND_PASS_INC
 
 #if HAS_XP >= 1
 
@@ -30,6 +28,9 @@ vec4 xpReadDstColor() {
 }
 
 // Whether the evaluation loop runs the extra blend pass.
+/// The first blend mode the runtime routes through the advanced blend pass (the
+/// BlendModeFunctionName table's order: the porter-duff modes end at PlusLighter).
+#define XP_FIRST_ADVANCED_MODE 15
 bool xpNeedsBlendPass() {
   return XPBlendMode >= XP_FIRST_ADVANCED_MODE;
 }
@@ -47,7 +48,5 @@ vec4 xpCompositeBlendPass(vec4 S, vec4 D, vec4 C, vec4 loopBlend) {
   int mode = XPBlendMode;
   XP_COMPOSITE_WITH_COVERAGE(loopBlend)
 }
-
-#endif
 
 #endif

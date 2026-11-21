@@ -21,8 +21,6 @@ layout(set = TGFX_TEXTURE_SET, binding = XP_DST_TEX_BINDING) uniform sampler2D D
 #endif
 #endif
 
-#include "xp/xp_blend_colors.inc"
-
 #if HAS_XP == 1
 // The one signature the text route, the GL assembly and the Vulkan module all spell: every input
 // — the destination sampler included — arrives as an argument.
