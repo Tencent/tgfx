@@ -163,4 +163,8 @@ bool XfermodeFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID in
   return builder->addBlend(src, dst, parameters, output);
 }
 
+void XfermodeFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  bytesKey->write(static_cast<uint32_t>(mode) | (static_cast<uint32_t>(child) << 16));
+}
+
 }  // namespace tgfx

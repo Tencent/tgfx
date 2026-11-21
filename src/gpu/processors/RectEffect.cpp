@@ -50,4 +50,8 @@ bool RectEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID*
   return builder->addRectCoverage(input, parameters, output);
 }
 
+void RectEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
+  bytesKey->write(static_cast<uint32_t>(_needTransform ? 1 : 0));
+}
+
 }  // namespace tgfx

@@ -314,6 +314,11 @@ bool TiledTextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
   return builder->addTextureSource(input, parameters, output);
 }
 
+size_t TiledTextureEffect::onCountTextureSamplers() const {
+  auto textureView = getTextureView();
+  return textureView ? 1 : 0;
+}
+
 std::shared_ptr<Texture> TiledTextureEffect::onTextureAt(size_t) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
@@ -333,6 +338,22 @@ const TextureView* TiledTextureEffect::getTextureView() const {
     return textureView;
   }
   return nullptr;
+}
+
+void TiledTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
+    return;
+  }
+  // Sometimes textureProxy->isAlphaOnly() != texture->isAlphaOnly(), we use
+  // textureProxy->isAlphaOnly() to determine the alpha-only flag.
+  bytesKey->write(textureProxy->isAlphaOnly());
+  Sampling sampling(textureView, samplerState, subset);
+  auto flags = static_cast<uint32_t>(sampling.shaderModeX);
+  flags |= static_cast<uint32_t>(sampling.shaderModeY) << 4;
+  flags |= constraint == SrcRectConstraint::Strict ? static_cast<uint32_t>(1) << 8 : 0;
+  flags |= coordTransform.matrix.hasPerspective() ? static_cast<uint32_t>(1) << 9 : 0;
+  bytesKey->write(flags);
 }
 
 }  // namespace tgfx

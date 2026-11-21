@@ -43,6 +43,7 @@ struct GlassRefractionParams {
 class GlassRefractionFragmentProcessor : public FragmentProcessor {
  public:
   DEFINE_PROCESSOR_CLASS_ID
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
   static PlacementPtr<GlassRefractionFragmentProcessor> Make(
       BlockAllocator* allocator, std::shared_ptr<TextureProxy> source,
       PlacementPtr<GlassShapeGeometryFragmentProcessor> geometry,

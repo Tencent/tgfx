@@ -26,6 +26,7 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
  public:
   friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
   static constexpr int MaxColorCount = 16;
 
   static PlacementPtr<UnrolledBinaryGradientColorizer> Make(BlockAllocator* allocator,

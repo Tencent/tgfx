@@ -21,4 +21,8 @@
 
 namespace tgfx {
 
+void UnrolledBinaryGradientColorizer::onComputeProcessorKey(BytesKey* bytesKey) const {
+  bytesKey->write(static_cast<uint32_t>(intervalCount));
+}
+
 }  // namespace tgfx

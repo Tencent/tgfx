@@ -38,6 +38,7 @@ class ConstColorProcessor : public FragmentProcessor {
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   ConstColorProcessor(PMColor color, InputMode mode)
       : FragmentProcessor(ClassID()), color(color), inputMode(mode) {

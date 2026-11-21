@@ -130,4 +130,15 @@ bool GlassRefractionFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNo
   return builder->addOpaqueKernel(input, parameters, output);
 }
 
+void GlassRefractionFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  uint32_t flags = 0;
+  if (params.dispersion >= 0.01f) {
+    flags |= 1;
+  }
+  if (params.lightIntensity > 0.0f) {
+    flags |= 2;
+  }
+  bytesKey->write(flags);
+}
+
 }  // namespace tgfx

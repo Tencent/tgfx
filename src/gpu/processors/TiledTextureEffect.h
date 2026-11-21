@@ -29,6 +29,7 @@ class TiledTextureEffect : public FragmentProcessor {
  public:
   friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               std::shared_ptr<TextureProxy> textureProxy,
                                               const SamplingArgs& args,
@@ -93,6 +94,8 @@ class TiledTextureEffect : public FragmentProcessor {
   TiledTextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerState& samplerState,
                      SrcRectConstraint constraint, const Matrix& uvMatrix,
                      const std::optional<Rect>& subset);
+
+  size_t onCountTextureSamplers() const override;
 
   std::shared_ptr<Texture> onTextureAt(size_t) const override;
 

@@ -26,6 +26,7 @@ namespace tgfx {
 class ColorSpaceXformEffect : public FragmentProcessor {
  public:
   DEFINE_PROCESSOR_CLASS_ID
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator, ColorSpace* src,
                                               AlphaType srcAT, ColorSpace* dst, AlphaType dstAT);
 

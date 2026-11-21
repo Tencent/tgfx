@@ -28,6 +28,7 @@ class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
  public:
   friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
   /**
    * Creates a gaussian blur processor that samples the child along the given direction with the
    * specified step. sigma is the standard deviation of the gaussian kernel in pixels. Returns

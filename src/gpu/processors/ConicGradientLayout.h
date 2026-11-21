@@ -25,6 +25,7 @@ class ConicGradientLayout : public FragmentProcessor {
  public:
   friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   static PlacementPtr<ConicGradientLayout> Make(BlockAllocator* allocator, Matrix matrix,
                                                 float bias, float scale);

@@ -91,4 +91,8 @@ bool GaussianBlur1DFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNod
   return builder->addOpaqueKernel(childNode, parameters, output);
 }
 
+void GaussianBlur1DFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
+  key->write(maxSigma);
+}
+
 }  // namespace tgfx

@@ -35,6 +35,7 @@ class RRectEffect : public FragmentProcessor {
  public:
   friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
   /**
    * @param rRect       Rounded rectangle in local space. For Rect type, prefer RectEffect for
    *                    better performance.

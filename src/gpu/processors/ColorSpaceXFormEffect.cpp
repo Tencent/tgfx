@@ -56,4 +56,9 @@ ColorSpaceXformEffect::ColorSpaceXformEffect(std::shared_ptr<ColorSpaceXformStep
     : FragmentProcessor(ClassID()), colorSpaceXformSteps(std::move(colorXform)) {
 }
 
+void ColorSpaceXformEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
+  uint32_t key = ColorSpaceXformSteps::XFormKey(colorSpaceXformSteps.get());
+  bytesKey->write(key);
+}
+
 }  // namespace tgfx

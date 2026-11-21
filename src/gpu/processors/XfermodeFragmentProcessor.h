@@ -57,6 +57,7 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   enum class Child { DstChild, SrcChild, TwoChild };
 

@@ -36,6 +36,7 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
  public:
   friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   static PlacementPtr<PerlinNoiseFragmentProcessor> Make(
       BlockAllocator* allocator, Context* context, PerlinNoiseType noiseType, int numOctaves,

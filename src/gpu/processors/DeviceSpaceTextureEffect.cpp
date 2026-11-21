@@ -44,6 +44,10 @@ bool DeviceSpaceTextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID inp
   return builder->addTextureSource(input, parameters, output);
 }
 
+size_t DeviceSpaceTextureEffect::onCountTextureSamplers() const {
+  return textureProxy->getTextureView() ? 1 : 0;
+}
+
 std::shared_ptr<Texture> DeviceSpaceTextureEffect::onTextureAt(size_t) const {
   auto textureView = textureProxy->getTextureView();
   return textureView == nullptr ? nullptr : textureView->getTexture();

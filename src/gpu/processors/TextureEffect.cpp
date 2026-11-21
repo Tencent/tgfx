@@ -129,6 +129,17 @@ bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNode
   return builder->addTextureSource(input, parameters, output);
 }
 
+size_t TextureEffect::onCountTextureSamplers() const {
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
+    return 0;
+  }
+  if (textureView->isYUV()) {
+    return reinterpret_cast<YUVTextureView*>(textureView)->textureCount();
+  }
+  return 1;
+}
+
 std::shared_ptr<Texture> TextureEffect::onTextureAt(size_t index) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
@@ -181,6 +192,26 @@ bool TextureEffect::needSubset() const {
     return true;
   }
   return false;
+}
+
+void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
+    return;
+  }
+  uint32_t flags = alphaStart == Point::Zero() ? 1 : 0;
+  // Sometimes textureProxy->isAlphaOnly() != texture->isAlphaOnly(), we use
+  // textureProxy->isAlphaOnly() to determine the alpha-only flag.
+  flags |= textureProxy->isAlphaOnly() ? 2 : 0;
+  auto yuvTexture = getYUVTexture();
+  if (yuvTexture) {
+    flags |= yuvTexture->yuvFormat() == YUVFormat::I420 ? 0 : 4;
+    flags |= IsLimitedYUVColorRange(yuvTexture->yuvColorSpace()) ? 0 : 8;
+  }
+  flags |= needSubset() ? 16 : 0;
+  flags |= constraint == SrcRectConstraint::Strict ? 32 : 0;
+  flags |= coordTransform.matrix.hasPerspective() ? 64 : 0;
+  bytesKey->write(flags);
 }
 
 }  // namespace tgfx

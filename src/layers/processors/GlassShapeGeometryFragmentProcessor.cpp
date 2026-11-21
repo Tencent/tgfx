@@ -34,6 +34,10 @@ GlassUDFGeometryFragmentProcessor::GlassUDFGeometryFragmentProcessor(
       edgeMaskProxy(std::move(edgeMask)), params(params), enableEdgeLighting(enableEdgeLighting) {
 }
 
+size_t GlassUDFGeometryFragmentProcessor::onCountTextureSamplers() const {
+  return enableEdgeLighting ? 2 : 1;
+}
+
 std::shared_ptr<Texture> GlassUDFGeometryFragmentProcessor::onTextureAt(size_t index) const {
   auto proxy = index == 0 ? maskProxy : edgeMaskProxy;
   if (proxy == nullptr) {
@@ -45,6 +49,14 @@ std::shared_ptr<Texture> GlassUDFGeometryFragmentProcessor::onTextureAt(size_t i
 
 SamplerState GlassUDFGeometryFragmentProcessor::onSamplerStateAt(size_t) const {
   return SamplerState(TileMode::Decal, TileMode::Decal);
+}
+
+void GlassSDFGeometryFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  bytesKey->write(static_cast<uint32_t>(shapeType));
+}
+
+void GlassUDFGeometryFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  bytesKey->write(static_cast<uint32_t>(enableEdgeLighting));
 }
 
 }  // namespace tgfx

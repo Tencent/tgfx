@@ -24,4 +24,9 @@ RadialGradientLayout::RadialGradientLayout(Matrix matrix)
   addCoordTransform(&coordTransform);
 }
 
+void RadialGradientLayout::onComputeProcessorKey(BytesKey* bytesKey) const {
+  const uint32_t flags = coordTransform.matrix.hasPerspective() ? 1 : 0;
+  bytesKey->write(flags);
+}
+
 }  // namespace tgfx

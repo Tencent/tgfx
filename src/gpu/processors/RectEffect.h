@@ -31,6 +31,7 @@ class RectEffect : public FragmentProcessor {
  public:
   friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
   /**
    * @param localRect    The rectangle in local space.
    * @param matrix       Maps localRect to device space. Defaults to identity.

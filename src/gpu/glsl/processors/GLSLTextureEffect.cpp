@@ -18,6 +18,7 @@
 
 #include "GLSLTextureEffect.h"
 #include <unordered_map>
+#include "core/utils/Log.h"
 
 namespace tgfx {
 static std::array<float, 12> AlignMat3(const float* mat3) {
@@ -102,6 +103,15 @@ void GLSLTextureEffect::emitCode(EmitArgs& args) const {
 void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   auto uniformHandler = args.uniformHandler;
+  if (args.textureSamplers == nullptr || args.textureSamplers->count() == 0) {
+    // The sampler the processor declares was not registered by the install walk: the tree and
+    // the registration disagree, so emit a transparent pixel and report the offending processor
+    // instead of dereferencing a missing sampler handle.
+    LOGE("GLSLTextureEffect: no sampler registered for %s (view=%p); the draw renders transparent",
+         name().c_str(), static_cast<const void*>(getTextureView()));
+    fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
+    return;
+  }
   auto& textureSampler = (*args.textureSamplers)[0];
   auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
   if (args.coordFunc) {

@@ -8,11 +8,16 @@ set -u
 BIN="$1"
 LOG="$2"
 PREFIX="${3:-}"
+EXCLUDE="${4:-}"
 
+BIN="$(cd "$(dirname "$BIN")" && pwd)/$(basename "$BIN")"
 cd "$(dirname "$BIN")"
 : > "$LOG"
 
 suites=$("$BIN" --gtest_list_tests 2>/dev/null | awk '/^[A-Za-z]/ && !/^Running/ {print $1}' | sed 's/\.$//' | grep "^${PREFIX}" | sort)
+if [ -n "$EXCLUDE" ]; then
+  suites=$(echo "$suites" | grep -v -E "$EXCLUDE")
+fi
 total=$(echo "$suites" | wc -l | tr -d ' ')
 echo "suites: $total" >> "$LOG"
 
@@ -28,7 +33,10 @@ for s in $suites; do
   else
     status=exit$?
   fi
-  if grep -q "GPU Address Fault\|GPU error" "$out"; then
+  # Only the unrecoverable signals abort the run: a single discarded command buffer
+  # ("victim of GPU error/recovery") is routine and recoverable, while an address fault or the
+  # driver ignoring submissions means the GPU state is unstable and later suites would cascade.
+  if grep -q "GPU Address Fault\|SubmissionsIgnored" "$out"; then
     echo "GPU-FAULT at suite $s -- aborting remaining suites" >> "$LOG"
     cat "$out" >> "$LOG"
     gpu_abort=1

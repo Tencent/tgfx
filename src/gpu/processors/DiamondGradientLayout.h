@@ -32,6 +32,7 @@ class DiamondGradientLayout : public FragmentProcessor {
 
   // Public so the typed dispatch (IsProcessor<T>) works outside the class, matching Conic.
   DEFINE_PROCESSOR_CLASS_ID
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
  protected:
   explicit DiamondGradientLayout(Matrix matrix);

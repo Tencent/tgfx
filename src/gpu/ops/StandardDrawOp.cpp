@@ -162,9 +162,12 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
     for (auto& coverage : coverages) {
       fragmentProcessors.emplace_back(coverage.get());
     }
+    // The processor's placement outlives prepare(): executePrepared() reads the tree again for
+    // the uniform upload, so the op owns it until the draw is executed.
+    preparedGeometryProcessor = std::move(geometryProcessor);
     preparedProgramInfo = std::make_unique<ProgramInfo>(
-        renderTarget, geometryProcessor.get(), std::move(fragmentProcessors), colors.size(),
-        xferProcessor.get(), blendMode);
+        renderTarget, preparedGeometryProcessor.get(), std::move(fragmentProcessors),
+        colors.size(), xferProcessor.get(), blendMode);
     configureProgramInfo(preparedProgramInfo.get(), depthStencilFormat);
     preparedProgram = preparedProgramInfo->getProgram();
     if (preparedProgram == nullptr) {

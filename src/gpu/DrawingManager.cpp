@@ -139,11 +139,16 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   request.renderFlags = renderFlags;
   request.clearDestination = true;
   request.processor = fillProcessor;
+  // The FP-tree route serves the fill's RectDrawOp at prepare time, so the record-time plan task
+  // stays off it (see OpsCompositor::addDrawOp for the same gate).
+  static const bool fpTreeRoute = std::getenv("TGFX_FP_TREE") != nullptr;
   AOTRouter router(context);
-  if (auto task = router.route(&drawOp, request)) {
-    addRenderTask(std::move(task));
-    addGenerateMipmapsTask(renderTarget->asTextureProxy());
-    return true;
+  if (!fpTreeRoute) {
+    if (auto task = router.route(&drawOp, request)) {
+      addRenderTask(std::move(task));
+      addGenerateMipmapsTask(renderTarget->asTextureProxy());
+      return true;
+    }
   }
   auto allocator = drawingAllocator();
   auto drawOps = allocator->makeArray<DrawOp>(&drawOp, 1);

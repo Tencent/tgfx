@@ -31,4 +31,8 @@ bool ConstColorProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
   return builder->addConstColor(input, parameters, output);
 }
 
+void ConstColorProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  bytesKey->write(static_cast<uint32_t>(inputMode));
+}
+
 }  // namespace tgfx

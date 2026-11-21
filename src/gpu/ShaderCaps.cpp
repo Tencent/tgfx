@@ -58,9 +58,16 @@ ShaderCaps::ShaderCaps(GPU* gpu) {
   auto info = gpu->info();
   PrintGPUInfo(info);
   if (info->backend == Backend::OpenGL) {
-    usesPrecisionModifiers = info->version.find("OpenGL ES") != std::string::npos;
+    if (info->version.find("OpenGL ES") != std::string::npos) {
+      usesPrecisionModifiers = true;
+      versionDeclString = "#version 300 es";
+    } else {
+      usesPrecisionModifiers = false;
+      versionDeclString = "#version 150";
+    }
   } else {
     usesPrecisionModifiers = false;
+    versionDeclString = "#version 450";
   }
   auto limits = gpu->limits();
   maxFragmentSamplers = limits->maxSamplersPerShaderStage;

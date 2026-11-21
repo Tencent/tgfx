@@ -180,4 +180,10 @@ bool GlassUDFTentBlurFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTN
   return builder->addOpaqueKernel(childNode, parameters, output);
 }
 
+void GlassUDFTentBlurFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
+  key->write(maxRadius);
+  key->write(static_cast<uint32_t>(field));
+  key->write(static_cast<uint32_t>(inputIsPacked));
+}
+
 }  // namespace tgfx

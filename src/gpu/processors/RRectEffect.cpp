@@ -48,4 +48,8 @@ bool RRectEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID
   return builder->addRRectCoverage(input, parameters, output);
 }
 
+void RRectEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
+  bytesKey->write(static_cast<uint32_t>(_needTransform ? 1 : 0));
+}
+
 }  // namespace tgfx

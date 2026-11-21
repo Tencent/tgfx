@@ -159,5 +159,8 @@ class StandardDrawOp : public DrawOp {
   std::unique_ptr<ProgramInfo> preparedProgramInfo = nullptr;
   std::shared_ptr<Program> preparedProgram = nullptr;
   RenderTarget* preparedRenderTarget = nullptr;
+  /// The FP-tree route's geometry processor: it must outlive prepare(), because executePrepared()
+  /// walks it for the uniform upload after prepare() has returned.
+  PlacementPtr<GeometryProcessor> preparedGeometryProcessor = nullptr;
 };
 }  // namespace tgfx

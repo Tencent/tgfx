@@ -95,4 +95,18 @@ bool PerlinNoiseFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID
   return builder->addPerlinNoiseSource(input, parameters, output);
 }
 
+void PerlinNoiseFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  uint32_t key = static_cast<uint32_t>(numOctaves);
+  key = key << 3;
+  if (noiseType == PerlinNoiseType::FractalNoise) {
+    key |= 0x1;
+  } else {
+    key |= 0x2;
+  }
+  if (stitchTiles) {
+    key |= 0x4;
+  }
+  bytesKey->write(key);
+}
+
 }  // namespace tgfx

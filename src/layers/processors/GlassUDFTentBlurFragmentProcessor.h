@@ -40,6 +40,7 @@ enum class GlassUDFField { Refraction, EdgeLight };
 class GlassUDFTentBlurFragmentProcessor : public FragmentProcessor {
  public:
   DEFINE_PROCESSOR_CLASS_ID
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
   /**
    * @description Creates the processor. Both radii are expressed in destination texel units, and
    * only the one belonging to the requested field is read.

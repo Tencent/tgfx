@@ -24,4 +24,9 @@ DiamondGradientLayout::DiamondGradientLayout(Matrix matrix)
   addCoordTransform(&coordTransform);
 }
 
+void DiamondGradientLayout::onComputeProcessorKey(BytesKey* bytesKey) const {
+  const uint32_t flags = coordTransform.matrix.hasPerspective() ? 1 : 0;
+  bytesKey->write(flags);
+}
+
 }  // namespace tgfx

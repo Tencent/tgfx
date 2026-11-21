@@ -29,6 +29,7 @@ class TextureEffect : public FragmentProcessor {
  public:
   friend class BlockAllocator;
   DEFINE_PROCESSOR_CLASS_ID
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               std::shared_ptr<TextureProxy> proxy,
                                               const SamplingArgs& args = {},
@@ -94,8 +95,9 @@ class TextureEffect : public FragmentProcessor {
       : TextureEffect(proxy, SamplerState(sampling), constraint, alphaStart, uvMatrix, subset) {
   }
 
-  std::shared_ptr<Texture> onTextureAt(size_t index) const override;
+  size_t onCountTextureSamplers() const override;
 
+  std::shared_ptr<Texture> onTextureAt(size_t index) const override;
   SamplerState onSamplerStateAt(size_t) const override {
     return samplerState;
   }
