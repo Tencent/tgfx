@@ -83,6 +83,21 @@ PlacementPtr<FragmentProcessor> FragmentProcessor::Compose(BlockAllocator* alloc
   return ComposeFragmentProcessor::Make(allocator, std::move(first), std::move(second));
 }
 
+void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey) const {
+  bytesKey->write(classID());
+  onComputeProcessorKey(bytesKey);
+  auto textureSamplerCount = onCountTextureSamplers();
+  for (size_t i = 0; i < textureSamplerCount; ++i) {
+    auto texture = textureAt(i);
+    if (texture != nullptr) {
+      TextureView::ComputeTextureKey(texture, bytesKey);
+    }
+  }
+  for (const auto& childProcessor : childProcessors) {
+    childProcessor->computeProcessorKey(context, bytesKey);
+  }
+}
+
 bool FragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID, AOTNodeID*) const {
   if (builder != nullptr) {
     builder->recordMissingLowering(this);
@@ -96,6 +111,12 @@ size_t FragmentProcessor::registerChildProcessor(PlacementPtr<FragmentProcessor>
   return index;
 }
 
+FragmentProcessor::Iter::Iter(const ProgramInfo* programInfo) {
+  for (auto i = programInfo->numFragmentProcessors(); i >= 1; --i) {
+    fpStack.push_back(programInfo->getFragmentProcessor(i - 1));
+  }
+}
+
 const FragmentProcessor* FragmentProcessor::Iter::next() {
   if (fpStack.empty()) {
     return nullptr;
@@ -106,6 +127,95 @@ const FragmentProcessor* FragmentProcessor::Iter::next() {
     fpStack.push_back(back->childProcessor(back->numChildProcessors() - i - 1));
   }
   return back;
+}
+
+FragmentProcessor::CoordTransformIter::CoordTransformIter(const ProgramInfo* programInfo)
+    : fpIter(programInfo) {
+  currFP = fpIter.next();
+}
+
+const CoordTransform* FragmentProcessor::CoordTransformIter::next() {
+  if (!currFP) {
+    return nullptr;
+  }
+  while (currentIndex == currFP->numCoordTransforms()) {
+    currentIndex = 0;
+    currFP = fpIter.next();
+    if (!currFP) {
+      return nullptr;
+    }
+  }
+  return currFP->coordTransform(currentIndex++);
+}
+
+void FragmentProcessor::setData(UniformData* vertexUniformData,
+                                UniformData* fragmentUniformData) const {
+  onSetData(vertexUniformData, fragmentUniformData);
+}
+
+void FragmentProcessor::emitChild(size_t childIndex, const std::string& inputColor,
+                                  std::string* outputColor, EmitArgs& args,
+                                  std::function<std::string(std::string_view)> coordFunc) const {
+  auto fragBuilder = args.fragBuilder;
+  auto programInfo = fragBuilder->getProgramInfo();
+  outputColor->append(programInfo->getMangledSuffix(this));
+  fragBuilder->codeAppendf("vec4 %s;", outputColor->c_str());
+  internalEmitChild(childIndex, inputColor, *outputColor, args, std::move(coordFunc));
+}
+
+void FragmentProcessor::emitChild(size_t childIndex, const std::string& inputColor,
+                                  EmitArgs& parentArgs) const {
+  internalEmitChild(childIndex, inputColor, parentArgs.outputColor, parentArgs);
+}
+
+void FragmentProcessor::internalEmitChild(
+    size_t childIndex, const std::string& inputColor, const std::string& outputColor,
+    EmitArgs& args, std::function<std::string(std::string_view)> coordFunc) const {
+  auto fragBuilder = args.fragBuilder;
+  const auto childProc = childProcessor(childIndex);
+  fragBuilder->onBeforeChildProcEmitCode(childProc);  // call first so mangleString is updated
+  auto programInfo = fragBuilder->getProgramInfo();
+  // Prepare a mangled input color variable if the default is not used,
+  // inputName remains the empty string if no variable is needed.
+  std::string inputName;
+  if (!inputColor.empty() && inputColor != "vec4(1.0)") {
+    // The input name is based off of the current mangle string, and
+    // since this is called after onBeforeChildProcEmitCode(), it will be
+    // unique to the child processor (exactly what we want for its input).
+    inputName += "_childInput";
+    inputName += programInfo->getMangledSuffix(childProc);
+    fragBuilder->codeAppendf("vec4 %s = %s;", inputName.c_str(), inputColor.c_str());
+  }
+
+  // emit the code for the child in its own scope
+  fragBuilder->codeAppend("{\n");
+  fragBuilder->codeAppendf("// Processor%d : %s\n", programInfo->getProcessorIndex(childProc),
+                           childProc->name().c_str());
+  TransformedCoordVars coordVars = args.transformedCoords->childInputs(childIndex);
+  TextureSamplers textureSamplers = args.textureSamplers->childInputs(childIndex);
+
+  EmitArgs childArgs(fragBuilder, args.uniformHandler, outputColor,
+                     inputName.empty() ? "vec4(1.0)" : inputName, args.inputSubset, &coordVars,
+                     &textureSamplers, std::move(coordFunc));
+  childProcessor(childIndex)->emitCode(childArgs);
+  fragBuilder->codeAppend("}\n");
+
+  fragBuilder->onAfterChildProcEmitCode();
+}
+
+template <typename T, size_t (FragmentProcessor::*COUNT)() const>
+FragmentProcessor::BuilderInputProvider<T, COUNT>
+FragmentProcessor::BuilderInputProvider<T, COUNT>::childInputs(size_t childIndex) const {
+  const FragmentProcessor* child = fragmentProcessor->childProcessor(childIndex);
+  FragmentProcessor::Iter iter(fragmentProcessor);
+  int numToSkip = 0;
+  while (true) {
+    const FragmentProcessor* processor = iter.next();
+    if (processor == child) {
+      return BuilderInputProvider(child, t + numToSkip);
+    }
+    numToSkip += (processor->*COUNT)();
+  }
 }
 
 }  // namespace tgfx

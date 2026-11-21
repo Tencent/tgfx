@@ -40,6 +40,7 @@
 #include "gpu/ops/ShapeInstancedDrawOp.h"
 #include "gpu/ops/StandardDrawOp.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TextureEffect.h"
@@ -1139,6 +1140,10 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     if (!UsesFrameBufferFetch(context) && dstTextureInfo.textureProxy == nullptr) {
       return;
     }
+    // The FP-tree route spells the dst read through its xfer processor; the precompiled route
+    // reads the same fact off the op's dstTexture below.
+    op->setXferProcessor(PorterDuffXferProcessor::Make(drawingAllocator(), brush.blendMode,
+                                                       dstTextureInfo));
     // A present value with an empty proxy selects the framebuffer fetch; the gate above already
     // rejected a dst-less draw on backends without it.
     op->setDstTexture(std::move(dstTextureInfo));

@@ -19,6 +19,7 @@
 #include "HairlineQuadOp.h"
 #include "gpu/GlobalCache.h"
 #include "tgfx/gpu/Context.h"
+#include "gpu/processors/HairlineQuadGeometryProcessor.h"
 
 namespace tgfx {
 
@@ -52,6 +53,19 @@ std::optional<GeometryLayout> HairlineQuadOp::onMakeGeometry(RenderTarget* /*ren
   realUVMatrix.preConcat(viewMatrix);
   return HairlineQuadGeometryLayout(color, viewMatrix, realUVMatrix, coverage, aaType);
 }
+
+PlacementPtr<GeometryProcessor> HairlineQuadOp::onMakeGeometryProcessor(
+    RenderTarget* /*renderTarget*/) {
+  if (hairlineProxy == nullptr) {
+    return nullptr;
+  }
+  auto viewMatrix = hairlineProxy->getDrawingMatrix();
+  auto realUVMatrix = uvMatrix;
+  realUVMatrix.preConcat(viewMatrix);
+  return HairlineQuadGeometryProcessor::Make(allocator, color, viewMatrix, realUVMatrix, coverage,
+                                             aaType);
+}
+
 
 bool HairlineQuadOp::onPrepare() {
   // The hairline vertex buffer is produced asynchronously and may be empty when the path has

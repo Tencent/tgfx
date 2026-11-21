@@ -20,6 +20,7 @@
 
 #include "DrawOp.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/processors/GeometryProcessor.h"
 
 namespace tgfx {
 struct DrawIR;
@@ -119,6 +120,15 @@ class StandardDrawOp : public DrawOp {
    * geometry processor).
    */
   virtual std::optional<GeometryLayout> onMakeGeometry(RenderTarget* renderTarget) = 0;
+
+  /**
+   * Builds the geometry processor that drives this op's pipeline on the FP-tree (JIT) route.
+   * The default returns nullptr, which keeps the draw on the precompiled route; an op that
+   * spells its vertex stage through a GeometryProcessor overrides this.
+   */
+  virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* /*renderTarget*/) {
+    return nullptr;
+  }
 
   /**
    * Hook invoked right before the ProgramInfo is materialised, giving the op a chance to

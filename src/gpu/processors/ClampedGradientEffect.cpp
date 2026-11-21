@@ -125,11 +125,4 @@ bool ClampedGradientEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
 }
 
 // Mirrors the gradient layout ordering used by the precompiled gradient shaders'
-PlacementPtr<ClampedGradientEffect> ClampedGradientEffect::Make(
-    BlockAllocator* allocator, PlacementPtr<FragmentProcessor> colorizer,
-    PlacementPtr<FragmentProcessor> gradLayout, Color leftBorderColor, Color rightBorderColor) {
-  return allocator->make<ClampedGradientEffect>(std::move(colorizer), std::move(gradLayout),
-                                                leftBorderColor, rightBorderColor);
-}
-
 }  // namespace tgfx

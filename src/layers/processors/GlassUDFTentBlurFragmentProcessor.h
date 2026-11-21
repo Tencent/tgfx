@@ -61,6 +61,10 @@ class GlassUDFTentBlurFragmentProcessor : public FragmentProcessor {
     return maxRadius;
   }
 
+  void emitCode(EmitArgs& args) const override;
+
+  void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
+
  protected:
   GlassUDFTentBlurFragmentProcessor(PlacementPtr<FragmentProcessor> fineSource,
                                     PlacementPtr<FragmentProcessor> coarseSource, float fineRadius,

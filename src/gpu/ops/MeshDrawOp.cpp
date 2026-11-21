@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeshDrawOp.h"
+#include "gpu/processors/MeshGeometryProcessor.h"
 
 namespace tgfx {
 
@@ -41,6 +42,16 @@ std::optional<GeometryLayout> MeshDrawOp::onMakeGeometry(RenderTarget* /*renderT
   return MeshGeometryLayout(attrs.hasTexCoords, attrs.hasColors, attrs.hasCoverage, color,
                             viewMatrix);
 }
+
+PlacementPtr<GeometryProcessor> MeshDrawOp::onMakeGeometryProcessor(RenderTarget*) {
+  if (meshProxy == nullptr) {
+    return nullptr;
+  }
+  const auto& attrs = meshProxy->attributes();
+  return MeshGeometryProcessor::Make(allocator, attrs.hasTexCoords, attrs.hasColors,
+                                     attrs.hasCoverage, color, viewMatrix);
+}
+
 
 void MeshDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto vertexBuffer = meshProxy->getVertexBuffer();

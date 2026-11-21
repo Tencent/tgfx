@@ -38,6 +38,8 @@ namespace tgfx {
 
 class Context;
 struct DrawIR;
+class GeometryProcessor;
+class XferProcessor;
 
 struct SamplerInfo {
   std::shared_ptr<Texture> texture;
@@ -59,6 +61,34 @@ class ProgramInfo {
   ProgramInfo(RenderTarget* renderTarget, const GeometryLayout& geometryLayout,
               const std::optional<DstTextureInfo>& dstTexture, BlendMode blendMode,
               bool blendFormulaHasCoverage);
+
+  /**
+   * The JIT-route constructor: the processor tree the runtime ProgramBuilder walks. The AOT route
+   * (the layout-and-carried-IR constructor above) and this route share the pipeline state and the
+   * uniform plumbing below; only the program source differs (precompiled selection vs on-the-fly
+   * emission).
+   */
+  ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
+              std::vector<FragmentProcessor*> fragmentProcessors, size_t numColorProcessors,
+              XferProcessor* xferProcessor, BlendMode blendMode);
+
+  size_t numColorFragmentProcessors() const {
+    return numColorProcessors;
+  }
+
+  size_t numFragmentProcessors() const {
+    return fragmentProcessors.size();
+  }
+
+  const GeometryProcessor* getGeometryProcessor() const {
+    return geometryProcessor;
+  }
+
+  const FragmentProcessor* getFragmentProcessor(size_t idx) const {
+    return fragmentProcessors[idx];
+  }
+
+  const XferProcessor* getXferProcessor() const;
 
   /// The draw's render target: the engine-level writers (RTAdjust) read its size and origin.
   RenderTarget* getRenderTarget() const {
@@ -83,13 +113,9 @@ class ProgramInfo {
     return geometryLayout;
   }
 
-  const std::vector<Attribute>& getVertexAttributes() const {
-    return getGeometryLayout().vertexAttributes;
-  }
+  const std::vector<Attribute>& getVertexAttributes() const;
 
-  const std::vector<Attribute>& getInstanceAttributes() const {
-    return getGeometryLayout().instanceAttributes;
-  }
+  const std::vector<Attribute>& getInstanceAttributes() const;
 
   PipelineColorAttachment getPipelineColorAttachment() const;
 
@@ -214,6 +240,14 @@ class ProgramInfo {
    */
   BytesKey programKey() const;
 
+  /**
+   * Returns the index of the processor in the ProgramInfo. Returns -1 if the processor is not in
+   * the ProgramInfo.
+   */
+  int getProcessorIndex(const Processor* processor) const;
+
+  std::string getMangledSuffix(const Processor* processor) const;
+
   /** Formats a program key as the hex string the diagnostic records carry. */
   static std::string FormatDiagnosticKey(const BytesKey& key);
 
@@ -278,6 +312,13 @@ class ProgramInfo {
 
  private:
   RenderTarget* renderTarget = nullptr;
+  // The JIT route's processor tree; null on the AOT route.
+  GeometryProcessor* geometryProcessor = nullptr;
+  std::vector<FragmentProcessor*> fragmentProcessors = {};
+  std::unordered_map<const Processor*, int> processorIndices = {};
+  // This value is also the index in fragmentProcessors where coverage processors begin.
+  size_t numColorProcessors = 0;
+  XferProcessor* xferProcessor = nullptr;
   GeometryLayout geometryLayout = {};
   /// The xfer facts derived from the processor once per program: the shader-side blend flag and
   /// the destination it samples. The writers and the matcher read this, not the processor.
@@ -292,6 +333,13 @@ class ProgramInfo {
 
   /// Derives the xfer facts from the processor once, at construction.
   void updateXferFacts(const std::optional<DstTextureInfo>& dstTexture);
+
+  void updateProcessorIndices();
+
+  std::vector<SamplerInfo> getSamplers() const;
+
+  void updateUniformDataSuffix(UniformData* vertexUniformData, UniformData* fragmentUniformData,
+                               const Processor* processor) const;
 
   BytesKey buildProgramKey() const;
 

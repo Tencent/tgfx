@@ -26,6 +26,7 @@
 #include "gpu/aot/ir/EffectGraph.h"
 
 namespace tgfx {
+
 PlacementPtr<FragmentProcessor> TextureEffect::Make(BlockAllocator* allocator,
                                                     std::shared_ptr<TextureProxy> proxy,
                                                     const SamplingArgs& args,
@@ -159,20 +160,27 @@ bool TextureEffect::isAlphaOnly() const {
   return textureProxy->isAlphaOnly();
 }
 
-PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(BlockAllocator* allocator,
-                                                          std::shared_ptr<TextureProxy> proxy,
-                                                          const SamplingArgs& args,
-                                                          const Point& alphaStart,
-                                                          const Matrix* uvMatrix) {
-  if (proxy == nullptr) {
-    return nullptr;
+bool TextureEffect::needSubset() const {
+  auto bounds = Rect::MakeWH(textureProxy->width(), textureProxy->height());
+  if (subset.has_value() && !(*subset).contains(bounds)) {
+    // if subset equal to bounds, we don't need to use subset.
+    return true;
   }
-  auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
-  SamplerState samplerState(args.tileModeX, args.tileModeY, args.sampling);
-  // The base constructor's parameter order (sampler state before the alpha start); the shell used
-  // to reorder them for its own signature.
-  return allocator->make<TextureEffect>(std::move(proxy), samplerState, args.constraint, alphaStart,
-                                        matrix, args.sampleArea);
+  auto textureView = getTextureView();
+  if (textureProxy->width() != textureView->width() ||
+      textureProxy->height() != textureView->height()) {
+    // If the texture size is different from the proxy size, we need to use subset.
+    return true;
+  }
+  auto type = textureView->getTexture()->type();
+  if (type == TextureType::External) {
+    // The descriptor size of external (OES) textures may not match the actual size of the
+    // underlying buffer, which can hold unstable padding outside the content bounds (for example,
+    // SurfaceTexture buffers aligned by hardware decoders). Always clamp the sampling to the
+    // content bounds to prevent bilinear filtering from reaching the padding area.
+    return true;
+  }
+  return false;
 }
 
 }  // namespace tgfx

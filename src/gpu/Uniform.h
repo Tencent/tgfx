@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 namespace tgfx {
 /**
@@ -53,4 +54,61 @@ static_assert(static_cast<int>(UniformFormat::Float) == 0 &&
                   static_cast<int>(UniformFormat::Texture2DRectSampler) == 13,
               "the format values are pinned; append new formats instead of renumbering");
 
+/**
+ * Represents a uniform variable in a GPU program.
+ */
+class Uniform {
+ public:
+  /**
+   * Default constructor for Uniform.
+   */
+  Uniform() = default;
+
+  /**
+   * Creates a uniform variable with the specified name, type, and element count. An array uniform
+   * is created when count is greater than 1. Array uniforms must use a format whose element size is
+   * 16 bytes (e.g. Float4), because the std140 layout aligns every array element to 16 bytes.
+   */
+  Uniform(std::string name, UniformFormat format, uint32_t count = 1)
+      : _name(std::move(name)), _format(format), _count(count) {
+  }
+
+  /**
+   * Returns true if the uniform variable is empty.
+   */
+  bool empty() const {
+    return _name.empty();
+  }
+
+  /**
+   * The name of the uniform variable.
+   */
+  const std::string& name() const {
+    return _name;
+  }
+
+  /**
+   * The format of the uniform variable.
+   */
+  UniformFormat format() const {
+    return _format;
+  }
+
+  /**
+   * The number of elements in the uniform array. Returns 1 for scalar uniforms.
+   */
+  uint32_t count() const {
+    return _count;
+  }
+
+  /**
+   * Returns the total size of the uniform variable in bytes.
+   */
+  size_t size() const;
+
+ private:
+  std::string _name = {};
+  UniformFormat _format = UniformFormat::Float;
+  uint32_t _count = 1;
+};
 }  // namespace tgfx

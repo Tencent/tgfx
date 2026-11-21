@@ -24,6 +24,8 @@
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
+#include "gpu/processors/DefaultGeometryProcessor.h"
+#include "gpu/SamplingArgs.h"
 
 namespace tgfx {
 PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GPUShapeProxy> shapeProxy,
@@ -87,6 +89,40 @@ std::optional<GeometryLayout> ShapeDrawOp::onMakeGeometry(RenderTarget* /*render
   }
   return DefaultGeometryLayout(color, aa, viewMatrix, realUVMatrix);
 }
+
+PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+  if (shapeProxy == nullptr) {
+    return nullptr;
+  }
+  auto viewMatrix = shapeProxy->getDrawingMatrix();
+  auto realUVMatrix = uvMatrix;
+  realUVMatrix.preConcat(viewMatrix);
+  auto vertexBuffer = shapeProxy->getTriangles();
+  auto aa = aaType;
+  if (vertexBuffer == nullptr) {
+    aa = AAType::None;
+    auto textureProxy = shapeProxy->getTextureProxy();
+    if (textureProxy == nullptr || maskBufferProxy == nullptr ||
+        maskBufferProxy->getBuffer() == nullptr) {
+      return nullptr;
+    }
+    Matrix maskMatrix = {};
+    if (!realUVMatrix.invert(&maskMatrix)) {
+      return nullptr;
+    }
+    static const SamplingArgs args(TileMode::Clamp, TileMode::Clamp,
+                                   SamplingOptions(FilterMode::Nearest, MipmapMode::None),
+                                   SrcRectConstraint::Fast);
+    auto maskFP = TextureEffect::Make(allocator, std::move(textureProxy), args, &maskMatrix, true);
+    if (maskFP == nullptr) {
+      return nullptr;
+    }
+    addCoverageFP(std::move(maskFP));
+  }
+  return DefaultGeometryProcessor::Make(allocator, color, renderTarget->width(),
+                                        renderTarget->height(), aa, viewMatrix, realUVMatrix);
+}
+
 
 void ShapeDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto vertexBuffer = shapeProxy->getTriangles();

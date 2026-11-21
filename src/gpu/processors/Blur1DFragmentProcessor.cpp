@@ -25,4 +25,14 @@ namespace tgfx {
 Blur1DFragmentProcessor::Blur1DFragmentProcessor(uint32_t classID) : FragmentProcessor(classID) {
 }
 
+void Blur1DFragmentProcessor::setKernelData(UniformData* fragmentUniformData) const {
+  // Pack the half-kernel into a vec4 array. Unused trailing slots stay zero and are never indexed
+  // because the shader only accesses offsets within the stored radius.
+  std::array<float, 4 * KERNEL_VEC4_COUNT> kernelData = {};
+  const size_t weightCount = static_cast<size_t>(kernelRadius + 1);
+  memcpy(kernelData.data(), kernel.data(), weightCount * sizeof(float));
+  fragmentUniformData->setData("Kernel", kernelData);
+  fragmentUniformData->setData("Radius", kernelRadius);
+}
+
 }  // namespace tgfx

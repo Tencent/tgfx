@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorSpaceXFormEffect.h"
+#include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/aot/ir/EffectGraph.h"
 
 namespace tgfx {
@@ -39,6 +40,16 @@ bool ColorSpaceXformEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
   }
   AOTColorSpaceXformParameters parameters = {colorSpaceXformSteps};
   return builder->addColorSpaceXform(input, parameters, output);
+}
+
+void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
+  auto uniformHandler = args.uniformHandler;
+  auto fragBuilder = args.fragBuilder;
+  ColorSpaceXformHelper helper{};
+  helper.emitCode(uniformHandler, colorSpaceXformSteps.get());
+  std::string outputColor;
+  fragBuilder->appendColorGamutXform(&outputColor, args.inputColor.c_str(), &helper);
+  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outputColor.c_str());
 }
 
 ColorSpaceXformEffect::ColorSpaceXformEffect(std::shared_ptr<ColorSpaceXformSteps> colorXform)

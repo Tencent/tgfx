@@ -19,9 +19,4 @@
 #include "SingleIntervalGradientColorizer.h"
 
 namespace tgfx {
-PlacementPtr<SingleIntervalGradientColorizer> SingleIntervalGradientColorizer::Make(
-    BlockAllocator* allocator, Color start, Color end) {
-  return allocator->make<SingleIntervalGradientColorizer>(start, end);
-}
-
 }  // namespace tgfx

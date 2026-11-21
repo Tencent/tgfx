@@ -19,10 +19,96 @@
 #pragma once
 #include <skcms.h>
 #include <cstdint>
+#include <string>
+#include "UniformData.h"
+#include "UniformHandler.h"
 #include "core/ColorSpaceXformSteps.h"
+#include "gpu/ShaderVar.h"
 #include "gpu/aot/write/ParamBuffer.h"
 
 namespace tgfx {
+
+/**
+ * The JIT route's emission-side view of one color-space transform: the uniforms the emitted GLSL
+ * reads and the flags that gate them. The precompiled route's resolvers below share the same
+ * steps but spell the values through the bundle's std140 contract instead.
+ */
+class ColorSpaceXformHelper {
+ public:
+  ColorSpaceXformHelper() = default;
+
+  void emitCode(UniformHandler* uniformHandler, const ColorSpaceXformSteps* colorSpaceXform,
+                ShaderStage shaderStage = ShaderStage::Fragment);
+
+  void setData(UniformData* uniformData, const ColorSpaceXformSteps* colorSpaceXform);
+
+  bool isNoop() const {
+    return (0 == flags.mask());
+  }
+
+  bool applyUnpremul() const {
+    return flags.unPremul;
+  }
+  bool applySrcTF() const {
+    return flags.linearize;
+  }
+  bool applySrcOOTF() const {
+    return flags.srcOOTF;
+  }
+  bool applyGamutXform() const {
+    return flags.gamutTransform;
+  }
+  bool applyDstOOTF() const {
+    return flags.dstOOTF;
+  }
+  bool applyDstTF() const {
+    return flags.encode;
+  }
+  bool applyPremul() const {
+    return flags.premul;
+  }
+
+  gfx::skcms_TFType srcTFType() const {
+    return _srcTFType;
+  }
+  gfx::skcms_TFType dstTFType() const {
+    return _dstTFType;
+  }
+
+  const std::string& srcTFUniform0() const {
+    return srcTFVar0;
+  }
+  const std::string& srcTFUniform1() const {
+    return srcTFVar1;
+  }
+  const std::string& srcOOTFUniform() const {
+    return srcOOTFVar;
+  }
+  const std::string& gamutXformUniform() const {
+    return gamutXformVar;
+  }
+  const std::string& dstOOTFUniform() const {
+    return dstOOTFVar;
+  }
+  const std::string& dstTFUniform0() const {
+    return dstTFVar0;
+  }
+  const std::string& dstTFUniform1() const {
+    return dstTFVar1;
+  }
+
+ private:
+  std::string srcTFVar0;
+  std::string srcTFVar1;
+  std::string srcOOTFVar;
+  std::string gamutXformVar;
+  std::string dstOOTFVar;
+  std::string dstTFVar0;
+  std::string dstTFVar1;
+  ColorSpaceXformSteps::Flags flags;
+  gfx::skcms_TFType _srcTFType;
+  gfx::skcms_TFType _dstTFType;
+};
 
 /**
  * Maps an skcms transfer-function kind to the TFType uniform index the shaders switch on.
@@ -67,31 +153,4 @@ struct ColorSpaceXformValues {
 void ResolveColorSpaceXformValues(const ColorSpaceXformSteps* colorSpaceXform,
                                   ColorSpaceXformValues* out);
 
-/**
- * Uploads the uniforms of a color-space transform through one module's color-space block: the
- * caller names the module's field elements and the helper packs the steps into them. The fields
- * are addressed by element index through the variant's derived layout, so no name is composed per
- * draw and a field the module gates out is simply skipped.
- */
-class ColorSpaceXformHelper {
- public:
-  /**
-   * The element indices of one module's color-space block (the Chain and YUVChainTail spellings).
-   */
-  struct FieldElements {
-    uint8_t csFlags = 0;
-    uint8_t srcTF0 = 0;
-    uint8_t srcTF1 = 0;
-    uint8_t srcTFType = 0;
-    uint8_t srcOOTF = 0;
-    uint8_t colorXform = 0;
-    uint8_t dstOOTF = 0;
-    uint8_t dstTF0 = 0;
-    uint8_t dstTF1 = 0;
-    uint8_t dstTFType = 0;
-  };
-
-  void setData(SlotWriter* writer, const FieldElements& fields,
-               const ColorSpaceXformSteps* colorSpaceXform);
-};
 }  // namespace tgfx

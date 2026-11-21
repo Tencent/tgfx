@@ -33,6 +33,8 @@ class MeshDrawOp : public StandardDrawOp {
  protected:
   std::optional<GeometryLayout> onMakeGeometry(RenderTarget* renderTarget) override;
 
+  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
+
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
   Type type() const override {

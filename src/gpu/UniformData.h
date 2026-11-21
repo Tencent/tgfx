@@ -4,8 +4,8 @@
 //
 //  Copyright (C) 2023 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
@@ -20,16 +20,71 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include "gpu/Uniform.h"
+#include "tgfx/core/Color.h"
+#include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 
 /**
- * One stage's uniform block: a byte range the writers fill through the layout-derived offsets and
- * the upload hands to the GPU. The precompiled route addresses every field by the derived
- * layout's offset, so a block is a size and a writable buffer — there is no name table here.
+ * One stage's uniform block. The JIT route declares its uniforms by name and writes them through
+ * setData(); the precompiled route addresses every field by the derived layout's offset through
+ * writableBytes(), so both routes share one backing buffer of the block's size.
  */
 class UniformData {
  public:
+  /**
+   *
+   * Copies value into the uniform data. The data must have the same size as the uniform specified
+   * by name.
+   */
+  template <typename T>
+  std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> &&
+                       !std::is_same_v<std::decay_t<T>, Matrix> &&
+                       !std::is_same_v<std::decay_t<T>, ColorMatrix33>,
+                   void>
+  setData(const std::string& name, const T& value) const {
+    onSetData(name, &value, sizeof(value));
+  }
+
+  /**
+   * Convenience method for copying a Matrix to a 3x3 matrix in column-major order.
+   */
+  template <typename T>
+  std::enable_if_t<std::is_same_v<std::decay_t<T>, Matrix>, void> setData(const std::string& name,
+                                                                          const T& matrix) const {
+    float values[9] = {};
+    matrix.get9(values);
+
+    // clang-format off
+    const float data[] = {
+      values[0], values[3], values[6], 0,
+      values[1], values[4], values[7], 0,
+      values[2], values[5], values[8], 0,
+    };
+    // clang-format on
+    onSetData(name, data, sizeof(data));
+  }
+
+  template <typename T>
+  std::enable_if_t<std::is_same_v<std::decay_t<T>, ColorMatrix33>, void> setData(
+      const std::string& name, const T& matrix) const {
+
+    // clang-format off
+      const float data[] = {
+        matrix.values[0][0], matrix.values[1][0], matrix.values[2][0], 0,
+        matrix.values[0][1], matrix.values[1][1], matrix.values[2][1], 0,
+        matrix.values[0][2], matrix.values[1][2], matrix.values[2][2], 0,
+      };
+    // clang-format on
+    onSetData(name, data, sizeof(data));
+  }
+
   /**
    * Sets an external memory buffer for writing uniform data.
    * On platforms with UBO support, the buffer points to memory mapped from a GPU UBO object.
@@ -50,15 +105,59 @@ class UniformData {
     return bufferSize;
   }
 
+  /**
+   * Returns the list of uniforms in this data.
+   */
+  const std::vector<Uniform>& uniforms() const {
+    return _uniforms;
+  }
+
  private:
+  struct Field {
+    std::string name = "";
+    UniformFormat format = UniformFormat::Float;
+    size_t offset = 0;
+    size_t size = 0;
+    size_t align = 0;
+  };
+
+  struct Entry {
+    size_t size;
+    size_t align;
+  };
+
+  uint8_t* _buffer = nullptr;
+  size_t bufferSize = 0;
+  std::vector<Uniform> _uniforms = {};
+  std::string nameSuffix = "";
+  std::unordered_map<std::string, Field> fieldMap = {};
+  size_t cursor = 0;
+
   /// A block of the given byte size: the precompiled route addresses every field through its
   /// derived layout's offsets, so the block needs only its size and a buffer.
   explicit UniformData(size_t size);
 
-  uint8_t* _buffer = nullptr;
-  size_t bufferSize = 0;
+  explicit UniformData(std::vector<Uniform> uniforms);
+
+  void onSetData(const std::string& name, const void* data, size_t size) const;
+
+  const Field* findField(const std::string& key) const;
+
+  size_t alignCursor(size_t alignment) const;
+
+  static Entry EntryOf(UniformFormat format);
+
+  /**
+   * Dump UniformData's memory layout information is printed to the console for debugging.
+   */
+#if DEBUG
+  static const char* ToUniformFormatName(UniformFormat format);
+
+  void dump() const;
+#endif
 
   friend class PrecompiledProgramCreator;
+  friend class ProgramInfo;
+  friend class UniformHandler;
 };
-
 }  // namespace tgfx

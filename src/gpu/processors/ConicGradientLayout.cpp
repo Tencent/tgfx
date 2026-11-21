@@ -24,10 +24,4 @@ ConicGradientLayout::ConicGradientLayout(Matrix matrix, float bias, float scale)
   addCoordTransform(&coordTransform);
 }
 
-PlacementPtr<ConicGradientLayout> ConicGradientLayout::Make(BlockAllocator* allocator,
-                                                            Matrix matrix, float bias,
-                                                            float scale) {
-  return allocator->make<ConicGradientLayout>(matrix, bias, scale);
-}
-
 }  // namespace tgfx

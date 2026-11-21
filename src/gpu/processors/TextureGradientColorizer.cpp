@@ -19,12 +19,4 @@
 #include "TextureGradientColorizer.h"
 
 namespace tgfx {
-PlacementPtr<TextureGradientColorizer> TextureGradientColorizer::Make(
-    BlockAllocator* allocator, std::shared_ptr<TextureProxy> gradient) {
-  if (gradient == nullptr) {
-    return nullptr;
-  }
-  return allocator->make<TextureGradientColorizer>(std::move(gradient));
-}
-
 }  // namespace tgfx

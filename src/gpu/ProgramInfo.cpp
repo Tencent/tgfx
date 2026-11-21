@@ -23,6 +23,7 @@
 #include "gpu/BlendFormula.h"
 #include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/ProgramBuilder.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
@@ -30,6 +31,9 @@
 #include "gpu/aot/select/PrecompiledProgramCreator.h"
 #include "gpu/aot/select/ProgramKey.h"
 #include "gpu/aot/select/ShaderProfileResolver.h"
+#include "gpu/processors/EmptyXferProcessor.h"
+#include "gpu/processors/GeometryProcessor.h"
+#include "gpu/processors/XferProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/resources/YUVTextureView.h"
 #include "tgfx/gpu/GPU.h"
@@ -49,6 +53,104 @@ ProgramInfo::ProgramInfo(RenderTarget* renderTarget, const GeometryLayout& geome
     : renderTarget(renderTarget), geometryLayout(geometryLayout), blendMode(blendMode),
       hasCoverageForBlend(blendFormulaHasCoverage) {
   updateXferFacts(dstTexture);
+}
+
+ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
+                         std::vector<FragmentProcessor*> fragmentProcessors,
+                         size_t numColorProcessors, XferProcessor* xferProcessor,
+                         BlendMode blendMode)
+    : renderTarget(renderTarget), geometryProcessor(geometryProcessor),
+      fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
+      xferProcessor(xferProcessor), blendMode(blendMode),
+      hasCoverageForBlend(numColorProcessors < this->fragmentProcessors.size()) {
+  updateProcessorIndices();
+}
+
+const std::vector<Attribute>& ProgramInfo::getVertexAttributes() const {
+  if (geometryProcessor != nullptr) {
+    return geometryProcessor->vertexAttributes();
+  }
+  return getGeometryLayout().vertexAttributes;
+}
+
+const std::vector<Attribute>& ProgramInfo::getInstanceAttributes() const {
+  if (geometryProcessor != nullptr) {
+    return geometryProcessor->instanceAttributes();
+  }
+  return getGeometryLayout().instanceAttributes;
+}
+
+void ProgramInfo::updateProcessorIndices() {
+  int index = 0;
+  processorIndices[geometryProcessor] = index++;
+  for (auto& fragmentProcessor : fragmentProcessors) {
+    FragmentProcessor::Iter iter(fragmentProcessor);
+    const FragmentProcessor* fp = iter.next();
+    while (fp) {
+      processorIndices[fp] = index++;
+      fp = iter.next();
+    }
+  }
+  processorIndices[getXferProcessor()] = index++;
+}
+
+const XferProcessor* ProgramInfo::getXferProcessor() const {
+  if (xferProcessor == nullptr) {
+    return EmptyXferProcessor::GetInstance();
+  }
+  return xferProcessor;
+}
+
+int ProgramInfo::getProcessorIndex(const Processor* processor) const {
+  auto result = processorIndices.find(processor);
+  if (result == processorIndices.end()) {
+    return -1;
+  }
+  return result->second;
+}
+
+std::string ProgramInfo::getMangledSuffix(const Processor* processor) const {
+  auto processorIndex = getProcessorIndex(processor);
+  if (processorIndex == -1) {
+    return "";
+  }
+  return "_P" + std::to_string(processorIndex);
+}
+
+void ProgramInfo::updateUniformDataSuffix(UniformData* vertexUniformData,
+                                          UniformData* fragmentUniformData,
+                                          const Processor* processor) const {
+  auto suffix = getMangledSuffix(processor);
+  if (vertexUniformData != nullptr) {
+    vertexUniformData->nameSuffix = suffix;
+  }
+
+  if (fragmentUniformData != nullptr) {
+    fragmentUniformData->nameSuffix = suffix;
+  }
+}
+
+std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
+  std::vector<SamplerInfo> samplers = {};
+  for (size_t i = 0; i < geometryProcessor->numTextureSamplers(); i++) {
+    SamplerInfo sampler = {geometryProcessor->textureAt(i), geometryProcessor->samplerStateAt(i)};
+    samplers.push_back(sampler);
+  }
+  FragmentProcessor::Iter iter(this);
+  const FragmentProcessor* fp = iter.next();
+  while (fp) {
+    for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
+      SamplerInfo sampler = {fp->textureAt(i), fp->samplerStateAt(i)};
+      samplers.push_back(sampler);
+    }
+    fp = iter.next();
+  }
+  auto dstTextureView = xferProcessor != nullptr ? xferProcessor->dstTextureView() : nullptr;
+  if (dstTextureView != nullptr) {
+    SamplerInfo sampler = {dstTextureView->getTexture(), {}};
+    samplers.push_back(sampler);
+  }
+  return samplers;
 }
 
 void ProgramInfo::updateXferFacts(const std::optional<DstTextureInfo>& dstTexture) {
@@ -163,6 +265,29 @@ void ProgramInfo::writePipelineStateKey(BytesKey* key) const {
 
 std::shared_ptr<Program> ProgramInfo::getProgram() {
   auto context = renderTarget->getContext();
+  if (geometryProcessor != nullptr) {
+    // The JIT route: the tree's processor keys plus the shared pipeline-state tail key the
+    // program cache; a miss emits the program on the fly through ProgramBuilder.
+    BytesKey programKey = {};
+    geometryProcessor->computeProcessorKey(context, &programKey);
+    for (const auto& processor : fragmentProcessors) {
+      processor->computeProcessorKey(context, &programKey);
+    }
+    if (xferProcessor != nullptr) {
+      xferProcessor->computeProcessorKey(context, &programKey);
+    }
+    writePipelineStateKey(&programKey);
+    auto program = context->globalCache()->findProgram(programKey);
+    if (program == nullptr) {
+      program = ProgramBuilder::CreateProgram(context, this);
+      if (program == nullptr) {
+        LOGE("ProgramInfo::getProgram() Failed to create the program!");
+        return nullptr;
+      }
+      context->globalCache()->addProgram(programKey, program);
+    }
+    return program;
+  }
   // Precompiled artifacts are the only program source: a miss drops the draw (see
   // StandardDrawOp::prepare). The cache lookup lives in the creator because a program's key
   // carries its matched variant and specialization values, which only the match can name. The
@@ -253,6 +378,54 @@ void ProgramInfo::bindUniformBufferAndUnloadToGPU(const Program* program,
 
 bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* program) const {
   DEBUG_ASSERT(renderTarget != nullptr);
+  if (geometryProcessor != nullptr) {
+    // The JIT route: the program carries no route writer, so the processor tree itself walks the
+    // uniform data (each processor's names suffixed by its index) and the samplers follow the
+    // tree's pre-order.
+    size_t vertexOffset = 0;
+    size_t fragmentOffset = 0;
+    auto uniformBuffer = getUniformBuffer(program, &vertexOffset, &fragmentOffset);
+
+    auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
+    auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
+
+    auto array = GetRTAdjustArray(renderTarget);
+    if (vertexUniformData != nullptr) {
+      vertexUniformData->setData(RTAdjustName, array);
+    }
+    updateUniformDataSuffix(vertexUniformData, fragmentUniformData, geometryProcessor);
+
+    FragmentProcessor::CoordTransformIter coordTransformIter(this);
+    geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
+
+    for (auto& fragmentProcessor : fragmentProcessors) {
+      FragmentProcessor::Iter iter(fragmentProcessor);
+      const FragmentProcessor* fp = iter.next();
+      while (fp) {
+        updateUniformDataSuffix(vertexUniformData, fragmentUniformData, fp);
+        fp->setData(vertexUniformData, fragmentUniformData);
+        fp = iter.next();
+      }
+    }
+    const auto processor = getXferProcessor();
+    updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
+    processor->setData(vertexUniformData, fragmentUniformData);
+    updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
+
+    bindUniformBufferAndUnloadToGPU(program, std::move(uniformBuffer), renderPass, vertexOffset,
+                                    fragmentOffset);
+
+    auto samplers = getSamplers();
+    unsigned textureBinding = 0;
+    auto gpu = renderTarget->getContext()->gpu();
+    for (auto& [texture, state] : samplers) {
+      SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
+                                   state.minFilterMode, state.magFilterMode, state.mipmapMode);
+      auto sampler = gpu->createSampler(descriptor);
+      renderPass->setTexture(textureBinding++, texture, sampler);
+    }
+    return true;
+  }
   return program->writer()->write(*this, renderPass, program);
 }
 

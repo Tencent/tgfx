@@ -31,9 +31,4 @@ bool ConstColorProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
   return builder->addConstColor(input, parameters, output);
 }
 
-PlacementPtr<ConstColorProcessor> ConstColorProcessor::Make(BlockAllocator* allocator,
-                                                            PMColor color, InputMode mode) {
-  return allocator->make<ConstColorProcessor>(color, mode);
-}
-
 }  // namespace tgfx

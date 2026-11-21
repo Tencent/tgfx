@@ -67,10 +67,15 @@ class Blur1DFragmentProcessor : public FragmentProcessor {
    */
   virtual void computeKernel(float strength) = 0;
 
+  // The compile-time upper bound of the shader sampling loop. It determines the generated shader
+  // code, so subclasses must include the loop bound in the processor key.
+  virtual int kernelLoopUpperBound() const = 0;
+
   /**
    * Uploads the packed kernel and radius uniforms. The half-kernel uploads kernelRadius + 1
    * weights.
    */
+  void setKernelData(UniformData* fragmentUniformData) const;
 
   // The single-sided radius of the kernel.
   int kernelRadius = 0;

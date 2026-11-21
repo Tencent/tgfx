@@ -24,6 +24,7 @@
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/XferFacts.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/XferProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/RenderPass.h"
 
@@ -62,6 +63,10 @@ class DrawOp {
 
   void setBlendMode(BlendMode mode) {
     blendMode = mode;
+  }
+
+  void setXferProcessor(PlacementPtr<XferProcessor> processor) {
+    xferProcessor = std::move(processor);
   }
 
   void setCullMode(CullMode mode) {
@@ -164,6 +169,7 @@ class DrawOp {
   /// The draw's destination texture (present but empty = framebuffer fetch; absent = no shader
   /// xfer stage); see setDstTexture.
   std::optional<DstTextureInfo> dstTexture = std::nullopt;
+  PlacementPtr<XferProcessor> xferProcessor = nullptr;
   PlacementPtr<DrawIR> ir = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;

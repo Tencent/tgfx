@@ -19,27 +19,4 @@
 #include "DualIntervalGradientColorizer.h"
 
 namespace tgfx {
-PlacementPtr<DualIntervalGradientColorizer> DualIntervalGradientColorizer::Make(
-    BlockAllocator* allocator, Color c0, Color c1, Color c2, Color c3, float threshold) {
-  Color scale01;
-  // Derive scale and biases from the 4 colors and threshold
-  for (int i = 0; i < 4; ++i) {
-    auto vc0 = c0[i];
-    auto vc1 = c1[i];
-    scale01[i] = (vc1 - vc0) / threshold;
-  }
-  // bias01 = c0
-
-  Color scale23;
-  Color bias23;
-  for (int i = 0; i < 4; ++i) {
-    auto vc2 = c2[i];
-    auto vc3 = c3[i];
-    scale23[i] = (vc3 - vc2) / (1 - threshold);
-    bias23[i] = vc2 - threshold * scale23[i];
-  }
-
-  return allocator->make<DualIntervalGradientColorizer>(scale01, c0, scale23, bias23, threshold);
-}
-
 }  // namespace tgfx

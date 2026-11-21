@@ -44,6 +44,8 @@ class ColorSpaceXformEffect : public FragmentProcessor {
 
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
+  void emitCode(EmitArgs& args) const override;
+
  private:
   std::shared_ptr<ColorSpaceXformSteps> colorSpaceXformSteps;
 };

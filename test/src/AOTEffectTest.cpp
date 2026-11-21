@@ -142,6 +142,9 @@ class ShapeRejectingFragmentProcessor : public FragmentProcessor {
     return "ShapeRejectingFragmentProcessor";
   }
 
+  void emitCode(EmitArgs&) const override {
+  }
+
   bool lowerToAOT(AOTNodeBuilder*, AOTNodeID, AOTNodeID*) const override {
     return false;
   }

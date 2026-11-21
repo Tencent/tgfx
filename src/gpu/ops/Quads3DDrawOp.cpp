@@ -21,6 +21,7 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "tgfx/core/RenderFlags.h"
+#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
 
@@ -69,6 +70,13 @@ std::optional<GeometryLayout> Quads3DDrawOp::onMakeGeometry(RenderTarget* render
   return QuadGeometryLayoutOf(renderTarget->width(), renderTarget->height(), aaType, commonColor,
                               uvMatrix, false);
 }
+
+PlacementPtr<GeometryProcessor> Quads3DDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+  return QuadPerEdgeAAGeometryProcessor::Make(allocator, renderTarget->width(),
+                                              renderTarget->height(), aaType, commonColor, uvMatrix,
+                                              false);
+}
+
 
 void Quads3DDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   std::shared_ptr<BufferResource> indexBuffer = nullptr;

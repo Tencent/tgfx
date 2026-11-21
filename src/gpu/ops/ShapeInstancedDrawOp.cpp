@@ -24,6 +24,8 @@
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
+#include "gpu/processors/ShapeInstancedGeometryProcessor.h"
+#include "gpu/SamplingArgs.h"
 
 namespace tgfx {
 
@@ -104,6 +106,42 @@ std::optional<GeometryLayout> ShapeInstancedDrawOp::onMakeGeometry(RenderTarget*
   auto viewMatrix = stateMatrix * realUVMatrix;
   return ShapeInstancedGeometryLayout(aa, hasInstanceColors, viewMatrix, realUVMatrix);
 }
+
+PlacementPtr<GeometryProcessor> ShapeInstancedDrawOp::onMakeGeometryProcessor(
+    RenderTarget* renderTarget) {
+  if (shapeProxy == nullptr) {
+    return nullptr;
+  }
+  auto realUVMatrix = uvMatrix;
+  realUVMatrix.preConcat(shapeProxy->getDrawingMatrix());
+  auto aa = aaType;
+  auto vertexBuffer = shapeProxy->getTriangles();
+  if (vertexBuffer == nullptr) {
+    aa = AAType::None;
+    auto textureProxy = shapeProxy->getTextureProxy();
+    if (textureProxy == nullptr || maskBufferProxy == nullptr ||
+        maskBufferProxy->getBuffer() == nullptr) {
+      return nullptr;
+    }
+    Matrix maskMatrix = {};
+    if (!realUVMatrix.invert(&maskMatrix)) {
+      return nullptr;
+    }
+    static const SamplingArgs args(TileMode::Clamp, TileMode::Clamp,
+                                   SamplingOptions(FilterMode::Nearest, MipmapMode::None),
+                                   SrcRectConstraint::Fast);
+    auto maskFP = TextureEffect::Make(allocator, std::move(textureProxy), args, &maskMatrix, true);
+    if (maskFP == nullptr) {
+      return nullptr;
+    }
+    addCoverageFP(std::move(maskFP));
+  }
+  auto viewMatrix = stateMatrix * realUVMatrix;
+  return ShapeInstancedGeometryProcessor::Make(allocator, renderTarget->width(),
+                                               renderTarget->height(), aa, hasInstanceColors,
+                                               realUVMatrix, viewMatrix);
+}
+
 
 void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto vertexBuffer = shapeProxy->getTriangles();

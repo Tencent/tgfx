@@ -22,6 +22,75 @@
 #include "core/utils/Log.h"
 namespace tgfx {
 
+void ColorSpaceXformHelper::emitCode(UniformHandler* uniformHandler,
+                                     const ColorSpaceXformSteps* colorSpaceXform,
+                                     ShaderStage shaderStage) {
+  if (colorSpaceXform) {
+    flags = colorSpaceXform->flags;
+    if (this->applySrcTF()) {
+      srcTFVar0 = uniformHandler->addUniform("SrcTF0", UniformFormat::Float4, shaderStage);
+      srcTFVar1 = uniformHandler->addUniform("SrcTF1", UniformFormat::Float4, shaderStage);
+      _srcTFType =
+          gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
+              &colorSpaceXform->srcTransferFunction));
+    }
+    if (this->applySrcOOTF()) {
+      srcOOTFVar = uniformHandler->addUniform("SrcOOTF", UniformFormat::Float4, shaderStage);
+    }
+    if (this->applyGamutXform()) {
+      gamutXformVar =
+          uniformHandler->addUniform("ColorXform", UniformFormat::Float3x3, shaderStage);
+    }
+    if (this->applyDstOOTF()) {
+      dstOOTFVar = uniformHandler->addUniform("DstOOTF", UniformFormat::Float4, shaderStage);
+    }
+    if (this->applyDstTF()) {
+      dstTFVar0 = uniformHandler->addUniform("DstTF0", UniformFormat::Float4, shaderStage);
+      dstTFVar1 = uniformHandler->addUniform("DstTF1", UniformFormat::Float4, shaderStage);
+      _dstTFType =
+          gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
+              &colorSpaceXform->dstTransferFunctionInverse));
+    }
+  }
+}
+
+void ColorSpaceXformHelper::setData(UniformData* uniformData,
+                                    const ColorSpaceXformSteps* colorSpaceXform) {
+  if (colorSpaceXform) {
+    flags = colorSpaceXform->flags;
+    if (this->applySrcTF()) {
+      float srcTF0[4] = {
+          colorSpaceXform->srcTransferFunction.g, colorSpaceXform->srcTransferFunction.a,
+          colorSpaceXform->srcTransferFunction.b, colorSpaceXform->srcTransferFunction.c};
+      float srcTF1[4] = {colorSpaceXform->srcTransferFunction.d,
+                         colorSpaceXform->srcTransferFunction.e,
+                         colorSpaceXform->srcTransferFunction.f, 0.0f};
+      uniformData->setData("SrcTF0", srcTF0);
+      uniformData->setData("SrcTF1", srcTF1);
+    }
+    if (this->applySrcOOTF()) {
+      uniformData->setData("SrcOOTF", colorSpaceXform->srcOOTF);
+    }
+    if (this->applyGamutXform()) {
+      uniformData->setData("ColorXform", colorSpaceXform->srcToDstMatrix);
+    }
+    if (this->applyDstOOTF()) {
+      uniformData->setData("DstOOTF", colorSpaceXform->dstOOTF);
+    }
+    if (this->applyDstTF()) {
+      float dstTF0[4] = {colorSpaceXform->dstTransferFunctionInverse.g,
+                         colorSpaceXform->dstTransferFunctionInverse.a,
+                         colorSpaceXform->dstTransferFunctionInverse.b,
+                         colorSpaceXform->dstTransferFunctionInverse.c};
+      float dstTF1[4] = {colorSpaceXform->dstTransferFunctionInverse.d,
+                         colorSpaceXform->dstTransferFunctionInverse.e,
+                         colorSpaceXform->dstTransferFunctionInverse.f, 0.0f};
+      uniformData->setData("DstTF0", dstTF0);
+      uniformData->setData("DstTF1", dstTF1);
+    }
+  }
+}
+
 int TFTypeToIndex(gfx::skcms_TFType type) {
   switch (type) {
     case gfx::skcms_TFType_sRGBish:
@@ -80,51 +149,6 @@ std::array<float, 12> PackColorXform(const ColorMatrix33& matrix) {
   return {matrix.values[0][0], matrix.values[1][0], matrix.values[2][0], 0.0f,
           matrix.values[0][1], matrix.values[1][1], matrix.values[2][1], 0.0f,
           matrix.values[0][2], matrix.values[1][2], matrix.values[2][2], 0.0f};
-}
-
-// The element mode: one module's color-space block addressed by element index through the derived
-// layout. The disabled steps still write their identity placeholders when the module declares the
-// fields, matching the values' contract.
-struct ElementSink {
-  SlotWriter* writer;
-  const ColorSpaceXformHelper::FieldElements& fields;
-
-  uint8_t indexOf(CSField field) const;
-  void intValue(CSField field, int value) const {
-    writer->setIfPresent(indexOf(field), value);
-  }
-  void float4Value(CSField field, const float (&value)[4]) const {
-    writer->setIfPresent(indexOf(field), value);
-  }
-  void colorXformValue(const float (&value)[12]) const {
-    writer->setIfPresent(indexOf(CSField::ColorXform), value);
-  }
-};
-
-uint8_t ElementSink::indexOf(CSField field) const {
-  switch (field) {
-    case CSField::CSFlags:
-      return fields.csFlags;
-    case CSField::SrcTF0:
-      return fields.srcTF0;
-    case CSField::SrcTF1:
-      return fields.srcTF1;
-    case CSField::SrcTFType:
-      return fields.srcTFType;
-    case CSField::SrcOOTF:
-      return fields.srcOOTF;
-    case CSField::ColorXform:
-      return fields.colorXform;
-    case CSField::DstOOTF:
-      return fields.dstOOTF;
-    case CSField::DstTF0:
-      return fields.dstTF0;
-    case CSField::DstTF1:
-      return fields.dstTF1;
-    case CSField::DstTFType:
-      return fields.dstTFType;
-  }
-  return 0;
 }
 
 }  // namespace
@@ -191,23 +215,4 @@ void ResolveColorSpaceXformValues(const ColorSpaceXformSteps* colorSpaceXform,
   }
 }
 
-void ColorSpaceXformHelper::setData(SlotWriter* writer, const FieldElements& fields,
-                                    const ColorSpaceXformSteps* colorSpaceXform) {
-  if (!colorSpaceXform) {
-    return;
-  }
-  ColorSpaceXformValues values = {};
-  ResolveColorSpaceXformValues(colorSpaceXform, &values);
-  ElementSink sink = {writer, fields};
-  sink.intValue(CSField::CSFlags, values.flags);
-  sink.float4Value(CSField::SrcTF0, values.srcTF0);
-  sink.float4Value(CSField::SrcTF1, values.srcTF1);
-  sink.intValue(CSField::SrcTFType, values.srcTFType);
-  sink.float4Value(CSField::SrcOOTF, values.srcOOTF);
-  sink.colorXformValue(values.colorXform);
-  sink.float4Value(CSField::DstOOTF, values.dstOOTF);
-  sink.float4Value(CSField::DstTF0, values.dstTF0);
-  sink.float4Value(CSField::DstTF1, values.dstTF1);
-  sink.intValue(CSField::DstTFType, values.dstTFType);
-}
 }  // namespace tgfx

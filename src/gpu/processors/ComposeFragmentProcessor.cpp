@@ -20,6 +20,7 @@
 #include "gpu/aot/ir/EffectGraph.h"
 
 namespace tgfx {
+
 PlacementPtr<FragmentProcessor> ComposeFragmentProcessor::Make(
     BlockAllocator* allocator, PlacementPtr<FragmentProcessor> first,
     PlacementPtr<FragmentProcessor> second) {
@@ -48,7 +49,6 @@ PlacementPtr<FragmentProcessor> ComposeFragmentProcessor::Make(
   }
   return Make(allocator, std::move(processors));
 }
-
 ComposeFragmentProcessor::ComposeFragmentProcessor(
     std::vector<PlacementPtr<FragmentProcessor>> processors)
     : FragmentProcessor(ClassID()) {
@@ -76,14 +76,6 @@ bool ComposeFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID inp
   }
   *output = current;
   return true;
-}
-
-PlacementPtr<FragmentProcessor> ComposeFragmentProcessor::Make(
-    BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> processors) {
-  if (processors.empty()) {
-    return nullptr;
-  }
-  return allocator->make<ComposeFragmentProcessor>(std::move(processors));
 }
 
 }  // namespace tgfx

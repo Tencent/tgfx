@@ -62,6 +62,100 @@ GlassUDFTentBlurFragmentProcessor::GlassUDFTentBlurFragmentProcessor(
   }
 }
 
+// Returns the shader expression for sampling the child at a coord offset by the tent kernel.
+static std::string TentBlurOffsetCoordFunc(std::string_view coord) {
+  return "(" + std::string(coord) + " + offset * offsetValue)";
+}
+
+void GlassUDFTentBlurFragmentProcessor::emitCode(EmitArgs& args) const {
+  auto fragBuilder = args.fragBuilder;
+
+  std::string radiusName =
+      args.uniformHandler->addUniform("Radius", UniformFormat::Float, ShaderStage::Fragment);
+  std::string texelSizeName =
+      args.uniformHandler->addUniform("Step", UniformFormat::Float2, ShaderStage::Fragment);
+
+  fragBuilder->codeAppendf("vec2 offset = %s;", texelSizeName.c_str());
+
+  fragBuilder->codeAppendf("float radius = %s;", radiusName.c_str());
+  fragBuilder->codeAppend("float sum = 0.0;");
+  fragBuilder->codeAppend("float total = 0.0;");
+
+  // RGBA8 unpack constants: dot(rgba, UNPACK) recovers the original float.
+  fragBuilder->codeAppend("const vec4 UNPACK = vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0);");
+
+  // Pairwise bilinear sampling: combine adjacent positions (k, k+1) into a single texture fetch
+  // via hardware bilinear filtering. The tent kernel's linear weights make this exact. The fixed
+  // 64-iteration upper bound satisfies GLSL ES 1.0's constant-loop constraint; the actual exit is
+  // the weight<=0 break at radius+1 iterations.
+  fragBuilder->codeAppend("int k = 1;");
+  fragBuilder->codeAppend("float s = 1.0;");
+  fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", maxRadius);
+  fragBuilder->codeAppend("float offsetValue;");
+  fragBuilder->codeAppend("float weight;");
+  fragBuilder->codeAppend("if (j == 0) {");
+  fragBuilder->codeAppend("  offsetValue = 0.0;");
+  fragBuilder->codeAppend("  weight = radius;");
+  fragBuilder->codeAppend("} else {");
+  fragBuilder->codeAppend("  float w1 = max(0.0, radius - float(k));");
+  fragBuilder->codeAppend("  float w2 = max(0.0, radius - float(k + 1));");
+  fragBuilder->codeAppend("  weight = w1 + w2;");
+  fragBuilder->codeAppend("  offsetValue = (weight > 0.0) ? s * (float(k) + w2 / weight) : 0.0;");
+  fragBuilder->codeAppend("}");
+  fragBuilder->codeAppend("if (weight <= 0.0) { break; }");
+  fragBuilder->codeAppend("total += weight;");
+
+  std::string tempColor = "tempColor";
+  emitChild(0, &tempColor, args, TentBlurOffsetCoordFunc);
+
+  // Unpack sample: the fine field's packed input decodes RGBA8 to a float; the coarse field (and
+  // the fine field's first pass) reads the alpha channel.
+  if (field == GlassUDFField::Refraction && inputIsPacked) {
+    fragBuilder->codeAppendf("sum += dot(%s, UNPACK) * weight;", tempColor.c_str());
+  } else {
+    fragBuilder->codeAppendf("sum += %s.a * weight;", tempColor.c_str());
+  }
+  fragBuilder->codeAppend("if (j > 0) {");
+  fragBuilder->codeAppend("  if (s < 0.0) { k += 2; }");
+  fragBuilder->codeAppend("  s = -s;");
+  fragBuilder->codeAppend("}");
+  fragBuilder->codeAppend("}");
+
+  fragBuilder->codeAppend("float result = sum / total;");
+  if (field == GlassUDFField::EdgeLight) {
+    // The coarse field carries one 8-bit value in alpha.
+    fragBuilder->codeAppendf("%s = vec4(0.0, 0.0, 0.0, clamp(result, 0.0, 1.0));",
+                             args.outputColor.c_str());
+  } else {
+    // Encode the fine field into RGB with true 24-bit precision; the fract chain pre-compensates
+    // the 8-bit rounding of the following channel. The upper clamp is required because fract(1.0)
+    // == 0.0 and interior UDF samples are exactly 1.0.
+    fragBuilder->codeAppend("float fineValue = clamp(result, 0.0, 1.0 - 1.0 / 16581375.0);");
+    fragBuilder->codeAppend("vec3 enc = fract(vec3(1.0, 255.0, 65025.0) * fineValue);");
+    fragBuilder->codeAppend("enc.x -= enc.y / 255.0;");
+    fragBuilder->codeAppend("enc.y -= enc.z / 255.0;");
+    fragBuilder->codeAppendf("%s = vec4(enc, 0.0);", args.outputColor.c_str());
+  }
+}
+
+void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
+                                                  UniformData* fragmentUniformData) const {
+  auto processor = childProcessor(0);
+  Point stepVectors[] = {{0, 0}, {1, 0}};
+  if (direction == GlassUDFBlurDirection::Vertical) {
+    stepVectors[1] = {0, 1};
+  }
+
+  DEBUG_ASSERT(processor->numCoordTransforms() == 1);
+  auto transform = processor->coordTransform(0);
+  auto matrix = transform->getTotalMatrix();
+  matrix.mapPoints(stepVectors, 2);
+  Point step = stepVectors[1] - stepVectors[0];
+  fragmentUniformData->setData("Radius", field == GlassUDFField::Refraction ? fineRadius
+                                                                            : coarseRadius);
+  fragmentUniformData->setData("Step", step);
+}
+
 bool GlassUDFTentBlurFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                                    AOTNodeID* output) const {
   // Same contract as the gaussian blur's opaque node: the active source child lowers into the

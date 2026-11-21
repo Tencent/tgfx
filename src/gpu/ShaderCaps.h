@@ -40,15 +40,35 @@ class ShaderCaps {
   bool usesPrecisionModifiers = false;
 
   /**
+   * The version declaration the shader language requires at the top of every shader source.
+   */
+  std::string versionDeclString;
+
+  /**
    * Indicates if the shader language supports framebuffer fetch, which allows reading the current
    * contents of the framebuffer in the fragment shader.
    */
   bool frameBufferFetchSupport = false;
 
   /**
+   * Whether the framebuffer fetch path needs a custom output declaration in the fragment shader.
+   */
+  bool frameBufferFetchNeedsCustomOutput = false;
+
+  /**
+   * The color name the fragment shader reads the framebuffer through, when supported.
+   */
+  std::string frameBufferFetchColorName;
+
+  /**
    * The extension string required to enable framebuffer fetch support, if any.
    */
   std::string frameBufferFetchExtensionString;
+
+  /**
+   * Whether the framebuffer fetch reads through a subpass input instead of a color attachment.
+   */
+  bool frameBufferFetchUsesSubpassInput = false;
 
   /**
    * Returns the maximum number of texture samplers that can be used in a shader.

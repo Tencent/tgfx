@@ -24,9 +24,4 @@ DiamondGradientLayout::DiamondGradientLayout(Matrix matrix)
   addCoordTransform(&coordTransform);
 }
 
-PlacementPtr<DiamondGradientLayout> DiamondGradientLayout::Make(BlockAllocator* allocator,
-                                                                Matrix matrix) {
-  return allocator->make<DiamondGradientLayout>(matrix);
-}
-
 }  // namespace tgfx

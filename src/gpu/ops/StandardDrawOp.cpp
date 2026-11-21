@@ -141,6 +141,39 @@ bool StandardDrawOp::failLookup(RenderTarget* renderTarget, bool isFinalLookup,
 
 bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStencilFormat,
                              bool isFinalLookup, const DrawIR* passIR) {
+  // The FP-tree (JIT) route: an op that spells its vertex stage through a GeometryProcessor serves
+  // the whole draw from the processor tree — the geometry processor, the color/coverage fragment
+  // processors and the xfer processor assembled here — with the runtime GLSL emission. The route
+  // is opt-in via TGFX_FP_TREE while the precompiled route stays the default; a null geometry
+  // processor keeps the draw on the precompiled route below. A plan-task pass is the precompiled
+  // route's own product and always stays on it.
+  static const bool fpTreeRoute = std::getenv("TGFX_FP_TREE") != nullptr;
+  auto geometryProcessor =
+      (passIR != nullptr || !fpTreeRoute) ? nullptr : onMakeGeometryProcessor(renderTarget);
+  if (geometryProcessor != nullptr) {
+    preparedProgram = nullptr;
+    preparedProgramInfo = nullptr;
+    preparedRenderTarget = nullptr;
+    std::vector<FragmentProcessor*> fragmentProcessors = {};
+    fragmentProcessors.reserve(colors.size() + coverages.size());
+    for (auto& color : colors) {
+      fragmentProcessors.emplace_back(color.get());
+    }
+    for (auto& coverage : coverages) {
+      fragmentProcessors.emplace_back(coverage.get());
+    }
+    preparedProgramInfo = std::make_unique<ProgramInfo>(
+        renderTarget, geometryProcessor.get(), std::move(fragmentProcessors), colors.size(),
+        xferProcessor.get(), blendMode);
+    configureProgramInfo(preparedProgramInfo.get(), depthStencilFormat);
+    preparedProgram = preparedProgramInfo->getProgram();
+    if (preparedProgram == nullptr) {
+      LOGE("StandardDrawOp::prepare() Failed to get the FP-tree program!");
+      return false;
+    }
+    preparedRenderTarget = renderTarget;
+    return true;
+  }
   if (!geometryInitialized) {
     geometryInitialized = true;
     geometryLayout = onMakeGeometry(renderTarget);

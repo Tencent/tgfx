@@ -81,6 +81,8 @@ class TiledTextureEffect : public FragmentProcessor {
   struct Sampling {
     Sampling(const SamplingSource& source, SamplerState sampler, const Rect& subset);
 
+    Sampling(const TextureView* textureView, SamplerState sampler, const Rect& subset);
+
     SamplerState hardwareSampler;
     ShaderMode shaderModeX = ShaderMode::None;
     ShaderMode shaderModeY = ShaderMode::None;

@@ -59,6 +59,8 @@ class TextureEffect : public FragmentProcessor {
     return alphaStart != Point::Zero();
   }
 
+  bool needSubset() const;
+
   // True when the coordinate transform carries a projective matrix. The plain precompiled texture
   // templates transform coordinates affinely (no w division), so matchers use this to keep a
   // projective source off them; the runtime route emits a perspective-divided coordinate.
@@ -85,6 +87,12 @@ class TextureEffect : public FragmentProcessor {
   TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerState& samplerState,
                 SrcRectConstraint constraint, const Point& alphaStart, const Matrix& uvMatrix,
                 const std::optional<Rect>& subset);
+
+  TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
+                SrcRectConstraint constraint, const Point& alphaStart, const Matrix& uvMatrix,
+                const std::optional<Rect>& subset)
+      : TextureEffect(proxy, SamplerState(sampling), constraint, alphaStart, uvMatrix, subset) {
+  }
 
   std::shared_ptr<Texture> onTextureAt(size_t index) const override;
 

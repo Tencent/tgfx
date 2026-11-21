@@ -24,9 +24,4 @@ RadialGradientLayout::RadialGradientLayout(Matrix matrix)
   addCoordTransform(&coordTransform);
 }
 
-PlacementPtr<RadialGradientLayout> RadialGradientLayout::Make(BlockAllocator* allocator,
-                                                              Matrix matrix) {
-  return allocator->make<RadialGradientLayout>(matrix);
-}
-
 }  // namespace tgfx
