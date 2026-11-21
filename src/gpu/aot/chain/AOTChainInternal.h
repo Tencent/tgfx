@@ -90,6 +90,10 @@ bool MergeCoverageTerms(const std::vector<AOTCoverageTerm>& terms, ChainCoverage
  * resolved coverage facts (the merged coverage graph, the coverage/clip root slots).
  */
 struct AOTChainGraphLayout {
+  /// The merged coverage graph's own storage. The copied coverage nodes' addresses (the call
+  /// sites' node pointers, and through them every binding's node) must stay valid until the draw
+  /// uploads its uniforms, so the graph rides with the layout's products under shared ownership.
+  std::shared_ptr<AOTEffectGraph> ownedCoverage = {};
   /// The merged node space: the color graph's nodes, then the merged coverage graph's.
   std::vector<const AOTEffectNode*> nodes = {};
   size_t colorCount = 0;

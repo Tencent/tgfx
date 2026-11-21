@@ -415,6 +415,20 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
     RenderLayoutScene(context, variant, image, &candidate);
     RenderLayoutScene(context, variant, image, &background, false);
     // Two zigzags of 12 segments each: a working scene changes well over a thousand pixels.
+    if (CountChangedPixels(candidate, background) <= 1000u) {
+      FILE* ppm = fopen("/tmp/candidate.ppm", "wb");
+      if (ppm != nullptr) {
+        fprintf(ppm, "P6\n%d %d\n255\n", SceneSize, SceneSize);
+        auto* px = static_cast<const uint32_t*>(candidate.lockPixels());
+        for (size_t i = 0; i < static_cast<size_t>(SceneSize) * SceneSize; ++i) {
+          fputc(static_cast<int>((px[i] >> 16) & 0xFF), ppm);
+          fputc(static_cast<int>((px[i] >> 8) & 0xFF), ppm);
+          fputc(static_cast<int>(px[i] & 0xFF), ppm);
+        }
+        candidate.unlockPixels();
+        fclose(ppm);
+      }
+    }
     EXPECT_GT(CountChangedPixels(candidate, background), 1000u) << variant.label;
 
     EXPECT_EQ(cache->drawStats().droppedDraws, 0u) << variant.label;

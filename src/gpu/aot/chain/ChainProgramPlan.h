@@ -91,6 +91,9 @@ struct ChainSamplerBinding {
  * so the declarations and the writer cannot disagree: nothing exists that is not read.
  */
 struct ChainBindings {
+  /// The merged coverage graph the bindings' node pointers address: it keeps the copied nodes
+  /// alive through the writer's uniform uploads, wherever the bindings travel.
+  std::shared_ptr<AOTEffectGraph> ownedCoverage = {};
   std::vector<ChainBinding> vertex = {};
   std::vector<ChainBinding> fragment = {};
   std::vector<ChainSamplerBinding> samplers = {};

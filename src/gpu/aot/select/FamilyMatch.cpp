@@ -97,6 +97,10 @@ namespace {
 /// geometry or the body, so the ordinal is HAS_XP alone.
 bool MatchSolidColor(const ProgramInfo* /*info*/, const DrawShape& shape,
                      FamilyMatchResult* result) {
+  // Retired with the dedicated families: the assembled chain serves these shapes with the full
+  // coverage tree and the same leaf kernels, so the dedicated variant sets stay dark.
+  return false;
+
   if (shape.geometry->kind != GeometryKind::Default) {
     return false;
   }
@@ -114,6 +118,10 @@ bool MatchSolidColor(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// sampler facts come off the IR's sole coverage term, so the acceptance reads the carried IR.
 /// Slot layout: Frame(0), RectGeometry(1), MaskTexture(2), Xfer(3: HAS_XP).
 bool MatchMaskFill(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMatchResult* result) {
+  // Retired with the dedicated families: the assembled chain serves these shapes with the full
+  // coverage tree and the same leaf kernels, so the dedicated variant sets stay dark.
+  return false;
+
   if (shape.geometry->kind != GeometryKind::Default) {
     return false;
   }
@@ -146,6 +154,10 @@ bool MatchMaskFill(const ProgramInfo* /*info*/, const DrawShape& shape, FamilyMa
 /// geometry + 2 * HAS_XP.
 bool MatchTiledTextureFill(const ProgramInfo* /*info*/, const DrawShape& shape,
                            FamilyMatchResult* result) {
+  // Retired with the dedicated families: the assembled chain serves these shapes with the full
+  // coverage tree and the same leaf kernels, so the dedicated variant sets stay dark.
+  return false;
+
   if (!shape.positionOnlyRect()) {
     return false;
   }
@@ -182,6 +194,10 @@ bool MatchTiledTextureFill(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// DeviceMask(2: PRESENT), AnalyticClip(3), Xfer(4: HAS_XP). The ordinal is PRESENT + 2 * HAS_XP.
 bool MatchQuadColor(const ProgramInfo* /*info*/, const DrawShape& shape,
                     FamilyMatchResult* result) {
+  // Retired with the dedicated families: the assembled chain serves these shapes with the full
+  // coverage tree and the same leaf kernels, so the dedicated variant sets stay dark.
+  return false;
+
   if (shape.geometry->kind != GeometryKind::QuadPerEdgeAA) {
     return false;
   }
@@ -601,6 +617,10 @@ bool MatchRoundStrokeRect(const ProgramInfo* /*info*/, const DrawShape& shape,
 /// UV_COORD + 2*SUBSET + 4*SUBSET + 8*PRESENT + 16*HAS_XP.
 bool MatchQuadTexture(const ProgramInfo* /*info*/, const DrawShape& shape,
                       FamilyMatchResult* result) {
+  // Retired with the dedicated families: the assembled chain serves these shapes with the full
+  // coverage tree and the same leaf kernels, so the dedicated variant sets stay dark.
+  return false;
+
   if (shape.geometry->kind != GeometryKind::QuadPerEdgeAA || shape.colorFPCount != 1 ||
       shape.xpType() < XP_NONE || shape.ir == nullptr) {
     return false;

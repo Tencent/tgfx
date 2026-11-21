@@ -1125,8 +1125,13 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
       return false;
     }
   }
+  // The merged graph's nodes are freshly copied: their addresses back the call sites' node
+  // pointers (and every binding's), so the graph moves into the layout's own storage before any
+  // pointer is taken — the vector's buffer is stable from here on.
+  layout->ownedCoverage = std::make_shared<AOTEffectGraph>(std::move(coverage.graph));
+  const auto& ownedCoverage = *layout->ownedCoverage;
   const size_t colorCount = graph.nodeCount();
-  const size_t covCount = coverage.graph.nodeCount();
+  const size_t covCount = ownedCoverage.nodeCount();
   if (coverage.coverageRoot.isValid() && coverage.coverageRoot.index() >= covCount) {
     LOGE("LR #9", 9);
     return false;
@@ -1145,7 +1150,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
     nodes.push_back(node);
   }
   for (size_t index = 0; index < covCount; ++index) {
-    auto* node = coverage.graph.nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
+    auto* node = ownedCoverage.nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
     if (node == nullptr) {
       LOGE("LR #11", 11);
       return false;
@@ -1592,7 +1597,7 @@ bool LayoutChainGraph(const DrawIR& ir, const PassIR* pass, AOTChainGraphLayout*
   layout->instructionCount = layout->ordered.size();
   layout->coverage = std::move(coverage);
   layout->coverageGraph =
-      layout->coverage.graph.nodeCount() == 0 ? nullptr : &layout->coverage.graph;
+      layout->ownedCoverage->nodeCount() == 0 ? nullptr : layout->ownedCoverage.get();
   return true;
 }
 
@@ -1643,6 +1648,7 @@ bool PlanChainProgramFromGraph(const DrawIR& ir, bool xpNeedsBlendPass, const Fa
   frame.coverageRootRegister = assignment.coverageRootRegister;
   frame.clipCoverageRegister = assignment.clipCoverageRegister;
   frame.xpNeedsBlendPass = xpNeedsBlendPass;
+  plan->bindings.ownedCoverage = layout.ownedCoverage;
   return WalkChainProgram(frame, family, variant, plan);
 }
 

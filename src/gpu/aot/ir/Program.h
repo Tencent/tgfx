@@ -66,6 +66,8 @@ struct AOTChainDeviceLeaf {
  * spells the draw's operators directly and every parameter reader addresses its graph node).
  */
 struct AOTProgram {
+  /// The merged coverage graph the bindings' node pointers address (see AOTChainGraphLayout).
+  std::shared_ptr<AOTEffectGraph> ownedCoverage = {};
   std::vector<AOTBinding> bindings = {};
   std::vector<AOTChainDeviceLeaf> deviceLeaves = {};
   // Bit k is set when leaf k samples in destination device space; the coord-source mask for the

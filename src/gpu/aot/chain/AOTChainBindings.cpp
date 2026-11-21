@@ -409,6 +409,7 @@ bool BuildChainProgram(const DrawIR& ir, const PassIR* pass, AOTProgram* out) {
     return false;
   }
   AOTProgram program = {};
+  program.ownedCoverage = layout.ownedCoverage;
   program.profile = profile;
   program.rootRegister = layout.rootIndex;
   program.coverageRootRegister = layout.coverageRootSlot;

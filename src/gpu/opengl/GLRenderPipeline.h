@@ -80,6 +80,10 @@ class GLRenderPipeline : public RenderPipeline, public GLResource {
     return sampleCount;
   }
 
+  unsigned debugProgramID() const {
+    return programID;
+  }
+
  protected:
   void onRelease(GLGPU* gpu) override;
 

@@ -625,7 +625,7 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   } else if (porterDuff) {
     tailText += "  fragColor = chainTail_porterDuff(result, finalCoverage);\n";
   } else {
-    tailText += "  fragColor = vec4(1.0, 0.0, 1.0, 1.0);\n";
+    tailText += "  fragColor = chainTail_plain(result, finalCoverage);\n";
   }
   tailText += "  if (OutputAlphaSwizzle != 0) {\n    fragColor = fragColor.aaaa;\n  }\n";
 

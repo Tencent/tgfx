@@ -597,6 +597,7 @@ bool ReadBinding(const ReadContext& ctx, const ChainBinding& binding, uint8_t* o
     }
     case ChainBindingSource::XpBlendMode: {
       const int blendMode = static_cast<int>(ctx.info->getBlendMode());
+      LOGE("XPMODE upload=%d", blendMode);
       Store(out, blendMode);
       return true;
     }
