@@ -95,95 +95,10 @@ const char* GlslTypeOf(FragmentType type) {
 
 }  // namespace
 
-namespace {
-
-// The blend-mode function the catalog declares for each BlendMode value (the split table).
-const char* BlendModeFunctionName(int mode) {
-  static const char* kNames[] = {
-      "Clear",       "Src",       "Dst",        "SrcOver",   "DstOver",    "SrcIn",
-      "DstIn",       "SrcOut",    "DstOut",     "SrcATop",   "DstATop",    "Xor",
-      "PlusLighter", "Modulate",  "Screen",     "Overlay",   "Darken",     "Lighten",
-      "ColorDodge",  "ColorBurn", "HardLight",  "SoftLight", "Difference", "Exclusion",
-      "Multiply",    "Hue",       "Saturation", "Color",     "Luminosity", "PlusDarker"};
-  if (mode < 0 || mode >= 30) {
-    return nullptr;
-  }
-  return kNames[mode];
-}
-
-// The xp support text with only the baked mode's function: the four helpers, the mode (and its
-// coverage composite), a one-line dispatcher and a one-branch macro, plus the untouched xp tail
-// that follows the macro in the pack text. Any anchor that is missing leaves the full text alone.
-std::string ComposeXpSupport(const std::string& full, int blendMode, bool wantsCoverage) {
-  const char* modeName = BlendModeFunctionName(blendMode);
-  if (modeName == nullptr) {
-    return {};
-  }
-  const std::string macroHead = "#define XP_COMPOSITE_WITH_COVERAGE(ADVANCED_BLEND) \\";
-  const auto macroAt = full.find(macroHead);
-  if (macroAt == std::string::npos) {
-    return {};
-  }
-  // The macro ends at the first line that does not continue.
-  size_t cursor = macroAt;
-  while (cursor < full.size()) {
-    size_t eol = full.find('\n', cursor);
-    if (eol == std::string::npos) {
-      eol = full.size();
-    }
-    const bool continues = eol > cursor && full[eol - 1] == '\\';
-    cursor = eol + 1;
-    if (!continues) {
-      break;
-    }
-  }
-  const std::string tail = full.substr(cursor);
-  std::string out = {};
-  for (const char* helperName :
-       {"xpLuminance", "xpSaturation", "xpSetLuminance", "xpSetSaturation"}) {
-    const char* source = FindChainFunctionSource(helperName);
-    if (source == nullptr) {
-      return {};
-    }
-    out += source;
-    out.push_back('\n');
-  }
-  const std::string modeFunction = std::string("xpBlend_") + modeName;
-  const char* modeSource = FindChainFunctionSource(modeFunction.c_str());
-  if (modeSource == nullptr) {
-    return {};
-  }
-  out += modeSource;
-  out.push_back('\n');
-  if (wantsCoverage) {
-    const std::string coverageFunction = modeFunction + "_coverage";
-    const char* coverageSource = FindChainFunctionSource(coverageFunction.c_str());
-    if (coverageSource == nullptr) {
-      return {};
-    }
-    out += coverageSource;
-    out.push_back('\n');
-  }
-  out +=
-      "vec4 xpBlendColors(vec4 S, vec4 D, int mode) {\n  vec4 dstSrcAlpha = D * S.a;\n"
-      "  vec4 srcDstAlpha = S * D.a;\n  return " +
-      modeFunction + "(S, D, dstSrcAlpha, srcDstAlpha);\n}\n";
-  if (wantsCoverage) {
-    out += "#define XP_COMPOSITE_WITH_COVERAGE(ADVANCED_BLEND) return " + modeFunction +
-           "_coverage(S, D, C);\n";
-  } else {
-    out +=
-        "#define XP_COMPOSITE_WITH_COVERAGE(ADVANCED_BLEND) vec4 blended = ADVANCED_BLEND; "
-        "return C * blended + (vec4(1.0) - C) * D;\n";
-  }
-  out += tail;
-  return out;
-}
-
-}  // namespace
+namespace {}  // namespace
 
 bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShaderCache* cache,
-                           std::string* code, bool esProfile, int blendMode) {
+                           std::string* code, bool esProfile) {
   if (cache == nullptr || code == nullptr) {
     return false;
   }
@@ -318,14 +233,16 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   const bool needsTexture = !plan.leafSlots.empty();
   const bool needsAnalytic = plan.usedOps.count(ChainISA::LocalRectCoverage) != 0 ||
                              plan.usedOps.count(ChainISA::RRectCoverage) != 0;
+  // The assembled xfer leg reads the dst through its own catalog functions (the read, the
+  // porter-duff apply and the advanced blend pass with their dispatchers), so no packed xp text
+  // and no macro surgery: the family's raw functions carry the whole leg. The framebuffer-fetch
+  // form stays on the packed entries until the ES profile moves over too.
   std::string xpSupport = {};
-  if (plan.hasXp == 1) {
-    xpSupport = ChainPackText(cache, FragmentPackXpDstTexture);
-  } else if (plan.hasXp == 2) {
+  if (plan.hasXp == 2) {
     xpSupport = ChainPackText(cache, FragmentPackXpFramebufferFetch);
-  }
-  if (plan.hasXp != 0 && xpSupport.empty()) {
-    return false;  // the xfer leg's support entry is missing; nothing to spell
+    if (xpSupport.empty()) {
+      return false;
+    }
   }
   std::string pieces = {};
   auto appendPiece = [&](uint32_t id) {
@@ -338,19 +255,21 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   };
   // The sampling text includes the read-swizzle helper itself, so the standalone swizzle entry is
   // never appended: its copy only lengthened the text the driver parsed.
-  const bool xpCarriesSampling = xpSupport.find("aotTextureSample(") != std::string::npos;
-  if (needsTexture && !xpCarriesSampling && !appendPiece(FragmentPackDepTextureSampling)) {
+  if (needsTexture && !appendPiece(FragmentPackDepTextureSampling)) {
     return false;
   }
   if (needsAnalytic && !appendPiece(FragmentPackDepAnalyticClipMath)) {
     return false;
   }
-  if (!xpSupport.empty()) {
-    const std::string composed = ComposeXpSupport(xpSupport, blendMode, plan.hasXp == 1);
-    pieces += (composed.empty() ? xpSupport : composed) + "\n";
-  }
 #if defined(TGFX_HAS_CHAIN_CATALOG)
   std::set<std::string> catalogEmitted = {};
+  // The dst-texture xfer leg's raw functions: the read, and whichever composite the tail names
+  // (the porter-duff apply through the tail function's own requires, the blend pass directly).
+  if (plan.hasXp == 1) {
+    AppendCatalogFunction("xpReadDstColor", &catalogEmitted, &pieces);
+    AppendCatalogFunction(plan.xpNeedsBlendPass ? "xpCompositeBlendPass" : "applyPorterDuffXP",
+                          &catalogEmitted, &pieces);
+  }
   // A shader-tiled leaf's fetch maps through the tiled catalog functions: the map and the border
   // pass always, the seam blend with them.
   if (!plan.tiledLeafSlots.empty()) {
@@ -363,9 +282,6 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
     const auto* def = FindFragment(op);
     if (def == nullptr || def->sourceFile == nullptr) {
       continue;
-    }
-    if (op == ChainISA::Blend && xpSupport.find("xpBlendColors(") != std::string::npos) {
-      continue;  // the xfer tail already carries the blend table
     }
 #if defined(TGFX_HAS_CHAIN_CATALOG)
     if (FindChainFunctionSource(def->functionName) != nullptr) {
@@ -588,26 +504,16 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
           "  finalCoverage *= texture(MaskTextureSampler, maskCoord.xy).r;";
     }
   }
-  std::string output = {};
-  if (plan.hasXp != 0 && plan.xpNeedsBlendPass) {
-    output = "  fragColor = xpCompositeBlendPass(result, chainXPDst, finalCoverage, xpBlended);";
-  } else if (plan.hasXp != 0) {
-    output =
-        "  fragColor = applyPorterDuffXP(result, finalCoverage, gl_FragCoord.xy, "
-        "DstTextureUpperLeft, DstTextureCoordScale, XPBlendMode, DstTextureSampler);";
-  } else {
-    output = "  fragColor = (result * finalCoverage);";
-  }
   // The epilogue is a call: the tail form is a catalog function and the coverage left-fold stays
   // here as plain statements, so no placeholder template survives.
   const bool porterDuff = plan.hasXp != 0 && !plan.xpNeedsBlendPass;
   const char* tailName = porterDuff ? "chainTail_porterDuff" : "chainTail_plain";
-  const char* tailSource = FindChainFunctionSource(tailName);
-  if (tailSource == nullptr) {
+  if (FindChainFunctionSource(tailName) == nullptr) {
     return false;
   }
-  pieces += tailSource;
-  pieces.push_back('\n');
+  // The tail rides the catalog so its own requires (the porter-duff apply and the blend table
+  // behind it) come along in one pass.
+  AppendCatalogFunction(tailName, &catalogEmitted, &pieces);
   std::string tailText = "  vec4 finalCoverage = " + coverage + ";\n";
   if (plan.hasMaskSampler) {
     tailText += "  highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);\n";
@@ -621,7 +527,7 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   tailText += "  finalCoverage *= " + clip + ";\n";
   if (plan.hasXp != 0 && plan.xpNeedsBlendPass) {
     tailText +=
-        "  fragColor = xpCompositeBlendPass(result, chainXPDst, finalCoverage, xpBlended);\n";
+        "  fragColor = xpCompositeBlendPass(result, chainXPDst, finalCoverage, XPBlendMode);\n";
   } else if (porterDuff) {
     tailText += "  fragColor = chainTail_porterDuff(result, finalCoverage);\n";
   } else {
@@ -633,11 +539,10 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   std::string xpLocals = {};
   if (plan.hasXp != 0) {
     xpGlobals = "vec4 chainXPDst = vec4(0.0);\nvec4 chainXPSrc = vec4(0.0);\n";
-    xpLocals = "  chainXPDst = xpReadDstColor();\n  vec4 xpBlended = vec4(0.0);\n";
+    xpLocals = "  chainXPDst = xpReadDstColor();\n";
   }
   const std::string blendPass =
-      "  chainXPSrc = chainXPSrcUnpremul(result, coverageRootRegister);\n"
-      "  xpBlended = xpBlendColors(chainXPSrc, chainXPDst, XPBlendMode);\n";
+      "  chainXPSrc = chainXPSrcUnpremul(result, coverageRootRegister);\n";
   const std::string versionLine =
       esProfile ? "#version 300 es\nprecision highp float;\nprecision highp int;\n"
                 : "#version 330\n";
@@ -657,8 +562,7 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
 
 bool EmitChainProgramGLSL(const DrawIR& ir, bool xpNeedsBlendPass, const Family& family,
                           const Variant& variant, const PrecompiledShaderCache* cache,
-                          std::string* code, ChainBindings* bindings, bool esProfile,
-                          int blendMode) {
+                          std::string* code, ChainBindings* bindings, bool esProfile) {
   if (code == nullptr || bindings == nullptr || cache == nullptr) {
     return false;
   }
@@ -666,7 +570,7 @@ bool EmitChainProgramGLSL(const DrawIR& ir, bool xpNeedsBlendPass, const Family&
   if (!PlanChainProgramFromGraph(ir, xpNeedsBlendPass, family, variant, cache, &plan)) {
     return false;
   }
-  if (!PrintChainProgramGLSL(plan, cache, code, esProfile, blendMode)) {
+  if (!PrintChainProgramGLSL(plan, cache, code, esProfile)) {
     return false;
   }
   *bindings = std::move(plan.bindings);

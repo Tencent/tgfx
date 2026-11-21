@@ -497,8 +497,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramForVariantInter
           }
         } else if (EmitChainProgramGLSL(*assembledIR, xpPass, chainFamily, variant, cache,
                                         &fragmentDesc.code, &chainBindings,
-                                        cache->profileTag() == "opengles",
-                                        static_cast<int>(programInfo->getBlendMode()))) {
+                                        cache->profileTag() == "opengles")) {
           assembledAttempt = true;
           LOGI("AssembledChain: assembled entry for %s[variant=%u] (%zu bytes, %zu blocks)",
                shaderName, variantId, fragmentDesc.code.size(), chainBindings.fragment.size());

@@ -410,7 +410,9 @@ bool WalkChainProgram(const ChainWalkFrame& frame, const Family& family, const V
   // framebuffer fetch; 0 carries none. The pack entries themselves are the GL printer's concern
   // (it re-fetches them and declines when they are missing), so the walk stays backend-neutral.
   const int hasXp = XferDimValue(family, variant);
-  if (hasXp != 0 && hasXp != 1 && hasXp != 2) {
+  // The framebuffer-fetch form (2) stays on the packed entries; the assembled text spells the
+  // dst-texture leg only.
+  if (hasXp != 0 && hasXp != 1) {
     return false;
   }
 

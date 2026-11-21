@@ -56,8 +56,7 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
  */
 bool EmitChainProgramGLSL(const DrawIR& ir, bool xpNeedsBlendPass, const Family& family,
                           const Variant& variant, const PrecompiledShaderCache* cache,
-                          std::string* code, ChainBindings* bindings, bool esProfile,
-                          int blendMode);
+                          std::string* code, ChainBindings* bindings, bool esProfile);
 
 /**
  * Assembles the vertex stage from the stored variant text and the emit's varying contract: the
