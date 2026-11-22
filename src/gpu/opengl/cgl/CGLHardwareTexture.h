@@ -39,10 +39,8 @@ class CGLHardwareTexture : public GLTexture {
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLTextureCacheRef textureCache = nullptr;
-  // Set only for render targets, which render straight into the pixel buffer through the
-  // CoreVideo-owned rectangle texture. Sampling-only imports hold a private 2D copy instead.
-  CVOpenGLTextureRef cvTexture = nullptr;
+  CVOpenGLTextureRef texture = nil;
+  CVOpenGLTextureCacheRef textureCache = nil;
 
   CGLHardwareTexture(const TextureDescriptor& descriptor, CVPixelBufferRef pixelBuffer,
                      CVOpenGLTextureCacheRef textureCache, unsigned target, unsigned textureID);
