@@ -75,6 +75,23 @@ class ShaderBuilder {
    */
   std::string appendFunction(const char* name);
 
+  /**
+   * Emits the subset clamps that precede a texture read: the strict-constraint clamp when
+   * extraSubset names a variable, then the draw-level subset clamp when subset names one.
+   * Returns the name of the variable holding the clamped coordinate (coordName itself when no
+   * clamp applies).
+   */
+  std::string clampToSubsets(const std::string& coordName, const std::string& extraSubset,
+                             const std::string& subset);
+
+  /**
+   * The channel swizzle a read of the sampler's texture applies, as a GLSL suffix (".rrrr" and
+   * the like), or an empty string for RGBA. Callers that spell the read through a shared function
+   * append this to the result; a read and its swizzle commute through the linear blends those
+   * functions perform, so one suffix on the result equals the per-read form.
+   */
+  std::string getSamplerSwizzleSuffix(SamplerHandle samplerHandle) const;
+
   std::string getMangledFunctionName(const char* baseName);
 
   /**
@@ -112,6 +129,7 @@ class ShaderBuilder {
 
   std::vector<std::string> shaderStrings;
   std::set<std::string> emittedFunctions = {};
+  int clampedCoordIndex = 0;
   ProgramBuilder* programBuilder = nullptr;
   std::vector<ShaderVar> inputs;
   std::vector<ShaderVar> outputs;

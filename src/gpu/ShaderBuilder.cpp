@@ -93,6 +93,27 @@ std::string ShaderBuilder::appendFunction(const char* name) {
   return name;
 }
 
+std::string ShaderBuilder::clampToSubsets(const std::string& coordName,
+                                          const std::string& extraSubset,
+                                          const std::string& subset) {
+  if (extraSubset.empty() && subset.empty()) {
+    return coordName;
+  }
+  auto entry = appendFunction("tgfxClampSubset");
+  if (entry.empty()) {
+    return coordName;
+  }
+  const std::string out = "clampedCoord" + std::to_string(clampedCoordIndex++);
+  codeAppendf("highp vec2 %s = %s;", out.c_str(), coordName.c_str());
+  if (!extraSubset.empty()) {
+    codeAppendf("%s = %s(%s, %s);", out.c_str(), entry.c_str(), out.c_str(), extraSubset.c_str());
+  }
+  if (!subset.empty()) {
+    codeAppendf("%s = %s(%s, %s);", out.c_str(), entry.c_str(), out.c_str(), subset.c_str());
+  }
+  return out;
+}
+
 std::string ShaderBuilder::getMangledFunctionName(const char* baseName) {
   return programBuilder->nameVariable(baseName);
 }
@@ -106,10 +127,35 @@ static std::string TextureSwizzleString(const Swizzle& swizzle) {
   return ret;
 }
 
+std::string ShaderBuilder::getSamplerSwizzleSuffix(SamplerHandle samplerHandle) const {
+  return TextureSwizzleString(programBuilder->uniformHandler()->getSamplerSwizzle(samplerHandle));
+}
+
 void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName) {
   auto uniformHandler = programBuilder->uniformHandler();
   auto sampler = uniformHandler->getSamplerVariable(samplerHandle);
-  codeAppendf("texture(%s, %s)", sampler.name().c_str(), coordName.c_str());
+  // One reader per sampler type: a GLSL function's parameter type is fixed, so the three sampler
+  // types carry three names instead of one overloaded entry.
+  const char* reader = nullptr;
+  switch (sampler.type()) {
+    case SLType::Texture2DSampler:
+      reader = "tgfxTextureSample";
+      break;
+    case SLType::Texture2DRectSampler:
+      reader = "tgfxTextureSampleRect";
+      break;
+    case SLType::TextureExternalSampler:
+      reader = "tgfxTextureSampleExternal";
+      break;
+    default:
+      break;
+  }
+  auto entry = reader == nullptr ? std::string() : appendFunction(reader);
+  if (entry.empty()) {
+    codeAppendf("texture(%s, %s)", sampler.name().c_str(), coordName.c_str());
+  } else {
+    codeAppendf("%s(%s, %s)", entry.c_str(), sampler.name().c_str(), coordName.c_str());
+  }
   codeAppend(TextureSwizzleString(uniformHandler->getSamplerSwizzle(samplerHandle)));
 }
 

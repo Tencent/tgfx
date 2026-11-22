@@ -22,6 +22,38 @@
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
+
+namespace {
+// The per-axis mode the shared sampler receives: 0 none/clamp/border, 1 repeat, 2 mipmap seam,
+// 3 mirror.
+int AxisModeOf(TiledTextureEffect::ShaderMode mode) {
+  switch (mode) {
+    case TiledTextureEffect::ShaderMode::None:
+    case TiledTextureEffect::ShaderMode::Clamp:
+    case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
+    case TiledTextureEffect::ShaderMode::ClampToBorderLinear:
+      return 0;
+    case TiledTextureEffect::ShaderMode::RepeatNearestNone:
+    case TiledTextureEffect::ShaderMode::RepeatLinearNone:
+      return 1;
+    case TiledTextureEffect::ShaderMode::RepeatNearestMipmap:
+    case TiledTextureEffect::ShaderMode::RepeatLinearMipmap:
+      return 2;
+    case TiledTextureEffect::ShaderMode::MirrorRepeat:
+      return 3;
+  }
+  return 0;
+}
+
+// The coordinates the shader works in are normalized by the Dimension uniform (see emitCode), so a
+// sample re-applies it. Empty dimensions (rectangle textures) leave the expression alone.
+std::string ScaledCoord(const std::string& coord, const std::string& dimensions) {
+  if (dimensions.empty()) {
+    return coord;
+  }
+  return "(" + coord + ") * " + dimensions;
+}
+}  // namespace
 PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(BlockAllocator* allocator,
                                                          std::shared_ptr<TextureProxy> proxy,
                                                          const SamplingArgs& args,
@@ -101,99 +133,6 @@ bool GLSLTiledTextureEffect::ShaderModeUsesClamp(TiledTextureEffect::ShaderMode 
   return false;
 }
 
-void GLSLTiledTextureEffect::readColor(EmitArgs& args, const std::string& dimensionsName,
-                                       const std::string& coord, const char* out) const {
-  std::string normCoord;
-  if (!dimensionsName.empty()) {
-    normCoord = "(" + coord + ") * " + dimensionsName + "";
-  } else {
-    normCoord = coord;
-  }
-  auto fragBuilder = args.fragBuilder;
-  fragBuilder->codeAppendf("vec4 %s = ", out);
-  fragBuilder->appendTextureLookup((*args.textureSamplers)[0], normCoord);
-  fragBuilder->codeAppend(";");
-}
-
-void GLSLTiledTextureEffect::subsetCoord(EmitArgs& args, TiledTextureEffect::ShaderMode mode,
-                                         const std::string& subsetName, const char* coordSwizzle,
-                                         const char* subsetStartSwizzle,
-                                         const char* subsetStopSwizzle, const char* extraCoord,
-                                         const char* coordWeight) const {
-  auto fragBuilder = args.fragBuilder;
-  switch (mode) {
-    case TiledTextureEffect::ShaderMode::None:
-    case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
-    case TiledTextureEffect::ShaderMode::ClampToBorderLinear:
-    case TiledTextureEffect::ShaderMode::Clamp:
-      fragBuilder->codeAppendf("subsetCoord.%s = inCoord.%s;", coordSwizzle, coordSwizzle);
-      break;
-    case TiledTextureEffect::ShaderMode::RepeatNearestNone:
-    case TiledTextureEffect::ShaderMode::RepeatLinearNone:
-      fragBuilder->codeAppendf("subsetCoord.%s = mod(inCoord.%s - %s.%s, %s.%s - %s.%s) + %s.%s;",
-                               coordSwizzle, coordSwizzle, subsetName.c_str(), subsetStartSwizzle,
-                               subsetName.c_str(), subsetStopSwizzle, subsetName.c_str(),
-                               subsetStartSwizzle, subsetName.c_str(), subsetStartSwizzle);
-      break;
-    case TiledTextureEffect::ShaderMode::RepeatNearestMipmap:
-    case TiledTextureEffect::ShaderMode::RepeatLinearMipmap:
-      fragBuilder->codeAppend("{");
-      fragBuilder->codeAppendf("highp float w = %s.%s - %s.%s;", subsetName.c_str(),
-                               subsetStopSwizzle, subsetName.c_str(), subsetStartSwizzle);
-      fragBuilder->codeAppendf("highp float w2 = 2.0 * w;");
-      fragBuilder->codeAppendf("highp float d = inCoord.%s - %s.%s;", coordSwizzle,
-                               subsetName.c_str(), subsetStartSwizzle);
-      fragBuilder->codeAppend("highp float m = mod(d, w2);");
-      fragBuilder->codeAppend("highp float o = mix(m, w2 - m, step(w, m));");
-      fragBuilder->codeAppendf("subsetCoord.%s = o + %s.%s;", coordSwizzle, subsetName.c_str(),
-                               subsetStartSwizzle);
-      fragBuilder->codeAppendf("%s = w - o + %s.%s;", extraCoord, subsetName.c_str(),
-                               subsetStartSwizzle);
-      // coordWeight is used as the third param of mix() to blend between a sample taken using
-      // subsetCoord and a sample at extraCoord.
-      fragBuilder->codeAppend("highp float hw = w / 2.0;");
-      fragBuilder->codeAppend("highp float n = mod(d - hw, w2);");
-      fragBuilder->codeAppendf("%s = clamp(mix(n, w2 - n, step(w, n)) - hw + 0.5, 0.0, 1.0);",
-                               coordWeight);
-      fragBuilder->codeAppend("}");
-      break;
-    case TiledTextureEffect::ShaderMode::MirrorRepeat:
-      fragBuilder->codeAppend("{");
-      fragBuilder->codeAppendf("highp float w = %s.%s - %s.%s;", subsetName.c_str(),
-                               subsetStopSwizzle, subsetName.c_str(), subsetStartSwizzle);
-      fragBuilder->codeAppendf("highp float w2 = 2.0 * w;");
-      fragBuilder->codeAppendf("highp float m = mod(inCoord.%s - %s.%s, w2);", coordSwizzle,
-                               subsetName.c_str(), subsetStartSwizzle);
-      fragBuilder->codeAppendf("subsetCoord.%s = mix(m, w2 - m, step(w, m)) + %s.%s;", coordSwizzle,
-                               subsetName.c_str(), subsetStartSwizzle);
-      fragBuilder->codeAppend("}");
-      break;
-  }
-}
-
-void GLSLTiledTextureEffect::clampCoord(EmitArgs& args, bool clamp, const std::string& clampName,
-                                        const char* coordSwizzle, const char* clampStartSwizzle,
-                                        const char* clampStopSwizzle) const {
-  auto fragBuilder = args.fragBuilder;
-  if (clamp) {
-    fragBuilder->codeAppendf("clampedCoord%s = clamp(subsetCoord%s, %s%s, %s%s);", coordSwizzle,
-                             coordSwizzle, clampName.c_str(), clampStartSwizzle, clampName.c_str(),
-                             clampStopSwizzle);
-  } else {
-    fragBuilder->codeAppendf("clampedCoord%s = subsetCoord%s;", coordSwizzle, coordSwizzle);
-  }
-}
-
-void GLSLTiledTextureEffect::clampCoord(EmitArgs& args, const bool useClamp[2],
-                                        const std::string& clampName) const {
-  if (useClamp[0] == useClamp[1]) {
-    clampCoord(args, useClamp[0], clampName, "", ".xy", ".zw");
-  } else {
-    clampCoord(args, useClamp[0], clampName, ".x", ".x", ".z");
-    clampCoord(args, useClamp[1], clampName, ".y", ".y", ".w");
-  }
-}
-
 GLSLTiledTextureEffect::UniformNames GLSLTiledTextureEffect::initUniform(
     EmitArgs& args, const TextureView* textureView, const Sampling& sampling,
     const bool useClamp[2]) const {
@@ -230,201 +169,167 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
     texCoordName = args.coordFunc(texCoordName);
   }
   Sampling sampling(textureView, samplerState, subset);
+  const auto& sampler = (*args.textureSamplers)[0];
+  const auto samplerVar = args.uniformHandler->getSamplerVariable(sampler);
+  const auto samplerName = samplerVar.name();
   if (sampling.shaderModeX == TiledTextureEffect::ShaderMode::None &&
       sampling.shaderModeY == TiledTextureEffect::ShaderMode::None) {
     fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
-    fragBuilder->appendTextureLookup((*args.textureSamplers)[0], texCoordName);
+    fragBuilder->appendTextureLookup(sampler, texCoordName);
     fragBuilder->codeAppend(";");
   } else {
-    fragBuilder->codeAppendf("highp vec2 inCoord = %s;", texCoordName.c_str());
     bool useClamp[2] = {ShaderModeUsesClamp(sampling.shaderModeX),
                         ShaderModeUsesClamp(sampling.shaderModeY)};
     auto names = initUniform(args, textureView, sampling, useClamp);
+    const std::string typeSuffix = samplerVar.type() == SLType::Texture2DRectSampler ? "Rect" : "";
+    const std::string subsetArg = names.subsetName.empty() ? "vec4(0.0)" : names.subsetName;
+    const std::string clampArg = names.clampName.empty() ? "vec4(0.0)" : names.clampName;
+    const int modeX = AxisModeOf(sampling.shaderModeX);
+    const int modeY = AxisModeOf(sampling.shaderModeY);
+    const bool mipmapX = modeX == 2;
+    const bool mipmapY = modeY == 2;
+    // The linear repeat modes need the seam blend whether or not they also carry a mipmap seam,
+    // so this pair is judged on the original mode, not on the coordinate-transform class above.
+    const bool repeatX = sampling.shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearNone ||
+                         sampling.shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
+    const bool repeatY = sampling.shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearNone ||
+                         sampling.shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
+    const bool borderLinearX =
+        sampling.shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderLinear;
+    const bool borderLinearY =
+        sampling.shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderLinear;
+    const bool borderNearestX =
+        sampling.shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderNearest;
+    const bool borderNearestY =
+        sampling.shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderNearest;
+
+    auto axisCoord = fragBuilder->appendFunction("tgfxTiledAxisCoord");
+    auto axisClamp = fragBuilder->appendFunction("tgfxTiledAxisClamp");
+    if (axisCoord.empty() || axisClamp.empty()) {
+      return;
+    }
+    fragBuilder->codeAppendf("highp vec2 inCoord = %s;", texCoordName.c_str());
     if (!names.dimensionsName.empty()) {
       fragBuilder->codeAppendf("inCoord /= %s;", names.dimensionsName.c_str());
     }
-
-    const char* extraRepeatCoordX = nullptr;
-    const char* repeatCoordWeightX = nullptr;
-    const char* extraRepeatCoordY = nullptr;
-    const char* repeatCoordWeightY = nullptr;
-
-    bool mipmapRepeatX =
-        sampling.shaderModeX == TiledTextureEffect::ShaderMode::RepeatNearestMipmap ||
-        sampling.shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
-    bool mipmapRepeatY =
-        sampling.shaderModeY == TiledTextureEffect::ShaderMode::RepeatNearestMipmap ||
-        sampling.shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
-
-    if (mipmapRepeatX || mipmapRepeatY) {
-      fragBuilder->codeAppend("highp vec2 extraRepeatCoord;");
-    }
-    if (mipmapRepeatX) {
-      fragBuilder->codeAppend("float repeatCoordWeightX;");
-      extraRepeatCoordX = "extraRepeatCoord.x";
-      repeatCoordWeightX = "repeatCoordWeightX";
-    }
-    if (mipmapRepeatY) {
-      fragBuilder->codeAppend("float repeatCoordWeightY;");
-      extraRepeatCoordY = "extraRepeatCoord.y";
-      repeatCoordWeightY = "repeatCoordWeightY";
-    }
-
-    fragBuilder->codeAppend("highp vec2 subsetCoord;");
-    subsetCoord(args, sampling.shaderModeX, names.subsetName, "x", "x", "z", extraRepeatCoordX,
-                repeatCoordWeightX);
-    subsetCoord(args, sampling.shaderModeY, names.subsetName, "y", "y", "w", extraRepeatCoordY,
-                repeatCoordWeightY);
-
-    fragBuilder->codeAppend("highp vec2 clampedCoord;");
-    clampCoord(args, useClamp, names.clampName);
-
+    fragBuilder->codeAppendf("highp vec4 axisX = %s(inCoord.x, %s.x, %s.z, %d);", axisCoord.c_str(),
+                             subsetArg.c_str(), subsetArg.c_str(), modeX);
+    fragBuilder->codeAppendf("highp vec4 axisY = %s(inCoord.y, %s.y, %s.w, %d);", axisCoord.c_str(),
+                             subsetArg.c_str(), subsetArg.c_str(), modeY);
+    fragBuilder->codeAppend("highp vec2 subsetCoord = vec2(axisX.x, axisY.x);");
+    fragBuilder->codeAppendf(
+        "highp vec2 clampedCoord = vec2(%s(axisX.x, %s.x, %s.z, %d), "
+        "%s(axisY.x, %s.y, %s.w, %d));",
+        axisClamp.c_str(), clampArg.c_str(), clampArg.c_str(), useClamp[0] ? 1 : 0,
+        axisClamp.c_str(), clampArg.c_str(), clampArg.c_str(), useClamp[1] ? 1 : 0);
     if (constraint == SrcRectConstraint::Strict) {
-      std::string subsetName = args.inputSubset;
+      std::string strictSubset = args.inputSubset;
       if (!names.dimensionsName.empty()) {
-        fragBuilder->codeAppendf("highp vec4 extraSubset = %s;", subsetName.c_str());
-        subsetName = "extraSubset";
+        fragBuilder->codeAppendf("highp vec4 extraSubset = %s;", strictSubset.c_str());
         fragBuilder->codeAppendf("extraSubset.xy /= %s;", names.dimensionsName.c_str());
         fragBuilder->codeAppendf("extraSubset.zw /= %s;", names.dimensionsName.c_str());
+        strictSubset = "extraSubset";
       }
-      args.fragBuilder->codeAppendf("clampedCoord = clamp(clampedCoord, %s.xy, %s.zw);",
-                                    subsetName.c_str(), subsetName.c_str());
+      fragBuilder->codeAppendf("clampedCoord = tgfxClampSubset(clampedCoord, %s);",
+                               strictSubset.c_str());
     }
-
-    if (mipmapRepeatX && mipmapRepeatY) {
-      fragBuilder->codeAppendf("extraRepeatCoord = clamp(extraRepeatCoord, %s.xy, %s.zw);",
-                               names.clampName.c_str(), names.clampName.c_str());
-    } else if (mipmapRepeatX) {
-      fragBuilder->codeAppendf("extraRepeatCoord.x = clamp(extraRepeatCoord.x, %s.x, %s.z);",
-                               names.clampName.c_str(), names.clampName.c_str());
-    } else if (mipmapRepeatY) {
-      fragBuilder->codeAppendf("extraRepeatCoord.y = clamp(extraRepeatCoord.y, %s.y, %s.w);",
-                               names.clampName.c_str(), names.clampName.c_str());
+    if (mipmapX) {
+      fragBuilder->codeAppendf("axisX.y = %s(axisX.y, %s.x, %s.z, %d);", axisClamp.c_str(),
+                               clampArg.c_str(), clampArg.c_str(), useClamp[0] ? 1 : 0);
     }
-
-    if (mipmapRepeatX && mipmapRepeatY) {
-      const char* textureColor1 = "textureColor1";
-      readColor(args, names.dimensionsName, "clampedCoord", textureColor1);
-      const char* textureColor2 = "textureColor2";
-      readColor(args, names.dimensionsName, "vec2(extraRepeatCoord.x, clampedCoord.y)",
-                textureColor2);
-      const char* textureColor3 = "textureColor3";
-      readColor(args, names.dimensionsName, "vec2(clampedCoord.x, extraRepeatCoord.y)",
-                textureColor3);
-      const char* textureColor4 = "textureColor4";
-      readColor(args, names.dimensionsName, "vec2(extraRepeatCoord.x, extraRepeatCoord.y)",
-                textureColor4);
+    if (mipmapY) {
+      fragBuilder->codeAppendf("axisY.y = %s(axisY.y, %s.y, %s.w, %d);", axisClamp.c_str(),
+                               clampArg.c_str(), clampArg.c_str(), useClamp[1] ? 1 : 0);
+    }
+    fragBuilder->codeAppend("vec4 textureColor;");
+    const std::string clampedScaled = ScaledCoord("clampedCoord", names.dimensionsName);
+    if (mipmapX && mipmapY) {
+      auto sample = fragBuilder->appendFunction(("tgfxTiledSample4" + typeSuffix).c_str());
+      if (sample.empty()) {
+        return;
+      }
       fragBuilder->codeAppendf(
-          "vec4 textureColor = mix(mix(%s, %s, repeatCoordWeightX), mix(%s, %s, "
-          "repeatCoordWeightX), repeatCoordWeightY);",
-          textureColor1, textureColor2, textureColor3, textureColor4);
-    } else if (mipmapRepeatX) {
-      const char* textureColor1 = "textureColor1";
-      readColor(args, names.dimensionsName, "clampedCoord", textureColor1);
-      const char* textureColor2 = "textureColor2";
-      readColor(args, names.dimensionsName, "vec2(extraRepeatCoord.x, clampedCoord.y)",
-                textureColor2);
-      fragBuilder->codeAppendf("vec4 textureColor = mix(%s, %s, repeatCoordWeightX);",
-                               textureColor1, textureColor2);
-    } else if (mipmapRepeatY) {
-      const char* textureColor1 = "textureColor1";
-      readColor(args, names.dimensionsName, "clampedCoord", textureColor1);
-      const char* textureColor2 = "textureColor2";
-      readColor(args, names.dimensionsName, "vec2(clampedCoord.x, extraRepeatCoord.y)",
-                textureColor2);
-      fragBuilder->codeAppendf("vec4 textureColor = mix(%s, %s, repeatCoordWeightY);",
-                               textureColor1, textureColor2);
+          "textureColor = %s(%s, %s, %s, %s, %s, axisX.z, axisY.z);", sample.c_str(),
+          samplerName.c_str(), clampedScaled.c_str(),
+          ScaledCoord("vec2(axisX.y, clampedCoord.y)", names.dimensionsName).c_str(),
+          ScaledCoord("vec2(clampedCoord.x, axisY.y)", names.dimensionsName).c_str(),
+          ScaledCoord("vec2(axisX.y, axisY.y)", names.dimensionsName).c_str());
+    } else if (mipmapX) {
+      auto sample = fragBuilder->appendFunction(("tgfxTiledSample2" + typeSuffix).c_str());
+      if (sample.empty()) {
+        return;
+      }
+      fragBuilder->codeAppendf(
+          "textureColor = %s(%s, %s, %s, axisX.z);", sample.c_str(), samplerName.c_str(),
+          clampedScaled.c_str(),
+          ScaledCoord("vec2(axisX.y, clampedCoord.y)", names.dimensionsName).c_str());
+    } else if (mipmapY) {
+      auto sample = fragBuilder->appendFunction(("tgfxTiledSample2" + typeSuffix).c_str());
+      if (sample.empty()) {
+        return;
+      }
+      fragBuilder->codeAppendf(
+          "textureColor = %s(%s, %s, %s, axisY.z);", sample.c_str(), samplerName.c_str(),
+          clampedScaled.c_str(),
+          ScaledCoord("vec2(clampedCoord.x, axisY.y)", names.dimensionsName).c_str());
     } else {
-      readColor(args, names.dimensionsName, "clampedCoord", "textureColor");
+      auto sample = fragBuilder->appendFunction(("tgfxTiledSample1" + typeSuffix).c_str());
+      if (sample.empty()) {
+        return;
+      }
+      fragBuilder->codeAppendf("textureColor = %s(%s, %s);", sample.c_str(), samplerName.c_str(),
+                               clampedScaled.c_str());
     }
-
-    static const char* repeatReadX = "repeatReadX";
-    static const char* repeatReadY = "repeatReadY";
-    bool repeatX = sampling.shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearNone ||
-                   sampling.shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
-    bool repeatY = sampling.shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearNone ||
-                   sampling.shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
-    if (repeatX || sampling.shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
+    const bool needErrX = repeatX || borderLinearX;
+    const bool needErrY = repeatY || borderLinearY;
+    if (needErrX) {
       fragBuilder->codeAppend("highp float errX = subsetCoord.x - clampedCoord.x;");
-      if (repeatX) {
-        fragBuilder->codeAppendf("highp float repeatCoordX = errX > 0.0 ? %s.x : %s.z;",
-                                 names.clampName.c_str(), names.clampName.c_str());
-      }
     }
-    if (repeatY || sampling.shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
+    if (needErrY) {
       fragBuilder->codeAppend("highp float errY = subsetCoord.y - clampedCoord.y;");
-      if (repeatY) {
-        fragBuilder->codeAppendf("highp float repeatCoordY = errY > 0.0 ? %s.y : %s.w;",
-                                 names.clampName.c_str(), names.clampName.c_str());
-      }
-    }
-
-    const char* ifStr = "if";
-    if (repeatX && repeatY) {
-      readColor(args, names.dimensionsName, "vec2(repeatCoordX, clampedCoord.y)", repeatReadX);
-      readColor(args, names.dimensionsName, "vec2(clampedCoord.x, repeatCoordY)", repeatReadY);
-      static const char* repeatReadXY = "repeatReadXY";
-      readColor(args, names.dimensionsName, "vec2(repeatCoordX, repeatCoordY)", repeatReadXY);
-      fragBuilder->codeAppend("if (errX != 0.0 && errY != 0.0) {");
-      fragBuilder->codeAppend("errX = abs(errX);");
-      fragBuilder->codeAppendf(
-          "textureColor = mix(mix(textureColor, %s, errX), mix(%s, %s, errX), abs(errY));",
-          repeatReadX, repeatReadY, repeatReadXY);
-      fragBuilder->codeAppend("}");
-      ifStr = "else if";
     }
     if (repeatX) {
-      auto shaderCaps = fragBuilder->shaderCaps();
-      if (!(repeatX && repeatY)) {
-        if (shaderCaps->requiresUniformControlFlow) {
-          // Read texture outside the conditional to satisfy WGSL uniformity requirements.
-          readColor(args, names.dimensionsName, "vec2(repeatCoordX, clampedCoord.y)", repeatReadX);
-        }
-      }
-      fragBuilder->codeAppendf("%s (errX != 0.0) {", ifStr);
-      if (!shaderCaps->requiresUniformControlFlow && !(repeatX && repeatY)) {
-        readColor(args, names.dimensionsName, "vec2(repeatCoordX, clampedCoord.y)", repeatReadX);
-      }
-      fragBuilder->codeAppendf("textureColor = mix(textureColor, %s, errX);", repeatReadX);
-      fragBuilder->codeAppend("}");
+      fragBuilder->codeAppendf("highp float repeatCoordX = errX > 0.0 ? %s.x : %s.z;",
+                               clampArg.c_str(), clampArg.c_str());
     }
     if (repeatY) {
-      auto shaderCaps = fragBuilder->shaderCaps();
-      if (!(repeatX && repeatY)) {
-        if (shaderCaps->requiresUniformControlFlow) {
-          // Read texture outside the conditional to satisfy WGSL uniformity requirements.
-          readColor(args, names.dimensionsName, "vec2(clampedCoord.x, repeatCoordY)", repeatReadY);
-        }
+      fragBuilder->codeAppendf("highp float repeatCoordY = errY > 0.0 ? %s.y : %s.w;",
+                               clampArg.c_str(), clampArg.c_str());
+    }
+    if (repeatX || repeatY) {
+      auto blend = fragBuilder->appendFunction(("tgfxTiledRepeatBlend" + typeSuffix).c_str());
+      if (blend.empty()) {
+        return;
       }
-      fragBuilder->codeAppendf("%s (errY != 0.0) {", ifStr);
-      if (!shaderCaps->requiresUniformControlFlow && !(repeatX && repeatY)) {
-        readColor(args, names.dimensionsName, "vec2(clampedCoord.x, repeatCoordY)", repeatReadY);
+      const std::string repeatScaled =
+          ScaledCoord(std::string("vec2(") + (repeatX ? "repeatCoordX" : "0.0") + ", " +
+                          (repeatY ? "repeatCoordY" : "0.0") + ")",
+                      names.dimensionsName);
+      fragBuilder->codeAppendf("textureColor = %s(%s, textureColor, %s, %s, %s, %s, %d, %d);",
+                               blend.c_str(), samplerName.c_str(), clampedScaled.c_str(),
+                               repeatScaled.c_str(), needErrX ? "errX" : "0.0",
+                               needErrY ? "errY" : "0.0", repeatX ? 1 : 0, repeatY ? 1 : 0);
+    }
+    if (borderLinearX || borderLinearY) {
+      auto border = fragBuilder->appendFunction("tgfxTiledBorderLinear");
+      if (border.empty()) {
+        return;
       }
-      fragBuilder->codeAppendf("textureColor = mix(textureColor, %s, errY);", repeatReadY);
-      fragBuilder->codeAppend("}");
+      fragBuilder->codeAppendf("textureColor = %s(textureColor, %s, %s, %d, %d);", border.c_str(),
+                               needErrX ? "errX" : "0.0", needErrY ? "errY" : "0.0",
+                               borderLinearX ? 1 : 0, borderLinearY ? 1 : 0);
     }
-
-    if (sampling.shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
-      fragBuilder->codeAppend("textureColor = mix(textureColor, vec4(0.0), min(abs(errX), 1.0));");
+    if (borderNearestX || borderNearestY) {
+      auto border = fragBuilder->appendFunction("tgfxTiledBorderNearest");
+      if (border.empty()) {
+        return;
+      }
+      fragBuilder->codeAppendf("textureColor = %s(textureColor, inCoord, %s, %d, %d);",
+                               border.c_str(), subsetArg.c_str(), borderNearestX ? 1 : 0,
+                               borderNearestY ? 1 : 0);
     }
-    if (sampling.shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
-      fragBuilder->codeAppendf("textureColor = mix(textureColor, vec4(0.0), min(abs(errY), 1.0));");
-    }
-    if (sampling.shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderNearest) {
-      fragBuilder->codeAppend("highp float snappedX = floor(inCoord.x + 0.001) + 0.5;");
-      fragBuilder->codeAppendf("if (snappedX < %s.x || snappedX > %s.z) {",
-                               names.subsetName.c_str(), names.subsetName.c_str());
-      fragBuilder->codeAppend("textureColor = vec4(0.0);");  // border color
-      fragBuilder->codeAppend("}");
-    }
-    if (sampling.shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderNearest) {
-      fragBuilder->codeAppend("highp float snappedY = floor(inCoord.y + 0.001) + 0.5;");
-      fragBuilder->codeAppendf("if (snappedY < %s.y || snappedY > %s.w) {",
-                               names.subsetName.c_str(), names.subsetName.c_str());
-      fragBuilder->codeAppend("textureColor = vec4(0.0);");  // border color
-      fragBuilder->codeAppend("}");
-    }
-    fragBuilder->codeAppendf("%s = textureColor;", args.outputColor.c_str());
+    fragBuilder->codeAppendf("%s = textureColor%s;", args.outputColor.c_str(),
+                             fragBuilder->getSamplerSwizzleSuffix(sampler).c_str());
   }
   if (textureProxy->isAlphaOnly()) {
     args.fragBuilder->codeAppendf("%s = %s.a * %s;", args.outputColor.c_str(),
