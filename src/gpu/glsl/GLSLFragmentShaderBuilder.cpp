@@ -54,6 +54,13 @@ void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
                                            const std::string& functionName,
                                            std::initializer_list<std::string> args,
                                            const std::string& wrapType) {
+  if (callRecorder != nullptr) {
+    CallRecord record = {};
+    record.output = outputVar;
+    record.function = functionName;
+    record.args.assign(args.begin(), args.end());
+    callRecorder->push_back(std::move(record));
+  }
   codeAppendf("%s = ", outputVar.c_str());
   if (!wrapType.empty()) {
     codeAppendf("%s(", wrapType.c_str());

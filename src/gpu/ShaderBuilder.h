@@ -20,12 +20,24 @@
 
 #include <cstdint>
 #include <set>
+#include <string>
+#include <vector>
 #include "gpu/SamplerHandle.h"
 #include "gpu/ShaderVar.h"
 #include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
 class ProgramBuilder;
+
+/**
+ * One structured call the emitCode sites made, in emission order: the bytecode builders turn
+ * these into instructions, and the GLSL builder is free to ignore them.
+ */
+struct CallRecord {
+  std::string output;
+  std::string function;
+  std::vector<std::string> args;
+};
 class ProgramInfo;
 class ShaderCaps;
 
@@ -74,6 +86,14 @@ class ShaderBuilder {
    * site, or the shader would reference an undefined function.
    */
   std::string appendFunction(const char* name);
+
+  /**
+   * The sink a bytecode builder installs to collect the structured calls; nullptr keeps the
+   * records off (the GLSL route). The records are appended in call order.
+   */
+  void setCallRecorder(std::vector<CallRecord>* records) {
+    callRecorder = records;
+  }
 
   /**
    * Emits the subset clamps that precede a texture read: the strict-constraint clamp when
@@ -129,6 +149,7 @@ class ShaderBuilder {
 
   std::vector<std::string> shaderStrings;
   std::set<std::string> emittedFunctions = {};
+  std::vector<CallRecord>* callRecorder = nullptr;
   int tempCallIndex = 0;
   int clampedCoordIndex = 0;
   ProgramBuilder* programBuilder = nullptr;
