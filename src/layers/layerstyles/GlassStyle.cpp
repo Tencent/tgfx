@@ -786,6 +786,7 @@ GlassRefractionParams GlassStyle::makeBaseRefractionParams(float halfW, float ha
                                                            const BackgroundMapping& mapping) const {
   GlassRefractionParams params = {};
   params.dispersion = getDispersionFactor();
+  params.lightAngle = _lightAngle;
   params.lightIntensity = getLightIntensityFactor();
   params.origWidth = halfW * 2.0f;
   params.origHeight = halfH * 2.0f;

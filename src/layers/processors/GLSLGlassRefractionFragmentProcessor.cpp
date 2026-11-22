@@ -115,7 +115,7 @@ void GLSLGlassRefractionFragmentProcessor::onSetData(UniformData*,
 
   // The precompiled refraction kernel dropped the directional-light angle term, so the runtime
   // emission matches it with a fixed head-on light instead of reviving the old field.
-  float angle = 0.0f;
+  float angle = params.lightAngle * static_cast<float>(M_PI) / 180.0f;
   float layerToSourceX = params.layerPixelToSourcePixelX;
   float layerToSourceY = params.layerPixelToSourcePixelY;
   if (layerToSourceX <= 0.0f) {
