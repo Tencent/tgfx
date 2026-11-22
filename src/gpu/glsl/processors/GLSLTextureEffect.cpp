@@ -179,15 +179,16 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     fragBuilder->appendTextureLookup(textureSamplers[1], chromaCoord);
     fragBuilder->codeAppend(".ra;");
   }
-  if (IsLimitedYUVColorRange(yuvTexture->yuvColorSpace())) {
-    fragBuilder->codeAppend("yuv.x -= (16.0 / 255.0);");
-  }
-  fragBuilder->codeAppend("yuv.yz -= vec2(0.5, 0.5);");
   auto mat3Name = uniformHandler->addUniform("Mat3ColorConversion", UniformFormat::Float3x3,
                                              ShaderStage::Fragment);
-  fragBuilder->codeAppendf("vec3 rgb = clamp(%s * yuv, 0.0, 1.0);", mat3Name.c_str());
+  auto entry = fragBuilder->appendFunction("tgfxYUVToRGB");
+  if (entry.empty()) {
+    return;
+  }
+  const std::string limitedRange =
+      std::to_string(IsLimitedYUVColorRange(yuvTexture->yuvColorSpace()) ? 1 : 0);
   if (alphaStart == Point::Zero()) {
-    fragBuilder->codeAppendf("%s = vec4(rgb, 1.0);", args.outputColor.c_str());
+    fragBuilder->appendCall(args.outputColor, entry, {"yuv", mat3Name, limitedRange, "0", "1.0"});
   } else {
     auto alphaStartName =
         uniformHandler->addUniform("AlphaStart", UniformFormat::Float2, ShaderStage::Fragment);
@@ -197,9 +198,7 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     fragBuilder->codeAppend("float yuv_a = ");
     fragBuilder->appendTextureLookup(textureSamplers[0], alphaVertexColor);
     fragBuilder->codeAppend(".r;");
-    fragBuilder->codeAppend("yuv_a = (yuv_a - 16.0/255.0) / (219.0/255.0 - 1.0/255.0);");
-    fragBuilder->codeAppend("yuv_a = clamp(yuv_a, 0.0, 1.0);");
-    fragBuilder->codeAppendf("%s = vec4(rgb * yuv_a, yuv_a);", args.outputColor.c_str());
+    fragBuilder->appendCall(args.outputColor, entry, {"yuv", mat3Name, limitedRange, "1", "yuv_a"});
   }
 }
 
