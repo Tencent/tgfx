@@ -26,14 +26,15 @@ QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int he
     : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), commonColor(commonColor),
       uvMatrix(uvMatrix), hasSubset(hasSubset) {
   position = {"aPosition", VertexFormat::Float2};
-  // The vertex buffers are filled for the whole quad layout unconditionally (see
-  // QuadGeometryLayoutOf), so the processor declares the same slots even when the shader never
-  // reads them — an unused vertex attribute keeps the buffer strides aligned.
-  coverage = {"inCoverage", VertexFormat::Float};
+  if (aa == AAType::Coverage) {
+    coverage = {"inCoverage", VertexFormat::Float};
+  }
   if (!uvMatrix.has_value()) {
     uvCoord = {"uvCoord", VertexFormat::Float2};
   }
-  color = {"inColor", VertexFormat::UByte4Normalized};
+  if (!commonColor.has_value()) {
+    color = {"inColor", VertexFormat::UByte4Normalized};
+  }
   if (hasSubset) {
     subset = {"texSubset", VertexFormat::Float4};
   }

@@ -50,23 +50,18 @@ class RectsVertexProvider : public VertexProvider {
   /**
    * Creates a new RectsVertexProvider from a single rect.
    */
-  // skipCoverage: keep the coverage slot out of a forceColor buffer whose consumer declares no
-  // coverage attribute (the non-AA atlas glyph quads).
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockAllocator* allocator, const Rect& rect,
-                                                    AAType aaType, bool forceColor = false,
-                                                    bool skipCoverage = false);
+                                                    AAType aaType);
 
   /**
    * Creates a new RectsVertexProvider from a list of rect records.
    */
-  // skipCoverage: same contract as the single-rect overload (the atlas glyph quads: their GP
-  // declares no non-AA coverage attribute).
   static PlacementPtr<RectsVertexProvider> MakeFrom(
       BlockAllocator* allocator, std::vector<PlacementPtr<RectRecord>>&& rects,
       std::vector<PlacementPtr<Rect>>&& uvRects, std::vector<PlacementPtr<Rect>>&& subsetRects,
       AAType aaType, bool needUVCoord, UVSubsetMode subsetMode,
-      std::vector<PlacementPtr<Stroke>>&& strokes, std::shared_ptr<ColorSpace> colorSpace = nullptr,
-      bool forceColor = false, bool skipCoverage = false);
+      std::vector<PlacementPtr<Stroke>>&& strokes,
+      std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Returns the number of rects in the provider.
@@ -111,19 +106,19 @@ class RectsVertexProvider : public VertexProvider {
   }
 
   /**
-   * Returns the first matrix in the provider. If no matrix record exists, a identity matrix is
-   * returned.
-   */
-  const Matrix& firstMatrix() const {
-    return rects.front()->viewMatrix;
-  }
-
-  /**
    * Returns the UV rect of the first rect, or nullptr when the provider has no explicit UV rects
    * (its UV coordinates, if any, are then the rect's own local coordinates).
    */
   const Rect* firstUVRect() const {
     return uvRects.empty() ? nullptr : uvRects.front().get();
+  }
+
+  /**
+   * Returns the first matrix in the provider. If no matrix record exists, a identity matrix is
+   * returned.
+   */
+  const Matrix& firstMatrix() const {
+    return rects.front()->viewMatrix;
   }
 
   /**
@@ -155,18 +150,12 @@ class RectsVertexProvider : public VertexProvider {
     bool hasUVCoord : 1;
     bool hasColor : 1;
     uint8_t subsetMode : 2;
-    // When true the color slot is written even for uniform-color batches, because the consuming
-    // geometry processor (QuadPerEdgeAA fill kernels) declares the color attribute unconditionally.
-    bool writeColor : 1;
-    // Same contract for coverage: QuadPerEdgeAA fill kernels always read vCoverage, so non-AA
-    // providers feeding them emit coverage 1.0. Providers for other GPs skip the slot entirely.
-    bool writeCoverage : 1;
   } bitFields = {};
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,
                       PlacementArray<Rect>&& subsetRects, AAType aaType, bool hasUVCoord,
                       bool hasColor, UVSubsetMode subsetMode,
                       std::shared_ptr<BlockAllocator> reference,
-                      std::shared_ptr<ColorSpace> colorSpace, bool forceColor = false);
+                      std::shared_ptr<ColorSpace> colorSpace);
 };
 }  // namespace tgfx

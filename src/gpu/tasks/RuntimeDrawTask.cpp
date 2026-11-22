@@ -22,6 +22,7 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/QuadsVertexProvider.h"
+#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
@@ -144,11 +145,35 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to lower the flatten draw!");
     return nullptr;
   }
-  PlacementPtr<DrawIR> carriedIR = allocator->make<DrawIR>(std::move(*lowered));
-  auto programInfo = std::make_unique<ProgramInfo>(renderTarget.get(), geometryLayout, std::nullopt,
-                                                   BlendMode::Src, false);
-  programInfo->setCarriedIR(carriedIR.get());
-  auto program = programInfo->getProgram();
+  // The FP-tree route assembles the same flatten draw from the processor tree (the geometry
+  // processor, the color processor, no xfer) and lets the runtime emission build the program;
+  // the precompiled route keeps the IR-based flow below.
+  static const bool fpTreeRoute = std::getenv("TGFX_FP_TREE") != nullptr;
+  std::shared_ptr<Program> program = nullptr;
+  std::unique_ptr<ProgramInfo> programInfo = nullptr;
+  // The geometry processor outlives the program use below (setUniformsAndSamplers reads the tree
+  // again for the upload), so it is held for the whole function scope.
+  PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
+  if (fpTreeRoute) {
+    geometryProcessor = QuadPerEdgeAAGeometryProcessor::Make(
+        allocator, static_cast<int>(renderTarget->width()),
+        static_cast<int>(renderTarget->height()), AAType::None, PMColor::White(), std::nullopt,
+        false);
+    if (geometryProcessor == nullptr) {
+      return nullptr;
+    }
+    std::vector<FragmentProcessor*> fragmentProcessors = {colorProcessor.get()};
+    programInfo = std::make_unique<ProgramInfo>(renderTarget.get(), geometryProcessor.get(),
+                                                std::move(fragmentProcessors), 1, nullptr,
+                                                BlendMode::Src);
+    program = programInfo->getProgram();
+  } else {
+    PlacementPtr<DrawIR> carriedIR = allocator->make<DrawIR>(std::move(*lowered));
+    programInfo = std::make_unique<ProgramInfo>(renderTarget.get(), geometryLayout, std::nullopt,
+                                                BlendMode::Src, false);
+    programInfo->setCarriedIR(carriedIR.get());
+    program = programInfo->getProgram();
+  }
   if (program == nullptr) {
     LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to get the program!");
     return nullptr;

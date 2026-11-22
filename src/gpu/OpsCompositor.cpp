@@ -548,7 +548,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
       auto subsetRects = std::move(pendingSubsetRects);
       auto provider = RectsVertexProvider::MakeFrom(
           drawingAllocator(), std::move(pendingRects), std::move(uvRects), std::move(subsetRects),
-          aaType, needUVCoord, subsetMode, std::move(pendingStrokes), dstColorSpace, true);
+          aaType, needUVCoord, subsetMode, std::move(pendingStrokes), dstColorSpace);
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
@@ -558,13 +558,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::Atlas: {
-      // forceColor: the atlas GP binds the color attribute unconditionally, so single-color glyph
-      // batches broadcast the common color into the slot instead of dropping it. skipCoverage:
-      // the non-AA atlas GP declares no coverage attribute, and forceColor alone would couple the
-      // coverage slot on.
       auto provider = RectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRects), {},
                                                     {}, AAType::None, true, UVSubsetMode::None, {},
-                                                    dstColorSpace, true, true);
+                                                    dstColorSpace);
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
                                  std::move(pendingAtlasTexture), pendingSampling);
     } break;

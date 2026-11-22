@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLProgramBuilder.h"
+#include <atomic>
+#include <cstdio>
+#include <cstdlib>
 #include <string>
 #include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
@@ -172,6 +175,23 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
 std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   fragmentShaderBuilder()->declareCustomOutputColor();
   finalizeShaders();
+  // Diagnostic dump of the emitted stage texts (TGFX_DUMP_PROGRAM=dir): the FP-tree route's
+  // shader is otherwise only visible to the driver. Static counter, one file per program.
+  if (const char* dumpDir = std::getenv("TGFX_DUMP_PROGRAM")) {
+    static std::atomic<int> dumpIndex{0};
+    const int index = dumpIndex.fetch_add(1);
+    const std::string base = std::string(dumpDir) + "/fp_program_" + std::to_string(index);
+    if (auto* file = fopen((base + ".vert").c_str(), "wb")) {
+      auto text = vertexShaderBuilder()->shaderString();
+      fwrite(text.data(), 1, text.size(), file);
+      fclose(file);
+    }
+    if (auto* file = fopen((base + ".frag").c_str(), "wb")) {
+      auto text = fragmentShaderBuilder()->shaderString();
+      fwrite(text.data(), 1, text.size(), file);
+      fclose(file);
+    }
+  }
   auto gpu = context->gpu();
   ShaderModuleDescriptor vertexModule = {};
   vertexModule.code = vertexShaderBuilder()->shaderString();

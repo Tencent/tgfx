@@ -42,19 +42,8 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
   // VertexMesh::Make() guarantees positions != nullptr
   DEBUG_ASSERT(vertexMesh->positions() != nullptr);
 
-  // The buffer follows the chain's rect-layout attribute order: position, coverage, texCoord,
-  // color. Vertex meshes carry no real coverage data, so a constant 1.0f slot is written for
-  // every mesh (matching MeshGeometryProcessor's unconditional coverage attribute).
-  size_t stride = sizeof(float) * 2;  // position.xy
-  stride += sizeof(float);            // coverage (constant 1.0f)
-  if (vertexMesh->hasTexCoords()) {
-    stride += sizeof(float) * 2;
-  }
-  // The color slot is unconditional: meshes without per-vertex colors bake white, because the
-  // buffer is a per-mesh resource shared across draws and the per-draw paint color rides the
-  // Color uniform instead (the kernels select it through the HasCommonColor runtime uniform).
-  stride += sizeof(uint8_t) * 4;
-  size_t vertexDataSize = stride * static_cast<size_t>(vertexMesh->vertexCount());
+  size_t vertexDataSize =
+      vertexMesh->getVertexStride() * static_cast<size_t>(vertexMesh->vertexCount());
 
   // Create color space transform steps if needed
   std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
@@ -72,23 +61,17 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
     *reinterpret_cast<Point*>(ptr) = vertexMesh->positions()[i];
     ptr += sizeof(Point);
 
-    // Coverage (float, constant 1.0)
-    *reinterpret_cast<float*>(ptr) = 1.0f;
-    ptr += sizeof(float);
-
     // TexCoord (float2, optional)
     if (vertexMesh->hasTexCoords()) {
       *reinterpret_cast<Point*>(ptr) = vertexMesh->texCoords()[i];
       ptr += sizeof(Point);
     }
 
-    // Color (UByte4Normalized, unconditional): per-vertex colors when present, otherwise white.
+    // Color (UByte4Normalized, optional)
     if (vertexMesh->hasColors()) {
       *reinterpret_cast<uint32_t*>(ptr) = ToUintPMColor(vertexMesh->colors()[i], steps.get());
-    } else {
-      *reinterpret_cast<uint32_t*>(ptr) = 0xFFFFFFFFu;
+      ptr += sizeof(uint32_t);
     }
-    ptr += sizeof(uint32_t);
   }
 
   auto bufferResource =

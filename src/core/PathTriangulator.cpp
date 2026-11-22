@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PathTriangulator.h"
-#include <cstring>
 #include "PathRef.h"
 #include "pathkit.h"
 #include "utils/MathExtra.h"
@@ -57,52 +56,9 @@ bool PathTriangulator::ShouldTriangulatePath(const Path& path) {
   return path.countPoints() * AA_TESSELLATOR_BUFFER_SIZE_FACTOR <= width * height;
 }
 
-// Appends a white color slot (one float's worth of UByte4Normalized bytes) to every vertex of a
-// tessellated buffer that pathkit wrote with floatsPerVertex floats per vertex. The color is a
-// constant filler: the triangle buffers are cached per shape and shared across draws, so the
-// per-draw paint color rides the Color uniform instead (selected by the HasCommonColor runtime
-// uniform) and the broadcast value is never read.
-static void AppendWhiteColorSlots(std::vector<float>* vertices, size_t floatsPerVertex) {
-  constexpr uint32_t White = 0xFFFFFFFFu;
-  const size_t count = vertices->size() / floatsPerVertex;
-  vertices->resize(count * (floatsPerVertex + 1));
-  for (size_t vertex = count; vertex > 0; --vertex) {
-    const size_t dstBase = (vertex - 1) * (floatsPerVertex + 1);
-    const size_t srcBase = (vertex - 1) * floatsPerVertex;
-    // Backward copy: early blocks shift forward into overlapping ranges (memmove semantics).
-    for (size_t f = floatsPerVertex; f > 0; --f) {
-      (*vertices)[dstBase + f - 1] = (*vertices)[srcBase + f - 1];
-    }
-    std::memcpy(&(*vertices)[dstBase + floatsPerVertex], &White, sizeof(float));
-  }
-}
-
-// Appends a constant 1.0 coverage slot and a white color slot to every vertex of a tessellated
-// buffer that pathkit wrote with floatsPerVertex floats per vertex (2: x, y). The non-AA
-// triangles share the AA vertex layout (x, y, coverage, color): the coverage slot lets the
-// DefaultGP-binding kernels declare the attribute unconditionally, and the constant 1.0 is inert
-// (modulating by one is the identity). The color is the same constant filler as above.
-static void AppendCoverageAndWhiteSlots(std::vector<float>* vertices, size_t floatsPerVertex) {
-  constexpr uint32_t White = 0xFFFFFFFFu;
-  constexpr uint32_t One = 0x3F800000u;  // The bit pattern of 1.0f.
-  const size_t count = vertices->size() / floatsPerVertex;
-  vertices->resize(count * (floatsPerVertex + 2));
-  for (size_t vertex = count; vertex > 0; --vertex) {
-    const size_t dstBase = (vertex - 1) * (floatsPerVertex + 2);
-    const size_t srcBase = (vertex - 1) * floatsPerVertex;
-    for (size_t f = floatsPerVertex; f > 0; --f) {
-      (*vertices)[dstBase + f - 1] = (*vertices)[srcBase + f - 1];
-    }
-    std::memcpy(&(*vertices)[dstBase + floatsPerVertex], &One, sizeof(float));
-    std::memcpy(&(*vertices)[dstBase + floatsPerVertex + 1], &White, sizeof(float));
-  }
-}
-
 size_t PathTriangulator::GetNonAAVertexCount(size_t bufferSize) {
-  // Each vertex has 4 float slots: x, y, a constant 1.0 coverage and the white color filler — the
-  // same layout as the AA triangles, so the DefaultGP-binding kernels bind the coverage attribute
-  // in a single variant (the 1.0 modulation is the identity).
-  return bufferSize / (sizeof(float) * 4);
+  // Each vertex has 2 floats: x, y
+  return bufferSize / (sizeof(float) * 2);
 }
 
 size_t PathTriangulator::ToTriangles(const Path& path, const Rect& clipBounds,
@@ -115,13 +71,12 @@ size_t PathTriangulator::ToTriangles(const Path& path, const Rect& clipBounds,
   if (isLinear) {
     *isLinear = linear;
   }
-  AppendCoverageAndWhiteSlots(vertices, 2);
   return static_cast<size_t>(count);
 }
 
 size_t PathTriangulator::GetAAVertexCount(size_t bufferSize) {
-  // Each vertex has 4 float slots: x, y, coverage and the white color filler.
-  return bufferSize / (sizeof(float) * 4);
+  // Each vertex has 3 floats: x, y, coverage
+  return bufferSize / (sizeof(float) * 3);
 }
 
 size_t PathTriangulator::ToAATriangles(const Path& path, const Rect& clipBounds,
@@ -129,7 +84,6 @@ size_t PathTriangulator::ToAATriangles(const Path& path, const Rect& clipBounds,
   const auto& skPath = PathRef::ReadAccess(path);
   auto count = skPath.toAATriangles(PathUtils::DefaultTolerance,
                                     *reinterpret_cast<const pk::SkRect*>(&clipBounds), vertices);
-  AppendWhiteColorSlots(vertices, 3);
   return static_cast<size_t>(count);
 }
 }  // namespace tgfx
