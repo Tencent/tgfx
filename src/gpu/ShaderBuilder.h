@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <set>
 #include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/SamplerHandle.h"
 #include "gpu/ShaderVar.h"
@@ -69,6 +70,14 @@ class ShaderBuilder {
 
   void addFunction(const std::string& str);
 
+  /**
+   * Appends the named catalog function and its dependencies to this shader's function section,
+   * deduplicated within this shader. Returns the entry name to spell at the call site, or an empty
+   * string when the catalog is absent or the name is unknown; the caller must then skip the call
+   * site, or the shader would reference an undefined function.
+   */
+  std::string appendFunction(const char* name);
+
   std::string getMangledFunctionName(const char* baseName);
 
   /**
@@ -105,6 +114,7 @@ class ShaderBuilder {
   std::string getDeclarations(const std::vector<ShaderVar>& vars, ShaderStage stage) const;
 
   std::vector<std::string> shaderStrings;
+  std::set<std::string> emittedFunctions = {};
   ProgramBuilder* programBuilder = nullptr;
   std::vector<ShaderVar> inputs;
   std::vector<ShaderVar> outputs;
