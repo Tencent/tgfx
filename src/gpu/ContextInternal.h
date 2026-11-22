@@ -34,4 +34,12 @@ class ContextCacheAccess {
   static PrecompiledShaderCache* Cache(const Context* context);
 };
 
+/**
+ * Whether the FP-tree route serves the context's draws. The route assembles a program from the
+ * processor tree and emits GLSL at runtime, which only the GL family implements; the other
+ * backends resolve their programs through the precompiled route, whose artifacts carry the
+ * shader binaries for their own stages, so they must stay off this route.
+ */
+bool FPRecordingEnabled(const Context* context);
+
 }  // namespace tgfx

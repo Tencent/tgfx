@@ -141,13 +141,13 @@ bool StandardDrawOp::failLookup(RenderTarget* renderTarget, bool isFinalLookup,
 
 bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStencilFormat,
                              bool isFinalLookup, const DrawIR* passIR) {
-  // The FP-tree (JIT) route: an op that spells its vertex stage through a GeometryProcessor serves
-  // the whole draw from the processor tree — the geometry processor, the color/coverage fragment
+  // The FP-tree route: an op that spells its vertex stage through a GeometryProcessor serves the
+  // whole draw from the processor tree — the geometry processor, the color/coverage fragment
   // processors and the xfer processor assembled here — with the runtime GLSL emission. The route
-  // is the default; TGFX_NO_FP_TREE opts back into the precompiled route, and a null geometry
-  // processor also keeps a draw on that route below. A plan-task pass is the precompiled route's
-  // own product and always stays on it.
-  static const bool fpTreeRoute = std::getenv("TGFX_NO_FP_TREE") == nullptr;
+  // is GL-only (see FPRecordingEnabled); a null geometry processor also keeps a draw on the
+  // precompiled route below. A plan-task pass is the precompiled route's own product and always
+  // stays on it.
+  const bool fpTreeRoute = FPRecordingEnabled(renderTarget->getContext());
   auto geometryProcessor =
       (passIR != nullptr || !fpTreeRoute) ? nullptr : onMakeGeometryProcessor(renderTarget);
   if (geometryProcessor != nullptr) {
@@ -166,8 +166,8 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
     // the uniform upload, so the op owns it until the draw is executed.
     preparedGeometryProcessor = std::move(geometryProcessor);
     preparedProgramInfo = std::make_unique<ProgramInfo>(
-        renderTarget, preparedGeometryProcessor.get(), std::move(fragmentProcessors),
-        colors.size(), xferProcessor.get(), blendMode);
+        renderTarget, preparedGeometryProcessor.get(), std::move(fragmentProcessors), colors.size(),
+        xferProcessor.get(), blendMode);
     configureProgramInfo(preparedProgramInfo.get(), depthStencilFormat);
     preparedProgram = preparedProgramInfo->getProgram();
     if (preparedProgram == nullptr) {

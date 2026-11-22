@@ -250,4 +250,8 @@ PrecompiledShaderCache* ContextCacheAccess::Cache(const Context* context) {
   return context == nullptr ? nullptr : context->_precompiledShaderCache;
 }
 
+bool FPRecordingEnabled(const Context* context) {
+  return context != nullptr && context->backend() == Backend::OpenGL;
+}
+
 }  // namespace tgfx

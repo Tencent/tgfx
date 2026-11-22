@@ -18,14 +18,15 @@
 
 #include "RuntimeDrawTask.h"
 #include "core/utils/ColorSpaceHelper.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/Program.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/QuadsVertexProvider.h"
-#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
+#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
 #include "tgfx/gpu/RenderPass.h"
@@ -148,7 +149,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   // The FP-tree route assembles the same flatten draw from the processor tree (the geometry
   // processor, the color processor, no xfer) and lets the runtime emission build the program;
   // the precompiled route keeps the IR-based flow below.
-  static const bool fpTreeRoute = std::getenv("TGFX_NO_FP_TREE") == nullptr;
+  const bool fpTreeRoute = FPRecordingEnabled(context);
   std::shared_ptr<Program> program = nullptr;
   std::unique_ptr<ProgramInfo> programInfo = nullptr;
   // The geometry processor outlives the program use below (setUniformsAndSamplers reads the tree
@@ -158,17 +159,17 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     // The provider writes position-only vertices for a single white quad (no per-vertex UV or
     // color), so the processor must not declare the uv attribute: an identity matrix keeps the
     // transform built into the shader and the declared stride equal to the buffer's.
-    geometryProcessor = QuadPerEdgeAAGeometryProcessor::Make(
-        allocator, static_cast<int>(renderTarget->width()),
-        static_cast<int>(renderTarget->height()), AAType::None, PMColor::White(), Matrix::I(),
-        false);
+    geometryProcessor =
+        QuadPerEdgeAAGeometryProcessor::Make(allocator, static_cast<int>(renderTarget->width()),
+                                             static_cast<int>(renderTarget->height()), AAType::None,
+                                             PMColor::White(), Matrix::I(), false);
     if (geometryProcessor == nullptr) {
       return nullptr;
     }
     std::vector<FragmentProcessor*> fragmentProcessors = {colorProcessor.get()};
-    programInfo = std::make_unique<ProgramInfo>(renderTarget.get(), geometryProcessor.get(),
-                                                std::move(fragmentProcessors), 1, nullptr,
-                                                BlendMode::Src);
+    programInfo =
+        std::make_unique<ProgramInfo>(renderTarget.get(), geometryProcessor.get(),
+                                      std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);
     program = programInfo->getProgram();
   } else {
     PlacementPtr<DrawIR> carriedIR = allocator->make<DrawIR>(std::move(*lowered));

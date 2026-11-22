@@ -558,9 +558,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::Atlas: {
-      auto provider = RectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRects), {},
-                                                    {}, AAType::None, true, UVSubsetMode::None, {},
-                                                    dstColorSpace);
+      auto provider =
+          RectsVertexProvider::MakeFrom(drawingAllocator(), std::move(pendingRects), {}, {},
+                                        AAType::None, true, UVSubsetMode::None, {}, dstColorSpace);
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
                                  std::move(pendingAtlasTexture), pendingSampling);
     } break;
@@ -1141,8 +1141,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     }
     // The FP-tree route spells the dst read through its xfer processor; the precompiled route
     // reads the same fact off the op's dstTexture below.
-    op->setXferProcessor(PorterDuffXferProcessor::Make(drawingAllocator(), brush.blendMode,
-                                                       dstTextureInfo));
+    op->setXferProcessor(
+        PorterDuffXferProcessor::Make(drawingAllocator(), brush.blendMode, dstTextureInfo));
     // A present value with an empty proxy selects the framebuffer fetch; the gate above already
     // rejected a dst-less draw on backends without it.
     op->setDstTexture(std::move(dstTextureInfo));
@@ -1160,7 +1160,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
   // The FP-tree route serves its draws at prepare time (StandardDrawOp::prepare), so the
   // record-time lowering and the plan task stay off it: no IR is recorded and the fill's multi-pass
   // work stays with the ImageFilter's own successive fills.
-  static const bool fpTreeRoute = std::getenv("TGFX_NO_FP_TREE") == nullptr;
+  const bool fpTreeRoute = FPRecordingEnabled(context);
   AOTRouter router(context);
   if (!fpTreeRoute) {
     if (auto task = router.route(&op, request)) {

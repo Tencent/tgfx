@@ -141,7 +141,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   request.processor = fillProcessor;
   // The FP-tree route serves the fill's RectDrawOp at prepare time, so the record-time plan task
   // stays off it (see OpsCompositor::addDrawOp for the same gate).
-  static const bool fpTreeRoute = std::getenv("TGFX_NO_FP_TREE") == nullptr;
+  const bool fpTreeRoute = FPRecordingEnabled(context);
   AOTRouter router(context);
   if (!fpTreeRoute) {
     if (auto task = router.route(&drawOp, request)) {
