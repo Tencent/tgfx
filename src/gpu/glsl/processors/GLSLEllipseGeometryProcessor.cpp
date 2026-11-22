@@ -78,9 +78,9 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   if (coverageEntry.empty()) {
     return;
   }
-  fragBuilder->codeAppendf("%s = vec4(%s(%s.xy, %s, %d));", args.outputCoverage.c_str(),
-                           coverageEntry.c_str(), ellipseOffsets.fsIn().c_str(),
-                           ellipseRadii.fsIn().c_str(), stroke ? 1 : 0);
+  fragBuilder->appendCall(
+      args.outputCoverage, coverageEntry,
+      {ellipseOffsets.fsIn() + ".xy", ellipseRadii.fsIn(), std::to_string(stroke ? 1 : 0)}, "vec4");
 }
 
 void GLSLEllipseGeometryProcessor::setData(UniformData* vertexUniformData,

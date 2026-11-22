@@ -41,9 +41,8 @@ void GLSLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
   if (entry.empty()) {
     return;
   }
-  fragBuilder->codeAppendf("%s = %s(%s, %s, %s);", args.outputColor.c_str(), entry.c_str(),
-                           args.inputColor.c_str(), matrixUniformName.c_str(),
-                           vectorUniformName.c_str());
+  fragBuilder->appendCall(args.outputColor, entry,
+                          {args.inputColor, matrixUniformName, vectorUniformName});
 }
 
 void GLSLColorMatrixFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

@@ -34,8 +34,7 @@ void GLSLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
   if (entry.empty()) {
     return;
   }
-  fragBuilder->codeAppendf("%s = %s(%s, %s);", args.outputColor.c_str(), entry.c_str(),
-                           args.inputColor.c_str(), thresholdUniformName.c_str());
+  fragBuilder->appendCall(args.outputColor, entry, {args.inputColor, thresholdUniformName});
 }
 
 void GLSLAlphaThresholdFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

@@ -89,11 +89,11 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   }
   if (stroke) {
     fragBuilder->codeAppendf("highp vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
-    fragBuilder->codeAppendf("%s = vec4(%s(localCoord, bounds, radii, sw, 1));",
-                             args.outputCoverage.c_str(), coverageEntry.c_str());
+    fragBuilder->appendCall(args.outputCoverage, coverageEntry,
+                            {"localCoord", "bounds", "radii", "sw", "1"}, "vec4");
   } else {
-    fragBuilder->codeAppendf("%s = vec4(%s(localCoord, bounds, radii, vec2(0.0), 0));",
-                             args.outputCoverage.c_str(), coverageEntry.c_str());
+    fragBuilder->appendCall(args.outputCoverage, coverageEntry,
+                            {"localCoord", "bounds", "radii", "vec2(0.0)", "0"}, "vec4");
   }
 }
 

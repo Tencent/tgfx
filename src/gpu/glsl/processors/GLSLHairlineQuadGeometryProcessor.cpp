@@ -68,9 +68,10 @@ void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   auto coverageScale =
       uniformHandler->addUniform("Coverage", UniformFormat::Float, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = vec4(%s(%s, %s, %d));", args.outputCoverage.c_str(),
-                           coverageEntry.c_str(), edgeVarying.fsIn().c_str(), coverageScale.c_str(),
-                           aaType == AAType::Coverage ? 1 : 0);
+  fragBuilder->appendCall(
+      args.outputCoverage, coverageEntry,
+      {edgeVarying.fsIn(), coverageScale, std::to_string(aaType == AAType::Coverage ? 1 : 0)},
+      "vec4");
 
   // Emit final vertex position
   vertBuilder->emitNormalizedPosition(positionName);

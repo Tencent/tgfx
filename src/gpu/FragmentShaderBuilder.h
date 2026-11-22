@@ -43,7 +43,8 @@ class FragmentShaderBuilder : public ShaderBuilder {
    * builder resolves the names into its own instruction forms instead.
    */
   virtual void appendCall(const std::string& outputVar, const std::string& functionName,
-                          std::initializer_list<std::string> args) = 0;
+                          std::initializer_list<std::string> args,
+                          const std::string& wrapType = "") = 0;
 
   void onBeforeChildProcEmitCode(const FragmentProcessor* child) const;
 

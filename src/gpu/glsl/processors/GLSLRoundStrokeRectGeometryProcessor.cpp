@@ -74,12 +74,11 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
     return;
   }
   if (aaType == AAType::Coverage) {
-    fragBuilder->codeAppendf("%s = vec4(%s(offset, %s, %s, 1));", args.outputCoverage.c_str(),
-                             coverageEntry.c_str(), ellipseRadii.fsIn().c_str(),
-                             coverageVar.fsIn().c_str());
+    fragBuilder->appendCall(args.outputCoverage, coverageEntry,
+                            {"offset", ellipseRadii.fsIn(), coverageVar.fsIn(), "1"}, "vec4");
   } else {
-    fragBuilder->codeAppendf("%s = vec4(%s(offset, vec2(0.0), 1.0, 0));",
-                             args.outputCoverage.c_str(), coverageEntry.c_str());
+    fragBuilder->appendCall(args.outputCoverage, coverageEntry, {"offset", "vec2(0.0)", "1.0", "0"},
+                            "vec4");
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.

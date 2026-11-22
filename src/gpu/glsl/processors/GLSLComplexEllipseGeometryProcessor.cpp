@@ -80,14 +80,15 @@ void GLSLComplexEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   }
   if (stroke) {
     fragBuilder->codeAppendf("highp vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
-    fragBuilder->codeAppendf("%s = vec4(%s(%s.xy, %s, %s, sw, 1));", args.outputCoverage.c_str(),
-                             coverageEntry.c_str(), ellipseOffsets.fsIn().c_str(),
-                             ellipseRadii.fsIn().c_str(), edgeDist.fsIn().c_str());
+    fragBuilder->appendCall(args.outputCoverage, coverageEntry,
+                            {ellipseOffsets.fsIn() + ".xy", ellipseRadii.fsIn(), edgeDist.fsIn(),
+                             strokeWidthVarying.fsIn(), "1"},
+                            "vec4");
   } else {
-    fragBuilder->codeAppendf("%s = vec4(%s(%s.xy, %s, %s, vec2(0.0), 0));",
-                             args.outputCoverage.c_str(), coverageEntry.c_str(),
-                             ellipseOffsets.fsIn().c_str(), ellipseRadii.fsIn().c_str(),
-                             edgeDist.fsIn().c_str());
+    fragBuilder->appendCall(
+        args.outputCoverage, coverageEntry,
+        {ellipseOffsets.fsIn() + ".xy", ellipseRadii.fsIn(), edgeDist.fsIn(), "vec2(0.0)", "0"},
+        "vec4");
   }
 }
 
