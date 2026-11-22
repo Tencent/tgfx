@@ -1,6 +1,4 @@
 //@function xpSetSaturation
-#pragma tgfx_spec_reader
-#pragma tgfx_spec_gate BlendSaturation : SPEC_NeedsBlendMath() != 0
 vec3 xpSetSaturation(vec3 hueLumColor, vec3 satColor) {
   // Component-wise rank form of the classic min/mid/max permutation tree: every channel maps to
   // sat * (c - min) / (max - min), which is exactly the tree's mid-channel expression, while the

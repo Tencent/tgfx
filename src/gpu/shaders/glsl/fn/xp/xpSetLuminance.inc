@@ -1,6 +1,4 @@
 //@function xpSetLuminance
-#pragma tgfx_spec_reader
-#pragma tgfx_spec_gate BlendLuminance : SPEC_NeedsBlendMath() != 0
 vec3 xpSetLuminance(vec3 hueSat, float alpha, vec3 lumColor) {
   // Match GLSLBlend's set_luminance: subtract the colors before computing luminance so the
   // floating-point reduction has the same rounding path on the runtime and precompiled routes.
