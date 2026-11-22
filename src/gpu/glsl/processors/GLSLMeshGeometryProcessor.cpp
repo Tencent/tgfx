@@ -47,14 +47,13 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
 
   // Transform position by view matrix
   std::string positionName = "position";
-  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
-                           matrixName.c_str(), position.name().c_str());
+  vertBuilder->transformPoint(positionName, position.name(), matrixName, false);
 
   // Handle texture coordinates for FragmentProcessor
   if (hasTexCoords) {
     // User provided texCoords, pass them through
     auto texCoordVar = varyingHandler->addVarying("TexCoord", SLType::Float2);
-    vertBuilder->codeAppendf("%s = %s;", texCoordVar.vsOut().c_str(), texCoord.name().c_str());
+    vertBuilder->storeVarying(texCoordVar.vsOut(), texCoord.name());
     emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(texCoord));
   } else {
     // No user texCoords, use position with uvMatrix (like DefaultGeometryProcessor)
@@ -63,7 +62,7 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
 
   if (hasColors) {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
+    vertBuilder->storeVarying(colorVar.vsOut(), color.name());
 
     // Output vertex color (will be modulated by FragmentProcessor if texCoords present)
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
@@ -76,7 +75,7 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
   // Handle coverage for anti-aliasing
   if (hasCoverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
+    vertBuilder->storeVarying(coverageVar.vsOut(), coverage.name());
     fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
                              coverageVar.fsIn().c_str());
   } else {
@@ -84,7 +83,7 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
   }
 
-  vertBuilder->emitNormalizedPosition(positionName);
+  vertBuilder->storePosition(positionName);
 }
 
 void GLSLMeshGeometryProcessor::setData(UniformData* vertexUniformData,

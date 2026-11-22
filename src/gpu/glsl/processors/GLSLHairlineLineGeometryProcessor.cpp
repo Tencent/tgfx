@@ -48,14 +48,13 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
   std::string positionName = "transformedPosition";
-  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
-                           matrixName.c_str(), position.name().c_str());
+  vertBuilder->transformPoint(positionName, position.name(), matrixName, false);
 
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
                  ShaderVar(positionName, SLType::Float2));
   // Pass edge distance to fragment shader for anti-aliasing
   auto edgeVarying = varyingHandler->addVarying("EdgeDistance", SLType::Float);
-  vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(), edgeDistance.name().c_str());
+  vertBuilder->storeVarying(edgeVarying.vsOut(), edgeDistance.name());
 
   // Fragment shader: the shared hairline edge alpha. The non-coverage step rides the function's
   // runtime flag as a literal, so the driver folds the arm this draw does not use.
@@ -74,7 +73,7 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
       "vec4");
 
   // Emit final vertex position
-  vertBuilder->emitNormalizedPosition(positionName);
+  vertBuilder->storePosition(positionName);
 }
 
 void GLSLHairlineLineGeometryProcessor::setData(UniformData* vertexUniformData,

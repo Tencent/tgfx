@@ -45,8 +45,7 @@ void GLSLStencilCoverCoverPassGeometryProcessor::emitCode(EmitArgs& args) const 
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
   std::string positionName = "position";
-  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
-                           matrixName.c_str(), position.name().c_str());
+  vertBuilder->transformPoint(positionName, position.name(), matrixName, false);
 
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
 
@@ -58,7 +57,7 @@ void GLSLStencilCoverCoverPassGeometryProcessor::emitCode(EmitArgs& args) const 
       uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
 
-  vertBuilder->emitNormalizedPosition(positionName);
+  vertBuilder->storePosition(positionName);
 }
 
 void GLSLStencilCoverCoverPassGeometryProcessor::setData(

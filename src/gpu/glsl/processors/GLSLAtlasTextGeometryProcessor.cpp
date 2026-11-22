@@ -46,12 +46,11 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   auto samplerVarying = varyingHandler->addVarying("textureCoords", SLType::Float2);
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
   auto uvName = maskCoord.name();
-  vertBuilder->codeAppendf("%s = %s * %s;", samplerVarying.vsOut().c_str(), uvName.c_str(),
-                           atlasName.c_str());
+  vertBuilder->multiplyVec2(samplerVarying.vsOut(), uvName, atlasName);
 
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
+    vertBuilder->storeVarying(coverageVar.vsOut(), coverage.name());
     fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
                              coverageVar.fsIn().c_str());
   } else {
@@ -64,7 +63,7 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
+    vertBuilder->storeVarying(colorVar.vsOut(), color.name());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
   }
   auto textureView = textureProxy->getTextureView();
@@ -83,7 +82,7 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(position.name());
+  args.vertBuilder->storePosition(position.name());
 }
 
 void GLSLAtlasTextGeometryProcessor::setData(UniformData* vertexUniformData,

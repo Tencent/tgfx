@@ -39,11 +39,10 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   varyingHandler->emitAttributes(*this);
 
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
-  vertBuilder->codeAppendf("%s = %s;", ellipseOffsets.vsOut().c_str(),
-                           inEllipseOffset.name().c_str());
+  vertBuilder->storeVarying(ellipseOffsets.vsOut(), inEllipseOffset.name());
 
   auto ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float4);
-  vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(), inEllipseRadii.name().c_str());
+  vertBuilder->storeVarying(ellipseRadii.vsOut(), inEllipseRadii.name());
 
   auto fragBuilder = args.fragBuilder;
   // setup pass through color
@@ -53,12 +52,12 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto color = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), inColor.name().c_str());
+    vertBuilder->storeVarying(color.vsOut(), inColor.name());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
   }
 
   // Setup position
-  args.vertBuilder->emitNormalizedPosition(inPosition.name());
+  args.vertBuilder->storePosition(inPosition.name());
   // emit transforms
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(inPosition));
   // For stroked ellipses, we use the full ellipse equation (x^2/a^2 + y^2/b^2 = 1)

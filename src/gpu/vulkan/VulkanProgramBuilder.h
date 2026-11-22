@@ -72,6 +72,8 @@ class VulkanProgramBuilder : public ProgramBuilder {
   GLSLFragmentShaderBuilder _fragBuilder;
   /// The structured calls the emit sites made, in emission order.
   std::vector<CallRecord> fragmentCalls = {};
+  /// The structured vertex writes the geometry's emit made, in emission order.
+  std::vector<VertexCallRecord> vertexCalls = {};
 
   friend class ProgramBuilder;
 };

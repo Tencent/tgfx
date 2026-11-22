@@ -46,32 +46,30 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto color = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), inColor.name().c_str());
+    vertBuilder->storeVarying(color.vsOut(), inColor.name());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
   }
 
   // Output position using RTAdjust uniform
-  vertBuilder->emitNormalizedPosition(inPosition.name());
+  vertBuilder->storePosition(inPosition.name());
 
   // Pass local coordinates to fragment shader
   auto localCoordVarying = varyingHandler->addVarying("localCoord", SLType::Float2);
-  vertBuilder->codeAppendf("%s = %s;", localCoordVarying.vsOut().c_str(),
-                           inLocalCoord.name().c_str());
+  vertBuilder->storeVarying(localCoordVarying.vsOut(), inLocalCoord.name());
 
   // Pass radii to fragment shader
   auto radiiVarying = varyingHandler->addVarying("radii", SLType::Float2);
-  vertBuilder->codeAppendf("%s = %s;", radiiVarying.vsOut().c_str(), inRadii.name().c_str());
+  vertBuilder->storeVarying(radiiVarying.vsOut(), inRadii.name());
 
   // Pass rect bounds to fragment shader
   auto boundsVarying = varyingHandler->addVarying("rectBounds", SLType::Float4);
-  vertBuilder->codeAppendf("%s = %s;", boundsVarying.vsOut().c_str(), inRectBounds.name().c_str());
+  vertBuilder->storeVarying(boundsVarying.vsOut(), inRectBounds.name());
 
   // Pass stroke width to fragment shader (stroke mode only)
   Varying strokeWidthVarying;
   if (stroke) {
     strokeWidthVarying = varyingHandler->addVarying("strokeWidth", SLType::Float2);
-    vertBuilder->codeAppendf("%s = %s;", strokeWidthVarying.vsOut().c_str(),
-                             inStrokeWidth.name().c_str());
+    vertBuilder->storeVarying(strokeWidthVarying.vsOut(), inStrokeWidth.name());
   }
 
   // Emit transforms using position as UV coordinates.

@@ -73,9 +73,6 @@ void GeometryProcessor::emitTransforms(EmitArgs& args, VertexShaderBuilder* vert
                                        VaryingHandler* varyingHandler,
                                        UniformHandler* uniformHandler,
                                        const ShaderVar& uvCoordsVar) const {
-  std::string uvCoords = "vec3(";
-  uvCoords += uvCoordsVar.name();
-  uvCoords += ", 1)";
   int i = 0;
   auto transformHandler = args.fpCoordTransformHandler;
   while (const CoordTransform* coordTransform = transformHandler->nextCoordTransform()) {
@@ -93,13 +90,7 @@ void GeometryProcessor::emitTransforms(EmitArgs& args, VertexShaderBuilder* vert
     transformHandler->specifyCoordsForCurrCoordTransform(varying.name(), varyingType);
     // For perspective: pass vec3 directly, division happens in fragment shader.
     // For non-perspective: compute vec2 directly as an optimization.
-    if (hasPerspective) {
-      vertexBuilder->codeAppendf("%s = %s * %s;", varying.vsOut().c_str(), uniName.c_str(),
-                                 uvCoords.c_str());
-    } else {
-      vertexBuilder->codeAppendf("%s = (%s * %s).xy;", varying.vsOut().c_str(), uniName.c_str(),
-                                 uvCoords.c_str());
-    }
+    vertexBuilder->transformVarying(varying.vsOut(), uvCoordsVar.name(), uniName, hasPerspective);
     onEmitTransform(args, vertexBuilder, varyingHandler, uniformHandler, uniName, hasPerspective,
                     i);
     ++i;

@@ -61,11 +61,10 @@ void GLSLStencilCoverStencilPassGeometryProcessor::emitCode(EmitArgs& args) cons
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
   std::string positionName = "position";
-  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
-                           matrixName.c_str(), position.name().c_str());
+  vertBuilder->transformPoint(positionName, position.name(), matrixName, false);
 
   auto klmVarying = varyingHandler->addVarying("KLM", SLType::Float3);
-  vertBuilder->codeAppendf("%s = %s;", klmVarying.vsOut().c_str(), klm.name().c_str());
+  vertBuilder->storeVarying(klmVarying.vsOut(), klm.name());
 
   // Loop-Blinn quadratic implicit-curve test: discard fragments where k*k - l > 0
   // (convex / exterior side of the bezier).
@@ -74,7 +73,7 @@ void GLSLStencilCoverStencilPassGeometryProcessor::emitCode(EmitArgs& args) cons
   fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
   fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
 
-  vertBuilder->emitNormalizedPosition(positionName);
+  vertBuilder->storePosition(positionName);
 }
 
 void GLSLStencilCoverStencilPassGeometryProcessor::setData(UniformData* vertexUniformData,

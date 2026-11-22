@@ -39,20 +39,18 @@ void GLSLComplexEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   varyingHandler->emitAttributes(*this);
 
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
-  vertBuilder->codeAppendf("%s = %s;", ellipseOffsets.vsOut().c_str(),
-                           inEllipseOffset.name().c_str());
+  vertBuilder->storeVarying(ellipseOffsets.vsOut(), inEllipseOffset.name());
 
   auto ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float4);
-  vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(), inEllipseRadii.name().c_str());
+  vertBuilder->storeVarying(ellipseRadii.vsOut(), inEllipseRadii.name());
 
   auto edgeDist = varyingHandler->addVarying("EdgeDist", SLType::Float2);
-  vertBuilder->codeAppendf("%s = %s;", edgeDist.vsOut().c_str(), inEdgeDist.name().c_str());
+  vertBuilder->storeVarying(edgeDist.vsOut(), inEdgeDist.name());
 
   Varying strokeWidthVarying;
   if (stroke) {
     strokeWidthVarying = varyingHandler->addVarying("StrokeWidth", SLType::Float2);
-    vertBuilder->codeAppendf("%s = %s;", strokeWidthVarying.vsOut().c_str(),
-                             inStrokeWidth.name().c_str());
+    vertBuilder->storeVarying(strokeWidthVarying.vsOut(), inStrokeWidth.name());
   }
 
   auto fragBuilder = args.fragBuilder;
@@ -63,12 +61,12 @@ void GLSLComplexEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto color = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), inColor.name().c_str());
+    vertBuilder->storeVarying(color.vsOut(), inColor.name());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
   }
 
   // Setup position
-  args.vertBuilder->emitNormalizedPosition(inPosition.name());
+  args.vertBuilder->storePosition(inPosition.name());
   // Emit transforms
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(inPosition));
 

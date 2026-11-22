@@ -45,7 +45,7 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
 
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
+    vertBuilder->storeVarying(coverageVar.vsOut(), coverage.name());
     fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
                              coverageVar.fsIn().c_str());
   } else {
@@ -58,12 +58,12 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
+    vertBuilder->storeVarying(colorVar.vsOut(), color.name());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(position.name());
+  args.vertBuilder->storePosition(position.name());
 }
 
 void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformData* vertexUniformData,
@@ -101,14 +101,13 @@ void GLSLQuadPerEdgeAAGeometryProcessor::onEmitTransform(EmitArgs& args,
     const std::string srcRB = "srcRB";
     const std::string perspLT = "perspLT";
     const std::string perspRB = "perspRB";
-    vertexBuilder->codeAppendf("highp vec2 %s = %s.xy;", srcLT.c_str(), subset.name().c_str());
-    vertexBuilder->codeAppendf("highp vec2 %s = %s.zw;", srcRB.c_str(), subset.name().c_str());
-    vertexBuilder->emitTransformedPoint(perspLT, srcLT, subsetMatrixName, hasPerspective);
-    vertexBuilder->emitTransformedPoint(perspRB, srcRB, subsetMatrixName, hasPerspective);
-    vertexBuilder->codeAppend("highp vec4 subset = vec4(" + perspLT + ", " + perspRB + ");");
-    vertexBuilder->codeAppend(
-        "subset = vec4(min(subset.xy, subset.zw), max(subset.xy, subset.zw));");
-    vertexBuilder->codeAppendf("%s = subset;", varying.vsOut().c_str());
+    vertexBuilder->swizzleVec2(srcLT, subset.name(), "xy");
+    vertexBuilder->swizzleVec2(srcRB, subset.name(), "zw");
+    vertexBuilder->transformPoint(perspLT, srcLT, subsetMatrixName, hasPerspective);
+    vertexBuilder->transformPoint(perspRB, srcRB, subsetMatrixName, hasPerspective);
+    vertexBuilder->composeVec4("subset", perspLT, perspRB);
+    vertexBuilder->normalizeRect("subset");
+    vertexBuilder->storeVarying(varying.vsOut(), "subset");
     *args.outputSubset = varying.fsIn();
   }
 }

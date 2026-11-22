@@ -133,14 +133,15 @@ VulkanProgramBuilder::VulkanProgramBuilder(Context* context, const ProgramInfo* 
       _vertexBuilder(this), _fragBuilder(this) {
   // The bytecode route never spells shader text: the calls land in the record list instead.
   _fragBuilder.setCallRecorder(&fragmentCalls);
+  _vertexBuilder.setVertexRecorder(&vertexCalls);
 }
 
 std::string VulkanProgramBuilder::getShaderVarDeclarations(const ShaderVar&, ShaderStage) const {
   return "";
 }
 
-std::string VulkanProgramBuilder::getUniformBlockDeclaration(
-    ShaderStage, const std::vector<Uniform>&) const {
+std::string VulkanProgramBuilder::getUniformBlockDeclaration(ShaderStage,
+                                                             const std::vector<Uniform>&) const {
   return "";
 }
 
@@ -206,8 +207,8 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
           chainArg.kind = ChainArgKind::Literal;
           chainArg.index = std::atoi(arg.c_str());
         } else {
-          LOGE("VulkanProgramBuilder: the argument %s of %s does not resolve",
-               arg.c_str(), record.function.c_str());
+          LOGE("VulkanProgramBuilder: the argument %s of %s does not resolve", arg.c_str(),
+               record.function.c_str());
           return nullptr;
         }
       }

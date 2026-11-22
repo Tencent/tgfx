@@ -45,15 +45,13 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   Varying coverageVar;
   if (aaType == AAType::Coverage) {
     coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), inCoverage.name().c_str());
+    vertBuilder->storeVarying(coverageVar.vsOut(), inCoverage.name());
     ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float2);
-    vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(),
-                             inEllipseRadii.name().c_str());
+    vertBuilder->storeVarying(ellipseRadii.vsOut(), inEllipseRadii.name());
   }
 
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
-  vertBuilder->codeAppendf("%s = %s;", ellipseOffsets.vsOut().c_str(),
-                           inEllipseOffset.name().c_str());
+  vertBuilder->storeVarying(ellipseOffsets.vsOut(), inEllipseOffset.name());
 
   if (commonColor.has_value()) {
     auto colorName =
@@ -61,7 +59,7 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), inColor.name().c_str());
+    vertBuilder->storeVarying(colorVar.vsOut(), inColor.name());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
   }
 
@@ -82,7 +80,7 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(inPosition.name());
+  args.vertBuilder->storePosition(inPosition.name());
 }
 
 void GLSLRoundStrokeRectGeometryProcessor::setData(UniformData* vertexUniformData,
