@@ -76,11 +76,10 @@ void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
   const std::string dstOOTF = helper.applyDstOOTF() ? helper.dstOOTFUniform() : "vec4(0.0)";
   const std::string dstTF0 = helper.applyDstTF() ? helper.dstTFUniform0() : "vec4(0.0)";
   const std::string dstTF1 = helper.applyDstTF() ? helper.dstTFUniform1() : "vec4(0.0)";
-  fragBuilder->codeAppendf("%s = %s(%s, %u, %s, %s, %d, %s, %s, %s, %s, %s, %d);",
-                           args.outputColor.c_str(), entry.c_str(), args.inputColor.c_str(),
-                           static_cast<unsigned>(flags), srcTF0.c_str(), srcTF1.c_str(), srcTFType,
-                           srcOOTF.c_str(), colorXform.c_str(), dstOOTF.c_str(), dstTF0.c_str(),
-                           dstTF1.c_str(), dstTFType);
+  fragBuilder->appendCall(
+      args.outputColor, entry,
+      {args.inputColor, std::to_string(flags), srcTF0, srcTF1, std::to_string(srcTFType), srcOOTF,
+       colorXform, dstOOTF, dstTF0, dstTF1, std::to_string(dstTFType)});
 }
 
 void ColorSpaceXformEffect::onSetData(UniformData* /*vertexUniformData*/,

@@ -1,5 +1,5 @@
 //@function pmApplyLuma
-vec4 pmApplyLuma(vec4 color, vec3 lumaCoefficients) {
-  float luma = dot(color.rgb, lumaCoefficients);
+vec4 pmApplyLuma(vec4 color, float kr, float kg, float kb) {
+  float luma = dot(color.rgb, vec3(kr, kg, kb));
   return vec4(luma);
 }

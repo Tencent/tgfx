@@ -40,7 +40,7 @@ vec4 evalPointwiseColorOp(int op, vec4 color, int at, int mode) {
   }
   if (op == OP_LUMA) {
     LumaData d = chainLoadLuma(at);
-    return pmApplyLuma(color, vec3(d.kr, d.kg, d.kb));
+    return pmApplyLuma(color, d.kr, d.kg, d.kb);
   }
   if (op == OP_ALPHA_THRESHOLD) {
     AlphaThresholdData d = chainLoadAlphaThreshold(at);

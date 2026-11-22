@@ -34,9 +34,7 @@ void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
   if (entry.empty()) {
     return;
   }
-  args.fragBuilder->codeAppendf("%s = %s(%s, vec3(%s, %s, %s));\n", args.outputColor.c_str(),
-                                entry.c_str(), args.inputColor.c_str(), kr.c_str(), kg.c_str(),
-                                kb.c_str());
+  args.fragBuilder->appendCall(args.outputColor, entry, {args.inputColor, kr, kg, kb});
 }
 
 void GLSLLumaFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
