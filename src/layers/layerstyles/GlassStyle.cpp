@@ -473,9 +473,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       float blurRadius =
           std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
       float minHalf = std::min(origBounds.width(), origBounds.height()) * 0.5f;
-      // Nominal layer-space tent reach, before the texel-count floors below are applied. The
-      // density budget uses this value so the cap tracks the physical radius, not the floors.
-      float nominalTentRadius = std::min(blurRadius, minHalf);
       auto visibleContentRect = Rect::MakeWH(contentWidth, contentHeight);
       if (clipBounds.has_value() && !visibleContentRect.intersect(*clipBounds)) {
         return;
@@ -509,15 +506,6 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // the layer-space radius into the UDF texel density.
       float layerToSourceX = contentWidth / origBounds.width();
       float layerToSourceY = contentHeight / origBounds.height();
-      // The UDF has a hard box-limited tent radius (GlassUDFMaxTentRadius). Clamping the radius
-      // would shrink the layer-space transition band as the density grows with zoom * DPR, so the
-      // density is lowered instead: the physical radius has priority, and the density is capped so
-      // that radius * density never exceeds the tent box. This can leave the short axis of a narrow
-      // shape below MIN_SHORT_SIDE_TEXELS, which is the intended trade-off for a stable radius.
-      float layerToSourceMax = std::max(layerToSourceX, layerToSourceY);
-      float densityCap =
-          static_cast<float>(GlassUDFMaxTentRadius) / std::max(nominalTentRadius, 1e-4f);
-      udfScale = std::min(udfScale, densityCap / layerToSourceMax);
       if (!(udfScale > 0.0f) || !std::isfinite(udfScale)) {
         return;
       }
