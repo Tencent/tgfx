@@ -28,6 +28,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <unordered_map>
+#include "gpu/aot/chain/SPIRVWriter.h"
 #include "gpu/shaders/contract/ChainISA.h"
 #include "gpu/shaders/contract/OpTable.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
@@ -37,129 +38,7 @@
 namespace tgfx {
 namespace {
 
-// The opcodes, decorations and enumerants the emitter touches.
-enum : uint16_t {
-  kOpCapability = 17,
-  kOpMemoryModel = 14,
-  kOpTypeVoid = 19,
-  kOpTypeBool = 20,
-  kOpTypeInt = 21,
-  kOpTypeFloat = 22,
-  kOpTypeVector = 23,
-  kOpTypeMatrix = 24,
-  kOpTypeArray = 28,
-  kOpTypeStruct = 30,
-  kOpTypePointer = 32,
-  kOpTypeFunction = 33,
-  kOpConstant = 43,
-  kOpConstantComposite = 44,
-  kOpFunction = 54,
-  kOpFunctionParameter = 55,
-  kOpFunctionEnd = 56,
-  kOpFunctionCall = 57,
-  kOpVariable = 59,
-  kOpLoad = 61,
-  kOpStore = 62,
-  kOpAccessChain = 65,
-  kOpName = 5,
-  kOpMemberName = 6,
-  kOpDecorate = 71,
-  kOpMemberDecorate = 72,
-  kOpVectorShuffle = 79,
-  kOpCompositeConstruct = 80,
-  kOpCompositeExtract = 81,
-  kOpTypeImage = 25,
-  kOpTypeSampler = 26,
-  kOpTypeSampledImage = 27,
-  kOpMatrixTimesVector = 145,
-  kOpImageSampleImplicitLod = 87,
-  kOpFMul = 133,
-  kOpINotEqual = 171,
-  kOpSelect = 169,
-  kOpSelectionMerge = 247,
-  kOpBranch = 249,
-  kOpBranchConditional = 250,
-  kOpLabel = 248,
-  kOpReturnValue = 254,
-};
-enum : uint32_t {
-  kDecorationBlock = 2,
-  kDecorationColMajor = 5,
-  kDecorationArrayStride = 6,
-  kDecorationMatrixStride = 7,
-  kDecorationBinding = 33,
-  kDecorationDescriptorSet = 34,
-  kDecorationOffset = 35,
-  kDecorationLinkageAttributes = 41,
-};
-enum : uint32_t { kCapabilityShader = 1, kCapabilityLinkage = 5 };
-enum : uint32_t { kLinkageTypeExport = 0, kLinkageTypeImport = 1 };
-enum : uint32_t { kStorageUniform = 2, kStorageUniformConstant = 0, kStorageFunction = 7 };
-
-// The module's logical sections: SPIR-V requires capabilities, then annotations, then types and
-// constants, then functions — instructions must appear in that order or no validator accepts the
-// module. The writer routes each instruction into its section as it is emitted, so the emission
-// code can interleave types and decorations freely.
-struct Writer {
-  std::vector<uint32_t> pre = {};    // capabilities and the memory model
-  std::vector<uint32_t> debug = {};  // names
-  std::vector<uint32_t> ann = {};    // decorations
-  std::vector<uint32_t> decl = {};   // types, constants, variables
-  std::vector<uint32_t> func = {};   // functions
-  std::vector<uint32_t>* sink = &pre;
-  uint32_t nextId = 1;
-
-  uint32_t NewId() {
-    return nextId++;
-  }
-
-  void Sink(std::vector<uint32_t>* section) {
-    sink = section;
-  }
-
-  void Inst(uint16_t opcode, const std::vector<uint32_t>& operands) {
-    sink->push_back((static_cast<uint32_t>(operands.size() + 1) << 16) | opcode);
-    sink->insert(sink->end(), operands.begin(), operands.end());
-  }
-
-  void Inst(uint16_t opcode) {
-    Inst(opcode, {});
-  }
-
-  void Finish(std::vector<uint32_t>* out) const {
-    out->clear();
-    out->reserve(5 + pre.size() + debug.size() + ann.size() + decl.size() + func.size());
-    out->push_back(0x07230203u);
-    out->push_back(0x00010000u);  // SPIR-V 1.0, the op modules' version
-    out->push_back(0);
-    out->push_back(nextId);
-    out->push_back(0);
-    out->insert(out->end(), pre.begin(), pre.end());
-    out->insert(out->end(), debug.begin(), debug.end());
-    out->insert(out->end(), ann.begin(), ann.end());
-    out->insert(out->end(), decl.begin(), decl.end());
-    out->insert(out->end(), func.begin(), func.end());
-  }
-};
-
-// The canonical type ids, created once per module.
-struct Types {
-  uint32_t voidId = 0;
-  uint32_t boolId = 0;
-  uint32_t boolVec4 = 0;
-  uint32_t intId = 0;
-  uint32_t floatId = 0;
-  uint32_t vec2 = 0;
-  uint32_t vec3 = 0;
-  uint32_t vec4 = 0;
-  uint32_t ivec4 = 0;
-  uint32_t mat3 = 0;
-  uint32_t mat4 = 0;
-  uint32_t vec4Array8 = 0;
-  uint32_t image = 0;
-  uint32_t samplerType = 0;
-  uint32_t sampledImage = 0;
-};
+using namespace spirv;
 
 uint32_t VaryingTypeId(const Types& types, ShaderType type, bool* ok) {
   switch (type) {
@@ -1271,9 +1150,10 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
           // argument resolves from the record and the table's source column is not consulted.
           if (argument < call.args.size()) {
             const ChainArg& positional = call.args[argument];
-            value = positional.kind == ChainArgKind::LeafTex
-                        ? leafFetchValue(positional.index)
-                        : ResolveTypedArg(&state, plan, positional, ToParamKind(spec.type), coverageId);
+            value =
+                positional.kind == ChainArgKind::LeafTex
+                    ? leafFetchValue(positional.index)
+                    : ResolveTypedArg(&state, plan, positional, ToParamKind(spec.type), coverageId);
           }
           values.push_back(value);
           continue;

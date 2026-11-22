@@ -108,6 +108,9 @@ enum class ChainBindingSource : uint8_t {
   HasMaskTexture,
   DeviceMaskSubset,
   DeviceLeafMask,
+  /// A member no binding reader addresses: the runtime route declares its members by name and
+  /// fills them through the name-keyed upload instead.
+  Unbound,
   DeviceLeafCoordMatrix,
   // The shader-tiled leaves' recipes (per leaf, indexed by the leaf's own index).
   TiledShaderModeX,

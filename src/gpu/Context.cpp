@@ -251,7 +251,13 @@ PrecompiledShaderCache* ContextCacheAccess::Cache(const Context* context) {
 }
 
 bool FPRecordingEnabled(const Context* context) {
-  return context != nullptr && context->backend() == Backend::OpenGL;
+  if (context == nullptr) {
+    return false;
+  }
+  // Both backends serve the processor tree through their own runtime emission: OpenGL prints the
+  // GLSL text, Vulkan emits and links the SPIR-V modules. The remaining backends still read the
+  // precompiled payloads.
+  return context->backend() == Backend::OpenGL || context->backend() == Backend::Vulkan;
 }
 
 }  // namespace tgfx

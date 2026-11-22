@@ -119,7 +119,7 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("vec4 color = vec4(0.0);");
 
   if (stitchTiles) {
-    fragBuilder->codeAppendf("highp vec2 stitchData = %s;", stitchDataName.c_str());
+    fragBuilder->aliasValue("stitchData", stitchDataName, "highp vec2");
   }
 
   fragBuilder->codeAppend("float ratio = 1.0;");

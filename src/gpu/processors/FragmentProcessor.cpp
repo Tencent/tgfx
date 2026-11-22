@@ -184,7 +184,7 @@ void FragmentProcessor::internalEmitChild(
     // unique to the child processor (exactly what we want for its input).
     inputName += "_childInput";
     inputName += programInfo->getMangledSuffix(childProc);
-    fragBuilder->codeAppendf("vec4 %s = %s;", inputName.c_str(), inputColor.c_str());
+    fragBuilder->aliasValue(inputName, inputColor, "vec4");
   }
 
   // emit the code for the child in its own scope

@@ -208,7 +208,7 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
     if (axisCoord.empty() || axisClamp.empty()) {
       return;
     }
-    fragBuilder->codeAppendf("highp vec2 inCoord = %s;", texCoordName.c_str());
+    fragBuilder->aliasValue("inCoord", texCoordName, "highp vec2");
     if (!names.dimensionsName.empty()) {
       fragBuilder->codeAppendf("inCoord /= %s;", names.dimensionsName.c_str());
     }
@@ -225,7 +225,7 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
     if (constraint == SrcRectConstraint::Strict) {
       std::string strictSubset = args.inputSubset;
       if (!names.dimensionsName.empty()) {
-        fragBuilder->codeAppendf("highp vec4 extraSubset = %s;", strictSubset.c_str());
+        fragBuilder->aliasValue("extraSubset", strictSubset, "highp vec4");
         fragBuilder->codeAppendf("extraSubset.xy /= %s;", names.dimensionsName.c_str());
         fragBuilder->codeAppendf("extraSubset.zw /= %s;", names.dimensionsName.c_str());
         strictSubset = "extraSubset";

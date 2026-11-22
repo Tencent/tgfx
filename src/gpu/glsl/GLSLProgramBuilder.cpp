@@ -25,6 +25,9 @@
 #include "gpu/UniformData.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/GPU.h"
+#if defined(TGFX_USE_VULKAN)
+#include "gpu/vulkan/VulkanProgramBuilder.h"
+#endif
 
 namespace tgfx {
 static std::string TypeModifierString(ShaderVar::TypeModifier t, ShaderStage stage) {
@@ -111,6 +114,11 @@ static std::string SLTypeString(SLType t) {
 
 std::shared_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
                                                        const ProgramInfo* programInfo) {
+#if defined(TGFX_USE_VULKAN)
+  if (context != nullptr && context->backend() == Backend::Vulkan) {
+    return VulkanProgramBuilder::Create(context, programInfo);
+  }
+#endif
   GLSLProgramBuilder builder(context, programInfo);
   if (!builder.emitAndInstallProcessors()) {
     return nullptr;

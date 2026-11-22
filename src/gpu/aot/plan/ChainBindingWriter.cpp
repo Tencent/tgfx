@@ -451,6 +451,8 @@ bool ReadYUV(const ReadContext& ctx, const ChainBinding& binding, ChainBindingSo
 bool ReadBinding(const ReadContext& ctx, const ChainBinding& binding, uint8_t* out) {
   const auto& geometry = *ctx.geometry;
   switch (binding.source) {
+    case ChainBindingSource::Unbound:
+      return false;
     case ChainBindingSource::SlotColorMatrixLinear:
       return ReadSlotColorMatrix(binding, true, out);
     case ChainBindingSource::SlotColorMatrixTranslate:

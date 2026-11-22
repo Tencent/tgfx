@@ -25,8 +25,7 @@ static constexpr char SubpassInputName[] = "tgfx_SubpassInput";
 
 GLSLFragmentShaderBuilder::GLSLFragmentShaderBuilder(ProgramBuilder* program)
     : FragmentShaderBuilder(program) {
-  auto glProgram = static_cast<GLSLProgramBuilder*>(program);
-  auto shaderCaps = glProgram->getContext()->shaderCaps();
+  auto shaderCaps = program->getContext()->shaderCaps();
   if (shaderCaps->usesPrecisionModifiers) {
     setPrecisionQualifier("precision mediump float;");
   }
@@ -59,6 +58,7 @@ void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
     record.output = outputVar;
     record.function = functionName;
     record.args.assign(args.begin(), args.end());
+    record.order = nextEmitOrder();
     callRecorder->push_back(std::move(record));
   }
   codeAppendf("%s = ", outputVar.c_str());

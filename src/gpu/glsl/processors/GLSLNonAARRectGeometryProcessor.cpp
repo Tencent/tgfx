@@ -78,15 +78,15 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
 
   // Fragment shader - evaluate round rect shape using the shared SDF. The stroke form rides the
   // function's runtime flag as a literal, so the driver folds the arm this draw does not use.
-  fragBuilder->codeAppendf("highp vec2 localCoord = %s;", localCoordVarying.fsIn().c_str());
-  fragBuilder->codeAppendf("highp vec2 radii = %s;", radiiVarying.fsIn().c_str());
-  fragBuilder->codeAppendf("highp vec4 bounds = %s;", boundsVarying.fsIn().c_str());
+  fragBuilder->aliasValue("localCoord", localCoordVarying.fsIn(), "highp vec2");
+  fragBuilder->aliasValue("radii", radiiVarying.fsIn(), "highp vec2");
+  fragBuilder->aliasValue("bounds", boundsVarying.fsIn(), "highp vec4");
   auto coverageEntry = fragBuilder->appendFunction("nonAARRectCoverage");
   if (coverageEntry.empty()) {
     return;
   }
   if (stroke) {
-    fragBuilder->codeAppendf("highp vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
+    fragBuilder->aliasValue("sw", strokeWidthVarying.fsIn(), "highp vec2");
     fragBuilder->appendCall(args.outputCoverage, coverageEntry,
                             {"localCoord", "bounds", "radii", "sw", "1"}, "vec4");
   } else {

@@ -77,7 +77,7 @@ void GLSLComplexEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
     return;
   }
   if (stroke) {
-    fragBuilder->codeAppendf("highp vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
+    fragBuilder->aliasValue("sw", strokeWidthVarying.fsIn(), "highp vec2");
     fragBuilder->appendCall(args.outputCoverage, coverageEntry,
                             {ellipseOffsets.fsIn() + ".xy", ellipseRadii.fsIn(), edgeDist.fsIn(),
                              strokeWidthVarying.fsIn(), "1"},

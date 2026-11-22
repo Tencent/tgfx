@@ -37,6 +37,9 @@ struct CallRecord {
   std::string output;
   std::string function;
   std::vector<std::string> args;
+  /// The record's position among every emission record of the stage (calls, aliases and stage
+  /// outputs share one counter), so a consumer can rebuild the emission order.
+  uint32_t order = 0;
 };
 class ProgramInfo;
 class ShaderCaps;
@@ -96,6 +99,13 @@ class ShaderBuilder {
   }
 
   /**
+   * The next position in the stage's emission order, shared by every kind of record.
+   */
+  uint32_t nextEmitOrder() {
+    return emitOrder++;
+  }
+
+  /**
    * Emits the subset clamps that precede a texture read: the strict-constraint clamp when
    * extraSubset names a variable, then the draw-level subset clamp when subset names one.
    * Returns the name of the variable holding the clamped coordinate (coordName itself when no
@@ -151,6 +161,7 @@ class ShaderBuilder {
   std::set<std::string> emittedFunctions = {};
   std::vector<CallRecord>* callRecorder = nullptr;
   int tempCallIndex = 0;
+  uint32_t emitOrder = 0;
   int clampedCoordIndex = 0;
   ProgramBuilder* programBuilder = nullptr;
   std::vector<ShaderVar> inputs;

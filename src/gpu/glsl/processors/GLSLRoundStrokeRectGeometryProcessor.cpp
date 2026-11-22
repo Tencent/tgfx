@@ -63,7 +63,7 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->storeColor(args.outputColor, colorVar.fsIn());
   }
 
-  fragBuilder->codeAppendf("highp vec2 offset = %s;", ellipseOffsets.fsIn().c_str());
+  fragBuilder->aliasValue("offset", ellipseOffsets.fsIn(), "highp vec2");
   // The shared SDF scales the per-vertex coverage inside the ramp band when AA is on, and is a
   // hard inside step otherwise. The AA form rides the function's runtime flag as a literal, so the
   // driver folds the arm this draw does not use.

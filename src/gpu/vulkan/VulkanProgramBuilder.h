@@ -34,6 +34,13 @@ namespace tgfx {
  */
 class VulkanProgramBuilder : public ProgramBuilder {
  public:
+  /**
+   * Builds one draw's program through the Vulkan runtime route: the processor tree's recorded
+   * calls become the plan, the plan becomes SPIR-V, and the linked module becomes the pipeline.
+   * Returns nullptr when the draw is outside the route's slice.
+   */
+  static std::shared_ptr<Program> Create(Context* context, const ProgramInfo* programInfo);
+
   std::string getShaderVarDeclarations(const ShaderVar& var, ShaderStage stage) const override;
 
   std::string getUniformBlockDeclaration(ShaderStage stage,

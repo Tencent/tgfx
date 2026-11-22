@@ -38,6 +38,8 @@ struct FragmentSourceRecord {
     Coverage,
     /// dst = src * operand, the plain xfer formula.
     Combine,
+    /// dst = src, a local alias the child emission introduces (no instruction).
+    Alias,
   };
   Kind kind = Kind::Color;
   std::string dst = {};
@@ -47,6 +49,10 @@ struct FragmentSourceRecord {
   std::string operand = {};
   /// The coverage store wraps a scalar source in vec4(...).
   bool splat = false;
+  /// The alias's declaration spelling ("vec4", "highp vec2"), so the text stays as emitted.
+  std::string declaration = {};
+  /// The record's position among every emission record of the stage.
+  uint32_t order = 0;
 };
 
 class FragmentShaderBuilder : public ShaderBuilder {
@@ -94,6 +100,13 @@ class FragmentShaderBuilder : public ShaderBuilder {
    * scalar source widens to vec4 at the store.
    */
   void storeCoverage(const std::string& outputVar, const std::string& srcName, bool splat);
+
+  /**
+   * Declares one local alias of a value (a child processor's input, a geometry's hoisted varying)
+   * and records that the two names carry the same value.
+   */
+  void aliasValue(const std::string& dstName, const std::string& srcName,
+                  const std::string& declaration);
 
   /**
    * Writes the plain output formula the color chain and the coverage chain combine through, and

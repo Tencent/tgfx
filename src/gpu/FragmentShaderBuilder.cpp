@@ -37,12 +37,27 @@ void FragmentShaderBuilder::declareCustomOutputColor() {
   outputs.emplace_back(CUSTOM_COLOR_OUTPUT_NAME, SLType::Float4, typeModifier);
 }
 
+void FragmentShaderBuilder::aliasValue(const std::string& dstName, const std::string& srcName,
+                                       const std::string& declaration) {
+  if (sourceRecorder != nullptr) {
+    FragmentSourceRecord record = {};
+    record.kind = FragmentSourceRecord::Kind::Alias;
+    record.dst = dstName;
+    record.src = srcName;
+    record.declaration = declaration;
+    record.order = nextEmitOrder();
+    sourceRecorder->push_back(std::move(record));
+  }
+  codeAppendf("%s %s = %s;", declaration.c_str(), dstName.c_str(), srcName.c_str());
+}
+
 void FragmentShaderBuilder::storeColor(const std::string& outputVar, const std::string& srcName) {
   if (sourceRecorder != nullptr) {
     FragmentSourceRecord record = {};
     record.kind = FragmentSourceRecord::Kind::Color;
     record.dst = outputVar;
     record.src = srcName;
+    record.order = nextEmitOrder();
     sourceRecorder->push_back(std::move(record));
   }
   codeAppendf("%s = %s;", outputVar.c_str(), srcName.c_str());
@@ -56,6 +71,7 @@ void FragmentShaderBuilder::storeCoverage(const std::string& outputVar, const st
     record.dst = outputVar;
     record.src = srcName;
     record.splat = splat;
+    record.order = nextEmitOrder();
     sourceRecorder->push_back(std::move(record));
   }
   if (splat) {
@@ -74,6 +90,7 @@ void FragmentShaderBuilder::combineColorWithCoverage(const std::string& outputVa
     record.dst = outputVar;
     record.src = colorVar;
     record.operand = coverageVar;
+    record.order = nextEmitOrder();
     sourceRecorder->push_back(std::move(record));
   }
   codeAppendf("%s = %s * %s;", outputVar.c_str(), colorVar.c_str(), coverageVar.c_str());
