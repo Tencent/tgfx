@@ -133,6 +133,7 @@ VulkanProgramBuilder::VulkanProgramBuilder(Context* context, const ProgramInfo* 
       _vertexBuilder(this), _fragBuilder(this) {
   // The bytecode route never spells shader text: the calls land in the record list instead.
   _fragBuilder.setCallRecorder(&fragmentCalls);
+  _fragBuilder.setSourceRecorder(&fragmentSources);
   _vertexBuilder.setVertexRecorder(&vertexCalls);
 }
 
@@ -180,8 +181,49 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
     decl.type = FragmentTypeOf(varying.type());
     plan.varyings.push_back(std::move(decl));
   }
-  // The recorded calls in emission order; every argument must resolve to a register, a uniform
-  // member, or an integer literal, otherwise the shape stays on its runtime path.
+  // The stage-output sources the geometry and the xfer recorded: the composition's own inputs and
+  // the plain formula that closes it. A value the plan cannot name as a declared member, a
+  // varying, or a constant leaves the draw on its runtime path.
+  auto argOfValue = [&](const std::string& name, ChainArg* arg) -> bool {
+    const auto member = uniformIndex.find(name);
+    if (member != uniformIndex.end()) {
+      arg->kind = ChainArgKind::Uniform;
+      arg->index = member->second;
+      return true;
+    }
+    for (size_t index = 0; index < plan.varyings.size(); ++index) {
+      if (plan.varyings[index].name == name) {
+        arg->kind = ChainArgKind::Varying;
+        arg->index = static_cast<int>(index);
+        return true;
+      }
+    }
+    if (name == "vec4(1.0)" || name == "1.0") {
+      arg->kind = ChainArgKind::White;
+      return true;
+    }
+    return false;
+  };
+  std::map<std::string, ChainArg> sourceOf = {};
+  for (const auto& source : fragmentSources) {
+    if (source.kind == FragmentSourceRecord::Kind::Combine) {
+      continue;
+    }
+    ChainArg arg = ChainArg::None();
+    if (!argOfValue(source.src, &arg)) {
+      LOGE("VulkanProgramBuilder: the stage output %s reads %s, which the plan cannot name",
+           source.dst.c_str(), source.src.c_str());
+      return nullptr;
+    }
+    if (source.kind == FragmentSourceRecord::Kind::Color) {
+      plan.geomColor = arg;
+    } else {
+      plan.geomCoverage = arg;
+    }
+    sourceOf[source.dst] = arg;
+  }
+  // The recorded calls in emission order; every argument must resolve to a register, a declared
+  // source, a uniform member, or an integer literal, otherwise the shape stays on its runtime path.
   std::map<std::string, int> registerOf = {};
   int nextRegister = 0;
   for (const auto& record : fragmentCalls) {
@@ -194,22 +236,27 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
     call.op = op;
     for (const auto& arg : record.args) {
       ChainArg chainArg = {};
-      const auto member = uniformIndex.find(arg);
-      if (member != uniformIndex.end()) {
-        chainArg.kind = ChainArgKind::Uniform;
-        chainArg.index = member->second;
+      const auto source = sourceOf.find(arg);
+      if (source != sourceOf.end()) {
+        chainArg = source->second;
       } else {
-        const auto reg = registerOf.find(arg);
-        if (reg != registerOf.end()) {
-          chainArg.kind = ChainArgKind::Register;
-          chainArg.index = reg->second;
-        } else if (IsIntegerLiteral(arg)) {
-          chainArg.kind = ChainArgKind::Literal;
-          chainArg.index = std::atoi(arg.c_str());
+        const auto member = uniformIndex.find(arg);
+        if (member != uniformIndex.end()) {
+          chainArg.kind = ChainArgKind::Uniform;
+          chainArg.index = member->second;
         } else {
-          LOGE("VulkanProgramBuilder: the argument %s of %s does not resolve", arg.c_str(),
-               record.function.c_str());
-          return nullptr;
+          const auto reg = registerOf.find(arg);
+          if (reg != registerOf.end()) {
+            chainArg.kind = ChainArgKind::Register;
+            chainArg.index = reg->second;
+          } else if (IsIntegerLiteral(arg)) {
+            chainArg.kind = ChainArgKind::Literal;
+            chainArg.index = std::atoi(arg.c_str());
+          } else {
+            LOGE("VulkanProgramBuilder: the argument %s of %s does not resolve", arg.c_str(),
+                 record.function.c_str());
+            return nullptr;
+          }
         }
       }
       call.args.push_back(chainArg);
@@ -217,6 +264,54 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
     call.outRegister = nextRegister++;
     registerOf[record.output] = call.outRegister;
     plan.calls.push_back(std::move(call));
+  }
+  // The closing formula names the composition's root role: a register the calls wrote, or a
+  // declared source the geometry produced.
+  auto resolveOutput = [&](const std::string& name, ChainArg* source, int* reg) -> bool {
+    *reg = -1;
+    *source = ChainArg::None();
+    const auto written = registerOf.find(name);
+    if (written != registerOf.end()) {
+      *reg = written->second;
+      return true;
+    }
+    const auto produced = sourceOf.find(name);
+    if (produced != sourceOf.end()) {
+      *source = produced->second;
+      return true;
+    }
+    return false;
+  };
+  plan.positionalArgs = true;
+  plan.rootRegister = -1;
+  plan.coverageRootRegister = -1;
+  bool combined = false;
+  for (const auto& source : fragmentSources) {
+    if (source.kind != FragmentSourceRecord::Kind::Combine) {
+      continue;
+    }
+    ChainArg colorSource = ChainArg::None();
+    int colorRegister = -1;
+    ChainArg coverageSource = ChainArg::None();
+    int coverageRegister = -1;
+    if (!resolveOutput(source.src, &colorSource, &colorRegister) ||
+        !resolveOutput(source.operand, &coverageSource, &coverageRegister)) {
+      LOGE("VulkanProgramBuilder: the output formula reads values the plan cannot name");
+      return nullptr;
+    }
+    plan.rootRegister = colorRegister;
+    if (colorRegister < 0) {
+      plan.geomColor = colorSource;
+    }
+    plan.coverageRootRegister = coverageRegister;
+    if (coverageRegister < 0) {
+      plan.geomCoverage = coverageSource;
+    }
+    combined = true;
+  }
+  if (!combined) {
+    LOGE("VulkanProgramBuilder: the xfer stage recorded no output formula");
+    return nullptr;
   }
   // The body emitter and the module link land here next.
   LOGE("VulkanProgramBuilder: the SPIR-V finalize is not wired yet");

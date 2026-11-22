@@ -58,11 +58,11 @@ void GLSLComplexEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   if (commonColor.has_value()) {
     auto colorName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    fragBuilder->storeColor(args.outputColor, colorName);
   } else {
     auto color = varyingHandler->addVarying("Color", SLType::Float4);
     vertBuilder->storeVarying(color.vsOut(), inColor.name());
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
+    fragBuilder->storeColor(args.outputColor, color.fsIn());
   }
 
   // Setup position

@@ -50,12 +50,12 @@ void GLSLStencilCoverCoverPassGeometryProcessor::emitCode(EmitArgs& args) const 
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
 
   // Default coverage of 1.0; the FP chain (mask filter, clip) may multiply this further.
-  fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+  fragBuilder->storeCoverage(args.outputCoverage, "1.0", true);
   // Brush colour uniform — matches GLSLDefaultGeometryProcessor. Without this uniform the
   // cover pass would emit a hard-coded colour (white) and silently ignore the brush.
   auto colorName =
       uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+  fragBuilder->storeColor(args.outputColor, colorName);
 
   vertBuilder->storePosition(positionName);
 }

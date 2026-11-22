@@ -595,6 +595,16 @@ uint32_t ResolveArg(BodyState* state, const ChainProgramPlan& plan, const ChainA
       return LoadMember(state, plan, arg.index);
     case ChainArgKind::Literal:
       return IntConstant(state, arg.index);
+    case ChainArgKind::Varying: {
+      if (arg.index < 0 || static_cast<size_t>(arg.index) >= plan.varyings.size()) {
+        return 0;
+      }
+      const auto& name = plan.varyings[static_cast<size_t>(arg.index)].name;
+      const auto found = state->varyingIds.find(name);
+      return found == state->varyingIds.end() ? 0 : found->second;
+    }
+    case ChainArgKind::None:
+      return 0;
     case ChainArgKind::LeafTex:
     case ChainArgKind::LeafCoord:
     case ChainArgKind::LeafSampler:
@@ -602,6 +612,25 @@ uint32_t ResolveArg(BodyState* state, const ChainProgramPlan& plan, const ChainA
       break;
   }
   return 0;
+}
+
+// Resolves one argument for a parameter of the given type: a scalar value feeding a vec4 parameter
+// widens to the four-component form every operator reads.
+uint32_t ResolveTypedArg(BodyState* state, const ChainProgramPlan& plan, const ChainArg& arg,
+                         ParamKind type, uint32_t coverageId) {
+  const uint32_t value = ResolveArg(state, plan, arg, coverageId);
+  if (value == 0 || type != kVec4) {
+    return value;
+  }
+  bool scalar = false;
+  if (arg.kind == ChainArgKind::Varying && arg.index >= 0 &&
+      static_cast<size_t>(arg.index) < plan.varyings.size()) {
+    scalar = plan.varyings[static_cast<size_t>(arg.index)].type == FragmentType::Float;
+  } else if (arg.kind == ChainArgKind::Uniform && arg.index >= 0 &&
+             static_cast<size_t>(arg.index) < plan.uniforms.size()) {
+    scalar = plan.uniforms[static_cast<size_t>(arg.index)].type == FragmentType::Float;
+  }
+  return scalar ? Splat4(state, value) : value;
 }
 
 }  // namespace
@@ -1237,6 +1266,18 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
       for (size_t argument = 0; argument < row->argCount; ++argument) {
         const OpTable::Arg& spec = row->args[argument];
         uint32_t value = 0;
+        if (plan.positionalArgs) {
+          // The runtime plans spell the operator's whole parameter list at the call site, so the
+          // argument resolves from the record and the table's source column is not consulted.
+          if (argument < call.args.size()) {
+            const ChainArg& positional = call.args[argument];
+            value = positional.kind == ChainArgKind::LeafTex
+                        ? leafFetchValue(positional.index)
+                        : ResolveTypedArg(&state, plan, positional, ToParamKind(spec.type), coverageId);
+          }
+          values.push_back(value);
+          continue;
+        }
         switch (spec.source) {
           case OpTable::Source::CallArg: {
             if (spec.a >= 0 && static_cast<size_t>(spec.a) < call.args.size()) {
@@ -1337,9 +1378,19 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   }
 
   // The epilogue: coverage, clip, the plain output and the alpha swizzle.
-  const auto rootFound = state.registers.find(plan.rootRegister);
-  if (rootFound == state.registers.end()) {
-    *error = "the plan did not write a root register";
+  uint32_t rootValue = 0;
+  if (plan.rootRegister >= 0) {
+    const auto rootFound = state.registers.find(plan.rootRegister);
+    if (rootFound == state.registers.end()) {
+      *error = "the plan did not write a root register";
+      return false;
+    }
+    rootValue = rootFound->second;
+  } else if (plan.geomColor.kind != ChainArgKind::None) {
+    rootValue = ResolveTypedArg(&state, plan, plan.geomColor, kVec4, coverageId);
+  }
+  if (rootValue == 0) {
+    *error = "the plan names no root color";
     return false;
   }
   uint32_t finalCoverage = coverageId;
@@ -1350,6 +1401,12 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
       return false;
     }
     finalCoverage = found->second;
+  } else if (plan.geomCoverage.kind != ChainArgKind::None) {
+    finalCoverage = ResolveTypedArg(&state, plan, plan.geomCoverage, kVec4, coverageId);
+    if (finalCoverage == 0) {
+      *error = "the plan's geometry coverage does not resolve";
+      return false;
+    }
   }
   uint32_t clip = state.whiteId;
   if (plan.clipCoverageRegister >= 0) {
@@ -1423,7 +1480,7 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   const uint32_t withClip = writer.NewId();
   writer.Inst(kOpFMul, {types.vec4, withClip, coverage, clip});
   const uint32_t clipped = writer.NewId();
-  writer.Inst(kOpFMul, {types.vec4, clipped, rootFound->second, withClip});
+  writer.Inst(kOpFMul, {types.vec4, clipped, rootValue, withClip});
   // The xfer tail: the porter-duff composite over the destination texture, before the alpha
   // swizzle (the text route's order).
   uint32_t outputSource = clipped;
@@ -1436,7 +1493,7 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
       *error = "the xfer tail has no destination records";
       return false;
     }
-    const uint32_t values[6] = {rootFound->second,
+    const uint32_t values[6] = {rootValue,
                                 withClip,
                                 state.fragCoordId,
                                 LoadMember(&state, plan, upperLeftIndex),

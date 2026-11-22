@@ -65,22 +65,21 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
     vertBuilder->storeVarying(colorVar.vsOut(), color.name());
 
     // Output vertex color (will be modulated by FragmentProcessor if texCoords present)
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
+    fragBuilder->storeColor(args.outputColor, colorVar.fsIn());
   } else {
     auto colorName =
         uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    fragBuilder->storeColor(args.outputColor, colorName);
   }
 
   // Handle coverage for anti-aliasing
   if (hasCoverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->storeVarying(coverageVar.vsOut(), coverage.name());
-    fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
-                             coverageVar.fsIn().c_str());
+    fragBuilder->storeCoverage(args.outputCoverage, coverageVar.fsIn(), true);
   } else {
     // No coverage for mesh (no anti-aliasing)
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    fragBuilder->storeCoverage(args.outputCoverage, "1.0", true);
   }
 
   vertBuilder->storePosition(positionName);

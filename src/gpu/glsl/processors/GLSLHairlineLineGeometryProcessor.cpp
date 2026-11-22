@@ -64,7 +64,7 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   }
   auto colorName =
       uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+  fragBuilder->storeColor(args.outputColor, colorName);
   auto coverageScale =
       uniformHandler->addUniform("Coverage", UniformFormat::Float, ShaderStage::Fragment);
   fragBuilder->appendCall(

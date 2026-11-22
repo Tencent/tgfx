@@ -66,19 +66,18 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->storeVarying(coverageVar.vsOut(), coverage.name());
-    fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
-                             coverageVar.fsIn().c_str());
+    fragBuilder->storeCoverage(args.outputCoverage, coverageVar.fsIn(), true);
   } else {
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    fragBuilder->storeCoverage(args.outputCoverage, "1.0", true);
   }
 
   // Color: per-instance color or opaque white (overridden by shader FP).
   if (hasColors) {
     auto colorVar = varyingHandler->addVarying("InstanceColor", SLType::Float4);
     vertBuilder->storeVarying(colorVar.vsOut(), instanceColor.name());
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
+    fragBuilder->storeColor(args.outputColor, colorVar.fsIn());
   } else {
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputColor.c_str());
+    fragBuilder->storeColor(args.outputColor, "vec4(1.0)");
   }
 
   // Emit the vertex position to NDC.

@@ -373,6 +373,10 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
         return plan.uniforms[static_cast<size_t>(arg.index)].name;
       case ChainArgKind::Literal:
         return std::to_string(arg.index);
+      case ChainArgKind::Varying:
+        return plan.varyings[static_cast<size_t>(arg.index)].name;
+      case ChainArgKind::None:
+        break;
     }
     return {};
   };

@@ -109,7 +109,7 @@ struct ChainBindings {
 };
 
 /// How one call argument reaches the operator: a prior register, one of the frame's fixed inputs,
-/// a declared uniform member, or a literal the plan baked at walk time.
+/// a declared uniform member, a declared varying, or a literal the plan baked at walk time.
 enum class ChainArgKind : uint8_t {
   Register,
   GeomColor,
@@ -123,13 +123,25 @@ enum class ChainArgKind : uint8_t {
   FragCoord,
   Uniform,
   Literal,
+  /// The arg is absent (see ChainArg::None).
+  None,
+  /// A declared varying read straight from the frame's parameter list.
+  Varying,
 };
 
 struct ChainArg {
   ChainArgKind kind = ChainArgKind::White;
   /// The register written by an earlier call (Register), the leaf slot (LeafTex), the uniform
-  /// member's index into ChainProgramPlan::uniforms (Uniform), or the literal's value (Literal).
+  /// member's index into ChainProgramPlan::uniforms (Uniform), the varying's index into
+  /// ChainProgramPlan::varyings (Varying), or the literal's value (Literal).
   int index = 0;
+
+  /// The absent arg: the slot carries no value (a stage output the plan does not produce).
+  static ChainArg None() {
+    ChainArg arg = {};
+    arg.kind = ChainArgKind::None;
+    return arg;
+  }
 };
 
 /// One instruction of the straight-line body: the operator, its arguments in call order, and the
@@ -193,6 +205,15 @@ struct ChainProgramPlan {
   int clipCoverageRegister = -1;
   int coverageRootRegister = -1;
   bool xpNeedsBlendPass = false;
+  /// The geometry stage's own color and coverage when the composition reads them straight from a
+  /// declared value (a varying or a uniform member) instead of a register. The epilogue falls back
+  /// to these when rootRegister or coverageRootRegister is -1.
+  ChainArg geomColor = ChainArg::None();
+  ChainArg geomCoverage = ChainArg::None();
+  /// True when the plan's call arguments are the operator's parameter list in order, so every
+  /// argument resolves from the call record itself and the operator table's argument sources are
+  /// not consulted. The FP tree's runtime plans set it; the graph walk's plans do not.
+  bool positionalArgs = false;
   /// The leaves the body samples and the operator set it reaches, both for the pack entries.
   std::set<int> leafSlots = {};
   std::set<int> usedOps = {};

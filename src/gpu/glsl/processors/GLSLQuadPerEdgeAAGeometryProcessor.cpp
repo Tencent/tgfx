@@ -46,20 +46,19 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->storeVarying(coverageVar.vsOut(), coverage.name());
-    fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
-                             coverageVar.fsIn().c_str());
+    fragBuilder->storeCoverage(args.outputCoverage, coverageVar.fsIn(), true);
   } else {
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+    fragBuilder->storeCoverage(args.outputCoverage, "1.0", true);
   }
 
   if (commonColor.has_value()) {
     auto colorName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    fragBuilder->storeColor(args.outputColor, colorName);
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
     vertBuilder->storeVarying(colorVar.vsOut(), color.name());
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
+    fragBuilder->storeColor(args.outputColor, colorVar.fsIn());
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.

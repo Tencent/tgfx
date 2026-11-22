@@ -56,11 +56,11 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   if (commonColor.has_value()) {
     auto colorName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+    fragBuilder->storeColor(args.outputColor, colorName);
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
     vertBuilder->storeVarying(colorVar.vsOut(), inColor.name());
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
+    fragBuilder->storeColor(args.outputColor, colorVar.fsIn());
   }
 
   fragBuilder->codeAppendf("highp vec2 offset = %s;", ellipseOffsets.fsIn().c_str());

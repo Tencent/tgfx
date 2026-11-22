@@ -26,6 +26,29 @@ class FragmentProcessor;
 
 static constexpr char CUSTOM_COLOR_OUTPUT_NAME[] = "tgfx_FragColor";
 
+/// One recorded stage-output write: the geometry stage's own color or coverage, or the plain xfer
+/// formula that multiplies the color chain by the coverage chain. A bytecode route reads these to
+/// learn where its composition starts and how it ends; the GLSL route prints the same text it
+/// always printed.
+struct FragmentSourceRecord {
+  enum class Kind : uint8_t {
+    /// dst = src, the geometry stage's color.
+    Color,
+    /// dst = src, or vec4(src) when the source is a scalar, the geometry stage's coverage.
+    Coverage,
+    /// dst = src * operand, the plain xfer formula.
+    Combine,
+  };
+  Kind kind = Kind::Color;
+  std::string dst = {};
+  /// The value stored (Color/Coverage), or the color operand (Combine).
+  std::string src = {};
+  /// The coverage operand of Combine.
+  std::string operand = {};
+  /// The coverage store wraps a scalar source in vec4(...).
+  bool splat = false;
+};
+
 class FragmentShaderBuilder : public ShaderBuilder {
  public:
   explicit FragmentShaderBuilder(ProgramBuilder* program);
@@ -53,6 +76,32 @@ class FragmentShaderBuilder : public ShaderBuilder {
   virtual std::string appendTempCall(const std::string& functionName,
                                      std::initializer_list<std::string> args) = 0;
 
+  /**
+   * The sink a bytecode builder installs to collect the stage-output writes; nullptr keeps the
+   * records off (the GLSL route). The records append in emission order.
+   */
+  void setSourceRecorder(std::vector<FragmentSourceRecord>* records) {
+    sourceRecorder = records;
+  }
+
+  /**
+   * Writes the stage's color output from the named value and records where it came from.
+   */
+  void storeColor(const std::string& outputVar, const std::string& srcName);
+
+  /**
+   * Writes the stage's coverage output from the named value and records where it came from; a
+   * scalar source widens to vec4 at the store.
+   */
+  void storeCoverage(const std::string& outputVar, const std::string& srcName, bool splat);
+
+  /**
+   * Writes the plain output formula the color chain and the coverage chain combine through, and
+   * records the two operands.
+   */
+  void combineColorWithCoverage(const std::string& outputVar, const std::string& colorVar,
+                                const std::string& coverageVar);
+
   void onBeforeChildProcEmitCode(const FragmentProcessor* child) const;
 
   void onAfterChildProcEmitCode() const;
@@ -72,6 +121,8 @@ class FragmentShaderBuilder : public ShaderBuilder {
 
  protected:
   virtual std::string colorOutputName() = 0;
+
+  std::vector<FragmentSourceRecord>* sourceRecorder = nullptr;
 
   friend class ProgramBuilder;
 };
