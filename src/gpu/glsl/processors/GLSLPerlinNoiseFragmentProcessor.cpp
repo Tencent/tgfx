@@ -109,8 +109,12 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
   // weight in the final accumulation is ratio = 2^-k <= 1/128, contributing < 1% of the total
   // amplitude. With the supported numOctaves <= 8 this is invisible. The exact bias value is
   // not load-bearing — any small non-zero constant breaks the integer-baseFrequency case.
-  fragBuilder->codeAppendf("highp vec2 noiseVec = %s * %s + vec2(0.0078125);", texCoordName.c_str(),
-                           baseFreqName.c_str());
+  auto coordEntry = fragBuilder->appendFunction("tgfxNoiseCoord");
+  if (coordEntry.empty()) {
+    return;
+  }
+  fragBuilder->codeAppendf("highp vec2 noiseVec = %s(%s, %s);", coordEntry.c_str(),
+                           texCoordName.c_str(), baseFreqName.c_str());
 
   fragBuilder->codeAppend("vec4 color = vec4(0.0);");
 
@@ -149,10 +153,18 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend(".r;");
 
   // Recover [0,255] index from [0,1] texture value.
-  fragBuilder->codeAppend("highp vec2 latticeIdx = floor(vec2(permX, permZ) * 255.0 + 0.5);");
+  auto idxEntry = fragBuilder->appendFunction("tgfxNoiseLatticeIdx");
+  if (idxEntry.empty()) {
+    return;
+  }
+  fragBuilder->codeAppendf("highp vec2 latticeIdx = %s(vec2(permX, permZ));", idxEntry.c_str());
 
   // bcoords: (latticeIdx + floorY) mod 256, used to index into noise texture.
-  fragBuilder->codeAppend("highp vec4 bcoords = mod(latticeIdx.xyxy + floorVal.yyww, 256.0);");
+  auto bcoordsEntry = fragBuilder->appendFunction("tgfxNoiseBcoords");
+  if (bcoordsEntry.empty()) {
+    return;
+  }
+  fragBuilder->codeAppendf("highp vec4 bcoords = %s(latticeIdx, floorVal);", bcoordsEntry.c_str());
 
   fragBuilder->codeAppend("vec4 noiseResult;");
 
@@ -169,17 +181,18 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->appendTextureLookup(
         noiseSampler, std::string("vec2((bcoords.x + 0.5) / 256.0, ") + chanCoords[ch] + ")");
     fragBuilder->codeAppend(";");
-    fragBuilder->codeAppend(
-        "float u = dot((lattice.ga + lattice.rb * 0.00390625) * 2.0 - vec2(1.0), fractVal);");
+    auto gradEntry = fragBuilder->appendFunction("tgfxNoiseGradDot");
+    if (gradEntry.empty()) {
+      return;
+    }
+    fragBuilder->codeAppendf("float u = %s(lattice, fractVal, vec2(0.0, 0.0));", gradEntry.c_str());
 
     // Corner B: gradient at (floor.x+1, floor.y), dot with (fractVal - (1,0))
     fragBuilder->codeAppend("lattice = ");
     fragBuilder->appendTextureLookup(
         noiseSampler, std::string("vec2((bcoords.y + 0.5) / 256.0, ") + chanCoords[ch] + ")");
     fragBuilder->codeAppend(";");
-    fragBuilder->codeAppend(
-        "float v = dot((lattice.ga + lattice.rb * 0.00390625) * 2.0 - vec2(1.0),"
-        " fractVal - vec2(1.0, 0.0));");
+    fragBuilder->codeAppendf("float v = %s(lattice, fractVal, vec2(1.0, 0.0));", gradEntry.c_str());
 
     fragBuilder->codeAppend("float a = mix(u, v, noiseSmooth.x);");
 
@@ -188,18 +201,14 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
     fragBuilder->appendTextureLookup(
         noiseSampler, std::string("vec2((bcoords.w + 0.5) / 256.0, ") + chanCoords[ch] + ")");
     fragBuilder->codeAppend(";");
-    fragBuilder->codeAppend(
-        "v = dot((lattice.ga + lattice.rb * 0.00390625) * 2.0 - vec2(1.0),"
-        " fractVal - vec2(1.0, 1.0));");
+    fragBuilder->codeAppendf("v = %s(lattice, fractVal, vec2(1.0, 1.0));", gradEntry.c_str());
 
     // Corner D: gradient at (floor.x, floor.y+1), dot with (fractVal - (0,1))
     fragBuilder->codeAppend("lattice = ");
     fragBuilder->appendTextureLookup(
         noiseSampler, std::string("vec2((bcoords.z + 0.5) / 256.0, ") + chanCoords[ch] + ")");
     fragBuilder->codeAppend(";");
-    fragBuilder->codeAppend(
-        "u = dot((lattice.ga + lattice.rb * 0.00390625) * 2.0 - vec2(1.0),"
-        " fractVal - vec2(0.0, 1.0));");
+    fragBuilder->codeAppendf("u = %s(lattice, fractVal, vec2(0.0, 1.0));", gradEntry.c_str());
 
     fragBuilder->codeAppend("float b = mix(u, v, noiseSmooth.x);");
 
@@ -235,8 +244,11 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
   // serves as alpha and the RGB channels are premultiplied by it. Downstream filters consuming
   // premultiplied inputs (e.g. ColorFilter::Matrix) will unpremultiply correctly; callers
   // needing unpremultiplied noise should compose an appropriate color matrix.
-  fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
-  fragBuilder->codeAppendf("%s = vec4(color.rgb * color.aaa, color.a);", args.outputColor.c_str());
+  auto premulEntry = fragBuilder->appendFunction("tgfxNoisePremul");
+  if (premulEntry.empty()) {
+    return;
+  }
+  fragBuilder->codeAppendf("%s = %s(color);", args.outputColor.c_str(), premulEntry.c_str());
 }
 
 void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
