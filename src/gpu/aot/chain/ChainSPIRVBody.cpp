@@ -895,10 +895,6 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     writer.Inst(kOpDecorate, decoration);
     writer.Sink(&writer.decl);
   }
-  if (plan.calls.empty()) {
-    *error = "the plan has no calls to link";
-    return false;
-  }
 
   // chainBody itself: the exported function the frame calls.
   writer.Sink(&writer.decl);

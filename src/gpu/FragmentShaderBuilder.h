@@ -109,6 +109,12 @@ class FragmentShaderBuilder : public ShaderBuilder {
                   const std::string& declaration);
 
   /**
+   * Assigns one value to a name the stage already declared and records that the two carry the
+   * same value.
+   */
+  void copyValue(const std::string& dstName, const std::string& srcName);
+
+  /**
    * Writes the plain output formula the color chain and the coverage chain combine through, and
    * records the two operands.
    */

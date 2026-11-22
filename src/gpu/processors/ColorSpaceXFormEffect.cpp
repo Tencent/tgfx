@@ -48,7 +48,7 @@ void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
   ColorSpaceXformHelper helper{};
   helper.emitCode(uniformHandler, colorSpaceXformSteps.get());
   if (helper.isNoop()) {
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), args.inputColor.c_str());
+    fragBuilder->copyValue(args.outputColor, args.inputColor);
     return;
   }
   uint32_t flags = helper.flagsMask();

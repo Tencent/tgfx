@@ -51,6 +51,18 @@ void FragmentShaderBuilder::aliasValue(const std::string& dstName, const std::st
   codeAppendf("%s %s = %s;", declaration.c_str(), dstName.c_str(), srcName.c_str());
 }
 
+void FragmentShaderBuilder::copyValue(const std::string& dstName, const std::string& srcName) {
+  if (sourceRecorder != nullptr) {
+    FragmentSourceRecord record = {};
+    record.kind = FragmentSourceRecord::Kind::Alias;
+    record.dst = dstName;
+    record.src = srcName;
+    record.order = nextEmitOrder();
+    sourceRecorder->push_back(std::move(record));
+  }
+  codeAppendf("%s = %s;", dstName.c_str(), srcName.c_str());
+}
+
 void FragmentShaderBuilder::storeColor(const std::string& outputVar, const std::string& srcName) {
   if (sourceRecorder != nullptr) {
     FragmentSourceRecord record = {};
