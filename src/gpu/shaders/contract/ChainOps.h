@@ -311,6 +311,14 @@ TGFX_CHAIN_DECLARE_OP(PerlinNoise, TGFX_PERLIN_NOISE_DATA, TGFX_PERLIN_NOISE_STR
   T(Int32, format)
 TGFX_CHAIN_DECLARE_OP(YUV, TGFX_YUV_DATA, TGFX_YUV_STRUCTURE)
 TGFX_CHAIN_DECLARE_OP(GaussianBlur1D, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(PremulAlpha, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(YUVConvert, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(LinearGradientT, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(RadialGradientT, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(DiamondGradientT, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(ConicGradientT, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(SingleGradientColor, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(DualGradientColor, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
 
 /// The chain-wide block region: operators whose data exceeds the slot stride get a fixed offset
 /// here instead of a slot index. The region starts right after the slot region, so a reader takes
@@ -351,7 +359,15 @@ static_assert(ColorSpaceXformDataWords > PoolSlotWords,
   X(MulAlpha, TGFX_CHAIN_EMPTY_FIELDS)                \
   X(PerlinNoise, TGFX_PERLIN_NOISE_DATA)              \
   X(YUV, TGFX_YUV_DATA)                               \
-  X(GaussianBlur1D, TGFX_CHAIN_EMPTY_FIELDS)
+  X(GaussianBlur1D, TGFX_CHAIN_EMPTY_FIELDS)          \
+  X(PremulAlpha, TGFX_CHAIN_EMPTY_FIELDS)             \
+  X(YUVConvert, TGFX_CHAIN_EMPTY_FIELDS)              \
+  X(LinearGradientT, TGFX_CHAIN_EMPTY_FIELDS)         \
+  X(RadialGradientT, TGFX_CHAIN_EMPTY_FIELDS)         \
+  X(DiamondGradientT, TGFX_CHAIN_EMPTY_FIELDS)        \
+  X(ConicGradientT, TGFX_CHAIN_EMPTY_FIELDS)          \
+  X(SingleGradientColor, TGFX_CHAIN_EMPTY_FIELDS)     \
+  X(DualGradientColor, TGFX_CHAIN_EMPTY_FIELDS)
 
 inline constexpr int FieldListCount = 0
 #define TGFX_CHAIN_FIELD_LIST_COUNT(name, data) +1

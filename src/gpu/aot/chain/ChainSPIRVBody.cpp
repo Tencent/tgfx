@@ -223,6 +223,7 @@ enum ParamKind : uint8_t {
 struct OpSignature {
   int op = 0;
   const char* name = nullptr;
+  ParamKind returnType = kVec4;
   std::vector<ParamKind> params = {};
 };
 
@@ -271,6 +272,7 @@ const std::vector<OpSignature>& OpSignatures() {
       OpSignature signature = {};
       signature.op = row.id;
       signature.name = row.exportName;
+      signature.returnType = ToParamKind(row.returnType);
       for (size_t argument = 0; argument < row.argCount; ++argument) {
         signature.params.push_back(ToParamKind(row.args[argument].type));
       }

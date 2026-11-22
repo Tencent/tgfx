@@ -111,6 +111,8 @@ struct Row {
   const char* special = nullptr;
   const Arg* args = nullptr;
   size_t argCount = 0;
+  /// The module function's return type; every row that omits it returns vec4.
+  Param returnType = Param::Vec4;
 };
 
 // The two operators that are not chain opcodes: the body imports them on demand.
@@ -289,6 +291,53 @@ inline constexpr Arg kPorterDuffArgs[] = {
 };
 inline constexpr const char* kPorterDuffIncludes[] = {"xp/xp_porter_duff.inc"};
 
+// ---- PremulAlpha (the FP tree's tgfxMulAlpha: the blend operand recipes) --------------------
+inline constexpr Arg kPremulAlphaArgs[] = {
+    {Param::Vec4, Source::CallArg, 0},
+    {Param::Vec4, Source::CallArg, 1},
+};
+inline constexpr const char* kPremulAlphaIncludes[] = {"fn/ops/mul_alpha.inc"};
+
+// ---- YUVConvert (the FP tree's tgfxYUVToRGB) ----------------------------------------------
+inline constexpr Arg kYUVConvertArgs[] = {
+    {Param::Vec3, Source::CallArg, 0},  {Param::Mat3, Source::CallArg, 1},
+    {Param::Int, Source::CallArg, 2},   {Param::Int, Source::CallArg, 3},
+    {Param::Float, Source::CallArg, 4},
+};
+inline constexpr const char* kYUVConvertIncludes[] = {"fn/effects/yuv_to_rgb.inc"};
+
+// ---- The gradient layouts and colorizers the FP tree spells --------------------------------
+inline constexpr Arg kGradientTArgs[] = {
+    {Param::Vec2, Source::CallArg, 0},
+};
+inline constexpr const char* kLinearGradientTIncludes[] = {"fn/source/tgfx_linear_gradient_t.inc"};
+inline constexpr const char* kRadialGradientTIncludes[] = {"fn/source/tgfx_radial_gradient_t.inc"};
+inline constexpr const char* kDiamondGradientTIncludes[] = {
+    "fn/source/tgfx_diamond_gradient_t.inc"};
+
+inline constexpr Arg kConicGradientTArgs[] = {
+    {Param::Vec2, Source::CallArg, 0},
+    {Param::Float, Source::CallArg, 1},
+    {Param::Float, Source::CallArg, 2},
+};
+inline constexpr const char* kConicGradientTIncludes[] = {"fn/source/tgfx_conic_gradient_t.inc"};
+
+inline constexpr Arg kSingleGradientColorArgs[] = {
+    {Param::Float, Source::CallArg, 0},
+    {Param::Vec4, Source::CallArg, 1},
+    {Param::Vec4, Source::CallArg, 2},
+};
+inline constexpr const char* kSingleGradientColorIncludes[] = {
+    "fn/source/tgfx_single_gradient_color.inc"};
+
+inline constexpr Arg kDualGradientColorArgs[] = {
+    {Param::Float, Source::CallArg, 0}, {Param::Vec4, Source::CallArg, 1},
+    {Param::Vec4, Source::CallArg, 2},  {Param::Vec4, Source::CallArg, 3},
+    {Param::Vec4, Source::CallArg, 4},  {Param::Float, Source::CallArg, 5},
+};
+inline constexpr const char* kDualGradientColorIncludes[] = {
+    "fn/source/tgfx_dual_gradient_color.inc"};
+
 inline constexpr Row kRows[] = {
     {ChainISA::ConstColor, "pmApplyConstColor", "", kConstColorIncludes, 1, false, true, "",
      kConstColorArgs, 3},
@@ -317,6 +366,22 @@ inline constexpr Row kRows[] = {
      true, "", kColorSpaceXformArgs, 11},
     {LeafFetchId, "chainLeafFetch", "", kLeafFetchIncludes, 2, true, true, "leafFetch",
      kLeafFetchArgs, 12},
+    {ChainISA::PremulAlpha, "tgfxMulAlpha", "", kPremulAlphaIncludes, 1, false, true, "",
+     kPremulAlphaArgs, 2},
+    {ChainISA::YUVConvert, "tgfxYUVToRGB", "", kYUVConvertIncludes, 1, false, true, "",
+     kYUVConvertArgs, 5},
+    {ChainISA::LinearGradientT, "tgfxLinearGradientT", "", kLinearGradientTIncludes, 1, false, true,
+     "", kGradientTArgs, 1},
+    {ChainISA::RadialGradientT, "tgfxRadialGradientT", "", kRadialGradientTIncludes, 1, false, true,
+     "", kGradientTArgs, 1},
+    {ChainISA::DiamondGradientT, "tgfxDiamondGradientT", "", kDiamondGradientTIncludes, 1, false,
+     true, "", kGradientTArgs, 1, Param::Float},
+    {ChainISA::ConicGradientT, "tgfxConicGradientT", "", kConicGradientTIncludes, 1, false, true,
+     "", kConicGradientTArgs, 3, Param::Float},
+    {ChainISA::SingleGradientColor, "tgfxSingleGradientColor", "", kSingleGradientColorIncludes, 1,
+     false, true, "", kSingleGradientColorArgs, 3},
+    {ChainISA::DualGradientColor, "tgfxDualGradientColor", "", kDualGradientColorIncludes, 1, false,
+     true, "", kDualGradientColorArgs, 6},
     {PorterDuffId, "applyPorterDuffXP",
      "#define HAS_XP 1\n#define TGFX_DECLARED_CHAIN 1\n"
      "layout(set = 2, binding = 0) uniform sampler2D dummyDstTex;\n",
