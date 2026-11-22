@@ -214,6 +214,9 @@ bool ParseAnnotatedFunction(const std::string& text, CatalogEntry* entry, std::s
                line.rfind("//@member-start ", 0) == 0 || line.rfind("//@requires ", 0) == 0) {
       *error = "retired annotation: " + line + " (see the //@function prefix form)";
       return false;
+    } else if (line.rfind("#pragma tgfx_", 0) == 0) {
+      // Build-tool directives (the spec reader marker and its gates): the runtime consumers
+      // assemble plain GLSL, so the pragmas stay out of the emitted text.
     } else {
       source += line;
       source.push_back('\n');

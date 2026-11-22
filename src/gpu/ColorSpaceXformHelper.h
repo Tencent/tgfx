@@ -67,6 +67,10 @@ class ColorSpaceXformHelper {
   bool applyPremul() const {
     return flags.premul;
   }
+  /// The active steps, in the shader's flag encoding (see ColorSpaceXformSteps::Flags::mask).
+  uint32_t flagsMask() const {
+    return flags.mask();
+  }
 
   gfx::skcms_TFType srcTFType() const {
     return _srcTFType;

@@ -47,9 +47,40 @@ void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   ColorSpaceXformHelper helper{};
   helper.emitCode(uniformHandler, colorSpaceXformSteps.get());
-  std::string outputColor;
-  fragBuilder->appendColorGamutXform(&outputColor, args.inputColor.c_str(), &helper);
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outputColor.c_str());
+  if (helper.isNoop()) {
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), args.inputColor.c_str());
+    return;
+  }
+  uint32_t flags = helper.flagsMask();
+  int srcTFType = TFTypeToIndex(helper.srcTFType());
+  int dstTFType = TFTypeToIndex(helper.dstTFType());
+  // A transfer-function family the shared curve does not implement takes the identity arm: its
+  // stage leaves the flags, matching the no-op form the inline emission produced for the kind.
+  if (srcTFType < 0) {
+    flags &= ~2u;
+    srcTFType = 0;
+  }
+  if (dstTFType < 0) {
+    flags &= ~8u;
+    dstTFType = 0;
+  }
+  auto entry = fragBuilder->appendFunction("chainApplyColorSpaceXform");
+  if (entry.empty()) {
+    return;
+  }
+  const std::string srcTF0 = helper.applySrcTF() ? helper.srcTFUniform0() : "vec4(0.0)";
+  const std::string srcTF1 = helper.applySrcTF() ? helper.srcTFUniform1() : "vec4(0.0)";
+  const std::string srcOOTF = helper.applySrcOOTF() ? helper.srcOOTFUniform() : "vec4(0.0)";
+  const std::string colorXform =
+      helper.applyGamutXform() ? helper.gamutXformUniform() : "mat3(1.0)";
+  const std::string dstOOTF = helper.applyDstOOTF() ? helper.dstOOTFUniform() : "vec4(0.0)";
+  const std::string dstTF0 = helper.applyDstTF() ? helper.dstTFUniform0() : "vec4(0.0)";
+  const std::string dstTF1 = helper.applyDstTF() ? helper.dstTFUniform1() : "vec4(0.0)";
+  fragBuilder->codeAppendf("%s = %s(%s, %u, %s, %s, %d, %s, %s, %s, %s, %s, %d);",
+                           args.outputColor.c_str(), entry.c_str(), args.inputColor.c_str(),
+                           static_cast<unsigned>(flags), srcTF0.c_str(), srcTF1.c_str(), srcTFType,
+                           srcOOTF.c_str(), colorXform.c_str(), dstOOTF.c_str(), dstTF0.c_str(),
+                           dstTF1.c_str(), dstTFType);
 }
 
 void ColorSpaceXformEffect::onSetData(UniformData* /*vertexUniformData*/,
