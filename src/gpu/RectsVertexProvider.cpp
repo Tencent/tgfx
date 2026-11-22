@@ -98,34 +98,21 @@ class AARectsVertexProvider : public RectsVertexProvider {
         uintColor = ToUintPMColor(record->color, steps.get());
       }
 
-      // Per-axis device scale with a subpixel collapse: an axis thinner than 1 device pixel flips
-      // when inset by the padding, blending the coverage quad into the ring and rendering up to
-      // 2.3x brighter than the paint alpha. Collapse it to the rect center and widen the outset
-      // to one full device pixel per side, so the ring's ink matches the rect's device-pixel
-      // area (ported from the precompiled route's provider).
-      auto scales = viewMatrix.getAxisScales();
-      auto scaleX = scales.x;
-      auto scaleY = scales.y;
+      auto scale = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
+                         viewMatrix.getSkewY() * viewMatrix.getSkewY());
       // we want the new edge to be .5px away from the old line.
-      auto paddingX = 0.5f / scaleX;
-      auto paddingY = 0.5f / scaleY;
-      auto subpixelX = rect.width() * scaleX < 1.0f;
-      auto subpixelY = rect.height() * scaleY < 1.0f;
-      auto insetX = subpixelX ? rect.width() * 0.5f : paddingX;
-      auto insetY = subpixelY ? rect.height() * 0.5f : paddingY;
-      auto outsetX = subpixelX ? 2.0f * paddingX - insetX : paddingX;
-      auto outsetY = subpixelY ? 2.0f * paddingY - insetY : paddingY;
-      auto insetBounds = rect.makeInset(insetX, insetY);
+      auto padding = 0.5f / scale;
+      auto insetBounds = rect.makeInset(padding, padding);
       auto insetQuad = Quad::MakeFrom(insetBounds, &viewMatrix);
-      auto outsetBounds = rect.makeOutset(outsetX, outsetY);
+      auto outsetBounds = rect.makeOutset(padding, padding);
       auto outsetQuad = Quad::MakeFrom(outsetBounds, &viewMatrix);
       auto insetUV = insetBounds;
       auto outsetUV = outsetBounds;
       auto subset = rect;
       if (hasUVRect) {
         auto& uvRect = *uvRects[i];
-        insetUV = uvRect.makeInset(paddingX, paddingY);
-        outsetUV = uvRect.makeOutset(paddingX, paddingY);
+        insetUV = uvRect.makeInset(padding, padding);
+        outsetUV = uvRect.makeOutset(padding, padding);
         subset = uvRect;
       }
       if (hasSubsetRect) {
