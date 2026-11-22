@@ -61,16 +61,14 @@ void GLSLDualIntervalGradientColorizer::emitCode(EmitArgs& args) const {
       args.uniformHandler->addUniform("bias23", UniformFormat::Float4, ShaderStage::Fragment);
   auto thresholdName =
       args.uniformHandler->addUniform("threshold", UniformFormat::Float, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("float t = %s.x;", args.inputColor.c_str());
-  fragBuilder->codeAppend("vec4 scale, bias;");
-  fragBuilder->codeAppendf("if (t < %s) {", thresholdName.c_str());
-  fragBuilder->codeAppendf("scale = %s;", scale01Name.c_str());
-  fragBuilder->codeAppendf("bias = %s;", bias01Name.c_str());
-  fragBuilder->codeAppend("} else {");
-  fragBuilder->codeAppendf("scale = %s;", scale23Name.c_str());
-  fragBuilder->codeAppendf("bias = %s;", bias23Name.c_str());
-  fragBuilder->codeAppend("}");
-  fragBuilder->codeAppendf("%s = vec4(t * scale + bias);", args.outputColor.c_str());
+  auto entry = fragBuilder->appendFunction("tgfxDualGradientColor");
+  if (entry.empty()) {
+    return;
+  }
+  fragBuilder->codeAppendf("%s = %s(%s.x, %s, %s, %s, %s, %s);", args.outputColor.c_str(),
+                           entry.c_str(), args.inputColor.c_str(), scale01Name.c_str(),
+                           bias01Name.c_str(), scale23Name.c_str(), bias23Name.c_str(),
+                           thresholdName.c_str());
 }
 
 void GLSLDualIntervalGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,

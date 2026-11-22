@@ -34,9 +34,12 @@ void GLSLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) const {
       args.uniformHandler->addUniform("start", UniformFormat::Float4, ShaderStage::Fragment);
   auto endName =
       args.uniformHandler->addUniform("end", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("float t = %s.x;", args.inputColor.c_str());
-  fragBuilder->codeAppendf("%s = (1.0 - t) * %s + t * %s;", args.outputColor.c_str(),
-                           startName.c_str(), endName.c_str());
+  auto entry = fragBuilder->appendFunction("tgfxSingleGradientColor");
+  if (entry.empty()) {
+    return;
+  }
+  fragBuilder->codeAppendf("%s = %s(%s.x, %s, %s);", args.outputColor.c_str(), entry.c_str(),
+                           args.inputColor.c_str(), startName.c_str(), endName.c_str());
 }
 
 void GLSLSingleIntervalGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,

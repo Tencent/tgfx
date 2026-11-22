@@ -35,11 +35,12 @@ void GLSLConicGradientLayout::emitCode(EmitArgs& args) const {
   auto biasName = uniformHandler->addUniform("Bias", UniformFormat::Float, ShaderStage::Fragment);
   auto scaleName = uniformHandler->addUniform("Scale", UniformFormat::Float, ShaderStage::Fragment);
   const auto coordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
-  fragBuilder->codeAppendf("highp float angle = atan(-%s.y, -%s.x);", coordName.c_str(),
-                           coordName.c_str());
-  fragBuilder->codeAppendf("highp float t = ((angle * 0.15915494309180001 + 0.5) + %s) * %s;",
-                           biasName.c_str(), scaleName.c_str());
-  fragBuilder->codeAppendf("%s = vec4(t, 1.0, 0.0, 0.0);", args.outputColor.c_str());
+  auto entry = fragBuilder->appendFunction("tgfxConicGradientT");
+  if (entry.empty()) {
+    return;
+  }
+  fragBuilder->codeAppendf("%s = vec4(%s(%s, %s, %s), 1.0, 0.0, 0.0);", args.outputColor.c_str(),
+                           entry.c_str(), coordName.c_str(), biasName.c_str(), scaleName.c_str());
 }
 
 void GLSLConicGradientLayout::onSetData(UniformData* /*vertexUniformData*/,

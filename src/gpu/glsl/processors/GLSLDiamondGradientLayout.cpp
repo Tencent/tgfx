@@ -31,9 +31,12 @@ GLSLDiamondGradientLayout::GLSLDiamondGradientLayout(Matrix matrix)
 void GLSLDiamondGradientLayout::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   const auto coordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
-  fragBuilder->codeAppendf("highp vec2 rotated = %s;", coordName.c_str());
-  fragBuilder->codeAppendf("highp float t = max(abs(rotated.x), abs(rotated.y));");
-  fragBuilder->codeAppendf("%s = vec4(t, 1.0, 0.0, 0.0);", args.outputColor.c_str());
+  auto entry = fragBuilder->appendFunction("tgfxDiamondGradientT");
+  if (entry.empty()) {
+    return;
+  }
+  fragBuilder->codeAppendf("%s = vec4(%s(%s), 1.0, 0.0, 0.0);", args.outputColor.c_str(),
+                           entry.c_str(), coordName.c_str());
 }
 
 }  // namespace tgfx
