@@ -138,7 +138,9 @@ inline constexpr const char* kColorMatrixIncludes[] = {"ops/ColorMatrix.glsl"};
 // ---- Luma ---------------------------------------------------------------------------------
 inline constexpr Arg kLumaArgs[] = {
     {Param::Vec4, Source::CallArg, 0},
-    {Param::Vec3, Source::CallArg, 1},
+    {Param::Float, Source::CallArg, 1},
+    {Param::Float, Source::CallArg, 2},
+    {Param::Float, Source::CallArg, 3},
 };
 inline constexpr const char* kLumaIncludes[] = {"ops/Luma.glsl"};
 
@@ -343,7 +345,7 @@ inline constexpr Row kRows[] = {
      kConstColorArgs, 3},
     {ChainISA::ColorMatrix, "pmApplyColorMatrix", "", kColorMatrixIncludes, 1, false, true, "",
      kColorMatrixArgs, 3},
-    {ChainISA::Luma, "pmApplyLuma", "", kLumaIncludes, 1, false, true, "", kLumaArgs, 2},
+    {ChainISA::Luma, "pmApplyLuma", "", kLumaIncludes, 1, false, true, "", kLumaArgs, 4},
     {ChainISA::AlphaThreshold, "pmApplyAlphaThreshold", "", kAlphaThresholdIncludes, 1, false, true,
      "", kAlphaThresholdArgs, 2},
     {ChainISA::Blend, "xpBlendColors", "#define HAS_XP 1\n", kBlendIncludes, 1, false, true, "",
@@ -357,9 +359,9 @@ inline constexpr Row kRows[] = {
      false, true, "", kLocalRectCoverageArgs, 4},
     {ChainISA::RRectCoverage, "tgfxOpRRectCoverage", "", kRRectCoverageIncludes, 2, false, true, "",
      kRRectCoverageArgs, 7},
-    {ChainISA::Gradient, "evalGradientSlot", "#define NTEX 0\n", kGradientIncludes, 1, false, true,
+    {ChainISA::Gradient, "evalGradientSlot", "#define NTEX 0\n", kGradientIncludes, 1, false, false,
      "", kGradientArgs, 20},
-    {ChainISA::PerlinNoise, "evalNoiseSlot", "", kPerlinNoiseIncludes, 1, false, true, "",
+    {ChainISA::PerlinNoise, "evalNoiseSlot", "", kPerlinNoiseIncludes, 1, false, false, "",
      kPerlinNoiseArgs, 7},
     {ChainISA::YUV, "pmApplyYUV", "", kYUVIncludes, 1, true, true, "", kYUVArgs, 11},
     {ChainISA::ColorSpaceXform, "chainApplyColorSpaceXform", "", kColorSpaceXformIncludes, 1, false,
@@ -371,9 +373,9 @@ inline constexpr Row kRows[] = {
     {ChainISA::YUVConvert, "tgfxYUVToRGB", "", kYUVConvertIncludes, 1, false, true, "",
      kYUVConvertArgs, 5},
     {ChainISA::LinearGradientT, "tgfxLinearGradientT", "", kLinearGradientTIncludes, 1, false, true,
-     "", kGradientTArgs, 1},
+     "", kGradientTArgs, 1, Param::Float},
     {ChainISA::RadialGradientT, "tgfxRadialGradientT", "", kRadialGradientTIncludes, 1, false, true,
-     "", kGradientTArgs, 1},
+     "", kGradientTArgs, 1, Param::Float},
     {ChainISA::DiamondGradientT, "tgfxDiamondGradientT", "", kDiamondGradientTIncludes, 1, false,
      true, "", kGradientTArgs, 1, Param::Float},
     {ChainISA::ConicGradientT, "tgfxConicGradientT", "", kConicGradientTIncludes, 1, false, true,
@@ -382,10 +384,11 @@ inline constexpr Row kRows[] = {
      false, true, "", kSingleGradientColorArgs, 3},
     {ChainISA::DualGradientColor, "tgfxDualGradientColor", "", kDualGradientColorIncludes, 1, false,
      true, "", kDualGradientColorArgs, 6},
+    // The chain xfer tail: the FP tree reaches the per-mode functions instead.
     {PorterDuffId, "applyPorterDuffXP",
      "#define HAS_XP 1\n#define TGFX_DECLARED_CHAIN 1\n"
      "layout(set = 2, binding = 0) uniform sampler2D dummyDstTex;\n",
-     kPorterDuffIncludes, 1, false, true, "porterDuff", kPorterDuffArgs, 7},
+     kPorterDuffIncludes, 1, false, false, "porterDuff", kPorterDuffArgs, 7},
 };
 
 inline constexpr const Row* Rows() {

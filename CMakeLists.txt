@@ -234,11 +234,11 @@ file(GLOB PLATFORM_COMMON_FILES
         src/platform/*.*)
 list(APPEND TGFX_FILES ${PLATFORM_COMMON_FILES})
 
-if (NOT TGFX_USE_METAL AND NOT TGFX_USE_VULKAN AND NOT TGFX_USE_D3D12)
-    file(GLOB SHADER_COMPILER_FILES src/gpu/ShaderCompiler.cpp)
-    if (SHADER_COMPILER_FILES)
-        list(REMOVE_ITEM TGFX_FILES ${SHADER_COMPILER_FILES})
-    endif ()
+# ShaderCompiler.cpp serves the build tool only (the variant and module compilation); the runtime
+# never compiles GLSL text, so it stays out of the tgfx archive on every backend.
+file(GLOB SHADER_COMPILER_FILES src/gpu/ShaderCompiler.cpp)
+if (SHADER_COMPILER_FILES)
+    list(REMOVE_ITEM TGFX_FILES ${SHADER_COMPILER_FILES})
 endif ()
 
 if (TGFX_BUILD_SVG)

@@ -596,6 +596,9 @@ uint32_t ResolveArg(BodyState* state, const ChainProgramPlan& plan, const ChainA
     case ChainArgKind::Literal:
       return IntConstant(state, arg.index);
     case ChainArgKind::LeafTex:
+    case ChainArgKind::LeafCoord:
+    case ChainArgKind::LeafSampler:
+      // The leaf-derived operands resolve through the leaf recipes, not this table.
       break;
   }
   return 0;

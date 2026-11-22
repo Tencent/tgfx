@@ -895,6 +895,12 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         }
       }
       text += "\nlayout(location = 0) out vec4 dummyOut;\nvoid main() {\n  dummyOut = ";
+      // A row whose function returns a scalar rides a vec4 wrapper around the call; every other
+      // row returns vec4 itself.
+      const bool scalarReturn = row.returnType != OpTable::Param::Vec4;
+      if (scalarReturn) {
+        text += "vec4(";
+      }
       text += row.exportName;
       text += "(";
       for (size_t argument = 0; argument < row.argCount; ++argument) {
@@ -936,7 +942,7 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
             break;
         }
       }
-      text += ");\n}\n";
+      text += scalarReturn ? "));\n}\n" : ");\n}\n";
       std::string buildError;
       auto patched = CompileSPIRVLibraryModule(text, row.exportName, row.exportName, &buildError);
       if (patched.empty()) {
