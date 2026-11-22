@@ -59,7 +59,7 @@ class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
   int kernelLoopUpperBound() const override {
-    return 2 * maxSigma;
+    return 4 * maxSigma;
   }
 
  protected:
