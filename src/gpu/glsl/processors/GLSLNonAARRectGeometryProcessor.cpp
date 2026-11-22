@@ -78,46 +78,23 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
                  ShaderVar(inPosition.name(), SLType::Float2));
 
-  // Fragment shader - evaluate round rect shape using SDF
+  // Fragment shader - evaluate round rect shape using the shared SDF. The stroke form rides the
+  // function's runtime flag as a literal, so the driver folds the arm this draw does not use.
   fragBuilder->codeAppendf("highp vec2 localCoord = %s;", localCoordVarying.fsIn().c_str());
   fragBuilder->codeAppendf("highp vec2 radii = %s;", radiiVarying.fsIn().c_str());
   fragBuilder->codeAppendf("highp vec4 bounds = %s;", boundsVarying.fsIn().c_str());
-
-  // Calculate outer round rect coverage using SDF
-  fragBuilder->codeAppend("highp vec2 center = (bounds.xy + bounds.zw) * 0.5;");
-  fragBuilder->codeAppend("highp vec2 halfSize = (bounds.zw - bounds.xy) * 0.5;");
-  fragBuilder->codeAppend("highp vec2 q = abs(localCoord - center) - halfSize + radii;");
-  fragBuilder->codeAppend(
-      "highp float d = min(max(q.x / radii.x, q.y / radii.y), 0.0) + length(max(q / radii, 0.0)) - "
-      "1.0;");
-  fragBuilder->codeAppend("highp float outerCoverage = step(d, 0.0);");
-
-  if (stroke) {
-    // Stroke mode: also check inner round rect using SDF
-    fragBuilder->codeAppendf("highp vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
-    fragBuilder->codeAppend("highp vec2 innerHalfSize = halfSize - 2.0 * sw;");
-    fragBuilder->codeAppend("highp vec2 innerRadii = max(radii - 2.0 * sw, vec2(0.0));");
-    fragBuilder->codeAppend("highp float innerCoverage = 0.0;");
-    // Check if inner rect is valid (not degenerate)
-    fragBuilder->codeAppend("if (innerHalfSize.x > 0.0 && innerHalfSize.y > 0.0) {");
-    fragBuilder->codeAppend(
-        "  highp vec2 qi = abs(localCoord - center) - innerHalfSize + innerRadii;");
-    // Use safe division for inner radii (avoid division by zero)
-    fragBuilder->codeAppend("  highp vec2 safeInnerRadii = max(innerRadii, vec2(0.001));");
-    fragBuilder->codeAppend(
-        "  highp float di = min(max(qi.x / safeInnerRadii.x, qi.y / safeInnerRadii.y), 0.0) + "
-        "length(max(qi / safeInnerRadii, vec2(0.0))) - 1.0;");
-    fragBuilder->codeAppend("  innerCoverage = step(di, 0.0);");
-    fragBuilder->codeAppend("}");
-
-    // Final coverage: inside outer but outside inner
-    fragBuilder->codeAppend("highp float coverage = outerCoverage * (1.0 - innerCoverage);");
-  } else {
-    // Fill mode: just use outer coverage
-    fragBuilder->codeAppend("highp float coverage = outerCoverage;");
+  auto coverageEntry = fragBuilder->appendFunction("nonAARRectCoverage");
+  if (coverageEntry.empty()) {
+    return;
   }
-
-  fragBuilder->codeAppendf("%s = vec4(coverage);", args.outputCoverage.c_str());
+  if (stroke) {
+    fragBuilder->codeAppendf("highp vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
+    fragBuilder->codeAppendf("%s = vec4(%s(localCoord, bounds, radii, sw, 1));",
+                             args.outputCoverage.c_str(), coverageEntry.c_str());
+  } else {
+    fragBuilder->codeAppendf("%s = vec4(%s(localCoord, bounds, radii, vec2(0.0), 0));",
+                             args.outputCoverage.c_str(), coverageEntry.c_str());
+  }
 }
 
 void GLSLNonAARRectGeometryProcessor::setData(UniformData* vertexUniformData,

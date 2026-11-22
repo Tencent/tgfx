@@ -57,22 +57,20 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   auto edgeVarying = varyingHandler->addVarying("EdgeDistance", SLType::Float);
   vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(), edgeDistance.name().c_str());
 
-  // Fragment shader: calculate anti-aliasing based on edge distance
-  fragBuilder->codeAppendf("highp float edgeAlpha = abs(%s);", edgeVarying.fsIn().c_str());
-  fragBuilder->codeAppend("edgeAlpha = clamp(edgeAlpha, 0.0, 1.0);");
-  if (aaType != AAType::Coverage) {
-    // Non-coverage anti-aliasing
-    fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
+  // Fragment shader: the shared hairline edge alpha. The non-coverage step rides the function's
+  // runtime flag as a literal, so the driver folds the arm this draw does not use.
+  auto coverageEntry = fragBuilder->appendFunction("hairlineLineEdgeCoverage");
+  if (coverageEntry.empty()) {
+    return;
   }
-
-  // Output color and coverage
   auto colorName =
       uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   auto coverageScale =
       uniformHandler->addUniform("Coverage", UniformFormat::Float, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
-                           coverageScale.c_str());
+  fragBuilder->codeAppendf("%s = vec4(%s(%s, %s, %d));", args.outputCoverage.c_str(),
+                           coverageEntry.c_str(), edgeVarying.fsIn().c_str(), coverageScale.c_str(),
+                           aaType == AAType::Coverage ? 1 : 0);
 
   // Emit final vertex position
   vertBuilder->emitNormalizedPosition(positionName);

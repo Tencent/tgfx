@@ -72,84 +72,23 @@ void GLSLComplexEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   // Emit transforms
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(inPosition));
 
-  // ── Fragment shader: offset-based region dispatch ──
-  //
-  // The offset attribute encodes each corner vertex's position relative to its corner ellipse.
-  // For fills it's the normalized (x/a, y/b) of the ellipse equation; for strokes it's the raw
-  // ellipse-space offset in pixels, normalized later in the fragment shader via the radii
-  // reciprocals. For vertices not on any arc (rows/columns along straight edges), the
-  // corresponding component is set to exact 0.0. Since IEEE 754 preserves exact zero through
-  // linear interpolation (0*w₁ + 0*w₂ = 0), the fragment shader can reliably use `offset > 0.0`
-  // to distinguish regions:
-  //   - Corner region (both offset.x > 0 and offset.y > 0): use ellipse distance
-  //   - Horizontal edge region (only offset.y > 0): use edgeDist.y linear AA
-  //   - Vertical edge region (only offset.x > 0): use edgeDist.x linear AA
-  //   - Center region (both ≤ 0): full coverage
-  //
-  // In the corner branch, offset is clamped to a small minimum before the ellipse computation
-  // to avoid division-by-zero in inversesqrt().
-
-  fragBuilder->codeAppendf("highp vec2 offset = %s.xy;", ellipseOffsets.fsIn().c_str());
-  fragBuilder->codeAppendf("highp vec2 eDist = %s;", edgeDist.fsIn().c_str());
-
-  fragBuilder->codeAppend("bool hasXCurve = offset.x > 0.0;");
-  fragBuilder->codeAppend("bool hasYCurve = offset.y > 0.0;");
-
-  fragBuilder->codeAppend("highp float outerAlpha;");
-  fragBuilder->codeAppend("if (hasXCurve && hasYCurve) {");
-  // Corner region: clamp offset to avoid zero in gradient computation
-  fragBuilder->codeAppend("  highp vec2 safeOffset = max(offset, vec2(1.0/4096.0));");
-  if (stroke) {
-    fragBuilder->codeAppendf("  safeOffset *= %s.xy;", ellipseRadii.fsIn().c_str());
+  // Fragment shader: the shared offset-based region dispatch. The stroke form rides the
+  // function's runtime flag as a literal, so the driver folds the arm this draw does not use.
+  auto coverageEntry = fragBuilder->appendFunction("complexEllipseEdgeCoverage");
+  if (coverageEntry.empty()) {
+    return;
   }
-  fragBuilder->codeAppend("  highp float test = dot(safeOffset, safeOffset) - 1.0;");
-  fragBuilder->codeAppendf("  highp vec2 grad = 2.0*safeOffset*%s.xy;",
-                           ellipseRadii.fsIn().c_str());
-  fragBuilder->codeAppend("  highp float gradDot = max(dot(grad, grad), 1.1755e-38);");
-  fragBuilder->codeAppend("  highp float invlen = inversesqrt(gradDot);");
-  fragBuilder->codeAppend("  outerAlpha = clamp(0.5-test*invlen, 0.0, 1.0);");
-  fragBuilder->codeAppend("} else if (hasYCurve) {");
-  // Horizontal edge region (top/bottom): use vertical edge distance
-  fragBuilder->codeAppend("  outerAlpha = clamp(0.5 + eDist.y, 0.0, 1.0);");
-  fragBuilder->codeAppend("} else if (hasXCurve) {");
-  // Vertical edge region (left/right): use horizontal edge distance
-  fragBuilder->codeAppend("  outerAlpha = clamp(0.5 + eDist.x, 0.0, 1.0);");
-  fragBuilder->codeAppend("} else {");
-  // Center region: full coverage
-  fragBuilder->codeAppend("  outerAlpha = 1.0;");
-  fragBuilder->codeAppend("}");
-
-  // Inner ellipse (stroke mode)
   if (stroke) {
     fragBuilder->codeAppendf("highp vec2 sw = %s;", strokeWidthVarying.fsIn().c_str());
-    fragBuilder->codeAppend("highp float innerAlpha;");
-    fragBuilder->codeAppend("if (hasXCurve && hasYCurve) {");
-    // Corner region: inner ellipse Sampson distance
-    fragBuilder->codeAppendf("  highp vec2 innerOffset = max(offset, vec2(1.0/4096.0)) * %s.zw;",
-                             ellipseRadii.fsIn().c_str());
-    fragBuilder->codeAppend("  highp float innerTest = dot(innerOffset, innerOffset) - 1.0;");
-    fragBuilder->codeAppendf("  highp vec2 innerGrad = 2.0*innerOffset*%s.zw;",
-                             ellipseRadii.fsIn().c_str());
-    fragBuilder->codeAppend(
-        "  highp float innerGradDot = max(dot(innerGrad, innerGrad), 1.1755e-38);");
-    fragBuilder->codeAppend("  highp float innerInvlen = inversesqrt(innerGradDot);");
-    fragBuilder->codeAppend("  innerAlpha = clamp(0.5+innerTest*innerInvlen, 0.0, 1.0);");
-    fragBuilder->codeAppend("} else if (hasYCurve) {");
-    // Horizontal edge: inner coverage from edgeDist.y minus full stroke width
-    fragBuilder->codeAppend("  innerAlpha = clamp(0.5 - (eDist.y - 2.0*sw.y), 0.0, 1.0);");
-    fragBuilder->codeAppend("} else if (hasXCurve) {");
-    // Vertical edge: inner coverage from edgeDist.x minus full stroke width
-    fragBuilder->codeAppend("  innerAlpha = clamp(0.5 - (eDist.x - 2.0*sw.x), 0.0, 1.0);");
-    fragBuilder->codeAppend("} else {");
-    // Center region: use min of both inner edge distances
-    fragBuilder->codeAppend("  highp float innerEdgeX = eDist.x - 2.0*sw.x;");
-    fragBuilder->codeAppend("  highp float innerEdgeY = eDist.y - 2.0*sw.y;");
-    fragBuilder->codeAppend("  innerAlpha = clamp(0.5 - min(innerEdgeX, innerEdgeY), 0.0, 1.0);");
-    fragBuilder->codeAppend("}");
-    fragBuilder->codeAppend("outerAlpha *= innerAlpha;");
+    fragBuilder->codeAppendf("%s = vec4(%s(%s.xy, %s, %s, sw, 1));", args.outputCoverage.c_str(),
+                             coverageEntry.c_str(), ellipseOffsets.fsIn().c_str(),
+                             ellipseRadii.fsIn().c_str(), edgeDist.fsIn().c_str());
+  } else {
+    fragBuilder->codeAppendf("%s = vec4(%s(%s.xy, %s, %s, vec2(0.0), 0));",
+                             args.outputCoverage.c_str(), coverageEntry.c_str(),
+                             ellipseOffsets.fsIn().c_str(), ellipseRadii.fsIn().c_str(),
+                             edgeDist.fsIn().c_str());
   }
-
-  fragBuilder->codeAppendf("%s = vec4(outerAlpha);", args.outputCoverage.c_str());
 }
 
 void GLSLComplexEllipseGeometryProcessor::setData(UniformData* vertexUniformData,

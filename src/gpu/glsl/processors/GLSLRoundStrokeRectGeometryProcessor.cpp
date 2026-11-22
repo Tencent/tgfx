@@ -42,16 +42,13 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
 
   Varying ellipseRadii;
+  Varying coverageVar;
   if (aaType == AAType::Coverage) {
-    auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
+    coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), inCoverage.name().c_str());
-    fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
-                             coverageVar.fsIn().c_str());
     ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float2);
     vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(),
                              inEllipseRadii.name().c_str());
-  } else {
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
   }
 
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
@@ -69,20 +66,20 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   fragBuilder->codeAppendf("highp vec2 offset = %s;", ellipseOffsets.fsIn().c_str());
+  // The shared SDF scales the per-vertex coverage inside the ramp band when AA is on, and is a
+  // hard inside step otherwise. The AA form rides the function's runtime flag as a literal, so the
+  // driver folds the arm this draw does not use.
+  auto coverageEntry = fragBuilder->appendFunction("roundStrokeRectCoverage");
+  if (coverageEntry.empty()) {
+    return;
+  }
   if (aaType == AAType::Coverage) {
-    fragBuilder->codeAppend("highp float test = dot(offset, offset) - 1.0;");
-    fragBuilder->codeAppend("if (test > -0.5) {");
-    fragBuilder->codeAppendf("highp vec2 grad = 2.0 * offset * %s;", ellipseRadii.fsIn().c_str());
-    fragBuilder->codeAppend("highp float grad_dot = dot(grad, grad);");
-    fragBuilder->codeAppend("grad_dot = max(grad_dot, 1.1755e-38);");
-    fragBuilder->codeAppend("highp float invlen = inversesqrt(grad_dot);");
-    fragBuilder->codeAppend("highp float edgeAlpha = clamp(0.5 - test * invlen, 0.0, 1.0);");
-    fragBuilder->codeAppendf("%s *= edgeAlpha;", args.outputCoverage.c_str());
-    fragBuilder->codeAppendf("}");
+    fragBuilder->codeAppendf("%s = vec4(%s(offset, %s, %s, 1));", args.outputCoverage.c_str(),
+                             coverageEntry.c_str(), ellipseRadii.fsIn().c_str(),
+                             coverageVar.fsIn().c_str());
   } else {
-    fragBuilder->codeAppend("highp float test = dot(offset, offset);");
-    fragBuilder->codeAppend("highp float edgeAlpha = step(test, 1.0);");
-    fragBuilder->codeAppendf("%s *= edgeAlpha;", args.outputCoverage.c_str());
+    fragBuilder->codeAppendf("%s = vec4(%s(offset, vec2(0.0), 1.0, 0));",
+                             args.outputCoverage.c_str(), coverageEntry.c_str());
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.

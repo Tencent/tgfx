@@ -72,30 +72,15 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   // before taking the inverse square root to minimize the chance that we're dividing
   // by zero, then we scale the result back.
 
-  // for outer curve
-  fragBuilder->codeAppendf("highp vec2 offset = %s.xy;", ellipseOffsets.fsIn().c_str());
-  if (stroke) {
-    fragBuilder->codeAppendf("offset *= %s.xy;", ellipseRadii.fsIn().c_str());
+  // Fragment shader: the shared ellipse edge coverage. The stroke form rides the function's
+  // runtime flag as a literal, so the driver folds the arm this draw does not use.
+  auto coverageEntry = fragBuilder->appendFunction("ellipseEdgeCoverage");
+  if (coverageEntry.empty()) {
+    return;
   }
-  fragBuilder->codeAppend("highp float test = dot(offset, offset) - 1.0;");
-  fragBuilder->codeAppendf("highp vec2 grad = 2.0*offset*%s.xy;", ellipseRadii.fsIn().c_str());
-  fragBuilder->codeAppend("highp float grad_dot = dot(grad, grad);");
-  fragBuilder->codeAppend("grad_dot = max(grad_dot, 1.1755e-38);");
-  fragBuilder->codeAppend("highp float invlen = inversesqrt(grad_dot);");
-  fragBuilder->codeAppend("highp float edgeAlpha = clamp(0.5-test*invlen, 0.0, 1.0);");
-
-  // for inner curve
-  if (stroke) {
-    fragBuilder->codeAppendf("offset = %s.xy*%s.zw;", ellipseOffsets.fsIn().c_str(),
-                             ellipseRadii.fsIn().c_str());
-    fragBuilder->codeAppend("test = dot(offset, offset) - 1.0;");
-    fragBuilder->codeAppendf("grad = 2.0*offset*%s.zw;", ellipseRadii.fsIn().c_str());
-    fragBuilder->codeAppend("grad_dot = dot(grad, grad);");
-    fragBuilder->codeAppend("invlen = inversesqrt(grad_dot);");
-    fragBuilder->codeAppend("edgeAlpha *= clamp(0.5+test*invlen, 0.0, 1.0);");
-  }
-
-  fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());
+  fragBuilder->codeAppendf("%s = vec4(%s(%s.xy, %s, %d));", args.outputCoverage.c_str(),
+                           coverageEntry.c_str(), ellipseOffsets.fsIn().c_str(),
+                           ellipseRadii.fsIn().c_str(), stroke ? 1 : 0);
 }
 
 void GLSLEllipseGeometryProcessor::setData(UniformData* vertexUniformData,

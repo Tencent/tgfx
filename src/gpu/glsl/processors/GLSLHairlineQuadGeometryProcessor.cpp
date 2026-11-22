@@ -57,39 +57,20 @@ void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
   auto edgeVarying = varyingHandler->addVarying("HairQuadEdge", SLType::Float4);
   vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(), hairQuadEdge.name().c_str());
 
-  // Fragment shader: Loop-Blinn quadratic curve anti-aliasing
-  // The UV coordinates are set up so that the curve is defined by the implicit equation: u^2 - v = 0
-  // Points where u^2 < v are inside the curve, u^2 > v are outside.
-  const char* edge = edgeVarying.fsIn().c_str();
-  fragBuilder->codeAppendf("highp float edgeAlpha;");
-  // Compute screen-space partial derivatives of UV coordinates for gradient calculation
-  fragBuilder->codeAppendf("highp vec2 duvdx = vec2(dFdx(%s.xy));", edge);
-  fragBuilder->codeAppendf("highp vec2 duvdy = vec2(dFdy(%s.xy));", edge);
-  // Compute gradient of the implicit function F(u,v) = u^2 - v
-  // gradF = (dF/dx, dF/dy) where dF/dx = 2u * du/dx - dv/dx, dF/dy = 2u * du/dy - dv/dy
-  fragBuilder->codeAppendf(
-      "highp vec2 gF = vec2(2.0 * %s.x * duvdx.x - duvdx.y,"
-      "               2.0 * %s.x * duvdy.x - duvdy.y);",
-      edge, edge);
-  // Evaluate the implicit function: F = u^2 - v (positive outside, negative inside)
-  fragBuilder->codeAppendf("edgeAlpha = float(%s.x * %s.x - %s.y);", edge, edge, edge);
-  // Convert to signed distance and normalize by gradient magnitude for anti-aliasing
-  fragBuilder->codeAppend("edgeAlpha = sqrt(edgeAlpha * edgeAlpha / dot(gF, gF));");
-  // Invert so that 1.0 = on curve, 0.0 = far from curve
-  fragBuilder->codeAppend("edgeAlpha = max(1.0 - edgeAlpha, 0.0);");
-  if (aaType != AAType::Coverage) {
-    // Non-coverage AA: threshold to binary
-    fragBuilder->codeAppend("edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;");
+  // Fragment shader: the shared Loop-Blinn edge alpha. The non-coverage step rides the
+  // function's runtime flag as a literal, so the driver folds the arm this draw does not use.
+  auto coverageEntry = fragBuilder->appendFunction("hairlineQuadEdgeCoverage");
+  if (coverageEntry.empty()) {
+    return;
   }
-
-  // Output color and coverage
   auto colorName =
       uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   auto coverageScale =
       uniformHandler->addUniform("Coverage", UniformFormat::Float, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
-                           coverageScale.c_str());
+  fragBuilder->codeAppendf("%s = vec4(%s(%s, %s, %d));", args.outputCoverage.c_str(),
+                           coverageEntry.c_str(), edgeVarying.fsIn().c_str(), coverageScale.c_str(),
+                           aaType == AAType::Coverage ? 1 : 0);
 
   // Emit final vertex position
   vertBuilder->emitNormalizedPosition(positionName);
