@@ -88,9 +88,9 @@ static constexpr float EdgeLightMinContentScale = 0.5f;
 // scales, and it also sets the lower bound where the band would start flickering on sub-pixel edges.
 static float GetEdgeBandLayerPixels(float contentScale) {
   if (contentScale <= 0.0f) {
-    return 1.5f;
+    return 1.0f;
   }
-  return std::max(1.5f, 1.0f / contentScale);
+  return std::max(1.0f, 1.0f / contentScale);
 }
 
 // SDF shapes cap the refraction displacement at refractionFactor * glassThickness in the shader
