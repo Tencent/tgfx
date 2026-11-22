@@ -1021,6 +1021,9 @@ PlacementPtr<FragmentProcessor> OpsCompositor::makeMaskFP(
   }
   PlacementPtr<FragmentProcessor> maskFP =
       DeviceSpaceTextureEffect::Make(allocator, std::move(maskTexture), uvMatrix);
+  // The mask modulates the color it is composited over: the SrcIn wrapper makes the mask's alpha
+  // gate the input's premultiplied color (see the Xfermode composition in the emitted shader).
+  maskFP = FragmentProcessor::MulInputByChildAlpha(allocator, std::move(maskFP));
   if (!inputFP) {
     return maskFP;
   }
