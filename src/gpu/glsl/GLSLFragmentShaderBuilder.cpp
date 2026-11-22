@@ -50,6 +50,21 @@ std::string GLSLFragmentShaderBuilder::dstColor() {
   return DstColorName;
 }
 
+void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
+                                           const std::string& functionName,
+                                           std::initializer_list<std::string> args) {
+  codeAppendf("%s = %s(", outputVar.c_str(), functionName.c_str());
+  bool first = true;
+  for (const auto& arg : args) {
+    if (!first) {
+      codeAppend(", ");
+    }
+    first = false;
+    codeAppend(arg);
+  }
+  codeAppend(");");
+}
+
 void GLSLFragmentShaderBuilder::declareSubpassInput() {
   if (subpassInputDeclared) {
     return;

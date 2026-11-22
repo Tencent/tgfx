@@ -36,6 +36,15 @@ class FragmentShaderBuilder : public ShaderBuilder {
 
   virtual std::string dstColor() = 0;
 
+  /**
+   * One structured call: the output variable, the catalog function name, and the argument list,
+   * each spelled as the builder names it (a uniform, a prior call's output, or a literal). The
+   * GLSL builder renders it back to the exact text the inline emission produced; a bytecode
+   * builder resolves the names into its own instruction forms instead.
+   */
+  virtual void appendCall(const std::string& outputVar, const std::string& functionName,
+                          std::initializer_list<std::string> args) = 0;
+
   void onBeforeChildProcEmitCode(const FragmentProcessor* child) const;
 
   void onAfterChildProcEmitCode() const;
