@@ -52,6 +52,12 @@ void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outputColor.c_str());
 }
 
+void ColorSpaceXformEffect::onSetData(UniformData* /*vertexUniformData*/,
+                                      UniformData* fragmentUniformData) const {
+  ColorSpaceXformHelper helper{};
+  helper.setData(fragmentUniformData, colorSpaceXformSteps.get());
+}
+
 ColorSpaceXformEffect::ColorSpaceXformEffect(std::shared_ptr<ColorSpaceXformSteps> colorXform)
     : FragmentProcessor(ClassID()), colorSpaceXformSteps(std::move(colorXform)) {
 }

@@ -47,6 +47,8 @@ class ColorSpaceXformEffect : public FragmentProcessor {
 
   void emitCode(EmitArgs& args) const override;
 
+  void onSetData(UniformData*, UniformData*) const override;
+
  private:
   std::shared_ptr<ColorSpaceXformSteps> colorSpaceXformSteps;
 };

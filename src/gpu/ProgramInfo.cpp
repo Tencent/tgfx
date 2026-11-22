@@ -171,7 +171,10 @@ PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
   PipelineColorAttachment colorAttachment = {};
   colorAttachment.format = renderTarget->format();
   colorAttachment.colorWriteMask = colorWriteMask;
-  if (xferFacts.shaderBlend() || blendMode == BlendMode::Src) {
+  // A bound xfer processor runs the blend formula in the shader (the JIT route keeps the dst
+  // fact on the processor rather than in xferFacts), so the fixed-function blend must stay off
+  // there too — porter-duff modes such as SrcIn have no fixed-function equivalent.
+  if (xferProcessor != nullptr || xferFacts.shaderBlend() || blendMode == BlendMode::Src) {
     return colorAttachment;
   }
   BlendFormula blendFormula = {};
