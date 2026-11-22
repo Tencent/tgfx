@@ -171,8 +171,9 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
     configureProgramInfo(preparedProgramInfo.get(), depthStencilFormat);
     preparedProgram = preparedProgramInfo->getProgram();
     if (preparedProgram == nullptr) {
-      LOGE("StandardDrawOp::prepare() Failed to get the FP-tree program!");
-      return false;
+      preparedGeometryProcessor = nullptr;
+      preparedProgramInfo = nullptr;
+      return failLookup(renderTarget, isFinalLookup, "the FP-tree program is unavailable");
     }
     preparedRenderTarget = renderTarget;
     return true;
