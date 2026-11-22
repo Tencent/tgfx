@@ -50,6 +50,14 @@ class UniformHandler {
   }
 
   /**
+   * Returns the uniforms visible in the given stage, in declaration order. The bytecode route
+   * derives its std140 member table from this list.
+   */
+  const std::vector<Uniform>& getUniforms(ShaderStage stage) const {
+    return stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms;
+  }
+
+  /**
    * Adds a sampler to the current program.
    */
   SamplerHandle addSampler(std::shared_ptr<Texture> texture, const std::string& name);

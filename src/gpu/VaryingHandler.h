@@ -71,6 +71,14 @@ class VaryingHandler {
 
   void getDeclarations(std::string* inputDecls, std::string* outputDecls, ShaderStage stage) const;
 
+  /**
+   * Returns the varyings added so far, in declaration order. The bytecode route derives its
+   * interface block from this list.
+   */
+  const std::vector<Varying>& getVaryings() const {
+    return varyings;
+  }
+
  private:
   void appendDecls(const std::vector<ShaderVar>& vars, std::string* out, ShaderStage stage) const;
 
