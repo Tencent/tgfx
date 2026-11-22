@@ -30,15 +30,12 @@ void GLSLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
       uniformHandler->addUniform("Threshold", UniformFormat::Float, ShaderStage::Fragment);
 
   auto fragBuilder = args.fragBuilder;
-  fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
-  fragBuilder->codeAppendf("if (%s.a > 0.0) {", args.inputColor.c_str());
-  fragBuilder->codeAppendf("  %s.rgb = %s.rgb / %s.a;", args.outputColor.c_str(),
-                           args.inputColor.c_str(), args.inputColor.c_str());
-  fragBuilder->codeAppendf("  %s.a = step(%s, %s.a);", args.outputColor.c_str(),
-                           thresholdUniformName.c_str(), args.inputColor.c_str());
-  fragBuilder->codeAppendf("  %s = clamp(%s, 0.0, 1.0);", args.outputColor.c_str(),
-                           args.outputColor.c_str());
-  fragBuilder->codeAppend("}");
+  auto entry = fragBuilder->appendFunction("pmApplyAlphaThreshold");
+  if (entry.empty()) {
+    return;
+  }
+  fragBuilder->codeAppendf("%s = %s(%s, %s);", args.outputColor.c_str(), entry.c_str(),
+                           args.inputColor.c_str(), thresholdUniformName.c_str());
 }
 
 void GLSLAlphaThresholdFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

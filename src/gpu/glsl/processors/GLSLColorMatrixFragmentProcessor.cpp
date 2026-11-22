@@ -37,15 +37,13 @@ void GLSLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
       uniformHandler->addUniform("Vector", UniformFormat::Float4, ShaderStage::Fragment);
 
   auto fragBuilder = args.fragBuilder;
-  fragBuilder->codeAppendf("%s = vec4(%s.rgb / max(%s.a, 9.9999997473787516e-05), %s.a);",
-                           args.outputColor.c_str(), args.inputColor.c_str(),
-                           args.inputColor.c_str(), args.inputColor.c_str());
-  fragBuilder->codeAppendf("%s = %s * %s + %s;", args.outputColor.c_str(),
-                           matrixUniformName.c_str(), args.outputColor.c_str(),
+  auto entry = fragBuilder->appendFunction("pmApplyColorMatrix");
+  if (entry.empty()) {
+    return;
+  }
+  fragBuilder->codeAppendf("%s = %s(%s, %s, %s);", args.outputColor.c_str(), entry.c_str(),
+                           args.inputColor.c_str(), matrixUniformName.c_str(),
                            vectorUniformName.c_str());
-  fragBuilder->codeAppendf("%s = clamp(%s, 0.0, 1.0);", args.outputColor.c_str(),
-                           args.outputColor.c_str());
-  fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
 }
 
 void GLSLColorMatrixFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

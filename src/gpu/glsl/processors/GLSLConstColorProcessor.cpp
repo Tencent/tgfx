@@ -32,17 +32,12 @@ void GLSLConstColorProcessor::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   auto colorName =
       args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
-  switch (inputMode) {
-    case InputMode::Ignore:
-      break;
-    case InputMode::ModulateRGBA:
-      fragBuilder->codeAppendf("%s *= %s;", args.outputColor.c_str(), args.inputColor.c_str());
-      break;
-    case InputMode::ModulateA:
-      fragBuilder->codeAppendf("%s *= %s.a;", args.outputColor.c_str(), args.inputColor.c_str());
-      break;
+  auto entry = fragBuilder->appendFunction("pmApplyConstColor");
+  if (entry.empty()) {
+    return;
   }
+  fragBuilder->codeAppendf("%s = %s(%s, %s, %d);", args.outputColor.c_str(), entry.c_str(),
+                           colorName.c_str(), args.inputColor.c_str(), static_cast<int>(inputMode));
 }
 
 void GLSLConstColorProcessor::onSetData(UniformData* /*vertexUniformData*/,

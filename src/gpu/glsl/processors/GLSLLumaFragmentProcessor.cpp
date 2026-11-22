@@ -30,9 +30,13 @@ void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
   auto kg = uniformHandler->addUniform("Kg", UniformFormat::Float, ShaderStage::Fragment);
   auto kb = uniformHandler->addUniform("Kb", UniformFormat::Float, ShaderStage::Fragment);
 
-  args.fragBuilder->codeAppendf("float luma = dot(%s.rgb, vec3(%s, %s, %s));\n",
-                                args.inputColor.c_str(), kr.c_str(), kg.c_str(), kb.c_str());
-  args.fragBuilder->codeAppendf("%s = vec4(luma);\n", args.outputColor.c_str());
+  auto entry = args.fragBuilder->appendFunction("pmApplyLuma");
+  if (entry.empty()) {
+    return;
+  }
+  args.fragBuilder->codeAppendf("%s = %s(%s, vec3(%s, %s, %s));\n", args.outputColor.c_str(),
+                                entry.c_str(), args.inputColor.c_str(), kr.c_str(), kg.c_str(),
+                                kb.c_str());
 }
 
 void GLSLLumaFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
