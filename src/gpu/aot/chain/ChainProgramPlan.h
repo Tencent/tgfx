@@ -127,6 +127,8 @@ enum class ChainArgKind : uint8_t {
   None,
   /// A declared varying read straight from the frame's parameter list.
   Varying,
+  /// A declared sampler, by its index into ChainProgramPlan::samplers.
+  Sampler,
 };
 
 struct ChainArg {

@@ -222,6 +222,8 @@ struct BodyState {
   uint32_t opaqueColorId = 0;
   // The op function ids by ChainISA value.
   std::unordered_map<int, uint32_t> opFunctions = {};
+  // The leaf sampler variables, by leaf index: a plan argument of kind Sampler reads them.
+  uint32_t leafSamplerIds[4] = {0, 0, 0, 0};
   // The Pointer(Function, T) types, cached per pointee: glslang passes every non-entry
   // function's parameters as pointers to Function storage, and the linked modules keep that ABI.
   std::unordered_map<uint32_t, uint32_t> functionPointers = {};
@@ -482,6 +484,8 @@ uint32_t ResolveArg(BodyState* state, const ChainProgramPlan& plan, const ChainA
       const auto found = state->varyingIds.find(name);
       return found == state->varyingIds.end() ? 0 : found->second;
     }
+    case ChainArgKind::Sampler:
+      return arg.index >= 0 && arg.index < 4 ? state->leafSamplerIds[arg.index] : 0;
     case ChainArgKind::None:
       return 0;
     case ChainArgKind::LeafTex:
@@ -772,6 +776,7 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
       writer.Inst(kOpDecorate, {variableId, kDecorationBinding, leafBindings[leaf]});
       writer.Sink(&writer.decl);
       leafSamplerVars[leaf] = variableId;
+      state.leafSamplerIds[leaf] = variableId;
     }
   }
 

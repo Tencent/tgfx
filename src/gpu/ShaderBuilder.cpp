@@ -131,25 +131,23 @@ std::string ShaderBuilder::getSamplerSwizzleSuffix(SamplerHandle samplerHandle) 
   return TextureSwizzleString(programBuilder->uniformHandler()->getSamplerSwizzle(samplerHandle));
 }
 
+const char* ShaderBuilder::TextureReaderName(SLType samplerType) {
+  switch (samplerType) {
+    case SLType::Texture2DSampler:
+      return "tgfxTextureSample";
+    case SLType::Texture2DRectSampler:
+      return "tgfxTextureSampleRect";
+    case SLType::TextureExternalSampler:
+      return "tgfxTextureSampleExternal";
+    default:
+      return nullptr;
+  }
+}
+
 void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName) {
   auto uniformHandler = programBuilder->uniformHandler();
   auto sampler = uniformHandler->getSamplerVariable(samplerHandle);
-  // One reader per sampler type: a GLSL function's parameter type is fixed, so the three sampler
-  // types carry three names instead of one overloaded entry.
-  const char* reader = nullptr;
-  switch (sampler.type()) {
-    case SLType::Texture2DSampler:
-      reader = "tgfxTextureSample";
-      break;
-    case SLType::Texture2DRectSampler:
-      reader = "tgfxTextureSampleRect";
-      break;
-    case SLType::TextureExternalSampler:
-      reader = "tgfxTextureSampleExternal";
-      break;
-    default:
-      break;
-  }
+  const char* reader = TextureReaderName(sampler.type());
   auto entry = reader == nullptr ? std::string() : appendFunction(reader);
   if (entry.empty()) {
     codeAppendf("texture(%s, %s)", sampler.name().c_str(), coordName.c_str());

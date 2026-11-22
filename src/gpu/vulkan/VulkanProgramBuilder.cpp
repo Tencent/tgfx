@@ -269,8 +269,19 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
         return true;
       }
     }
+    for (size_t index = 0; index < plan.samplers.size(); ++index) {
+      if (plan.samplers[index].name == name) {
+        arg->kind = ChainArgKind::Sampler;
+        arg->index = static_cast<int>(index);
+        return true;
+      }
+    }
     if (name == "vec4(1.0)" || name == "1.0") {
       arg->kind = ChainArgKind::White;
+      return true;
+    }
+    if (name == "vec4(0.0)") {
+      arg->kind = ChainArgKind::Black;
       return true;
     }
     if (IsIntegerLiteral(name)) {
@@ -400,15 +411,13 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
       continue;
     }
     ChainArg arg = ChainArg::None();
-    if (!argOfValue(source.src, &arg)) {
+    if (!resolveArg(source.src, &arg)) {
       LOGE("VulkanProgramBuilder: the stage output %s reads %s, which the plan cannot name",
            source.dst.c_str(), source.src.c_str());
       return nullptr;
     }
-    if (source.kind == FragmentSourceRecord::Kind::Color) {
+    if (source.kind == FragmentSourceRecord::Kind::Color && arg.kind != ChainArgKind::Register) {
       plan.geomColor = arg;
-    } else {
-      plan.geomCoverage = arg;
     }
     sourceOf[source.dst] = arg;
   }
@@ -456,6 +465,11 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
     layout.textures.push_back(std::move(texture));
   }
 
+  if (plan.samplers.size() > 4) {
+    LOGE("VulkanProgramBuilder: the plan declares %zu samplers, the body carries four",
+         plan.samplers.size());
+    return nullptr;
+  }
   const int hasXp = plan.hasXp;
   if (!ChainSPIRVBodySupported(plan.usedOps, layout, hasXp)) {
     LOGE("VulkanProgramBuilder: the planned operators have no linkable modules");

@@ -115,6 +115,12 @@ class ShaderBuilder {
                              const std::string& subset);
 
   /**
+   * The catalog reader for one sampler type: a GLSL function's parameter type is fixed, so the
+   * three sampler types carry three names instead of one overloaded entry.
+   */
+  static const char* TextureReaderName(SLType samplerType);
+
+  /**
    * The channel swizzle a read of the sampler's texture applies, as a GLSL suffix (".rrrr" and
    * the like), or an empty string for RGBA. Callers that spell the read through a shared function
    * append this to the result; a read and its swizzle commute through the linear blends those

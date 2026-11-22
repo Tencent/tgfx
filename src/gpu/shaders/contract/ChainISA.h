@@ -63,7 +63,8 @@ inline constexpr int DataCapacity = 256;
   X(DiamondGradientT, 22, 1, false, DIAMOND_GRADIENT_T)       \
   X(ConicGradientT, 23, 1, false, CONIC_GRADIENT_T)           \
   X(SingleGradientColor, 24, 1, false, SINGLE_GRADIENT_COLOR) \
-  X(DualGradientColor, 25, 1, false, DUAL_GRADIENT_COLOR)
+  X(DualGradientColor, 25, 1, false, DUAL_GRADIENT_COLOR)     \
+  X(GpuTextureRead, 26, 0, false, GPU_TEXTURE_READ)
 
 #define TGFX_CHAIN_OP_CONSTANT(name, id, inputs, sensitive, defineName) \
   inline constexpr int name = id;

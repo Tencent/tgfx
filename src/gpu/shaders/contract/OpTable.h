@@ -340,6 +340,13 @@ inline constexpr Arg kDualGradientColorArgs[] = {
 inline constexpr const char* kDualGradientColorIncludes[] = {
     "fn/source/tgfx_dual_gradient_color.inc"};
 
+// ---- GpuTextureRead (the FP tree's plain sampler read) -------------------------------------
+inline constexpr Arg kGpuTextureReadArgs[] = {
+    {Param::SampledImage, Source::CallArg, 0},
+    {Param::Vec2, Source::CallArg, 1},
+};
+inline constexpr const char* kGpuTextureReadIncludes[] = {"fn/source/tgfx_texture_sample.inc"};
+
 inline constexpr Row kRows[] = {
     {ChainISA::ConstColor, "pmApplyConstColor", "", kConstColorIncludes, 1, false, true, "",
      kConstColorArgs, 3},
@@ -384,6 +391,8 @@ inline constexpr Row kRows[] = {
      false, true, "", kSingleGradientColorArgs, 3},
     {ChainISA::DualGradientColor, "tgfxDualGradientColor", "", kDualGradientColorIncludes, 1, false,
      true, "", kDualGradientColorArgs, 6},
+    {ChainISA::GpuTextureRead, "tgfxTextureSample", "", kGpuTextureReadIncludes, 1, false, true, "",
+     kGpuTextureReadArgs, 2},
     // The chain xfer tail: the FP tree reaches the per-mode functions instead.
     {PorterDuffId, "applyPorterDuffXP",
      "#define HAS_XP 1\n#define TGFX_DECLARED_CHAIN 1\n"
