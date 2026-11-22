@@ -155,9 +155,12 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   // again for the upload), so it is held for the whole function scope.
   PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
   if (fpTreeRoute) {
+    // The provider writes position-only vertices for a single white quad (no per-vertex UV or
+    // color), so the processor must not declare the uv attribute: an identity matrix keeps the
+    // transform built into the shader and the declared stride equal to the buffer's.
     geometryProcessor = QuadPerEdgeAAGeometryProcessor::Make(
         allocator, static_cast<int>(renderTarget->width()),
-        static_cast<int>(renderTarget->height()), AAType::None, PMColor::White(), std::nullopt,
+        static_cast<int>(renderTarget->height()), AAType::None, PMColor::White(), Matrix::I(),
         false);
     if (geometryProcessor == nullptr) {
       return nullptr;
