@@ -74,6 +74,26 @@ void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
   codeAppend(";");
 }
 
+std::string GLSLFragmentShaderBuilder::appendTempCall(const std::string& functionName,
+                                                      std::initializer_list<std::string> args) {
+  auto entry = appendFunction(functionName.c_str());
+  if (entry.empty()) {
+    return "";
+  }
+  const std::string temp = "tgfxTemp" + std::to_string(tempCallIndex++);
+  codeAppendf("vec4 %s = %s(", temp.c_str(), entry.c_str());
+  bool first = true;
+  for (const auto& arg : args) {
+    if (!first) {
+      codeAppend(", ");
+    }
+    first = false;
+    codeAppend(arg);
+  }
+  codeAppend(");");
+  return temp;
+}
+
 void GLSLFragmentShaderBuilder::declareSubpassInput() {
   if (subpassInputDeclared) {
     return;

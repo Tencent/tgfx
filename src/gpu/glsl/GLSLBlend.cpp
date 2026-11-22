@@ -36,9 +36,11 @@ static void HandleBlendModes(FragmentShaderBuilder* fsBuilder, const std::string
     fsBuilder->codeAppendf("%s = %s;", outputColor.c_str(), srcColor.c_str());
     return;
   }
-  fsBuilder->codeAppendf("%s = %s(%s, %s, %s * %s.a, %s * %s.a);", outputColor.c_str(),
-                         entry.c_str(), srcColor.c_str(), dstColor.c_str(), dstColor.c_str(),
-                         srcColor.c_str(), srcColor.c_str(), dstColor.c_str());
+  // The two premultiplied operands the formulas read are their own calls, so every argument a
+  // call site passes is a name or a literal.
+  auto dstPremul = fsBuilder->appendTempCall("tgfxMulAlpha", {dstColor, srcColor});
+  auto srcPremul = fsBuilder->appendTempCall("tgfxMulAlpha", {srcColor, dstColor});
+  fsBuilder->appendCall(outputColor, entry, {srcColor, dstColor, dstPremul, srcPremul});
 }
 
 static void OutputHandler_None(FragmentShaderBuilder* fragBuilder, const char*, const char*) {

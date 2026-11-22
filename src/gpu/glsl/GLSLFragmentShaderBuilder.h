@@ -31,6 +31,9 @@ class GLSLFragmentShaderBuilder : public FragmentShaderBuilder {
                   std::initializer_list<std::string> args,
                   const std::string& wrapType = "") override;
 
+  std::string appendTempCall(const std::string& functionName,
+                             std::initializer_list<std::string> args) override;
+
  private:
   std::string colorOutputName() override;
 

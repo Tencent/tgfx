@@ -46,6 +46,13 @@ class FragmentShaderBuilder : public ShaderBuilder {
                           std::initializer_list<std::string> args,
                           const std::string& wrapType = "") = 0;
 
+  /**
+   * One structured call whose result lands in a builder-named temporary, for the call sites that
+   * need the value under a name (a later call's argument). Returns the temporary's name.
+   */
+  virtual std::string appendTempCall(const std::string& functionName,
+                                     std::initializer_list<std::string> args) = 0;
+
   void onBeforeChildProcEmitCode(const FragmentProcessor* child) const;
 
   void onAfterChildProcEmitCode() const;

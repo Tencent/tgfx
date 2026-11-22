@@ -129,6 +129,7 @@ class ShaderBuilder {
 
   std::vector<std::string> shaderStrings;
   std::set<std::string> emittedFunctions = {};
+  int tempCallIndex = 0;
   int clampedCoordIndex = 0;
   ProgramBuilder* programBuilder = nullptr;
   std::vector<ShaderVar> inputs;
