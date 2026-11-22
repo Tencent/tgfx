@@ -144,10 +144,10 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
   // The FP-tree (JIT) route: an op that spells its vertex stage through a GeometryProcessor serves
   // the whole draw from the processor tree — the geometry processor, the color/coverage fragment
   // processors and the xfer processor assembled here — with the runtime GLSL emission. The route
-  // is opt-in via TGFX_FP_TREE while the precompiled route stays the default; a null geometry
-  // processor keeps the draw on the precompiled route below. A plan-task pass is the precompiled
-  // route's own product and always stays on it.
-  static const bool fpTreeRoute = std::getenv("TGFX_FP_TREE") != nullptr;
+  // is the default; TGFX_NO_FP_TREE opts back into the precompiled route, and a null geometry
+  // processor also keeps a draw on that route below. A plan-task pass is the precompiled route's
+  // own product and always stays on it.
+  static const bool fpTreeRoute = std::getenv("TGFX_NO_FP_TREE") == nullptr;
   auto geometryProcessor =
       (passIR != nullptr || !fpTreeRoute) ? nullptr : onMakeGeometryProcessor(renderTarget);
   if (geometryProcessor != nullptr) {

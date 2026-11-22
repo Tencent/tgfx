@@ -148,7 +148,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   // The FP-tree route assembles the same flatten draw from the processor tree (the geometry
   // processor, the color processor, no xfer) and lets the runtime emission build the program;
   // the precompiled route keeps the IR-based flow below.
-  static const bool fpTreeRoute = std::getenv("TGFX_FP_TREE") != nullptr;
+  static const bool fpTreeRoute = std::getenv("TGFX_NO_FP_TREE") == nullptr;
   std::shared_ptr<Program> program = nullptr;
   std::unique_ptr<ProgramInfo> programInfo = nullptr;
   // The geometry processor outlives the program use below (setUniformsAndSamplers reads the tree

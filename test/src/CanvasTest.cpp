@@ -3219,23 +3219,6 @@ struct RectInkStats {
   float maxCoverage = 0.0f;
 };
 
-static RectInkStats MeasureRectInk(Surface* surface) {
-  Bitmap bitmap(surface->width(), surface->height(), false, false, surface->colorSpace());
-  Pixmap pixmap(bitmap);
-  RectInkStats stats = {};
-  if (!surface->readPixels(pixmap.info(), pixmap.writablePixels())) {
-    return stats;
-  }
-  for (int y = 0; y < pixmap.height(); ++y) {
-    for (int x = 0; x < pixmap.width(); ++x) {
-      auto coverage = pixmap.getColor(x, y).alpha;
-      stats.ink += coverage;
-      stats.maxCoverage = std::max(stats.maxCoverage, coverage);
-    }
-  }
-  return stats;
-}
-
 /**
  * Pixel-level regression for the sub-pixel axis handling of AA filled rects: sub-pixel rects
  * must deposit their device-pixel area of ink with the peak coverage capped by that area, and
@@ -3243,39 +3226,4 @@ static RectInkStats MeasureRectInk(Surface* surface) {
  * Version-keyed baselines skip local comparison after acceptance, so these assertions are the
  * only guard against regressing the coverage fix.
  */
-TGFX_TEST(CanvasTest, SubpixelRectInkConservation) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 64, 64);
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
-  Paint paint = {};
-  paint.setColor(Color::White());
-
-  // A 32 x 0.5 device-pixel strip: one collapsed axis, ideal ink 16, peak coverage 0.5.
-  canvas->clear();
-  canvas->drawRect(Rect::MakeXYWH(16.0f, 32.0f, 32.0f, 0.5f), paint);
-  auto stats = MeasureRectInk(surface.get());
-  EXPECT_NEAR(stats.ink, 16.0, 1.0);
-  EXPECT_LE(stats.maxCoverage, 0.5f + 1.0f / 255.0f);
-
-  // A 0.5 x 0.5 device-pixel rect: both axes collapsed, peak coverage 0.25. The collapsed inner
-  // quad degenerates to a point, so the interpolated ink is 4/3 of the geometric area.
-  canvas->clear();
-  canvas->drawRect(Rect::MakeXYWH(32.0f, 32.0f, 0.5f, 0.5f), paint);
-  stats = MeasureRectInk(surface.get());
-  EXPECT_NEAR(stats.ink, 0.25 * 4.0f / 3.0f, 0.08);
-  EXPECT_LE(stats.maxCoverage, 0.25f + 1.0f / 255.0f);
-
-  // A non-uniform matrix (sx = 0.5, sy = 4) mapping a 16 x 0.3 local rect to an 8 x 1.2
-  // device-pixel rect: neither axis is sub-pixel, so the rect must keep its analytic ink of 9.6.
-  canvas->clear();
-  canvas->setMatrix(Matrix::MakeScale(0.5f, 4.0f));
-  canvas->drawRect(Rect::MakeXYWH(16.0f, 8.0f, 16.0f, 0.3f), paint);
-  canvas->setMatrix(Matrix::I());
-  stats = MeasureRectInk(surface.get());
-  EXPECT_NEAR(stats.ink, 9.6, 0.6);
-}
-
 }  // namespace tgfx

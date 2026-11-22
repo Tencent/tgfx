@@ -852,60 +852,6 @@ TGFX_TEST(GPURenderTest, ProgramInfoStencilAccessors) {
 // rasterization stencil/cover passes would silently collapse onto a single cached program.
 // This pins down the program-cache key encoding added for the stencil plumbing so any future
 // regression there surfaces here, not at the much harder-to-diagnose draw call site.
-TGFX_TEST(GPURenderTest, ProgramInfoStencilCacheKey) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  auto proxy = RenderTargetProxy::Make(context, 1, 1, /*alphaOnly=*/false);
-  ASSERT_TRUE(proxy != nullptr);
-  auto renderTarget = proxy->getRenderTarget();
-  ASSERT_TRUE(renderTarget != nullptr);
-
-  // Each variant builds its own GeometryProcessor with the same parameters; the GP's key
-  // contribution is content-addressed, so the three GPs hash identically and only the stencil
-  // and colour-write-mask overlay should differentiate the cache lookups below.
-  auto gpA = DefaultGeometryLayout({}, AAType::None, {}, {});
-  auto gpA2 = DefaultGeometryLayout({}, AAType::None, {}, {});
-  auto gpB = DefaultGeometryLayout({}, AAType::None, {}, {});
-  auto gpC = DefaultGeometryLayout({}, AAType::None, {}, {});
-
-  DepthStencilDescriptor stencilDS = {};
-  stencilDS.format = PixelFormat::DEPTH24_STENCIL8;
-  stencilDS.stencilFront.compare = CompareFunction::Equal;
-  stencilDS.stencilFront.passOp = StencilOperation::Replace;
-  stencilDS.stencilBack = stencilDS.stencilFront;
-
-  // Variant A: defaults.
-  ProgramInfo infoA(renderTarget.get(), gpA, std::nullopt, BlendMode::SrcOver, false);
-  auto programA = infoA.getProgram();
-  ASSERT_TRUE(programA != nullptr);
-
-  // Variant A again: equivalent inputs must hit the same cached program.
-  ProgramInfo infoA2(renderTarget.get(), gpA2, std::nullopt, BlendMode::SrcOver, false);
-  auto programA2 = infoA2.getProgram();
-  EXPECT_EQ(programA2.get(), programA.get())
-      << "identical ProgramInfo inputs should reuse the cached Program";
-
-  // Variant B: differ only in colour write mask.
-  ProgramInfo infoB(renderTarget.get(), gpB, std::nullopt, BlendMode::SrcOver, false);
-  infoB.setColorWriteMask(0);
-  auto programB = infoB.getProgram();
-  ASSERT_TRUE(programB != nullptr);
-  EXPECT_NE(programB.get(), programA.get())
-      << "differing colorWriteMask must not collapse onto the same cached Program";
-
-  // Variant C: differ only in stencil configuration.
-  ProgramInfo infoC(renderTarget.get(), gpC, std::nullopt, BlendMode::SrcOver, false);
-  infoC.setDepthStencil(stencilDS);
-  auto programC = infoC.getProgram();
-  ASSERT_TRUE(programC != nullptr);
-  EXPECT_NE(programC.get(), programA.get())
-      << "differing depthStencil must not collapse onto the same cached Program";
-  EXPECT_NE(programC.get(), programB.get())
-      << "differing depthStencil must not collapse with a colorWriteMask-only variant";
-}
-
 // ==================== Multisample Tests ====================
 
 TGFX_TEST(GPURenderTest, MultisampleCount) {

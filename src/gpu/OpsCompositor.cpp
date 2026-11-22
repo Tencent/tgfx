@@ -1160,7 +1160,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
   // The FP-tree route serves its draws at prepare time (StandardDrawOp::prepare), so the
   // record-time lowering and the plan task stay off it: no IR is recorded and the fill's multi-pass
   // work stays with the ImageFilter's own successive fills.
-  static const bool fpTreeRoute = std::getenv("TGFX_FP_TREE") != nullptr;
+  static const bool fpTreeRoute = std::getenv("TGFX_NO_FP_TREE") == nullptr;
   AOTRouter router(context);
   if (!fpTreeRoute) {
     if (auto task = router.route(&op, request)) {
