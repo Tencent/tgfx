@@ -718,8 +718,8 @@ bool LayerDrawSession::applyAncestorClips(const DrawArgs& args, Canvas* canvas,
     auto ancestorToTile = targetToTile;
     ancestorToTile.preConcat(ancestor->getRelativeMatrix(request.target));
     canvas->setMatrix(ancestorToTile);
-    if (ancestor->_scrollRect != nullptr) {
-      canvas->clipRect(*ancestor->_scrollRect, ancestor->bitFields.allowsEdgeAntialiasing);
+    if (!ancestor->applyScrollRect(args, canvas)) {
+      return false;
     }
     std::shared_ptr<MaskFilter> maskFilter;
     if (HasEmptyClip(canvas) || !ancestor->prepareMask(maskArgs, canvas, &maskFilter)) {

@@ -1833,6 +1833,17 @@ TGFX_TEST(LayerImageReaderTest, FullyClippedBackdropDoesNotRequireTileSnapshot) 
   ASSERT_TRUE(output.bandSequenceValid);
   ExpectExportPixel(output.image, 10, 10, {255, 96, 96, 255}, 1);
   ExpectExportPixel(output.image, 100, 10, {255, 0, 0, 255});
+
+  // A geometric mask can clip the same subtree out of a tile.
+  viewport->setScrollRect(Rect::MakeEmpty());
+  auto mask = MakeExportSolid(Color::White());
+  mask->setWidth(32);
+  target->addChild(mask);
+  viewport->setMask(mask);
+  auto masked = ReadTiled(context, target, {32, 32});
+  ASSERT_EQ(masked.error, LayerImageErrorCode::None);
+  EXPECT_TRUE(masked.bandSequenceValid);
+  EXPECT_EQ(CountDifferentPixels(output.image, masked.image, 0), 0);
 }
 
 TGFX_TEST(LayerImageReaderTest, AncestorAlphaMaskClipsBackdropAndPlainTiles) {

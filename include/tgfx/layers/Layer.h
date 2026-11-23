@@ -663,6 +663,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const Matrix3D& matrix3D,
                                LayerDrawFunc drawFunc, float alpha);
+  bool applyScrollRect(const DrawArgs& args, Canvas* canvas) const;
   bool drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float alpha,
                  LayerDrawFunc drawFunc);
 

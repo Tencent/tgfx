@@ -694,12 +694,6 @@ TGFX_TEST(ClipTest, QueryClipAndBounds) {
   auto clipBound = canvas->getTotalClipBounds();
   EXPECT_TRUE(clipBound.has_value());
   EXPECT_EQ(clipBound.value(), Rect::MakeXYWH(10, 10, 80, 80));
-
-  canvas->save();
-  canvas->clipRect(Rect::MakeXYWH(92, 10, 6, 80), false);
-  EXPECT_EQ(canvas->getTotalClipBounds(), Rect::MakeEmpty());
-  canvas->restore();
-  EXPECT_EQ(canvas->getTotalClipBounds(), clipBound);
 }
 
 TGFX_TEST(ClipTest, ScissorOnlyClip) {

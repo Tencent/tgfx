@@ -60,28 +60,6 @@ static constexpr int SUBTREE_CACHE_MIN_SIZE = 32;
 static std::atomic_bool AllowsEdgeAntialiasing = true;
 static std::atomic_bool AllowsGroupOpacity = false;
 
-/**
- * Clips the canvas using the scroll rect. If the sublayer's Matrix contains 3D transformations or
- * projection transformations, because this matrix has been merged into the Canvas, it can be
- * directly completed through the clipping rectangle. Otherwise, the canvas will not contain this
- * matrix information, and clipping needs to be done by transforming the Path.
- */
-static void ClipScrollRect(Canvas* canvas, const Rect* scrollRect, const Matrix3D* transform,
-                           bool antiAlias) {
-  if (scrollRect == nullptr) {
-    return;
-  }
-
-  if (transform != nullptr) {
-    Path path;
-    path.addRect(*scrollRect);
-    path.transform3D(*transform);
-    canvas->clipPath(path, antiAlias);
-  } else {
-    canvas->clipRect(*scrollRect, antiAlias);
-  }
-}
-
 struct MaskData {
   MaskData() = default;
 
@@ -1209,8 +1187,12 @@ bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
   maskArgs.render3DContext = nullptr;
   auto maskData = getMaskData(maskArgs, contentScale, clipBounds);
   if (maskData.maskFilter == nullptr) {
-    if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
-      return false;
+    if (!maskData.clipPath.isInverseFillType()) {
+      if (maskData.clipPath.isEmpty() ||
+          (args.drawControl && clipBounds &&
+           !Rect::Intersects(*clipBounds, maskData.clipPath.getBounds()))) {
+        return false;
+      }
     }
     canvas->clipPath(maskData.clipPath, _mask->bitFields.allowsEdgeAntialiasing);
     return true;
@@ -1776,6 +1758,21 @@ void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const 
   newContext->finishAndDrawTo(args, canvas);
 }
 
+bool Layer::applyScrollRect(const DrawArgs& args, Canvas* canvas) const {
+  if (_scrollRect == nullptr) {
+    return true;
+  }
+  if (args.drawControl != nullptr) {
+    // A tile outside this viewport needs no backdrop snapshots from the subtree.
+    auto clip = GetClipBounds(canvas);
+    if (clip && !Rect::Intersects(*clip, *_scrollRect)) {
+      return false;
+    }
+  }
+  canvas->clipRect(*_scrollRect, bitFields.allowsEdgeAntialiasing);
+  return true;
+}
+
 bool Layer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float alpha,
                       LayerDrawFunc drawFunc) {
   // 2D → 3D switch: hand off to drawByStarting3DContext, which expands the 3D subtree internally.
@@ -1787,8 +1784,9 @@ bool Layer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float 
 
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(child->getMatrixWithScrollRect().asMatrix());
-  ClipScrollRect(canvas, child->_scrollRect.get(), nullptr,
-                 child->bitFields.allowsEdgeAntialiasing);
+  if (!child->applyScrollRect(args, canvas)) {
+    return true;
+  }
   auto blendMode = static_cast<BlendMode>(child->bitFields.blendMode);
   return (child->*drawFunc)(args, canvas, child->_alpha * alpha, blendMode);
 }

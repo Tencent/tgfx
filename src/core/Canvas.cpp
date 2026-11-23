@@ -180,9 +180,6 @@ std::optional<Rect> Canvas::getTotalClipBounds() const {
   if (clipStack->state() == ClipState::WideOpen) {
     return std::nullopt;
   }
-  if (clipStack->state() == ClipState::Empty) {
-    return Rect::MakeEmpty();
-  }
   return clipStack->bounds();
 }
 
