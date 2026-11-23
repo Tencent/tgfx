@@ -113,7 +113,8 @@ class FragmentShaderBuilder : public ShaderBuilder {
    * carry it (a 2D sampler with the identity channel swizzle). Returns the local's name.
    */
   std::string readTexture(SamplerHandle handle, const std::string& coordName,
-                          const std::string& subsetName, bool* recorded);
+                          const std::string& strictSubset, const std::string& drawSubset,
+                          bool* recorded);
 
   /**
    * Assigns one value to a name the stage already declared and records that the two carry the

@@ -129,11 +129,10 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   }
   // The read keeps the clamp the call site already composed: a clamped coordinate is a local the
   // plan cannot name, so those draws stay on their fallback.
-  const auto finalCoordName =
-      fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
-  bool recorded = false;
-  const auto readName = fragBuilder->readTexture(textureSampler, finalCoordName, "", &recorded);
   if (alphaStart == Point::Zero()) {
+    bool recorded = false;
+    const auto readName = fragBuilder->readTexture(textureSampler, texCoordName, extraSubsetName,
+                                                   subsetName, &recorded);
     if (recorded) {
       fragBuilder->storeColor(args.outputColor, readName);
     } else {
@@ -143,6 +142,10 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
     }
     return;
   }
+  const auto finalCoordName =
+      fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
+  bool recorded = false;
+  const auto readName = fragBuilder->readTexture(textureSampler, finalCoordName, "", "", &recorded);
   fragBuilder->codeAppendf("vec4 color = %s;", readName.c_str());
   if (alphaStart != Point::Zero()) {
     fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
