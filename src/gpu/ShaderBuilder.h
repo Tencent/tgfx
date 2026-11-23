@@ -24,6 +24,7 @@
 #include <vector>
 #include "gpu/SamplerHandle.h"
 #include "gpu/ShaderVar.h"
+#include "gpu/Swizzle.h"
 #include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
@@ -119,6 +120,12 @@ class ShaderBuilder {
    * three sampler types carry three names instead of one overloaded entry.
    */
   static const char* TextureReaderName(SLType samplerType);
+
+  /**
+   * The read swizzle as the code the shared read function takes: 0 identity, then the channel
+   * selections the texture formats need. Returns -1 for a selection the function does not carry.
+   */
+  static int ReadSwizzleCode(const Swizzle& swizzle);
 
   /**
    * The channel swizzle a read of the sampler's texture applies, as a GLSL suffix (".rrrr" and

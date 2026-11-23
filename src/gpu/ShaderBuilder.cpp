@@ -144,6 +144,29 @@ const char* ShaderBuilder::TextureReaderName(SLType samplerType) {
   }
 }
 
+int ShaderBuilder::ReadSwizzleCode(const Swizzle& swizzle) {
+  if (swizzle == Swizzle::RGBA()) {
+    return 0;
+  }
+  if (swizzle == Swizzle::RRRR()) {
+    return 1;
+  }
+  const std::string channels = swizzle.c_str();
+  if (channels == "rrra") {
+    return 2;
+  }
+  if (channels == "rgrg") {
+    return 3;
+  }
+  if (swizzle == Swizzle::AAAA()) {
+    return 4;
+  }
+  if (channels == "bgra") {
+    return 5;
+  }
+  return -1;
+}
+
 void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName) {
   auto uniformHandler = programBuilder->uniformHandler();
   auto sampler = uniformHandler->getSamplerVariable(samplerHandle);
@@ -152,11 +175,13 @@ void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::
   // The 2D reader carries the subset clamp as a call argument, so every reader spells the same
   // four-argument shape; the rect/external readers keep their two-argument form for now.
   const bool carriesSubset = sampler.type() == SLType::Texture2DSampler;
+  const int swizzleCode =
+      carriesSubset ? ReadSwizzleCode(uniformHandler->getSamplerSwizzle(samplerHandle)) : -1;
   if (entry.empty()) {
     codeAppendf("texture(%s, %s)", sampler.name().c_str(), coordName.c_str());
-  } else if (carriesSubset) {
-    codeAppendf("%s(%s, %s, vec4(0.0), 0)", entry.c_str(), sampler.name().c_str(),
-                coordName.c_str());
+  } else if (carriesSubset && swizzleCode >= 0) {
+    codeAppendf("%s(%s, %s, vec4(0.0), 0, %d)", entry.c_str(), sampler.name().c_str(),
+                coordName.c_str(), swizzleCode);
   } else {
     codeAppendf("%s(%s, %s)", entry.c_str(), sampler.name().c_str(), coordName.c_str());
   }

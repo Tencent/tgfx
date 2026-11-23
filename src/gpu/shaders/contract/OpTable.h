@@ -162,9 +162,8 @@ inline constexpr const char* kBlendIncludes[] = {"xp/xp_blend_colors.inc"};
 // ---- Texture -------------------------------------------------------------------------------
 inline constexpr Arg kTextureArgs[] = {
     {Param::Vec4, Source::CallArg, 0},  // the prefetched leaf (a LeafTex register)
-    {Param::Vec4, Source::CallArg, 1},
-    {Param::Vec4, Source::CallArg, 2},
-    {Param::Int, Source::CallArg, 3},
+    {Param::Vec4, Source::CallArg, 1}, {Param::Vec4, Source::CallArg, 2},
+    {Param::Int, Source::CallArg, 3},  {Param::Int, Source::CallArg, 4},
 };
 inline constexpr const char* kTextureIncludes[] = {"source/texture_sampling.inc",
                                                    "ops/Texture.glsl"};
@@ -342,10 +341,9 @@ inline constexpr const char* kDualGradientColorIncludes[] = {
 
 // ---- GpuTextureRead (the FP tree's plain sampler read) -------------------------------------
 inline constexpr Arg kGpuTextureReadArgs[] = {
-    {Param::SampledImage, Source::CallArg, 0},
-    {Param::Vec2, Source::CallArg, 1},
-    {Param::Vec4, Source::CallArg, 2},
-    {Param::Int, Source::CallArg, 3},
+    {Param::SampledImage, Source::CallArg, 0}, {Param::Vec2, Source::CallArg, 1},
+    {Param::Vec4, Source::CallArg, 2},         {Param::Int, Source::CallArg, 3},
+    {Param::Int, Source::CallArg, 4},
 };
 inline constexpr const char* kGpuTextureReadIncludes[] = {"fn/source/tgfx_texture_sample.inc"};
 
@@ -394,7 +392,7 @@ inline constexpr Row kRows[] = {
     {ChainISA::DualGradientColor, "tgfxDualGradientColor", "", kDualGradientColorIncludes, 1, false,
      true, "", kDualGradientColorArgs, 6},
     {ChainISA::GpuTextureRead, "tgfxTextureSample", "", kGpuTextureReadIncludes, 1, false, true, "",
-     kGpuTextureReadArgs, 4},
+     kGpuTextureReadArgs, 5},
     // The chain xfer tail: the FP tree reaches the per-mode functions instead.
     {PorterDuffId, "applyPorterDuffXP",
      "#define HAS_XP 1\n#define TGFX_DECLARED_CHAIN 1\n"

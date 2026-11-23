@@ -46,10 +46,12 @@ std::string FragmentShaderBuilder::readTexture(SamplerHandle handle, const std::
   auto sampler = uniformHandler->getSamplerVariable(handle);
   const char* reader = TextureReaderName(sampler.type());
   const bool carriesSubset = sampler.type() == SLType::Texture2DSampler;
+  const int swizzleCode =
+      carriesSubset ? ReadSwizzleCode(uniformHandler->getSamplerSwizzle(handle)) : -1;
   const std::string swizzle = getSamplerSwizzleSuffix(handle);
   auto entry = reader == nullptr ? std::string() : appendFunction(reader);
   const std::string temp = "tgfxRead" + std::to_string(tempCallIndex++);
-  if (entry.empty() || !carriesSubset || !swizzle.empty()) {
+  if (entry.empty() || !carriesSubset || swizzleCode < 0) {
     // The plan carries neither the rect/external sampler types nor a channel swizzle yet: the read
     // stays text, and the caller leaves its store unrecorded so the draw declines as a whole
     // instead of composing from a value the plan cannot name.
@@ -63,7 +65,8 @@ std::string FragmentShaderBuilder::readTexture(SamplerHandle handle, const std::
   codeAppendf("vec4 %s;", temp.c_str());
   const std::string subset = subsetName.empty() ? "vec4(0.0)" : subsetName;
   const std::string clampOn = subsetName.empty() ? "0" : "1";
-  appendCall(temp, entry, {sampler.name(), coordName, subset, clampOn});
+  appendCall(temp, entry,
+             {sampler.name(), coordName, subset, clampOn, std::to_string(swizzleCode)});
   if (recorded != nullptr) {
     *recorded = true;
   }
