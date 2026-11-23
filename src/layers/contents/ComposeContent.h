@@ -48,6 +48,7 @@ class ComposeContent : public LayerContent {
   Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;
   bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const override;
   bool contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const override;
+  bool isFullyOpaque() const override;
   bool hasBlendMode() const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;

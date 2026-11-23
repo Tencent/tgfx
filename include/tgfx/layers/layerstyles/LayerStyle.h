@@ -179,6 +179,15 @@ class LayerStyle : public LayerProperty {
   }
 
   /**
+   * Returns whether the style is painted only inside the layer's content, so content that covers the
+   * whole input hides its output entirely. Callers pair this with a check that the content and every
+   * descendant paint opaquely wherever they paint.
+   */
+  virtual bool isHiddenByOpaqueInput() const {
+    return false;
+  }
+
+  /**
    * Draws this layer style onto the canvas using the provided input data.
    * @param canvas The canvas to draw the layer style on.
    * @param input The input data for this layer style.
