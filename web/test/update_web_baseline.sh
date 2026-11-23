@@ -25,6 +25,12 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"
+# The reference run drives the browser runner, so its dependencies are required in every mode;
+# the isolated install below only covers the pinned C++ and JS build dependencies.
+if [ ! -d "$SCRIPT_DIR/node_modules/puppeteer" ] || [ ! -d "$SCRIPT_DIR/node_modules/adm-zip" ] || [ ! -f "$SCRIPT_DIR/node_modules/http-server/bin/http-server" ]; then
+    echo "Error: Web test dependencies are missing. Run (cd web/test && npm install) first."
+    exit 1
+fi
 REFERENCE_COMMIT=$(git rev-parse --verify 'origin/main^{commit}')
 if node "$SCRIPT_DIR/reference_cache.js" --check "$BACKEND" "$REFERENCE_COMMIT"; then
     echo "Complete $BACKEND reference cache already matches origin/main."
