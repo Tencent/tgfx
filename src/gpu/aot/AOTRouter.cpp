@@ -22,8 +22,7 @@
 #include <vector>
 #include "gpu/ContextInternal.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/aot/chain/AOTChainBuilder.h"
-#include "gpu/aot/plan/AOTPlanner.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/ops/StandardDrawOp.h"
 #include "tgfx/gpu/Context.h"
 
@@ -57,39 +56,16 @@ PlacementPtr<RenderTask> AOTRouter::routePlan(const DrawIR* ir, const AOTRouteRe
                                               const std::vector<AOTCoverageTerm>* terminalCoverage,
                                               StandardDrawOp* localRemapSource,
                                               PlacementPtr<DrawOp>* op, bool* planMissed) {
-  // A graph one fused pass can carry needs no plan at all: prepare compiles that pass from the
-  // graph itself, which is the same decision the DAG planner would make.
-  PassIR fused = {};
-  if (AOTChainBuilder::PlanFusedPass(ir->color, &fused)) {
-    return nullptr;
-  }
-  auto plan = AOTPlanner::MakePlan(*ir);
-  if (!plan.has_value()) {
-    if (planMissed != nullptr) {
-      *planMissed = true;
-    }
-    return nullptr;
-  }
-  // A fill pass carrying local-coordinate leaves (a plain texture, a gradient, a noise source)
-  // evaluates them at top-left device positions and needs one affine device-to-local map; the
-  // uniform-geometry-color requirement is enforced inside AOTPlanner::Build. An offscreen fill
-  // needs none: its local coordinates are exactly device plus coordOffset, which Build expresses
-  // as an absent map.
-  std::optional<Matrix> deviceToLocal = std::nullopt;
-  if (localRemapSource != nullptr && plan->passes.size() > 1 &&
-      AOTPlanner::NeedsLocalRemap(ir->color, *plan)) {
-    deviceToLocal = localRemapSource->deviceToLocalMatrix();
-    if (!deviceToLocal.has_value()) {
-      return nullptr;
-    }
-  }
-  const std::vector<AOTCoverageTerm> noCoverage = {};
-  const auto& coverage = terminalCoverage != nullptr ? *terminalCoverage : noCoverage;
-  if (!AOTPlanner::RouteRecordPlan(*plan, coverage, blend)) {
-    // Anything else keeps the plain route: the matcher serves it at prepare time.
-    return nullptr;
-  }
-  return buildPlanTask(ir->color, *plan, request, deviceToLocal, terminalCoverage, op);
+  (void)ir;
+  (void)request;
+  (void)blend;
+  (void)terminalCoverage;
+  (void)localRemapSource;
+  (void)op;
+  (void)planMissed;
+  // The multi-pass plan execution is retired: every draw renders on the plain route, whose
+  // prepare walks the lowered IR. The router keeps only its lowering pass.
+  return nullptr;
 }
 
 PlacementPtr<RenderTask> AOTRouter::routeDraw(PlacementPtr<DrawOp>* op,
@@ -164,20 +140,6 @@ PlacementPtr<RenderTask> AOTRouter::routeFill(PlacementPtr<DrawOp>* op,
     return nullptr;
   }
   return routePlan(ir, request, BlendMode::Src, nullptr, nullptr, op);
-}
-
-PlacementPtr<RenderTask> AOTRouter::buildPlanTask(
-    const AOTEffectGraph& graph, const Plan& plan, const AOTRouteRequest& request,
-    const std::optional<Matrix>& deviceToLocal,
-    const std::vector<AOTCoverageTerm>* terminalCoverage, PlacementPtr<DrawOp>* op) {
-  // The fill covers its target's logical bounds, and its processors see coordinates shifted by
-  // coordOffset; the split-off passes of a multi-pass plan reproduce both. A draw reaches here
-  // with its own device bounds instead.
-  auto deviceBounds = request.deviceBounds.value_or(Rect::MakeWH(
-      static_cast<float>(request.target->width()), static_cast<float>(request.target->height())));
-  return AOTPlanner::Build(_context, request.renderFlags, graph, plan, deviceBounds, request.target,
-                           op, request.coordOffset, request.clearDestination, deviceToLocal,
-                           terminalCoverage);
 }
 
 }  // namespace tgfx

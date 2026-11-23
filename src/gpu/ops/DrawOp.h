@@ -20,7 +20,6 @@
 
 #include <optional>
 #include "gpu/AAType.h"
-#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/XferFacts.h"
 #include "gpu/processors/FragmentProcessor.h"

@@ -21,6 +21,7 @@
 #include "core/AtlasManager.h"
 #include "gpu/ContextInternal.h"
 #include "gpu/aot/AOTRouter.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"

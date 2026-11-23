@@ -32,6 +32,7 @@
 #include "gpu/ContextInternal.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/HairlineLineOp.h"
 #include "gpu/ops/HairlineQuadOp.h"

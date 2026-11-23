@@ -28,7 +28,6 @@
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/DrawIR.h"
-#include "gpu/aot/select/PrecompiledProgramCreator.h"
 #include "gpu/aot/select/ProgramKey.h"
 #include "gpu/aot/select/ShaderProfileResolver.h"
 #include "gpu/processors/EmptyXferProcessor.h"
@@ -291,17 +290,9 @@ std::shared_ptr<Program> ProgramInfo::getProgram() {
     }
     return program;
   }
-  // Precompiled artifacts are the only program source: a miss drops the draw (see
-  // StandardDrawOp::prepare). The cache lookup lives in the creator because a program's key
-  // carries its matched variant and specialization values, which only the match can name. The
-  // creator records the selection's data sources on this info, so the upload reads them instead
-  // of re-matching.
-  auto program = PrecompiledProgramCreator::CreateProgram(context, this);
-  if (program == nullptr) {
-    LOGE("ProgramInfo::getProgram() Precompiled program unavailable!");
-    return nullptr;
-  }
-  return program;
+  // Without a geometry processor the tree has nothing to build: the draw has no program source.
+  LOGE("ProgramInfo::getProgram() the info carries no geometry processor");
+  return nullptr;
 }
 
 std::shared_ptr<GPUBuffer> ProgramInfo::getUniformBuffer(const Program* program,

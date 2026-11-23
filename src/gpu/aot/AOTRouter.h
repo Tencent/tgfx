@@ -96,12 +96,6 @@ class AOTRouter {
                                      StandardDrawOp* localRemapSource, PlacementPtr<DrawOp>* op,
                                      bool* planMissed = nullptr);
 
-  PlacementPtr<RenderTask> buildPlanTask(const AOTEffectGraph& graph, const Plan& plan,
-                                         const AOTRouteRequest& request,
-                                         const std::optional<Matrix>& deviceToLocal,
-                                         const std::vector<AOTCoverageTerm>* terminalCoverage,
-                                         PlacementPtr<DrawOp>* op);
-
   Context* _context = nullptr;
 };
 

@@ -37,7 +37,6 @@
 #include "gpu/UniformData.h"
 #include "gpu/aot/AOTFailure.h"
 #include "gpu/aot/bundle/BundleData.h"
-#include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/spec/SpecValues.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Backend.h"
@@ -45,7 +44,16 @@
 namespace tgfx {
 
 class Context;
-enum class AOTDecomposeOutcome;
+enum class AOTDecomposeOutcome {
+  /// The axis has no fragment processors: nothing to decompose.
+  Trivial,
+  /// Lower + Decompose succeed: a production route submits the plan.
+  FusablePointwise,
+  /// Some fragment processor in the tree has no lowering yet.
+  BlockedByLowering,
+  /// The chain lowers, but the decompose rules do not cover its shape.
+  UnsupportedShape,
+};
 
 // The bundle data model (stages, keys, the parsed bundle) lives in BundleData.h: the reader that
 // fills it and this cache that stores it are separate translation units.
