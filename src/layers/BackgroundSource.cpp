@@ -227,7 +227,7 @@ std::shared_ptr<BackgroundSource> BackgroundSource::MakeWithGeometry(
 
 // ─── Shared parent-merge logic ────────────────────────────────────────────────────────────────
 
-std::shared_ptr<Image> BackgroundSource::getBackgroundImage(const SamplingOptions& parentSampling) {
+std::shared_ptr<Image> BackgroundSource::getBackgroundImage() {
   auto ownImage = onGetOwnContents();
   if (parent == nullptr) {
     // Top-level: own contents == full background image.
@@ -257,7 +257,7 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage(const SamplingOption
   std::shared_ptr<Image> subsetImage = nullptr;
   float subsetOffsetX = 0.0f;
   float subsetOffsetY = 0.0f;
-  if (auto parentImage = parent->getBackgroundImage(parentSampling)) {
+  if (auto parentImage = parent->getBackgroundImage()) {
     auto subsetRect = Rect::MakeXYWH(surfaceOffset.x, surfaceOffset.y, static_cast<float>(width),
                                      static_cast<float>(height));
     auto parentBounds = Rect::MakeWH(parentImage->width(), parentImage->height());
@@ -277,7 +277,7 @@ std::shared_ptr<Image> BackgroundSource::getBackgroundImage(const SamplingOption
   PictureRecorder recorder;
   auto canvas = recorder.beginRecording();
   if (subsetImage) {
-    canvas->drawImage(subsetImage, subsetOffsetX, subsetOffsetY, parentSampling);
+    canvas->drawImage(subsetImage, subsetOffsetX, subsetOffsetY);
   }
   if (ownImage) {
     canvas->concat(ownToSubImage);

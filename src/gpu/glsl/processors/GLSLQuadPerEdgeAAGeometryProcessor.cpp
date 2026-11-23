@@ -41,8 +41,7 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   varyingHandler->emitAttributes(*this);
 
   auto& uvCoordsVar = uvCoord.empty() ? position : uvCoord;
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar),
-                 hasAffineDeviceCoords());
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
 
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
@@ -70,8 +69,7 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
 void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformData* vertexUniformData,
                                                  UniformData* fragmentUniformData,
                                                  FPCoordTransformIter* transformIter) const {
-  setTransformDataHelper(uvMatrix.value_or(Matrix::I()), vertexUniformData, transformIter,
-                         hasAffineDeviceCoords() ? fragmentUniformData : nullptr);
+  setTransformDataHelper(uvMatrix.value_or(Matrix::I()), vertexUniformData, transformIter);
   if (commonColor.has_value()) {
     fragmentUniformData->setData("Color", *commonColor);
   }

@@ -56,17 +56,14 @@ void GeometryProcessor::setInstanceAttributes(const Attribute* attrs, int attrCo
 }
 
 void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix, UniformData* uniformData,
-                                               FPCoordTransformIter* transformIter,
-                                               UniformData* pixelCenterUniforms) const {
+                                               FPCoordTransformIter* transformIter) const {
   int i = 0;
   while (const CoordTransform* coordTransform = transformIter->next()) {
     Matrix combined = {};
     combined.setConcat(coordTransform->getTotalMatrix(), uvMatrix);
     std::string uniformName = TRANSFORM_UNIFORM_PREFIX;
     uniformName += std::to_string(i);
-    auto uniforms = pixelCenterUniforms && coordTransform->usePixelCenters() ? pixelCenterUniforms
-                                                                             : uniformData;
-    uniforms->setData(uniformName, combined);
+    uniformData->setData(uniformName, combined);
     onSetTransformData(uniformData, coordTransform, i);
     ++i;
   }
@@ -74,33 +71,16 @@ void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix, UniformDa
 
 void GeometryProcessor::emitTransforms(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
                                        VaryingHandler* varyingHandler,
-                                       UniformHandler* uniformHandler, const ShaderVar& uvCoordsVar,
-                                       bool devicePositions) const {
+                                       UniformHandler* uniformHandler,
+                                       const ShaderVar& uvCoordsVar) const {
   std::string uvCoords = "vec3(";
   uvCoords += uvCoordsVar.name();
   uvCoords += ", 1)";
   int i = 0;
   auto transformHandler = args.fpCoordTransformHandler;
-  std::string devicePosition;
   while (const CoordTransform* coordTransform = transformHandler->nextCoordTransform()) {
     std::string strUniName = TRANSFORM_UNIFORM_PREFIX;
     strUniName += std::to_string(i);
-    if (devicePositions && coordTransform->usePixelCenters()) {
-      auto matrix =
-          uniformHandler->addUniform(strUniName, UniformFormat::Float3x3, ShaderStage::Fragment);
-      if (devicePosition.empty()) {
-        // The quad's positions are in canvas device space for either render target origin.
-        // Evaluate the UV transform at the pixel center: interpolating normalized UVs from
-        // clipped vertices can move a bilinear sample to the other side of a rounding boundary.
-        auto pixel = varyingHandler->addVarying("DevicePosition", SLType::Float2);
-        vertexBuilder->codeAppendf("%s = %s;", pixel.vsOut().c_str(), uvCoordsVar.name().c_str());
-        devicePosition = "vec3(floor(" + pixel.fsIn() + ") + 0.5, 1.0)";
-      }
-      auto coord = "(" + matrix + " * " + devicePosition + ").xy";
-      transformHandler->specifyCoordsForCurrCoordTransform(coord, SLType::Float2);
-      ++i;
-      continue;
-    }
     auto uniName =
         uniformHandler->addUniform(strUniName, UniformFormat::Float3x3, ShaderStage::Vertex);
     std::string strVaryingName = "TransformedCoords_";

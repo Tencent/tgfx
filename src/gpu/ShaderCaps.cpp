@@ -57,9 +57,6 @@ ShaderCaps::ShaderCaps(GPU* gpu) {
   DEBUG_ASSERT(gpu != nullptr);
   auto info = gpu->info();
   PrintGPUInfo(info);
-  needsPixelAlignedLayerSampling =
-      (info->backend == Backend::OpenGL || info->backend == Backend::Vulkan) &&
-      info->renderer.find("SwiftShader") != std::string::npos;
   if (info->backend == Backend::OpenGL) {
     if (info->version.find("OpenGL ES") != std::string::npos) {
       usesPrecisionModifiers = true;

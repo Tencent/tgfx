@@ -20,7 +20,6 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/PictureUtils.h"
-#include "gpu/ShaderCaps.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
 #include "layers/CanvasUtils.h"
@@ -395,12 +394,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
                        visibleLocal.top * contentScale - contentOffset.y,
                        visibleLocal.width() * contentScale, visibleLocal.height() * contentScale);
   }
-  // The detached capture replays at native resolution with a whole-pixel translation.
-  // Parent subsets also use whole-pixel offsets within this capture.
-  auto parentSampling = args.context && args.context->shaderCaps()->needsPixelAlignedLayerSampling
-                            ? SamplingOptions(FilterMode::Nearest, MipmapMode::None)
-                            : SamplingOptions();
-  auto bgImage = bgSource->getBackgroundImage(parentSampling);
+  auto bgImage = bgSource->getBackgroundImage();
   Point imageOffset = {};
   if (bgImage) {
     auto bgPixelToLocal = worldToLocal;
@@ -409,9 +403,6 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
                                        &imageOffset, args.dstColorSpace);
     if (detached) {
       bgImage = std::move(detached);
-    } else if (parentSampling != SamplingOptions()) {
-      // The fallback is replayed under the layer transform and may need linear sampling.
-      bgImage = bgSource->getBackgroundImage();
     }
   }
   if (bgImage == nullptr) {

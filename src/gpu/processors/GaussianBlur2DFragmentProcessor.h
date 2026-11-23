@@ -46,8 +46,7 @@ class GaussianBlur2DFragmentProcessor : public FragmentProcessor {
    */
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               PlacementPtr<FragmentProcessor> processor,
-                                              float sigmaX, float sigmaY, const Point& origin,
-                                              bool quantizeHorizontal);
+                                              float sigmaX, float sigmaY, const Point& origin);
 
   std::string name() const override {
     return "GaussianBlur2DFragmentProcessor";
@@ -57,12 +56,9 @@ class GaussianBlur2DFragmentProcessor : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   GaussianBlur2DFragmentProcessor(PlacementPtr<FragmentProcessor> processor, float sigmaX,
-                                  float sigmaY, const Point& origin, bool quantizeHorizontal);
-
-  void onComputeProcessorKey(BytesKey* key) const override;
+                                  float sigmaY, const Point& origin);
 
   Point origin = {};
-  bool quantizeHorizontal;
   int radiusX = 0;
   int radiusY = 0;
   // Normalized half-kernels, see GaussianBlur1DFragmentProcessor::ComputeHalfKernel().

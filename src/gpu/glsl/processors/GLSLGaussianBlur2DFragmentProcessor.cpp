@@ -35,21 +35,19 @@ static std::string BlurSampleCoordFunc(std::string_view coord) {
 
 PlacementPtr<FragmentProcessor> GaussianBlur2DFragmentProcessor::Make(
     BlockAllocator* allocator, PlacementPtr<FragmentProcessor> processor, float sigmaX,
-    float sigmaY, const Point& origin, bool quantizeHorizontal) {
+    float sigmaY, const Point& origin) {
   if (!processor || !std::isfinite(sigmaX) || !std::isfinite(sigmaY) || sigmaX < 0.0f ||
       sigmaY < 0.0f || (sigmaX <= 0.0f && sigmaY <= 0.0f) || sigmaX > MAX_SIGMA ||
       sigmaY > MAX_SIGMA) {
     return nullptr;
   }
   return allocator->make<GLSLGaussianBlur2DFragmentProcessor>(std::move(processor), sigmaX, sigmaY,
-                                                              origin, quantizeHorizontal);
+                                                              origin);
 }
 
 GLSLGaussianBlur2DFragmentProcessor::GLSLGaussianBlur2DFragmentProcessor(
-    PlacementPtr<FragmentProcessor> processor, float sigmaX, float sigmaY, const Point& origin,
-    bool quantizeHorizontal)
-    : GaussianBlur2DFragmentProcessor(std::move(processor), sigmaX, sigmaY, origin,
-                                      quantizeHorizontal) {
+    PlacementPtr<FragmentProcessor> processor, float sigmaX, float sigmaY, const Point& origin)
+    : GaussianBlur2DFragmentProcessor(std::move(processor), sigmaX, sigmaY, origin) {
 }
 
 void GLSLGaussianBlur2DFragmentProcessor::emitCode(EmitArgs& args) const {
@@ -76,28 +74,15 @@ void GLSLGaussianBlur2DFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("int blur2DY = blur2DJY - blur2DRadiusY;");
   fragBuilder->codeAppend("if (blur2DY > blur2DRadiusY) { break; }");
   AppendKernelWeight(fragBuilder, kernelYName, "blur2DY", "blur2DWeightY", KERNEL_VEC4_COUNT);
-  if (quantizeHorizontal) {
-    fragBuilder->codeAppend("vec4 blur2DRow = vec4(0.0);");
-  }
   fragBuilder->codeAppendf("for (int blur2DJX = 0; blur2DJX <= %d; ++blur2DJX) {", 2 * MAX_RADIUS);
   fragBuilder->codeAppend("int blur2DX = blur2DJX - blur2DRadiusX;");
   fragBuilder->codeAppend("if (blur2DX > blur2DRadiusX) { break; }");
   AppendKernelWeight(fragBuilder, kernelXName, "blur2DX", "blur2DWeightX", KERNEL_VEC4_COUNT);
   std::string sampleColor = "blur2DSample";
   emitChild(0, &sampleColor, args, BlurSampleCoordFunc);
-  if (quantizeHorizontal) {
-    fragBuilder->codeAppendf("blur2DRow += %s * blur2DWeightX;", sampleColor.c_str());
-  } else {
-    fragBuilder->codeAppendf("blur2DSum += %s * (blur2DWeightX * blur2DWeightY);",
-                             sampleColor.c_str());
-  }
+  fragBuilder->codeAppendf("blur2DSum += %s * (blur2DWeightX * blur2DWeightY);",
+                           sampleColor.c_str());
   fragBuilder->codeAppend("}");
-  if (quantizeHorizontal) {
-    // A larger clip runs the separable blur, storing each horizontal sum in an 8-bit target.
-    // Match that conversion before weighting this row so a smaller tile can use the fast path.
-    fragBuilder->codeAppend("blur2DRow = floor(clamp(blur2DRow, 0.0, 1.0) * 255.0 + 0.5);");
-    fragBuilder->codeAppend("blur2DSum += blur2DRow * (1.0 / 255.0) * blur2DWeightY;");
-  }
   fragBuilder->codeAppend("}");
   fragBuilder->codeAppendf("%s = blur2DSum;", args.outputColor.c_str());
 }

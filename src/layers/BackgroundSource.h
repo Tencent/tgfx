@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 
@@ -57,7 +56,7 @@ class BackgroundSource {
 
   // Returns "parent backdrop + everything drawn through getCanvas() so far". Safe to call
   // repeatedly.
-  std::shared_ptr<Image> getBackgroundImage(const SamplingOptions& parentSampling = {});
+  std::shared_ptr<Image> getBackgroundImage();
 
   // Derives a sub source backed by an externally-owned Surface (the offscreen carrier's surface).
   // renderBounds is in world coords; localToWorld / localToSurface map the sub's local coords.

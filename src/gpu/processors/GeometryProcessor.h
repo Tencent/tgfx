@@ -129,8 +129,7 @@ class GeometryProcessor : public Processor {
    * A helper to upload coord transform matrices in setData().
    */
   void setTransformDataHelper(const Matrix& uvMatrix, UniformData* uniformData,
-                              FPCoordTransformIter* transformIter,
-                              UniformData* pixelCenterUniforms = nullptr) const;
+                              FPCoordTransformIter* transformIter) const;
 
   /**
    * Emit transformed uv coords from the vertex shader as a uniform matrix and varying per
@@ -138,7 +137,7 @@ class GeometryProcessor : public Processor {
    */
   void emitTransforms(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
                       VaryingHandler* varyingHandler, UniformHandler* uniformHandler,
-                      const ShaderVar& uvCoordsVar, bool devicePositions = false) const;
+                      const ShaderVar& uvCoordsVar) const;
 
  private:
   virtual void onComputeProcessorKey(BytesKey*) const {

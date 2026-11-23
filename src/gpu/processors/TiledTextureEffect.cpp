@@ -155,7 +155,6 @@ void TiledTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   flags |= static_cast<uint32_t>(sampling.shaderModeY) << 4;
   flags |= constraint == SrcRectConstraint::Strict ? static_cast<uint32_t>(1) << 8 : 0;
   flags |= coordTransform.matrix.hasPerspective() ? static_cast<uint32_t>(1) << 9 : 0;
-  flags |= coordTransform.usePixelCenters() ? static_cast<uint32_t>(1) << 10 : 0;
   bytesKey->write(flags);
 }
 

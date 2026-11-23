@@ -26,7 +26,6 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/ops/DrawOp.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
@@ -432,40 +431,6 @@ TGFX_TEST(GPURenderTest, StencilMaskRenderPass) {
   // read as the transparent-black clear colour.
   EXPECT_EQ(centrePixel, 0xFF0000FFu) << "centre pixel was not the opaque red cover colour";
   EXPECT_EQ(cornerPixel, 0u) << "corner pixel was not the clear colour";
-}
-
-TGFX_TEST(GPURenderTest, MipmapsExcludePreviousRenderTargetContents) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  constexpr int Size = 9;
-  auto target = RenderTargetProxy::Make(context, Size, Size, false, 1, true, ImageOrigin::TopLeft,
-                                        BackingFit::Approx);
-  ASSERT_TRUE(target != nullptr);
-  auto texture = target->asTextureProxy();
-  ASSERT_GT(texture->backingStoreWidth(), Size);
-
-  // Prime the entire allocation, including texels outside the logical image.
-  auto manager = context->drawingManager();
-  manager->addOpsRenderTask(target, {}, PMColor::White());
-  auto transparent = ConstColorProcessor::Make(context->drawingAllocator(), PMColor::Transparent(),
-                                               InputMode::Ignore);
-  ASSERT_TRUE(manager->fillRTWithFP(target, std::move(transparent), 0));
-
-  // Read the first padding texel directly. Generating mip levels reads it even though
-  // drawing the logical image at native resolution cannot reach it.
-  auto readback = context->proxyProvider()->createReadbackBufferProxy(
-      static_cast<size_t>(std::max(4, context->gpu()->limits()->minBufferCopyRowAlignment)));
-  ASSERT_TRUE(readback != nullptr);
-  manager->addTransferPixelsTask(target, Rect::MakeXYWH(Size, 0, 1, 1), readback);
-  context->flushAndSubmit(true);
-  ASSERT_TRUE(readback->getBuffer() != nullptr);
-  auto buffer = readback->getBuffer()->gpuBuffer();
-  buffer->requestMapAsync();
-  auto pixel = static_cast<const uint32_t*>(buffer->map());
-  ASSERT_TRUE(pixel != nullptr);
-  EXPECT_EQ(*pixel, 0u);
-  buffer->unmap();
 }
 
 TGFX_TEST(GPURenderTest, RenderTargetProxyGetStencil) {

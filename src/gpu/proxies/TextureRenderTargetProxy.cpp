@@ -41,7 +41,6 @@ std::shared_ptr<TextureView> TextureRenderTargetProxy::onMakeTexture(Context* co
     LOGE("TextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
     return nullptr;
   }
-  renderTarget->sampleAtPixelCenters = sampleAtPixelCenters;
   return renderTarget->asTextureView();
 }
 }  // namespace tgfx

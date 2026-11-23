@@ -42,10 +42,6 @@ class GLSLQuadPerEdgeAAGeometryProcessor : public QuadPerEdgeAAGeometryProcessor
                        int index) const override;
 
  private:
-  bool hasAffineDeviceCoords() const {
-    return uvCoord.empty() && subset.empty() && !hasUVPerspective();
-  }
-
   std::optional<std::string> subsetVaryingName = std::nullopt;
 };
 }  // namespace tgfx

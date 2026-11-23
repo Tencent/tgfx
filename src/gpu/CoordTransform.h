@@ -32,11 +32,6 @@ struct CoordTransform {
 
   Matrix getTotalMatrix() const;
 
-  bool usePixelCenters() const {
-    return textureProxy && textureProxy->sampleAtPixelCenters && textureProxy->getTextureView() &&
-           !matrix.hasPerspective();
-  }
-
   Matrix matrix = {};
   const TextureProxy* textureProxy = nullptr;
   // The alpha start point of the RGBAAA layout.

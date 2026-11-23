@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/filters/BlurFilter.h"
-#include "core/filters/GaussianBlurImageFilter.h"
 
 namespace tgfx {
 
@@ -55,7 +54,7 @@ BlurFilter::BlurFilter(float blurrinessX, float blurrinessY, TileMode tileMode)
 }
 
 std::shared_ptr<ImageFilter> BlurFilter::onCreateImageFilter(float scale) {
-  return GaussianBlurImageFilter::Make(_blurrinessX * scale, _blurrinessY * scale, _tileMode, true);
+  return ImageFilter::Blur(_blurrinessX * scale, _blurrinessY * scale, _tileMode);
 }
 
 }  // namespace tgfx

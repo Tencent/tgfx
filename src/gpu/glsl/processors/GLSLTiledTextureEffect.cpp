@@ -33,7 +33,7 @@ PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(BlockAllocator* allocat
     return TextureEffect::Make(allocator, std::move(proxy), args, uvMatrix, forceAsMask);
   }
   auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
-  SamplerState samplerState(args.tileModeX, args.tileModeY, args.samplingForMatrix(matrix));
+  SamplerState samplerState(args.tileModeX, args.tileModeY, args.sampling);
   auto isAlphaOnly = proxy->isAlphaOnly();
   PlacementPtr<FragmentProcessor> processor = allocator->make<GLSLTiledTextureEffect>(
       std::move(proxy), samplerState, args.constraint, matrix, args.sampleArea);

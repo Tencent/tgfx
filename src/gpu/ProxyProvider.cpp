@@ -677,7 +677,6 @@ std::shared_ptr<TextureProxy> ProxyProvider::findOrWrapTextureProxy(const Unique
         textureView->width(), textureView->height(), renderTarget->format(),
         renderTarget->sampleCount(), textureView->hasMipmaps(), textureView->origin(),
         renderTarget->externallyOwned()));
-    proxy->sampleAtPixelCenters = renderTarget->sampleAtPixelCenters;
   } else {
     auto format = textureView->isYUV() ? PixelFormat::Unknown : textureView->getTexture()->format();
     proxy = std::shared_ptr<TextureProxy>(
