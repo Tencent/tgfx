@@ -31,13 +31,15 @@ if node "$SCRIPT_DIR/reference_cache.js" --check "$BACKEND" "$REFERENCE_COMMIT";
     exit 0
 fi
 
-# Reuse installed dependencies only when their declarations match the pinned source. The
+# Reuse the worktree dependencies only when their declarations match the pinned source. The
 # lockfiles are not tracked by git, so only DEPS and web/package.json can be compared here.
+# A pull request may legitimately change the dependencies and the baselines together, so a
+# mismatch selects an isolated install of the pinned dependencies instead of rejecting the run.
+REUSE_DEPS=ON
 if ! git diff --quiet "$REFERENCE_COMMIT" -- DEPS web/package.json; then
-    echo "Error: Dependency declarations differ from origin/main. Install matching dependencies first."
-    exit 1
+    REUSE_DEPS=OFF
 fi
-if [ ! -d "$PROJECT_ROOT/third_party/vendor_tools" ] || [ ! -f "$PROJECT_ROOT/web/node_modules/rollup/dist/bin/rollup" ]; then
+if [ "$REUSE_DEPS" = "ON" ] && { [ ! -d "$PROJECT_ROOT/third_party/vendor_tools" ] || [ ! -f "$PROJECT_ROOT/web/node_modules/rollup/dist/bin/rollup" ]; }; then
     echo "Error: Installed C++ dependencies and Web build dependencies are required."
     exit 1
 fi
@@ -47,6 +49,9 @@ fi
 
 # Archive a fixed commit instead of changing or stashing the user's worktree.
 mkdir -p "$SCRIPT_DIR/build-reference-$BACKEND"
+# Keep only the newest sessions so repeated local runs do not accumulate full build trees.
+(ls -1dt "$SCRIPT_DIR/build-reference-$BACKEND"/run.* 2>/dev/null || true) | tail -n +4 |
+    while read -r old; do rm -rf "$old"; done
 SESSION=$(mktemp -d "$SCRIPT_DIR/build-reference-$BACKEND/run.XXXXXX")
 SOURCE_DIR="$SESSION/source"
 BUILD_DIR="$SESSION/build"
@@ -55,8 +60,20 @@ mkdir -p "$SOURCE_DIR" "$RUNTIME_DIR"
 echo "Generating $BACKEND reference from origin/main ${REFERENCE_COMMIT:0:9} in $SESSION"
 git archive "$REFERENCE_COMMIT" | tar -x -C "$SOURCE_DIR"
 node "$SCRIPT_DIR/reference_source.js" "$SOURCE_DIR"
-ln -s "$PROJECT_ROOT/third_party" "$SOURCE_DIR/third_party"
-ln -s "$PROJECT_ROOT/web/node_modules" "$SOURCE_DIR/web/node_modules"
+if [ "$REUSE_DEPS" = "ON" ]; then
+    ln -s "$PROJECT_ROOT/third_party" "$SOURCE_DIR/third_party"
+    ln -s "$PROJECT_ROOT/web/node_modules" "$SOURCE_DIR/web/node_modules"
+else
+    # The reference must be built from the pinned dependency declarations rather than the
+    # worktree's, so install them inside the isolated source tree.
+    if ! command -v depsync > /dev/null; then
+        echo "Error: depsync is required to install the pinned dependencies. Run ./install_tools.sh first."
+        exit 1
+    fi
+    echo "Dependency declarations differ from origin/main; installing the pinned set in $SOURCE_DIR"
+    (cd "$SOURCE_DIR" && depsync)
+    (cd "$SOURCE_DIR/web" && npm install)
+fi
 (
     cd "$SOURCE_DIR/web"
     node node_modules/rollup/dist/bin/rollup -c script/rollup.tgfx.js
