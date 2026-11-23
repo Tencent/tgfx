@@ -1388,6 +1388,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleShareCompactGate){TGFX_PRIVATE_ACCESS
   DisplayList displayList;
   displayList.setBackgroundColor(Color::White());
   auto blurLayer = SolidLayer::Make();
+  blurLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
   blurLayer->setWidth(400);
   blurLayer->setHeight(400);
   blurLayer->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
@@ -1401,21 +1402,21 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleShareCompactGate){TGFX_PRIVATE_ACCESS
   auto atBoundary = displayList.captureBackgrounds(
       surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(100, 100, 100, 100)},
       displayList.getViewMatrix());
-  EXPECT_TRUE(atBoundary != nullptr);
+  ASSERT_TRUE(atBoundary != nullptr);
   EXPECT_TRUE(atBoundary->styleShareCompact);
 
   // One pixel further apart and the union grows past the boundary.
   auto pastBoundary = displayList.captureBackgrounds(
       surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(101, 100, 100, 100)},
       displayList.getViewMatrix());
-  EXPECT_TRUE(pastBoundary != nullptr);
+  ASSERT_TRUE(pastBoundary != nullptr);
   EXPECT_FALSE(pastBoundary->styleShareCompact);
 
   // Opposite corners of the surface: the union is the whole surface.
   auto scattered = displayList.captureBackgrounds(
       surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(300, 300, 100, 100)},
       displayList.getViewMatrix());
-  EXPECT_TRUE(scattered != nullptr);
+  ASSERT_TRUE(scattered != nullptr);
   EXPECT_FALSE(scattered->styleShareCompact);
 
   // Submitting flushes the render tasks these captures queued, so they do not leak into the next
@@ -1526,7 +1527,7 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, CullFootprintsCoverTheSampledArea) {
         Matrix3D::MakeTranslate(120, 120, 0) * projection * Matrix3D::MakeRotate({0, 1, 0}, 30);
     ASSERT_TRUE(matrix3D.asMatrix().hasPerspective());
     perspective->setPath(rect);
-    perspective->setFillStyle(ShapeStyle::Make(Color::Blue()));
+    perspective->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 255, 128)));
     perspective->setMatrix3D(matrix3D);
     perspective->setLayerStyles({BackgroundBlurStyle::Make(2, 2)});
     displayList->root()->addChild(perspective);
@@ -1585,6 +1586,26 @@ static size_t CountDifferentPixels(const std::vector<uint8_t>& a, const std::vec
   for (size_t i = 0; i < a.size(); i += 4) {
     if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2] || a[i + 3] != b[i + 3]) {
       ++different;
+    }
+  }
+  return different;
+}
+
+// Counts the pixels whose channels differ by more than the given amount, so a rounding difference
+// of one unit between two render paths does not read as content.
+static size_t CountDifferentPixelsBeyond(const std::vector<uint8_t>& a,
+                                         const std::vector<uint8_t>& b, int threshold) {
+  if (a.size() != b.size()) {
+    return a.size() + b.size();
+  }
+  size_t different = 0;
+  for (size_t i = 0; i + 3 < a.size(); i += 4) {
+    for (size_t channel = 0; channel < 4; ++channel) {
+      auto delta = std::abs(static_cast<int>(a[i + channel]) - static_cast<int>(b[i + channel]));
+      if (delta > threshold) {
+        ++different;
+        break;
+      }
     }
   }
   return different;
@@ -2951,77 +2972,252 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest,
 
 // A 3D subtree is composited through the BSP, but its styles still sample only their own bounds, so
 // the capture culls to those bounds instead of covering everything the subtree draws.
-TGFX_TEST_PRIVATE(BackgroundBlurTest, ThreeDSubtreeCullsToItsStyles) {
+TGFX_TEST_PRIVATE(BackgroundBlurTest, ThreeDSubtreeCullsToItsStyles){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int SurfaceSize = 240;
+
+  auto render = [&](bool cull) {
+    auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
+    EXPECT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    displayList->setRenderMode(RenderMode::Tiled);
+    CaptureCullScope cullScope(cull);
+    displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
+
+    Path blockPath;
+    blockPath.addRect(Rect::MakeWH(20, 20));
+    for (auto offset : {Point::Make(30, 30), Point::Make(160, 160)}) {
+      auto block = ShapeLayer::Make();
+      block->setPath(blockPath);
+      block->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
+      block->setMatrix(Matrix::MakeTrans(offset.x, offset.y));
+      displayList->root()->addChild(block);
+    }
+
+    auto group = Layer::Make();
+    group->setPreserve3D(true);
+    auto cube = ShapeLayer::Make();
+    Path cubePath;
+    cubePath.addRect(Rect::MakeWH(40, 40));
+    cube->setPath(cubePath);
+    cube->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 120, 0, 255)));
+    cube->setMatrix(Matrix::MakeTrans(150, 20));
+    group->addChild(cube);
+
+    auto blurred3D = ShapeLayer::Make();
+    Path blurPath;
+    blurPath.addRect(Rect::MakeWH(40, 40));
+    blurred3D->setPath(blurPath);
+    blurred3D->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
+    blurred3D->setMatrix(Matrix::MakeTrans(20, 20));
+    blurred3D->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
+    group->addChild(blurred3D);
+    displayList->root()->addChild(group);
+
+    auto blurred = ShapeLayer::Make();
+    blurred->setPath(blurPath);
+    blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
+    blurred->setMatrix(Matrix::MakeTrans(150, 150));
+    blurred->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
+    displayList->root()->addChild(blurred);
+
+    displayList->render(surface.get());
+    return std::make_pair(std::move(displayList), ReadSurfacePixels(surface.get()));
+  };
+
+  auto culledResult = render(true);
+  auto unculledResult = render(false);
+  EXPECT_GT(CountPixelsDifferentFrom(unculledResult.second, 0), 1000u);
+  ExpectMatchingRenders(unculledResult.second, culledResult.second);
+
+  auto& displayList = culledResult.first;
+  auto cullRects =
+      displayList->computeCaptureCullRects({Rect::MakeWH(240.0f, 240.0f)}, Matrix::I());
+  ASSERT_EQ(cullRects.size(), 2u);
+  auto blurred3D = displayList->root()->_children[2]->_children[1].get();
+  auto blurred = displayList->root()->_children[3].get();
+  EXPECT_EQ(cullRects[0], SampledBounds(blurred3D->renderBounds));
+  EXPECT_EQ(cullRects[1], SampledBounds(blurred->renderBounds));
+  context->flushAndSubmit();
+})}
+
+// A background blur under fully opaque content, its own fill and its children, is hidden by that
+// content, so the layer stops depending on the background altogether.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, OpaqueContentHidesBackgroundBlur) {
   TGFX_PRIVATE_ACCESS({
     ContextScope scope;
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
-    constexpr int SurfaceSize = 240;
+    auto surface = Surface::Make(context, 240, 200);
+    DisplayList displayList;
+    displayList.setBackgroundColor(Color::White());
+    // Direct rendering draws every frame, so the subtree cache gets built once the tree is static.
+    displayList.setRenderMode(RenderMode::Direct);
+    displayList.setSubtreeCacheMaxSize(2048);
+    Path stripes;
+    for (int x = 0; x < 240; x += 6) {
+      stripes.addRect(Rect::MakeXYWH(static_cast<float>(x), 0.0f, 3.0f, 200.0f));
+    }
+    auto stripeLayer = ShapeLayer::Make();
+    stripeLayer->setPath(stripes);
+    stripeLayer->setFillStyle(ShapeStyle::Make(Color::Black()));
+    displayList.root()->addChild(stripeLayer);
 
-    auto render = [&](bool cull) {
-      auto surface = Surface::Make(context, SurfaceSize, SurfaceSize);
-      EXPECT_TRUE(surface != nullptr);
-      auto displayList = std::make_unique<DisplayList>();
-      displayList->setRenderMode(RenderMode::Tiled);
-      CaptureCullScope cullScope(cull);
-      displayList->setBackgroundColor(Color::FromRGBA(20, 90, 180, 255));
+    auto container = Layer::Make();
+    container->setMatrix(Matrix::MakeTrans(20, 20));
+    displayList.root()->addChild(container);
+    auto card = SolidLayer::Make();
+    card->setColor(Color::FromRGBA(30, 120, 220, 255));
+    card->setWidth(160);
+    card->setHeight(120);
+    auto blur = BackgroundBlurStyle::Make(6, 6);
+    blur->setExcludeChildEffects(true);
+    card->setLayerStyles({blur});
+    container->addChild(card);
+    Path childPath;
+    childPath.addRect(Rect::MakeXYWH(20, 20, 60, 40));
+    auto child = ShapeLayer::Make();
+    child->setPath(childPath);
+    child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 220, 0, 255)));
+    card->addChild(child);
+    for (int i = 0; i < 3; ++i) {
+      displayList.render(surface.get());
+    }
+    EXPECT_FALSE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
+    EXPECT_FALSE(card->hasBackgroundStyle(1.0f));
+    EXPECT_FALSE(container->hasBackgroundStyle(1.0f));
+    // Nothing samples the background, so the container caches like any other static subtree.
+    EXPECT_TRUE(container->subtreeCache != nullptr);
+    auto inside = surface->getColor(130, 110);
+    EXPECT_NEAR(inside.red, 30.0f / 255.0f, 2.0f / 255.0f);
+    EXPECT_NEAR(inside.blue, 220.0f / 255.0f, 2.0f / 255.0f);
 
-      Path blockPath;
-      blockPath.addRect(Rect::MakeWH(20, 20));
-      for (auto offset : {Point::Make(30, 30), Point::Make(160, 160)}) {
-        auto block = ShapeLayer::Make();
-        block->setPath(blockPath);
-        block->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 40, 40, 255)));
-        block->setMatrix(Matrix::MakeTrans(offset.x, offset.y));
-        displayList->root()->addChild(block);
-      }
+    // Nothing samples the background, so the frame skips the capture pass entirely.
+    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)}) == nullptr);
 
-      auto group = Layer::Make();
-      group->setPreserve3D(true);
-      auto cube = ShapeLayer::Make();
-      Path cubePath;
-      cubePath.addRect(Rect::MakeWH(40, 40));
-      cube->setPath(cubePath);
-      cube->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 120, 0, 255)));
-      cube->setMatrix(Matrix::MakeTrans(150, 20));
-      group->addChild(cube);
+    // A child that lets the backdrop through brings the blur back.
+    child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 220, 0, 200)));
+    displayList.render(surface.get());
+    EXPECT_TRUE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
+    EXPECT_TRUE(container->hasBackgroundStyle(1.0f));
+    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)}) != nullptr);
 
-      auto blurred3D = ShapeLayer::Make();
-      Path blurPath;
-      blurPath.addRect(Rect::MakeWH(40, 40));
-      blurred3D->setPath(blurPath);
-      blurred3D->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
-      blurred3D->setMatrix(Matrix::MakeTrans(20, 20));
-      blurred3D->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
-      group->addChild(blurred3D);
-      displayList->root()->addChild(group);
+    // So does a fill that is not fully opaque.
+    child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 220, 0, 255)));
+    card->setColor(Color::FromRGBA(30, 120, 220, 252));
+    displayList.render(surface.get());
+    EXPECT_TRUE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
+    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)}) != nullptr);
 
-      auto blurred = ShapeLayer::Make();
-      blurred->setPath(blurPath);
-      blurred->setFillStyle(ShapeStyle::Make(Color::FromRGBA(0, 0, 0, 80)));
-      blurred->setMatrix(Matrix::MakeTrans(150, 150));
-      blurred->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
-      displayList->root()->addChild(blurred);
+    // Whichever source bucket the blur samples, the opaque fill still covers it.
+    card->setColor(Color::FromRGBA(30, 120, 220, 255));
+    displayList.render(surface.get());
+    EXPECT_FALSE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
+    blur->setExcludeChildEffects(false);
+    EXPECT_FALSE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
 
-      displayList->render(surface.get());
-      return std::make_pair(std::move(displayList), ReadSurfacePixels(surface.get()));
-    };
-
-    auto culledResult = render(true);
-    auto unculledResult = render(false);
-    EXPECT_GT(CountPixelsDifferentFrom(unculledResult.second, 0), 1000u);
-    ExpectMatchingRenders(unculledResult.second, culledResult.second);
-
-    auto& displayList = culledResult.first;
-    auto cullRects =
-        displayList->computeCaptureCullRects({Rect::MakeWH(240.0f, 240.0f)}, Matrix::I());
-    ASSERT_EQ(cullRects.size(), 2u);
-    auto blurred3D = displayList->root()->_children[2]->_children[1].get();
-    auto blurred = displayList->root()->_children[3].get();
-    EXPECT_EQ(cullRects[0], SampledBounds(blurred3D->renderBounds));
-    EXPECT_EQ(cullRects[1], SampledBounds(blurred->renderBounds));
+    // A child effect can paint past the opaque fill, and the blur mask follows it there.
+    child->setLayerStyles({DropShadowStyle::Make(0, 20, 0, 0, Color::FromRGBA(0, 0, 0, 128))});
+    displayList.render(surface.get());
+    EXPECT_TRUE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
     context->flushAndSubmit();
-  })
+  });
+}
+
+// The subtree cache records its image at full alpha. A fade lowers the alpha that reaches the
+// subtree and brings back a background style that opaque content used to hide, so that frame has to
+// ignore the cache and draw the blur again.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, FadedBlurMatchesAnUncachedRender) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    DisplayList displayList;
+    displayList.setRenderMode(RenderMode::Direct);
+    displayList.setSubtreeCacheMaxSize(2048);
+    Path stripes;
+    for (int x = 0; x < 240; x += 6) {
+      stripes.addRect(Rect::MakeXYWH(static_cast<float>(x), 0.0f, 3.0f, 200.0f));
+    }
+    auto stripeLayer = ShapeLayer::Make();
+    stripeLayer->setPath(stripes);
+    stripeLayer->setFillStyle(ShapeStyle::Make(Color::Black()));
+    displayList.root()->addChild(stripeLayer);
+    auto container = Layer::Make();
+    container->setMatrix(Matrix::MakeTrans(20, 20));
+    displayList.root()->addChild(container);
+    auto card = SolidLayer::Make();
+    card->setColor(Color::FromRGBA(30, 120, 220, 255));
+    card->setWidth(160);
+    card->setHeight(120);
+    auto blur = BackgroundBlurStyle::Make(6, 6);
+    blur->setExcludeChildEffects(true);
+    card->setLayerStyles({blur});
+    container->addChild(card);
+
+    auto surface = Surface::Make(context, 240, 200);
+    ASSERT_TRUE(surface != nullptr);
+    for (int i = 0; i < 3; ++i) {
+      displayList.render(surface.get());
+    }
+    EXPECT_TRUE(container->subtreeCache != nullptr);
+    EXPECT_FALSE(container->hasBackgroundStyle(1.0f));
+
+    // The opacity animation lowers the alpha that reaches the card, so the blur is visible again
+    // even though the cached image was recorded without it.
+    container->setAlpha(0.5f);
+    displayList.render(surface.get());
+    auto faded = ReadSurfacePixels(surface.get());
+    // The control swaps the blur for a zero-radius style, so the layer bounds and the capture stay
+    // the same while the blur disappears.
+    card->setLayerStyles({BackgroundBlurStyle::Make(0, 0)});
+    displayList.render(surface.get());
+    EXPECT_GT(CountDifferentPixelsBeyond(faded, ReadSurfacePixels(surface.get()), 2), 100u);
+    context->flushAndSubmit();
+  });
+}
+
+// Layer::draw() hands the same alpha to the bounds update and to the capture pass, so a blur that
+// opaque content hides at full alpha still shows up in a faded draw.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, PartialAlphaDrawKeepsTheBlur) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    DisplayList displayList;
+    Path stripes;
+    for (int x = 0; x < 240; x += 6) {
+      stripes.addRect(Rect::MakeXYWH(static_cast<float>(x), 0.0f, 3.0f, 200.0f));
+    }
+    auto stripeLayer = ShapeLayer::Make();
+    stripeLayer->setPath(stripes);
+    stripeLayer->setFillStyle(ShapeStyle::Make(Color::Black()));
+    displayList.root()->addChild(stripeLayer);
+    auto card = SolidLayer::Make();
+    card->setMatrix(Matrix::MakeTrans(20, 20));
+    card->setColor(Color::FromRGBA(30, 120, 220, 255));
+    card->setWidth(160);
+    card->setHeight(120);
+    auto blur = BackgroundBlurStyle::Make(6, 6);
+    blur->setExcludeChildEffects(true);
+    card->setLayerStyles({blur});
+    displayList.root()->addChild(card);
+
+    auto withStyle = Surface::Make(context, 240, 200);
+    ASSERT_TRUE(withStyle != nullptr);
+    displayList.root()->draw(withStyle->getCanvas(), 0.5f);
+    auto styled = ReadSurfacePixels(withStyle.get());
+
+    // The zero-radius style leaves the layer bounds unchanged while adding no blur of its own.
+    card->setLayerStyles({BackgroundBlurStyle::Make(0, 0)});
+    auto withoutBlur = Surface::Make(context, 240, 200);
+    ASSERT_TRUE(withoutBlur != nullptr);
+    displayList.root()->draw(withoutBlur->getCanvas(), 0.5f);
+    EXPECT_GT(CountDifferentPixelsBeyond(styled, ReadSurfacePixels(withoutBlur.get()), 2), 100u);
+    context->flushAndSubmit();
+  });
 }
 
 }  // namespace tgfx
