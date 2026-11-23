@@ -190,7 +190,7 @@ class LayerDrawSession::TargetBackgroundCapturer final : public BackgroundCaptur
 
   using BackgroundCapturer::forceDrawDescendants;
 
-  LayerChildRange childRange(const Layer* parent) const override {
+  LayerChildRange childRange(const Layer* parent, float alpha) const override {
     if (selection != nullptr) {
       auto limit = selection->childLimits.find(parent);
       if (limit != selection->childLimits.end()) {
@@ -199,11 +199,12 @@ class LayerDrawSession::TargetBackgroundCapturer final : public BackgroundCaptur
       }
     }
     if (styleSourceRects() != nullptr || isForcedCapture()) {
-      return BackgroundCapturer::childRange(parent);
+      return BackgroundCapturer::childRange(parent, alpha);
     }
     const auto& children = parent->children();
     for (int i = static_cast<int>(children.size()) - 1; i >= 0; --i) {
-      if (BackgroundCapturer::HasDrawableBackdrop(children[static_cast<size_t>(i)].get())) {
+      const auto& child = children[static_cast<size_t>(i)];
+      if (BackgroundCapturer::HasDrawableBackdrop(child.get(), alpha * child->alpha())) {
         return {i};
       }
     }
@@ -238,7 +239,7 @@ class LayerDrawSession::TargetBackgroundCapturer final : public BackgroundCaptur
 
   bool needsSurface(Layer* layer) const override {
     if (styleSourceRects() == nullptr) {
-      return layer != nullptr && BackgroundCapturer::HasDrawableBackdropDescendant(layer);
+      return layer != nullptr && BackgroundCapturer::HasDrawableBackdropDescendant(layer, 1.0f);
     }
     return BackgroundCapturer::needsSurface(layer);
   }

@@ -207,7 +207,7 @@ void BackgroundHandler::DispatchOrSkip(const DrawArgs& args, Canvas* canvas, Lay
   handler->drawBackgroundStyle(args, canvas, layer, alpha, style, source);
 }
 
-LayerChildRange BackgroundHandler::childRange(const Layer* parent) const {
+LayerChildRange BackgroundHandler::childRange(const Layer* parent, float /*alpha*/) const {
   return {static_cast<int>(parent->children().size()) - 1};
 }
 
@@ -216,13 +216,14 @@ void BackgroundHandler::drawChild(const DrawArgs& args, Canvas* canvas, Layer* p
   parent->drawChild(args, canvas, child, alpha, &Layer::drawLayer);
 }
 
-LayerChildRange BackgroundCapturer::childRange(const Layer* parent) const {
+LayerChildRange BackgroundCapturer::childRange(const Layer* parent, float alpha) const {
   if (isForcedCapture()) {
-    return BackgroundHandler::childRange(parent);
+    return BackgroundHandler::childRange(parent, alpha);
   }
   const auto& children = parent->children();
   for (int i = static_cast<int>(children.size()) - 1; i >= 0; --i) {
-    if (children[static_cast<size_t>(i)]->hasBackgroundStyle()) {
+    const auto& child = children[static_cast<size_t>(i)];
+    if (child->hasBackgroundStyle(alpha * child->alpha())) {
       return {i};
     }
   }
@@ -241,20 +242,20 @@ void BackgroundCapturer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* 
 }
 
 bool BackgroundCapturer::needsSurface(Layer* layer) const {
-  return layer != nullptr && layer->hasDescendantBackgroundStyle();
+  return layer != nullptr && layer->hasDescendantBackgroundStyle(1.0f);
 }
 
-bool BackgroundCapturer::HasDrawableBackdrop(Layer* layer) {
+bool BackgroundCapturer::HasDrawableBackdrop(Layer* layer, float alpha) {
   return layer->visible() && layer->alpha() > 0.0f && layer->maskOwner == nullptr &&
-         (layer->hasOwnBackgroundStyle() || HasDrawableBackdropDescendant(layer));
+         (layer->hasOwnBackgroundStyle(alpha) || HasDrawableBackdropDescendant(layer, alpha));
 }
 
-bool BackgroundCapturer::HasDrawableBackdropDescendant(Layer* layer) {
+bool BackgroundCapturer::HasDrawableBackdropDescendant(Layer* layer, float alpha) {
   if (layer == nullptr) {
     return false;
   }
   for (const auto& child : layer->children()) {
-    if (HasDrawableBackdrop(child.get())) {
+    if (HasDrawableBackdrop(child.get(), alpha * child->alpha())) {
       return true;
     }
   }
@@ -497,7 +498,7 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
 }
 
 bool BackgroundConsumer::needsSurface(Layer* layer) const {
-  return matchLiveBackdrop && BackgroundCapturer::HasDrawableBackdropDescendant(layer);
+  return matchLiveBackdrop && BackgroundCapturer::HasDrawableBackdropDescendant(layer, 1.0f);
 }
 
 void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
@@ -656,7 +657,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
 void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
                              std::shared_ptr<BackgroundSource> bgSource,
                              BackgroundSnapshotMap* snapshots, const std::vector<Rect>& renderRects,
-                             const std::vector<Rect>& styleSourceRects) {
+                             const std::vector<Rect>& styleSourceRects, float alpha) {
   DEBUG_ASSERT(captureRoot != nullptr);
   DEBUG_ASSERT(bgSource != nullptr);
   DEBUG_ASSERT(snapshots != nullptr);
@@ -670,7 +671,7 @@ void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
   DrawArgs captureArgs = baseArgs;
   captureArgs.backgroundHandler = &capturer;
   captureArgs.renderRects = &renderRects;
-  captureRoot->drawLayer(captureArgs, bgCanvas, 1.0f, BlendMode::SrcOver);
+  captureRoot->drawLayer(captureArgs, bgCanvas, alpha, BlendMode::SrcOver);
 }
 
 }  // namespace tgfx

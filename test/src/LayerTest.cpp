@@ -4293,7 +4293,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleStrokeContentBounds) {
     vectorLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 135, 50)});
     DrawArgs drawArgs(context);
     // The recording Glass samples is the layer's geometry: its bucket records no shared content.
-    TGFX_PRIVATE_ACCESS(auto source = vectorLayer->getLayerStyleSource(drawArgs, Matrix::I());
+    TGFX_PRIVATE_ACCESS(auto source = vectorLayer->getLayerStyleSource(drawArgs, Matrix::I(), 1.0f);
                         ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
                         ASSERT_TRUE(source->groups[0]->geometry != nullptr);
                         ASSERT_TRUE(source->groups[0]->geometry->image() != nullptr);
@@ -4421,7 +4421,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleDeclaresGeometryContentSource) {
             static_cast<uint32_t>(LayerStyleExtraSourceType::Background));
 
   DrawArgs drawArgs(context);
-  TGFX_PRIVATE_ACCESS(auto source = layer->getLayerStyleSource(drawArgs, Matrix::I());
+  TGFX_PRIVATE_ACCESS(auto source = layer->getLayerStyleSource(drawArgs, Matrix::I(), 1.0f);
                       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
                       ASSERT_TRUE(source->groups[0]->geometry != nullptr);
                       EXPECT_TRUE(source->groups[0]->geometry->image() != nullptr);
@@ -4442,12 +4442,12 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleDeclaresGeometryContentSource) {
   mixedLayer->setHeight(80);
   mixedLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 0, 0),
                               DropShadowStyle::Make(0, 15, 0, 0, Color::Black())});
-  TGFX_PRIVATE_ACCESS(auto mixedSource = mixedLayer->getLayerStyleSource(drawArgs, Matrix::I());
-                      ASSERT_TRUE(mixedSource != nullptr);
-                      ASSERT_TRUE(mixedSource->groups[0] != nullptr);
-                      EXPECT_TRUE(mixedSource->groups[0]->geometry != nullptr);
-                      EXPECT_TRUE(mixedSource->groups[0]->content != nullptr)
-                      << "a non-Geometry style in the same bucket still needs the shared content";)
+  TGFX_PRIVATE_ACCESS(
+      auto mixedSource = mixedLayer->getLayerStyleSource(drawArgs, Matrix::I(), 1.0f);
+      ASSERT_TRUE(mixedSource != nullptr); ASSERT_TRUE(mixedSource->groups[0] != nullptr);
+      EXPECT_TRUE(mixedSource->groups[0]->geometry != nullptr);
+      EXPECT_TRUE(mixedSource->groups[0]->content != nullptr)
+      << "a non-Geometry style in the same bucket still needs the shared content";)
 }
 
 // The geometry raster and shape of a layer never depend on the excludeChildEffects bucket: the
@@ -4477,7 +4477,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleGeometryRecordedOnceForBothBuckets) {
 
   DrawArgs drawArgs(context);
   TGFX_PRIVATE_ACCESS(
-      auto source = layer->getLayerStyleSource(drawArgs, Matrix::I());
+      auto source = layer->getLayerStyleSource(drawArgs, Matrix::I(), 1.0f);
       ASSERT_TRUE(source != nullptr);
       ASSERT_TRUE(source->groups[0] != nullptr) << "the excludeChildEffects=false bucket";
       ASSERT_TRUE(source->groups[1] != nullptr) << "the excludeChildEffects=true bucket";
@@ -4519,7 +4519,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleGeometryFallbackStaysPerBucket) {
 
   DrawArgs drawArgs(context);
   TGFX_PRIVATE_ACCESS(
-      auto source = parent->getLayerStyleSource(drawArgs, Matrix::I());
+      auto source = parent->getLayerStyleSource(drawArgs, Matrix::I(), 1.0f);
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
       ASSERT_TRUE(source->groups[1] != nullptr);
       EXPECT_TRUE(source->groups[0]->geometry == nullptr)
@@ -5039,7 +5039,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassGeometryGivesCoverageWithoutAnyFill) {
       // on purpose -- a leak would change rendered pixels only through some other style, which would
       // make the failure impossible to attribute.
       auto markedSource =
-          MakePanel({bareGeometry}, {glass})->getLayerStyleSource(drawArgs, Matrix::I());
+          MakePanel({bareGeometry}, {glass})->getLayerStyleSource(drawArgs, Matrix::I(), 1.0f);
       ASSERT_TRUE(markedSource != nullptr); ASSERT_TRUE(markedSource->groups[0] != nullptr);
       EXPECT_TRUE(markedSource->groups[0]->content == nullptr)
       << "bare geometry must not be recorded in the shared content image";
@@ -5729,7 +5729,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassWithoutGeometryResolvesToSharedContour) {
   shadow->setExcludeChildEffects(true);
   panel->setLayerStyles({glass, shadow});
   TGFX_PRIVATE_ACCESS(
-      auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
+      auto source = panel->getLayerStyleSource(drawArgs, Matrix::I(), 1.0f);
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[1] != nullptr);
       const auto& group = *source->groups[1];
       // A group with only children must not record geometry: that is what triggers the lazy
@@ -7233,7 +7233,7 @@ static std::vector<int> RasterizeGeometryAlpha(Context* context,
   std::shared_ptr<Image> image = nullptr;
   Point offset = Point::Zero();
   TGFX_PRIVATE_ACCESS(
-      auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
+      auto source = panel->getLayerStyleSource(drawArgs, Matrix::I(), 1.0f);
       if (source == nullptr) { return raster; } for (auto& group
                                                      : source->groups) {
         if (group != nullptr && group->geometry != nullptr && group->geometry->image() != nullptr) {
@@ -7632,7 +7632,8 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryShapeIsOnlyGivenToGeometrySourceStyles) {
   ASSERT_TRUE(surface != nullptr);
 
   TGFX_PRIVATE_ACCESS(
-      DrawArgs drawArgs(context); auto source = parent->getLayerStyleSource(drawArgs, Matrix::I());
+      DrawArgs drawArgs(context);
+      auto source = parent->getLayerStyleSource(drawArgs, Matrix::I(), 1.0f);
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
       ASSERT_TRUE(source->groups[0]->geometry != nullptr)
       << "control: the group has to carry the geometry, or the gating below proves nothing";
@@ -7852,7 +7853,8 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleSourceSwapSharesOneRasterizedGeometry) {
   auto panel = MakePanel({painted}, {seesChildren, seesOwnOnly});
 
   TGFX_PRIVATE_ACCESS(
-      DrawArgs drawArgs(context); auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
+      DrawArgs drawArgs(context);
+      auto source = panel->getLayerStyleSource(drawArgs, Matrix::I(), 1.0f);
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
       ASSERT_TRUE(source->groups[1] != nullptr);
       ASSERT_TRUE(source->groups[0]->geometry != nullptr);
@@ -7892,7 +7894,8 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryShapeIsDroppedWhenPaintersCoexist) {
 
   auto both = MakePanel({painted, bareGeometry}, {glass});
   TGFX_PRIVATE_ACCESS(
-      DrawArgs drawArgs(context); auto source = both->getLayerStyleSource(drawArgs, Matrix::I());
+      DrawArgs drawArgs(context);
+      auto source = both->getLayerStyleSource(drawArgs, Matrix::I(), 1.0f);
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[1] != nullptr);
       ASSERT_TRUE(source->groups[1]->geometry != nullptr);
       EXPECT_FALSE(source->groups[1]->geometry->shape().has_value())
@@ -7911,7 +7914,7 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryShapeIsDroppedWhenPaintersCoexist) {
   // painter being present rather than the fixture having no shape at all.
   auto bareOnly = MakePanel({bareGeometry}, {glass});
   TGFX_PRIVATE_ACCESS(DrawArgs bareArgs(context);
-                      auto bareSource = bareOnly->getLayerStyleSource(bareArgs, Matrix::I());
+                      auto bareSource = bareOnly->getLayerStyleSource(bareArgs, Matrix::I(), 1.0f);
                       ASSERT_TRUE(bareSource != nullptr && bareSource->groups[1] != nullptr);
                       ASSERT_TRUE(bareSource->groups[1]->geometry != nullptr);
                       EXPECT_TRUE(bareSource->groups[1]->geometry->shape().has_value());)
@@ -7937,7 +7940,7 @@ static GeometryProbe ProbeGeometry(Context* context, const std::shared_ptr<Layer
                                    const Matrix& matrix = Matrix::I()) {
   GeometryProbe probe = {};
   TGFX_PRIVATE_ACCESS(
-      DrawArgs drawArgs(context); auto source = layer->getLayerStyleSource(drawArgs, matrix);
+      DrawArgs drawArgs(context); auto source = layer->getLayerStyleSource(drawArgs, matrix, 1.0f);
       if (source == nullptr) { return probe; } for (auto& group
                                                     : source->groups) {
         if (group != nullptr && group->geometry != nullptr) {
@@ -8389,7 +8392,8 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryIncludesTextGeometry) {
 
   auto panel = makePanel(true);
   TGFX_PRIVATE_ACCESS(
-      DrawArgs drawArgs(context); auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
+      DrawArgs drawArgs(context);
+      auto source = panel->getLayerStyleSource(drawArgs, Matrix::I(), 1.0f);
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[1] != nullptr);
       ASSERT_TRUE(source->groups[1]->geometry != nullptr)
       << "text without a painter is still the layer's geometry";
@@ -8420,7 +8424,7 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryIncludesTextGeometry) {
   shadowed->setLayerStyles({DropShadowStyle::Make(-20, -20, 0, 0, Color::Black())});
   std::unique_ptr<LayerStyleSource> shadowSource = nullptr;
   TGFX_PRIVATE_ACCESS(DrawArgs shadowArgs(context);
-                      shadowSource = shadowed->getLayerStyleSource(shadowArgs, Matrix::I());)
+                      shadowSource = shadowed->getLayerStyleSource(shadowArgs, Matrix::I(), 1.0f);)
   ASSERT_TRUE(shadowSource != nullptr) << "a non-geometry style still resolves its own source";
   for (const auto& group : shadowSource->groups) {
     EXPECT_TRUE(group == nullptr || group->geometry == nullptr)

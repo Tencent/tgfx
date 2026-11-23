@@ -108,7 +108,7 @@ class BackgroundHandler {
   }
 
   // Selects the children to visit and whether to draw the parent's content after them.
-  virtual LayerChildRange childRange(const Layer* parent) const;
+  virtual LayerChildRange childRange(const Layer* parent, float alpha) const;
 
   // Draws a child whose descendants must be visited or whose parent has a truncated range.
   // The final child of a full range uses the layer's normal draw path directly, so this is only
@@ -170,7 +170,7 @@ class BackgroundCapturer : public BackgroundHandler {
     return _styleSourceRects;
   }
 
-  LayerChildRange childRange(const Layer* parent) const override;
+  LayerChildRange childRange(const Layer* parent, float alpha) const override;
 
   void drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent, Layer* child, float alpha,
                  bool forceDescendants) override;
@@ -185,16 +185,19 @@ class BackgroundCapturer : public BackgroundHandler {
   // Returns true when `layer` has a visible descendant whose Background-sourced style draws. This
   // is the live-tree selection both the export capturer and its matching consumer use, so they
   // agree on which offscreen groups need a real Surface.
-  static bool HasDrawableBackdropDescendant(Layer* layer);
+  static bool HasDrawableBackdropDescendant(Layer* layer, float alpha);
 
   // Runs a capture pass: replays captureRoot onto bgSource's canvas, populating snapshots. The
   // replay walks the tree exactly once with renderRects set to the rects the capture actually
   // samples, so drawLayer culls each layer whose renderBounds does not intersect any of them.
   // styleSourceRects covers the whole captured area: the layer style sources it caches are reused
   // outside those cull rects, so they are recorded against this wider set instead.
+  // alpha is the draw alpha of the consume pass: both sides push and read the same snapshots only
+  // when a style is visible at the same alpha, so the replay must see the same value.
   static void Run(Layer* captureRoot, const DrawArgs& baseArgs,
                   std::shared_ptr<BackgroundSource> bgSource, BackgroundSnapshotMap* snapshots,
-                  const std::vector<Rect>& renderRects, const std::vector<Rect>& styleSourceRects);
+                  const std::vector<Rect>& renderRects, const std::vector<Rect>& styleSourceRects,
+                  float alpha);
 
   // Exposes the snapshot map this capturer writes into, so per-fragment Sub3DCapturers spawned
   // by 3D subtrees can append their composed-backdrop entries to the same map under the same
@@ -219,7 +222,7 @@ class BackgroundCapturer : public BackgroundHandler {
 
  protected:
   // Returns true when `layer` itself draws a Background-sourced style or contains one that does.
-  static bool HasDrawableBackdrop(Layer* layer);
+  static bool HasDrawableBackdrop(Layer* layer, float alpha);
 
   virtual std::unique_ptr<BackgroundCapturer> makeSubCapturer(
       BackgroundSnapshotMap* snapshots, std::shared_ptr<BackgroundSource> source,
