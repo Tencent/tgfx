@@ -46,6 +46,9 @@ class FakeImageStream : public ImageStream {
 
   bool providesFrameTimestamp = true;
   bool fails = false;
+  bool retainContent = false;
+  bool failureChangesContent = true;
+  bool replacementChangesContent = true;
   int readCount = 0;
   int seekCount = 0;
   int64_t lastTarget = -1;
@@ -67,15 +70,20 @@ class FakeImageStream : public ImageStream {
     lastTarget = target;
     lastDeadline = deadline;
     if (fails) {
-      return {std::move(texture), ImageReaderStatus::Failed, _boundTimestamp};
+      return {std::move(texture), ImageReaderStatus::Failed, _boundTimestamp,
+              failureChangesContent};
     }
-    uint8_t pixels[] = {_frameID, 0, 0, 255};
-    texture = TextureView::MakeFormat(context, width(), height(), pixels, sizeof(pixels),
-                                      PixelFormat::RGBA_8888, mipmapped);
-    if (texture == nullptr) {
-      return {};
+    bool contentChanged = false;
+    if (texture == nullptr || !retainContent) {
+      uint8_t pixels[] = {_frameID, 0, 0, 255};
+      texture = TextureView::MakeFormat(context, width(), height(), pixels, sizeof(pixels),
+                                        PixelFormat::RGBA_8888, mipmapped);
+      if (texture == nullptr) {
+        return {};
+      }
+      _boundTimestamp = providesFrameTimestamp ? _timestamp : -1;
+      contentChanged = replacementChangesContent;
     }
-    _boundTimestamp = providesFrameTimestamp ? _timestamp : -1;
     auto status = ImageReaderStatus::Ready;
     if (target >= 0) {
       if (!providesFrameTimestamp) {
@@ -86,7 +94,7 @@ class FakeImageStream : public ImageStream {
         status = ImageReaderStatus::Mismatched;
       }
     }
-    return {std::move(texture), status, _boundTimestamp};
+    return {std::move(texture), status, _boundTimestamp, contentChanged};
   }
 
   void onSeeked() override {
@@ -146,6 +154,127 @@ static void ExpectFrameID(Context* context, const std::shared_ptr<TextureView>& 
 }
 
 }  // namespace
+
+TGFX_TEST(SurfaceTextureFrameStateTest, ContentChangeSurvivesRepeatedAndRestoredTimestamp) {
+  SurfaceTextureFrameState state;
+  state.onLatched(1000);
+  auto initial = state.latchedContentVersion();
+  state.onLatched(2000);
+  state.onLatched(2000);
+  EXPECT_FALSE(state.lastLatchAdvanced());
+  EXPECT_NE(state.latchedContentVersion(), initial);
+  state.onLatched(1000);
+  EXPECT_EQ(state.lastLatchedTimestamp(), 1000);
+  EXPECT_NE(state.latchedContentVersion(), initial);
+}
+
+TGFX_TEST(SurfaceTextureFrameStateTest, EqualTimestampLatchIsConservativelyChanged) {
+  SurfaceTextureFrameState state;
+  state.onLatched(0);
+  auto initial = state.latchedContentVersion();
+  EXPECT_EQ(state.readStatus(1000, true), ImageReaderStatus::NotReady);
+  EXPECT_EQ(state.latchedContentVersion(), initial);
+  state.onLatched(0);
+  EXPECT_FALSE(state.lastLatchAdvanced());
+  EXPECT_NE(state.latchedContentVersion(), initial);
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, UnchangedNotReadyKeepsPreviousBufferReadable) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_TRUE(context != nullptr);
+      auto stream = std::make_shared<FakeImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); ASSERT_TRUE(reader != nullptr);
+      stream->setFrame(1, 1000); auto first = reader->acquireBuffer();
+      auto texture = TextureView::MakeFrom(context, first); ASSERT_TRUE(texture != nullptr);
+      auto version = reader->textureVersion; auto options = std::make_shared<ImageReaderOptions>();
+      options->targetTimestamp = 2000; auto receipt = std::make_shared<ImageReaderResult>();
+      auto second = reader->acquireBuffer(options, receipt); stream->retainContent = true;
+      for (int retry = 0; retry < 3; retry++) {
+        EXPECT_TRUE(TextureView::MakeFrom(context, second) == nullptr);
+        EXPECT_EQ(receipt->status.load(), ImageReaderStatus::NotReady);
+        EXPECT_FALSE(first->expired());
+        EXPECT_EQ(reader->textureVersion, version);
+        EXPECT_EQ(TextureView::MakeFrom(context, first), texture);
+        ExpectFrameID(context, texture, 1);
+      } stream->retainContent = false;
+      stream->setFrame(2, 2000); ExpectFrameID(context, TextureView::MakeFrom(context, second), 2);
+      EXPECT_EQ(receipt->status.load(), ImageReaderStatus::Ready); EXPECT_TRUE(first->expired());)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, ChangedNotReadyExpiresPreviousBuffer) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_TRUE(context != nullptr);
+      auto stream = std::make_shared<FakeImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); stream->setFrame(1, 1000);
+      auto first = reader->acquireBuffer();
+      ASSERT_TRUE(TextureView::MakeFrom(context, first) != nullptr);
+      auto options = std::make_shared<ImageReaderOptions>(); options->targetTimestamp = 3000;
+      auto receipt = std::make_shared<ImageReaderResult>();
+      auto second = reader->acquireBuffer(options, receipt); stream->setFrame(2, 2000);
+      EXPECT_TRUE(TextureView::MakeFrom(context, second) == nullptr);
+      EXPECT_EQ(receipt->status.load(), ImageReaderStatus::NotReady);
+      EXPECT_EQ(reader->textureVersion, 0u); EXPECT_TRUE(first->expired());
+      EXPECT_TRUE(TextureView::MakeFrom(context, first) == nullptr);
+      ExpectFrameID(context, reader->textureView, 2);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, UnchangedFailureKeepsPreviousBufferReadable) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_TRUE(context != nullptr);
+      auto stream = std::make_shared<FakeImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); stream->setFrame(1, 1000);
+      auto first = reader->acquireBuffer(); auto texture = TextureView::MakeFrom(context, first);
+      ASSERT_TRUE(texture != nullptr); auto options = std::make_shared<ImageReaderOptions>();
+      options->targetTimestamp = 2000; auto receipt = std::make_shared<ImageReaderResult>();
+      auto second = reader->acquireBuffer(options, receipt); stream->fails = true;
+      stream->failureChangesContent = false;
+      EXPECT_TRUE(TextureView::MakeFrom(context, second) == nullptr);
+      EXPECT_EQ(receipt->status.load(), ImageReaderStatus::Failed); EXPECT_FALSE(first->expired());
+      EXPECT_EQ(TextureView::MakeFrom(context, first), texture); stream->fails = false;
+      stream->setFrame(2, 2000); ExpectFrameID(context, TextureView::MakeFrom(context, second), 2);
+      EXPECT_TRUE(first->expired());)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, UnknownFailureExpiresPreviousBuffer) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_TRUE(context != nullptr);
+      auto stream = std::make_shared<FakeImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); stream->setFrame(1, 1000);
+      auto first = reader->acquireBuffer();
+      ASSERT_TRUE(TextureView::MakeFrom(context, first) != nullptr);
+      auto second = reader->acquireBuffer(); stream->fails = true;
+      EXPECT_TRUE(TextureView::MakeFrom(context, second) == nullptr); EXPECT_TRUE(first->expired());
+      EXPECT_TRUE(TextureView::MakeFrom(context, first) == nullptr);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, UnchangedMismatchedKeepsPreviousBufferReadable) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_TRUE(context != nullptr);
+      auto stream = std::make_shared<FakeImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); stream->setFrame(1, 2000);
+      auto first = reader->acquireBuffer(); auto texture = TextureView::MakeFrom(context, first);
+      ASSERT_TRUE(texture != nullptr); auto options = std::make_shared<ImageReaderOptions>();
+      options->targetTimestamp = 1000; auto receipt = std::make_shared<ImageReaderResult>();
+      auto second = reader->acquireBuffer(options, receipt); stream->retainContent = true;
+      EXPECT_TRUE(TextureView::MakeFrom(context, second) == nullptr);
+      EXPECT_EQ(receipt->status.load(), ImageReaderStatus::Mismatched);
+      EXPECT_FALSE(first->expired()); EXPECT_EQ(TextureView::MakeFrom(context, first), texture);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, ReplacedTextureExpiresPreviousBufferDespiteUnchangedClaim) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_TRUE(context != nullptr);
+      auto stream = std::make_shared<FakeImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); stream->setFrame(1, 1000);
+      auto first = reader->acquireBuffer();
+      ASSERT_TRUE(TextureView::MakeFrom(context, first) != nullptr);
+      auto options = std::make_shared<ImageReaderOptions>(); options->targetTimestamp = 3000;
+      auto receipt = std::make_shared<ImageReaderResult>();
+      auto second = reader->acquireBuffer(options, receipt);
+      stream->replacementChangesContent = false; stream->setFrame(2, 2000);
+      EXPECT_TRUE(TextureView::MakeFrom(context, second) == nullptr); EXPECT_TRUE(first->expired());
+      EXPECT_EQ(reader->textureVersion, 0u);)
+}
 
 TGFX_TEST(SurfaceTextureFrameStateTest, SeekKeepsRecoveryWhileNotReady) {
   SurfaceTextureFrameState state;

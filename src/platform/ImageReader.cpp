@@ -139,10 +139,17 @@ std::shared_ptr<TextureView> ImageReader::readTexture(
   if (result.status == ImageReaderStatus::Ready && result.texture == nullptr) {
     result.status = ImageReaderStatus::Failed;
   }
+  if (result.contentChanged || result.texture != textureView) {
+    textureVersion = 0;
+    if (textureView != nullptr) {
+      textureView->removeUniqueKey();
+    }
+    if (result.texture != nullptr) {
+      result.texture->removeUniqueKey();
+    }
+  }
   textureView = std::move(result.texture);
-  textureVersion = 0;
   if (textureView != nullptr) {
-    textureView->removeUniqueKey();
     if (result.status == ImageReaderStatus::Ready ||
         result.status == ImageReaderStatus::Unsupported) {
       textureVersion = contentVersion;

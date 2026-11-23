@@ -36,6 +36,8 @@ class SurfaceTextureFrameState {
       seekPending = false;
     }
     latchAdvanced = !hasFrame || value != timestamp;
+    // Equal timestamps do not prove equal pixels. Every successful native latch may change content.
+    contentVersion++;
     hasFrame = true;
     timestamp = value;
   }
@@ -50,6 +52,10 @@ class SurfaceTextureFrameState {
 
   int64_t lastLatchedTimestamp() const {
     return timestamp;
+  }
+
+  uint64_t latchedContentVersion() const {
+    return contentVersion;
   }
 
   ImageReaderStatus readStatus(int64_t target, bool endOfRead = false) {
@@ -73,6 +79,7 @@ class SurfaceTextureFrameState {
   bool hasFrame = false;
   bool latchAdvanced = false;
   int64_t timestamp = -1;
+  uint64_t contentVersion = 0;
   bool seekPending = false;
 };
 }  // namespace tgfx

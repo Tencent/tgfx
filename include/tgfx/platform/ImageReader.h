@@ -82,9 +82,10 @@ struct ImageReaderResult {
  *    1) The generated ImageBuffers are bound to the associated GPU Context when first being drawn
  *       and cannot be drawn to another Context anymore.
  *    2) The generated ImageBuffers may have a limited lifetime and cannot create textures after
- *       expiration. Usually, the previously acquired ImageBuffer will expire after the newly
- *       created ImageBuffer is drawn. So there are only two ImageBuffers that can be accessed
- *       simultaneously.
+ *       expiration. A previously delivered buffer remains readable while the shared texture is
+ *       known to be unchanged. A later read that changes or may have changed its content expires
+ *       that buffer, even if the later read fails. Acquiring another buffer expires older undelivered
+ *       buffers; notifySeeked() expires all previously acquired buffers.
  */
 class ImageReader {
  public:
@@ -112,8 +113,10 @@ class ImageReader {
    * request belongs to this buffer and cannot be overwritten by later acquisitions. A texture
    * read returns no texture while reporting NotReady, Mismatched, Failed, or Expired. This prevents
    * resource caches from treating unrelated pixels as this buffer's content. The caller decides
-   * whether to retry, retain its previous output, or request the latest frame instead. An incomplete
-   * read remains retryable until another buffer is acquired or the producer seeks. A timestamped
+   * whether to retry, retain its previous output, or request the latest frame instead. Redrawing a
+   * previously delivered buffer is valid only while it has not expired. To retain output regardless
+   * of subsequent stream reads, the caller must keep an independent pixel copy or rendered output.
+   * An incomplete read remains retryable until another buffer is acquired or the producer seeks. A timestamped
    * stream may immediately report Mismatched again after passing the target; retrying does not seek
    * the producer. To recover an earlier target, reposition the producer, notifySeeked(), and acquire
    * a new buffer.
@@ -127,7 +130,8 @@ class ImageReader {
   std::shared_ptr<ImageBuffer> acquireBuffer(std::shared_ptr<ImageReaderOptions> options = nullptr,
                                              std::shared_ptr<ImageReaderResult> result = nullptr);
 
-  /** Compatibility entry point. Use acquireBuffer() for deferred image acquisition. */
+  /** Source-compatible entry point. Reads no longer wait for producer notifications; before the
+   * first image arrives, a texture read may immediately return nullptr. Use acquireBuffer() instead. */
   [[deprecated("Use acquireBuffer() instead.")]] std::shared_ptr<ImageBuffer> acquireNextBuffer();
 
   /**

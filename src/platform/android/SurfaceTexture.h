@@ -98,6 +98,7 @@ class SurfaceTexture : public ImageStream {
     ImageReaderStatus status = ImageReaderStatus::Failed;
     int64_t timestamp = -1;
     ISize textureSize = {};
+    bool contentChanged = false;
   };
 
   FrameUpdateResult updateTexImage(int64_t target, int64_t deadline);

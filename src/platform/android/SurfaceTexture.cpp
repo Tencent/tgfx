@@ -255,6 +255,14 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
     int64_t deadline) {
   unsigned textureID = 0;
   if (textureView == nullptr) {
+    {
+      std::lock_guard<std::mutex> lock(locker);
+      // Before the first notification, a nonwaiting read cannot latch any image. Avoid creating
+      // and detaching a context-owned OES texture on every retry. A late notification is retried.
+      if (!frameAvailable && !frameState.hasLatchedFrame() && deadline <= Clock::Now()) {
+        return {nullptr, ImageReaderStatus::NotReady, -1, false};
+      }
+    }
     textureID = makeExternalOESTexture(context);
     if (textureID == 0) {
       return {};
@@ -262,11 +270,13 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
   }
   auto result = updateTexImage(target, deadline);
   if (textureView != nullptr) {
-    return {std::move(textureView), result.status, result.timestamp};
+    return {std::move(textureView), result.status, result.timestamp, result.contentChanged};
   }
   if (result.timestamp < 0 || result.status == ImageReaderStatus::Failed) {
+    // A waiting first read may still time out. Release its context-owned attachment instead of
+    // retaining a raw GL name without a TextureView to manage its context and lifetime.
     releaseExternalOESTexture(context, textureID);
-    return {nullptr, result.status, -1};
+    return {nullptr, result.status, -1, result.contentChanged};
   }
   // The descriptor must match the real size of the OES texture, otherwise getTextureCoord()
   // converts pixel coordinates with a wrong base: hardware decoders pad the output buffer to an
@@ -288,7 +298,7 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
   auto texture = gpu->makeResource<GLTexture>(
       descriptor, static_cast<unsigned>(GL_TEXTURE_EXTERNAL_OES), textureID);
   textureView = Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
-  return {std::move(textureView), result.status, result.timestamp};
+  return {std::move(textureView), result.status, result.timestamp, result.contentChanged};
 }
 
 bool SurfaceTexture::latchTexture(JNIEnv* env) {
@@ -359,17 +369,21 @@ void SurfaceTexture::releaseExternalOESTexture(Context* context, unsigned textur
 
 SurfaceTexture::FrameUpdateResult SurfaceTexture::updateTexImage(int64_t target, int64_t deadline) {
   std::unique_lock<std::mutex> autoLock(locker);
-  auto snapshot = [this](ImageReaderStatus status) {
-    return FrameUpdateResult{status, frameState.lastLatchedTimestamp(), textureSize};
+  auto initialContentVersion = frameState.latchedContentVersion();
+  bool failedMutation = false;
+  auto snapshot = [this, initialContentVersion, &failedMutation](ImageReaderStatus status) {
+    return FrameUpdateResult{
+        status, frameState.lastLatchedTimestamp(), textureSize,
+        failedMutation || frameState.latchedContentVersion() != initialContentVersion};
   };
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
     return snapshot(ImageReaderStatus::Failed);
   }
-  // Notifications can be coalesced, so an advancing latch also permits polling the queue. Only an
-  // empty queue waits for another notification, always using the caller's remaining monotonic
-  // budget. A producer that continuously queues frames is bounded independently of that budget.
+  // SurfaceTexture latches the most recent image and notifications may be coalesced. Without a
+  // notification, do not poll and risk replacing the previous output with equal-PTS new content.
+  // Waits share the caller's remaining monotonic budget; continuously queued frames are capped.
   static constexpr int MAX_LATCH_FRAMES = 8;
   int latchCount = 0;
   while (latchCount < MAX_LATCH_FRAMES) {
@@ -377,7 +391,7 @@ SurfaceTexture::FrameUpdateResult SurfaceTexture::updateTexImage(int64_t target,
     if (status != ImageReaderStatus::Pending) {
       return snapshot(status);
     }
-    if (!frameAvailable && (!frameState.hasLatchedFrame() || !frameState.lastLatchAdvanced())) {
+    if (!frameAvailable) {
       auto remaining = deadline - Clock::Now();
       if (target < 0 && frameState.hasLatchedFrame()) {
         break;
@@ -390,6 +404,7 @@ SurfaceTexture::FrameUpdateResult SurfaceTexture::updateTexImage(int64_t target,
     }
     frameAvailable = false;
     if (!latchTexture(env)) {
+      failedMutation = true;
       return snapshot(ImageReaderStatus::Failed);
     }
     latchCount++;

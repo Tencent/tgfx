@@ -73,6 +73,9 @@ class ImageStream {
     std::shared_ptr<TextureView> texture = nullptr;
     ImageReaderStatus status = ImageReaderStatus::Failed;
     int64_t timestamp = -1;
+    // False only when the previous texture and its pixels are known to be unchanged throughout
+    // this read. Unknown or failed mutations must conservatively report true.
+    bool contentChanged = true;
   };
 
   /**
