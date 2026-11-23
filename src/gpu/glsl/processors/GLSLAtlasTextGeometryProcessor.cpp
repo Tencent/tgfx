@@ -46,7 +46,10 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   auto samplerVarying = varyingHandler->addVarying("textureCoords", SLType::Float2);
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
   auto uvName = maskCoord.name();
-  vertBuilder->multiplyVec2(samplerVarying.vsOut(), uvName, atlasName);
+  // The varying is stored explicitly so a bytecode route sees it produced: the multiply names
+  // a local, and the store names the varying.
+  vertBuilder->multiplyVec2("atlasCoord", uvName, atlasName, /*declare=*/true);
+  vertBuilder->storeVarying(samplerVarying.vsOut(), "atlasCoord");
 
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
@@ -69,15 +72,40 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   DEBUG_ASSERT(textureView != nullptr);
   DEBUG_ASSERT(textureView->getTexture() != nullptr);
   auto samplerHandle = uniformHandler->addSampler(textureView->getTexture(), "TextureSampler");
-  fragBuilder->codeAppend("vec4 color = ");
-  fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.vsOut());
-  fragBuilder->codeAppend(";");
-  if (textureView->isAlphaOnly()) {
-    fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
+  auto sampleEntry = fragBuilder->appendFunction("tgfxTextureSample");
+  auto coverageEntry = fragBuilder->appendFunction("tgfxTextCoverageFromAlpha");
+  auto colorEntry = fragBuilder->appendFunction("tgfxTextColorUnpremul");
+  // The atlas is a mask, so the read carries its sampler's own channel swizzle.
+  const int readSwizzle =
+      ShaderBuilder::ReadSwizzleCode(uniformHandler->getSamplerSwizzle(samplerHandle));
+  if (!sampleEntry.empty() && !coverageEntry.empty() && readSwizzle >= 0 &&
+      (textureView->isAlphaOnly() || !colorEntry.empty())) {
+    // The texel, the unpremultiplied color and the coverage are all named values, so a bytecode
+    // route records the whole block.
+    const auto samplerName = uniformHandler->getSamplerVariable(samplerHandle).name();
+    fragBuilder->codeAppend("vec4 textTexel;");
+    fragBuilder->appendCall(
+        "textTexel", sampleEntry,
+        {samplerName, samplerVarying.vsOut(), "vec4(0.0)", "0", std::to_string(readSwizzle)});
+    fragBuilder->codeAppend("vec4 textCoverage;");
+    fragBuilder->appendCall("textCoverage", coverageEntry, {"textTexel"});
+    fragBuilder->storeCoverage(args.outputCoverage, "textCoverage", false);
+    if (!textureView->isAlphaOnly()) {
+      fragBuilder->codeAppend("vec4 textColor;");
+      fragBuilder->appendCall("textColor", colorEntry, {"textTexel"});
+      fragBuilder->storeColor(args.outputColor, "textColor");
+    }
   } else {
-    fragBuilder->codeAppendf("%s = clamp(vec4(color.rgb/color.a, 1.0), 0.0, 1.0);",
-                             args.outputColor.c_str());
-    fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
+    fragBuilder->codeAppend("vec4 color = ");
+    fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.vsOut());
+    fragBuilder->codeAppend(";");
+    if (textureView->isAlphaOnly()) {
+      fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
+    } else {
+      fragBuilder->codeAppendf("%s = clamp(vec4(color.rgb/color.a, 1.0), 0.0, 1.0);",
+                               args.outputColor.c_str());
+      fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
+    }
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.

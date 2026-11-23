@@ -125,8 +125,8 @@ class VertexShaderBuilder : public ShaderBuilder {
   /**
    * Multiplies two vec2 values and stores the result in a local.
    */
-  void multiplyVec2(const std::string& dstName, const std::string& first,
-                    const std::string& second);
+  void multiplyVec2(const std::string& dstName, const std::string& first, const std::string& second,
+                    bool declare = false);
 
   /**
    * Stores one half of a vec4 value in a vec2 local; components is "xy" or "zw".

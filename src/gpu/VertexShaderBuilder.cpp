@@ -58,9 +58,13 @@ void VertexShaderBuilder::transformPointAdd(const std::string& dstPointName,
 }
 
 void VertexShaderBuilder::multiplyVec2(const std::string& dstName, const std::string& first,
-                                       const std::string& second) {
+                                       const std::string& second, bool declare) {
   recordVertexCall(VertexCallKind::MultiplyVec2, dstName, first, second, "", false);
-  codeAppendf("%s = %s * %s;", dstName.c_str(), first.c_str(), second.c_str());
+  if (declare) {
+    codeAppendf("highp vec2 %s = %s * %s;", dstName.c_str(), first.c_str(), second.c_str());
+  } else {
+    codeAppendf("%s = %s * %s;", dstName.c_str(), first.c_str(), second.c_str());
+  }
 }
 
 void VertexShaderBuilder::swizzleVec2(const std::string& dstName, const std::string& srcName,

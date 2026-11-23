@@ -402,6 +402,12 @@ inline constexpr const char* kHairlineQuadCoverageIncludes[] = {
 
 inline constexpr Arg kOpaqueColorArgs[] = {{Param::Vec4, Source::CallArg, 0}};
 inline constexpr const char* kOpaqueColorIncludes[] = {"fn/source/tgfx_opaque_color.inc"};
+inline constexpr Arg kTextCoverageFromAlphaArgs[] = {{Param::Vec4, Source::CallArg, 0}};
+inline constexpr const char* kTextCoverageFromAlphaIncludes[] = {
+    "fn/source/tgfx_text_coverage_from_alpha.inc"};
+inline constexpr Arg kTextColorUnpremulArgs[] = {{Param::Vec4, Source::CallArg, 0}};
+inline constexpr const char* kTextColorUnpremulIncludes[] = {
+    "fn/source/tgfx_text_color_unpremul.inc"};
 inline constexpr Arg kGaussianBlur1DArgs[] = {
     {Param::SampledImage, Source::CallArg, 0}, {Param::Vec2, Source::CallArg, 1},
     {Param::Vec2, Source::CallArg, 2},         {Param::Int, Source::CallArg, 3},
@@ -488,6 +494,10 @@ inline constexpr Row kRows[] = {
      1, false, true, "", kHairlineQuadCoverageArgs, 3, Param::Float},
     {ChainISA::OpaqueColor, "tgfxOpaqueColor", "", kOpaqueColorIncludes, 1, false, true, "",
      kOpaqueColorArgs, 1},
+    {ChainISA::TextCoverageFromAlpha, "tgfxTextCoverageFromAlpha", "",
+     kTextCoverageFromAlphaIncludes, 1, false, true, "", kTextCoverageFromAlphaArgs, 1},
+    {ChainISA::TextColorUnpremul, "tgfxTextColorUnpremul", "", kTextColorUnpremulIncludes, 1, false,
+     true, "", kTextColorUnpremulArgs, 1},
     {ChainISA::GaussianBlur1D, "gaussianBlur1D", "", kGaussianBlur1DIncludes, 6, false, true, "",
      kGaussianBlur1DArgs, 31},
     // The chain xfer tail: the FP tree reaches the per-mode functions instead.
