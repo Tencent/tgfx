@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <future>
+#include <string>
 #include <vector>
 #include "layers/DrawArgs.h"
 #include "layers/LayerDrawSession.h"
@@ -302,6 +303,52 @@ static int CountDifferentPixels(const PixelImage& a, const PixelImage& b, int to
   return different;
 }
 
+static std::string FormatPixel(const uint8_t* pixel) {
+  return "(" + std::to_string(pixel[0]) + "," + std::to_string(pixel[1]) + "," +
+         std::to_string(pixel[2]) + "," + std::to_string(pixel[3]) + ")";
+}
+
+// Summarizes how far two same-sized images differ, so a failure on a remote backend reports the
+// error magnitude and not only the number of differing pixels.
+static std::string DescribePixelDifferences(const PixelImage& a, const PixelImage& b) {
+  if (a.pixels.empty() || b.pixels.empty() || a.width != b.width || a.height != b.height) {
+    return "images are empty or have different sizes";
+  }
+  std::array<int, 4> pixelsByDiff = {};
+  int maxDiff = 0;
+  int maxX = -1;
+  int maxY = -1;
+  for (int y = 0; y < a.height; ++y) {
+    auto* rowA = a.pixels.data() + static_cast<size_t>(y) * a.rowBytes;
+    auto* rowB = b.pixels.data() + static_cast<size_t>(y) * b.rowBytes;
+    for (int x = 0; x < a.width; ++x) {
+      int pixelDiff = 0;
+      for (size_t channel = 0; channel < 4; ++channel) {
+        auto offset = static_cast<size_t>(x) * 4 + channel;
+        pixelDiff = std::max(
+            pixelDiff, std::abs(static_cast<int>(rowA[offset]) - static_cast<int>(rowB[offset])));
+      }
+      pixelsByDiff[static_cast<size_t>(std::min(pixelDiff, 3))]++;
+      if (pixelDiff > maxDiff) {
+        maxDiff = pixelDiff;
+        maxX = x;
+        maxY = y;
+      }
+    }
+  }
+  std::string result = "pixels by max channel diff: 1=" + std::to_string(pixelsByDiff[1]) +
+                       " 2=" + std::to_string(pixelsByDiff[2]) +
+                       " 3+=" + std::to_string(pixelsByDiff[3]) +
+                       ", maxDiff=" + std::to_string(maxDiff);
+  if (maxDiff > 0) {
+    auto offset = static_cast<size_t>(maxY) * a.rowBytes + static_cast<size_t>(maxX) * 4;
+    result += " at (" + std::to_string(maxX) + "," + std::to_string(maxY) +
+              ") expected=" + FormatPixel(a.pixels.data() + offset) +
+              " actual=" + FormatPixel(b.pixels.data() + offset);
+  }
+  return result;
+}
+
 // A different clip can change rounding at blurred edges. By default, allow one 8-bit step
 // per channel and limit the affected area to 0.5% of the image.
 static void ExpectBlurredPixelsNear(const PixelImage& reference, const PixelImage& output,
@@ -310,8 +357,10 @@ static void ExpectBlurredPixelsNear(const PixelImage& reference, const PixelImag
   ASSERT_FALSE(output.pixels.empty());
   ASSERT_EQ(reference.width, output.width);
   ASSERT_EQ(reference.height, output.height);
-  EXPECT_EQ(CountDifferentPixels(reference, output, channelTolerance), 0);
-  EXPECT_LE(CountDifferentPixels(reference, output, 0), reference.width * reference.height / 200);
+  EXPECT_EQ(CountDifferentPixels(reference, output, channelTolerance), 0)
+      << DescribePixelDifferences(reference, output);
+  EXPECT_LE(CountDifferentPixels(reference, output, 0), reference.width * reference.height / 200)
+      << DescribePixelDifferences(reference, output);
 }
 
 // Check the readback format against the same render tiles, including the same band boundaries.
@@ -2000,7 +2049,8 @@ TGFX_TEST(LayerImageReaderTest, OffscreenBlurDoesNotEnlargeLocalTiles) {
   root->addChild(distant);
   auto output = ReadTiled(context, root, {64, 64});
   ASSERT_EQ(output.error, LayerImageErrorCode::None);
-  EXPECT_EQ(CountDifferentPixels(reference, output.image, 1), 0);
+  EXPECT_EQ(CountDifferentPixels(reference, output.image, 1), 0)
+      << DescribePixelDifferences(reference, output.image);
 }
 
 TGFX_TEST(LayerImageReaderTest, WideBandRemainsCompleteAcrossBackgroundBatches) {
