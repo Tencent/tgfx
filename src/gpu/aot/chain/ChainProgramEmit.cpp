@@ -377,6 +377,8 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
         return plan.varyings[static_cast<size_t>(arg.index)].name;
       case ChainArgKind::Sampler:
         return plan.samplers[static_cast<size_t>(arg.index)].name;
+      case ChainArgKind::Vec2Zero:
+        return "vec2(0.0)";
       case ChainArgKind::None:
         break;
     }

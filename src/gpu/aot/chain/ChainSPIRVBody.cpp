@@ -215,6 +215,7 @@ struct BodyState {
   std::unordered_map<int, uint32_t> registers = {};
   // Cached constants.
   std::unordered_map<uint32_t, uint32_t> intConstants = {};
+  uint32_t vec2ZeroId = 0;
   uint32_t whiteId = 0;
   uint32_t blackId = 0;
   uint32_t oneFloatId = 0;
@@ -487,6 +488,21 @@ uint32_t ResolveArg(BodyState* state, const ChainProgramPlan& plan, const ChainA
       return state->whiteId;
     case ChainArgKind::Black:
       return state->blackId;
+    case ChainArgKind::Vec2Zero: {
+      // The vec2 zero a shape operator's literal argument carries, built once with the other
+      // template constants.
+      if (state->vec2ZeroId == 0) {
+        // A constant belongs to the declaration section whatever the caller's sink is.
+        auto* sink = state->writer.sink;
+        state->writer.Sink(&state->writer.decl);
+        const uint32_t zeroFloat = FloatConstant(state, 0.0f);
+        state->vec2ZeroId = state->writer.NewId();
+        state->writer.Inst(kOpConstantComposite,
+                           {state->types.vec2, state->vec2ZeroId, zeroFloat, zeroFloat});
+        state->writer.Sink(sink);
+      }
+      return state->vec2ZeroId;
+    }
     case ChainArgKind::FragCoord:
       return state->fragCoordId;
     case ChainArgKind::Uniform:

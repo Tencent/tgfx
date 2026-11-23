@@ -129,6 +129,8 @@ enum class ChainArgKind : uint8_t {
   Varying,
   /// A declared sampler, by its index into ChainProgramPlan::samplers.
   Sampler,
+  /// The two-component zero, the shape an operator's vec2 literal argument carries.
+  Vec2Zero,
 };
 
 struct ChainArg {

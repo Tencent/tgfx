@@ -280,6 +280,14 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
       arg->kind = ChainArgKind::White;
       return true;
     }
+    if (name == "vec4(0.0)" || name == "0.0") {
+      arg->kind = ChainArgKind::Black;
+      return true;
+    }
+    if (name == "vec2(0.0)") {
+      arg->kind = ChainArgKind::Vec2Zero;
+      return true;
+    }
     if (name == "vec4(0.0)") {
       arg->kind = ChainArgKind::Black;
       return true;
