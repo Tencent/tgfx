@@ -22,10 +22,10 @@
 #include "gpu/InstanceProvider.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
+#include "gpu/SamplingArgs.h"
+#include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
-#include "gpu/processors/ShapeInstancedGeometryProcessor.h"
-#include "gpu/SamplingArgs.h"
 
 namespace tgfx {
 
@@ -138,7 +138,6 @@ PlacementPtr<GeometryProcessor> ShapeInstancedDrawOp::onMakeGeometryProcessor(
                                                renderTarget->height(), aa, hasInstanceColors,
                                                realUVMatrix, viewMatrix);
 }
-
 
 void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto vertexBuffer = shapeProxy->getTriangles();

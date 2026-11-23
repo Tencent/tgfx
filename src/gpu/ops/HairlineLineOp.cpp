@@ -18,8 +18,8 @@
 
 #include "HairlineLineOp.h"
 #include "gpu/GlobalCache.h"
-#include "tgfx/gpu/Context.h"
 #include "gpu/processors/HairlineLineGeometryProcessor.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 
@@ -65,7 +65,6 @@ PlacementPtr<GeometryProcessor> HairlineLineOp::onMakeGeometryProcessor(
   return HairlineLineGeometryProcessor::Make(allocator, color, viewMatrix, realUVMatrix, coverage,
                                              aaType);
 }
-
 
 bool HairlineLineOp::onPrepare() {
   // The hairline vertex buffer is produced asynchronously and may be empty when the path has

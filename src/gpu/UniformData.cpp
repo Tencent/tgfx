@@ -61,8 +61,8 @@ void UniformData::onSetData(const std::string& name, const void* data, size_t si
       }
       known += fieldKey;
     }
-    LOGE("UniformData::onSetData() uniform '%s' (suffix '%s') not found! known: %s",
-         name.c_str(), nameSuffix.c_str(), known.c_str());
+    LOGE("UniformData::onSetData() uniform '%s' (suffix '%s') not found! known: %s", name.c_str(),
+         nameSuffix.c_str(), known.c_str());
     return;
   }
   DEBUG_ASSERT(field->size == size);

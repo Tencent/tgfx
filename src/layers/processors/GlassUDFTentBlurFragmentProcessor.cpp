@@ -151,8 +151,8 @@ void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData* /*vertexUniformDa
   auto matrix = transform->getTotalMatrix();
   matrix.mapPoints(stepVectors, 2);
   Point step = stepVectors[1] - stepVectors[0];
-  fragmentUniformData->setData("Radius", field == GlassUDFField::Refraction ? fineRadius
-                                                                            : coarseRadius);
+  fragmentUniformData->setData("Radius",
+                               field == GlassUDFField::Refraction ? fineRadius : coarseRadius);
   fragmentUniformData->setData("Step", step);
 }
 

@@ -21,9 +21,9 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
-#include "tgfx/core/RenderFlags.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
+#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
@@ -100,7 +100,6 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
                                               renderTarget->height(), aaType, commonColor, uvMatrix,
                                               hasSubset);
 }
-
 
 static uint16_t GetNumIndicesPerQuad(AAType aaType, const std::optional<LineJoin>& lineJoin) {
   const auto isAA = aaType == AAType::Coverage;

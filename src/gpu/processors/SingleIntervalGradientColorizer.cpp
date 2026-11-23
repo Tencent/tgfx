@@ -18,5 +18,4 @@
 
 #include "SingleIntervalGradientColorizer.h"
 
-namespace tgfx {
-}  // namespace tgfx
+namespace tgfx {}  // namespace tgfx

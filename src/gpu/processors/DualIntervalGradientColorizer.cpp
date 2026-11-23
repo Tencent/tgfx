@@ -18,5 +18,4 @@
 
 #include "DualIntervalGradientColorizer.h"
 
-namespace tgfx {
-}  // namespace tgfx
+namespace tgfx {}  // namespace tgfx

@@ -20,8 +20,8 @@
 #include "core/utils/ColorHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
-#include "tgfx/core/RenderFlags.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 
@@ -76,7 +76,6 @@ PlacementPtr<GeometryProcessor> Quads3DDrawOp::onMakeGeometryProcessor(RenderTar
                                               renderTarget->height(), aaType, commonColor, uvMatrix,
                                               false);
 }
-
 
 void Quads3DDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   std::shared_ptr<BufferResource> indexBuffer = nullptr;

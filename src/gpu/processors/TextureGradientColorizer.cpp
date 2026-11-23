@@ -18,5 +18,4 @@
 
 #include "TextureGradientColorizer.h"
 
-namespace tgfx {
-}  // namespace tgfx
+namespace tgfx {}  // namespace tgfx

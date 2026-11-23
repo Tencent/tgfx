@@ -230,8 +230,7 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
                                        const Rect& subset)
     : Sampling(SamplingSource{textureView->width(), textureView->height(),
                               textureView->getTexture()->type(), textureView->hasMipmaps(),
-                              textureView->origin(),
-                              textureView->getContext()->gpu()->features()},
+                              textureView->origin(), textureView->getContext()->gpu()->features()},
                sampler, subset) {
 }
 

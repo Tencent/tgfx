@@ -4674,7 +4674,6 @@ static std::shared_ptr<ShapePath> MakeRectShapePath(const Rect& rect, float radi
 // Which fill painter a panel carries next to its stroke: none, or a retained fully transparent fill.
 enum class GeometryFillKind { None, Transparent };
 
-
 // A fill painter and a differently typed stroke painter live in two sibling VectorGroups instead of
 // one element list. withFillGroup=false drops the fill group and is the control that shows what a
 // shape with no coverage inside its stroke band reads back as.

@@ -21,11 +21,11 @@
 #include "core/utils/ColorHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
-#include "tgfx/core/RenderFlags.h"
-#include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
-#include "gpu/processors/NonAARRectGeometryProcessor.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
+#include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
+#include "gpu/processors/NonAARRectGeometryProcessor.h"
+#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
@@ -89,7 +89,6 @@ PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarge
   return EllipseGeometryProcessor::Make(allocator, renderTarget->width(), renderTarget->height(),
                                         hasStroke, commonColor);
 }
-
 
 void RRectDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   if (indexBufferProxy == nullptr || vertexBufferProxyView == nullptr) {

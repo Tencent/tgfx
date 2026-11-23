@@ -52,7 +52,6 @@ PlacementPtr<GeometryProcessor> MeshDrawOp::onMakeGeometryProcessor(RenderTarget
                                      attrs.hasCoverage, color, viewMatrix);
 }
 
-
 void MeshDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto vertexBuffer = meshProxy->getVertexBuffer();
   if (vertexBuffer == nullptr) {

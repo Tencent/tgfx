@@ -22,10 +22,10 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
+#include "gpu/SamplingArgs.h"
+#include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
-#include "gpu/processors/DefaultGeometryProcessor.h"
-#include "gpu/SamplingArgs.h"
 
 namespace tgfx {
 PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GPUShapeProxy> shapeProxy,
@@ -119,7 +119,6 @@ PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarge
   return DefaultGeometryProcessor::Make(allocator, color, renderTarget->width(),
                                         renderTarget->height(), aa, viewMatrix, realUVMatrix);
 }
-
 
 void ShapeDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto vertexBuffer = shapeProxy->getTriangles();
