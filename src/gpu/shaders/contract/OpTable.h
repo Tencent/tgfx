@@ -400,6 +400,8 @@ inline constexpr Arg kHairlineQuadCoverageArgs[] = {{Param::Vec4, Source::CallAr
 inline constexpr const char* kHairlineQuadCoverageIncludes[] = {
     "geometry/hairline_quad_coverage.inc"};
 
+inline constexpr Arg kOpaqueColorArgs[] = {{Param::Vec4, Source::CallArg, 0}};
+inline constexpr const char* kOpaqueColorIncludes[] = {"fn/source/tgfx_opaque_color.inc"};
 inline constexpr Row kRows[] = {
     {ChainISA::ConstColor, "pmApplyConstColor", "", kConstColorIncludes, 1, false, true, "",
      kConstColorArgs, 3},
@@ -462,6 +464,8 @@ inline constexpr Row kRows[] = {
      1, false, true, "", kHairlineLineCoverageArgs, 3, Param::Float},
     {ChainISA::HairlineQuadCoverage, "hairlineQuadEdgeCoverage", "", kHairlineQuadCoverageIncludes,
      1, false, true, "", kHairlineQuadCoverageArgs, 3, Param::Float},
+    {ChainISA::OpaqueColor, "tgfxOpaqueColor", "", kOpaqueColorIncludes, 1, false, true, "",
+     kOpaqueColorArgs, 1},
     // The chain xfer tail: the FP tree reaches the per-mode functions instead.
     {PorterDuffId, "applyPorterDuffXP",
      "#define HAS_XP 1\n#define TGFX_DECLARED_CHAIN 1\n"
