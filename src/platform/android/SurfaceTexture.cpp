@@ -243,24 +243,21 @@ static ISize ComputeTextureSize(const float matrix[16], int width, int height) {
 }
 
 std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, bool mipmapped) {
-  return onReadTexture(context, mipmapped, nullptr, -1, 0).texture;
+  return onReadTexture(context, mipmapped, nullptr).texture;
 }
 
 bool SurfaceTexture::onUpdateTexture(std::shared_ptr<TextureView>) {
-  return updateTexImage(-1, 0).status == ImageReaderStatus::Ready;
+  return updateTexImage().advanced;
 }
 
 ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
-    Context* context, bool, std::shared_ptr<TextureView> textureView, int64_t target,
-    int64_t deadline) {
+    Context* context, bool, std::shared_ptr<TextureView> textureView) {
   unsigned textureID = 0;
   if (textureView == nullptr) {
     {
       std::lock_guard<std::mutex> lock(locker);
-      // Before the first notification, a nonwaiting read cannot latch any image. Avoid creating
-      // and detaching a context-owned OES texture on every retry. A late notification is retried.
-      if (!frameAvailable && !frameState.hasLatchedFrame() && deadline <= Clock::Now()) {
-        return {nullptr, ImageReaderStatus::NotReady, -1, false};
+      if (!frameAvailable && !hasLatchedFrame) {
+        return {nullptr, false, -1, false, false};
       }
     }
     textureID = makeExternalOESTexture(context);
@@ -268,15 +265,14 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
       return {};
     }
   }
-  auto result = updateTexImage(target, deadline);
+  auto result = updateTexImage();
   if (textureView != nullptr) {
-    return {std::move(textureView), result.status, result.timestamp, result.contentChanged};
+    return {std::move(textureView), result.advanced, result.timestamp, result.contentChanged,
+            result.failed};
   }
-  if (result.timestamp < 0 || result.status == ImageReaderStatus::Failed) {
-    // A waiting first read may still time out. Release its context-owned attachment instead of
-    // retaining a raw GL name without a TextureView to manage its context and lifetime.
+  if (!result.advanced) {
     releaseExternalOESTexture(context, textureID);
-    return {nullptr, result.status, -1, result.contentChanged};
+    return {nullptr, false, -1, result.contentChanged, result.failed};
   }
   // The descriptor must match the real size of the OES texture, otherwise getTextureCoord()
   // converts pixel coordinates with a wrong base: hardware decoders pad the output buffer to an
@@ -298,7 +294,8 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
   auto texture = gpu->makeResource<GLTexture>(
       descriptor, static_cast<unsigned>(GL_TEXTURE_EXTERNAL_OES), textureID);
   textureView = Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
-  return {std::move(textureView), result.status, result.timestamp, result.contentChanged};
+  return {std::move(textureView), result.advanced, result.timestamp, result.contentChanged,
+          result.failed};
 }
 
 bool SurfaceTexture::latchTexture(JNIEnv* env) {
@@ -316,18 +313,12 @@ bool SurfaceTexture::latchTexture(JNIEnv* env) {
         env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getTransfer, dataSpace);
     _colorSpace = AndroidDataSpaceToColorSpace(standard, transfer);
   }
-  frameState.onLatched(currentTimestamp(env));
   return true;
 }
 
 int64_t SurfaceTexture::currentTimestamp(JNIEnv* env) {
   return static_cast<int64_t>(
       env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp));
-}
-
-void SurfaceTexture::onSeeked() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  frameState.onSeeked();
 }
 
 unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
@@ -367,50 +358,29 @@ void SurfaceTexture::releaseExternalOESTexture(Context* context, unsigned textur
   gl->deleteTextures(1, &textureID);
 }
 
-SurfaceTexture::FrameUpdateResult SurfaceTexture::updateTexImage(int64_t target, int64_t deadline) {
-  std::unique_lock<std::mutex> autoLock(locker);
-  auto initialContentVersion = frameState.latchedContentVersion();
-  bool failedMutation = false;
-  auto snapshot = [this, initialContentVersion, &failedMutation](ImageReaderStatus status) {
-    return FrameUpdateResult{
-        status, frameState.lastLatchedTimestamp(), textureSize,
-        failedMutation || frameState.latchedContentVersion() != initialContentVersion};
-  };
+SurfaceTexture::FrameUpdateResult SurfaceTexture::updateTexImage() {
+  std::unique_lock<std::mutex> lock(locker);
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
-    return snapshot(ImageReaderStatus::Failed);
+    return {false, lastLatchedTimestamp, textureSize, false};
   }
-  // SurfaceTexture latches the most recent image and notifications may be coalesced. Without a
-  // notification, do not poll and risk replacing the previous output with equal-PTS new content.
-  // Waits share the caller's remaining monotonic budget; continuously queued frames are capped.
-  static constexpr int MAX_LATCH_FRAMES = 8;
-  int latchCount = 0;
-  while (latchCount < MAX_LATCH_FRAMES) {
-    auto status = frameState.readStatus(target);
-    if (status != ImageReaderStatus::Pending) {
-      return snapshot(status);
-    }
-    if (!frameAvailable) {
-      auto remaining = deadline - Clock::Now();
-      if (target < 0 && frameState.hasLatchedFrame()) {
-        break;
-      }
-      if (remaining <= 0) {
-        break;
-      }
-      condition.wait_for(autoLock, std::chrono::microseconds(remaining));
-      continue;
-    }
-    frameAvailable = false;
-    if (!latchTexture(env)) {
-      failedMutation = true;
-      return snapshot(ImageReaderStatus::Failed);
-    }
-    latchCount++;
-    resolveTextureSize(env);
+  auto notified = frameAvailable;
+  frameAvailable = false;
+  auto previous = lastLatchedTimestamp;
+  if (!latchTexture(env)) {
+    return {false, previous, textureSize, true};
   }
-  return snapshot(frameState.readStatus(target, true));
+  auto timestamp = currentTimestamp(env);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    return {false, previous, textureSize, true, true};
+  }
+  auto advanced = !hasLatchedFrame || notified || timestamp != previous;
+  hasLatchedFrame = true;
+  lastLatchedTimestamp = timestamp;
+  resolveTextureSize(env);
+  return {advanced, timestamp, textureSize, true, false};
 }
 
 void SurfaceTexture::resolveTextureSize(JNIEnv* env) {

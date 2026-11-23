@@ -31,6 +31,8 @@ class Context;
 class TextureView;
 class BufferImage;
 
+enum class ImageBufferState { Pending, Ready, Expired };
+
 /**
  * ImageBuffer describes a two-dimensional array of pixels and is optimized for creating textures.
  * ImageBuffer is immutable and safe across threads. The content of an ImageBuffer never changes,
@@ -100,6 +102,17 @@ class ImageBuffer {
    */
   virtual bool expired() const {
     return false;
+  }
+
+  virtual ImageBufferState state() const {
+    return expired() ? ImageBufferState::Expired : ImageBufferState::Ready;
+  }
+
+  /** Source timestamp of the last successful read of this buffer in nanoseconds, or -1 when absent.
+   * Read after resource tasks finish and after observing Ready. It does not specify a target or
+   * guarantee that the shared source remains valid; expired() must also be checked. */
+  virtual int64_t timestamp() const {
+    return -1;
   }
 
   /**
