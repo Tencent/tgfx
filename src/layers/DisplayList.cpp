@@ -799,6 +799,11 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
   const auto treeTileCount = countTiles(tileSizeFloat * 0.5f);
   const auto gridTileCount = countTiles(tileSizeFloat);
   totalTileCount = 2 * treeTileCount + gridTileCount;
+  // Callers built against the scale-keyed cache ask for at least maxTileCount() tiles; keep that
+  // floor, since the layered pool otherwise sizes itself from the viewport alone.
+  if (_maxTileCount > totalTileCount) {
+    totalTileCount = _maxTileCount;
+  }
   auto maxTileCountPerAtlas = getMaxTileCountPerAtlas(renderSurface->getContext());
   if (maxTileCountPerAtlas > 0) {
     auto atlasCount = (totalTileCount + maxTileCountPerAtlas - 1) / maxTileCountPerAtlas;
