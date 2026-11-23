@@ -24,23 +24,18 @@ namespace tgfx {
 static void HandleBlendModes(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
                              const std::string& dstColor, const std::string& outputColor,
                              BlendMode blendMode) {
-  // The advanced modes' formula is one shared catalog function per mode, the same text the other
-  // backends consume. The function computes the whole vec4 (its alpha is the src-over rule the
-  // handlers used to spell before their per-mode rgb math), and the two precomputed operands the
-  // hue-family modes read ride the last two arguments.
-  const std::string functionName = std::string("xpBlend_") + BlendModeName(blendMode);
-  auto entry = fsBuilder->appendFunction(functionName.c_str());
+  // One dispatcher call: the mode travels as a literal, the two premultiplied operands the
+  // hue-family modes read are computed inside the function, and the whole tail is one recorded
+  // call the bytecode routes can link.
+  auto entry = fsBuilder->appendFunction("xpBlendColors");
   if (entry.empty()) {
     // A build without the catalog cannot serve the advanced modes: pass the source color through
     // so the draw still completes instead of reading uninitialized output.
     fsBuilder->codeAppendf("%s = %s;", outputColor.c_str(), srcColor.c_str());
     return;
   }
-  // The two premultiplied operands the formulas read are their own calls, so every argument a
-  // call site passes is a name or a literal.
-  auto dstPremul = fsBuilder->appendTempCall("tgfxMulAlpha", {dstColor, srcColor});
-  auto srcPremul = fsBuilder->appendTempCall("tgfxMulAlpha", {srcColor, dstColor});
-  fsBuilder->appendCall(outputColor, entry, {srcColor, dstColor, dstPremul, srcPremul});
+  fsBuilder->appendCall(outputColor, entry,
+                        {srcColor, dstColor, std::to_string(static_cast<int>(blendMode))});
 }
 
 static void OutputHandler_None(FragmentShaderBuilder* fragBuilder, const char*, const char*) {
