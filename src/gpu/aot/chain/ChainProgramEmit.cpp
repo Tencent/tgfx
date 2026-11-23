@@ -381,6 +381,10 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
         return "vec2(0.0)";
       case ChainArgKind::Vec2One:
         return "vec2(1.0)";
+      case ChainArgKind::ProjectedCoord:
+        // The assembled text route never produces this value: the divide only exists on the record
+        // route, where the body emits it as instructions.
+        return {};
       case ChainArgKind::UniformElement:
         return plan.uniforms[static_cast<size_t>(arg.index)].name + "[" +
                std::to_string(arg.element) + "]";

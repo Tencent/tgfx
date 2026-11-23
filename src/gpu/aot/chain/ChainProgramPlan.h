@@ -135,6 +135,8 @@ enum class ChainArgKind : uint8_t {
   UniformElement,
   /// The two-component one, the identity factor a coordinate scaling argument carries.
   Vec2One,
+  /// A projective coordinate's divide: the varying (index) reduced to a vec2 by w.
+  ProjectedCoord,
 };
 
 struct ChainArg {

@@ -895,12 +895,27 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         }
       }
       text += "\nlayout(location = 0) out vec4 dummyOut;\nvoid main() {\n  dummyOut = ";
-      // A row whose function returns a scalar rides a vec4 wrapper around the call; every other
-      // row returns vec4 itself.
-      const bool scalarReturn = row.returnType != OpTable::Param::Vec4;
-      if (scalarReturn) {
-        text += "vec4(";
+      // A row whose function returns something narrower than vec4 widens at the wrapper: a scalar
+      // wraps whole, a vec2 pads with zeros, a vec3 appends one zero.
+      std::string widenPrefix;
+      std::string widenSuffix;
+      switch (row.returnType) {
+        case OpTable::Param::Float:
+          widenPrefix = "vec4(";
+          widenSuffix = ")";
+          break;
+        case OpTable::Param::Vec2:
+          widenPrefix = "vec4(";
+          widenSuffix = ", 0.0, 0.0)";
+          break;
+        case OpTable::Param::Vec3:
+          widenPrefix = "vec4(";
+          widenSuffix = ", 0.0)";
+          break;
+        default:
+          break;
       }
+      text += widenPrefix;
       text += row.exportName;
       text += "(";
       for (size_t argument = 0; argument < row.argCount; ++argument) {
@@ -942,7 +957,9 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
             break;
         }
       }
-      text += scalarReturn ? "));\n}\n" : ");\n}\n";
+      text += ")";
+      text += widenSuffix;
+      text += ";\n}\n";
       std::string buildError;
       auto patched = CompileSPIRVLibraryModule(text, row.exportName, row.exportName, &buildError);
       if (patched.empty()) {

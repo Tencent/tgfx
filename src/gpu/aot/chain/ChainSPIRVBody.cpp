@@ -514,6 +514,24 @@ uint32_t ResolveArg(BodyState* state, const ChainProgramPlan& plan, const ChainA
       state->writer.Inst(kOpLoad, {elementType, valueId, chainId});
       return valueId;
     }
+    case ChainArgKind::ProjectedCoord: {
+      if (arg.index < 0 || static_cast<size_t>(arg.index) >= plan.varyings.size()) {
+        return 0;
+      }
+      const auto& name = plan.varyings[static_cast<size_t>(arg.index)].name;
+      const auto found = state->varyingIds.find(name);
+      if (found == state->varyingIds.end() || state->varyingIds[name] == 0) {
+        return 0;
+      }
+      const uint32_t varyingId = found->second;
+      const uint32_t xy = state->writer.NewId();
+      state->writer.Inst(kOpVectorShuffle, {state->types.vec2, xy, varyingId, varyingId, 0u, 1u});
+      const uint32_t z = state->writer.NewId();
+      state->writer.Inst(kOpCompositeExtract, {state->types.floatId, z, varyingId, 2u});
+      const uint32_t divided = state->writer.NewId();
+      state->writer.Inst(kOpFDiv, {state->types.vec2, divided, xy, z});
+      return divided;
+    }
     case ChainArgKind::Vec2One: {
       if (state->vec2OneId == 0) {
         auto* sink = state->writer.sink;

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VulkanProgramBuilder.h"
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <map>
@@ -265,7 +266,19 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
   // The stage-output sources the geometry and the xfer recorded: the composition's own inputs and
   // the plain formula that closes it. A value the plan cannot name as a declared member, a
   // varying, or a constant leaves the draw on its runtime path.
+  std::map<std::string, std::string> projectedOf = {};
   auto argOfValue = [&](const std::string& rawName, ChainArg* arg) -> bool {
+    const auto projected = projectedOf.find(rawName);
+    if (projected != projectedOf.end()) {
+      for (size_t index = 0; index < plan.varyings.size(); ++index) {
+        if (plan.varyings[index].name == projected->second) {
+          arg->kind = ChainArgKind::ProjectedCoord;
+          arg->index = static_cast<int>(index);
+          return true;
+        }
+      }
+      return false;
+    }
     std::string name = rawName;
     const auto dot = name.rfind('.');
     if (dot != std::string::npos && name.compare(dot + 1, std::string::npos, "xy") == 0) {
@@ -431,6 +444,10 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
         plan.geomCoverage = coverageSource;
       }
       combined = true;
+      continue;
+    }
+    if (source.kind == FragmentSourceRecord::Kind::Project) {
+      projectedOf[source.dst] = source.src;
       continue;
     }
     if (source.kind == FragmentSourceRecord::Kind::Alias) {

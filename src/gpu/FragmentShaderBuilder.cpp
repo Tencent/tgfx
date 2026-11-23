@@ -160,6 +160,14 @@ std::string FragmentShaderBuilder::emitPerspTextCoord(const ShaderVar& coordVar)
   }
   if (coordVar.type() == SLType::Float3) {
     const std::string perspCoordName = "perspCoord2D";
+    if (sourceRecorder != nullptr) {
+      FragmentSourceRecord record = {};
+      record.kind = FragmentSourceRecord::Kind::Project;
+      record.dst = perspCoordName;
+      record.src = coordVar.name();
+      record.order = nextEmitOrder();
+      sourceRecorder->push_back(std::move(record));
+    }
     codeAppendf("highp vec2 %s = %s.xy / %s.z;", perspCoordName.c_str(), coordVar.name().c_str(),
                 coordVar.name().c_str());
     return perspCoordName;

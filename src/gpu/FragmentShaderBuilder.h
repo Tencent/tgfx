@@ -40,6 +40,8 @@ struct FragmentSourceRecord {
     Combine,
     /// dst = src, a local alias the child emission introduces (no instruction).
     Alias,
+    /// dst = src.xy / src.z, the perspective divide of a projective coordinate.
+    Project,
   };
   Kind kind = Kind::Color;
   std::string dst = {};
