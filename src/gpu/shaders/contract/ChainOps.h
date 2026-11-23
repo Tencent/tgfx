@@ -320,6 +320,13 @@ TGFX_CHAIN_DECLARE_OP(ConicGradientT, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_
 TGFX_CHAIN_DECLARE_OP(SingleGradientColor, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
 TGFX_CHAIN_DECLARE_OP(DualGradientColor, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
 TGFX_CHAIN_DECLARE_OP(GpuTextureRead, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(EllipseCoverage, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(ComplexEllipseCoverage, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(NonAARRectCoverage, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(ComplexRRectCoverage, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(RoundStrokeRectCoverage, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(HairlineLineCoverage, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(HairlineQuadCoverage, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
 
 /// The chain-wide block region: operators whose data exceeds the slot stride get a fixed offset
 /// here instead of a slot index. The region starts right after the slot region, so a reader takes
@@ -369,7 +376,14 @@ static_assert(ColorSpaceXformDataWords > PoolSlotWords,
   X(ConicGradientT, TGFX_CHAIN_EMPTY_FIELDS)          \
   X(SingleGradientColor, TGFX_CHAIN_EMPTY_FIELDS)     \
   X(DualGradientColor, TGFX_CHAIN_EMPTY_FIELDS)       \
-  X(GpuTextureRead, TGFX_CHAIN_EMPTY_FIELDS)
+  X(GpuTextureRead, TGFX_CHAIN_EMPTY_FIELDS)          \
+  X(EllipseCoverage, TGFX_CHAIN_EMPTY_FIELDS)         \
+  X(ComplexEllipseCoverage, TGFX_CHAIN_EMPTY_FIELDS)  \
+  X(NonAARRectCoverage, TGFX_CHAIN_EMPTY_FIELDS)      \
+  X(ComplexRRectCoverage, TGFX_CHAIN_EMPTY_FIELDS)    \
+  X(RoundStrokeRectCoverage, TGFX_CHAIN_EMPTY_FIELDS) \
+  X(HairlineLineCoverage, TGFX_CHAIN_EMPTY_FIELDS)    \
+  X(HairlineQuadCoverage, TGFX_CHAIN_EMPTY_FIELDS)
 
 inline constexpr int FieldListCount = 0
 #define TGFX_CHAIN_FIELD_LIST_COUNT(name, data) +1

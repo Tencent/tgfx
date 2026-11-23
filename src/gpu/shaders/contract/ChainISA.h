@@ -37,34 +37,41 @@ inline constexpr int DataCapacity = 256;
 // function) must share its pass with its input's producer (see IsPassBoundarySensitive).
 // The define spelling is explicit rather than derived from the name: the vocabulary names carry
 // consecutive capitals (AARectCoverage), which a CamelCase-to-SCREAMING_SNAKE rule splits wrong.
-#define TGFX_CHAIN_OPS(X)                                     \
-  X(ColorMatrix, 0, 1, false, COLOR_MATRIX)                   \
-  X(Luma, 1, 1, false, LUMA)                                  \
-  X(AlphaThreshold, 2, 1, true, ALPHA_THRESHOLD)              \
-  X(ColorSpaceXform, 3, 1, false, COLOR_SPACE_XFORM)          \
-  X(None, 4, 0, false, NONE)                                  \
-  X(Texture, 5, 0, false, TEXTURE)                            \
-  X(ConstColor, 6, 1, false, CONST_COLOR)                     \
-  X(Blend, 7, 2, false, BLEND)                                \
-  X(AARectCoverage, 8, 1, false, AARECT_COVERAGE)             \
-  X(Gradient, 9, 0, false, GRADIENT)                          \
-  X(LocalRectCoverage, 10, 1, false, LOCAL_RECT_COVERAGE)     \
-  X(RRectCoverage, 11, 1, false, RRECT_COVERAGE)              \
-  X(TexModulate, 12, 1, false, TEX_MODULATE)                  \
-  X(InputOpaque, 13, 1, false, INPUT_OPAQUE)                  \
-  X(MulAlpha, 14, 2, false, MUL_ALPHA)                        \
-  X(PerlinNoise, 15, 0, false, PERLIN_NOISE)                  \
-  X(YUV, 16, 0, false, YUV)                                   \
-  X(GaussianBlur1D, 17, 1, false, GAUSSIAN_BLUR_1D)           \
-  X(PremulAlpha, 18, 2, false, PREMUL_ALPHA)                  \
-  X(YUVConvert, 19, 1, false, YUV_CONVERT)                    \
-  X(LinearGradientT, 20, 1, false, LINEAR_GRADIENT_T)         \
-  X(RadialGradientT, 21, 1, false, RADIAL_GRADIENT_T)         \
-  X(DiamondGradientT, 22, 1, false, DIAMOND_GRADIENT_T)       \
-  X(ConicGradientT, 23, 1, false, CONIC_GRADIENT_T)           \
-  X(SingleGradientColor, 24, 1, false, SINGLE_GRADIENT_COLOR) \
-  X(DualGradientColor, 25, 1, false, DUAL_GRADIENT_COLOR)     \
-  X(GpuTextureRead, 26, 0, false, GPU_TEXTURE_READ)
+#define TGFX_CHAIN_OPS(X)                                           \
+  X(ColorMatrix, 0, 1, false, COLOR_MATRIX)                         \
+  X(Luma, 1, 1, false, LUMA)                                        \
+  X(AlphaThreshold, 2, 1, true, ALPHA_THRESHOLD)                    \
+  X(ColorSpaceXform, 3, 1, false, COLOR_SPACE_XFORM)                \
+  X(None, 4, 0, false, NONE)                                        \
+  X(Texture, 5, 0, false, TEXTURE)                                  \
+  X(ConstColor, 6, 1, false, CONST_COLOR)                           \
+  X(Blend, 7, 2, false, BLEND)                                      \
+  X(AARectCoverage, 8, 1, false, AARECT_COVERAGE)                   \
+  X(Gradient, 9, 0, false, GRADIENT)                                \
+  X(LocalRectCoverage, 10, 1, false, LOCAL_RECT_COVERAGE)           \
+  X(RRectCoverage, 11, 1, false, RRECT_COVERAGE)                    \
+  X(TexModulate, 12, 1, false, TEX_MODULATE)                        \
+  X(InputOpaque, 13, 1, false, INPUT_OPAQUE)                        \
+  X(MulAlpha, 14, 2, false, MUL_ALPHA)                              \
+  X(PerlinNoise, 15, 0, false, PERLIN_NOISE)                        \
+  X(YUV, 16, 0, false, YUV)                                         \
+  X(GaussianBlur1D, 17, 1, false, GAUSSIAN_BLUR_1D)                 \
+  X(PremulAlpha, 18, 2, false, PREMUL_ALPHA)                        \
+  X(YUVConvert, 19, 1, false, YUV_CONVERT)                          \
+  X(LinearGradientT, 20, 1, false, LINEAR_GRADIENT_T)               \
+  X(RadialGradientT, 21, 1, false, RADIAL_GRADIENT_T)               \
+  X(DiamondGradientT, 22, 1, false, DIAMOND_GRADIENT_T)             \
+  X(ConicGradientT, 23, 1, false, CONIC_GRADIENT_T)                 \
+  X(SingleGradientColor, 24, 1, false, SINGLE_GRADIENT_COLOR)       \
+  X(DualGradientColor, 25, 1, false, DUAL_GRADIENT_COLOR)           \
+  X(GpuTextureRead, 26, 0, false, GPU_TEXTURE_READ)                 \
+  X(EllipseCoverage, 27, 0, false, ELLIPSECOVERAGE)                 \
+  X(ComplexEllipseCoverage, 28, 0, false, COMPLEXELLIPSECOVERAGE)   \
+  X(NonAARRectCoverage, 29, 0, false, NONAARRECTCOVERAGE)           \
+  X(ComplexRRectCoverage, 30, 0, false, COMPLEXRRECTCOVERAGE)       \
+  X(RoundStrokeRectCoverage, 31, 0, false, ROUNDSTROKERECTCOVERAGE) \
+  X(HairlineLineCoverage, 32, 0, false, HAIRLINELINECOVERAGE)       \
+  X(HairlineQuadCoverage, 33, 0, false, HAIRLINEQUADCOVERAGE)
 
 #define TGFX_CHAIN_OP_CONSTANT(name, id, inputs, sensitive, defineName) \
   inline constexpr int name = id;

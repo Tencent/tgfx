@@ -347,6 +347,59 @@ inline constexpr Arg kGpuTextureReadArgs[] = {
 };
 inline constexpr const char* kGpuTextureReadIncludes[] = {"fn/source/tgfx_texture_sample.inc"};
 
+// ---- EllipseCoverage: the geometry stage coverage function ----
+inline constexpr Arg kEllipseCoverageArgs[] = {{Param::Vec2, Source::CallArg, 0},
+                                               {Param::Vec4, Source::CallArg, 1},
+                                               {Param::Int, Source::CallArg, 2}};
+inline constexpr const char* kEllipseCoverageIncludes[] = {"geometry/ellipse_coverage.inc"};
+
+// ---- ComplexEllipseCoverage: the geometry stage coverage function ----
+inline constexpr Arg kComplexEllipseCoverageArgs[] = {{Param::Vec2, Source::CallArg, 0},
+                                                      {Param::Vec4, Source::CallArg, 1},
+                                                      {Param::Vec2, Source::CallArg, 2},
+                                                      {Param::Vec2, Source::CallArg, 3},
+                                                      {Param::Int, Source::CallArg, 4}};
+inline constexpr const char* kComplexEllipseCoverageIncludes[] = {
+    "geometry/complex_ellipse_coverage.inc"};
+
+// ---- NonAARRectCoverage: the geometry stage coverage function ----
+inline constexpr Arg kNonAARRectCoverageArgs[] = {{Param::Vec2, Source::CallArg, 0},
+                                                  {Param::Vec4, Source::CallArg, 1},
+                                                  {Param::Vec2, Source::CallArg, 2},
+                                                  {Param::Vec2, Source::CallArg, 3},
+                                                  {Param::Int, Source::CallArg, 4}};
+inline constexpr const char* kNonAARRectCoverageIncludes[] = {"geometry/rrect_coverage.inc"};
+
+// ---- ComplexRRectCoverage: the geometry stage coverage function ----
+inline constexpr Arg kComplexRRectCoverageArgs[] = {
+    {Param::Vec2, Source::CallArg, 0}, {Param::Vec4, Source::CallArg, 1},
+    {Param::Vec4, Source::CallArg, 2}, {Param::Vec4, Source::CallArg, 3},
+    {Param::Vec2, Source::CallArg, 4}, {Param::Int, Source::CallArg, 5}};
+inline constexpr const char* kComplexRRectCoverageIncludes[] = {
+    "geometry/complex_rrect_coverage.inc"};
+
+// ---- RoundStrokeRectCoverage: the geometry stage coverage function ----
+inline constexpr Arg kRoundStrokeRectCoverageArgs[] = {{Param::Vec2, Source::CallArg, 0},
+                                                       {Param::Vec2, Source::CallArg, 1},
+                                                       {Param::Float, Source::CallArg, 2},
+                                                       {Param::Int, Source::CallArg, 3}};
+inline constexpr const char* kRoundStrokeRectCoverageIncludes[] = {
+    "geometry/round_stroke_rect_coverage.inc"};
+
+// ---- HairlineLineCoverage: the geometry stage coverage function ----
+inline constexpr Arg kHairlineLineCoverageArgs[] = {{Param::Float, Source::CallArg, 0},
+                                                    {Param::Float, Source::CallArg, 1},
+                                                    {Param::Int, Source::CallArg, 2}};
+inline constexpr const char* kHairlineLineCoverageIncludes[] = {
+    "geometry/hairline_line_coverage.inc"};
+
+// ---- HairlineQuadCoverage: the geometry stage coverage function ----
+inline constexpr Arg kHairlineQuadCoverageArgs[] = {{Param::Vec4, Source::CallArg, 0},
+                                                    {Param::Float, Source::CallArg, 1},
+                                                    {Param::Int, Source::CallArg, 2}};
+inline constexpr const char* kHairlineQuadCoverageIncludes[] = {
+    "geometry/hairline_quad_coverage.inc"};
+
 inline constexpr Row kRows[] = {
     {ChainISA::ConstColor, "pmApplyConstColor", "", kConstColorIncludes, 1, false, true, "",
      kConstColorArgs, 3},
@@ -393,6 +446,22 @@ inline constexpr Row kRows[] = {
      true, "", kDualGradientColorArgs, 6},
     {ChainISA::GpuTextureRead, "tgfxTextureSample", "", kGpuTextureReadIncludes, 1, false, true, "",
      kGpuTextureReadArgs, 5},
+    {ChainISA::EllipseCoverage, "ellipseEdgeCoverage", "", kEllipseCoverageIncludes, 1, false, true,
+     "", kEllipseCoverageArgs, 3, Param::Float},
+    {ChainISA::ComplexEllipseCoverage, "complexEllipseEdgeCoverage", "",
+     kComplexEllipseCoverageIncludes, 1, false, true, "", kComplexEllipseCoverageArgs, 5,
+     Param::Float},
+    {ChainISA::NonAARRectCoverage, "nonAARRectCoverage", "", kNonAARRectCoverageIncludes, 1, false,
+     true, "", kNonAARRectCoverageArgs, 5, Param::Float},
+    {ChainISA::ComplexRRectCoverage, "complexRRectCoverage", "", kComplexRRectCoverageIncludes, 1,
+     false, true, "", kComplexRRectCoverageArgs, 6, Param::Float},
+    {ChainISA::RoundStrokeRectCoverage, "roundStrokeRectCoverage", "",
+     kRoundStrokeRectCoverageIncludes, 1, false, true, "", kRoundStrokeRectCoverageArgs, 4,
+     Param::Float},
+    {ChainISA::HairlineLineCoverage, "hairlineLineEdgeCoverage", "", kHairlineLineCoverageIncludes,
+     1, false, true, "", kHairlineLineCoverageArgs, 3, Param::Float},
+    {ChainISA::HairlineQuadCoverage, "hairlineQuadEdgeCoverage", "", kHairlineQuadCoverageIncludes,
+     1, false, true, "", kHairlineQuadCoverageArgs, 3, Param::Float},
     // The chain xfer tail: the FP tree reaches the per-mode functions instead.
     {PorterDuffId, "applyPorterDuffXP",
      "#define HAS_XP 1\n#define TGFX_DECLARED_CHAIN 1\n"

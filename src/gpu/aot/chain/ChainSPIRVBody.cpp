@@ -235,6 +235,23 @@ struct BodyState {
 
 // A vec4 select with a broadcast condition: SPIR-V 1.0 requires the condition's component count
 // to equal the result's, so the scalar becomes a bool vector instead of riding along as-is.
+// The SPIR-V type an operator returns: the coverage operators hand back a scalar, every other row
+// a vec4.
+uint32_t ReturnTypeId(const Types& types, ParamKind kind) {
+  switch (kind) {
+    case kFloat:
+      return types.floatId;
+    case kVec2:
+      return types.vec2;
+    case kVec3:
+      return types.vec3;
+    case kInt:
+      return types.intId;
+    default:
+      return types.vec4;
+  }
+}
+
 uint32_t SelectVec4(BodyState* state, uint32_t condition, uint32_t trueValue, uint32_t falseValue) {
   const uint32_t conditionVector = state->writer.NewId();
   state->writer.Inst(kOpCompositeConstruct, {state->types.boolVec4, conditionVector, condition,
@@ -861,7 +878,7 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
       return kind == kSampledImage ? UniformConstantPtrTo(&state, ParamTypeId(types, kind))
                                    : PtrTo(&state, ParamTypeId(types, kind));
     };
-    std::vector<uint32_t> operands = {types.vec4};
+    std::vector<uint32_t> operands = {ReturnTypeId(types, signature->returnType)};
     for (ParamKind kind : signature->params) {
       operands.push_back(paramPointer(kind));
     }
@@ -884,7 +901,8 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
     const uint32_t functionId = writer.NewId();
     state.opFunctions[importOp] = functionId;
     writer.Sink(&writer.func);
-    writer.Inst(kOpFunction, {types.vec4, functionId, 0, functionType});
+    writer.Inst(kOpFunction,
+                {ReturnTypeId(types, signature->returnType), functionId, 0, functionType});
     for (ParamKind kind : signature->params) {
       const uint32_t parameterId = writer.NewId();
       writer.Inst(kOpFunctionParameter, {paramPointer(kind), parameterId});
@@ -1250,10 +1268,16 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
           *error = "a call has no linked operator for op " + std::to_string(call.op);
           return false;
         }
+        const ParamKind returnKind = signature == nullptr ? kVec4 : signature->returnType;
         result = writer.NewId();
-        std::vector<uint32_t> callOperands = {types.vec4, result, found->second};
+        std::vector<uint32_t> callOperands = {ReturnTypeId(types, returnKind), result,
+                                              found->second};
         callOperands.insert(callOperands.end(), arguments.begin(), arguments.end());
         writer.Inst(kOpFunctionCall, callOperands);
+        if (returnKind == kFloat) {
+          // A scalar operator (the geometry coverage) feeds the vec4 register the plan reads.
+          result = Splat4(&state, result);
+        }
         break;
       }
     }
