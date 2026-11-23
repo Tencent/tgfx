@@ -109,11 +109,27 @@
             await new Promise(function(resolve) { setTimeout(resolve, 0); });
         }
         console.log('All tests finished with exit code:', result);
-        await downloadOutputDir(module.FS, '/test/baseline-out', 'baseline-out.zip');
-        await downloadOutputDir(module.FS, '/test/out', 'test-out.zip');
+        // A broken archive must not abort the remaining downloads: test-out.zip carries the
+        // failure screenshots exactly when the run fails. Any failure still flips the exit code.
+        let downloadFailed = false;
+        const downloads = [
+            ['/test/baseline-out', 'baseline-out.zip', null],
+            ['/test/out', 'test-out.zip', null],
+        ];
         if (mode === 'reference' && result === 0) {
-            await downloadOutputDir(module.FS, '/test/baseline/.cache/' + backend,
-                                    'reference-cache.zip', ['md5.json', 'version.json']);
+            downloads.push(['/test/baseline/.cache/' + backend, 'reference-cache.zip',
+                            ['md5.json', 'version.json']]);
+        }
+        for (const [dir, zipName, names] of downloads) {
+            try {
+                await downloadOutputDir(module.FS, dir, zipName, names);
+            } catch (e) {
+                downloadFailed = true;
+                console.error(`Failed to create ${zipName}:`, e);
+            }
+        }
+        if (downloadFailed) {
+            console.log('All tests finished with exit code: 1');
         }
         } catch (e) {
             console.error('Test execution failed:', e);

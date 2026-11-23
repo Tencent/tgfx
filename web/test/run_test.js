@@ -14,7 +14,7 @@ function ReadOption(name, fallback) {
 }
 
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
-const WEB_TEST_DIR = path.resolve(ReadOption('--web-root', __dirname));
+const WEB_TEST_DIR = fs.realpathSync(path.resolve(ReadOption('--web-root', __dirname)));
 const DOWNLOADS_DIR = path.join(WEB_TEST_DIR, '.downloads');
 const PORT = 8082;
 const TIMEOUT_MS = 10 * 60 * 1000;
@@ -23,9 +23,12 @@ const MODE = ReadOption('--mode', 'verify');
 const REFERENCE_COMMIT = ReadOption('--reference-commit', '');
 const TEST_URL = `http://127.0.0.1:${PORT}/index.html?mode=${encodeURIComponent(MODE)}` +
   `&backend=${encodeURIComponent(BACKEND)}&commit=${encodeURIComponent(REFERENCE_COMMIT)}`;
-if (!['verify', 'reference'].includes(MODE) ||
-    (MODE === 'reference' && (!/^[0-9a-f]{40}$/.test(REFERENCE_COMMIT) ||
-      !WEB_TEST_DIR.startsWith(path.join(__dirname, `build-reference-${BACKEND}`) + path.sep)))) {
+if (!['verify', 'reference'].includes(MODE)) {
+  console.error(`Invalid mode: "${MODE}". Must be one of: verify, reference`);
+  process.exit(1);
+}
+if (MODE === 'reference' && (!/^[0-9a-f]{40}$/.test(REFERENCE_COMMIT) ||
+    !WEB_TEST_DIR.startsWith(path.join(__dirname, `build-reference-${BACKEND}`) + path.sep))) {
   console.error('Reference generation requires a pinned main commit and isolated runtime directory.');
   process.exit(1);
 }

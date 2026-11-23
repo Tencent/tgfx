@@ -29,6 +29,7 @@ function RunScenario(options) {
     }
     const filesystem = {
       existsSync(file) { return files.has(path.basename(file)); },
+      realpathSync(file) { return file; },
       mkdirSync: CheckMutation,
       rmSync: CheckMutation,
     };
@@ -231,12 +232,17 @@ async function RunPage(options) {
   const module = {
     tgfx: { setColorSpace() {} },
     FS: {
-      stat(directory) {
-        if (directory !== '/test/baseline/.cache/webgpu') throw new Error('No output');
-        return {};
+      stat(target) {
+        const existing = options.outputDirs || ['/test/baseline/.cache/webgpu'];
+        const exists = existing.some(function(dir) { return target === dir || target.startsWith(dir + '/'); });
+        if (!exists) throw new Error('No output');
+        return { mode: 0 };
       },
+      readdir() { return ['result.json']; },
+      isDir() { return false; },
       readFile(filename) {
         if (options.missingFile && filename.endsWith(options.missingFile)) throw new Error('Missing reference file');
+        if (options.failingDir && filename.startsWith(options.failingDir + '/')) throw new Error('Read failed');
         return Buffer.from('{}');
       },
     },
@@ -308,4 +314,27 @@ test('http server runs without npx and is stopped before the runner exits', { ti
     assert.equal(command, process.execPath);
     assert.ok(args[0].endsWith(path.join('http-server', 'bin', 'http-server')));
     assert.deepEqual(result.serverSignals, ['SIGTERM']);
+  });
+
+test('page a failed archive does not abort the remaining downloads', async function() {
+  const result = await RunPage({
+    mode: 'reference',
+    outputDirs: ['/test/baseline-out', '/test/out', '/test/baseline/.cache/webgpu'],
+    failingDir: '/test/baseline-out',
+  });
+  assert.ok(!result.downloads.includes('baseline-out.zip'));
+  assert.ok(result.downloads.includes('test-out.zip'));
+  assert.ok(result.downloads.includes('reference-cache.zip'));
+  assert.ok(result.messages.includes('All tests finished with exit code: 1'));
+  assert.equal(result.messages.at(-1), DONE);
+});
+
+test('invalid mode reports the mode error instead of reference requirements', { timeout: 2000 },
+  async function() {
+    const result = await RunScenario({ mode: 'verfy', messages: [SUCCESS, DONE] });
+    assert.equal(result.code, 1);
+    assert.ok(result.output.some(function(line) { return line.includes('Invalid mode: "verfy"'); }));
+    assert.ok(!result.output.some(function(line) {
+      return line.includes('Reference generation requires a pinned main commit');
+    }));
   });
