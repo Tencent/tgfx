@@ -1872,6 +1872,56 @@ TGFX_TEST(LayerImageReaderTest, AncestorScrollRectClipsBackdropAndPlainTiles) {
   }
 }
 
+static std::shared_ptr<Layer> BuildAncestorScrollClipScene(float offset,
+                                                           std::shared_ptr<Layer>* target) {
+  auto ancestor = Layer::Make();
+  ancestor->setMatrix(Matrix::MakeTrans(7, 9));
+  ancestor->setScrollRect(Rect::MakeXYWH(12.0f + offset, 8.0f, 20.0f, 20.0f));
+  auto parent = Layer::Make();
+  parent->setMatrix(Matrix::MakeTrans(3 + offset, 1));
+  auto content = Layer::Make();
+  content->setMatrix(Matrix::MakeTrans(7, 3));
+  content->addChild(MakeExportSolid(Color::Red()));
+  content->addChild(MakeExportGlass(6, 7, 10));
+  content->addChild(MakeExportGlass(96, 72, 16, 5000));
+  auto viewport = Layer::Make();
+  viewport->setScrollRect(Rect::MakeXYWH(5000.0f + offset, 0.0f, 100.0f, 100.0f));
+  viewport->addChild(MakeExportGlass(5003.0f + offset, 18.0f, 5.0f));
+  content->addChild(viewport);
+  parent->addChild(content);
+  ancestor->addChild(parent);
+  *target = content;
+  return ancestor;
+}
+
+TGFX_TEST(LayerImageReaderTest, AncestorScrollRectFarFromOriginMatchesLocalScene) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  std::shared_ptr<Layer> localTarget = nullptr;
+  auto localScene = BuildAncestorScrollClipScene(0.0f, &localTarget);
+  auto localDisplayList = MakeDisplayList(localScene);
+  auto local = ReadTiled(context, localTarget, {32, 32});
+  ASSERT_EQ(local.error, LayerImageErrorCode::None);
+  ASSERT_FALSE(local.image.pixels.empty());
+  EXPECT_TRUE(local.bandSequenceValid);
+
+  constexpr float FarOffset = 5000.0f;
+  std::shared_ptr<Layer> farTarget = nullptr;
+  auto farScene = BuildAncestorScrollClipScene(FarOffset, &farTarget);
+  auto farDisplayList = MakeDisplayList(farScene);
+  auto far = ReadTiled(context, farTarget, {32, 32});
+  ASSERT_EQ(far.error, LayerImageErrorCode::None);
+  ASSERT_FALSE(far.image.pixels.empty());
+  EXPECT_TRUE(far.bandSequenceValid);
+  EXPECT_EQ(CountDifferentPixels(local.image, far.image, 0), 0)
+      << DescribePixelDifferences(local.image, far.image);
+  ExpectExportPixel(far.image, 11, 12, {255, 96, 96, 255}, 1);
+  ExpectExportPixel(far.image, 18, 19, {255, 0, 0, 255});
+  // The scrolled viewport inside the target is also culled by the same check.
+  ExpectExportPixel(far.image, 5, 20, {255, 96, 96, 255}, 1);
+}
+
 TGFX_TEST(LayerImageReaderTest, FullyClippedBackdropDoesNotRequireTileSnapshot) {
   ContextScope scope;
   auto context = scope.getContext();

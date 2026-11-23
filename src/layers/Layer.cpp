@@ -1771,7 +1771,9 @@ bool Layer::applyScrollRect(const DrawArgs& args, Canvas* canvas) const {
     return true;
   }
   if (args.drawControl != nullptr) {
-    // A tile outside this viewport needs no backdrop snapshots from the subtree.
+    // A tile outside this viewport needs no backdrop snapshots from the subtree. GetClipBounds
+    // reports the clip in the current canvas-local space, which is also the space of the scroll
+    // rect after the caller applied this layer's matrix.
     auto clip = GetClipBounds(canvas);
     if (clip && !Rect::Intersects(*clip, *_scrollRect)) {
       return false;

@@ -111,13 +111,17 @@ class BackgroundHandler {
   virtual LayerChildRange childRange(const Layer* parent, float alpha) const;
 
   // Draws a child whose descendants must be visited or whose parent has a truncated range.
-  // The final child of a full range uses the layer's normal draw path directly, so this is only
-  // called when forceDescendants is true or the range is truncated. A subclass that intercepts a
-  // specific child must return drawTrailingContent = false from childRange for its parent.
+  // Descendants of siblings before a background style are part of the backdrop source, so they
+  // must be drawn completely even when they fall outside the tile's clip. The final child of a
+  // full range uses the layer's normal draw path directly, so this is only called when
+  // forceDescendants is true or the range is truncated. A subclass that intercepts a specific
+  // child must return drawTrailingContent = false from childRange for its parent.
   virtual void drawChild(const DrawArgs& args, Canvas* canvas, Layer* parent, Layer* child,
                          float alpha, bool forceDescendants);
 
-  // The consume pass reuses sources from capture to avoid redundant image recordings.
+  // Returns a previously cached LayerStyleSource for the given layer, or nullptr if none exists.
+  // The consume pass reuses sources from capture to avoid redundant image recordings. The default
+  // returns nullptr, so NoOp handlers don't engage caching.
   virtual const LayerStyleSource* getCachedLayerStyleSource(Layer* /*layer*/) const {
     return nullptr;
   }

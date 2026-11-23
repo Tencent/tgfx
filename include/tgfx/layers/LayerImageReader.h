@@ -54,8 +54,8 @@ enum class LayerImageErrorCode {
   /**
    * The layer tree or output mapping cannot be exported by the reader. For example: a hidden
    * target branch, a singular target-to-scene transform, 3D content that participates in drawing
-   * or masking, a perspective output matrix, or dimensions, translations or capture bounds
-   * beyond 2^23.
+   * or masking, a perspective output matrix, or output dimensions or capture origins beyond 2^23
+   * or capture edges beyond 2^24.
    */
   UnsupportedContent,
   /**
@@ -194,6 +194,10 @@ struct LayerImageReadResult {
  * The reader reports UnsupportedContent for hidden targets or 3D content that participates in
  * scene drawing or masking. Output dimensions, tile origins, and output-space translations are
  * limited to a magnitude of 2^23.
+ *
+ * On WebGPU the reader needs a build with Asyncify enabled, because reading a band synchronously
+ * requires the asynchronous buffer mapping to complete inside readNextBand(). Without Asyncify
+ * every read fails with ReadbackFailed.
  *
  * The reader holds strong references to the target and scene root, but that does not freeze the
  * scene: the caller must keep the layers, styles, fonts and image resources unchanged until the

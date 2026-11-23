@@ -539,6 +539,8 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
                 Rect::MakeXYWH(contentOffset.x, contentOffset.y, contentWidth, contentHeight);
             auto styleBounds = style->filterBounds(contentBounds, source->contentScale);
             auto inverseScale = 1.0f / source->contentScale;
+            // GetClipBounds reports the clip in the current canvas-local space, so scale the
+            // style bounds back from content pixels before comparing them.
             styleBounds.scale(inverseScale, inverseScale);
             if (!Rect::Intersects(styleBounds, *clipBounds)) {
               return;
