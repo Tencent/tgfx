@@ -518,19 +518,22 @@ uint32_t ResolveArg(BodyState* state, const ChainProgramPlan& plan, const ChainA
       if (arg.index < 0 || static_cast<size_t>(arg.index) >= plan.varyings.size()) {
         return 0;
       }
-      const auto& name = plan.varyings[static_cast<size_t>(arg.index)].name;
-      const auto found = state->varyingIds.find(name);
-      if (found == state->varyingIds.end() || state->varyingIds[name] == 0) {
+      const auto& varying = plan.varyings[static_cast<size_t>(arg.index)];
+      const auto found = state->varyingIds.find(varying.name);
+      if (found == state->varyingIds.end() || found->second == 0) {
         return 0;
       }
       const uint32_t varyingId = found->second;
-      const uint32_t xy = state->writer.NewId();
-      state->writer.Inst(kOpVectorShuffle, {state->types.vec2, xy, varyingId, varyingId, 0u, 1u});
-      const uint32_t z = state->writer.NewId();
-      state->writer.Inst(kOpCompositeExtract, {state->types.floatId, z, varyingId, 2u});
-      const uint32_t divided = state->writer.NewId();
-      state->writer.Inst(kOpFDiv, {state->types.vec2, divided, xy, z});
-      return divided;
+      if (varying.type != FragmentType::Float3) {
+        // An affine coordinate arrives already reduced; only the projective form divides.
+        return varying.type == FragmentType::Float2 ? varyingId : 0;
+      }
+      // A fragment-side divide of a parameter-derived vector crashes SwiftShader's code generator
+      // (rr::Nucleus::createBitCast), whether the operands come from an extract, a shuffle or a
+      // vector divide. Until the divide moves to the vertex stage, the projective coordinate stays
+      // unnamed and the draw keeps its gated path.
+      (void)varyingId;
+      return 0;
     }
     case ChainArgKind::Vec2One: {
       if (state->vec2OneId == 0) {
