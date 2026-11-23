@@ -40,10 +40,11 @@ int main(int argc, char** argv) {
     // rejected": scripts can tell a usage mistake from a real build failure.
     return 2;
   }
-  if (!options.catalogPath.empty()) {
-    std::string catalogError;
-    if (!tgfx::WriteFunctionCatalog(options.shaderDir, options.catalogPath, &catalogError)) {
-      std::cerr << "ERROR: " << catalogError << "\n";
+  if (!options.libraryBundlePath.empty()) {
+    std::string bundleError;
+    if (!tgfx::WriteShaderLibraryBundle(options.shaderDir, options.libraryBundlePath,
+                                        &bundleError)) {
+      std::cerr << "ERROR: " << bundleError << "\n";
       return 1;
     }
     return 0;

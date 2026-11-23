@@ -17,13 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/chain/ChainProgramEmit.h"
-
-// The scanned function catalog (shader_build_tool --catalog). Builds that do not generate it fall
-// back to the pack entries.
-#if __has_include("ChainFunctionCatalog.h")
-#include "ChainFunctionCatalog.h"
-#define TGFX_HAS_CHAIN_CATALOG 1
-#endif
 #include <atomic>
 #include <cstdlib>
 #include <fstream>
@@ -31,43 +24,18 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/chain/ChainProgramPlan.h"
 #include "gpu/aot/ir/DrawIR.h"
+#include "gpu/shaders/ShaderFunctionCatalog.h"
+#include "gpu/shaders/ShaderLibraryBundle.h"
 #include "gpu/shaders/contract/ChainISA.h"
 #include "gpu/shaders/contract/FragmentLibrary.h"
 
 namespace tgfx {
 
-#if defined(TGFX_HAS_CHAIN_CATALOG)
-// The catalog's requires list is inferred from the function bodies, so emitting a function after its
-// dependencies gives a text whose callees are always spelled before the call. `emitted` is per
-// program: two programs never share a prefix.
+// The bundle expands a function's dependencies before the call, so the assembled text never names a
+// callee it has not spelled yet.
 void AppendCatalogFunction(const char* name, std::set<std::string>* emitted, std::string* out) {
-  if (name == nullptr || name[0] == '\0' || !emitted->insert(name).second) {
-    return;
-  }
-  for (const auto& entry : kChainFunctions) {
-    if (entry.name == nullptr || std::strcmp(entry.name, name) != 0) {
-      continue;
-    }
-    const std::string requires = entry.requires != nullptr ? entry.requires : "";
-    size_t start = 0;
-    while (start <= requires.size()) {
-      const size_t comma = requires.find(',', start);
-      const std::string dep =
-          requires.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
-      if (!dep.empty()) {
-        AppendCatalogFunction(dep.c_str(), emitted, out);
-      }
-      if (comma == std::string::npos) {
-        break;
-      }
-      start = comma + 1;
-    }
-    out->append(entry.source);
-    out->push_back('\n');
-    return;
-  }
+  AppendShaderFunction(name, emitted, out);
 }
-#endif
 
 namespace {
 
@@ -177,10 +145,6 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
     unitCoverageExpr = "vec4(1.0)";
   }
   if (const auto* coverage = ChainGeometryCoverageOf(plan.geometry)) {
-#if defined(TGFX_HAS_CHAIN_CATALOG)
-    if (FindChainFunctionSource(coverage->function) == nullptr) {
-      return false;
-    }
     std::string callArgs = {};
     for (size_t arg = 0; arg < coverage->argCount; ++arg) {
       if (arg != 0) {
@@ -190,10 +154,9 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
     }
     unitCoverageExpr = std::string(coverage->function) + "(" + callArgs + ")";
     std::set<std::string> geometryEmitted = {};
-    AppendCatalogFunction(coverage->function, &geometryEmitted, &geometryFormulas);
-#else
-    return false;
-#endif
+    if (!AppendShaderFunction(coverage->function, &geometryEmitted, &geometryFormulas)) {
+      return false;
+    }
   }
 
   // The source functions the body calls, each reading the members and varyings it declares. The
@@ -261,7 +224,6 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   if (needsAnalytic && !appendPiece(FragmentPackDepAnalyticClipMath)) {
     return false;
   }
-#if defined(TGFX_HAS_CHAIN_CATALOG)
   std::set<std::string> catalogEmitted = {};
   // The dst-texture xfer leg's raw functions: the read, and whichever composite the tail names
   // (the porter-duff apply through the tail function's own requires, the blend pass directly).
@@ -277,18 +239,16 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
     AppendCatalogFunction("tiledApplyBorder", &catalogEmitted, &pieces);
     AppendCatalogFunction("tiledSeamBlend", &catalogEmitted, &pieces);
   }
-#endif
   for (int op : plan.usedOps) {
     const auto* def = FindFragment(op);
     if (def == nullptr || def->sourceFile == nullptr) {
       continue;
     }
-#if defined(TGFX_HAS_CHAIN_CATALOG)
-    if (FindChainFunctionSource(def->functionName) != nullptr) {
+    if (ShaderLibraryBundle::Get().containsFunction(ShaderLibraryLanguage::GLSL,
+                                                    def->functionName)) {
       AppendCatalogFunction(def->functionName, &catalogEmitted, &pieces);
       continue;
     }
-#endif
     if (!appendPiece(0x40000000u | static_cast<uint32_t>(op))) {
       return false;
     }
@@ -532,12 +492,11 @@ bool PrintChainProgramGLSL(const ChainProgramPlan& plan, const PrecompiledShader
   // here as plain statements, so no placeholder template survives.
   const bool porterDuff = plan.hasXp != 0 && !plan.xpNeedsBlendPass;
   const char* tailName = porterDuff ? "chainTail_porterDuff" : "chainTail_plain";
-  if (FindChainFunctionSource(tailName) == nullptr) {
+  // The tail rides the bundle so its own requires (the porter-duff apply and the blend table
+  // behind it) come along in one pass.
+  if (!AppendShaderFunction(tailName, &catalogEmitted, &pieces)) {
     return false;
   }
-  // The tail rides the catalog so its own requires (the porter-duff apply and the blend table
-  // behind it) come along in one pass.
-  AppendCatalogFunction(tailName, &catalogEmitted, &pieces);
   std::string tailText = "  vec4 finalCoverage = " + coverage + ";\n";
   if (plan.hasMaskSampler) {
     tailText += "  highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);\n";

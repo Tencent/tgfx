@@ -271,6 +271,9 @@ std::string UsageText() {
          "  --out-dir <path>      Output directory for build artifacts\n"
          "  --backends <list>     Comma-separated backend list "
          "(opengl,opengles,vulkan,metal,webgpu,d3d12)\n"
+         "  --library-bundle <path>\n"
+         "                        Scan the function sources and write the single shader library\n"
+         "                        bundle (no variant bundles are built)\n"
          "\n"
          "  --compress            Compress data pool with zstd in output bundles\n"
          "  --cache-dir <path>    Persistent stage cache (default: <out-dir>/stage_cache)\n"
@@ -297,8 +300,8 @@ void PrintUsage() {
 
 bool ParseArgs(int argc, char** argv, BuildOptions* options) {
   for (int i = 1; i < argc; i++) {
-    if (std::strcmp(argv[i], "--catalog") == 0 && i + 1 < argc) {
-      options->catalogPath = argv[++i];
+    if (std::strcmp(argv[i], "--library-bundle") == 0 && i + 1 < argc) {
+      options->libraryBundlePath = argv[++i];
     } else if (std::strcmp(argv[i], "--shader-dir") == 0 && i + 1 < argc) {
       options->shaderDir = argv[++i];
     } else if (std::strcmp(argv[i], "--out-dir") == 0 && i + 1 < argc) {
