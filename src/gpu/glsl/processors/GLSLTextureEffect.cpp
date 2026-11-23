@@ -131,9 +131,16 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   // plan cannot name, so those draws stay on their fallback.
   const auto finalCoordName =
       fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
-  const auto readName = fragBuilder->readTexture(textureSampler, finalCoordName, "");
+  bool recorded = false;
+  const auto readName = fragBuilder->readTexture(textureSampler, finalCoordName, "", &recorded);
   if (alphaStart == Point::Zero()) {
-    fragBuilder->storeColor(args.outputColor, readName);
+    if (recorded) {
+      fragBuilder->storeColor(args.outputColor, readName);
+    } else {
+      // The read stayed text: keep the store text too, so the runtime route declines the draw
+      // instead of reading a value it cannot name.
+      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), readName.c_str());
+    }
     return;
   }
   fragBuilder->codeAppendf("vec4 color = %s;", readName.c_str());

@@ -397,14 +397,13 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
     }
     if (source.kind == FragmentSourceRecord::Kind::Alias) {
       ChainArg arg = ChainArg::None();
-      int reg = -1;
-      if (!resolveOutput(source.src, &arg, &reg)) {
+      if (!resolveArg(source.src, &arg)) {
         LOGE("VulkanProgramBuilder: the alias %s reads %s, which the plan cannot name",
              source.dst.c_str(), source.src.c_str());
         return nullptr;
       }
-      if (reg >= 0) {
-        registerOf[source.dst] = reg;
+      if (arg.kind == ChainArgKind::Register) {
+        registerOf[source.dst] = arg.index;
       } else {
         sourceOf[source.dst] = arg;
       }
