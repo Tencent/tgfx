@@ -621,11 +621,10 @@ TGFX_TEST(PathShapeTest, ChainedUnionBuildsEachOperandOnce) {
   EXPECT_EQ(pathCalls, 3);
 }
 
-// A PathProvider is allowed to report bounds that only contain its outlines - that is what a text
-// run does with its em box. Two such shapes whose reported bounds overlap but whose outlines sit
-// apart are the case where a union has to be resolved: deciding the fast path from the tighter
-// outline bounds would concatenate them and hand out an outline carrying a rule the shape does not
-// report.
+// A PathProvider is allowed to report bounds that contain its outlines - that is what a text run
+// does with its em box. Two such shapes whose reported bounds overlap but whose outlines sit apart
+// must be resolved by boolean: deciding the fast path from the tighter outline bounds would
+// concatenate them even though the shapes' own reported bounds say they overlap.
 class LooseBoundsProvider final : public PathProvider {
  public:
   LooseBoundsProvider(const Rect& outline, const Rect& bounds) : outline(outline), bounds(bounds) {
@@ -1601,6 +1600,21 @@ TGFX_TEST(PathShapeTest, DashEffectKeepsInputFillRule) {
   ASSERT_TRUE(effect != nullptr);
   ASSERT_TRUE(effect->filterPath(&path));
   EXPECT_EQ(path.getFillType(), PathFillType::EvenOdd);
+}
+
+TGFX_TEST(PathShapeTest, DashEffectsKeepWindingRuleForInverseInput) {
+  float intervals[] = {10.0f, 5.0f};
+  for (bool adaptive : {false, true}) {
+    Path path = {};
+    path.addRect(Rect::MakeLTRB(0, 0, 100, 100));
+    path.setFillType(PathFillType::InverseWinding);
+    auto effect = PathEffect::MakeDash(intervals, 2, 0.0f, adaptive);
+    ASSERT_TRUE(effect != nullptr);
+    ASSERT_TRUE(effect->filterPath(&path));
+    // Both dash modes rewrite the outline, so neither may flip the plane into the filled area.
+    EXPECT_EQ(path.getFillType(), PathFillType::Winding) << (adaptive ? "adaptive" : "fixed");
+    EXPECT_FALSE(path.contains(200.f, 200.f)) << (adaptive ? "adaptive" : "fixed");
+  }
 }
 
 }  // namespace tgfx

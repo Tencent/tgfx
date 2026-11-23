@@ -238,7 +238,11 @@ bool AdaptiveDashEffect::filterPath(Path* path) const {
   }
 
   PathRef::WriteAccess(*path) = resultPath;
-  path->setFillType(fillType);
+  // The dash contours are a new outline, so an inverse rule would flip the filled area to the
+  // plane minus the dashes. Match SkPathEffectWrapper and keep the rule only for non-inverse input.
+  if (fillType != PathFillType::InverseWinding && fillType != PathFillType::InverseEvenOdd) {
+    path->setFillType(fillType);
+  }
   return true;
 }
 
