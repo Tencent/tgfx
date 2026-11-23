@@ -91,12 +91,14 @@ void GLSLTextureEffect::emitCode(EmitArgs& args) const {
   } else {
     emitDefaultTextureCode(args);
   }
+  auto entry = fragBuilder->appendFunction("tgfxMulAlpha");
+  if (entry.empty()) {
+    return;
+  }
   if (textureProxy->isAlphaOnly()) {
-    fragBuilder->codeAppendf("%s = %s.a * %s;", args.outputColor.c_str(), args.outputColor.c_str(),
-                             args.inputColor.c_str());
+    fragBuilder->appendCall(args.outputColor, entry, {args.inputColor, args.outputColor});
   } else {
-    fragBuilder->codeAppendf("%s = %s * %s.a;", args.outputColor.c_str(), args.outputColor.c_str(),
-                             args.inputColor.c_str());
+    fragBuilder->appendCall(args.outputColor, entry, {args.outputColor, args.inputColor});
   }
 }
 
@@ -125,10 +127,16 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   if (SrcRectConstraint::Strict == constraint) {
     extraSubsetName = args.inputSubset;
   }
-  auto finalCoordName = fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
-  fragBuilder->codeAppend("vec4 color = ");
-  fragBuilder->appendTextureLookup(textureSampler, finalCoordName);
-  fragBuilder->codeAppend(";");
+  // The read keeps the clamp the call site already composed: a clamped coordinate is a local the
+  // plan cannot name, so those draws stay on their fallback.
+  const auto finalCoordName =
+      fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
+  const auto readName = fragBuilder->readTexture(textureSampler, finalCoordName, "");
+  if (alphaStart == Point::Zero()) {
+    fragBuilder->storeColor(args.outputColor, readName);
+    return;
+  }
+  fragBuilder->codeAppendf("vec4 color = %s;", readName.c_str());
   if (alphaStart != Point::Zero()) {
     fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
     auto alphaStartName =

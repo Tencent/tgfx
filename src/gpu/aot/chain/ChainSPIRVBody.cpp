@@ -755,19 +755,25 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   writer.Inst(kOpDecorate, {state.uboId, kDecorationBinding, FRAGMENT_UBO_BINDING_POINT});
   writer.Sink(&writer.decl);
 
-  // The four leaf samplers: the body owns every descriptor declaration, and the operators that
-  // sample take them as arguments, so the linked module carries one variable per location.
+  // The leaf samplers the layout declares: the body owns every descriptor declaration, and the
+  // operators that sample take them as arguments. Only the declared leaves get a variable — a
+  // plan with one sampler must not bind four, or the pipeline's descriptor set disagrees.
   uint32_t leafSamplerVars[4] = {0, 0, 0, 0};
   {
-    uint32_t leafBindings[4] = {8, 9, 10, 11};
+    bool present[4] = {false, false, false, false};
+    uint32_t leafBindings[4] = {0, 0, 0, 0};
     for (const auto& texture : layout.textures) {
       for (int leaf = 0; leaf < 4; ++leaf) {
         if (texture.name == "TextureSampler_" + std::to_string(leaf)) {
+          present[leaf] = true;
           leafBindings[leaf] = texture.binding;
         }
       }
     }
     for (int leaf = 0; leaf < 4; ++leaf) {
+      if (!present[leaf]) {
+        continue;
+      }
       const uint32_t samplerPointer = UniformConstantPtrTo(&state, types.sampledImage);
       const uint32_t variableId = writer.NewId();
       writer.Inst(kOpVariable, {samplerPointer, variableId, kStorageUniformConstant});

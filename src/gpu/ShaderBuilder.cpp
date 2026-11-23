@@ -149,8 +149,14 @@ void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::
   auto sampler = uniformHandler->getSamplerVariable(samplerHandle);
   const char* reader = TextureReaderName(sampler.type());
   auto entry = reader == nullptr ? std::string() : appendFunction(reader);
+  // The 2D reader carries the subset clamp as a call argument, so every reader spells the same
+  // four-argument shape; the rect/external readers keep their two-argument form for now.
+  const bool carriesSubset = sampler.type() == SLType::Texture2DSampler;
   if (entry.empty()) {
     codeAppendf("texture(%s, %s)", sampler.name().c_str(), coordName.c_str());
+  } else if (carriesSubset) {
+    codeAppendf("%s(%s, %s, vec4(0.0), 0)", entry.c_str(), sampler.name().c_str(),
+                coordName.c_str());
   } else {
     codeAppendf("%s(%s, %s)", entry.c_str(), sampler.name().c_str(), coordName.c_str());
   }

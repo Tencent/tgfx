@@ -460,7 +460,9 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
   }
   for (size_t index = 0; index < plan.samplers.size(); ++index) {
     Layout::Texture texture = {};
-    texture.name = plan.samplers[index].name;
+    // The body declares its leaf samplers by the canonical name (`TextureSampler_<leaf>`); the
+    // mangled declaration name only serves the upload's slot order.
+    texture.name = "TextureSampler_" + std::to_string(index);
     texture.binding = static_cast<uint8_t>(index);
     layout.textures.push_back(std::move(texture));
   }

@@ -37,19 +37,26 @@ void FragmentShaderBuilder::declareCustomOutputColor() {
   outputs.emplace_back(CUSTOM_COLOR_OUTPUT_NAME, SLType::Float4, typeModifier);
 }
 
-std::string FragmentShaderBuilder::readTexture(SamplerHandle handle, const std::string& coordName) {
+std::string FragmentShaderBuilder::readTexture(SamplerHandle handle, const std::string& coordName,
+                                               const std::string& subsetName) {
   auto uniformHandler = programBuilder->uniformHandler();
   auto sampler = uniformHandler->getSamplerVariable(handle);
   const char* reader = TextureReaderName(sampler.type());
+  const bool carriesSubset = sampler.type() == SLType::Texture2DSampler;
+  auto entry = reader == nullptr ? std::string() : appendFunction(reader);
   const std::string temp = "tgfxRead" + std::to_string(tempCallIndex++);
-  codeAppendf("vec4 %s = ", temp.c_str());
-  appendTextureLookup(handle, coordName);
-  codeAppend(";");
-  // The plan carries neither the rect/external sampler types nor a channel swizzle yet: the read
-  // stays unrecorded, so the runtime route declines the draw instead of sampling wrongly.
-  if (reader != nullptr && getSamplerSwizzleSuffix(handle).empty()) {
-    appendCall(temp, reader, {sampler.name(), coordName});
+  if (entry.empty() || !carriesSubset || !getSamplerSwizzleSuffix(handle).empty()) {
+    // The plan carries neither the rect/external sampler types nor a channel swizzle yet: the read
+    // stays unrecorded, so the runtime route declines the draw instead of sampling wrongly.
+    codeAppendf("vec4 %s = ", temp.c_str());
+    appendTextureLookup(handle, coordName);
+    codeAppend(";");
+    return temp;
   }
+  codeAppendf("vec4 %s;", temp.c_str());
+  const std::string subset = subsetName.empty() ? "vec4(0.0)" : subsetName;
+  const std::string clampOn = subsetName.empty() ? "0" : "1";
+  appendCall(temp, entry, {sampler.name(), coordName, subset, clampOn});
   return temp;
 }
 
