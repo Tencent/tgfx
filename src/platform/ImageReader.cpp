@@ -25,9 +25,10 @@ namespace tgfx {
 class ImageReaderBuffer : public ImageBuffer {
  public:
   ImageReaderBuffer(std::shared_ptr<ImageReader> imageReader, uint64_t bufferVersion,
-                    std::shared_ptr<ImageReaderFrame> frame)
-      : imageReader(std::move(imageReader)), contentVersion(bufferVersion),
-        frame(std::move(frame)) {
+                    int64_t target, std::shared_ptr<ImageReaderOptions> options,
+                    std::shared_ptr<ImageReaderResult> receipt)
+      : imageReader(std::move(imageReader)), contentVersion(bufferVersion), target(target),
+        options(std::move(options)), receipt(std::move(receipt)) {
   }
 
   int width() const override {
@@ -52,13 +53,15 @@ class ImageReaderBuffer : public ImageBuffer {
 
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override {
-    return imageReader->readTexture(contentVersion, context, mipmapped, frame);
+    return imageReader->readTexture(contentVersion, context, mipmapped, target, options, receipt);
   }
 
  private:
   std::shared_ptr<ImageReader> imageReader = nullptr;
   uint64_t contentVersion = 0;
-  std::shared_ptr<ImageReaderFrame> frame = nullptr;
+  int64_t target = -1;
+  std::shared_ptr<ImageReaderOptions> options = nullptr;
+  std::shared_ptr<ImageReaderResult> receipt = nullptr;
 };
 
 std::shared_ptr<ImageReader> ImageReader::MakeFrom(std::shared_ptr<ImageStream> imageStream) {
@@ -86,12 +89,18 @@ const std::shared_ptr<ColorSpace>& ImageReader::colorSpace() const {
   return stream->colorSpace();
 }
 
-std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer(
-    std::shared_ptr<ImageReaderFrame> frame) {
+std::shared_ptr<ImageBuffer> ImageReader::acquireBuffer(std::shared_ptr<ImageReaderOptions> options,
+                                                        std::shared_ptr<ImageReaderResult> result) {
   std::lock_guard<std::mutex> autoLock(locker);
   DEBUG_ASSERT(!weakThis.expired());
   bufferVersion++;
-  return std::make_shared<ImageReaderBuffer>(weakThis.lock(), bufferVersion, std::move(frame));
+  auto target = options != nullptr ? options->targetTimestamp : -1;
+  return std::make_shared<ImageReaderBuffer>(weakThis.lock(), bufferVersion, target,
+                                             std::move(options), std::move(result));
+}
+
+std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {
+  return acquireBuffer();
 }
 
 void ImageReader::notifySeeked() {
@@ -109,20 +118,20 @@ bool ImageReader::checkExpired(uint64_t contentVersion) {
 }
 
 std::shared_ptr<TextureView> ImageReader::readTexture(
-    uint64_t contentVersion, Context* context, bool mipmapped,
-    const std::shared_ptr<ImageReaderFrame>& frame) {
+    uint64_t contentVersion, Context* context, bool mipmapped, int64_t target,
+    const std::shared_ptr<ImageReaderOptions>& options,
+    const std::shared_ptr<ImageReaderResult>& receipt) {
   std::lock_guard<std::mutex> autoLock(locker);
   if (contentVersion == textureVersion) {
     return textureView;
   }
   if (contentVersion < bufferVersion) {
-    if (frame != nullptr) {
-      frame->status.store(ImageReaderStatus::Expired, std::memory_order_release);
+    if (receipt != nullptr) {
+      receipt->status.store(ImageReaderStatus::Expired, std::memory_order_release);
     }
     return nullptr;
   }
-  auto target = frame != nullptr ? frame->targetTimestamp : -1;
-  auto deadline = frame != nullptr ? frame->deadline.load(std::memory_order_acquire) : 0;
+  auto deadline = options != nullptr ? options->deadline.load(std::memory_order_acquire) : 0;
   auto result = stream->onReadTexture(context, mipmapped, textureView, target, deadline);
   if (result.status == ImageReaderStatus::Ready && target >= 0 && result.timestamp != target) {
     result.status = ImageReaderStatus::Mismatched;
@@ -139,9 +148,9 @@ std::shared_ptr<TextureView> ImageReader::readTexture(
       textureVersion = contentVersion;
     }
   }
-  if (frame != nullptr) {
-    frame->timestamp.store(result.timestamp, std::memory_order_relaxed);
-    frame->status.store(result.status, std::memory_order_release);
+  if (receipt != nullptr) {
+    receipt->timestamp.store(result.timestamp, std::memory_order_relaxed);
+    receipt->status.store(result.status, std::memory_order_release);
   }
   if (result.status != ImageReaderStatus::Ready &&
       result.status != ImageReaderStatus::Unsupported) {

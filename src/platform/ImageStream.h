@@ -77,8 +77,10 @@ class ImageStream {
 
   /**
    * Creates or updates a texture and reports which frame is bound. The deadline uses Clock::Now()'s
-   * microsecond timeline and bounds all producer-notification waits in this read. A target of -1
-   * requests the latest available frame. The result may retain a texture without declaring Ready.
+   * microsecond timeline and bounds all producer-notification waits in this read. A nonnegative
+   * target is a forward-consumption stopping point, never a request to seek or rewind the source.
+   * A target of -1 requests the latest available frame. The result may retain a texture without
+   * declaring Ready; the caller, not the stream, determines playback and publication policy.
    */
   virtual TextureReadResult onReadTexture(Context* context, bool mipmapped,
                                           std::shared_ptr<TextureView> texture, int64_t target,

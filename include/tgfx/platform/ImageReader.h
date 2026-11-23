@@ -28,31 +28,43 @@ class TextureView;
 class ImageStream;
 
 /**
- * Describes the delivery state of a texture read. Only Ready confirms that the requested frame is
- * bound. Other states do not prescribe whether the caller should display, retry, or cache it.
+ * Reports texture delivery, not playback progress or screen presentation. For a nonnegative target,
+ * only Ready confirms that the bound texture has the requested timestamp. Without a target, Ready
+ * confirms a valid texture read, not a new frame or a one-frame advance. The caller decides whether
+ * to display, retry, reposition the producer, or cache the output.
  */
 enum class ImageReaderStatus {
-  Pending,
-  Ready,
-  NotReady,
-  Mismatched,
-  Failed,
-  Expired,
-  Unsupported,
+  Pending,      // No texture read result has been reported yet.
+  Ready,        // A valid texture is bound, matching the target when one was supplied.
+  NotReady,     // The target has not been reached; the buffer may still be retried.
+  Mismatched,   // The bound timestamp does not match the target.
+  Failed,       // The texture read failed.
+  Expired,      // The buffer is no longer eligible for texture reads.
+  Unsupported,  // The source cannot verify the supplied target timestamp.
 };
 
 /**
- * Carries the target and delivery state of one ImageBuffer. Set targetTimestamp before acquiring
- * the buffer and keep it unchanged afterwards. The caller may update deadline before each texture
- * read, including retries. Read status with acquire ordering after the GPU resource tasks complete.
+ * Caller-supplied constraints for a deferred texture read. The target is copied when acquiring a
+ * buffer; later edits do not retarget that buffer. The caller may update the waiting deadline before
+ * each read, including retries. Use separate options for buffers with independent waiting budgets.
  */
-struct ImageReaderFrame {
-  /** The requested presentation timestamp in nanoseconds, or -1 to read the latest available frame. */
+struct ImageReaderOptions {
+  /** A forward-consumption stopping timestamp in nanoseconds, not a seek or random-access request.
+   * Reading never rewinds the source to reach it. Use -1 to read the latest available frame. */
   int64_t targetTimestamp = -1;
   /** The absolute waiting deadline in microseconds on Clock::Now()'s monotonic timeline.
    * A deadline at or before Clock::Now(), including 0, disables waiting for producer notifications.
    * This bounds notification waits, not platform driver calls or GPU execution. */
   std::atomic<int64_t> deadline = 0;
+};
+
+/**
+ * Reader-written delivery receipt for one buffer. Use a separate result for each buffer. After the
+ * GPU resource tasks complete, read status with acquire ordering before reading timestamp. Do not
+ * modify these fields while the buffer is in use. This reports texture reads, not playback progress
+ * or screen presentation; the caller decides whether to publish or cache the output.
+ */
+struct ImageReaderResult {
   /** The timestamp of the bound texture in nanoseconds, or -1 if no timestamp is available. */
   std::atomic<int64_t> timestamp = -1;
   /** The result of the most recent texture read. */
@@ -62,7 +74,7 @@ struct ImageReaderFrame {
 /**
  * The ImageReader class allows direct access to ImageBuffers generated from a video source of the
  * native platform. The video source could be a Surface on the android platform or an
- * HTMLVideoElement on the web platform. You should call ImageReader::acquireNextBuffer() to read a
+ * HTMLVideoElement on the web platform. You should call ImageReader::acquireBuffer() to read a
  * new ImageBuffer each time when the video source is changed. All ImageBuffers generated from one
  * ImageReader share the same internal texture, which allows you to continuously read the latest
  * content from the video source with minimal memory copying. However, there are two limits:
@@ -94,8 +106,10 @@ class ImageReader {
   const std::shared_ptr<ColorSpace>& colorSpace() const;
 
   /**
-   * Acquires an ImageBuffer after the producer renders a frame into the associated source. The
-   * frame request belongs to this buffer and cannot be overwritten by later acquisitions. A texture
+   * Acquires a deferred ImageBuffer after the producer renders into the associated source. This
+   * does not dequeue a frame; pixels are resolved during a texture read. Acquisition counts do not
+   * identify source frames: the source may skip frames when latching its latest image. The frame
+   * request belongs to this buffer and cannot be overwritten by later acquisitions. A texture
    * read returns no texture while reporting NotReady, Mismatched, Failed, or Expired. This prevents
    * resource caches from treating unrelated pixels as this buffer's content. The caller decides
    * whether to retry, retain its previous output, or request the latest frame instead. An incomplete
@@ -103,12 +117,18 @@ class ImageReader {
    * stream may immediately report Mismatched again after passing the target; retrying does not seek
    * the producer. To recover an earlier target, reposition the producer, notifySeeked(), and acquire
    * a new buffer.
-   * @param frame Optional target, waiting deadline, and delivery state for this buffer. Passing
-   * nullptr requests the latest available frame without waiting. Do not reuse a frame request for
-   * different buffers. Streams without timestamps report Unsupported for a nonnegative target.
+   * @param options Optional target and waiting deadline. A null value requests the latest available
+   * frame without waiting. The target is copied here; the deadline is read on each texture read.
+   * @param result Optional receipt for this buffer. Use a new result for each acquisition. Streams
+   * without timestamps report Unsupported for a nonnegative target. Omitting the receipt does not
+   * bypass the supplied read constraints or allow a mismatched texture to be returned.
    * @return The acquired ImageBuffer, whose pixels are resolved when it is first drawn.
    */
-  std::shared_ptr<ImageBuffer> acquireNextBuffer(std::shared_ptr<ImageReaderFrame> frame = nullptr);
+  std::shared_ptr<ImageBuffer> acquireBuffer(std::shared_ptr<ImageReaderOptions> options = nullptr,
+                                             std::shared_ptr<ImageReaderResult> result = nullptr);
+
+  /** Compatibility entry point. Use acquireBuffer() for deferred image acquisition. */
+  [[deprecated("Use acquireBuffer() instead.")]] std::shared_ptr<ImageBuffer> acquireNextBuffer();
 
   /**
    * Tells the reader that the producer seeked, so the presentation time it compares the next frame
@@ -136,8 +156,9 @@ class ImageReader {
   bool checkExpired(uint64_t contentVersion);
 
   std::shared_ptr<TextureView> readTexture(uint64_t contentVersion, Context* context,
-                                           bool mipmapped,
-                                           const std::shared_ptr<ImageReaderFrame>& frame);
+                                           bool mipmapped, int64_t target,
+                                           const std::shared_ptr<ImageReaderOptions>& options,
+                                           const std::shared_ptr<ImageReaderResult>& receipt);
 
   friend class ImageReaderBuffer;
   friend class ImageStream;
