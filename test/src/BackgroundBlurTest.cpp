@@ -21,6 +21,7 @@
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/CaptureCulling.h"
 #include "layers/RootLayer.h"
+#include "layers/SubtreeCache.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
@@ -3122,6 +3123,175 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, OpaqueContentHidesBackgroundBlur) {
     child->setLayerStyles({DropShadowStyle::Make(0, 20, 0, 0, Color::FromRGBA(0, 0, 0, 128))});
     displayList.render(surface.get());
     EXPECT_TRUE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
+    context->flushAndSubmit();
+  });
+}
+
+// Builds a card whose background blur only samples the card's own opaque fill, under a drop shadow
+// and next to striped content outside the card.
+static std::shared_ptr<SolidLayer> AddSelfContainedCard(Layer* root,
+                                                        std::shared_ptr<ShapeLayer>* backdrop) {
+  Path stripes;
+  for (int x = 0; x < 240; x += 4) {
+    stripes.addRect(Rect::MakeXYWH(static_cast<float>(x), 0.0f, 2.0f, 240.0f));
+  }
+  auto stripeLayer = ShapeLayer::Make();
+  stripeLayer->setPath(stripes);
+  stripeLayer->setFillStyle(ShapeStyle::Make(Color::Black()));
+  root->addChild(stripeLayer);
+  *backdrop = stripeLayer;
+
+  auto card = SolidLayer::Make();
+  card->setColor(Color::FromRGBA(30, 120, 220, 255));
+  card->setWidth(160);
+  card->setHeight(120);
+  card->setMatrix(Matrix::MakeTrans(40, 40));
+  card->setLayerStyles({DropShadowStyle::Make(6, 6, 4, 4, Color::FromRGBA(0, 0, 0, 120))});
+  root->addChild(card);
+
+  // Half of the card is yellow, so the chip straddling the edge blurs two colors together.
+  Path half;
+  half.addRect(Rect::MakeWH(80, 120));
+  auto inner = ShapeLayer::Make();
+  inner->setPath(half);
+  inner->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 220, 0, 255)));
+  card->addChild(inner);
+
+  Path chipPath;
+  chipPath.addRect(Rect::MakeWH(80, 40));
+  auto chip = ShapeLayer::Make();
+  chip->setPath(chipPath);
+  chip->setMatrix(Matrix::MakeTrans(40, 30));
+  chip->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 60)));
+  chip->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
+  card->addChild(chip);
+  return card;
+}
+
+static void RenderSelfContainedCard(Context* context, RenderMode mode, int cacheSize, float zoom,
+                                    std::shared_ptr<Surface>* surfaceOut,
+                                    std::shared_ptr<SolidLayer>* cardOut,
+                                    std::unique_ptr<DisplayList>* listOut) {
+  auto surface = Surface::Make(context, static_cast<int>(240 * zoom), static_cast<int>(200 * zoom));
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(mode);
+  displayList->setZoomScale(zoom);
+  displayList->setBackgroundColor(Color::White());
+  displayList->setSubtreeCacheMaxSize(cacheSize);
+  std::shared_ptr<ShapeLayer> backdrop = nullptr;
+  auto card = AddSelfContainedCard(displayList->root(), &backdrop);
+  for (int i = 0; i < 3; ++i) {
+    displayList->render(surface.get());
+  }
+  // Repaints the backdrop under the card so the card is drawn again once its subtree is static.
+  backdrop->setFillStyle(ShapeStyle::Make(Color::Black()));
+  displayList->render(surface.get());
+  context->flushAndSubmit();
+  *surfaceOut = surface;
+  *cardOut = card;
+  *listOut = std::move(displayList);
+}
+
+static int CountDifferentSurfacePixels(Surface* a, Surface* b, int tolerance, const Rect& area) {
+  Bitmap bitmapA(a->width(), a->height(), false, false);
+  Bitmap bitmapB(b->width(), b->height(), false, false);
+  Pixmap pixA(bitmapA);
+  Pixmap pixB(bitmapB);
+  if (!a->readPixels(pixA.info(), pixA.writablePixels()) ||
+      !b->readPixels(pixB.info(), pixB.writablePixels())) {
+    ADD_FAILURE() << "Failed to read the surface pixels for the comparison.";
+    return 1000000;
+  }
+  int diff = 0;
+  for (int y = static_cast<int>(area.top); y < static_cast<int>(area.bottom); ++y) {
+    for (int x = static_cast<int>(area.left); x < static_cast<int>(area.right); ++x) {
+      auto ca = pixA.getColor(x, y);
+      auto cb = pixB.getColor(x, y);
+      auto d = std::max({std::abs(ca.red - cb.red), std::abs(ca.green - cb.green),
+                         std::abs(ca.blue - cb.blue), std::abs(ca.alpha - cb.alpha)});
+      if (d * 255.0f > static_cast<float>(tolerance)) {
+        ++diff;
+      }
+    }
+  }
+  return diff;
+}
+
+TGFX_TEST_PRIVATE(BackgroundBlurTest, SelfContainedSubtreeCacheMatchesDirect) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    for (auto mode : {RenderMode::Direct, RenderMode::Tiled}) {
+      for (auto zoom : {1.0f, 1.5f}) {
+        std::shared_ptr<Surface> cached = nullptr;
+        std::shared_ptr<Surface> direct = nullptr;
+        std::shared_ptr<SolidLayer> cachedCard = nullptr;
+        std::shared_ptr<SolidLayer> directCard = nullptr;
+        std::unique_ptr<DisplayList> cachedList = nullptr;
+        std::unique_ptr<DisplayList> directList = nullptr;
+        RenderSelfContainedCard(context, mode, 2048, zoom, &cached, &cachedCard, &cachedList);
+        RenderSelfContainedCard(context, mode, 0, zoom, &direct, &directCard, &directList);
+        EXPECT_TRUE(cachedCard->bitFields.backgroundSelfContained);
+        EXPECT_TRUE(cachedCard->canCacheBackgroundSubtree());
+        ASSERT_TRUE(cachedCard->subtreeCache != nullptr);
+        // The object alone proves nothing; the entry at the layer's long edge proves the image was
+        // built, since a failed build falls back to direct drawing with the object still there.
+        auto longEdge = SubtreeCache::LongEdgeFor(2048, zoom, cachedCard->getBounds());
+        EXPECT_TRUE(cachedCard->subtreeCache->hasCache(context, longEdge))
+            << "mode " << static_cast<int>(mode) << " zoom " << zoom;
+        EXPECT_TRUE(directCard->subtreeCache == nullptr);
+        // Inside the chip the cached blur has to match the direct one; the card's edges only differ
+        // by the cache resampling every subtree cache goes through.
+        auto chipArea = Rect::MakeLTRB(83, 73, 157, 107);
+        chipArea.scale(zoom, zoom);
+        auto chipDiff = CountDifferentSurfacePixels(cached.get(), direct.get(), 4, chipArea);
+        EXPECT_LE(chipDiff, static_cast<int>(chipArea.area() * 0.01f))
+            << "mode " << static_cast<int>(mode) << " zoom " << zoom;
+        auto cardArea = Rect::MakeLTRB(36, 36, 210, 170);
+        cardArea.scale(zoom, zoom);
+        auto cardDiff = CountDifferentSurfacePixels(cached.get(), direct.get(), 8, cardArea);
+        EXPECT_LE(cardDiff, static_cast<int>(cardArea.area() * 0.04f))
+            << "mode " << static_cast<int>(mode) << " zoom " << zoom;
+      }
+    }
+  });
+}
+
+// A chip that sticks out of the card samples the backdrop outside it, so the card keeps drawing
+// without a subtree cache.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, UncoveredBlurKeepsSubtreeUncached) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto surface = Surface::Make(context, 240, 200);
+    DisplayList displayList;
+    displayList.setSubtreeCacheMaxSize(2048);
+    auto card = SolidLayer::Make();
+    card->setColor(Color::FromRGBA(30, 120, 220, 255));
+    card->setWidth(160);
+    card->setHeight(120);
+    card->setMatrix(Matrix::MakeTrans(40, 40));
+    displayList.root()->addChild(card);
+    Path chipPath;
+    chipPath.addRect(Rect::MakeWH(80, 40));
+    auto chip = ShapeLayer::Make();
+    chip->setPath(chipPath);
+    chip->setMatrix(Matrix::MakeTrans(120, 30));
+    chip->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 60)));
+    chip->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
+    card->addChild(chip);
+    for (int i = 0; i < 3; ++i) {
+      displayList.render(surface.get());
+    }
+    EXPECT_FALSE(card->bitFields.backgroundSelfContained);
+    EXPECT_TRUE(card->subtreeCache == nullptr);
+
+    // Pulling the chip back inside the card makes the subtree self-contained.
+    chip->setMatrix(Matrix::MakeTrans(40, 30));
+    displayList.render(surface.get());
+    EXPECT_TRUE(card->bitFields.backgroundSelfContained);
     context->flushAndSubmit();
   });
 }

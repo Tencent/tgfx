@@ -23,6 +23,7 @@
 #include "gpu/resources/ResourceKey.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 class TextureProxy;
@@ -47,6 +48,11 @@ class SubtreeCache {
   bool hasCache(Context* context, int longEdge) const;
 
   void draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint) const;
+
+  // Longest edge the cache image is built at: the layer's device extent raised to the smallest
+  // power-of-two budget between the minimum cache size and maxSize. Callers that address an entry
+  // need the same value the drawing path computes.
+  static int LongEdgeFor(int maxSize, float contentScale, const Rect& layerBounds);
 
  private:
   struct CacheEntry {

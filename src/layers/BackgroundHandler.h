@@ -220,13 +220,14 @@ class BackgroundCapturer : public BackgroundHandler {
   // replay walks the tree exactly once with renderRects set to the rects the capture actually
   // samples, so drawLayer culls each layer whose renderBounds does not intersect any of them.
   // styleSourceRects covers the whole captured area: the layer style sources it caches are reused
-  // outside those cull rects, so they are recorded against this wider set instead.
+  // outside those cull rects, so they are recorded against this wider set instead. rootMatrix maps
+  // captureRoot's local coordinates to the global ones renderRects use.
   // alpha is the draw alpha of the consume pass: both sides push and read the same snapshots only
   // when a style is visible at the same alpha, so the replay must see the same value.
   static void Run(Layer* captureRoot, const DrawArgs& baseArgs,
                   std::shared_ptr<BackgroundSource> bgSource, BackgroundSnapshotMap* snapshots,
                   const std::vector<Rect>& renderRects, const std::vector<Rect>& styleSourceRects,
-                  float alpha);
+                  float alpha, const Matrix& rootMatrix = Matrix::I());
 
   // Exposes the snapshot map this capturer writes into, so per-fragment Sub3DCapturers spawned
   // by 3D subtrees can append their composed-backdrop entries to the same map under the same

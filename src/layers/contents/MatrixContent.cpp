@@ -69,6 +69,13 @@ bool MatrixContent::contourEqualsOpaqueContent(bool includeUnpaintedGeometry) co
   return content->contourEqualsOpaqueContent(includeUnpaintedGeometry);
 }
 
+Rect MatrixContent::getOpaqueRect(bool includeForeground) const {
+  if (!matrix.rectStaysRect()) {
+    return Rect::MakeEmpty();
+  }
+  return matrix.mapRect(content->getOpaqueRect(includeForeground));
+}
+
 bool MatrixContent::hasBlendMode() const {
   return content->hasBlendMode();
 }
