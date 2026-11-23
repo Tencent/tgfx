@@ -37,6 +37,26 @@ void GLSLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
   auto uniformHandler = args.uniformHandler;
   auto deviceCoordMatrixName = uniformHandler->addUniform(
       "DeviceCoordMatrix", UniformFormat::Float3x3, ShaderStage::Fragment);
+  const auto& sampler = (*args.textureSamplers)[0];
+  const int swizzleCode =
+      ShaderBuilder::ReadSwizzleCode(uniformHandler->getSamplerSwizzle(sampler));
+  auto coordEntry = fragBuilder->appendFunction("tgfxDeviceCoord");
+  auto readEntry = fragBuilder->appendFunction("tgfxTextureSample");
+  auto mulEntry = fragBuilder->appendFunction(textureProxy->isAlphaOnly() ? "tgfxAlphaModulate"
+                                                                          : "tgfxMulAlpha");
+  if (!coordEntry.empty() && !readEntry.empty() && !mulEntry.empty() && swizzleCode >= 0) {
+    // The coordinate, the read and the alpha modulation are three named values, so a bytecode
+    // route records the whole block.
+    const auto samplerName = uniformHandler->getSamplerVariable(sampler).name();
+    fragBuilder->codeAppend("vec2 deviceCoord;");
+    fragBuilder->appendCall("deviceCoord", coordEntry, {deviceCoordMatrixName, "gl_FragCoord.xy"});
+    fragBuilder->codeAppend("vec4 deviceRead;");
+    fragBuilder->appendCall(
+        "deviceRead", readEntry,
+        {samplerName, "deviceCoord", "vec4(0.0)", "0", std::to_string(swizzleCode)});
+    fragBuilder->appendCall(args.outputColor, mulEntry, {"deviceRead", args.inputColor});
+    return;
+  }
   fragBuilder->codeAppendf("highp vec3 deviceCoord = %s * vec3(gl_FragCoord.xy, 1.0);",
                            deviceCoordMatrixName.c_str());
   std::string coordName = "deviceCoord.xy";

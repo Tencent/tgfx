@@ -74,7 +74,9 @@ inline constexpr int DataCapacity = 256;
   X(HairlineQuadCoverage, 33, 0, false, HAIRLINEQUADCOVERAGE)       \
   X(OpaqueColor, 34, 0, false, OPAQUE_COLOR)                        \
   X(TextCoverageFromAlpha, 35, 0, false, TEXT_COVERAGE_FROM_ALPHA)  \
-  X(TextColorUnpremul, 36, 0, false, TEXT_COLOR_UNPREMUL)
+  X(TextColorUnpremul, 36, 0, false, TEXT_COLOR_UNPREMUL)           \
+  X(DeviceCoord, 37, 0, false, DEVICE_COORD)                        \
+  X(AlphaModulate, 38, 0, false, ALPHA_MODULATE)
 
 #define TGFX_CHAIN_OP_CONSTANT(name, id, inputs, sensitive, defineName) \
   inline constexpr int name = id;

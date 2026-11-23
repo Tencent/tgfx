@@ -330,6 +330,8 @@ TGFX_CHAIN_DECLARE_OP(HairlineQuadCoverage, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_
 TGFX_CHAIN_DECLARE_OP(OpaqueColor, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
 TGFX_CHAIN_DECLARE_OP(TextCoverageFromAlpha, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
 TGFX_CHAIN_DECLARE_OP(TextColorUnpremul, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(DeviceCoord, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
+TGFX_CHAIN_DECLARE_OP(AlphaModulate, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
 
 /// The chain-wide block region: operators whose data exceeds the slot stride get a fixed offset
 /// here instead of a slot index. The region starts right after the slot region, so a reader takes
@@ -389,7 +391,9 @@ static_assert(ColorSpaceXformDataWords > PoolSlotWords,
   X(HairlineQuadCoverage, TGFX_CHAIN_EMPTY_FIELDS)    \
   X(OpaqueColor, TGFX_CHAIN_EMPTY_FIELDS)             \
   X(TextCoverageFromAlpha, TGFX_CHAIN_EMPTY_FIELDS)   \
-  X(TextColorUnpremul, TGFX_CHAIN_EMPTY_FIELDS)
+  X(TextColorUnpremul, TGFX_CHAIN_EMPTY_FIELDS)       \
+  X(DeviceCoord, TGFX_CHAIN_EMPTY_FIELDS)             \
+  X(AlphaModulate, TGFX_CHAIN_EMPTY_FIELDS)
 
 inline constexpr int FieldListCount = 0
 #define TGFX_CHAIN_FIELD_LIST_COUNT(name, data) +1

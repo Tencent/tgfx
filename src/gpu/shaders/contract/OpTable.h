@@ -409,6 +409,12 @@ inline constexpr const char* kTextCoverageFromAlphaIncludes[] = {
 inline constexpr Arg kTextColorUnpremulArgs[] = {{Param::Vec4, Source::CallArg, 0}};
 inline constexpr const char* kTextColorUnpremulIncludes[] = {
     "fn/source/tgfx_text_color_unpremul.inc"};
+inline constexpr Arg kDeviceCoordArgs[] = {{Param::Mat3, Source::CallArg, 0},
+                                           {Param::Vec2, Source::CallArg, 1}};
+inline constexpr const char* kDeviceCoordIncludes[] = {"fn/source/tgfx_device_coord.inc"};
+inline constexpr Arg kAlphaModulateArgs[] = {{Param::Vec4, Source::CallArg, 0},
+                                             {Param::Vec4, Source::CallArg, 1}};
+inline constexpr const char* kAlphaModulateIncludes[] = {"fn/source/tgfx_alpha_modulate.inc"};
 inline constexpr Arg kGaussianBlur1DArgs[] = {
     {Param::SampledImage, Source::CallArg, 0}, {Param::Vec2, Source::CallArg, 1},
     {Param::Vec2, Source::CallArg, 2},         {Param::Int, Source::CallArg, 3},
@@ -499,6 +505,10 @@ inline constexpr Row kRows[] = {
      kTextCoverageFromAlphaIncludes, 1, false, true, "", kTextCoverageFromAlphaArgs, 1},
     {ChainISA::TextColorUnpremul, "tgfxTextColorUnpremul", "", kTextColorUnpremulIncludes, 1, false,
      true, "", kTextColorUnpremulArgs, 1},
+    {ChainISA::DeviceCoord, "tgfxDeviceCoord", "", kDeviceCoordIncludes, 1, false, true, "",
+     kDeviceCoordArgs, 2, Param::Vec2},
+    {ChainISA::AlphaModulate, "tgfxAlphaModulate", "", kAlphaModulateIncludes, 1, false, true, "",
+     kAlphaModulateArgs, 2},
     {ChainISA::GaussianBlur1D, "gaussianBlur1D", "", kGaussianBlur1DIncludes, 6, false, true, "",
      kGaussianBlur1DArgs, 31},
     // The chain xfer tail: the FP tree reaches the per-mode functions instead.
