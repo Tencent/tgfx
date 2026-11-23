@@ -3096,21 +3096,24 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, OpaqueContentHidesBackgroundBlur) {
     EXPECT_NEAR(inside.blue, 220.0f / 255.0f, 2.0f / 255.0f);
 
     // Nothing samples the background, so the frame skips the capture pass entirely.
-    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)}) == nullptr);
+    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)},
+                                               displayList.getViewMatrix()) == nullptr);
 
     // A child that lets the backdrop through brings the blur back.
     child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 220, 0, 200)));
     displayList.render(surface.get());
     EXPECT_TRUE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
     EXPECT_TRUE(container->hasBackgroundStyle(1.0f));
-    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)}) != nullptr);
+    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)},
+                                               displayList.getViewMatrix()) != nullptr);
 
     // So does a fill that is not fully opaque.
     child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 220, 0, 255)));
     card->setColor(Color::FromRGBA(30, 120, 220, 252));
     displayList.render(surface.get());
     EXPECT_TRUE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
-    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)}) != nullptr);
+    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)},
+                                               displayList.getViewMatrix()) != nullptr);
 
     // Whichever source bucket the blur samples, the opaque fill still covers it.
     card->setColor(Color::FromRGBA(30, 120, 220, 255));
