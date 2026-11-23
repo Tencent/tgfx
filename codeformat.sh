@@ -85,7 +85,7 @@ fi
 
 echo "$report" | head -n 40
 echo "----Failed to pass the code format check----"
-# Format the offenders in place so running this locally fixes what it reports; the exit code still
-# says the tree was not clean when the check started.
-"$CLANG_FORMAT" -i "${files[@]}"
+# A check reports, it never rewrites: the verdict must describe the sources as committed, otherwise
+# every local run reformats unrelated files and the same run both fixes and fails. Format the
+# offenders by hand with: clang-format -i <file>...
 exit 1
