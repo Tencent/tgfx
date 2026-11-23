@@ -565,7 +565,7 @@ bool PathRef::AddPath(Path& destination, const Path& source, PathOp op, bool con
     return true;
   }
   if (concatenate) {
-    // Appending onto an empty path reads the verb array behind its end, so the operand replaces it.
+    // An empty destination can take the operand directly instead of appending a copy of it.
     if (path.isEmpty()) {
       path = newPath;
     } else {

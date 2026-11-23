@@ -543,7 +543,6 @@ TGFX_TEST(PathShapeTest, MergeInverseQueryMatchesOutlineRule) {
       auto merged = Shape::Merge(first, second, testCase.op);
       ASSERT_NE(merged, nullptr);
       EXPECT_EQ(merged->isInverseFillType(), testCase.expected[i]);
-      EXPECT_EQ(merged->isInverseFillType(), testCase.expected[i]);
       // The query now reads operand outlines, but the cached path of each operand is built once.
       EXPECT_LE(pathCalls, 2);
       EXPECT_EQ(merged->getPath().isInverseFillType(), testCase.expected[i]);
@@ -594,7 +593,6 @@ TGFX_TEST(PathShapeTest, AppendInverseQueryUsesOnlyNecessaryPaths) {
         auto appended = Shape::Merge(first, second);
         ASSERT_NE(appended, nullptr);
         bool expected = firstInverse || (emptyFirst && secondInverse);
-        EXPECT_EQ(appended->isInverseFillType(), expected);
         EXPECT_EQ(appended->isInverseFillType(), expected);
         // fillType() reads the first outline and stops there unless it is empty and non-inverse.
         EXPECT_EQ(firstCalls, 1);
@@ -695,12 +693,25 @@ TGFX_TEST(PathShapeTest, ShapeFillTypeMatchesOutline) {
   ExpectRuleMatchesOutline(Shape::Merge(inverseRect, oval, PathOp::Difference),
                            "difference inverseRect+oval");
 
-  // Disjoint areas: the union concatenates instead, and keeps the rule both sources share.
+  // Disjoint areas: concatenation keeps the sources' Winding rule, while a boolean result would
+  // be EvenOdd. Assert the concrete rule so a silent fallback to boolean cannot go unnoticed.
   auto farRect = Shape::ApplyMatrix(rect, Matrix::MakeTrans(1000, 1000));
-  ExpectRuleMatchesOutline(Shape::Merge(rect, farRect, PathOp::Union), "union disjoint winding");
+  auto disjointUnion = Shape::Merge(rect, farRect, PathOp::Union);
+  ASSERT_TRUE(disjointUnion != nullptr);
+  EXPECT_EQ(disjointUnion->fillType(), PathFillType::Winding);
+  EXPECT_EQ(disjointUnion->getPath().getFillType(), PathFillType::Winding);
+  ExpectRuleMatchesOutline(disjointUnion, "union disjoint winding");
   auto farEvenOddRect = Shape::ApplyFillType(farRect, PathFillType::EvenOdd);
   ExpectRuleMatchesOutline(Shape::Merge(evenOddRect, farEvenOddRect, PathOp::Union),
                            "union disjoint evenodd");
+
+  Path pathA = {};
+  pathA.addRect(Rect::MakeXYWH(0, 0, 10, 10));
+  Path pathB = {};
+  pathB.addRect(Rect::MakeXYWH(1000, 0, 10, 10));
+  pathA.addPath(pathB, PathOp::Union);
+  EXPECT_EQ(pathA.getFillType(), PathFillType::Winding);
+  EXPECT_EQ(pathA.getBounds(), Rect::MakeXYWH(0, 0, 1010, 10));
 
   // Append: an empty operand drops out, and an empty inverse one fills the whole plane.
   Path emptyPath = {};
