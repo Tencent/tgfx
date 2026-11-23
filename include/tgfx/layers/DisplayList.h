@@ -200,6 +200,21 @@ class DisplayList {
   void setTileSize(int tileSize);
 
   /**
+   * Compatibility for callers built against the scale-keyed tile cache. The layered pool manages
+   * its own budget, so the value is remembered but has no effect on rendering.
+   */
+  int maxTileCount() const {
+    return _maxTileCount;
+  }
+
+  /**
+   * Compatibility for callers built against the scale-keyed tile cache. It has no effect.
+   */
+  void setMaxTileCount(int count) {
+    _maxTileCount = count;
+  }
+
+  /**
    * Returns the current tile update mode. This setting only applies in tiled rendering mode and
    * controls how missing tiles are produced when the zoomScale changes. The default is
    * TileUpdateMode::Immediate.
@@ -312,6 +327,7 @@ class DisplayList {
   Point lastContentOffset = {};
   Point mousePosition = {};
   int totalTileCount = 0;
+  int _maxTileCount = 0;
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
   size_t minTreeTileCount = 0;
