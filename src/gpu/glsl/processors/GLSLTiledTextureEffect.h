@@ -30,6 +30,9 @@ class GLSLTiledTextureEffect : public TiledTextureEffect {
 
   void emitCode(EmitArgs& args) const override;
 
+  bool describeTiledRead(EmitArgs& args, SamplerHandle sampler,
+                         TiledReadDescription* description) const override;
+
  private:
   struct UniformNames {
     std::string subsetName;

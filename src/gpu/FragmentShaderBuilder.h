@@ -72,7 +72,7 @@ class FragmentShaderBuilder : public ShaderBuilder {
    * builder resolves the names into its own instruction forms instead.
    */
   virtual void appendCall(const std::string& outputVar, const std::string& functionName,
-                          std::initializer_list<std::string> args,
+                          const std::vector<std::string>& args,
                           const std::string& wrapType = "") = 0;
 
   /**
@@ -80,7 +80,7 @@ class FragmentShaderBuilder : public ShaderBuilder {
    * need the value under a name (a later call's argument). Returns the temporary's name.
    */
   virtual std::string appendTempCall(const std::string& functionName,
-                                     std::initializer_list<std::string> args) = 0;
+                                     const std::vector<std::string>& args) = 0;
 
   /**
    * The sink a bytecode builder installs to collect the stage-output writes; nullptr keeps the

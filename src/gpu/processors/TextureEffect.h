@@ -62,6 +62,10 @@ class TextureEffect : public FragmentProcessor {
 
   bool needSubset() const;
 
+  bool isStrict() const {
+    return constraint == SrcRectConstraint::Strict;
+  }
+
   // True when the coordinate transform carries a projective matrix. The plain precompiled texture
   // templates transform coordinates affinely (no w division), so matchers use this to keep a
   // projective source off them; the runtime route emits a perspective-divided coordinate.

@@ -16,20 +16,20 @@ vec4 tiledSeamBlend(sampler2D texSampler, vec4 texColor, int modeX, int modeY, v
   float repeatCoordY = errY > 0.0 ? clampRect.y : clampRect.w;
   if (repeatX && repeatY) {
     vec4 repeatReadX =
-        aotTextureRead(texSampler, vec2(repeatCoordX, clampedCoord.y) * dimension, readSwizzle);
+        tgfxTextureSample(texSampler, vec2(repeatCoordX, clampedCoord.y) * dimension, vec4(0.0), 0, readSwizzle);
     vec4 repeatReadY =
-        aotTextureRead(texSampler, vec2(clampedCoord.x, repeatCoordY) * dimension, readSwizzle);
+        tgfxTextureSample(texSampler, vec2(clampedCoord.x, repeatCoordY) * dimension, vec4(0.0), 0, readSwizzle);
     vec4 repeatReadXY =
-        aotTextureRead(texSampler, vec2(repeatCoordX, repeatCoordY) * dimension, readSwizzle);
+        tgfxTextureSample(texSampler, vec2(repeatCoordX, repeatCoordY) * dimension, vec4(0.0), 0, readSwizzle);
     return mix(mix(texColor, repeatReadX, abs(errX)), mix(repeatReadY, repeatReadXY, abs(errX)),
                abs(errY));
   }
   if (repeatX) {
     vec4 repeatReadX =
-        aotTextureRead(texSampler, vec2(repeatCoordX, clampedCoord.y) * dimension, readSwizzle);
+        tgfxTextureSample(texSampler, vec2(repeatCoordX, clampedCoord.y) * dimension, vec4(0.0), 0, readSwizzle);
     return mix(texColor, repeatReadX, errX);
   }
   vec4 repeatReadY =
-      aotTextureRead(texSampler, vec2(clampedCoord.x, repeatCoordY) * dimension, readSwizzle);
+      tgfxTextureSample(texSampler, vec2(clampedCoord.x, repeatCoordY) * dimension, vec4(0.0), 0, readSwizzle);
   return mix(texColor, repeatReadY, errY);
 }

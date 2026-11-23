@@ -156,6 +156,54 @@ GLSLTiledTextureEffect::UniformNames GLSLTiledTextureEffect::initUniform(
   return names;
 }
 
+bool GLSLTiledTextureEffect::describeTiledRead(EmitArgs& args, SamplerHandle sampler,
+                                               TiledReadDescription* description) const {
+  auto textureView = getTextureView();
+  if (textureView == nullptr || isStrict() || isAlphaOnly() || hasPerspective()) {
+    return false;
+  }
+  const auto samplerVar = args.uniformHandler->getSamplerVariable(sampler);
+  if (samplerVar.type() != SLType::Texture2DSampler) {
+    return false;
+  }
+  Sampling sampling(textureView, samplerState, subset);
+  if (sampling.shaderModeX == ShaderMode::None && sampling.shaderModeY == ShaderMode::None) {
+    return false;  // the plain reader serves it: no tiling to describe
+  }
+  // The mipmap and clamp-to-border-linear modes sample with an explicit level of detail the blur
+  // function does not carry, so those reads keep their own path.
+  const auto axisModeX = AxisModeOf(sampling.shaderModeX);
+  const auto axisModeY = AxisModeOf(sampling.shaderModeY);
+  if (axisModeX == 2 || axisModeY == 2 || sampling.shaderModeX == ShaderMode::ClampToBorderLinear ||
+      sampling.shaderModeY == ShaderMode::ClampToBorderLinear ||
+      sampling.shaderModeX == ShaderMode::ClampToBorderNearest ||
+      sampling.shaderModeY == ShaderMode::ClampToBorderNearest) {
+    return false;
+  }
+  if (sampling.shaderModeX == ShaderMode::Clamp && sampling.shaderModeY == ShaderMode::Clamp) {
+    // Both axes clamp: the effect's own emit reads without any tiling math, so the caller must too.
+    description->plainRead = true;
+    return true;
+  }
+  const bool useClamp[2] = {ShaderModeUsesClamp(sampling.shaderModeX),
+                            ShaderModeUsesClamp(sampling.shaderModeY)};
+  auto names = initUniform(args, textureView, sampling, useClamp);
+  description->subsetName = names.subsetName;
+  description->clampName = names.clampName;
+  description->dimensionName = names.dimensionsName;
+  // The shared mapping takes the shader-mode enumerators themselves, not the axis-coordinate
+  // encoding the emit path uses for its literals.
+  description->shaderModeX = static_cast<int>(sampling.shaderModeX);
+  description->shaderModeY = static_cast<int>(sampling.shaderModeY);
+  description->seamBlend = sampling.shaderModeX == ShaderMode::RepeatLinearNone ||
+                           sampling.shaderModeX == ShaderMode::RepeatLinearMipmap ||
+                           sampling.shaderModeY == ShaderMode::RepeatLinearNone ||
+                           sampling.shaderModeY == ShaderMode::RepeatLinearMipmap;
+  description->borderPass = sampling.shaderModeX == ShaderMode::ClampToBorderLinear ||
+                            sampling.shaderModeY == ShaderMode::ClampToBorderLinear;
+  return true;
+}
+
 void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   auto textureView = getTextureView();

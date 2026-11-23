@@ -79,6 +79,20 @@ FragmentType FragmentTypeOf(SLType type) {
   }
 }
 
+// The std140 alignment one member requires: scalars pack to four, a vec2 to eight, everything
+// wider to sixteen.
+uint32_t Std140Align(FragmentType type) {
+  switch (type) {
+    case FragmentType::Float:
+    case FragmentType::Int:
+      return 4;
+    case FragmentType::Float2:
+      return 8;
+    default:
+      return 16;
+  }
+}
+
 // The std140 footprint one member occupies (arrays stride every element to 16 bytes).
 uint32_t Std140Size(FragmentType type, uint32_t count) {
   uint32_t element = 16;
@@ -226,6 +240,8 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
     member.type = FragmentTypeOf(uniform.format());
     member.count = static_cast<uint16_t>(uniform.count());
     member.source = ChainBindingSource::Unbound;
+    const uint32_t alignment = Std140Align(member.type);
+    offset = (offset + alignment - 1) / alignment * alignment;
     member.offset = offset;
     member.size = Std140Size(member.type, member.count);
     offset += member.size;
@@ -282,6 +298,20 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
     }
     if (name == "vec4(0.0)" || name == "0.0") {
       arg->kind = ChainArgKind::Black;
+      return true;
+    }
+    const auto bracket = name.find('[');
+    if (bracket != std::string::npos && name.back() == ']') {
+      const auto member = uniformIndex.find(name.substr(0, bracket));
+      if (member != uniformIndex.end()) {
+        arg->kind = ChainArgKind::UniformElement;
+        arg->index = member->second;
+        arg->element = std::atoi(name.c_str() + bracket + 1);
+        return true;
+      }
+    }
+    if (name == "vec2(1.0)") {
+      arg->kind = ChainArgKind::Vec2One;
       return true;
     }
     if (name == "vec2(0.0)") {

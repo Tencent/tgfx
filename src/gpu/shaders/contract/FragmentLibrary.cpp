@@ -251,8 +251,8 @@ const std::vector<FragmentDef>& Table() {
        "gaussianBlur1D",
        "fn/source/gaussianBlur1D.inc",
        {},
-       {},
-       {}},
+       {Arg(FragmentArgKind::EntryValue, 0), Arg(FragmentArgKind::EntryValue, 1)},
+       {"fn/source/gaussianBlur1D.inc"}},
       // The FP tree's own operators the linking route reaches: every one takes its arguments from
       // the call site, so the argument table reads Input/Param only.
       {ChainISA::PremulAlpha,

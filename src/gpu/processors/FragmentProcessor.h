@@ -212,6 +212,22 @@ class FragmentProcessor : public Processor {
   using TextureSamplers =
       BuilderInputProvider<SamplerHandle, &FragmentProcessor::numTextureSamplers>;
 
+  /// One shader-tiled texture read described as values: the sampling uniforms it registered and
+  /// the axis modes, so a caller that replaces the read with a function call can name them.
+  struct TiledReadDescription {
+    std::string subsetName = {};
+    std::string clampName = {};
+    std::string dimensionName = {};
+    int shaderModeX = 0;
+    int shaderModeY = 0;
+    /// The sampling resolves to a plain read (both axes clamp): no tiling math applies.
+    bool plainRead = false;
+    /// The read needs the repeat seam blend (the linear repeat modes).
+    bool seamBlend = false;
+    /// The read needs the clamp-to-border pass.
+    bool borderPass = false;
+  };
+
   struct EmitArgs {
     EmitArgs(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
              std::string outputColor, std::string inputColor, std::string inputSubset,
@@ -255,6 +271,19 @@ class FragmentProcessor : public Processor {
    * will be in its own block ({}) and so locally scoped names will not collide across stages.
    */
   virtual void emitCode(EmitArgs& args) const = 0;
+
+  /**
+   * Registers and describes this processor's read when the whole read is a shader-tiled texture
+   * sample a caller can spell as argument values. The caller switches this processor's name
+   * mangling first, so the uniforms land under the names its own setData writes.
+   */
+  virtual bool describeTiledRead(EmitArgs& args, SamplerHandle sampler,
+                                 TiledReadDescription* description) const {
+    (void)args;
+    (void)sampler;
+    (void)description;
+    return false;
+  }
 
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const;
 

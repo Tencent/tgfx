@@ -402,6 +402,28 @@ inline constexpr const char* kHairlineQuadCoverageIncludes[] = {
 
 inline constexpr Arg kOpaqueColorArgs[] = {{Param::Vec4, Source::CallArg, 0}};
 inline constexpr const char* kOpaqueColorIncludes[] = {"fn/source/tgfx_opaque_color.inc"};
+inline constexpr Arg kGaussianBlur1DArgs[] = {
+    {Param::SampledImage, Source::CallArg, 0}, {Param::Vec2, Source::CallArg, 1},
+    {Param::Vec2, Source::CallArg, 2},         {Param::Int, Source::CallArg, 3},
+    {Param::Vec4, Source::CallArg, 4},         {Param::Int, Source::CallArg, 5},
+    {Param::Int, Source::CallArg, 6},          {Param::Int, Source::CallArg, 7},
+    {Param::Int, Source::CallArg, 8},          {Param::Vec4, Source::CallArg, 9},
+    {Param::Vec4, Source::CallArg, 10},        {Param::Vec2, Source::CallArg, 11},
+    {Param::Int, Source::CallArg, 12},         {Param::Int, Source::CallArg, 13},
+    {Param::Vec4, Source::CallArg, 14},        {Param::Vec4, Source::CallArg, 15},
+    {Param::Vec4, Source::CallArg, 16},        {Param::Vec4, Source::CallArg, 17},
+    {Param::Vec4, Source::CallArg, 18},        {Param::Vec4, Source::CallArg, 19},
+    {Param::Vec4, Source::CallArg, 20},        {Param::Vec4, Source::CallArg, 21},
+    {Param::Vec4, Source::CallArg, 22},        {Param::Vec4, Source::CallArg, 23},
+    {Param::Vec4, Source::CallArg, 24},        {Param::Vec4, Source::CallArg, 25},
+    {Param::Vec4, Source::CallArg, 26},        {Param::Vec4, Source::CallArg, 27},
+    {Param::Vec4, Source::CallArg, 28},        {Param::Vec4, Source::CallArg, 29},
+    {Param::Vec4, Source::CallArg, 30},
+};
+inline constexpr const char* kGaussianBlur1DIncludes[] = {
+    "source/texture_sampling.inc",      "fn/source/tgfx_texture_sample.inc",
+    "fn/source/tiled_map_coord.inc",    "fn/source/tiled_seam_blend.inc",
+    "fn/source/tiled_apply_border.inc", "fn/source/gaussianBlur1D.inc"};
 inline constexpr Row kRows[] = {
     {ChainISA::ConstColor, "pmApplyConstColor", "", kConstColorIncludes, 1, false, true, "",
      kConstColorArgs, 3},
@@ -466,6 +488,8 @@ inline constexpr Row kRows[] = {
      1, false, true, "", kHairlineQuadCoverageArgs, 3, Param::Float},
     {ChainISA::OpaqueColor, "tgfxOpaqueColor", "", kOpaqueColorIncludes, 1, false, true, "",
      kOpaqueColorArgs, 1},
+    {ChainISA::GaussianBlur1D, "gaussianBlur1D", "", kGaussianBlur1DIncludes, 6, false, true, "",
+     kGaussianBlur1DArgs, 31},
     // The chain xfer tail: the FP tree reaches the per-mode functions instead.
     {PorterDuffId, "applyPorterDuffXP",
      "#define HAS_XP 1\n#define TGFX_DECLARED_CHAIN 1\n"

@@ -131,6 +131,10 @@ enum class ChainArgKind : uint8_t {
   Sampler,
   /// The two-component zero, the shape an operator's vec2 literal argument carries.
   Vec2Zero,
+  /// One element of an array member: index into uniforms, element into element (see ChainArg).
+  UniformElement,
+  /// The two-component one, the identity factor a coordinate scaling argument carries.
+  Vec2One,
 };
 
 struct ChainArg {
@@ -139,6 +143,8 @@ struct ChainArg {
   /// member's index into ChainProgramPlan::uniforms (Uniform), the varying's index into
   /// ChainProgramPlan::varyings (Varying), or the literal's value (Literal).
   int index = 0;
+  /// The element inside the member (UniformElement).
+  int element = 0;
 
   /// The absent arg: the slot carries no value (a stage output the plan does not produce).
   static ChainArg None() {

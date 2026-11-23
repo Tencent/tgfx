@@ -73,6 +73,52 @@ void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   std::string texelSizeName =
       args.uniformHandler->addUniform("Step", UniformFormat::Float2, ShaderStage::Fragment);
 
+  // The tap loop expresses itself as one call when the child's whole composition is a single
+  // shader-tiled texture read: gaussianBlur1D reproduces exactly that read through the same shared
+  // mapping functions, so nothing of the child's semantics is dropped. Every other child keeps the
+  // inline loop below.
+  auto entry = fragBuilder->appendFunction("gaussianBlur1D");
+  if (!entry.empty() && args.textureSamplers != nullptr && args.transformedCoords != nullptr) {
+    const auto* child = childProcessor(0);
+    auto childSamplers = args.textureSamplers->childInputs(0);
+    auto childCoords = args.transformedCoords->childInputs(0);
+    if (child != nullptr && child->numChildProcessors() == 0 && childSamplers.count() == 1 &&
+        childCoords.count() >= 1) {
+      fragBuilder->onBeforeChildProcEmitCode(child);
+      FragmentProcessor::TiledReadDescription tiled = {};
+      const bool described = child->describeTiledRead(args, childSamplers[0], &tiled);
+      fragBuilder->onAfterChildProcEmitCode();
+      const bool tiledRead = described && !tiled.plainRead;
+      if (described && (!tiledRead || (!tiled.subsetName.empty() && !tiled.clampName.empty()))) {
+        const auto samplerName = args.uniformHandler->getSamplerVariable(childSamplers[0]).name();
+        const std::string subset = tiledRead ? tiled.subsetName : std::string("vec4(0.0)");
+        const std::string clamp = tiledRead ? tiled.clampName : std::string("vec4(0.0)");
+        const std::string dimension = tiledRead && !tiled.dimensionName.empty()
+                                          ? tiled.dimensionName
+                                          : std::string("vec2(1.0)");
+        std::vector<std::string> callArgs = {samplerName,
+                                             childCoords[0].name(),
+                                             texelSizeName,
+                                             radiusName,
+                                             subset,
+                                             "0",
+                                             tiledRead ? "1" : "0",
+                                             std::to_string(tiledRead ? tiled.shaderModeX : 0),
+                                             std::to_string(tiledRead ? tiled.shaderModeY : 0),
+                                             subset,
+                                             clamp,
+                                             dimension,
+                                             tiledRead && tiled.seamBlend ? "1" : "0",
+                                             tiledRead && tiled.borderPass ? "1" : "0"};
+        for (int slot = 0; slot < 17; ++slot) {
+          callArgs.push_back(kernelName + "[" + std::to_string(slot) + "]");
+        }
+        fragBuilder->appendCall(args.outputColor, entry, callArgs);
+        return;
+      }
+    }
+  }
+
   fragBuilder->codeAppendf("vec2 offset = %s;", texelSizeName.c_str());
   fragBuilder->codeAppendf("int radius = %s;", radiusName.c_str());
   fragBuilder->codeAppend("vec4 sum = vec4(0.0);");

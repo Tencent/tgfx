@@ -51,7 +51,7 @@ std::string GLSLFragmentShaderBuilder::dstColor() {
 
 void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
                                            const std::string& functionName,
-                                           std::initializer_list<std::string> args,
+                                           const std::vector<std::string>& args,
                                            const std::string& wrapType) {
   if (callRecorder != nullptr) {
     CallRecord record = {};
@@ -82,7 +82,7 @@ void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
 }
 
 std::string GLSLFragmentShaderBuilder::appendTempCall(const std::string& functionName,
-                                                      std::initializer_list<std::string> args) {
+                                                      const std::vector<std::string>& args) {
   auto entry = appendFunction(functionName.c_str());
   if (entry.empty()) {
     return "";

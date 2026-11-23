@@ -216,6 +216,7 @@ struct BodyState {
   // Cached constants.
   std::unordered_map<uint32_t, uint32_t> intConstants = {};
   uint32_t vec2ZeroId = 0;
+  uint32_t vec2OneId = 0;
   uint32_t whiteId = 0;
   uint32_t blackId = 0;
   uint32_t oneFloatId = 0;
@@ -488,6 +489,43 @@ uint32_t ResolveArg(BodyState* state, const ChainProgramPlan& plan, const ChainA
       return state->whiteId;
     case ChainArgKind::Black:
       return state->blackId;
+    case ChainArgKind::UniformElement: {
+      if (arg.index < 0 || static_cast<size_t>(arg.index) >= plan.uniforms.size()) {
+        return 0;
+      }
+      const auto& member = plan.uniforms[static_cast<size_t>(arg.index)];
+      bool ok = true;
+      const uint32_t elementType = MemberTypeId(state->types, member.type, &ok);
+      if (!ok) {
+        return 0;
+      }
+      const uint32_t pointerType = state->writer.NewId();
+      {
+        auto* sink = state->writer.sink;
+        state->writer.Sink(&state->writer.decl);
+        state->writer.Inst(kOpTypePointer, {pointerType, kStorageUniform, elementType});
+        state->writer.Sink(sink);
+      }
+      const uint32_t chainId = state->writer.NewId();
+      state->writer.Inst(kOpAccessChain,
+                         {pointerType, chainId, state->uboId, IntConstant(state, arg.index),
+                          IntConstant(state, arg.element)});
+      const uint32_t valueId = state->writer.NewId();
+      state->writer.Inst(kOpLoad, {elementType, valueId, chainId});
+      return valueId;
+    }
+    case ChainArgKind::Vec2One: {
+      if (state->vec2OneId == 0) {
+        auto* sink = state->writer.sink;
+        state->writer.Sink(&state->writer.decl);
+        const uint32_t oneFloat = FloatConstant(state, 1.0f);
+        state->vec2OneId = state->writer.NewId();
+        state->writer.Inst(kOpConstantComposite,
+                           {state->types.vec2, state->vec2OneId, oneFloat, oneFloat});
+        state->writer.Sink(sink);
+      }
+      return state->vec2OneId;
+    }
     case ChainArgKind::Vec2Zero: {
       // The vec2 zero a shape operator's literal argument carries, built once with the other
       // template constants.
