@@ -144,6 +144,12 @@ class ShaderBuilder {
 
   std::string shaderString();
 
+  /**
+   * Replaces the main-body statements with text a printer produced from the program description.
+   * The caller owns the closing brace: the text is used verbatim after "void main() {".
+   */
+  void setCodeText(const std::string& text);
+
  protected:
   class Type {
    public:

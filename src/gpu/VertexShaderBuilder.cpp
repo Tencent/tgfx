@@ -22,7 +22,9 @@
 namespace tgfx {
 void VertexShaderBuilder::storeVarying(const std::string& dstName, const std::string& srcName) {
   recordVertexCall(VertexCallKind::StoreVarying, dstName, srcName, "", "", false);
-  codeAppendf("%s = %s;", dstName.c_str(), srcName.c_str());
+  if (!suppressText) {
+    codeAppendf("%s = %s;", dstName.c_str(), srcName.c_str());
+  }
 }
 
 void VertexShaderBuilder::transformPoint(const std::string& dstPointName,
@@ -30,7 +32,9 @@ void VertexShaderBuilder::transformPoint(const std::string& dstPointName,
                                          const std::string& transformName, bool hasPerspective) {
   recordVertexCall(VertexCallKind::TransformPoint, dstPointName, srcPointName, transformName, "",
                    hasPerspective);
-  emitTransformedPoint(dstPointName, srcPointName, transformName, hasPerspective);
+  if (!suppressText) {
+    emitTransformedPoint(dstPointName, srcPointName, transformName, hasPerspective);
+  }
 }
 
 void VertexShaderBuilder::transformVarying(const std::string& varyingName,
@@ -38,6 +42,9 @@ void VertexShaderBuilder::transformVarying(const std::string& varyingName,
                                            const std::string& transformName, bool hasPerspective) {
   recordVertexCall(VertexCallKind::TransformVarying, varyingName, srcPointName, transformName, "",
                    hasPerspective);
+  if (suppressText) {
+    return;
+  }
   if (hasPerspective) {
     codeAppendf("%s = %s * vec3(%s, 1);", varyingName.c_str(), transformName.c_str(),
                 srcPointName.c_str());
@@ -53,13 +60,18 @@ void VertexShaderBuilder::transformPointAdd(const std::string& dstPointName,
                                             const std::string& offsetName) {
   recordVertexCall(VertexCallKind::TransformPointAdd, dstPointName, srcPointName, transformName,
                    offsetName, false);
-  codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy + %s;", dstPointName.c_str(),
-              transformName.c_str(), srcPointName.c_str(), offsetName.c_str());
+  if (!suppressText) {
+    codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy + %s;", dstPointName.c_str(),
+                transformName.c_str(), srcPointName.c_str(), offsetName.c_str());
+  }
 }
 
 void VertexShaderBuilder::multiplyVec2(const std::string& dstName, const std::string& first,
                                        const std::string& second, bool declare) {
-  recordVertexCall(VertexCallKind::MultiplyVec2, dstName, first, second, "", false);
+  recordVertexCall(VertexCallKind::MultiplyVec2, dstName, first, second, "", false, declare);
+  if (suppressText) {
+    return;
+  }
   if (declare) {
     codeAppendf("highp vec2 %s = %s * %s;", dstName.c_str(), first.c_str(), second.c_str());
   } else {
@@ -70,29 +82,38 @@ void VertexShaderBuilder::multiplyVec2(const std::string& dstName, const std::st
 void VertexShaderBuilder::swizzleVec2(const std::string& dstName, const std::string& srcName,
                                       const std::string& components) {
   recordVertexCall(VertexCallKind::SwizzleVec2, dstName, srcName, "", components, false);
-  codeAppendf("highp vec2 %s = %s.%s;", dstName.c_str(), srcName.c_str(), components.c_str());
+  if (!suppressText) {
+    codeAppendf("highp vec2 %s = %s.%s;", dstName.c_str(), srcName.c_str(), components.c_str());
+  }
 }
 
 void VertexShaderBuilder::composeVec4(const std::string& dstName, const std::string& first,
                                       const std::string& second) {
   recordVertexCall(VertexCallKind::ComposeVec4, dstName, first, second, "", false);
-  codeAppendf("highp vec4 %s = vec4(%s, %s);", dstName.c_str(), first.c_str(), second.c_str());
+  if (!suppressText) {
+    codeAppendf("highp vec4 %s = vec4(%s, %s);", dstName.c_str(), first.c_str(), second.c_str());
+  }
 }
 
 void VertexShaderBuilder::normalizeRect(const std::string& rectName) {
   recordVertexCall(VertexCallKind::NormalizeRect, "", rectName, "", "", false);
-  codeAppendf("%s = vec4(min(%s.xy, %s.zw), max(%s.xy, %s.zw));", rectName.c_str(),
-              rectName.c_str(), rectName.c_str(), rectName.c_str(), rectName.c_str());
+  if (!suppressText) {
+    codeAppendf("%s = vec4(min(%s.xy, %s.zw), max(%s.xy, %s.zw));", rectName.c_str(),
+                rectName.c_str(), rectName.c_str(), rectName.c_str(), rectName.c_str());
+  }
 }
 
 void VertexShaderBuilder::storePosition(const std::string& devPos) {
   recordVertexCall(VertexCallKind::StorePosition, "", devPos, "", "", false);
-  emitNormalizedPosition(devPos);
+  if (!suppressText) {
+    emitNormalizedPosition(devPos);
+  }
 }
 
 void VertexShaderBuilder::recordVertexCall(VertexCallKind kind, const std::string& dst,
                                            const std::string& src, const std::string& operand,
-                                           const std::string& extra, bool hasPerspective) {
+                                           const std::string& extra, bool hasPerspective,
+                                           bool declaresResult) {
   if (vertexRecorder == nullptr) {
     return;
   }
@@ -103,6 +124,7 @@ void VertexShaderBuilder::recordVertexCall(VertexCallKind kind, const std::strin
   record.operand = operand;
   record.extra = extra;
   record.hasPerspective = hasPerspective;
+  record.declaresResult = declaresResult;
   vertexRecorder->push_back(std::move(record));
 }
 }  // namespace tgfx

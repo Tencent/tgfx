@@ -30,7 +30,7 @@
 #include <utility>
 #include <vector>
 #include "cli/BuildCommand.h"
-#include "gpu/shaders/ShaderLibraryBundleFormat.h"
+#include "gpu/shaders/contract/ShaderLibraryBundleFormat.h"
 
 namespace tgfx {
 namespace {

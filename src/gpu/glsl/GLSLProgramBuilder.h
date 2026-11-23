@@ -23,6 +23,7 @@
 #include "gpu/ProgramBuilder.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/glsl/GLSLFragmentShaderBuilder.h"
+#include "gpu/ir/ProgramDescription.h"
 
 namespace tgfx {
 class GLSLProgramBuilder : public ProgramBuilder {
@@ -61,6 +62,7 @@ class GLSLProgramBuilder : public ProgramBuilder {
 
   VaryingHandler _varyingHandler;
   UniformHandler _uniformHandler;
+  ProgramDescription description = {};
   GLSLVertexShaderBuilder _vertexBuilder;
   GLSLFragmentShaderBuilder _fragBuilder;
   size_t vertexStride = 0;

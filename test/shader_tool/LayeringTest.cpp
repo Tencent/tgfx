@@ -119,7 +119,8 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
   static const std::set<std::string> allowed = {
       // contract layer
       "gpu/shaders/contract/ShaderBundleContract.h", "gpu/shaders/contract/ChainISA.h",
-      "gpu/shaders/contract/ChainOps.h", "gpu/shaders/contract/SpecContract.h", "gpu/Uniform.h",
+      "gpu/shaders/contract/ChainOps.h", "gpu/shaders/contract/SpecContract.h",
+      "gpu/shaders/contract/ShaderLibraryBundleFormat.h", "gpu/Uniform.h",
       "gpu/shaders/KernelContract.h",
       // declaration layer
       "gpu/shaders/PrecompiledShader.h",
@@ -142,6 +143,7 @@ const std::vector<std::string>& ContractHeaders() {
       "gpu/shaders/contract/ChainISA.h",
       "gpu/shaders/contract/ChainOps.h",
       "gpu/shaders/contract/SpecContract.h",
+      "gpu/shaders/contract/ShaderLibraryBundleFormat.h",
       "gpu/Uniform.h",
       "gpu/shaders/KernelContract.h",
   };

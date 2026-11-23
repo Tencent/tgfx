@@ -24,7 +24,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
-#include "gpu/shaders/ShaderLibraryBundleFormat.h"
+#include "gpu/shaders/contract/ShaderLibraryBundleFormat.h"
 
 namespace tgfx {
 

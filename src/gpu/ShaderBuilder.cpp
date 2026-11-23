@@ -249,6 +249,11 @@ void ShaderBuilder::appendIndentationIfNeeded(const std::string& code) {
   atLineStart = false;
 }
 
+void ShaderBuilder::setCodeText(const std::string& text) {
+  shaderStrings[Type::Code] = text;
+  atLineStart = true;
+}
+
 std::string ShaderBuilder::shaderString() {
   std::string fragment;
   for (auto& str : shaderStrings) {

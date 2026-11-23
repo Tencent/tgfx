@@ -22,52 +22,12 @@
 #include <string>
 #include <vector>
 #include "ShaderBuilder.h"
+#include "gpu/ir/ProgramDescription.h"
 
 namespace tgfx {
 static const std::string RTAdjustName = "tgfx_RTAdjust";
 
-/// Which write one vertex-stage record carries: the whole vertex emit surface the geometry
-/// processors use, namely attribute reads stored into varyings, the coordinate transforms the FP
-/// tree's varyings come from, and the clip-space write. The bytecode routes turn each record into
-/// SPIR-V; the GLSL builder prints the same text it always printed.
-enum class VertexCallKind : uint8_t {
-  /// dst = src, an attribute or a prior local stored into a varying.
-  StoreVarying,
-  /// dst = (matrix * vec3(src, 1)).xy, or the perspective-divided form when hasPerspective.
-  TransformPoint,
-  /// dst = matrix * vec3(src, 1) written to a varying: the vec3 form carries the w for the
-  /// fragment stage's divide, the vec2 form drops it at the vertex stage.
-  TransformVarying,
-  /// dst = (matrix * vec3(src, 1)).xy + extra.
-  TransformPointAdd,
-  /// dst = src * operand, two vec2 values.
-  MultiplyVec2,
-  /// dst = src.xy or src.zw: the two halves of a rect attribute.
-  SwizzleVec2,
-  /// dst = vec4(src, operand), two vec2 values side by side.
-  ComposeVec4,
-  /// src = vec4(min(src.xy, src.zw), max(src.xy, src.zw)), in place.
-  NormalizeRect,
-  /// gl_Position = vec4(src.xy * RTAdjust.xz + RTAdjust.yw, 0, 1).
-  StorePosition,
-};
-
-/// One vertex-stage write in emission order. A backend that emits a stage from these records must
-/// check that every declared varying has a producing record: a geometry still spelling part of its
-/// vertex stage as text leaves a varying unproduced, and that check turns the case into a declined
-/// draw instead of a silently wrong shader.
-struct VertexCallRecord {
-  VertexCallKind kind = VertexCallKind::StoreVarying;
-  /// The varying or local the record writes; unused by StorePosition.
-  std::string dst = {};
-  /// The value operand: an attribute's or an earlier local's name, the clip-space source.
-  std::string src = {};
-  /// The transform's matrix uniform, or MultiplyVec2's second factor.
-  std::string operand = {};
-  /// TransformPointAdd's addend.
-  std::string extra = {};
-  bool hasPerspective = false;
-};
+using VertexCallRecord = VertexCall;
 
 class VertexShaderBuilder : public ShaderBuilder {
  public:
@@ -84,6 +44,7 @@ class VertexShaderBuilder : public ShaderBuilder {
    */
   void setVertexRecorder(std::vector<VertexCallRecord>* records) {
     vertexRecorder = records;
+    suppressText = records != nullptr;
   }
 
   virtual void emitNormalizedPosition(const std::string& devPos) = 0;
@@ -150,11 +111,13 @@ class VertexShaderBuilder : public ShaderBuilder {
   void storePosition(const std::string& devPos);
 
  protected:
-  /// Appends one record when a recorder is installed; the callers print the text either way.
+  /// Appends one record when a recorder is installed; the callers print the text when text is on.
   void recordVertexCall(VertexCallKind kind, const std::string& dst, const std::string& src,
-                        const std::string& operand, const std::string& extra, bool hasPerspective);
+                        const std::string& operand, const std::string& extra, bool hasPerspective,
+                        bool declaresResult = false);
 
  private:
   std::vector<VertexCallRecord>* vertexRecorder = nullptr;
+  bool suppressText = false;
 };
 }  // namespace tgfx

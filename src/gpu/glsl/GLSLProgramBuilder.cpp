@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include "GLSLVertexPrinter.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
@@ -129,6 +130,7 @@ std::shared_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
 GLSLProgramBuilder::GLSLProgramBuilder(Context* context, const ProgramInfo* programInfo)
     : ProgramBuilder(context, programInfo), _varyingHandler(this), _uniformHandler(this),
       _vertexBuilder(this), _fragBuilder(this) {
+  _vertexBuilder.setVertexRecorder(&description.vertexCalls);
 }
 
 std::string GLSLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
@@ -183,6 +185,25 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
 std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   fragmentShaderBuilder()->declareCustomOutputColor();
   finalizeShaders();
+  for (const auto& attribute : getProgramInfo()->getVertexAttributes()) {
+    description.interface.attributes.push_back({attribute.name()});
+  }
+  for (const auto& attribute : getProgramInfo()->getInstanceAttributes()) {
+    description.interface.attributes.push_back({attribute.name()});
+  }
+  for (const auto& varying : _varyingHandler.getVaryings()) {
+    description.interface.varyings.push_back({varying.name(), varying.type()});
+  }
+  for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Vertex)) {
+    description.interface.uniforms.push_back({uniform.name()});
+  }
+  for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Fragment)) {
+    description.interface.uniforms.push_back({uniform.name()});
+  }
+  for (const auto& sampler : _uniformHandler.getSamplers()) {
+    description.interface.samplers.push_back({sampler.name()});
+  }
+  _vertexBuilder.setCodeText(PrintGLSLVertexProgram(description.vertexCalls));
   // Diagnostic dump of the emitted stage texts (TGFX_DUMP_PROGRAM=dir): the FP-tree route's
   // shader is otherwise only visible to the driver. Static counter, one file per program.
   if (const char* dumpDir = std::getenv("TGFX_DUMP_PROGRAM")) {
