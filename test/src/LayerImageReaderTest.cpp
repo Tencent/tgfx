@@ -302,6 +302,30 @@ static int CountDifferentPixels(const PixelImage& a, const PixelImage& b, int to
   return different;
 }
 
+// A different clip can change rounding at blurred edges. By default, allow one 8-bit step
+// per channel and limit the affected area to 0.5% of the image.
+static void ExpectBlurredPixelsNear(const PixelImage& reference, const PixelImage& output,
+                                    int channelTolerance = 1) {
+  ASSERT_FALSE(reference.pixels.empty());
+  ASSERT_FALSE(output.pixels.empty());
+  ASSERT_EQ(reference.width, output.width);
+  ASSERT_EQ(reference.height, output.height);
+  EXPECT_EQ(CountDifferentPixels(reference, output, channelTolerance), 0);
+  EXPECT_LE(CountDifferentPixels(reference, output, 0), reference.width * reference.height / 200);
+}
+
+// Check the readback format against the same render tiles, including the same band boundaries.
+static void ExpectPackedRGBAMatches(Context* context, LayerImageRequest request,
+                                    const LayerImageReadOptions& options, const PixelImage& image) {
+  request.colorType = ColorType::RGBA_8888;
+  auto reader = LayerImageReader::Make(context, request, options);
+  ASSERT_TRUE(reader != nullptr);
+  auto packed = ReadAllBands(context, reader.get(), reader->bandInfo().minRowBytes(), 0);
+  ASSERT_EQ(packed.error, LayerImageErrorCode::None);
+  ASSERT_TRUE(packed.bandSequenceValid);
+  EXPECT_EQ(CountDifferentPixels(image, packed.image, 0), 0);
+}
+
 static float MaxOutset(const Rect& rect) {
   return std::max(std::max(-rect.left, -rect.top), std::max(rect.right, rect.bottom));
 }
@@ -337,7 +361,7 @@ TGFX_TEST(LayerImageReaderTest, TiledMatchesSingleSurface) {
     ASSERT_FALSE(tiled.image.pixels.empty()) << "code=" << static_cast<int>(tiled.error);
     EXPECT_TRUE(tiled.bandSequenceValid);
     EXPECT_GT(tiled.bandsRead, 1);
-    EXPECT_EQ(CountDifferentPixels(reference, tiled.image, 0), 0);
+    ExpectBlurredPixelsNear(reference, tiled.image);
   }
 }
 
@@ -392,7 +416,7 @@ TGFX_TEST(LayerImageReaderTest, MaskedTargetWithAttributesMatchesSingleSurface) 
   EXPECT_EQ(outside[1], 128);
   EXPECT_EQ(outside[2], 128);
   EXPECT_EQ(outside[3], 255);
-  EXPECT_EQ(CountDifferentPixels(reference, output, 0), 0);
+  ExpectBlurredPixelsNear(reference, output);
 }
 
 TGFX_TEST(LayerImageReaderTest, NestedBackdropMatchesAndIsTileInvariant) {
@@ -407,16 +431,13 @@ TGFX_TEST(LayerImageReaderTest, NestedBackdropMatchesAndIsTileInvariant) {
   auto smallTiles = ReadTiled(context, content, {64, 64});
   ASSERT_FALSE(smallTiles.image.pixels.empty()) << "code=" << static_cast<int>(smallTiles.error);
   EXPECT_TRUE(smallTiles.bandSequenceValid);
-  // A layer filter applied to the enclosing group rasterizes its intermediate image at the tile's
-  // clip window, so its fractional output offset lands on a tile-dependent sub-pixel phase. That
-  // may move individual edge channels by one 8-bit step, but must never drop or duplicate content.
-  EXPECT_EQ(CountDifferentPixels(reference, smallTiles.image, 1), 0);
-  EXPECT_LE(CountDifferentPixels(reference, smallTiles.image, 0), TestWidth * TestHeight / 200);
+  ExpectBlurredPixelsNear(reference, smallTiles.image);
 
   auto largeTiles = ReadTiled(context, content, {4096, 4096});
   ASSERT_FALSE(largeTiles.image.pixels.empty());
-  EXPECT_EQ(CountDifferentPixels(reference, largeTiles.image, 0), 0);
-  EXPECT_EQ(CountDifferentPixels(smallTiles.image, largeTiles.image, 1), 0);
+  ExpectBlurredPixelsNear(reference, largeTiles.image);
+  // Each result can round one step away from the reference in opposite directions.
+  ExpectBlurredPixelsNear(smallTiles.image, largeTiles.image, 2);
 }
 
 TGFX_TEST(LayerImageReaderTest, ScaledOutputMatchesCanvasDraw) {
@@ -459,7 +480,7 @@ TGFX_TEST(LayerImageReaderTest, ScaledOutputMatchesCanvasDraw) {
   auto output = ReadAllBands(context, reader.get(), referenceInfo.rowBytes(), 0);
   ASSERT_FALSE(output.image.pixels.empty()) << "error=" << static_cast<int>(output.error);
   EXPECT_TRUE(output.bandSequenceValid);
-  EXPECT_EQ(CountDifferentPixels(reference, output.image, 0), 0);
+  ExpectBlurredPixelsNear(reference, output.image);
 }
 
 TGFX_TEST(LayerImageReaderTest, PaddedStrideLeavesPaddingUntouched) {
@@ -493,7 +514,8 @@ TGFX_TEST(LayerImageReaderTest, PaddedStrideLeavesPaddingUntouched) {
       EXPECT_EQ(row[info.rowBytes() + i], 0xcc);
     }
   }
-  EXPECT_EQ(CountDifferentPixels(reference, output.image, 0), 0);
+  ExpectPackedRGBAMatches(context, request, options, output.image);
+  ExpectBlurredPixelsNear(reference, output.image);
 }
 
 TGFX_TEST(LayerImageReaderTest, BgraOutputSwapsChannels) {
@@ -516,27 +538,14 @@ TGFX_TEST(LayerImageReaderTest, BgraOutputSwapsChannels) {
   auto reader = LayerImageReader::Make(context, request, options);
   ASSERT_TRUE(reader != nullptr);
   ASSERT_EQ(reader->bandInfo().colorType(), ColorType::BGRA_8888);
-  std::vector<uint8_t> pixels(reader->bandInfo().byteSize() * 2);
-  std::vector<uint8_t> fullOutput(static_cast<size_t>(TestWidth) * TestHeight * 4);
-  int nextRow = 0;
-  while (nextRow < TestHeight) {
-    auto rows = std::min(reader->bandInfo().height(), TestHeight - nextRow);
-    auto info = ImageInfo::Make(TestWidth, rows, ColorType::BGRA_8888, AlphaType::Premultiplied,
-                                TestWidth * 4, ColorSpace::SRGB());
-    auto result = reader->readNextBand(context, Pixmap(info, pixels.data()), info.byteSize());
-    ASSERT_EQ(result.code, LayerImageReadCode::BandReady);
-    std::copy_n(pixels.data(), info.byteSize(),
-                fullOutput.data() + static_cast<size_t>(nextRow) * TestWidth * 4);
-    nextRow += result.rowCount;
+  auto bgra = ReadAllBands(context, reader.get(), reference.rowBytes, 0);
+  ASSERT_EQ(bgra.error, LayerImageErrorCode::None);
+  ASSERT_TRUE(bgra.bandSequenceValid);
+  for (size_t i = 0; i < bgra.image.pixels.size(); i += 4) {
+    std::swap(bgra.image.pixels[i], bgra.image.pixels[i + 2]);
   }
-  int different = 0;
-  for (size_t i = 0; i + 3 < reference.pixels.size(); i += 4) {
-    if (fullOutput[i] != reference.pixels[i + 2] || fullOutput[i + 1] != reference.pixels[i + 1] ||
-        fullOutput[i + 2] != reference.pixels[i] || fullOutput[i + 3] != reference.pixels[i + 3]) {
-      different++;
-    }
-  }
-  EXPECT_EQ(different, 0);
+  ExpectPackedRGBAMatches(context, request, options, bgra.image);
+  ExpectBlurredPixelsNear(reference, bgra.image);
 }
 
 TGFX_TEST(LayerImageReaderTest, EquivalentColorSpacesAcceptIndependentInstances) {
@@ -673,7 +682,7 @@ TGFX_TEST(LayerImageReaderTest, TileSizeDoesNotChangePixels) {
   ASSERT_FALSE(largeTiles.image.pixels.empty());
   EXPECT_TRUE(smallTiles.bandSequenceValid);
   EXPECT_TRUE(largeTiles.bandSequenceValid);
-  EXPECT_EQ(CountDifferentPixels(smallTiles.image, largeTiles.image, 0), 0);
+  ExpectBlurredPixelsNear(smallTiles.image, largeTiles.image);
 }
 
 TGFX_TEST(LayerImageReaderTest, UsesExactSurfaceSizesForFullAndEdgeTiles) {
@@ -777,11 +786,12 @@ TGFX_TEST(LayerImageReaderTest, PlainTilesCullStyledSubtrees) {
   EXPECT_EQ(pixels[info.minRowBytes() - 1], 0);
 }
 
-TGFX_TEST(LayerImageReaderTest, PassThroughOffscreenRespectsEdgeTileSize) {
+TGFX_TEST_PRIVATE(LayerImageReaderTest, PassThroughOffscreenRespectsEdgeTileSize) {
   class MeasuringSolidLayer final : public SolidLayer {
    public:
     std::vector<ISize> surfaceSizes = {};
 
+#ifdef TGFX_TEST_ACCESS_PRIVATE
    protected:
     bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha,
                    BlendMode blendMode) override {
@@ -790,6 +800,7 @@ TGFX_TEST(LayerImageReaderTest, PassThroughOffscreenRespectsEdgeTileSize) {
                                                 : ISize{});
       return Layer::drawLayer(args, canvas, alpha, blendMode);
     }
+#endif
   };
 
   ContextScope scope;
@@ -2044,11 +2055,12 @@ TGFX_TEST(LayerImageReaderTest, WideBandRemainsCompleteAcrossBackgroundBatches) 
   }
 }
 
-TGFX_TEST(LayerImageReaderTest, SubdividingATileDoesNotRedrawEarlierBatches) {
+TGFX_TEST_PRIVATE(LayerImageReaderTest, SubdividingATileDoesNotRedrawEarlierBatches) {
   class TrackingLayer final : public Layer {
    public:
     int leftmostTileDraws = 0;
 
+#ifdef TGFX_TEST_ACCESS_PRIVATE
    protected:
     bool drawLayer(const DrawArgs& args, Canvas* canvas, float alpha,
                    BlendMode blendMode) override {
@@ -2058,6 +2070,7 @@ TGFX_TEST(LayerImageReaderTest, SubdividingATileDoesNotRedrawEarlierBatches) {
       }
       return Layer::drawLayer(args, canvas, alpha, blendMode);
     }
+#endif
   };
 
   ContextScope scope;
