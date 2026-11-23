@@ -42,6 +42,9 @@ struct FragmentSourceRecord {
     Alias,
     /// dst = src.xy / src.z, the perspective divide of a projective coordinate.
     Project,
+    /// dst is the stage's final output: the operator folded the coverage itself, so the epilogue
+    /// must not multiply it again.
+    Root,
   };
   Kind kind = Kind::Color;
   std::string dst = {};
@@ -117,6 +120,12 @@ class FragmentShaderBuilder : public ShaderBuilder {
   std::string readTexture(SamplerHandle handle, const std::string& coordName,
                           const std::string& strictSubset, const std::string& drawSubset,
                           bool* recorded);
+
+  /**
+   * Records that a call already stored the stage's final output and folded its coverage: the
+   * epilogue must not combine again. The value must be a call's register.
+   */
+  void recordStageRoot(const std::string& outputVar);
 
   /**
    * Assigns one value to a name the stage already declared and records that the two carry the

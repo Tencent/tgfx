@@ -75,6 +75,17 @@ std::string FragmentShaderBuilder::readTexture(SamplerHandle handle, const std::
   return temp;
 }
 
+void FragmentShaderBuilder::recordStageRoot(const std::string& outputVar) {
+  if (sourceRecorder == nullptr) {
+    return;
+  }
+  FragmentSourceRecord record = {};
+  record.kind = FragmentSourceRecord::Kind::Root;
+  record.dst = outputVar;
+  record.order = nextEmitOrder();
+  sourceRecorder->push_back(std::move(record));
+}
+
 void FragmentShaderBuilder::aliasValue(const std::string& dstName, const std::string& srcName,
                                        const std::string& declaration) {
   if (sourceRecorder != nullptr) {

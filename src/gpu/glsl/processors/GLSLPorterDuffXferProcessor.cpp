@@ -55,6 +55,26 @@ void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
     auto dstCoordScaleName = uniformHandler->addUniform(
         "DstTextureCoordScale", UniformFormat::Float2, ShaderStage::Fragment);
 
+    // One call owns the whole tail: the zero-coverage discard, the destination read and the
+    // coverage blend (the assembled file spells exactly what the text below spells). The
+    // dual-source coefficient modes keep the text: their second output has no single-value form.
+    auto porterDuffEntry = fragBuilder->appendFunction("applyPorterDuffXP");
+    BlendFormula blendFormula = {};
+    const bool dualSource =
+        BlendModeAsCoeff(blendMode, true, &blendFormula) && blendFormula.needSecondaryOutput();
+    if (!porterDuffEntry.empty() && !dualSource) {
+      const auto dstSamplerName =
+          uniformHandler->getSamplerVariable(args.dstTextureSamplerHandle).name();
+      fragBuilder->appendCall(
+          args.outputColor, porterDuffEntry,
+          {args.inputColor, args.inputCoverage, "gl_FragCoord.xy", dstTopLeftName,
+           dstCoordScaleName, std::to_string(static_cast<int>(blendMode)), dstSamplerName});
+      // The call folded the coverage itself (the zero-coverage discard and the coverage blend
+      // live inside it), so it is the stage's root and the epilogue must not combine again.
+      fragBuilder->recordStageRoot(args.outputColor);
+      return;
+    }
+
     fragBuilder->codeAppend("// Read color from copy of the destination.\n");
     std::string dstTexCoord = "_dstTexCoord";
     fragBuilder->codeAppendf("highp vec2 %s = (gl_FragCoord.xy - %s) * %s;", dstTexCoord.c_str(),

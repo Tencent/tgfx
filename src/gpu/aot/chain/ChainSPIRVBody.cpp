@@ -225,7 +225,7 @@ struct BodyState {
   // The op function ids by ChainISA value.
   std::unordered_map<int, uint32_t> opFunctions = {};
   // The leaf sampler variables, by leaf index: a plan argument of kind Sampler reads them.
-  uint32_t leafSamplerIds[4] = {0, 0, 0, 0};
+  uint32_t leafSamplerIds[8] = {0, 0, 0, 0, 0, 0, 0, 0};
   // The Pointer(Function, T) types, cached per pointee: glslang passes every non-entry
   // function's parameters as pointers to Function storage, and the linked modules keep that ABI.
   std::unordered_map<uint32_t, uint32_t> functionPointers = {};
@@ -577,7 +577,7 @@ uint32_t ResolveArg(BodyState* state, const ChainProgramPlan& plan, const ChainA
       return found == state->varyingIds.end() ? 0 : found->second;
     }
     case ChainArgKind::Sampler:
-      return arg.index >= 0 && arg.index < 4 ? state->leafSamplerIds[arg.index] : 0;
+      return arg.index >= 0 && arg.index < 8 ? state->leafSamplerIds[arg.index] : 0;
     case ChainArgKind::None:
       return 0;
     case ChainArgKind::LeafTex:
@@ -850,19 +850,19 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
   // The leaf samplers the layout declares: the body owns every descriptor declaration, and the
   // operators that sample take them as arguments. Only the declared leaves get a variable — a
   // plan with one sampler must not bind four, or the pipeline's descriptor set disagrees.
-  uint32_t leafSamplerVars[4] = {0, 0, 0, 0};
+  uint32_t leafSamplerVars[8] = {0, 0, 0, 0, 0, 0, 0, 0};
   {
-    bool present[4] = {false, false, false, false};
-    uint32_t leafBindings[4] = {0, 0, 0, 0};
+    bool present[8] = {false, false, false, false, false, false, false, false};
+    uint32_t leafBindings[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     for (const auto& texture : layout.textures) {
-      for (int leaf = 0; leaf < 4; ++leaf) {
+      for (int leaf = 0; leaf < 8; ++leaf) {
         if (texture.name == "TextureSampler_" + std::to_string(leaf)) {
           present[leaf] = true;
           leafBindings[leaf] = texture.binding;
         }
       }
     }
-    for (int leaf = 0; leaf < 4; ++leaf) {
+    for (int leaf = 0; leaf < 8; ++leaf) {
       if (!present[leaf]) {
         continue;
       }
@@ -1238,7 +1238,7 @@ bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
                              ? leafFetchValue(arg.index)
                              : ResolveArg(&state, plan, arg, coverageId));
       }
-    } else if (row->special != nullptr && row->special[0] != '\0') {
+    } else if (row->special != nullptr && row->special[0] != '\0' && !row->admitted) {
       *error = "a special operator cannot ride a plan call";
       return false;
     } else {

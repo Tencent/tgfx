@@ -290,7 +290,8 @@ inline constexpr Arg kPorterDuffArgs[] = {
     {Param::Vec2, Source::Special},         {Param::Int, Source::Special},
     {Param::SampledImage, Source::Special},
 };
-inline constexpr const char* kPorterDuffIncludes[] = {"xp/xp_porter_duff.inc"};
+inline constexpr const char* kPorterDuffIncludes[] = {"xp/xp_blend_colors.inc",
+                                                      "xp/xp_porter_duff.inc"};
 
 // ---- PremulAlpha (the FP tree's tgfxMulAlpha: the blend operand recipes) --------------------
 inline constexpr Arg kPremulAlphaArgs[] = {
@@ -504,7 +505,7 @@ inline constexpr Row kRows[] = {
     {PorterDuffId, "applyPorterDuffXP",
      "#define HAS_XP 1\n#define TGFX_DECLARED_CHAIN 1\n"
      "layout(set = 2, binding = 0) uniform sampler2D dummyDstTex;\n",
-     kPorterDuffIncludes, 1, false, false, "porterDuff", kPorterDuffArgs, 7},
+     kPorterDuffIncludes, 2, false, true, "porterDuff", kPorterDuffArgs, 7},
 };
 
 inline constexpr const Row* Rows() {

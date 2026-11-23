@@ -32,6 +32,7 @@
 #include "gpu/aot/chain/ChainSPIRVBody.h"
 #include "gpu/shaders/contract/ChainISA.h"
 #include "gpu/shaders/contract/FragmentLibrary.h"
+#include "gpu/shaders/contract/OpTable.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -186,6 +187,15 @@ int FindOpOfFunction(const std::string& name) {
       return fragment->op;
     }
   }
+  // The operator table's own rows (the porter-duff tail sits outside the ChainISA vocabulary):
+  // the linkable ones spell an exported name the record route can call.
+  const size_t rowCount = OpTable::RowCount();
+  for (size_t index = 0; index < rowCount; ++index) {
+    const auto& row = OpTable::Rows()[index];
+    if (row.admitted && row.exportName != nullptr && name == row.exportName) {
+      return row.id;
+    }
+  }
   return -1;
 }
 
@@ -268,6 +278,10 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
   // varying, or a constant leaves the draw on its runtime path.
   std::map<std::string, std::string> projectedOf = {};
   auto argOfValue = [&](const std::string& rawName, ChainArg* arg) -> bool {
+    if (rawName == "gl_FragCoord" || rawName == "gl_FragCoord.xy") {
+      arg->kind = ChainArgKind::FragCoord;
+      return true;
+    }
     const auto projected = projectedOf.find(rawName);
     if (projected != projectedOf.end()) {
       for (size_t index = 0; index < plan.varyings.size(); ++index) {
@@ -446,6 +460,23 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
       combined = true;
       continue;
     }
+    if (source.kind == FragmentSourceRecord::Kind::Root) {
+      const auto found = registerOf.find(source.dst);
+      if (found == registerOf.end()) {
+        LOGE("VulkanProgramBuilder: the stage root %s is not a call the plan recorded",
+             source.dst.c_str());
+        return nullptr;
+      }
+      plan.rootRegister = found->second;
+      // The coverage is folded inside the operator the root came from, so the epilogue reads the
+      // unit coverage instead of multiplying a second time.
+      ChainArg unitCoverage = ChainArg::None();
+      unitCoverage.kind = ChainArgKind::UnitCoverage;
+      plan.coverageRootRegister = -1;
+      plan.geomCoverage = unitCoverage;
+      combined = true;
+      continue;
+    }
     if (source.kind == FragmentSourceRecord::Kind::Project) {
       projectedOf[source.dst] = source.src;
       continue;
@@ -521,8 +552,8 @@ std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
     layout.textures.push_back(std::move(texture));
   }
 
-  if (plan.samplers.size() > 4) {
-    LOGE("VulkanProgramBuilder: the plan declares %zu samplers, the body carries four",
+  if (plan.samplers.size() > 8) {
+    LOGE("VulkanProgramBuilder: the plan declares %zu samplers, the body carries eight",
          plan.samplers.size());
     return nullptr;
   }

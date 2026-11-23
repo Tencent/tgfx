@@ -69,6 +69,9 @@ void GLSLXfermodeFragmentProcessor::emitCode(EmitArgs& args) const {
       fragBuilder->codeAppendf("%s *= %s.a;", args.outputColor.c_str(), args.inputColor.c_str());
     } else {
       fragBuilder->appendCall(args.outputColor, mulEntry, {args.outputColor, args.inputColor});
+      // The mode's blend folded everything the epilogue would do (this xfer carries no coverage
+      // multiply of its own), so the last call is the stage's root.
+      fragBuilder->recordStageRoot(args.outputColor);
     }
   } else {
     std::string childColor = "child";
@@ -79,6 +82,10 @@ void GLSLXfermodeFragmentProcessor::emitCode(EmitArgs& args) const {
       AppendBlendFunction(fragBuilder, args.inputColor, childColor, args.outputColor, mode);
     } else {
       AppendBlendFunction(fragBuilder, childColor, args.inputColor, args.outputColor, mode);
+    }
+    if (!fragBuilder->appendFunction("xpBlendColors").empty()) {
+      // The blend call folded everything the epilogue would do; it is the stage's root.
+      fragBuilder->recordStageRoot(args.outputColor);
     }
   }
 }
