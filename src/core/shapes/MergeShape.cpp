@@ -99,16 +99,19 @@ PathFillType MergeShape::fillType() const {
 Rect MergeShape::onGetBounds() const {
   auto firstBounds = first->onGetBounds();
   auto secondBounds = second->onGetBounds();
-  bool firstInverse = first->isInverseFillType();
-  bool secondInverse = second->isInverseFillType();
   switch (pathOp) {
     case PathOp::Difference:
-      return secondInverse ? secondBounds : firstBounds;
-    case PathOp::Intersect:
+      return second->isInverseFillType() ? secondBounds : firstBounds;
+    case PathOp::Intersect: {
+      // Only these two operations need the inverse flags; asking for them on a union chain would
+      // build every operand path just to discard the answer.
+      auto firstInverse = first->isInverseFillType();
+      auto secondInverse = second->isInverseFillType();
       if (firstInverse == secondInverse) {
         return firstBounds.intersect(secondBounds) ? firstBounds : Rect::MakeEmpty();
       }
       return firstInverse ? secondBounds : firstBounds;
+    }
     default:
       firstBounds.join(secondBounds);
       return firstBounds;

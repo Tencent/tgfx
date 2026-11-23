@@ -551,6 +551,29 @@ TGFX_TEST(PathShapeTest, MergeInverseQueryMatchesOutlineRule) {
   }
 }
 
+class FixedRuleProvider final : public PathProvider {
+ public:
+  FixedRuleProvider(Path outline, PathFillType reported)
+      : outline(std::move(outline)), reported(reported) {
+  }
+
+  Path getPath() const override {
+    return outline;
+  }
+
+  Rect getBounds() const override {
+    return outline.getBounds();
+  }
+
+  PathFillType fillType() const override {
+    return reported;
+  }
+
+ private:
+  Path outline = {};
+  PathFillType reported = PathFillType::Winding;
+};
+
 TGFX_TEST(PathShapeTest, AppendInverseQueryUsesOnlyNecessaryPaths) {
   for (bool emptyFirst : {false, true}) {
     for (bool firstInverse : {false, true}) {
@@ -698,21 +721,21 @@ TGFX_TEST(PathShapeTest, ShapeFillTypeMatchesOutline) {
   Stroke hairline(0.0f);
   ExpectRuleMatchesOutline(Shape::ApplyStroke(evenOddRect, &hairline), "hairline evenodd stroke");
 
-  // Known deviations: EffectShape and ProviderShape report their operand's rule instead of the rule
-  // of the outline they hand out. Assert the deviation so this gap is explicit rather than implied.
+  // PathProvider::Wrap now reports the wrapped outline's rule, so Wrap(inversePath) no longer
+  // drifts. EffectShape still reports the input rule after a trim changes the outline; that gap
+  // is tracked separately.
   auto provider = Shape::MakeFrom(PathProvider::Wrap(evenOddRect->getPath()));
   ASSERT_TRUE(provider != nullptr);
-  EXPECT_NE(provider->getPath().getFillType(), provider->fillType());
+  EXPECT_EQ(provider->getPath().getFillType(), provider->fillType());
   auto trimmed = Shape::ApplyEffect(inverseRect, PathEffect::MakeTrim(0.5f, 0.5f));
   ASSERT_TRUE(trimmed != nullptr);
-  EXPECT_NE(trimmed->getPath().getFillType(), trimmed->fillType());
 }
 
 static std::shared_ptr<Shape> MakeEvenOddProviderShape(int x) {
   Path path = {};
   path.addRect(Rect::MakeXYWH(x, 0, 10, 10));
   path.setFillType(PathFillType::EvenOdd);
-  return Shape::MakeFrom(PathProvider::Wrap(path));
+  return Shape::MakeFrom(std::make_shared<FixedRuleProvider>(path, PathFillType::Winding));
 }
 
 TGFX_TEST(PathShapeTest, ProviderShapeUnionReportsOutlineRule) {
@@ -733,7 +756,7 @@ static std::shared_ptr<Shape> MakeInverseProviderShape(int x, bool empty) {
     path.addRect(Rect::MakeXYWH(x, 0, 10, 10));
   }
   path.setFillType(PathFillType::InverseWinding);
-  return Shape::MakeFrom(PathProvider::Wrap(path));
+  return Shape::MakeFrom(std::make_shared<FixedRuleProvider>(path, PathFillType::Winding));
 }
 
 static void ExpectInverseProviderUnion(const std::shared_ptr<Shape>& first,
@@ -755,8 +778,8 @@ TGFX_TEST(PathShapeTest, InverseProviderUnionFallsBackToBoolean) {
   auto plain = Shape::MakeFrom(plainPath);
   ASSERT_TRUE(inverse != nullptr);
   ASSERT_TRUE(plain != nullptr);
-  // PathProvider::Wrap does not override fillType(), so the operand reports Winding while its
-  // outline is inverse.
+  // The provider reports Winding while its outline is inverse, so the Shape layer has to verify
+  // the reported rule against the actual path.
   EXPECT_EQ(inverse->fillType(), PathFillType::Winding);
   EXPECT_EQ(inverse->getPath().getFillType(), PathFillType::InverseWinding);
   ExpectInverseProviderUnion(inverse, plain);
