@@ -70,8 +70,8 @@ void GLSLStencilCoverStencilPassGeometryProcessor::emitCode(EmitArgs& args) cons
   // (convex / exterior side of the bezier).
   fragBuilder->codeAppendf("if (%s.x * %s.x - %s.y > 0.0) { discard; }", klmVarying.fsIn().c_str(),
                            klmVarying.fsIn().c_str(), klmVarying.fsIn().c_str());
-  fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
-  fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
+  fragBuilder->storeColor(args.outputColor, "vec4(0.0)");
+  fragBuilder->storeCoverage(args.outputCoverage, "vec4(1.0)", false);
 
   vertBuilder->storePosition(positionName);
 }
