@@ -222,6 +222,11 @@ void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
   }
 }
 
+void AppendBlendFunction(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
+                         const std::string& dstColor, const std::string& outColor, BlendMode mode) {
+  HandleBlendModes(fsBuilder, srcColor, dstColor, outColor, mode);
+}
+
 const char* BlendModeName(BlendMode mode) {
   const char* ModeStrings[] = {
       "Clear",       "Src",       "Dst",        "SrcOver",   "DstOver",    "SrcIn",

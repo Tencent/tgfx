@@ -27,5 +27,12 @@ void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
                 const std::string& coverageColor, const std::string& dstColor,
                 const std::string& outColor, BlendMode blendMode, bool hasCoverage);
 
+/**
+ * Emits the blend mode's own function (one recorded call), for the call sites that carry a
+ * coverage of one and therefore need no coefficient factors.
+ */
+void AppendBlendFunction(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
+                         const std::string& dstColor, const std::string& outColor, BlendMode mode);
+
 const char* BlendModeName(BlendMode mode);
 }  // namespace tgfx
