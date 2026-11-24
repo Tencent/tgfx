@@ -196,6 +196,46 @@ TEST(SPIRVShaderBuilderTest, EmitsUniformBlockLoad) {
   EXPECT_TRUE(ContainsOpcode(words, spirv::kOpLoad));
 }
 
+TEST(SPIRVShaderBuilderTest, EmitsUniformArrayLoad) {
+  ProgramIRBuilder program = {};
+  const auto kernel = program.AddUniformArray(
+      {"Kernel", SLType::Float4, Precision::High, ShaderStage::Fragment, 17});
+
+  SPIRVShaderBuilder builder(ShaderStage::Fragment);
+  std::string error = {};
+  ASSERT_TRUE(builder.Begin(&error)) << error;
+  uint32_t valueId = 0;
+  ASSERT_TRUE(builder.EmitValue(program.IR(), kernel, &valueId, &error)) << error;
+  const auto words = builder.Finish(&error);
+  ASSERT_FALSE(words.empty()) << error;
+  WriteIfRequested(words);
+
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpTypeArray));
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpAccessChain));
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpLoad));
+}
+
+TEST(SPIRVShaderBuilderTest, ImportsArrayFunctionParameter) {
+  const auto* desc = FindOperator(OperatorID::GaussianBlur1D);
+  ASSERT_NE(desc, nullptr);
+  OperatorArtifact artifact = {};
+  artifact.id = OperatorID::GaussianBlur1D;
+  artifact.backend = OperatorBackend::SPIRV;
+  artifact.symbol = "gaussianBlur1D";
+  artifact.spirv = {0x07230203u};
+
+  SPIRVShaderBuilder builder(ShaderStage::Fragment);
+  std::string error = {};
+  ASSERT_TRUE(builder.Begin(&error)) << error;
+  EXPECT_NE(builder.ImportFunction(*desc, artifact, &error), 0u) << error;
+  const auto words = builder.Finish(&error);
+  ASSERT_FALSE(words.empty()) << error;
+  WriteIfRequested(words);
+
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpTypeArray));
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpFunctionParameter));
+}
+
 TEST(SPIRVShaderBuilderTest, RejectsUnsupportedExpressions) {
   ProgramIRBuilder program = {};
   const auto input =
