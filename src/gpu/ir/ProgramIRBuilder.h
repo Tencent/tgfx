@@ -36,6 +36,8 @@ class ProgramIRBuilder {
   /// after processor mangling, so this keeps the interface and the dual-write path on one ID.
   ValueID InternValue(const std::string& name, SLType type, Precision precision, IRValueKind kind);
 
+  const IRValue* FindValue(const std::string& name) const;
+
   ValueID AddAttribute(AttributeIR attribute);
 
   ValueID AddVarying(VaryingIR varying);

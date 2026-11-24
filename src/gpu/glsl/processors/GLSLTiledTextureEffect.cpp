@@ -191,16 +191,52 @@ bool GLSLTiledTextureEffect::describeTiledRead(EmitArgs& args, SamplerHandle sam
   description->subsetName = names.subsetName;
   description->clampName = names.clampName;
   description->dimensionName = names.dimensionsName;
+  if (args.irBuilder != nullptr) {
+    if (!names.subsetName.empty()) {
+      description->subset = args.irBuilder->InternValue(names.subsetName, SLType::Float4,
+                                                        Precision::High, IRValueKind::Uniform);
+    }
+    if (!names.clampName.empty()) {
+      description->clamp = args.irBuilder->InternValue(names.clampName, SLType::Float4,
+                                                       Precision::High, IRValueKind::Uniform);
+    }
+    if (!names.dimensionsName.empty()) {
+      description->dimensions = args.irBuilder->InternValue(names.dimensionsName, SLType::Float2,
+                                                            Precision::High, IRValueKind::Uniform);
+    }
+  }
   // The shared mapping takes the shader-mode enumerators themselves, not the axis-coordinate
   // encoding the emit path uses for its literals.
   description->shaderModeX = static_cast<int>(sampling.shaderModeX);
   description->shaderModeY = static_cast<int>(sampling.shaderModeY);
-  description->seamBlend = sampling.shaderModeX == ShaderMode::RepeatLinearNone ||
-                           sampling.shaderModeX == ShaderMode::RepeatLinearMipmap ||
-                           sampling.shaderModeY == ShaderMode::RepeatLinearNone ||
-                           sampling.shaderModeY == ShaderMode::RepeatLinearMipmap;
-  description->borderPass = sampling.shaderModeX == ShaderMode::ClampToBorderLinear ||
-                            sampling.shaderModeY == ShaderMode::ClampToBorderLinear;
+  const bool repeatX = sampling.shaderModeX == ShaderMode::RepeatLinearNone ||
+                       sampling.shaderModeX == ShaderMode::RepeatLinearMipmap;
+  const bool repeatY = sampling.shaderModeY == ShaderMode::RepeatLinearNone ||
+                       sampling.shaderModeY == ShaderMode::RepeatLinearMipmap;
+  const bool borderLinearX = sampling.shaderModeX == ShaderMode::ClampToBorderLinear;
+  const bool borderLinearY = sampling.shaderModeY == ShaderMode::ClampToBorderLinear;
+  const bool borderNearestX = sampling.shaderModeX == ShaderMode::ClampToBorderNearest;
+  const bool borderNearestY = sampling.shaderModeY == ShaderMode::ClampToBorderNearest;
+  if (repeatX) {
+    description->flags |= TiledFlags(TiledReadFlag::RepeatX);
+  }
+  if (repeatY) {
+    description->flags |= TiledFlags(TiledReadFlag::RepeatY);
+  }
+  if (borderLinearX) {
+    description->flags |= TiledFlags(TiledReadFlag::BorderLinearX);
+  }
+  if (borderLinearY) {
+    description->flags |= TiledFlags(TiledReadFlag::BorderLinearY);
+  }
+  if (borderNearestX) {
+    description->flags |= TiledFlags(TiledReadFlag::BorderNearestX);
+  }
+  if (borderNearestY) {
+    description->flags |= TiledFlags(TiledReadFlag::BorderNearestY);
+  }
+  description->seamBlend = repeatX || repeatY;
+  description->borderPass = borderLinearX || borderLinearY;
   return true;
 }
 
@@ -220,11 +256,33 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
   const auto& sampler = (*args.textureSamplers)[0];
   const auto samplerVar = args.uniformHandler->getSamplerVariable(sampler);
   const auto samplerName = samplerVar.name();
+  ValueID textureValue = INVALID_VALUE_ID;
+  auto makeCoordValue = [&](const std::string& name) -> ValueID {
+    if (args.irBuilder == nullptr) {
+      return INVALID_VALUE_ID;
+    }
+    const auto* existing = args.irBuilder->FindValue(name);
+    if (existing != nullptr) {
+      if (existing->type == SLType::Float2) {
+        return existing->id;
+      }
+      if (existing->type == SLType::Float3 || existing->type == SLType::Float4) {
+        return args.irBuilder->CreateSwizzle(existing->id, SLType::Float2, "xy");
+      }
+    }
+    return args.irBuilder->InternValue(name, SLType::Float2, Precision::High, IRValueKind::Local);
+  };
   if (sampling.shaderModeX == TiledTextureEffect::ShaderMode::None &&
       sampling.shaderModeY == TiledTextureEffect::ShaderMode::None) {
     fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
     fragBuilder->appendTextureLookup(sampler, texCoordName);
     fragBuilder->codeAppend(";");
+    if (args.irBuilder != nullptr && args.samplerValue(sampler) != INVALID_VALUE_ID) {
+      const auto coordValue = makeCoordValue(texCoordName);
+      textureValue =
+          args.irBuilder->CreateTextureSample(args.samplerValue(sampler), coordValue,
+                                              SLType::Float4, args.outputColor, samplerVar.type());
+    }
   } else {
     bool useClamp[2] = {ShaderModeUsesClamp(sampling.shaderModeX),
                         ShaderModeUsesClamp(sampling.shaderModeY)};
@@ -378,6 +436,65 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
     }
     fragBuilder->codeAppendf("%s = textureColor%s;", args.outputColor.c_str(),
                              fragBuilder->getSamplerSwizzleSuffix(sampler).c_str());
+    if (args.irBuilder != nullptr && args.samplerValue(sampler) != INVALID_VALUE_ID) {
+      const auto zero = args.irBuilder->CreateConstant(0.0f);
+      const auto one = args.irBuilder->CreateConstant(1.0f);
+      const auto zero4 = args.irBuilder->CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
+      const auto one2 = args.irBuilder->CreateConstruct(SLType::Float2, {one, one});
+      const auto coordValue = makeCoordValue(texCoordName);
+      const auto subsetValue =
+          names.subsetName.empty()
+              ? zero4
+              : args.irBuilder->InternValue(names.subsetName, SLType::Float4, Precision::High,
+                                            IRValueKind::Uniform);
+      const auto clampValue = names.clampName.empty() ? zero4
+                                                      : args.irBuilder->InternValue(
+                                                            names.clampName, SLType::Float4,
+                                                            Precision::High, IRValueKind::Uniform);
+      const auto dimensionsValue =
+          names.dimensionsName.empty()
+              ? one2
+              : args.irBuilder->InternValue(names.dimensionsName, SLType::Float2, Precision::High,
+                                            IRValueKind::Uniform);
+      const auto strictSubsetValue =
+          constraint == SrcRectConstraint::Strict && !args.inputSubset.empty()
+              ? args.irBuilder->InternValue(args.inputSubset, SLType::Float4, Precision::High,
+                                            IRValueKind::Uniform)
+              : zero4;
+      const auto modeXValue = args.irBuilder->CreateIntConstant(modeX);
+      const auto modeYValue = args.irBuilder->CreateIntConstant(modeY);
+      uint32_t flags = 0;
+      if (constraint == SrcRectConstraint::Strict) {
+        flags |= TiledFlags(TiledReadFlag::StrictSubset);
+      }
+      if (repeatX) {
+        flags |= TiledFlags(TiledReadFlag::RepeatX);
+      }
+      if (repeatY) {
+        flags |= TiledFlags(TiledReadFlag::RepeatY);
+      }
+      if (borderLinearX) {
+        flags |= TiledFlags(TiledReadFlag::BorderLinearX);
+      }
+      if (borderLinearY) {
+        flags |= TiledFlags(TiledReadFlag::BorderLinearY);
+      }
+      if (borderNearestX) {
+        flags |= TiledFlags(TiledReadFlag::BorderNearestX);
+      }
+      if (borderNearestY) {
+        flags |= TiledFlags(TiledReadFlag::BorderNearestY);
+      }
+      const auto flagsValue = args.irBuilder->CreateIntConstant(static_cast<int32_t>(flags));
+      const auto op = samplerVar.type() == SLType::Texture2DRectSampler
+                          ? OperatorID::TiledSampleRect
+                          : OperatorID::TiledSample;
+      textureValue = args.irBuilder->CreateCall(
+          op, SLType::Float4,
+          {args.samplerValue(sampler), coordValue, subsetValue, clampValue, dimensionsValue,
+           modeXValue, modeYValue, flagsValue, strictSubsetValue},
+          args.outputColor);
+    }
   }
   if (textureProxy->isAlphaOnly()) {
     args.fragBuilder->codeAppendf("%s = %s.a * %s;", args.outputColor.c_str(),
@@ -385,6 +502,13 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
   } else {
     args.fragBuilder->codeAppendf("%s = %s * %s.a;", args.outputColor.c_str(),
                                   args.outputColor.c_str(), args.inputColor.c_str());
+  }
+  if (textureValue != INVALID_VALUE_ID && args.irBuilder != nullptr &&
+      args.inputValue != INVALID_VALUE_ID && args.outputValue != INVALID_VALUE_ID) {
+    const auto op = textureProxy->isAlphaOnly() ? OperatorID::AlphaModulate : OperatorID::MulAlpha;
+    const auto result = args.irBuilder->CreateCall(
+        op, SLType::Float4, {textureValue, args.inputValue}, args.outputColor);
+    args.irBuilder->StoreOutput(args.outputValue, result);
   }
 }
 

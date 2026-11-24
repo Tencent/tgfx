@@ -220,8 +220,12 @@ class FragmentProcessor : public Processor {
     std::string subsetName = {};
     std::string clampName = {};
     std::string dimensionName = {};
+    ValueID subset = INVALID_VALUE_ID;
+    ValueID clamp = INVALID_VALUE_ID;
+    ValueID dimensions = INVALID_VALUE_ID;
     int shaderModeX = 0;
     int shaderModeY = 0;
+    uint32_t flags = 0;
     /// The sampling resolves to a plain read (both axes clamp): no tiling math applies.
     bool plainRead = false;
     /// The read needs the repeat seam blend (the linear repeat modes).

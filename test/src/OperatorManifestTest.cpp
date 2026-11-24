@@ -52,6 +52,17 @@ TEST(OperatorManifestTest, ExposesGaussianBlurSignature) {
   EXPECT_EQ(desc->params[11], SLType::Float4);
 }
 
+TEST(OperatorManifestTest, ExposesTiledSampleSignature) {
+  const auto* desc = FindOperator(OperatorID::TiledSample);
+  ASSERT_NE(desc, nullptr);
+  EXPECT_EQ(desc->returnType, SLType::Float4);
+  ASSERT_EQ(desc->params.size(), 9u);
+  EXPECT_EQ(desc->params[0], SLType::Texture2DSampler);
+  EXPECT_EQ(desc->params[2], SLType::Float4);
+  EXPECT_EQ(desc->params[7], SLType::Int);
+  EXPECT_EQ(desc->params[8], SLType::Float4);
+}
+
 TEST(OperatorManifestTest, RejectsUnknownOperators) {
   EXPECT_EQ(FindOperator(static_cast<OperatorID>(999)), nullptr);
 }

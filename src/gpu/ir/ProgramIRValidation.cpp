@@ -87,7 +87,10 @@ bool ValidateExpr(const ProgramIR& program, const IRExpr& expr, std::string* err
     for (size_t index = 0; index < expr.args.size(); ++index) {
       const auto& argument = program.values[expr.args[index]];
       if (argument.type != operatorDesc->params[index]) {
-        *error = "a call argument type does not match the operator manifest";
+        *error = "argument " + std::to_string(index) + " of '" +
+                 (operatorDesc->debugName != nullptr ? operatorDesc->debugName : "?") + "' is " +
+                 std::to_string(static_cast<int>(argument.type)) + ", expected " +
+                 std::to_string(static_cast<int>(operatorDesc->params[index]));
         return false;
       }
     }

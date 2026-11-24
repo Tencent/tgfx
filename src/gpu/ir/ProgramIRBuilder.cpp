@@ -104,6 +104,14 @@ ValueID ProgramIRBuilder::InternValue(const std::string& name, SLType type, Prec
   return CreateValue(type, precision, kind, name);
 }
 
+const IRValue* ProgramIRBuilder::FindValue(const std::string& name) const {
+  const auto found = valuesByName.find(name);
+  if (found == valuesByName.end()) {
+    return nullptr;
+  }
+  return &ir.values[found->second];
+}
+
 ValueID ProgramIRBuilder::AddAttribute(AttributeIR attribute) {
   const auto precision = Precision::High;
   attribute.location = nextAttributeLocation++;

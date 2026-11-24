@@ -41,6 +41,21 @@ enum class Precision : uint8_t {
   High,
 };
 
+enum class TiledReadFlag : uint32_t {
+  None = 0,
+  StrictSubset = 1 << 0,
+  RepeatX = 1 << 1,
+  RepeatY = 1 << 2,
+  BorderLinearX = 1 << 3,
+  BorderLinearY = 1 << 4,
+  BorderNearestX = 1 << 5,
+  BorderNearestY = 1 << 6,
+};
+
+constexpr uint32_t TiledFlags(TiledReadFlag flag) {
+  return static_cast<uint32_t>(flag);
+}
+
 enum class IRValueKind : uint8_t {
   Constant,
   Attribute,

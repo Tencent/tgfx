@@ -75,6 +75,18 @@ const std::vector<OperatorDesc>& Operators() {
        {SLType::Texture2DSampler, SLType::Float2, SLType::Float2, SLType::Int, SLType::Float4,
         SLType::Int, SLType::Int, SLType::Float4, SLType::Float2, SLType::Int, SLType::Int,
         SLType::Float4}},
+      {OperatorID::TiledSample,
+       "TiledSample",
+       "tgfxTiledSample",
+       SLType::Float4,
+       {SLType::Texture2DSampler, SLType::Float2, SLType::Float4, SLType::Float4, SLType::Float2,
+        SLType::Int, SLType::Int, SLType::Int, SLType::Float4}},
+      {OperatorID::TiledSampleRect,
+       "TiledSampleRect",
+       "tgfxTiledSampleRect",
+       SLType::Float4,
+       {SLType::Texture2DRectSampler, SLType::Float2, SLType::Float4, SLType::Float4,
+        SLType::Float2, SLType::Int, SLType::Int, SLType::Int, SLType::Float4}},
   };
   return operators;
 }

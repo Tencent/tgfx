@@ -37,6 +37,8 @@ enum class OperatorID : uint32_t {
   MulAlpha = 8,
   AlphaModulate = 9,
   GaussianBlur1D = 10,
+  TiledSample = 11,
+  TiledSampleRect = 12,
 };
 
 constexpr OperatorID INVALID_OPERATOR_ID = static_cast<OperatorID>(-1);
