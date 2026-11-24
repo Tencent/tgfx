@@ -19,6 +19,7 @@
 #include "BackgroundHandler.h"
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include "core/utils/GpuProbe.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -428,6 +429,9 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     recording->drawImage(std::move(smallBgImage));
   } else {
     // Fallback when detached copy is unavailable; original path may trigger COW.
+    std::printf("[CAP-NODETACH] bg=%dx%d content=%.0f,%.0f,%.0f,%.0f\n", bgImage->width(),
+                bgImage->height(), contentBounds.left, contentBounds.top, contentBounds.right,
+                contentBounds.bottom);
     recording->drawImage(bgImage);
   }
   auto picture = recorder.finishRecordingAsPicture();
