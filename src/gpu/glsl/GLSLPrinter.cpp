@@ -17,10 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLPrinter.h"
+#include "gpu/ProgramBuilder.h"
+#include "gpu/ShaderBuilder.h"
+#include "gpu/ShaderVar.h"
 #include "gpu/VertexShaderBuilder.h"
 
 namespace tgfx {
 namespace {
+
+void AppendSection(std::string* out, const std::string& section) {
+  if (section.empty()) {
+    return;
+  }
+  *out += section;
+  *out += "\n";
+}
 
 constexpr char Indent[] = "    ";
 
@@ -183,6 +194,71 @@ std::string GLSLPrinter::PrintFragmentProgram(const FragmentProgram& program) {
     }
   }
   out += "}\n";
+  return out;
+}
+
+std::string GLSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderStage stage,
+                                    const InterfaceDesc& interface, const ShaderBuilder& builder) {
+  std::string uniforms = {};
+  std::vector<UniformDesc> uniformDescriptors = {};
+  for (const auto& uniform : interface.uniforms) {
+    if (uniform.stage == stage) {
+      uniformDescriptors.push_back(uniform);
+    }
+  }
+  uniforms += programBuilder.getUniformBlockDeclaration(stage, uniformDescriptors);
+  if (stage == ShaderStage::Fragment) {
+    for (const auto& sampler : interface.samplers) {
+      ShaderVar var(sampler.name, sampler.type, ShaderVar::TypeModifier::Uniform);
+      uniforms += programBuilder.getShaderVarDeclarations(var, stage);
+      uniforms += ";\n";
+    }
+  }
+
+  std::string inputs = {};
+  std::string outputs = {};
+  for (const auto& input : builder.inputVars()) {
+    inputs += programBuilder.getShaderVarDeclarations(input, stage);
+    inputs += ";\n";
+  }
+  for (const auto& output : builder.outputVars()) {
+    outputs += programBuilder.getShaderVarDeclarations(output, stage);
+    outputs += ";\n";
+  }
+  if (stage == ShaderStage::Vertex) {
+    for (const auto& attribute : interface.attributes) {
+      ShaderVar var(attribute.name, attribute.type, ShaderVar::TypeModifier::Attribute);
+      inputs += programBuilder.getShaderVarDeclarations(var, stage);
+      inputs += ";\n";
+    }
+    for (const auto& varying : interface.varyings) {
+      ShaderVar var(
+          varying.name, varying.type,
+          varying.flat ? ShaderVar::TypeModifier::FlatVarying : ShaderVar::TypeModifier::Varying);
+      outputs += programBuilder.getShaderVarDeclarations(var, stage);
+      outputs += ";\n";
+    }
+  } else {
+    for (const auto& varying : interface.varyings) {
+      ShaderVar var(
+          varying.name, varying.type,
+          varying.flat ? ShaderVar::TypeModifier::FlatVarying : ShaderVar::TypeModifier::Varying);
+      inputs += programBuilder.getShaderVarDeclarations(var, stage);
+      inputs += ";\n";
+    }
+  }
+
+  std::string out = {};
+  AppendSection(&out, builder.versionDecl());
+  AppendSection(&out, builder.extensions());
+  AppendSection(&out, builder.definitions());
+  AppendSection(&out, builder.precisionQualifier());
+  AppendSection(&out, uniforms);
+  AppendSection(&out, inputs);
+  AppendSection(&out, outputs);
+  AppendSection(&out, builder.functions());
+  AppendSection(&out, builder.mainHeader());
+  AppendSection(&out, builder.code());
   return out;
 }
 

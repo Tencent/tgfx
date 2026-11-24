@@ -21,17 +21,23 @@
 #include <string>
 #include <vector>
 #include "gpu/ir/ProgramDescription.h"
+#include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
+class ProgramBuilder;
+class ShaderBuilder;
 
-/// The single GLSL printer for the body of each stage. Declarations still come from the stage
-/// builders; this class owns the statement translation so the vertex and fragment stages share one
-/// entry point. The text starts with the first statement and ends with the closing brace of main.
+/// The single GLSL printer for a stage. It prints the interface declarations from the typed
+/// description, appends the recorded function section, and prints the main body from the stage
+/// records. The result is the complete shader text sent to the driver.
 class GLSLPrinter {
  public:
   static std::string PrintVertexProgram(const std::vector<VertexCall>& calls);
 
   static std::string PrintFragmentProgram(const FragmentProgram& program);
+
+  static std::string PrintStage(const ProgramBuilder& programBuilder, ShaderStage stage,
+                                const InterfaceDesc& interface, const ShaderBuilder& builder);
 };
 
 }  // namespace tgfx

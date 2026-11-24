@@ -253,6 +253,10 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   }
   _vertexBuilder.setCodeText(GLSLPrinter::PrintVertexProgram(description.vertexCalls));
   _fragBuilder.setCodeText(GLSLPrinter::PrintFragmentProgram(description.fragment));
+  const auto vertexText =
+      GLSLPrinter::PrintStage(*this, ShaderStage::Vertex, description.interface, _vertexBuilder);
+  const auto fragmentText =
+      GLSLPrinter::PrintStage(*this, ShaderStage::Fragment, description.interface, _fragBuilder);
   // Diagnostic dump of the emitted stage texts (TGFX_DUMP_PROGRAM=dir): the FP-tree route's
   // shader is otherwise only visible to the driver. Static counter, one file per program.
   if (const char* dumpDir = std::getenv("TGFX_DUMP_PROGRAM")) {
@@ -260,26 +264,24 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     const int index = dumpIndex.fetch_add(1);
     const std::string base = std::string(dumpDir) + "/fp_program_" + std::to_string(index);
     if (auto* file = fopen((base + ".vert").c_str(), "wb")) {
-      auto text = vertexShaderBuilder()->shaderString();
-      fwrite(text.data(), 1, text.size(), file);
+      fwrite(vertexText.data(), 1, vertexText.size(), file);
       fclose(file);
     }
     if (auto* file = fopen((base + ".frag").c_str(), "wb")) {
-      auto text = fragmentShaderBuilder()->shaderString();
-      fwrite(text.data(), 1, text.size(), file);
+      fwrite(fragmentText.data(), 1, fragmentText.size(), file);
       fclose(file);
     }
   }
   auto gpu = context->gpu();
   ShaderModuleDescriptor vertexModule = {};
-  vertexModule.code = vertexShaderBuilder()->shaderString();
+  vertexModule.code = vertexText;
   vertexModule.stage = ShaderStage::Vertex;
   auto vertexShader = gpu->createShaderModule(vertexModule);
   if (vertexShader == nullptr) {
     return nullptr;
   }
   ShaderModuleDescriptor fragmentModule = {};
-  fragmentModule.code = fragmentShaderBuilder()->shaderString();
+  fragmentModule.code = fragmentText;
   fragmentModule.stage = ShaderStage::Fragment;
   auto fragmentShader = gpu->createShaderModule(fragmentModule);
   if (fragmentShader == nullptr) {

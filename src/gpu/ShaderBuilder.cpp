@@ -216,28 +216,12 @@ void ShaderBuilder::addFeature(uint32_t featureBit, const std::string& extension
   features |= featureBit;
 }
 
-std::string ShaderBuilder::getDeclarations(const std::vector<ShaderVar>& vars,
-                                           ShaderStage stage) const {
-  std::string ret;
-  for (const auto& var : vars) {
-    ret += programBuilder->getShaderVarDeclarations(var, stage);
-    ret += ";\n";
-  }
-  return ret;
-}
-
 void ShaderBuilder::finalize() {
   if (finalized) {
     return;
   }
   auto shaderCaps = programBuilder->getContext()->shaderCaps();
   shaderStrings[Type::VersionDecl] = shaderCaps->versionDeclString;
-  auto type = shaderStage();
-  shaderStrings[Type::Uniforms] += programBuilder->uniformHandler()->getUniformDeclarations(type);
-  shaderStrings[Type::Inputs] += getDeclarations(inputs, type);
-  shaderStrings[Type::Outputs] += getDeclarations(outputs, type);
-  programBuilder->varyingHandler()->getDeclarations(&shaderStrings[Type::Inputs],
-                                                    &shaderStrings[Type::Outputs], type);
   // append the 'footer' to code
   shaderStrings[Type::Code] += "}\n";
   finalized = true;
@@ -271,15 +255,4 @@ void ShaderBuilder::setCodeText(const std::string& text) {
   atLineStart = true;
 }
 
-std::string ShaderBuilder::shaderString() {
-  std::string fragment;
-  for (auto& str : shaderStrings) {
-    if (str.empty()) {
-      continue;
-    }
-    fragment += str;
-    fragment += "\n";
-  }
-  return fragment;
-}
 }  // namespace tgfx

@@ -153,7 +153,41 @@ class ShaderBuilder {
    */
   void finalize();
 
-  std::string shaderString();
+  const std::string& versionDecl() const {
+    return shaderStrings[Type::VersionDecl];
+  }
+
+  const std::string& extensions() const {
+    return shaderStrings[Type::Extensions];
+  }
+
+  const std::string& definitions() const {
+    return shaderStrings[Type::Definitions];
+  }
+
+  const std::string& precisionQualifier() const {
+    return shaderStrings[Type::PrecisionQualifier];
+  }
+
+  const std::string& functions() const {
+    return shaderStrings[Type::Functions];
+  }
+
+  const std::string& mainHeader() const {
+    return shaderStrings[Type::Main];
+  }
+
+  const std::string& code() const {
+    return shaderStrings[Type::Code];
+  }
+
+  const std::vector<ShaderVar>& inputVars() const {
+    return inputs;
+  }
+
+  const std::vector<ShaderVar>& outputVars() const {
+    return outputs;
+  }
 
   /**
    * Replaces the main-body statements with text a printer produced from the program description.
@@ -198,8 +232,6 @@ class ShaderBuilder {
   }
 
   ValueRef internValue(const std::string& name, SLType type, ValueOrigin origin);
-
-  std::string getDeclarations(const std::vector<ShaderVar>& vars, ShaderStage stage) const;
 
   std::vector<std::string> shaderStrings;
   std::set<std::string> emittedFunctions = {};
