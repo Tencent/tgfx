@@ -31,7 +31,7 @@ void VertexShaderBuilder::transformPoint(const std::string& dstPointName,
                                          const std::string& srcPointName,
                                          const std::string& transformName, bool hasPerspective) {
   recordVertexCall(VertexCallKind::TransformPoint, dstPointName, srcPointName, transformName, "",
-                   hasPerspective);
+                   hasPerspective, false, SLType::Float2);
   if (!suppressText) {
     emitTransformedPoint(dstPointName, srcPointName, transformName, hasPerspective);
   }
@@ -41,7 +41,7 @@ void VertexShaderBuilder::transformVarying(const std::string& varyingName,
                                            const std::string& srcPointName,
                                            const std::string& transformName, bool hasPerspective) {
   recordVertexCall(VertexCallKind::TransformVarying, varyingName, srcPointName, transformName, "",
-                   hasPerspective);
+                   hasPerspective, false, hasPerspective ? SLType::Float3 : SLType::Float2);
   if (suppressText) {
     return;
   }
@@ -59,7 +59,7 @@ void VertexShaderBuilder::transformPointAdd(const std::string& dstPointName,
                                             const std::string& transformName,
                                             const std::string& offsetName) {
   recordVertexCall(VertexCallKind::TransformPointAdd, dstPointName, srcPointName, transformName,
-                   offsetName, false);
+                   offsetName, false, false, SLType::Float2);
   if (!suppressText) {
     codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy + %s;", dstPointName.c_str(),
                 transformName.c_str(), srcPointName.c_str(), offsetName.c_str());
@@ -68,7 +68,8 @@ void VertexShaderBuilder::transformPointAdd(const std::string& dstPointName,
 
 void VertexShaderBuilder::multiplyVec2(const std::string& dstName, const std::string& first,
                                        const std::string& second, bool declare) {
-  recordVertexCall(VertexCallKind::MultiplyVec2, dstName, first, second, "", false, declare);
+  recordVertexCall(VertexCallKind::MultiplyVec2, dstName, first, second, "", false, declare,
+                   SLType::Float2);
   if (suppressText) {
     return;
   }
@@ -81,7 +82,8 @@ void VertexShaderBuilder::multiplyVec2(const std::string& dstName, const std::st
 
 void VertexShaderBuilder::swizzleVec2(const std::string& dstName, const std::string& srcName,
                                       const std::string& components) {
-  recordVertexCall(VertexCallKind::SwizzleVec2, dstName, srcName, "", components, false);
+  recordVertexCall(VertexCallKind::SwizzleVec2, dstName, srcName, "", components, false, false,
+                   SLType::Float2);
   if (!suppressText) {
     codeAppendf("highp vec2 %s = %s.%s;", dstName.c_str(), srcName.c_str(), components.c_str());
   }
@@ -89,7 +91,8 @@ void VertexShaderBuilder::swizzleVec2(const std::string& dstName, const std::str
 
 void VertexShaderBuilder::composeVec4(const std::string& dstName, const std::string& first,
                                       const std::string& second) {
-  recordVertexCall(VertexCallKind::ComposeVec4, dstName, first, second, "", false);
+  recordVertexCall(VertexCallKind::ComposeVec4, dstName, first, second, "", false, false,
+                   SLType::Float4);
   if (!suppressText) {
     codeAppendf("highp vec4 %s = vec4(%s, %s);", dstName.c_str(), first.c_str(), second.c_str());
   }
@@ -113,7 +116,7 @@ void VertexShaderBuilder::storePosition(const std::string& devPos) {
 void VertexShaderBuilder::recordVertexCall(VertexCallKind kind, const std::string& dst,
                                            const std::string& src, const std::string& operand,
                                            const std::string& extra, bool hasPerspective,
-                                           bool declaresResult) {
+                                           bool declaresResult, SLType resultType) {
   if (vertexRecorder == nullptr) {
     return;
   }
@@ -125,6 +128,7 @@ void VertexShaderBuilder::recordVertexCall(VertexCallKind kind, const std::strin
   record.extra = extra;
   record.hasPerspective = hasPerspective;
   record.declaresResult = declaresResult;
+  record.resultType = resultType;
   vertexRecorder->push_back(std::move(record));
 }
 }  // namespace tgfx

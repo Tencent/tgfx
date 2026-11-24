@@ -21,6 +21,21 @@
 namespace tgfx {
 namespace {
 
+const char* TypeName(SLType type) {
+  switch (type) {
+    case SLType::Float:
+      return "float";
+    case SLType::Float2:
+      return "vec2";
+    case SLType::Float3:
+      return "vec3";
+    case SLType::Float4:
+      return "vec4";
+    default:
+      return "unknown";
+  }
+}
+
 bool AssignIDs(ProgramDescription* description, std::string* error) {
   auto& interface = description->interface;
   if (interface.attributes.size() > 0xFFFFu) {
@@ -79,6 +94,11 @@ bool LinkVertexWrites(ProgramDescription* description, std::string* error) {
     auto* varying = FindVarying(&description->interface, call.dst);
     if (varying == nullptr) {
       *error = "the vertex stage writes undeclared varying '" + call.dst + "'";
+      return false;
+    }
+    if (call.resultType != SLType::Void && call.resultType != varying->type) {
+      *error = "the vertex stage writes " + std::string(TypeName(call.resultType)) +
+               " into varying '" + varying->name + "' declared as " + TypeName(varying->type);
       return false;
     }
     call.varying = varying->id;

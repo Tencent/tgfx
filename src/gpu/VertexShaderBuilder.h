@@ -114,7 +114,7 @@ class VertexShaderBuilder : public ShaderBuilder {
   /// Appends one record when a recorder is installed; the callers print the text when text is on.
   void recordVertexCall(VertexCallKind kind, const std::string& dst, const std::string& src,
                         const std::string& operand, const std::string& extra, bool hasPerspective,
-                        bool declaresResult = false);
+                        bool declaresResult = false, SLType resultType = SLType::Void);
 
  private:
   std::vector<VertexCallRecord>* vertexRecorder = nullptr;

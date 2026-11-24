@@ -62,6 +62,17 @@ TEST(ProgramValidationTest, RejectsUnproducedVarying) {
   EXPECT_NE(error.find("never produced"), std::string::npos);
 }
 
+TEST(ProgramValidationTest, RejectsVaryingWriteTypeMismatch) {
+  auto description = ValidDescription();
+  description.interface.varyings[0].type = SLType::Float3;
+  description.vertexCalls[0].kind = VertexCallKind::TransformVarying;
+  description.vertexCalls[0].resultType = SLType::Float2;
+  std::string error;
+  EXPECT_FALSE(ValidateProgramDescription(&description, &error));
+  EXPECT_NE(error.find("vec2"), std::string::npos);
+  EXPECT_NE(error.find("vColor"), std::string::npos);
+}
+
 TEST(ProgramValidationTest, RejectsUndeclaredWrite) {
   auto description = ValidDescription();
   description.vertexCalls[0].dst = "vMissing";

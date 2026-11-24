@@ -66,6 +66,8 @@ struct VertexCall {
   bool hasPerspective = false;
   /// MultiplyVec2's declaration form: true spells "highp vec2 dst = ...".
   bool declaresResult = false;
+  /// The value type the primitive writes; Void when the primitive does not determine it.
+  SLType resultType = SLType::Void;
   /// The varying this write targets, resolved after the interface is declared.
   VaryingID varying = INVALID_VARYING;
 };
