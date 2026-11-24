@@ -25,6 +25,12 @@
 
 namespace tgfx {
 
+using AttributeID = uint16_t;
+using UniformID = uint16_t;
+using VaryingID = uint16_t;
+using SamplerID = uint16_t;
+constexpr VaryingID INVALID_VARYING = static_cast<VaryingID>(-1);
+
 /// The vertex-stage write one record carries. The GLSL printer and the later SPIR-V emitters read
 /// the same records; a record names the values exactly as the emitting processor spelled them.
 enum class VertexCallKind : uint8_t {
@@ -60,23 +66,31 @@ struct VertexCall {
   bool hasPerspective = false;
   /// MultiplyVec2's declaration form: true spells "highp vec2 dst = ...".
   bool declaresResult = false;
+  /// The varying this write targets, resolved after the interface is declared.
+  VaryingID varying = INVALID_VARYING;
 };
 
 struct AttributeDesc {
   std::string name = {};
+  AttributeID id = 0;
 };
 
 struct VaryingDesc {
   std::string name = {};
   SLType type = SLType::Void;
+  VaryingID id = 0;
+  uint8_t location = 0;
+  bool produced = false;
 };
 
 struct UniformDesc {
   std::string name = {};
+  UniformID id = 0;
 };
 
 struct SamplerDesc {
   std::string name = {};
+  SamplerID id = 0;
 };
 
 /// The stage interface the emitter declared: attributes, varyings, uniforms and samplers, in

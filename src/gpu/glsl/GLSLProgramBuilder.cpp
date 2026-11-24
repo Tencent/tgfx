@@ -23,8 +23,10 @@
 #include <string>
 #include "GLSLFragmentPrinter.h"
 #include "GLSLVertexPrinter.h"
+#include "core/utils/Log.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
+#include "gpu/ir/ProgramValidation.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/GPU.h"
 #if defined(TGFX_USE_VULKAN)
@@ -204,6 +206,11 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   }
   for (const auto& sampler : _uniformHandler.getSamplers()) {
     description.interface.samplers.push_back({sampler.name()});
+  }
+  std::string validationError;
+  if (!ValidateProgramDescription(&description, &validationError)) {
+    LOGE("GLSLProgramBuilder: %s", validationError.c_str());
+    return nullptr;
   }
   _vertexBuilder.setCodeText(PrintGLSLVertexProgram(description.vertexCalls));
   _fragBuilder.setCodeText(PrintGLSLFragmentProgram(description.fragment));
