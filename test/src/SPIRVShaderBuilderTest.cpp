@@ -21,6 +21,12 @@
 #include "gpu/ir/ProgramIRBuilder.h"
 #include "gpu/spirv/SPIRVShaderBuilder.h"
 #include "gtest/gtest.h"
+#if defined(TGFX_USE_VULKAN)
+#include <cstring>
+#include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/ShaderModule.h"
+#include "utils/ContextScope.h"
+#endif
 
 namespace tgfx {
 namespace {
@@ -274,5 +280,72 @@ TEST(SPIRVShaderBuilderTest, RejectsUnsupportedExpressions) {
   EXPECT_FALSE(builder.EmitValue(program.IR(), result, &valueId, &error));
   EXPECT_FALSE(error.empty());
 }
+
+#if defined(TGFX_USE_VULKAN)
+TEST(SPIRVShaderBuilderTest, VulkanAcceptsGeneratedModules) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  if (context->backend() != Backend::Vulkan) {
+    GTEST_SKIP() << "the Vulkan backend is not active";
+  }
+  auto* gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+
+  ProgramIRBuilder program = {};
+  const auto zero = program.CreateConstant(0.0f);
+  const auto one = program.CreateConstant(1.0f);
+  const auto position = program.CreateConstruct(SLType::Float4, {zero, zero, zero, one});
+  const auto positionOutput =
+      program.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "gl_Position");
+  program.StoreOutput(positionOutput, position);
+
+  SPIRVVertexShaderBuilder vertexBuilder;
+  std::string error = {};
+  ASSERT_TRUE(vertexBuilder.Begin(&error)) << error;
+  uint32_t vertexValue = 0;
+  ASSERT_TRUE(vertexBuilder.EmitValue(program.IR(), position, &vertexValue, &error)) << error;
+  ASSERT_TRUE(vertexBuilder.StoreOutput(program.IR(), position, &error)) << error;
+  const auto vertexWords = vertexBuilder.Finish(&error);
+  ASSERT_FALSE(vertexWords.empty()) << error;
+
+  ProgramIRBuilder fragmentProgram = {};
+  const auto colorZero = fragmentProgram.CreateConstant(0.0f);
+  const auto colorOne = fragmentProgram.CreateConstant(1.0f);
+  const auto color =
+      fragmentProgram.CreateConstruct(SLType::Float4, {colorZero, colorZero, colorZero, colorOne});
+  const auto colorOutput = fragmentProgram.CreateValue(SLType::Float4, Precision::High,
+                                                       IRValueKind::Local, "outputColor");
+  fragmentProgram.StoreOutput(colorOutput, color);
+
+  SPIRVFragmentShaderBuilder fragmentBuilder;
+  ASSERT_TRUE(fragmentBuilder.Begin(&error)) << error;
+  uint32_t fragmentValue = 0;
+  ASSERT_TRUE(fragmentBuilder.EmitValue(fragmentProgram.IR(), color, &fragmentValue, &error))
+      << error;
+  ASSERT_TRUE(fragmentBuilder.StoreOutput(fragmentProgram.IR(), color, &error)) << error;
+  const auto fragmentWords = fragmentBuilder.Finish(&error);
+  ASSERT_FALSE(fragmentWords.empty()) << error;
+
+  auto toBytes = [](const std::vector<uint32_t>& words) {
+    std::vector<uint8_t> bytes(words.size() * sizeof(uint32_t));
+    std::memcpy(bytes.data(), words.data(), bytes.size());
+    return bytes;
+  };
+  ShaderModuleDescriptor vertexDesc = {};
+  vertexDesc.format = ShaderCodeFormat::SPIRV;
+  vertexDesc.stage = ShaderStage::Vertex;
+  vertexDesc.binaryData = toBytes(vertexWords);
+  auto vertexModule = gpu->createShaderModule(vertexDesc);
+  ASSERT_TRUE(vertexModule != nullptr);
+
+  ShaderModuleDescriptor fragmentDesc = {};
+  fragmentDesc.format = ShaderCodeFormat::SPIRV;
+  fragmentDesc.stage = ShaderStage::Fragment;
+  fragmentDesc.binaryData = toBytes(fragmentWords);
+  auto fragmentModule = gpu->createShaderModule(fragmentDesc);
+  ASSERT_TRUE(fragmentModule != nullptr);
+}
+#endif
 
 }  // namespace tgfx
