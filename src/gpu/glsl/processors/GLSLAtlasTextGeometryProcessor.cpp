@@ -38,8 +38,6 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
-  varyingHandler->emitAttributes(*this);
-
   auto atlasName =
       uniformHandler->addUniform(atlasSizeUniformName, UniformFormat::Float2, ShaderStage::Vertex);
 

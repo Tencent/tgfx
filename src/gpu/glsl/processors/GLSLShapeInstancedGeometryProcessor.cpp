@@ -39,8 +39,6 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
-  varyingHandler->emitAttributes(*this);
-
   // Step 1: uvMatrix transforms tessellation-space position back to local space.
   auto uvMatrixName =
       uniformHandler->addUniform("UVMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);

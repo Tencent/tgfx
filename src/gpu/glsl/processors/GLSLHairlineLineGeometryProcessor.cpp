@@ -42,7 +42,6 @@ void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
   auto uniformHandler = args.uniformHandler;
 
   // Emit vertex attributes
-  varyingHandler->emitAttributes(*this);
 
   // Transform vertex position by view matrix
   auto matrixName =

@@ -36,8 +36,6 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
-  varyingHandler->emitAttributes(*this);
-
   auto& uvCoordsVar = inUVCoord.empty() ? inPosition : inUVCoord;
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
 

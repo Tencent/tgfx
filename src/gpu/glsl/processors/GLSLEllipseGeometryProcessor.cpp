@@ -36,7 +36,6 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   auto uniformHandler = args.uniformHandler;
 
   // emit attributes
-  varyingHandler->emitAttributes(*this);
 
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
   vertBuilder->storeVarying(ellipseOffsets.vsOut(), inEllipseOffset.name());

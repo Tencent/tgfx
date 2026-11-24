@@ -38,8 +38,6 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
-  varyingHandler->emitAttributes(*this);
-
   auto& uvCoordsVar = uvCoord.empty() ? position : uvCoord;
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
 

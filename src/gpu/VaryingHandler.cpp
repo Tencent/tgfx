@@ -31,23 +31,4 @@ Varying VaryingHandler::addVarying(const std::string& name, SLType type, bool is
   return varyings[varyings.size() - 1];
 }
 
-void VaryingHandler::emitAttributes(const GeometryProcessor& processor) {
-  for (auto& attribute : processor.vertexAttributes()) {
-    addAttribute(ShaderVar(attribute));
-  }
-  for (auto& attribute : processor.instanceAttributes()) {
-    addAttribute(ShaderVar(attribute));
-  }
-}
-
-void VaryingHandler::addAttribute(const ShaderVar& var) {
-  for (const auto& attr : vertexInputs) {
-    // if attribute already added, don't add it again
-    if (attr.name() == var.name()) {
-      return;
-    }
-  }
-  vertexInputs.push_back(var);
-}
-
 }  // namespace tgfx

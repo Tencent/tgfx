@@ -40,8 +40,6 @@ void GLSLStencilCoverCoverPassGeometryProcessor::emitCode(EmitArgs& args) const 
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
-  varyingHandler->emitAttributes(*this);
-
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
   std::string positionName = "position";

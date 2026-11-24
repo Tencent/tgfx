@@ -25,7 +25,6 @@
 
 namespace tgfx {
 class ProgramBuilder;
-class GeometryProcessor;
 
 class Varying {
  public:
@@ -71,8 +70,6 @@ class VaryingHandler {
 
   Varying addVarying(const std::string& name, SLType type, bool isFlat = false);
 
-  void emitAttributes(const GeometryProcessor& processor);
-
   /**
    * Returns the varyings added so far, in declaration order. The bytecode route derives its
    * interface block from this list.
@@ -82,10 +79,7 @@ class VaryingHandler {
   }
 
  private:
-  void addAttribute(const ShaderVar& var);
-
   std::vector<Varying> varyings;
-  std::vector<ShaderVar> vertexInputs;
 
   // This is not owned by the class
   ProgramBuilder* programBuilder;

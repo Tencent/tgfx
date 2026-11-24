@@ -37,7 +37,6 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   auto uniformHandler = args.uniformHandler;
 
   // Emit attributes
-  varyingHandler->emitAttributes(*this);
 
   // Setup color output
   if (commonColor.has_value()) {
