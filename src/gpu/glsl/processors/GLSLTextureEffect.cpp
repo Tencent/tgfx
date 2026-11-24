@@ -18,7 +18,6 @@
 
 #include "GLSLTextureEffect.h"
 #include <unordered_map>
-#include "core/utils/Log.h"
 #include "gpu/glsl/GLSLOperatorEmitter.h"
 
 namespace tgfx {
