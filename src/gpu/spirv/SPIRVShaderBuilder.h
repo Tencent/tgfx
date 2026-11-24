@@ -37,6 +37,13 @@ class SPIRVShaderBuilder {
 
   bool Begin(std::string* error = nullptr);
 
+  /// Declares function-local variables for values that are assigned in the IR. Must be called
+  /// after Begin and before any other value is emitted so the variables stay in the entry block.
+  bool DeclareLocals(const ProgramIR& program, std::string* error = nullptr);
+
+  bool Assign(const ProgramIR& program, const LValue& dst, ValueID value,
+              std::string* error = nullptr);
+
   /// Emits the defining expression of value and returns its SPIR-V result id.
   bool EmitValue(const ProgramIR& program, ValueID value, uint32_t* resultId,
                  std::string* error = nullptr);
@@ -78,6 +85,7 @@ class SPIRVShaderBuilder {
   uint32_t labelId = 0;
   uint32_t outputPointerId = 0;
   uint32_t outputId = 0;
+  uint32_t fragCoordId = 0;
   std::vector<ImportedFunction> importedFunctions = {};
   bool begun = false;
   bool finished = false;

@@ -100,6 +100,54 @@ TEST(SPIRVShaderBuilderTest, EmitsSwizzleAndBinary) {
   EXPECT_TRUE(ContainsOpcode(words, spirv::kOpCompositeConstruct));
 }
 
+TEST(SPIRVShaderBuilderTest, EmitsBuiltinFragCoord) {
+  ProgramIRBuilder program = {};
+  const auto fragCoord = program.CreateBuiltin("gl_FragCoord", SLType::Float4);
+  const auto xy = program.CreateSwizzle(fragCoord, SLType::Float2, "xy");
+  const auto zero = program.CreateConstant(0.0f);
+  const auto output = program.CreateConstruct(SLType::Float4, {xy, zero, zero});
+
+  SPIRVShaderBuilder builder(ShaderStage::Fragment);
+  std::string error = {};
+  ASSERT_TRUE(builder.Begin(&error)) << error;
+  uint32_t valueId = 0;
+  ASSERT_TRUE(builder.EmitValue(program.IR(), output, &valueId, &error)) << error;
+  ASSERT_TRUE(builder.StoreOutput(program.IR(), output, &error)) << error;
+  const auto words = builder.Finish(&error);
+  ASSERT_FALSE(words.empty()) << error;
+  WriteIfRequested(words);
+
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpVariable));
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpLoad));
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpVectorShuffle));
+}
+
+TEST(SPIRVShaderBuilderTest, EmitsLocalLoadAndAssign) {
+  ProgramIRBuilder program = {};
+  const auto zero = program.CreateConstant(0.0f);
+  const auto color = program.CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
+  const auto local =
+      program.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "color");
+  const auto load = program.CreateLoad(local, SLType::Float4);
+  const auto output =
+      program.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "outputColor");
+  program.StoreOutput(output, load);
+
+  SPIRVShaderBuilder builder(ShaderStage::Fragment);
+  std::string error = {};
+  ASSERT_TRUE(builder.Begin(&error)) << error;
+  ASSERT_TRUE(builder.DeclareLocals(program.IR(), &error)) << error;
+  ASSERT_TRUE(builder.Assign(program.IR(), {local, ""}, color, &error)) << error;
+  ASSERT_TRUE(builder.StoreOutput(program.IR(), load, &error)) << error;
+  const auto words = builder.Finish(&error);
+  ASSERT_FALSE(words.empty()) << error;
+  WriteIfRequested(words);
+
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpVariable));
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpStore));
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpLoad));
+}
+
 TEST(SPIRVShaderBuilderTest, RejectsUnsupportedExpressions) {
   ProgramIRBuilder program = {};
   const auto input =

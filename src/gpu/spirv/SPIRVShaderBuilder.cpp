@@ -174,12 +174,14 @@ bool SPIRVShaderBuilder::Begin(std::string* error) {
 
   mainId = writer.NewId();
   outputId = writer.NewId();
+  fragCoordId = writer.NewId();
   writer.Sink(&writer.mode);
   {
     auto operands = std::vector<uint32_t>{spirv::kExecutionModelFragment, mainId};
     const auto name = spirv::NameWords("main");
     operands.insert(operands.end(), name.begin(), name.end());
     operands.push_back(outputId);
+    operands.push_back(fragCoordId);
     writer.Inst(spirv::kOpEntryPoint, operands);
   }
   writer.Inst(spirv::kOpExecutionMode, {mainId, spirv::kExecutionModeOriginUpperLeft});
@@ -200,6 +202,8 @@ bool SPIRVShaderBuilder::Begin(std::string* error) {
 
   writer.Sink(&writer.ann);
   writer.Inst(spirv::kOpDecorate, {outputId, spirv::kDecorationLocation, 0});
+  writer.Inst(spirv::kOpDecorate,
+              {fragCoordId, spirv::kDecorationBuiltIn, spirv::kBuiltInFragCoord});
 
   writer.Sink(&writer.decl);
   const auto voidType = TypeId(SLType::Void, error);
@@ -208,10 +212,12 @@ bool SPIRVShaderBuilder::Begin(std::string* error) {
     return false;
   }
   const auto outputPointer = PointerTypeId(SLType::Float4, spirv::kStorageOutput, error);
-  if (outputPointer == 0) {
+  const auto inputPointer = PointerTypeId(SLType::Float4, spirv::kStorageInput, error);
+  if (outputPointer == 0 || inputPointer == 0) {
     return false;
   }
   writer.Inst(spirv::kOpVariable, {outputPointer, outputId, spirv::kStorageOutput});
+  writer.Inst(spirv::kOpVariable, {inputPointer, fragCoordId, spirv::kStorageInput});
   outputPointerId = outputId;
   const auto functionType = writer.NewId();
   writer.Inst(spirv::kOpTypeFunction, {functionType, voidType});
@@ -224,12 +230,83 @@ bool SPIRVShaderBuilder::Begin(std::string* error) {
   return true;
 }
 
+bool SPIRVShaderBuilder::DeclareLocals(const ProgramIR& program, std::string* error) {
+  if (!begun) {
+    return Fail(error, "the SPIR-V shader builder has not begun");
+  }
+  for (const auto& value : program.values) {
+    if (value.kind != IRValueKind::Local || value.definingExpr != INVALID_EXPR_ID ||
+        valueIds.find(value.id) != valueIds.end()) {
+      continue;
+    }
+    const auto pointer = PointerTypeId(value.type, spirv::kStorageFunction, error);
+    if (pointer == 0) {
+      return false;
+    }
+    writer.Sink(&writer.func);
+    const auto variableId = writer.NewId();
+    writer.Inst(spirv::kOpVariable, {pointer, variableId, spirv::kStorageFunction});
+    valueIds[value.id] = variableId;
+  }
+  return true;
+}
+
+bool SPIRVShaderBuilder::Assign(const ProgramIR& program, const LValue& dst, ValueID value,
+                                std::string* error) {
+  if (!begun) {
+    return Fail(error, "the SPIR-V shader builder has not begun");
+  }
+  if (!dst.swizzle.empty()) {
+    return Fail(error, "the SPIR-V builder does not support swizzled assignment yet");
+  }
+  uint32_t target = 0;
+  uint32_t source = 0;
+  if (!EmitValue(program, dst.base, &target, error) || !EmitValue(program, value, &source, error)) {
+    return false;
+  }
+  writer.Sink(&writer.func);
+  writer.Inst(spirv::kOpStore, {target, source});
+  return true;
+}
+
 uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& expr,
                                       std::string* error) {
   switch (expr.kind) {
     case IRExprKind::ConstantFloat:
     case IRExprKind::ConstantInt:
       return ConstantId(expr, error);
+    case IRExprKind::Load: {
+      if (expr.args.size() != 1) {
+        Fail(error, "a load needs one source");
+        return 0;
+      }
+      uint32_t source = 0;
+      if (!EmitValue(program, expr.args[0], &source, error)) {
+        return 0;
+      }
+      const auto type = TypeId(expr.type, error);
+      if (type == 0) {
+        return 0;
+      }
+      writer.Sink(&writer.func);
+      const auto id = writer.NewId();
+      writer.Inst(spirv::kOpLoad, {type, id, source});
+      return id;
+    }
+    case IRExprKind::Builtin: {
+      if (expr.builtin != "gl_FragCoord") {
+        Fail(error, "the builtin read is not supported by the SPIR-V builder yet");
+        return 0;
+      }
+      const auto type = TypeId(expr.type, error);
+      if (type == 0) {
+        return 0;
+      }
+      writer.Sink(&writer.func);
+      const auto id = writer.NewId();
+      writer.Inst(spirv::kOpLoad, {type, id, fragCoordId});
+      return id;
+    }
     case IRExprKind::Construct: {
       std::vector<uint32_t> args = {};
       for (const auto argument : expr.args) {
