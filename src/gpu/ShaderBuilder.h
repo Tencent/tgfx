@@ -123,8 +123,8 @@ class ShaderBuilder {
    * Returns the name of the variable holding the clamped coordinate (coordName itself when no
    * clamp applies).
    */
-  std::string clampToSubsets(const std::string& coordName, const std::string& extraSubset,
-                             const std::string& subset);
+  virtual std::string clampToSubsets(const std::string& coordName, const std::string& extraSubset,
+                                     const std::string& subset);
 
   /**
    * The catalog reader for one sampler type: a GLSL function's parameter type is fixed, so the

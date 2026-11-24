@@ -157,6 +157,9 @@ class FragmentShaderBuilder : public ShaderBuilder {
    */
   std::string emitPerspTextCoord(const CoordValue& coordVar);
 
+  std::string clampToSubsets(const std::string& coordName, const std::string& extraSubset,
+                             const std::string& subset) override;
+
  protected:
   virtual std::string colorOutputName() = 0;
 

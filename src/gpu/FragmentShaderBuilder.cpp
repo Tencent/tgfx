@@ -37,6 +37,30 @@ void FragmentShaderBuilder::declareCustomOutputColor() {
   outputs.emplace_back(CUSTOM_COLOR_OUTPUT_NAME, SLType::Float4, typeModifier);
 }
 
+std::string FragmentShaderBuilder::clampToSubsets(const std::string& coordName,
+                                                  const std::string& extraSubset,
+                                                  const std::string& subset) {
+  if (fragmentProgramRecorder == nullptr) {
+    return ShaderBuilder::clampToSubsets(coordName, extraSubset, subset);
+  }
+  if (extraSubset.empty() && subset.empty()) {
+    return coordName;
+  }
+  auto entry = appendFunction("tgfxClampSubset");
+  if (entry.empty()) {
+    return coordName;
+  }
+  const std::string out = "clampedCoord" + std::to_string(clampedCoordIndex++);
+  aliasValue(out, coordName, "highp vec2");
+  if (!extraSubset.empty()) {
+    appendCall(out, entry, {out, extraSubset});
+  }
+  if (!subset.empty()) {
+    appendCall(out, entry, {out, subset});
+  }
+  return out;
+}
+
 std::string FragmentShaderBuilder::readTexture(SamplerHandle handle, const std::string& coordName,
                                                const std::string& strictSubset,
                                                const std::string& drawSubset, bool* recorded) {
