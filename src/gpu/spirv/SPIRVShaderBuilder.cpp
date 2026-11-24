@@ -262,6 +262,16 @@ uint32_t SPIRVShaderBuilder::FunctionParamTypeId(const OperatorParam& param, std
   return ArrayTypeId(param.type, param.arrayCount, 0, false, error);
 }
 
+void SPIRVShaderBuilder::EnsureLinkageCapability() {
+  if (linkageCapabilityAdded) {
+    return;
+  }
+  linkageCapabilityAdded = true;
+  // OpCapability Shader occupies the first two words; keep the capability before the memory model.
+  const uint32_t instruction = (2u << 16) | spirv::kOpCapability;
+  writer.pre.insert(writer.pre.begin() + 2, {instruction, spirv::kCapabilityLinkage});
+}
+
 bool SPIRVShaderBuilder::EnsureUniformBlock(const ProgramIR& program, std::string* error) {
   if (uniformBlockDeclared) {
     return true;
@@ -445,7 +455,6 @@ bool SPIRVShaderBuilder::Begin(std::string* error) {
 
   writer.Sink(&writer.pre);
   writer.Inst(spirv::kOpCapability, {spirv::kCapabilityShader});
-  writer.Inst(spirv::kOpCapability, {spirv::kCapabilityLinkage});
   writer.Inst(spirv::kOpMemoryModel, {0, 1});
 
   mainId = writer.NewId();
@@ -801,6 +810,7 @@ uint32_t SPIRVShaderBuilder::ImportFunction(const OperatorDesc& desc,
     Fail(error, "the operator bundle has no SPIR-V function for this operator");
     return 0;
   }
+  EnsureLinkageCapability();
   for (const auto& existing : importedFunctions) {
     if (existing.symbol == artifact.symbol) {
       return existing.id;

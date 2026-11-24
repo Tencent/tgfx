@@ -68,6 +68,7 @@ class SPIRVShaderBuilder {
   uint32_t ArrayTypeId(SLType elementType, uint32_t count, uint32_t stride, bool decorateStride,
                        std::string* error);
   uint32_t FunctionParamTypeId(const OperatorParam& param, std::string* error);
+  void EnsureLinkageCapability();
   uint32_t LoadSampler(const ProgramIR& program, ValueID sampler, std::string* error);
   bool EnsureUniformBlock(const ProgramIR& program, std::string* error);
   uint32_t EmitUniformValue(const ProgramIR& program, const IRValue& value, std::string* error);
@@ -102,6 +103,7 @@ class SPIRVShaderBuilder {
   uint32_t uniformBlockPointerId = 0;
   uint32_t uniformBlockVariableId = 0;
   bool uniformBlockDeclared = false;
+  bool linkageCapabilityAdded = false;
   std::unordered_map<uint32_t, uint32_t> samplerValues = {};
   std::unordered_map<std::string, uint32_t> uniformMemberIndices = {};
   std::unordered_map<std::string, uint32_t> uniformArrayTypeIds = {};

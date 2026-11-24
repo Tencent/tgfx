@@ -24,6 +24,7 @@
 #if defined(TGFX_USE_VULKAN)
 #include <cstring>
 #include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/RenderPipeline.h"
 #include "tgfx/gpu/ShaderModule.h"
 #include "utils/ContextScope.h"
 #endif
@@ -345,6 +346,13 @@ TEST(SPIRVShaderBuilderTest, VulkanAcceptsGeneratedModules) {
   fragmentDesc.binaryData = toBytes(fragmentWords);
   auto fragmentModule = gpu->createShaderModule(fragmentDesc);
   ASSERT_TRUE(fragmentModule != nullptr);
+
+  RenderPipelineDescriptor pipelineDesc = {};
+  pipelineDesc.vertex.module = vertexModule;
+  pipelineDesc.fragment.module = fragmentModule;
+  pipelineDesc.fragment.colorAttachments.push_back({});
+  auto pipeline = gpu->createRenderPipeline(pipelineDesc);
+  ASSERT_TRUE(pipeline != nullptr) << "the generated SPIR-V modules did not form a pipeline";
 }
 #endif
 
