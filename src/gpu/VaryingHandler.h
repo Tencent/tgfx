@@ -74,14 +74,6 @@ class VaryingHandler {
   void emitAttributes(const GeometryProcessor& processor);
 
   /**
-   * This should be called once all attributes and varyings have been added to the VaryingHandler
-   * and before getting/adding any of the declarations to the shaders.
-   */
-  void finalize();
-
-  void getDeclarations(std::string* inputDecls, std::string* outputDecls, ShaderStage stage) const;
-
-  /**
    * Returns the varyings added so far, in declaration order. The bytecode route derives its
    * interface block from this list.
    */
@@ -90,14 +82,10 @@ class VaryingHandler {
   }
 
  private:
-  void appendDecls(const std::vector<ShaderVar>& vars, std::string* out, ShaderStage stage) const;
-
   void addAttribute(const ShaderVar& var);
 
   std::vector<Varying> varyings;
   std::vector<ShaderVar> vertexInputs;
-  std::vector<ShaderVar> vertexOutputs;
-  std::vector<ShaderVar> fragInputs;
 
   // This is not owned by the class
   ProgramBuilder* programBuilder;

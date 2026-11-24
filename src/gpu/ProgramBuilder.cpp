@@ -202,7 +202,6 @@ void ProgramBuilder::nameExpression(std::string* output, const std::string& base
 }
 
 void ProgramBuilder::finalizeShaders() {
-  varyingHandler()->finalize();
   vertexShaderBuilder()->finalize();
   fragmentShaderBuilder()->finalize();
 }

@@ -76,11 +76,6 @@ class UniformHandler {
 
   std::unique_ptr<UniformData> makeUniformData(ShaderStage stage) const;
 
-  /**
-   * Returns the declarations of all uniforms that are visible in the given shader visibility.
-   */
-  std::string getUniformDeclarations(ShaderStage stage) const;
-
  private:
   // This is not owned by the class
   ProgramBuilder* programBuilder = nullptr;
