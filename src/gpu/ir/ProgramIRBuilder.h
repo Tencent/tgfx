@@ -80,6 +80,8 @@ class ProgramIRBuilder {
 
   void StoreOutput(ValueID dst, ValueID src);
 
+  void StoreVarying(LValue dst, ValueID src);
+
   const ProgramIR& IR() const {
     return ir;
   }

@@ -227,6 +227,67 @@ uint32_t SPIRVShaderBuilder::EnsureAttribute(const ProgramIR& program, const IRV
   return loadId;
 }
 
+uint32_t SPIRVShaderBuilder::EnsureVarying(const ProgramIR& program, const IRValue& value,
+                                           std::string* error) {
+  const auto found = varyingVariables.find(value.id);
+  if (found != varyingVariables.end()) {
+    return found->second;
+  }
+  const VaryingIR* varying = nullptr;
+  for (const auto& candidate : program.interface.varyings) {
+    if (candidate.name == value.debugName) {
+      varying = &candidate;
+      break;
+    }
+  }
+  if (varying == nullptr) {
+    Fail(error, "the varying is missing from the interface");
+    return 0;
+  }
+  const uint32_t storage =
+      stage == ShaderStage::Vertex ? spirv::kStorageOutput : spirv::kStorageInput;
+  const auto typeId = TypeId(value.type, error);
+  const auto pointer = PointerTypeId(value.type, storage, error);
+  if (typeId == 0 || pointer == 0) {
+    return 0;
+  }
+  auto* saved = writer.sink;
+  writer.Sink(&writer.decl);
+  const auto variableId = writer.NewId();
+  writer.Inst(spirv::kOpVariable, {pointer, variableId, storage});
+  writer.Sink(&writer.ann);
+  writer.Inst(spirv::kOpDecorate, {variableId, spirv::kDecorationLocation, varying->location});
+  writer.Sink(saved);
+  AddEntryPointInterface(variableId);
+  varyingVariables[value.id] = variableId;
+  return variableId;
+}
+
+bool SPIRVShaderBuilder::StoreVarying(const ProgramIR& program, const LValue& dst, ValueID value,
+                                      std::string* error) {
+  if (stage != ShaderStage::Vertex) {
+    return Fail(error, "varying stores are only valid in vertex shaders");
+  }
+  if (!dst.swizzle.empty()) {
+    return Fail(error, "the SPIR-V builder does not support swizzled varying stores yet");
+  }
+  if (dst.base == INVALID_VALUE_ID || dst.base >= program.values.size() ||
+      program.values[dst.base].kind != IRValueKind::Varying) {
+    return Fail(error, "the varying store target is not a varying");
+  }
+  const auto variable = EnsureVarying(program, program.values[dst.base], error);
+  if (variable == 0) {
+    return false;
+  }
+  uint32_t source = 0;
+  if (!EmitValue(program, value, &source, error)) {
+    return false;
+  }
+  writer.Sink(&writer.func);
+  writer.Inst(spirv::kOpStore, {variable, source});
+  return true;
+}
+
 uint32_t SPIRVShaderBuilder::LoadSampler(const ProgramIR& program, ValueID sampler,
                                          std::string* error) {
   const auto found = samplerValues.find(sampler);
@@ -832,6 +893,22 @@ bool SPIRVShaderBuilder::EmitValue(const ProgramIR& program, ValueID value, uint
     if (id == 0) {
       return false;
     }
+    valueIds.emplace(value, id);
+    *resultId = id;
+    return true;
+  }
+  if (irValue.kind == IRValueKind::Varying) {
+    if (stage != ShaderStage::Fragment) {
+      return Fail(error, "vertex varying outputs are store-only values");
+    }
+    const auto variable = EnsureVarying(program, irValue, error);
+    const auto typeId = TypeId(irValue.type, error);
+    if (variable == 0 || typeId == 0) {
+      return false;
+    }
+    writer.Sink(&writer.func);
+    const auto id = writer.NewId();
+    writer.Inst(spirv::kOpLoad, {typeId, id, variable});
     valueIds.emplace(value, id);
     *resultId = id;
     return true;

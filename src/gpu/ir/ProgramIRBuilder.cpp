@@ -375,4 +375,12 @@ void ProgramIRBuilder::StoreOutput(ValueID dst, ValueID src) {
   ir.statements.push_back(std::move(statement));
 }
 
+void ProgramIRBuilder::StoreVarying(LValue dst, ValueID src) {
+  IRStatement statement = {};
+  statement.kind = IRStatementKind::StoreVarying;
+  statement.dst = std::move(dst);
+  statement.src = src;
+  ir.statements.push_back(std::move(statement));
+}
+
 }  // namespace tgfx

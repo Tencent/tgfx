@@ -298,13 +298,16 @@ std::vector<uint8_t> WordsToBytes(const std::vector<uint32_t>& words) {
 std::shared_ptr<ShaderModule> MakeAttributeVertexModule(GPU* gpu, std::string* error) {
   ProgramIRBuilder program = {};
   const auto positionAttr = program.AddAttribute({"aPosition", SLType::Float2, Precision::High, 0});
+  const auto varying = program.AddVarying({"vColor", SLType::Float4, Precision::High, 0});
   const auto position = program.CreateLoad(positionAttr, SLType::Float2);
   const auto zero = program.CreateConstant(0.0f);
   const auto one = program.CreateConstant(1.0f);
   const auto clipPosition = program.CreateConstruct(SLType::Float4, {position, zero, one});
+  const auto red = program.CreateConstruct(SLType::Float4, {one, zero, zero, one});
   const auto output =
       program.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "gl_Position");
   program.StoreOutput(output, clipPosition);
+  program.StoreVarying({varying, ""}, red);
 
   SPIRVVertexShaderBuilder builder;
   if (!builder.Begin(error)) {
@@ -312,7 +315,8 @@ std::shared_ptr<ShaderModule> MakeAttributeVertexModule(GPU* gpu, std::string* e
   }
   uint32_t value = 0;
   if (!builder.EmitValue(program.IR(), clipPosition, &value, error) ||
-      !builder.StoreOutput(program.IR(), clipPosition, error)) {
+      !builder.StoreOutput(program.IR(), clipPosition, error) ||
+      !builder.StoreVarying(program.IR(), {varying, ""}, red, error)) {
     return nullptr;
   }
   const auto words = builder.Finish(error);
@@ -497,18 +501,16 @@ TEST(SPIRVShaderBuilderTest, VulkanDrawsGeneratedTriangle) {
   ASSERT_TRUE(vertexModule != nullptr) << error;
 
   ProgramIRBuilder fragmentProgram = {};
-  const auto zero = fragmentProgram.CreateConstant(0.0f);
-  const auto one = fragmentProgram.CreateConstant(1.0f);
-  const auto color = fragmentProgram.CreateConstruct(SLType::Float4, {zero, zero, zero, one});
+  const auto varying = fragmentProgram.AddVarying({"vColor", SLType::Float4, Precision::High, 0});
   const auto output = fragmentProgram.CreateValue(SLType::Float4, Precision::High,
                                                   IRValueKind::Local, "outputColor");
-  fragmentProgram.StoreOutput(output, color);
+  fragmentProgram.StoreOutput(output, varying);
 
   SPIRVFragmentShaderBuilder fragmentBuilder;
   ASSERT_TRUE(fragmentBuilder.Begin(&error)) << error;
   uint32_t value = 0;
-  ASSERT_TRUE(fragmentBuilder.EmitValue(fragmentProgram.IR(), color, &value, &error)) << error;
-  ASSERT_TRUE(fragmentBuilder.StoreOutput(fragmentProgram.IR(), color, &error)) << error;
+  ASSERT_TRUE(fragmentBuilder.EmitValue(fragmentProgram.IR(), varying, &value, &error)) << error;
+  ASSERT_TRUE(fragmentBuilder.StoreOutput(fragmentProgram.IR(), varying, &error)) << error;
   const auto fragmentWords = fragmentBuilder.Finish(&error);
   ASSERT_FALSE(fragmentWords.empty()) << error;
 
@@ -569,7 +571,7 @@ TEST(SPIRVShaderBuilderTest, VulkanDrawsGeneratedTriangle) {
   auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
   uint32_t centerPixel = 0;
   ASSERT_TRUE(surface->readPixels(info, &centerPixel, SIZE / 2, SIZE / 2));
-  EXPECT_EQ(centerPixel, 0xFF000000u) << "the generated shaders did not draw the triangle";
+  EXPECT_EQ(centerPixel, 0xFF0000FFu) << "the generated shaders did not pass the varying";
 }
 #endif
 

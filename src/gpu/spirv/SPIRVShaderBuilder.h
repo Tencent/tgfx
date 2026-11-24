@@ -44,6 +44,9 @@ class SPIRVShaderBuilder {
   bool Assign(const ProgramIR& program, const LValue& dst, ValueID value,
               std::string* error = nullptr);
 
+  bool StoreVarying(const ProgramIR& program, const LValue& dst, ValueID value,
+                    std::string* error = nullptr);
+
   /// Emits the defining expression of value and returns its SPIR-V result id.
   bool EmitValue(const ProgramIR& program, ValueID value, uint32_t* resultId,
                  std::string* error = nullptr);
@@ -70,6 +73,7 @@ class SPIRVShaderBuilder {
   uint32_t FunctionParamTypeId(const OperatorParam& param, std::string* error);
   void EnsureLinkageCapability();
   uint32_t EnsureAttribute(const ProgramIR& program, const IRValue& value, std::string* error);
+  uint32_t EnsureVarying(const ProgramIR& program, const IRValue& value, std::string* error);
   void AddEntryPointInterface(uint32_t id);
   uint32_t LoadSampler(const ProgramIR& program, ValueID sampler, std::string* error);
   bool EnsureUniformBlock(const ProgramIR& program, std::string* error);
@@ -107,6 +111,7 @@ class SPIRVShaderBuilder {
   bool uniformBlockDeclared = false;
   bool linkageCapabilityAdded = false;
   std::unordered_map<uint32_t, uint32_t> samplerValues = {};
+  std::unordered_map<uint32_t, uint32_t> varyingVariables = {};
   std::unordered_map<std::string, uint32_t> uniformMemberIndices = {};
   std::unordered_map<std::string, uint32_t> uniformArrayTypeIds = {};
   std::unordered_map<std::string, uint32_t> uniformArrayPointerIds = {};
