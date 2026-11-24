@@ -74,6 +74,7 @@ class SPIRVShaderBuilder {
  private:
   uint32_t TypeId(SLType type, std::string* error);
   uint32_t BoolTypeId(std::string* error);
+  uint32_t BoolVectorTypeId(uint32_t components, std::string* error);
   uint32_t ConstantId(const IRExpr& expr, std::string* error);
   uint32_t IntConstantId(int32_t value, std::string* error);
   uint32_t ArrayTypeId(SLType elementType, uint32_t count, uint32_t stride, bool decorateStride,
@@ -113,6 +114,7 @@ class SPIRVShaderBuilder {
   uint32_t outputId = 0;
   uint32_t fragCoordId = 0;
   uint32_t boolTypeId = 0;
+  std::unordered_map<uint32_t, uint32_t> boolVectorTypeIds = {};
   uint32_t imageTypeId = 0;
   uint32_t samplerTypeId = 0;
   uint32_t sampledImageTypeId = 0;

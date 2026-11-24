@@ -84,6 +84,24 @@ uint32_t SPIRVShaderBuilder::BoolTypeId(std::string* error) {
   return boolTypeId;
 }
 
+uint32_t SPIRVShaderBuilder::BoolVectorTypeId(uint32_t components, std::string* error) {
+  const auto found = boolVectorTypeIds.find(components);
+  if (found != boolVectorTypeIds.end()) {
+    return found->second;
+  }
+  const auto scalar = BoolTypeId(error);
+  if (scalar == 0) {
+    return 0;
+  }
+  auto* saved = writer.sink;
+  writer.Sink(&writer.decl);
+  const auto id = writer.NewId();
+  writer.Inst(spirv::kOpTypeVector, {id, scalar, components});
+  writer.Sink(saved);
+  boolVectorTypeIds.emplace(components, id);
+  return id;
+}
+
 uint32_t SPIRVShaderBuilder::TypeId(SLType type, std::string* error) {
   const auto key = static_cast<uint32_t>(type);
   const auto found = typeIds.find(key);
@@ -924,6 +942,42 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
         constant.constantBits = FloatBits(value);
         return ConstantId(constant, error);
       };
+      auto conditionType = [&](uint32_t type) {
+        if (type == TypeId(SLType::Float2, error)) {
+          return BoolVectorTypeId(2, error);
+        }
+        if (type == TypeId(SLType::Float3, error)) {
+          return BoolVectorTypeId(3, error);
+        }
+        if (type == TypeId(SLType::Float4, error)) {
+          return BoolVectorTypeId(4, error);
+        }
+        return BoolTypeId(error);
+      };
+      auto floatMin = [&](uint32_t type, uint32_t left, uint32_t right, uint32_t* result) {
+        const auto boolType = conditionType(type);
+        if (boolType == 0) {
+          return false;
+        }
+        writer.Sink(&writer.func);
+        const auto less = writer.NewId();
+        writer.Inst(spirv::kOpFOrdLessThan, {boolType, less, left, right});
+        *result = writer.NewId();
+        writer.Inst(spirv::kOpSelect, {type, *result, less, left, right});
+        return true;
+      };
+      auto floatMax = [&](uint32_t type, uint32_t left, uint32_t right, uint32_t* result) {
+        const auto boolType = conditionType(type);
+        if (boolType == 0) {
+          return false;
+        }
+        writer.Sink(&writer.func);
+        const auto greater = writer.NewId();
+        writer.Inst(spirv::kOpFOrdGreaterThan, {boolType, greater, left, right});
+        *result = writer.NewId();
+        writer.Inst(spirv::kOpSelect, {type, *result, greater, left, right});
+        return true;
+      };
       if (expr.op == OperatorID::ColorMatrix) {
         uint32_t color = 0;
         uint32_t matrix = 0;
@@ -948,8 +1002,10 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
           return 0;
         }
         writer.Sink(&writer.func);
-        const auto maxAlpha = writer.NewId();
-        writer.Inst(spirv::kOpFMax, {floatType, maxAlpha, alpha, epsilon});
+        uint32_t maxAlpha = 0;
+        if (!floatMax(floatType, alpha, epsilon, &maxAlpha)) {
+          return 0;
+        }
         uint32_t alpha4 = 0;
         uint32_t alpha3 = 0;
         if (!splat(maxAlpha, SLType::Float4, &alpha4) ||
@@ -975,10 +1031,12 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
           return 0;
         }
         writer.Sink(&writer.func);
-        const auto clampedLow = writer.NewId();
-        writer.Inst(spirv::kOpFMax, {float4, clampedLow, shifted, zero4});
-        const auto clamped = writer.NewId();
-        writer.Inst(spirv::kOpFMin, {float4, clamped, clampedLow, one4});
+        uint32_t clampedLow = 0;
+        uint32_t clamped = 0;
+        if (!floatMax(float4, shifted, zero4, &clampedLow) ||
+            !floatMin(float4, clampedLow, one4, &clamped)) {
+          return 0;
+        }
         const auto clampedRgb = writer.NewId();
         writer.Inst(spirv::kOpVectorShuffle, {float3, clampedRgb, clamped, clamped, 0, 1, 2});
         const auto clampedAlpha = writer.NewId();
@@ -1033,10 +1091,12 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
         if (!splat(zero, SLType::Float4, &zero4) || !splat(one, SLType::Float4, &one4)) {
           return 0;
         }
-        const auto clampedLow = writer.NewId();
-        writer.Inst(spirv::kOpFMax, {float4, clampedLow, result, zero4});
-        const auto clamped = writer.NewId();
-        writer.Inst(spirv::kOpFMin, {float4, clamped, clampedLow, one4});
+        uint32_t clampedLow = 0;
+        uint32_t clamped = 0;
+        if (!floatMax(float4, result, zero4, &clampedLow) ||
+            !floatMin(float4, clampedLow, one4, &clamped)) {
+          return 0;
+        }
         const auto alphaPositive = writer.NewId();
         writer.Inst(spirv::kOpFOrdGreaterThan, {boolType, alphaPositive, alpha, zero});
         const auto finalResult = writer.NewId();
@@ -1166,11 +1226,17 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
         if (type == 0) {
           return 0;
         }
+        uint32_t low4 = 0;
+        uint32_t high4 = 0;
+        if (!splat(low, SLType::Float4, &low4) || !splat(high, SLType::Float4, &high4)) {
+          return 0;
+        }
         writer.Sink(&writer.func);
-        const auto upper = writer.NewId();
-        writer.Inst(spirv::kOpFMax, {type, upper, value, low});
-        const auto result = writer.NewId();
-        writer.Inst(spirv::kOpFMin, {type, result, upper, high});
+        uint32_t upper = 0;
+        uint32_t result = 0;
+        if (!floatMax(type, value, low4, &upper) || !floatMin(type, upper, high4, &result)) {
+          return 0;
+        }
         return result;
       }
       Fail(error, std::string("the operator '") + desc->debugName + "' has no SPIR-V lowering yet");
@@ -1248,11 +1314,22 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
         return 0;
       }
       uint16_t opcode = 0;
-      if (program.values[expr.args[0]].type == SLType::Float3x3 &&
-          program.values[expr.args[1]].type == SLType::Float3 && expr.binaryOp == IRBinaryOp::Mul) {
+      const auto leftType = program.values[expr.args[0]].type;
+      const auto rightType = program.values[expr.args[1]].type;
+      uint32_t vectorOperand = left;
+      uint32_t scalarOperand = right;
+      if (expr.binaryOp == IRBinaryOp::Mul && IsFloatVector(leftType) &&
+          rightType == SLType::Float) {
+        opcode = spirv::kOpVectorTimesScalar;
+      } else if (expr.binaryOp == IRBinaryOp::Mul && leftType == SLType::Float &&
+                 IsFloatVector(rightType)) {
+        opcode = spirv::kOpVectorTimesScalar;
+        vectorOperand = right;
+        scalarOperand = left;
+      } else if (leftType == SLType::Float3x3 && rightType == SLType::Float3 &&
+                 expr.binaryOp == IRBinaryOp::Mul) {
         opcode = spirv::kOpMatrixTimesVector;
-      } else if (IsFloatVector(program.values[expr.args[0]].type) &&
-                 IsFloatVector(program.values[expr.args[1]].type)) {
+      } else if (IsFloatVector(leftType) && IsFloatVector(rightType)) {
         switch (expr.binaryOp) {
           case IRBinaryOp::Add:
             opcode = spirv::kOpFAdd;
@@ -1274,7 +1351,11 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
       }
       writer.Sink(&writer.func);
       const auto id = writer.NewId();
-      writer.Inst(opcode, {type, id, left, right});
+      if (opcode == spirv::kOpVectorTimesScalar) {
+        writer.Inst(opcode, {type, id, vectorOperand, scalarOperand});
+      } else {
+        writer.Inst(opcode, {type, id, left, right});
+      }
       return id;
     }
     default:
