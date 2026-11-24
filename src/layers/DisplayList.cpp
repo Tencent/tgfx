@@ -18,7 +18,9 @@
 
 #include "tgfx/layers/DisplayList.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <functional>
 #include <unordered_map>
 #include <unordered_set>
@@ -694,7 +696,16 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   std::vector<std::unique_ptr<BackgroundSnapshotMap>> levelSnapshots = {};
   std::vector<int> taskSnapshotIndex = {};
+  // TEMP probe: how much of a tiled frame the per-level background captures take.
+  const auto captureStart = std::chrono::steady_clock::now();
   captureBackgroundsByLevel(surface, tileTasks, zoomScale, &levelSnapshots, &taskSnapshotIndex);
+  const double captureMs =
+      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - captureStart)
+          .count();
+  if (captureMs > 2.0 || !levelSnapshots.empty()) {
+    std::printf("[CAP-FRAME] tasks=%zu levels=%zu ms=%.1f\n", tileTasks.size(),
+                levelSnapshots.size(), captureMs);
+  }
   auto dirtyRects = drawTileTasks(tileTasks, levelSnapshots, taskSnapshotIndex, surface, zoomScale);
   drawScreenTasks(std::move(screenTasks), std::move(skippedRects), surface, autoClear);
   return dirtyRects;
@@ -738,7 +749,12 @@ void DisplayList::captureBackgroundsByLevel(
       // One capture serves every tile of this level: the capturer culls the layers no background
       // style samples inside the rects it covers, so a capture spanning more than the tiles that
       // need it costs the surface, not the drawing.
+      const auto levelStart = std::chrono::steady_clock::now();
       auto map = captureBackgrounds(surface, levelRects, Matrix::MakeScale(rasterScale));
+      std::printf(
+          "[CAP-LEVEL] level=%d tiles=%zu ms=%.1f\n", level, levelEntry.second.size(),
+          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - levelStart)
+              .count());
       auto snapshotIndex = static_cast<int>(levelSnapshots->size());
       levelSnapshots->push_back(std::move(map));
       for (auto index : levelEntry.second) {
