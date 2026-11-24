@@ -23,6 +23,7 @@
 #include <vector>
 #include "gpu/SLType.h"
 #include "gpu/ir/ValueRef.h"
+#include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
 
@@ -90,11 +91,15 @@ struct VaryingDesc {
 
 struct UniformDesc {
   std::string name = {};
+  SLType type = SLType::Void;
+  ShaderStage stage = ShaderStage::Fragment;
+  uint32_t count = 1;
   UniformID id = 0;
 };
 
 struct SamplerDesc {
   std::string name = {};
+  SLType type = SLType::Void;
   SamplerID id = 0;
 };
 

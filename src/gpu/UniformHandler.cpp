@@ -81,6 +81,24 @@ std::unique_ptr<UniformData> UniformHandler::makeUniformData(ShaderStage stage) 
 
 std::string UniformHandler::getUniformDeclarations(ShaderStage stage) const {
   std::string ret;
+  const auto* interface = programBuilder->programInterface();
+  if (interface != nullptr) {
+    std::vector<UniformDesc> uniforms = {};
+    for (const auto& uniform : interface->uniforms) {
+      if (uniform.stage == stage) {
+        uniforms.push_back(uniform);
+      }
+    }
+    ret += programBuilder->getUniformBlockDeclaration(stage, uniforms);
+    if (stage == ShaderStage::Fragment) {
+      for (const auto& sampler : interface->samplers) {
+        ShaderVar var(sampler.name, sampler.type, ShaderVar::TypeModifier::Uniform);
+        ret += programBuilder->getShaderVarDeclarations(var, stage);
+        ret += ";\n";
+      }
+    }
+    return ret;
+  }
   auto& uniforms = stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms;
   ret += programBuilder->getUniformBlockDeclaration(stage, uniforms);
 

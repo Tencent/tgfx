@@ -186,6 +186,30 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
   return result;
 }
 
+std::string GLSLProgramBuilder::getUniformBlockDeclaration(
+    ShaderStage stage, const std::vector<UniformDesc>& uniforms) const {
+  if (uniforms.empty()) {
+    return "";
+  }
+  std::string result = "";
+  const std::string& uniformBlockName =
+      stage == ShaderStage::Vertex ? VertexUniformBlockName : FragmentUniformBlockName;
+  static const std::string INDENT_STR = "    ";  // 4 spaces
+  result += "layout(std140) uniform " + uniformBlockName + " {\n";
+  auto shaderCaps = context->shaderCaps();
+  for (const auto& uniform : uniforms) {
+    const std::string precision =
+        shaderCaps->usesPrecisionModifiers ? SLTypePrecision(uniform.type) : "";
+    result += INDENT_STR + precision + " " + SLTypeString(uniform.type) + " " + uniform.name;
+    if (uniform.count > 1) {
+      result += "[" + std::to_string(uniform.count) + "]";
+    }
+    result += ";\n";
+  }
+  result += "};\n";
+  return result;
+}
+
 std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   fragmentShaderBuilder()->declareCustomOutputColor();
   for (const auto& attribute : getProgramInfo()->getVertexAttributes()) {
@@ -203,19 +227,24 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
         {varying.name(), varying.type(), varying.id(), 0, false, varying.isFlat()});
     description.values.Intern(varying.name(), varying.type(), ValueOrigin::Varying);
   }
-  finalizeShaders();
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Vertex)) {
-    description.interface.uniforms.push_back({uniform.name()});
-    description.values.Intern(uniform.name(), SLType::Void, ValueOrigin::Uniform);
+    const auto type = ShaderVar(uniform).type();
+    description.interface.uniforms.push_back(
+        {uniform.name(), type, ShaderStage::Vertex, uniform.count()});
+    description.values.Intern(uniform.name(), type, ValueOrigin::Uniform);
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Fragment)) {
-    description.interface.uniforms.push_back({uniform.name()});
-    description.values.Intern(uniform.name(), SLType::Void, ValueOrigin::Uniform);
+    const auto type = ShaderVar(uniform).type();
+    description.interface.uniforms.push_back(
+        {uniform.name(), type, ShaderStage::Fragment, uniform.count()});
+    description.values.Intern(uniform.name(), type, ValueOrigin::Uniform);
   }
   for (const auto& sampler : _uniformHandler.getSamplers()) {
-    description.interface.samplers.push_back({sampler.name()});
-    description.values.Intern(sampler.name(), SLType::Void, ValueOrigin::Sampler);
+    const auto type = ShaderVar(sampler).type();
+    description.interface.samplers.push_back({sampler.name(), type});
+    description.values.Intern(sampler.name(), type, ValueOrigin::Sampler);
   }
+  finalizeShaders();
   std::string validationError;
   if (!ValidateProgramDescription(&description, &validationError)) {
     LOGE("GLSLProgramBuilder: %s", validationError.c_str());

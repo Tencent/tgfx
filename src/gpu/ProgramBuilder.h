@@ -53,6 +53,14 @@ class ProgramBuilder {
   virtual std::string getUniformBlockDeclaration(ShaderStage stage,
                                                  const std::vector<Uniform>& uniforms) const = 0;
 
+  /// Prints the block from the typed interface when a backend builds one.
+  virtual std::string getUniformBlockDeclaration(ShaderStage stage,
+                                                 const std::vector<UniformDesc>& uniforms) const {
+    (void)stage;
+    (void)uniforms;
+    return "";
+  }
+
   /**
    * Generates a name for a variable. The generated string will be mangled to be processor-specific.
    */
