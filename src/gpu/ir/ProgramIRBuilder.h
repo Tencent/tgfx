@@ -64,7 +64,9 @@ class ProgramIRBuilder {
 
   ValueID CreateTextureSample(ValueID sampler, ValueID coordinate, SLType type,
                               std::string debugName = {}, SLType samplerType = SLType::Void,
-                              int32_t samplerSwizzleCode = -1, bool subsetClamped = false);
+                              int32_t samplerSwizzleCode = -1, bool subsetClamped = false,
+                              ValueID strictSubset = INVALID_VALUE_ID,
+                              ValueID drawSubset = INVALID_VALUE_ID);
 
   void Assign(LValue dst, ValueID src);
 

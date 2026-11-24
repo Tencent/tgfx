@@ -293,7 +293,8 @@ ValueID ProgramIRBuilder::CreateCall(OperatorID op, SLType type, const std::vect
 
 ValueID ProgramIRBuilder::CreateTextureSample(ValueID sampler, ValueID coordinate, SLType type,
                                               std::string debugName, SLType samplerType,
-                                              int32_t samplerSwizzleCode, bool subsetClamped) {
+                                              int32_t samplerSwizzleCode, bool subsetClamped,
+                                              ValueID strictSubset, ValueID drawSubset) {
   IRExpr expr = {};
   expr.kind = IRExprKind::TextureSample;
   expr.type = type;
@@ -301,6 +302,8 @@ ValueID ProgramIRBuilder::CreateTextureSample(ValueID sampler, ValueID coordinat
   expr.samplerType = samplerType;
   expr.samplerSwizzleCode = samplerSwizzleCode;
   expr.subsetClamped = subsetClamped;
+  expr.strictSubset = strictSubset;
+  expr.drawSubset = drawSubset;
   return AddExpr(std::move(expr), debugName);
 }
 

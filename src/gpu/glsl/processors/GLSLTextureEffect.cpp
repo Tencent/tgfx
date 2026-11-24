@@ -127,13 +127,26 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   if (SrcRectConstraint::Strict == constraint) {
     extraSubsetName = args.inputSubset;
   }
+  ValueID strictSubsetValue = INVALID_VALUE_ID;
+  ValueID drawSubsetValue = INVALID_VALUE_ID;
+  if (args.irBuilder != nullptr) {
+    if (!extraSubsetName.empty()) {
+      strictSubsetValue = args.irBuilder->InternValue(extraSubsetName, SLType::Float4,
+                                                      Precision::High, IRValueKind::Uniform);
+    }
+    if (!subsetName.empty()) {
+      drawSubsetValue = args.irBuilder->InternValue(subsetName, SLType::Float4, Precision::High,
+                                                    IRValueKind::Uniform);
+    }
+  }
   // The read keeps the clamp the call site already composed: a clamped coordinate is a local the
   // plan cannot name, so those draws stay on their fallback.
   if (alphaStart == Point::Zero()) {
     bool recorded = false;
     const auto read = fragBuilder->readTexture(
         textureSampler, texCoordName, extraSubsetName, subsetName, &recorded, args.irBuilder,
-        args.samplerValue(textureSampler), (*args.transformedCoords)[0].type());
+        args.samplerValue(textureSampler), (*args.transformedCoords)[0].type(), strictSubsetValue,
+        drawSubsetValue);
     fragBuilder->storeColor(args.outputColor, read.name);
     if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID &&
         read.value != INVALID_VALUE_ID) {

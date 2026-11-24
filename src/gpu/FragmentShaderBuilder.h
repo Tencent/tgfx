@@ -127,7 +127,9 @@ class FragmentShaderBuilder : public ShaderBuilder {
                                 const std::string& strictSubset, const std::string& drawSubset,
                                 bool* recorded, ProgramIRBuilder* irBuilder = nullptr,
                                 ValueID samplerValue = INVALID_VALUE_ID,
-                                SLType coordType = SLType::Void);
+                                SLType coordType = SLType::Void,
+                                ValueID strictSubsetValue = INVALID_VALUE_ID,
+                                ValueID drawSubsetValue = INVALID_VALUE_ID);
 
   /**
    * Records that a call already stored the stage's final output and folded its coverage: the

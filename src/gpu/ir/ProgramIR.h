@@ -104,6 +104,8 @@ struct IRExpr {
   SLType samplerType = SLType::Void;
   int32_t samplerSwizzleCode = -1;
   bool subsetClamped = false;
+  ValueID strictSubset = INVALID_VALUE_ID;
+  ValueID drawSubset = INVALID_VALUE_ID;
 };
 
 /// A destination value, optionally narrowed to a swizzle such as yuv.x.

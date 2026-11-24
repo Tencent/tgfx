@@ -62,12 +62,10 @@ std::string FragmentShaderBuilder::clampToSubsets(const std::string& coordName,
   return out;
 }
 
-TextureReadResult FragmentShaderBuilder::readTexture(SamplerHandle handle,
-                                                     const std::string& coordName,
-                                                     const std::string& strictSubset,
-                                                     const std::string& drawSubset, bool* recorded,
-                                                     ProgramIRBuilder* irBuilder,
-                                                     ValueID samplerValue, SLType coordType) {
+TextureReadResult FragmentShaderBuilder::readTexture(
+    SamplerHandle handle, const std::string& coordName, const std::string& strictSubset,
+    const std::string& drawSubset, bool* recorded, ProgramIRBuilder* irBuilder,
+    ValueID samplerValue, SLType coordType, ValueID strictSubsetValue, ValueID drawSubsetValue) {
   if (recorded != nullptr) {
     *recorded = false;
   }
@@ -99,9 +97,9 @@ TextureReadResult FragmentShaderBuilder::readTexture(SamplerHandle handle,
       const auto coordValue =
           irBuilder->InternValue(coordName, coordType, Precision::High, IRValueKind::Local);
       if (coordValue != INVALID_VALUE_ID) {
-        result.value =
-            irBuilder->CreateTextureSample(samplerValue, coordValue, SLType::Float4, temp,
-                                           sampler.type(), swizzleCode, clampInside);
+        result.value = irBuilder->CreateTextureSample(
+            samplerValue, coordValue, SLType::Float4, temp, sampler.type(), swizzleCode,
+            clampInside, strictSubsetValue, drawSubsetValue);
       }
     }
     return result;
@@ -114,7 +112,8 @@ TextureReadResult FragmentShaderBuilder::readTexture(SamplerHandle handle,
         irBuilder->InternValue(finalCoord, coordType, Precision::High, IRValueKind::Local);
     if (coordValue != INVALID_VALUE_ID) {
       result.value = irBuilder->CreateTextureSample(samplerValue, coordValue, SLType::Float4, temp,
-                                                    sampler.type(), swizzleCode, clampInside);
+                                                    sampler.type(), swizzleCode, clampInside,
+                                                    strictSubsetValue, drawSubsetValue);
     }
   }
   return result;
