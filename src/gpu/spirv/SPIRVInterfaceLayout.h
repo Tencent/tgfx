@@ -43,6 +43,7 @@ class SPIRVInterfaceLayout {
   static uint32_t SamplerSet();
 
   bool Build(const InterfaceIR& interface, std::string* error = nullptr);
+  bool AddBinding(const SPIRVDescriptorBinding& binding, std::string* error = nullptr);
   bool Append(const SPIRVInterfaceLayout& other, std::string* error = nullptr);
 
   bool BuildBindingLayout(BindingLayout* layout, std::string* error = nullptr) const;

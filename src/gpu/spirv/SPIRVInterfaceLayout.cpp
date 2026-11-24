@@ -31,27 +31,13 @@ uint32_t SPIRVInterfaceLayout::SamplerSet() {
 
 bool SPIRVInterfaceLayout::Build(const InterfaceIR& interface, std::string* error) {
   descriptorBindings.clear();
-  std::unordered_set<uint64_t> seen = {};
-  auto add = [&](const SPIRVDescriptorBinding& binding) -> bool {
-    const auto key = (static_cast<uint64_t>(binding.set) << 32) | binding.binding;
-    if (!seen.insert(key).second) {
-      if (error != nullptr) {
-        *error = "descriptor set " + std::to_string(binding.set) + " binding " +
-                 std::to_string(binding.binding) + " is declared twice";
-      }
-      return false;
-    }
-    descriptorBindings.push_back(binding);
-    return true;
-  };
-
   for (const auto& block : interface.uniformBlocks) {
     SPIRVDescriptorBinding binding = {};
     binding.name = block.name;
     binding.set = UniformSet(block.stage);
     binding.binding = block.binding;
     binding.stage = block.stage;
-    if (!add(binding)) {
+    if (!AddBinding(binding, error)) {
       return false;
     }
   }
@@ -62,10 +48,24 @@ bool SPIRVInterfaceLayout::Build(const InterfaceIR& interface, std::string* erro
     binding.binding = sampler.binding;
     binding.type = sampler.type;
     binding.stage = ShaderStage::Fragment;
-    if (!add(binding)) {
+    if (!AddBinding(binding, error)) {
       return false;
     }
   }
+  return true;
+}
+
+bool SPIRVInterfaceLayout::AddBinding(const SPIRVDescriptorBinding& binding, std::string* error) {
+  for (const auto& existing : descriptorBindings) {
+    if (existing.set == binding.set && existing.binding == binding.binding) {
+      if (error != nullptr) {
+        *error = "descriptor set " + std::to_string(binding.set) + " binding " +
+                 std::to_string(binding.binding) + " is declared twice";
+      }
+      return false;
+    }
+  }
+  descriptorBindings.push_back(binding);
   return true;
 }
 

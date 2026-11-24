@@ -19,6 +19,7 @@
 #include "VulkanRenderPipeline.h"
 #include <cstdlib>
 #include "VulkanGPU.h"
+#include "VulkanInterfaceLayout.h"
 #include "VulkanShaderModule.h"
 #include "VulkanUtil.h"
 #include "core/utils/Log.h"
@@ -134,34 +135,6 @@ static VkFormat AttributeToVkFormat(const Attribute& attr) {
   }
 }
 
-static bool CreateUboSetLayout(VkDevice device,
-                               const std::map<unsigned, UniformSlotMapping>& mappings, bool vertex,
-                               VkShaderStageFlags stageFlags, VkDescriptorSetLayout* setLayout) {
-  std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
-  std::unordered_set<unsigned> physicalBindings;
-  for (const auto& item : mappings) {
-    auto slot = vertex ? item.second.vertexSlot : item.second.fragmentSlot;
-    if (!slot.has_value()) {
-      continue;
-    }
-    if (!physicalBindings.insert(*slot).second) {
-      LOGE("VulkanRenderPipeline: duplicate physical UBO binding %u.", *slot);
-      return false;
-    }
-    VkDescriptorSetLayoutBinding binding = {};
-    binding.binding = *slot;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    binding.descriptorCount = 1;
-    binding.stageFlags = stageFlags;
-    layoutBindings.push_back(binding);
-  }
-  VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-  layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  layoutInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
-  layoutInfo.pBindings = layoutBindings.data();
-  return vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, setLayout) == VK_SUCCESS;
-}
-
 std::shared_ptr<VulkanRenderPipeline> VulkanRenderPipeline::Make(
     VulkanGPU* gpu, const RenderPipelineDescriptor& descriptor) {
   if (!gpu) {
@@ -255,34 +228,53 @@ const UniformSlotMapping* VulkanRenderPipeline::getUniformSlots(unsigned binding
 bool VulkanRenderPipeline::createDescriptorSetLayouts(VulkanGPU* gpu,
                                                       const RenderPipelineDescriptor& descriptor) {
   auto device = gpu->device();
-
-  if (!CreateUboSetLayout(device, uniformSlots, /*vertex=*/true, VK_SHADER_STAGE_VERTEX_BIT,
-                          &vertexUboSetLayout) ||
-      !CreateUboSetLayout(device, uniformSlots, /*vertex=*/false, VK_SHADER_STAGE_FRAGMENT_BIT,
-                          &fragmentUboSetLayout)) {
-    LOGE("VulkanRenderPipeline: vkCreateDescriptorSetLayout (UBO set) failed.");
-    return false;
+  SPIRVInterfaceLayout interface = {};
+  std::string error = {};
+  for (const auto& item : uniformSlots) {
+    if (item.second.vertexSlot.has_value()) {
+      SPIRVDescriptorBinding binding = {};
+      binding.set = SPIRVInterfaceLayout::UniformSet(ShaderStage::Vertex);
+      binding.binding = *item.second.vertexSlot;
+      binding.stage = ShaderStage::Vertex;
+      if (!interface.AddBinding(binding, &error)) {
+        LOGE("VulkanRenderPipeline: %s.", error.c_str());
+        return false;
+      }
+    }
+    if (item.second.fragmentSlot.has_value()) {
+      SPIRVDescriptorBinding binding = {};
+      binding.set = SPIRVInterfaceLayout::UniformSet(ShaderStage::Fragment);
+      binding.binding = *item.second.fragmentSlot;
+      binding.stage = ShaderStage::Fragment;
+      if (!interface.AddBinding(binding, &error)) {
+        LOGE("VulkanRenderPipeline: %s.", error.c_str());
+        return false;
+      }
+    }
+  }
+  for (size_t index = 0; index < descriptor.layout.textureSamplers.size(); ++index) {
+    SPIRVDescriptorBinding binding = {};
+    binding.set = SPIRVInterfaceLayout::SamplerSet();
+    binding.binding = static_cast<uint32_t>(index);
+    binding.type = SLType::Texture2DSampler;
+    binding.stage = ShaderStage::Fragment;
+    if (!interface.AddBinding(binding, &error)) {
+      LOGE("VulkanRenderPipeline: %s.", error.c_str());
+      return false;
+    }
   }
 
-  std::vector<VkDescriptorSetLayoutBinding> texBindings;
-  auto samplerCount = descriptor.layout.textureSamplers.size();
-  for (size_t i = 0; i < samplerCount; i++) {
-    VkDescriptorSetLayoutBinding binding = {};
-    binding.binding = static_cast<unsigned>(i);
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    binding.descriptorCount = 1;
-    binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    texBindings.push_back(binding);
-  }
-  VkDescriptorSetLayoutCreateInfo texLayoutInfo = {};
-  texLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  texLayoutInfo.bindingCount = static_cast<uint32_t>(texBindings.size());
-  texLayoutInfo.pBindings = texBindings.data();
-  auto result = vkCreateDescriptorSetLayout(device, &texLayoutInfo, nullptr, &textureSetLayout);
-  if (result != VK_SUCCESS) {
-    LOGE("VulkanRenderPipeline: vkCreateDescriptorSetLayout (texture set) failed.");
+  std::vector<VkDescriptorSetLayout> layouts = {};
+  if (!VulkanInterfaceLayout::Create(device, interface, &layouts, &error) || layouts.size() != 3) {
+    LOGE("VulkanRenderPipeline: %s.",
+         error.empty() ? "the descriptor set layouts could not be created" : error.c_str());
+    VulkanInterfaceLayout::Destroy(device, &layouts);
     return false;
   }
+  vertexUboSetLayout = layouts[0];
+  fragmentUboSetLayout = layouts[1];
+  textureSetLayout = layouts[2];
+  layouts.clear();
   return true;
 }
 
