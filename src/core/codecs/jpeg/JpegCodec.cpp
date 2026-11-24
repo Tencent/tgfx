@@ -18,6 +18,7 @@
 
 #include "core/codecs/jpeg/JpegCodec.h"
 #include <csetjmp>
+#include <cstdlib>
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -75,6 +76,12 @@ struct my_error_mgr {
   jmp_buf setjmp_buffer;
 };
 
+// libjpeg's default error_exit terminates the process; malformed input must fail the decode only.
+static void JpegErrorExit(j_common_ptr cinfo) {
+  auto* err = reinterpret_cast<my_error_mgr*>(cinfo->err);
+  longjmp(err->setjmp_buffer, 1);
+}
+
 std::shared_ptr<ImageCodec> JpegCodec::MakeFrom(const std::string& filePath) {
   return MakeFromData(filePath, nullptr);
 }
@@ -110,8 +117,10 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
   jpeg_decompress_struct cinfo = {};
   my_error_mgr jerr = {};
   cinfo.err = jpeg_std_error(&jerr.pub);
+  jerr.pub.error_exit = JpegErrorExit;
   Orientation orientation = Orientation::TopLeft;
   std::shared_ptr<ColorSpace> cs = nullptr;
+  std::vector<uint8_t> iccProfileData;
   do {
     if (setjmp(jerr.setjmp_buffer)) break;
     jpeg_create_decompress(&cinfo);
@@ -124,7 +133,7 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
     jpeg_save_markers(&cinfo, JPEG_APP0 + 2, 0xFFFF);
     if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) break;
     orientation = get_exif_orientation(&cinfo);
-    std::vector<uint8_t> iccProfileData;
+    iccProfileData.clear();
     if (ExtractICCProfile(&cinfo, iccProfileData)) {
       cs = ColorSpace::MakeFromICC(iccProfileData.data(), iccProfileData.size());
     }
@@ -286,6 +295,11 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
   jpeg_decompress_struct cinfo = {};
   my_error_mgr jerr = {};
   cinfo.err = jpeg_std_error(&jerr.pub);
+  jerr.pub.error_exit = JpegErrorExit;
+  // Declared before setjmp so a longjmp never skips their destructors.
+  Bitmap bitmap = {};
+  Pixmap pixmap = {};
+  std::vector<uint8_t> iccProfileData;
   bool result = false;
   do {
     if (setjmp(jerr.setjmp_buffer)) break;
@@ -323,13 +337,14 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
         ImageInfo::Make(dstWidth, dstHeight, colorType, alphaType, dstRowBytes, dstColorSpace);
     auto outPixels = dstPixels;
     auto outRowBytes = dstRowBytes;
-    Bitmap bitmap = {};
+    bitmap = {};
+    pixmap.reset();
     if (needsBitmapConversion) {
       if (!bitmap.allocPixels(dstWidth, dstHeight, false, false, colorSpace())) {
         break;
       }
+      pixmap.reset(bitmap);
     }
-    Pixmap pixmap(bitmap);
     if (!pixmap.isEmpty()) {
       outPixels = pixmap.writablePixels();
       outRowBytes = pixmap.rowBytes();
@@ -342,7 +357,7 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
     }
     if (cinfo.out_color_space == JCS_CMYK) {
       bool converted = false;
-      std::vector<uint8_t> iccProfileData;
+      iccProfileData.clear();
       if (ExtractICCProfile(&cinfo, iccProfileData)) {
         gfx::skcms_ICCProfile cmykProfile;
         if (ParseICCProfile(iccProfileData, &cmykProfile)) {
@@ -385,59 +400,73 @@ std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality) {
   auto srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixmap.pixels()));
   int srcRowBytes = static_cast<int>(pixmap.rowBytes());
   jpeg_compress_struct cinfo = {};
-  jpeg_error_mgr jerr = {};
+  my_error_mgr jerr = {};
   JSAMPROW row_pointer[1];
-  cinfo.err = jpeg_std_error(&jerr);
-  jpeg_create_compress(&cinfo);
+  cinfo.err = jpeg_std_error(&jerr.pub);
+  jerr.pub.error_exit = JpegErrorExit;
   uint8_t* dstBuffer = nullptr;
   unsigned long dstBufferSize = 0;  // NOLINT
-  jpeg_mem_dest(&cinfo, &dstBuffer, &dstBufferSize);
-  cinfo.image_width = static_cast<JDIMENSION>(pixmap.width());
-  cinfo.image_height = static_cast<JDIMENSION>(pixmap.height());
+  // Declared before setjmp so a longjmp never skips its destructor.
   Buffer buffer = {};
-  switch (pixmap.colorType()) {
-    case ColorType::RGBA_8888:
-      cinfo.in_color_space = JCS_EXT_RGBA;
-      cinfo.input_components = 4;
+  bool succeeded = false;
+  bool allocationFailed = false;
+  do {
+    if (setjmp(jerr.setjmp_buffer)) break;
+    jpeg_create_compress(&cinfo);
+    jpeg_mem_dest(&cinfo, &dstBuffer, &dstBufferSize);
+    cinfo.image_width = static_cast<JDIMENSION>(pixmap.width());
+    cinfo.image_height = static_cast<JDIMENSION>(pixmap.height());
+    switch (pixmap.colorType()) {
+      case ColorType::RGBA_8888:
+        cinfo.in_color_space = JCS_EXT_RGBA;
+        cinfo.input_components = 4;
+        break;
+      case ColorType::BGRA_8888:
+        cinfo.in_color_space = JCS_EXT_BGRA;
+        cinfo.input_components = 4;
+        break;
+      case ColorType::Gray_8:
+        cinfo.in_color_space = JCS_GRAYSCALE;
+        cinfo.input_components = 1;
+        break;
+      default:
+        auto info = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888,
+                                    AlphaType::Premultiplied, 0, pixmap.colorSpace());
+        buffer.alloc(info.byteSize());
+        if (buffer.isEmpty()) {
+          allocationFailed = true;
+          break;
+        }
+        srcPixels = buffer.bytes();
+        srcRowBytes = static_cast<int>(info.rowBytes());
+        Pixmap(info, srcPixels).writePixels(pixmap.info(), pixmap.pixels());
+        cinfo.in_color_space = JCS_EXT_RGBA;
+        cinfo.input_components = 4;
+        break;
+    }
+    if (allocationFailed) {
       break;
-    case ColorType::BGRA_8888:
-      cinfo.in_color_space = JCS_EXT_BGRA;
-      cinfo.input_components = 4;
-      break;
-    case ColorType::Gray_8:
-      cinfo.in_color_space = JCS_GRAYSCALE;
-      cinfo.input_components = 1;
-      break;
-    default:
-      auto info = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888,
-                                  AlphaType::Premultiplied, 0, pixmap.colorSpace());
-      buffer.alloc(info.byteSize());
-      if (buffer.isEmpty()) {
-        return nullptr;
-      }
-      srcPixels = buffer.bytes();
-      srcRowBytes = static_cast<int>(info.rowBytes());
-      Pixmap(info, srcPixels).writePixels(pixmap.info(), pixmap.pixels());
-      cinfo.in_color_space = JCS_EXT_RGBA;
-      cinfo.input_components = 4;
-      break;
-  }
-  jpeg_set_defaults(&cinfo);
-  cinfo.optimize_coding = TRUE;
-  jpeg_set_quality(&cinfo, quality, TRUE);
-  jpeg_start_compress(&cinfo, TRUE);
-  if (pixmap.colorSpace()) {
-    auto iccData = pixmap.colorSpace()->toICCProfile();
-    jpeg_write_icc_profile(&cinfo, iccData->bytes(), static_cast<uint32_t>(iccData->size()));
-  }
-  while (cinfo.next_scanline < cinfo.image_height) {
-    row_pointer[0] = &(srcPixels)[cinfo.next_scanline * static_cast<JDIMENSION>(srcRowBytes)];
-    (void)jpeg_write_scanlines(&cinfo, row_pointer, 1);
-  }
-
-  /* similar to read file, clean up after we're done compressing */
-  jpeg_finish_compress(&cinfo);
+    }
+    jpeg_set_defaults(&cinfo);
+    cinfo.optimize_coding = TRUE;
+    jpeg_set_quality(&cinfo, quality, TRUE);
+    jpeg_start_compress(&cinfo, TRUE);
+    if (pixmap.colorSpace()) {
+      auto iccData = pixmap.colorSpace()->toICCProfile();
+      jpeg_write_icc_profile(&cinfo, iccData->bytes(), static_cast<uint32_t>(iccData->size()));
+    }
+    while (cinfo.next_scanline < cinfo.image_height) {
+      row_pointer[0] = &(srcPixels)[cinfo.next_scanline * static_cast<JDIMENSION>(srcRowBytes)];
+      (void)jpeg_write_scanlines(&cinfo, row_pointer, 1);
+    }
+    jpeg_finish_compress(&cinfo);
+    succeeded = true;
+  } while (false);
   jpeg_destroy_compress(&cinfo);
+  if (!succeeded) {
+    free(dstBuffer);
+    return nullptr;
+  }
   return Data::MakeAdopted(dstBuffer, dstBufferSize, Data::FreeProc);
 }
 #endif
