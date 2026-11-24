@@ -18,6 +18,7 @@
 
 #include "BackgroundHandler.h"
 #include <algorithm>
+#include <chrono>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/PictureUtils.h"
@@ -35,6 +36,13 @@
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
+
+CaptureProbe gCaptureProbe = {};
+
+static double ProbeMsSince(std::chrono::steady_clock::time_point start) {
+  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
+      .count();
+}
 
 namespace {
 
@@ -398,6 +406,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
                        visibleLocal.top * contentScale - contentOffset.y,
                        visibleLocal.width() * contentScale, visibleLocal.height() * contentScale);
   }
+  const auto probeStart = std::chrono::steady_clock::now();
   auto bgImage = bgSource->getBackgroundImage();
   if (bgImage == nullptr) {
     return;
@@ -431,6 +440,8 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   }
   snapshots->snapshots[BackgroundSnapshotKey{layer, style}].push_back(
       BackgroundSnapshotEntry{std::move(image), offset});
+  ++gCaptureProbe.snapshots;
+  gCaptureProbe.snapshotMs += ProbeMsSince(probeStart);
 }
 
 const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* layer) const {
@@ -675,8 +686,11 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       drawnBackdropBounds.push_back(layer->renderBounds);
     }
     if (fromTile) {
+      const auto probeStart = std::chrono::steady_clock::now();
       bgImage = makeTileBackdrop(args, canvas, contentBounds, source->contentScale, &bgOffset);
       fromTile = bgImage != nullptr;
+      ++gCaptureProbe.tileReads;
+      gCaptureProbe.tileReadMs += ProbeMsSince(probeStart);
     }
   }
   BackgroundSnapshotKey key{layer, style};
@@ -701,6 +715,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     auto& entry = it->second[cursor++];
     bgImage = entry.image;
     bgOffset = entry.offset;
+    ++gCaptureProbe.snapshotReads;
   } else if (snapshots != nullptr && !tileBackdrop.has_value()) {
     // Surface path without tile reads: the map is authoritative, so a miss is a capture-side
     // coverage bug. Silently skip rather than masking the bug with on-the-fly synthesis.
@@ -710,6 +725,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     // covers it. Synthesizing here replays the ancestors for every such style and can stall a frame
     // for seconds, so skip the style and let the caller redraw the tile with a capture.
     ++missingCount;
+    ++gCaptureProbe.missing;
     return;
   } else {
     // Picture-canvas path: capture was skipped because there is no GPU context. Synthesize the

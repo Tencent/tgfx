@@ -37,6 +37,28 @@ class LayerStyle;
 class Surface;
 struct LayerStyleSource;
 
+// TEMP probe: counters for profiling tiled background capture and tile backdrop reads.
+struct CaptureProbe {
+  bool inCapture = false;
+  int styleSources = 0;
+  double styleSourceMs = 0.0;
+  int drawStyleSources = 0;
+  double drawStyleSourceMs = 0.0;
+  int snapshots = 0;
+  double snapshotMs = 0.0;
+  int tileReads = 0;
+  double tileReadMs = 0.0;
+  int snapshotReads = 0;
+  int missing = 0;
+  int fallbacks = 0;
+  double fallbackMs = 0.0;
+
+  void reset() {
+    *this = {};
+  }
+};
+extern CaptureProbe gCaptureProbe;
+
 /**
  * Strategy for rendering Background-sourced LayerStyles.
  *   - BackgroundCapturer: samples the bg surface into a snapshot map during the capture pass.

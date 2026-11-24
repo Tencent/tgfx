@@ -717,6 +717,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   std::vector<int> taskSnapshotIndex = {};
   std::vector<bool> taskSnapshotCover = {};
   // TEMP probe: how much of a tiled frame the per-level background captures take.
+  gCaptureProbe.reset();
   const auto captureStart = std::chrono::steady_clock::now();
   captureBackgroundsByLevel(surface, tileTasks, zoomScale, &levelSnapshots, &taskSnapshotIndex,
                             &taskSnapshotCover);
@@ -727,8 +728,24 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     std::printf("[CAP-FRAME] tasks=%zu levels=%zu ms=%.1f\n", tileTasks.size(),
                 levelSnapshots.size(), captureMs);
   }
+  const auto drawStart = std::chrono::steady_clock::now();
+  const auto captureProbe = gCaptureProbe;
   auto dirtyRects = drawTileTasks(tileTasks, levelSnapshots, taskSnapshotIndex, taskSnapshotCover,
                                   surface, zoomScale);
+  if (hasBackgroundStyle && !tileTasks.empty()) {
+    const double drawMs =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - drawStart)
+            .count();
+    std::printf(
+        "[CAP-DRAW] tasks=%zu ms=%.1f tileReads=%d tileReadMs=%.1f snapReads=%d missing=%d "
+        "fallbacks=%d fallbackMs=%.1f drawSrcN=%d drawSrcMs=%.1f\n",
+        tileTasks.size(), drawMs, gCaptureProbe.tileReads - captureProbe.tileReads,
+        gCaptureProbe.tileReadMs - captureProbe.tileReadMs,
+        gCaptureProbe.snapshotReads - captureProbe.snapshotReads,
+        gCaptureProbe.missing - captureProbe.missing, gCaptureProbe.fallbacks,
+        gCaptureProbe.fallbackMs, gCaptureProbe.drawStyleSources - captureProbe.drawStyleSources,
+        gCaptureProbe.drawStyleSourceMs - captureProbe.drawStyleSourceMs);
+  }
   drawScreenTasks(std::move(screenTasks), std::move(skippedRects), surface, autoClear);
   return dirtyRects;
 }
@@ -771,18 +788,23 @@ void DisplayList::captureBackgroundsByLevel(
       std::vector<Rect> taskRects = {};
       std::vector<size_t> capturedTasks = {};
       taskRects.reserve(levelEntry.second.size());
+      const auto scanStart = std::chrono::steady_clock::now();
+      int forcedCount = 0;
+      int missingRectCount = 0;
       for (auto index : levelEntry.second) {
         const auto& task = tileTasks[index];
         taskRects.push_back(task.tileRect());
         if (isForceCaptured(task)) {
           captureRects.push_back(task.tileRect());
           capturedTasks.push_back(index);
+          ++forcedCount;
           continue;
         }
         std::vector<Rect> missingRects = {};
         if (!collectMissingBackdrops(task, &missingRects)) {
           continue;
         }
+        missingRectCount += static_cast<int>(missingRects.size());
         // One rect per task: capture culls layers per rect, so a rect per style would multiply the
         // cost of walking the tree by the number of styles.
         auto missingUnion = Rect::MakeEmpty();
@@ -794,16 +816,40 @@ void DisplayList::captureBackgroundsByLevel(
         captureRects.push_back(captureRect);
         capturedTasks.push_back(index);
       }
+      const double scanMs =
+          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - scanStart)
+              .count();
       std::unique_ptr<BackgroundSnapshotMap> map = nullptr;
       if (!captureRects.empty()) {
         // Every task of this level draws with the map, so the layer style sources it caches are
         // recorded against all task rects rather than the narrowed capture rects.
+        double captureArea = 0.0;
+        for (const auto& rect : captureRects) {
+          captureArea += static_cast<double>(rect.width()) * static_cast<double>(rect.height());
+        }
+        double tileArea = 0.0;
+        for (auto index : capturedTasks) {
+          const auto& rect = tileTasks[index].tileRect();
+          tileArea += static_cast<double>(rect.width()) * static_cast<double>(rect.height());
+        }
+        const auto before = gCaptureProbe;
         const auto levelStart = std::chrono::steady_clock::now();
         map = captureBackgrounds(surface, captureRects, viewMatrix, taskRects);
-        std::printf(
-            "[CAP-LEVEL] level=%d tiles=%zu ms=%.1f\n", level, capturedTasks.size(),
+        const double levelMs =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - levelStart)
-                .count());
+                .count();
+        const double sourceMs = gCaptureProbe.styleSourceMs - before.styleSourceMs;
+        const double snapMs = gCaptureProbe.snapshotMs - before.snapshotMs;
+        std::printf(
+            "[CAP-LEVEL] level=%d tiles=%zu ms=%.1f tasks=%zu forced=%d missRects=%d scanMs=%.2f "
+            "areaRatio=%.2f srcN=%d srcMs=%.1f snapN=%d snapMs=%.1f restMs=%.1f\n",
+            level, capturedTasks.size(), levelMs, levelEntry.second.size(), forcedCount,
+            missingRectCount, scanMs, tileArea > 0.0 ? captureArea / tileArea : 0.0,
+            gCaptureProbe.styleSources - before.styleSources, sourceMs,
+            gCaptureProbe.snapshots - before.snapshots, snapMs, levelMs - sourceMs - snapMs);
+      } else {
+        std::printf("[CAP-SKIP] level=%d tasks=%zu scanMs=%.2f\n", level,
+                    levelEntry.second.size(), scanMs);
       }
       if (map == nullptr) {
         continue;
@@ -843,9 +889,17 @@ std::vector<Rect> DisplayList::drawTileTasks(
       Matrix viewMatrix = Matrix::I();
       Rect clipRect = {};
       auto rasterScale = getTileDrawGeometry(task, &viewMatrix, &clipRect);
+      const auto fallbackStart = std::chrono::steady_clock::now();
       auto taskSnapshots =
           captureBackgrounds(surface, {task.tileRect()}, Matrix::MakeScale(rasterScale));
       hasContent = drawTileTask(task, taskSnapshots.get(), true);
+      const double fallbackMs = std::chrono::duration<double, std::milli>(
+                                    std::chrono::steady_clock::now() - fallbackStart)
+                                    .count();
+      ++gCaptureProbe.fallbacks;
+      gCaptureProbe.fallbackMs += fallbackMs;
+      std::printf("[CAP-FALLBACK] level=%d missing=%d ms=%.1f\n", task.treeLevel(),
+                  missingBackdrops, fallbackMs);
     }
     if (!hasContent && task.coversTiles()) {
       recycleBlankTiles(task);
@@ -2148,8 +2202,10 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
       styleSourceWorldRects.push_back(worldRect);
     }
   }
+  gCaptureProbe.inCapture = true;
   BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get(), cullWorldRects,
                           styleSourceWorldRects, 1.0f);
+  gCaptureProbe.inCapture = false;
   return snapshotMap;
 }
 

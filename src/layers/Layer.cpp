@@ -19,6 +19,7 @@
 #include "tgfx/layers/Layer.h"
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <string>
 #include <unordered_map>
@@ -1620,7 +1621,18 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
   }
   std::unique_ptr<LayerStyleSource> ownedSource;
   if (sourcePtr == nullptr) {
+    const auto probeStart = std::chrono::steady_clock::now();
     ownedSource = getLayerStyleSource(args, canvas->getMatrix(), alpha);
+    const auto probeMs =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - probeStart)
+            .count();
+    if (gCaptureProbe.inCapture) {
+      ++gCaptureProbe.styleSources;
+      gCaptureProbe.styleSourceMs += probeMs;
+    } else {
+      ++gCaptureProbe.drawStyleSources;
+      gCaptureProbe.drawStyleSourceMs += probeMs;
+    }
     if (ownedSource != nullptr && args.backgroundHandler != nullptr &&
         args.backgroundHandler->canCacheLayerStyleSource(this)) {
       sourcePtr = args.backgroundHandler->cacheLayerStyleSource(this, std::move(ownedSource));
