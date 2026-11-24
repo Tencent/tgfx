@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProgramBuilder.h"
+#include "core/utils/Log.h"
+#include "gpu/ir/ProgramIRValidation.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XferProcessor.h"
 
@@ -47,6 +49,11 @@ bool ProgramBuilder::emitAndInstallProcessors() {
   emitAndInstallXferProc(inputColor, inputCoverage);
   emitFSOutputSwizzle();
 
+  std::string validationError;
+  if (!ValidateProgramIR(programIR.IR(), &validationError)) {
+    LOGE("ProgramBuilder: %s", validationError.c_str());
+    return false;
+  }
   return checkSamplerCounts();
 }
 

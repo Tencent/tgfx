@@ -37,6 +37,14 @@ void GLSLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->appendCall(
       args.outputColor, entry,
       {args.inputColorValue, ValueRef(thresholdUniformName, SLType::Float, ValueOrigin::Uniform)});
+  if (args.irBuilder != nullptr) {
+    const auto thresholdValue = args.irBuilder->CreateValue(
+        SLType::Float, Precision::High, IRValueKind::Uniform, thresholdUniformName);
+    const auto result =
+        args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::AlphaThreshold),
+                                   SLType::Float4, {args.inputValue, thresholdValue});
+    args.irBuilder->StoreOutput(args.outputValue, result);
+  }
 }
 
 void GLSLAlphaThresholdFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

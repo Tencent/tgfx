@@ -38,6 +38,9 @@ constexpr OperatorID INVALID_OPERATOR_ID = static_cast<OperatorID>(-1);
 /// Temporary stable IDs for the dual-write phase; the generated operator table replaces this.
 enum class BuiltinOperator : OperatorID {
   Luma = 1,
+  ConstColor = 2,
+  ColorMatrix = 3,
+  AlphaThreshold = 4,
 };
 
 enum class Precision : uint8_t {

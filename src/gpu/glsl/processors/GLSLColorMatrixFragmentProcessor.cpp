@@ -45,6 +45,16 @@ void GLSLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
       args.outputColor, entry,
       {args.inputColorValue, ValueRef(matrixUniformName, SLType::Float4x4, ValueOrigin::Uniform),
        ValueRef(vectorUniformName, SLType::Float4, ValueOrigin::Uniform)});
+  if (args.irBuilder != nullptr) {
+    const auto matrixValue = args.irBuilder->CreateValue(SLType::Float4x4, Precision::High,
+                                                         IRValueKind::Uniform, matrixUniformName);
+    const auto vectorValue = args.irBuilder->CreateValue(SLType::Float4, Precision::High,
+                                                         IRValueKind::Uniform, vectorUniformName);
+    const auto result =
+        args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::ColorMatrix),
+                                   SLType::Float4, {args.inputValue, matrixValue, vectorValue});
+    args.irBuilder->StoreOutput(args.outputValue, result);
+  }
 }
 
 void GLSLColorMatrixFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

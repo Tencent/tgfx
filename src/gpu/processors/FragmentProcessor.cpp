@@ -194,9 +194,20 @@ void FragmentProcessor::internalEmitChild(
   TransformedCoordVars coordVars = args.transformedCoords->childInputs(childIndex);
   TextureSamplers textureSamplers = args.textureSamplers->childInputs(childIndex);
 
+  ValueID childInputValue = args.inputValue;
+  if (!inputName.empty() && args.irBuilder != nullptr) {
+    childInputValue =
+        args.irBuilder->CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, inputName);
+  }
+  ValueID childOutputValue = INVALID_VALUE_ID;
+  if (args.irBuilder != nullptr) {
+    childOutputValue = args.irBuilder->CreateValue(SLType::Float4, Precision::High,
+                                                   IRValueKind::Local, outputColor);
+  }
   EmitArgs childArgs(fragBuilder, args.uniformHandler, outputColor,
                      inputName.empty() ? "vec4(1.0)" : inputName, args.inputSubset, &coordVars,
-                     &textureSamplers, std::move(coordFunc));
+                     &textureSamplers, std::move(coordFunc), args.irBuilder, childInputValue,
+                     childOutputValue);
   childProcessor(childIndex)->emitCode(childArgs);
   fragBuilder->codeAppend("}\n");
 

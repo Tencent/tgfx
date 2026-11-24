@@ -40,6 +40,15 @@ void GLSLConstColorProcessor::emitCode(EmitArgs& args) const {
       args.outputColor, entry,
       {ValueRef(colorName, SLType::Float4, ValueOrigin::Uniform), args.inputColorValue,
        ValueRef(std::to_string(static_cast<int>(inputMode)), SLType::Int, ValueOrigin::Literal)});
+  if (args.irBuilder != nullptr) {
+    const auto colorValue = args.irBuilder->CreateValue(SLType::Float4, Precision::High,
+                                                        IRValueKind::Uniform, colorName);
+    const auto modeValue = args.irBuilder->CreateIntConstant(static_cast<int32_t>(inputMode));
+    const auto result =
+        args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::ConstColor),
+                                   SLType::Float4, {colorValue, args.inputValue, modeValue});
+    args.irBuilder->StoreOutput(args.outputValue, result);
+  }
 }
 
 void GLSLConstColorProcessor::onSetData(UniformData* /*vertexUniformData*/,
