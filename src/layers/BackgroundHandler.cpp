@@ -727,6 +727,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     }
     if (fromTile) {
       const auto probeStart = std::chrono::steady_clock::now();
+      GpuProbeTag probeTag("tileRead");
       bgImage = makeTileBackdrop(args, canvas, contentBounds, source->contentScale, &bgOffset);
       fromTile = bgImage != nullptr;
       ++gCaptureProbe.tileReads;
