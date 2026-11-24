@@ -125,6 +125,27 @@ TEST(ProgramIRTest, LaysOutUniformsWithStd140) {
   EXPECT_EQ(uniforms[4].size, 32u);
   ASSERT_EQ(builder.Interface().uniformBlocks.size(), 1u);
   EXPECT_EQ(builder.Interface().uniformBlocks[0].size, 96u);
+  std::string error;
+  EXPECT_TRUE(ValidateProgramIR(builder.IR(), &error)) << error;
+}
+
+TEST(ProgramIRTest, RejectsUniformBlockBindingMismatch) {
+  ProgramIR program = {};
+  UniformBlockIR block = {};
+  block.stage = ShaderStage::Fragment;
+  block.binding = 1;
+  block.size = 16;
+  program.interface.uniformBlocks.push_back(block);
+
+  ResourceBinding binding = {};
+  binding.kind = BindingKind::UniformBuffer;
+  binding.stage = ShaderStage::Fragment;
+  binding.binding = 0;
+  program.interface.bindings.push_back(binding);
+
+  std::string error;
+  EXPECT_FALSE(ValidateProgramIR(program, &error));
+  EXPECT_NE(error.find("binding"), std::string::npos);
 }
 
 TEST(ProgramIRTest, RejectsDuplicateSamplerBindings) {

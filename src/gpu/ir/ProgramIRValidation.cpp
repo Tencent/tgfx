@@ -122,6 +122,23 @@ bool ValidateInterface(const InterfaceIR& interface, std::string* error) {
       }
     }
   }
+  for (const auto& block : interface.uniformBlocks) {
+    const ResourceBinding* binding = nullptr;
+    for (const auto& candidate : interface.bindings) {
+      if (candidate.kind == BindingKind::UniformBuffer && candidate.stage == block.stage) {
+        binding = &candidate;
+        break;
+      }
+    }
+    if (binding == nullptr) {
+      *error = "a uniform block has no matching resource binding";
+      return false;
+    }
+    if (binding->binding != block.binding) {
+      *error = "a uniform block binding does not match its resource binding";
+      return false;
+    }
+  }
   for (const auto& uniform : interface.uniforms) {
     const UniformBlockIR* block = nullptr;
     for (const auto& candidate : interface.uniformBlocks) {
