@@ -203,11 +203,11 @@ ValueID ProgramIRBuilder::AddSampler(SamplerIR sampler) {
   return id;
 }
 
-ValueID ProgramIRBuilder::AddExpr(IRExpr expr) {
+ValueID ProgramIRBuilder::AddExpr(IRExpr expr, const std::string& debugName) {
   if (!CanAppend(ir.exprs.size())) {
     return INVALID_VALUE_ID;
   }
-  const auto result = CreateValue(expr.type, Precision::High, IRValueKind::Expr);
+  const auto result = CreateValue(expr.type, Precision::High, IRValueKind::Expr, debugName);
   if (result == INVALID_VALUE_ID) {
     return INVALID_VALUE_ID;
   }
@@ -291,12 +291,13 @@ ValueID ProgramIRBuilder::CreateCall(OperatorID op, SLType type, const std::vect
   return AddExpr(std::move(expr));
 }
 
-ValueID ProgramIRBuilder::CreateTextureSample(ValueID sampler, ValueID coordinate, SLType type) {
+ValueID ProgramIRBuilder::CreateTextureSample(ValueID sampler, ValueID coordinate, SLType type,
+                                              std::string debugName) {
   IRExpr expr = {};
   expr.kind = IRExprKind::TextureSample;
   expr.type = type;
   expr.args = {sampler, coordinate};
-  return AddExpr(std::move(expr));
+  return AddExpr(std::move(expr), debugName);
 }
 
 void ProgramIRBuilder::Assign(LValue dst, ValueID src) {

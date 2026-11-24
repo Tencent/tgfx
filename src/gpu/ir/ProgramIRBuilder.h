@@ -62,7 +62,8 @@ class ProgramIRBuilder {
 
   ValueID CreateCall(OperatorID op, SLType type, const std::vector<ValueID>& args);
 
-  ValueID CreateTextureSample(ValueID sampler, ValueID coordinate, SLType type);
+  ValueID CreateTextureSample(ValueID sampler, ValueID coordinate, SLType type,
+                              std::string debugName = {});
 
   void Assign(LValue dst, ValueID src);
 
@@ -73,7 +74,7 @@ class ProgramIRBuilder {
   }
 
  private:
-  ValueID AddExpr(IRExpr expr);
+  ValueID AddExpr(IRExpr expr, const std::string& debugName = {});
 
   bool HasUniformBinding(ShaderStage stage) const;
 

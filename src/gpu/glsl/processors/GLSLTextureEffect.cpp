@@ -145,7 +145,7 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
           args.irBuilder->InternValue(texCoordName, coordType, Precision::High, IRValueKind::Local);
       if (sampler != INVALID_VALUE_ID && coordValue != INVALID_VALUE_ID) {
         const auto sample =
-            args.irBuilder->CreateTextureSample(sampler, coordValue, SLType::Float4);
+            args.irBuilder->CreateTextureSample(sampler, coordValue, SLType::Float4, readName);
         args.irBuilder->StoreOutput(args.outputValue, sample);
       }
     }

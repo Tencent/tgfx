@@ -64,7 +64,8 @@ TEST(ProgramIRTest, RecordsFieldAssignment) {
   const auto sampler =
       builder.CreateValue(SLType::Texture2DSampler, Precision::Default, IRValueKind::Sampler);
   const auto coord = builder.CreateValue(SLType::Float2, Precision::High, IRValueKind::Local);
-  const auto sample = builder.CreateTextureSample(sampler, coord, SLType::Float4);
+  const auto sample = builder.CreateTextureSample(sampler, coord, SLType::Float4, "tgfxRead0");
+  EXPECT_EQ(builder.IR().values[sample].debugName, "tgfxRead0");
   const auto red = builder.CreateSwizzle(sample, SLType::Float, "r");
   builder.Assign({yuv, "x"}, red);
 
