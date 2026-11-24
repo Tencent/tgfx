@@ -44,6 +44,19 @@ struct ValueRef {
   SLType type = SLType::Void;
   ValueOrigin origin = ValueOrigin::Literal;
   std::string name = {};
+
+  ValueRef() = default;
+
+  ValueRef(const std::string& valueName) : name(valueName) {
+  }
+
+  ValueRef(const char* valueName) : name(valueName != nullptr ? valueName : "") {
+  }
+
+  ValueRef(const std::string& valueName, SLType valueType,
+           ValueOrigin valueOrigin = ValueOrigin::Literal)
+      : type(valueType), origin(valueOrigin), name(valueName) {
+  }
 };
 
 /**

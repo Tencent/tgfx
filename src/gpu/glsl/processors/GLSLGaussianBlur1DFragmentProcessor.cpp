@@ -96,20 +96,20 @@ void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
         const std::string dimension = tiledRead && !tiled.dimensionName.empty()
                                           ? tiled.dimensionName
                                           : std::string("vec2(1.0)");
-        std::vector<std::string> callArgs = {samplerName,
-                                             childCoords[0].name(),
-                                             texelSizeName,
-                                             radiusName,
-                                             subset,
-                                             "0",
-                                             tiledRead ? "1" : "0",
-                                             std::to_string(tiledRead ? tiled.shaderModeX : 0),
-                                             std::to_string(tiledRead ? tiled.shaderModeY : 0),
-                                             subset,
-                                             clamp,
-                                             dimension,
-                                             tiledRead && tiled.seamBlend ? "1" : "0",
-                                             tiledRead && tiled.borderPass ? "1" : "0"};
+        std::vector<ValueRef> callArgs = {samplerName,
+                                          childCoords[0].name(),
+                                          texelSizeName,
+                                          radiusName,
+                                          subset,
+                                          "0",
+                                          tiledRead ? "1" : "0",
+                                          std::to_string(tiledRead ? tiled.shaderModeX : 0),
+                                          std::to_string(tiledRead ? tiled.shaderModeY : 0),
+                                          subset,
+                                          clamp,
+                                          dimension,
+                                          tiledRead && tiled.seamBlend ? "1" : "0",
+                                          tiledRead && tiled.borderPass ? "1" : "0"};
         for (int slot = 0; slot < 17; ++slot) {
           callArgs.push_back(kernelName + "[" + std::to_string(slot) + "]");
         }

@@ -51,13 +51,15 @@ std::string GLSLFragmentShaderBuilder::dstColor() {
 
 void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
                                            const std::string& functionName,
-                                           const std::vector<std::string>& args,
+                                           const std::vector<ValueRef>& args,
                                            const std::string& wrapType) {
   if (callRecorder != nullptr) {
     CallRecord record = {};
     record.output = outputVar;
     record.function = functionName;
-    record.args.assign(args.begin(), args.end());
+    for (const auto& arg : args) {
+      record.args.push_back(arg.name);
+    }
     record.order = nextEmitOrder();
     callRecorder->push_back(std::move(record));
   }
@@ -74,7 +76,7 @@ void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
       codeAppend(", ");
     }
     first = false;
-    codeAppend(arg);
+    codeAppend(arg.name);
   }
   codeAppend(")");
   if (!wrapType.empty()) {
@@ -87,10 +89,17 @@ void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
     instruction.kind = FragmentInstructionKind::Call;
     instruction.output = outputVar;
     instruction.function = functionName;
-    instruction.args.assign(args.begin(), args.end());
     instruction.outputRef = internValue(outputVar, SLType::Void, ValueOrigin::CallResult);
     for (const auto& arg : args) {
-      instruction.argRefs.push_back(internValue(arg, SLType::Void, ValueOrigin::Literal));
+      instruction.args.push_back(arg.name);
+      ValueRef ref = arg;
+      if (ref.id == INVALID_VALUE_ID) {
+        auto interned = internValue(arg.name, arg.type, arg.origin);
+        if (interned.id != INVALID_VALUE_ID) {
+          ref = std::move(interned);
+        }
+      }
+      instruction.argRefs.push_back(std::move(ref));
     }
     instruction.wrapType = wrapType;
     instruction.text = codeTextFrom(start);
@@ -99,7 +108,7 @@ void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
 }
 
 std::string GLSLFragmentShaderBuilder::appendTempCall(const std::string& functionName,
-                                                      const std::vector<std::string>& args) {
+                                                      const std::vector<ValueRef>& args) {
   auto entry = appendFunction(functionName.c_str());
   if (entry.empty()) {
     return "";
@@ -114,7 +123,7 @@ std::string GLSLFragmentShaderBuilder::appendTempCall(const std::string& functio
       codeAppend(", ");
     }
     first = false;
-    codeAppend(arg);
+    codeAppend(arg.name);
   }
   codeAppend(");");
   setRawCaptureEnabled(true);
@@ -123,10 +132,17 @@ std::string GLSLFragmentShaderBuilder::appendTempCall(const std::string& functio
     instruction.kind = FragmentInstructionKind::Call;
     instruction.output = temp;
     instruction.function = functionName;
-    instruction.args.assign(args.begin(), args.end());
     instruction.outputRef = internValue(temp, SLType::Float4, ValueOrigin::CallResult);
     for (const auto& arg : args) {
-      instruction.argRefs.push_back(internValue(arg, SLType::Void, ValueOrigin::Literal));
+      instruction.args.push_back(arg.name);
+      ValueRef ref = arg;
+      if (ref.id == INVALID_VALUE_ID) {
+        auto interned = internValue(arg.name, arg.type, arg.origin);
+        if (interned.id != INVALID_VALUE_ID) {
+          ref = std::move(interned);
+        }
+      }
+      instruction.argRefs.push_back(std::move(ref));
     }
     instruction.declaresResult = true;
     instruction.resultType = "vec4";
