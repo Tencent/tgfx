@@ -738,13 +738,15 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
             .count();
     std::printf(
         "[CAP-DRAW] tasks=%zu ms=%.1f tileReads=%d tileReadMs=%.1f snapReads=%d missing=%d "
-        "fallbacks=%d fallbackMs=%.1f drawSrcN=%d drawSrcMs=%.1f\n",
+        "fallbacks=%d fallbackMs=%.1f drawSrcN=%d drawSrcMs=%.1f bgStyleN=%d bgStyleMs=%.1f\n",
         tileTasks.size(), drawMs, gCaptureProbe.tileReads - captureProbe.tileReads,
         gCaptureProbe.tileReadMs - captureProbe.tileReadMs,
         gCaptureProbe.snapshotReads - captureProbe.snapshotReads,
         gCaptureProbe.missing - captureProbe.missing, gCaptureProbe.fallbacks,
         gCaptureProbe.fallbackMs, gCaptureProbe.drawStyleSources - captureProbe.drawStyleSources,
-        gCaptureProbe.drawStyleSourceMs - captureProbe.drawStyleSourceMs);
+        gCaptureProbe.drawStyleSourceMs - captureProbe.drawStyleSourceMs,
+        gCaptureProbe.bgStyles - captureProbe.bgStyles,
+        gCaptureProbe.bgStyleMs - captureProbe.bgStyleMs);
     for (int pass = 0; pass < 2; ++pass) {
       const auto& p = gCaptureProbe;
       if (p.sourceCalls[pass][0] == 0 && p.sourceCacheHits[pass][0] == 0) {
@@ -863,8 +865,12 @@ void DisplayList::captureBackgroundsByLevel(
             gCaptureProbe.styleSources - before.styleSources, sourceMs,
             gCaptureProbe.snapshots - before.snapshots, snapMs, levelMs - sourceMs - snapMs);
       } else {
-        std::printf("[CAP-SKIP] level=%d tasks=%zu scanMs=%.2f\n", level,
-                    levelEntry.second.size(), scanMs);
+        std::printf("[CAP-SKIP] level=%d tasks=%zu scanMs=%.2f\n", level, levelEntry.second.size(),
+                    scanMs);
+        // Every task reads its backdrops from the tile, but the layer style sources are still
+        // shared: the first task records each one and the others reuse it.
+        map = std::make_unique<BackgroundSnapshotMap>();
+        map->styleSourceRects = makeStyleSourceRects(taskRects, viewMatrix);
       }
       if (map == nullptr) {
         continue;
@@ -2106,6 +2112,26 @@ bool DisplayList::HasVisibleBackgroundStyle(const Layer* layer, const Rect& unio
   return false;
 }
 
+std::vector<Rect> DisplayList::makeStyleSourceRects(const std::vector<Rect>& renderRects,
+                                                    const Matrix& viewMatrix) const {
+  Matrix inverse = Matrix::I();
+  if (!viewMatrix.invert(&inverse)) {
+    return {};
+  }
+  std::vector<Rect> worldRects = {};
+  worldRects.reserve(renderRects.size());
+  for (const auto& rect : renderRects) {
+    if (rect.isEmpty()) {
+      continue;
+    }
+    auto worldRect = inverse.mapRect(rect);
+    worldRect.roundOut();
+    worldRect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
+    worldRects.push_back(worldRect);
+  }
+  return worldRects;
+}
+
 std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     Surface* surface, const std::vector<Rect>& renderRects, const Matrix& viewMatrix,
     const std::vector<Rect>& styleSourceRects) const {
@@ -2203,23 +2229,11 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   }
   // The cached layer style sources are reused by every pass drawing with this map, so they follow
   // styleSourceRects when the caller passes a wider area than the captured one.
-  auto styleSourceWorldRects = worldRects;
-  if (!styleSourceRects.empty()) {
-    styleSourceWorldRects.clear();
-    styleSourceWorldRects.reserve(styleSourceRects.size());
-    for (const auto& rect : styleSourceRects) {
-      if (rect.isEmpty()) {
-        continue;
-      }
-      auto worldRect = inverse.mapRect(rect);
-      worldRect.roundOut();
-      worldRect.outset(_root->maxBackgroundOutset, _root->maxBackgroundOutset);
-      styleSourceWorldRects.push_back(worldRect);
-    }
-  }
+  snapshotMap->styleSourceRects =
+      styleSourceRects.empty() ? worldRects : makeStyleSourceRects(styleSourceRects, viewMatrix);
   gCaptureProbe.inCapture = true;
   BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get(), cullWorldRects,
-                          styleSourceWorldRects, 1.0f);
+                          snapshotMap->styleSourceRects, 1.0f);
   gCaptureProbe.inCapture = false;
   return snapshotMap;
 }

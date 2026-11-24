@@ -1647,7 +1647,7 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
       gCaptureProbe.drawStyleSourceMs += probeMs;
     }
     if (ownedSource != nullptr && args.backgroundHandler != nullptr &&
-        args.backgroundHandler->canCacheLayerStyleSource(this)) {
+        args.backgroundHandler->canCacheLayerStyleSource(this, canvas)) {
       sourcePtr = args.backgroundHandler->cacheLayerStyleSource(this, std::move(ownedSource));
     }
     if (sourcePtr == nullptr) {

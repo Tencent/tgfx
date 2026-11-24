@@ -455,7 +455,7 @@ const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* lay
   return it->second.get();
 }
 
-bool BackgroundCapturer::canCacheLayerStyleSource(Layer* /*layer*/) const {
+bool BackgroundCapturer::canCacheLayerStyleSource(Layer* /*layer*/, Canvas* /*canvas*/) const {
   // When the bg source was down-sampled (extreme blur outset), capture and consume run at
   // different densities, so a cached source built in capture cannot be reused in consume.
   return snapshots != nullptr && (bgSource == nullptr || bgSource->surfaceScale() == 1.0f);
@@ -463,8 +463,12 @@ bool BackgroundCapturer::canCacheLayerStyleSource(Layer* /*layer*/) const {
 
 const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
     Layer* layer, std::unique_ptr<LayerStyleSource> source) {
-  DEBUG_ASSERT(canCacheLayerStyleSource(layer));
-  if (source == nullptr) {
+  return CacheLayerStyleSource(snapshots, layer, std::move(source));
+}
+
+const LayerStyleSource* BackgroundHandler::CacheLayerStyleSource(
+    BackgroundSnapshotMap* snapshots, Layer* layer, std::unique_ptr<LayerStyleSource> source) {
+  if (snapshots == nullptr || source == nullptr) {
     return nullptr;
   }
   // Rasterize so the first draw uploads a GPU texture and the second reuses it. Wrapping an image
@@ -507,6 +511,32 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
     return nullptr;
   }
   return it->second.get();
+}
+
+bool BackgroundConsumer::canCacheLayerStyleSource(Layer* layer, Canvas* canvas) const {
+  if (styleSourceRects() == nullptr || canvas->getSurface() != tileBackdrop->surface) {
+    return false;
+  }
+  // A layer under a perspective matrix is projected after its source is drawn, and a rasterized
+  // source samples differently under that projection. The capture pass leaves those uncached too.
+  for (auto* current = layer; current != nullptr; current = current->_parent) {
+    if (!current->bitFields.matrix3DIsAffine) {
+      return false;
+    }
+  }
+  return true;
+}
+
+const LayerStyleSource* BackgroundConsumer::cacheLayerStyleSource(
+    Layer* layer, std::unique_ptr<LayerStyleSource> source) {
+  return CacheLayerStyleSource(snapshots, layer, std::move(source));
+}
+
+const std::vector<Rect>* BackgroundConsumer::styleSourceRects() const {
+  if (!tileBackdrop.has_value() || snapshots == nullptr || snapshots->styleSourceRects.empty()) {
+    return nullptr;
+  }
+  return &snapshots->styleSourceRects;
 }
 
 bool BackgroundConsumer::canStoreStyleOutput(Canvas* canvas, Layer* layer,
@@ -645,6 +675,13 @@ std::shared_ptr<Image> BackgroundConsumer::makeTileBackdrop(const DrawArgs& args
 void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
                                              float alpha, LayerStyle* style,
                                              const LayerStyleSource* source) {
+  struct ProbeScope {
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    ~ProbeScope() {
+      ++gCaptureProbe.bgStyles;
+      gCaptureProbe.bgStyleMs += ProbeMsSince(start);
+    }
+  } probeScope;
   if (source == nullptr || FloatNearlyZero(source->contentScale)) {
     return;
   }

@@ -478,6 +478,13 @@ class DisplayList {
       Surface* surface, const std::vector<Rect>& renderRects, const Matrix& viewMatrix,
       const std::vector<Rect>& styleSourceRects = {}) const;
 
+  /**
+   * Maps render rects in surface pixels to the world-space rects layer style sources are recorded
+   * against, widened by the root's maxBackgroundOutset.
+   */
+  std::vector<Rect> makeStyleSourceRects(const std::vector<Rect>& renderRects,
+                                         const Matrix& viewMatrix) const;
+
   void updateMousePosition();
 };
 }  // namespace tgfx

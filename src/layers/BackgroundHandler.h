@@ -52,6 +52,9 @@ struct CaptureProbe {
   int missing = 0;
   int fallbacks = 0;
   double fallbackMs = 0.0;
+  // Background styles drawn by the consumer, including their backdrop reads (CPU side only).
+  int bgStyles = 0;
+  double bgStyleMs = 0.0;
   // Style source recordings split by nesting depth (0, 1, 2, 3+) and by pass (0: draw, 1: capture).
   // A recording at depth N runs inside the subtree drawing of a recording at depth N - 1, so the
   // inclusive time at depth 0 minus that at depth 1 is the cost depth 0 spends on its own.
@@ -180,16 +183,21 @@ class BackgroundHandler {
 
   // Whether this handler will cache a LayerStyleSource for `layer`. Used by Layer::drawDirectly
   // to decide if `cacheLayerStyleSource` should be called.
-  virtual bool canCacheLayerStyleSource(Layer* /*layer*/) const {
+  virtual bool canCacheLayerStyleSource(Layer* /*layer*/, Canvas* /*canvas*/) const {
     return false;
   }
 
   // Takes ownership of `source` and caches it under `layer`, returning the raw pointer to the
-  // cached entry. Precondition: canCacheLayerStyleSource(layer) returned true.
+  // cached entry. Precondition: canCacheLayerStyleSource(layer, canvas) returned true.
   virtual const LayerStyleSource* cacheLayerStyleSource(
       Layer* /*layer*/, std::unique_ptr<LayerStyleSource> /*source*/) {
     return nullptr;
   }
+
+  // Rasterizes source and stores it in snapshots under layer, returning the stored entry.
+  static const LayerStyleSource* CacheLayerStyleSource(BackgroundSnapshotMap* snapshots,
+                                                       Layer* layer,
+                                                       std::unique_ptr<LayerStyleSource> source);
 
   // During the capture pass, a subtree that sits before a later bg-style sibling must draw all
   // descendants so their content appears on the bg source surface. drawChildren wraps each such
@@ -246,7 +254,7 @@ class BackgroundCapturer : public BackgroundHandler {
 
   const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
 
-  bool canCacheLayerStyleSource(Layer* layer) const override;
+  bool canCacheLayerStyleSource(Layer* layer, Canvas* canvas) const override;
 
   const LayerStyleSource* cacheLayerStyleSource(Layer* layer,
                                                 std::unique_ptr<LayerStyleSource> source) override;
@@ -373,6 +381,15 @@ class BackgroundConsumer : public BackgroundHandler {
                            LayerStyle* style, const LayerStyleSource* source) override;
 
   const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
+
+  // A tile pass caches the sources it records in the map of its level, so the other tiles of the
+  // level reuse them as they would reuse the ones recorded by a capture.
+  bool canCacheLayerStyleSource(Layer* layer, Canvas* canvas) const override;
+
+  const LayerStyleSource* cacheLayerStyleSource(Layer* layer,
+                                                std::unique_ptr<LayerStyleSource> source) override;
+
+  const std::vector<Rect>* styleSourceRects() const override;
 
  private:
   // Whether the output of style on layer may be stored in the cross-frame style output cache.

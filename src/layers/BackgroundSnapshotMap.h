@@ -102,6 +102,9 @@ struct BackgroundSnapshotMap {
                      BackgroundSnapshotKeyHash>
       snapshots = {};
   std::unordered_map<Layer*, std::unique_ptr<LayerStyleSource>> layerStyleSources = {};
+  // World-space rects the cached layer style sources are recorded against: every pass drawing with
+  // this map reuses them, so they span all of those passes, widened by maxBackgroundOutset.
+  std::vector<Rect> styleSourceRects = {};
   // True when this frame renders through multiple passes (tiles or dirty rects), which is
   // when caching the style output pays for its rasterization.
   bool multiPass = false;
