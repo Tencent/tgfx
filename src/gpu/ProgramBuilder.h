@@ -78,7 +78,7 @@ class ProgramBuilder {
 
  private:
   std::vector<const Processor*> currentProcessors = {};
-  std::vector<ShaderVar> transformedCoordVars = {};
+  std::vector<CoordValue> transformedCoordVars = {};
   std::string subsetVarName = {};
 
   /**

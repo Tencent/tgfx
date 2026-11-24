@@ -132,6 +132,8 @@ struct FragmentInstruction {
   std::string wrapType = {};
   /// The coverage operand of a combine.
   std::string operand = {};
+  /// The varying a projected coordinate reads, when the instruction is Project.
+  VaryingID varying = INVALID_VARYING;
   /// The alias declaration spelling ("vec4", "highp vec2").
   std::string declaration = {};
   /// A coverage store wraps a scalar source in vec4(...).

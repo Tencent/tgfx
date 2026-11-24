@@ -25,6 +25,7 @@
 #include "gpu/SamplingArgs.h"
 #include "gpu/UniformData.h"
 #include "gpu/UniformHandler.h"
+#include "gpu/ir/CoordValue.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
@@ -208,7 +209,7 @@ class FragmentProcessor : public Processor {
   };
 
   using TransformedCoordVars =
-      BuilderInputProvider<ShaderVar, &FragmentProcessor::numCoordTransforms>;
+      BuilderInputProvider<CoordValue, &FragmentProcessor::numCoordTransforms>;
   using TextureSamplers =
       BuilderInputProvider<SamplerHandle, &FragmentProcessor::numTextureSamplers>;
 

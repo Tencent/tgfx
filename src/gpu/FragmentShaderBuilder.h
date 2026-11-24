@@ -20,6 +20,7 @@
 
 #include "ShaderBuilder.h"
 #include "ShaderVar.h"
+#include "gpu/ir/CoordValue.h"
 
 namespace tgfx {
 class FragmentProcessor;
@@ -155,7 +156,7 @@ class FragmentShaderBuilder : public ShaderBuilder {
    * @param coordVar The input coordinate variable (Float2 or Float3)
    * @return The name of the 2D coordinate variable to use for texture sampling
    */
-  std::string emitPerspTextCoord(const ShaderVar& coordVar);
+  std::string emitPerspTextCoord(const CoordValue& coordVar);
 
  protected:
   virtual std::string colorOutputName() = 0;

@@ -196,7 +196,7 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     description.interface.attributes.push_back({attribute.name()});
   }
   for (const auto& varying : _varyingHandler.getVaryings()) {
-    description.interface.varyings.push_back({varying.name(), varying.type()});
+    description.interface.varyings.push_back({varying.name(), varying.type(), varying.id()});
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Vertex)) {
     description.interface.uniforms.push_back({uniform.name()});

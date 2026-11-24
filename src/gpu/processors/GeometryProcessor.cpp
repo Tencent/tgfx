@@ -83,7 +83,7 @@ void GeometryProcessor::emitTransforms(EmitArgs& args, VertexShaderBuilder* vert
     const SLType varyingType = CoordinateBinder::VaryingType(hasPerspective);
     auto varying = varyingHandler->addVarying(CoordinateBinder::VaryingName(static_cast<size_t>(i)),
                                               varyingType);
-    transformHandler->specifyCoordsForCurrCoordTransform(varying.name(), varyingType);
+    transformHandler->specifyCoordsForCurrCoordTransform(varying.name(), varyingType, varying.id());
     // For perspective: pass vec3 directly, division happens in fragment shader.
     // For non-perspective: compute vec2 directly as an optimization.
     vertexBuilder->transformVarying(varying.vsOut(), uvCoordsVar.name(), uniName, hasPerspective);

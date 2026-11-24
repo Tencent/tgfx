@@ -49,7 +49,7 @@ class GeometryProcessor : public Processor {
   class FPCoordTransformHandler {
    public:
     FPCoordTransformHandler(const ProgramInfo* programInfo,
-                            std::vector<ShaderVar>* transformedCoordVars)
+                            std::vector<CoordValue>* transformedCoordVars)
         : iter(programInfo), transformedCoordVars(transformedCoordVars) {
     }
 
@@ -57,15 +57,14 @@ class GeometryProcessor : public Processor {
       return iter.next();
     }
 
-    // 'args' are constructor params to ShaderVar.
-    template <typename... Args>
-    void specifyCoordsForCurrCoordTransform(Args&&... args) {
-      transformedCoordVars->emplace_back(std::forward<Args>(args)...);
+    void specifyCoordsForCurrCoordTransform(const std::string& name, SLType type,
+                                            VaryingID varying) {
+      transformedCoordVars->push_back({name, type, varying});
     }
 
    private:
     FragmentProcessor::CoordTransformIter iter;
-    std::vector<ShaderVar>* transformedCoordVars;
+    std::vector<CoordValue>* transformedCoordVars;
   };
 
   struct EmitArgs {

@@ -25,6 +25,7 @@ Varying VaryingHandler::addVarying(const std::string& name, SLType type, bool is
   Varying varying;
   varying._type = type;
   varying._name = programBuilder->nameVariable(name);
+  varying._id = static_cast<VaryingID>(varyings.size());
   varying._isFlat = isFlat;
   varyings.push_back(std::move(varying));
   return varyings[varyings.size() - 1];

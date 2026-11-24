@@ -73,6 +73,34 @@ TEST(ProgramValidationTest, RejectsVaryingWriteTypeMismatch) {
   EXPECT_NE(error.find("vColor"), std::string::npos);
 }
 
+TEST(ProgramValidationTest, RejectsProjectingNonProjectiveVarying) {
+  auto description = ValidDescription();
+  FragmentInstruction project = {};
+  project.kind = FragmentInstructionKind::Project;
+  project.output = "perspCoord2D";
+  project.src = "vColor";
+  project.varying = 0;
+  description.fragment.instructions.push_back(project);
+  std::string error;
+  EXPECT_FALSE(ValidateProgramDescription(&description, &error));
+  EXPECT_NE(error.find("not vec3"), std::string::npos);
+}
+
+TEST(ProgramValidationTest, AcceptsProjectingProjectiveVarying) {
+  auto description = ValidDescription();
+  description.interface.varyings[0].type = SLType::Float3;
+  description.vertexCalls[0].kind = VertexCallKind::TransformVarying;
+  description.vertexCalls[0].resultType = SLType::Float3;
+  FragmentInstruction project = {};
+  project.kind = FragmentInstructionKind::Project;
+  project.output = "perspCoord2D";
+  project.src = "vColor";
+  project.varying = 0;
+  description.fragment.instructions.push_back(project);
+  std::string error;
+  EXPECT_TRUE(ValidateProgramDescription(&description, &error)) << error;
+}
+
 TEST(ProgramValidationTest, RejectsUndeclaredWrite) {
   auto description = ValidDescription();
   description.vertexCalls[0].dst = "vMissing";

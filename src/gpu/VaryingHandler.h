@@ -20,6 +20,7 @@
 
 #include <vector>
 #include "gpu/ShaderVar.h"
+#include "gpu/ir/ProgramDescription.h"
 #include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
@@ -44,9 +45,14 @@ class Varying {
     return _type;
   }
 
+  VaryingID id() const {
+    return _id;
+  }
+
  private:
   SLType _type = SLType::Void;
   std::string _name;
+  VaryingID _id = INVALID_VARYING;
   bool _isFlat = false;
 
   friend class VaryingHandler;

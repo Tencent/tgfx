@@ -80,6 +80,35 @@ VaryingDesc* FindVarying(InterfaceDesc* interface, const std::string& name) {
   return nullptr;
 }
 
+VaryingDesc* FindVaryingByID(InterfaceDesc* interface, VaryingID id) {
+  for (auto& varying : interface->varyings) {
+    if (varying.id == id) {
+      return &varying;
+    }
+  }
+  return nullptr;
+}
+
+bool ValidateFragmentCoords(ProgramDescription* description, std::string* error) {
+  for (const auto& instruction : description->fragment.instructions) {
+    if (instruction.kind != FragmentInstructionKind::Project ||
+        instruction.varying == INVALID_VARYING) {
+      continue;
+    }
+    auto* varying = FindVaryingByID(&description->interface, instruction.varying);
+    if (varying == nullptr) {
+      *error =
+          "the fragment stage projects undeclared varying " + std::to_string(instruction.varying);
+      return false;
+    }
+    if (varying->type != SLType::Float3) {
+      *error = "the fragment stage projects varying '" + varying->name + "', which is not vec3";
+      return false;
+    }
+  }
+  return true;
+}
+
 bool LinkVertexWrites(ProgramDescription* description, std::string* error) {
   bool hasPosition = false;
   for (auto& call : description->vertexCalls) {
@@ -123,7 +152,8 @@ bool ValidateProgramDescription(ProgramDescription* description, std::string* er
   if (description == nullptr || error == nullptr) {
     return false;
   }
-  return AssignIDs(description, error) && LinkVertexWrites(description, error);
+  return AssignIDs(description, error) && LinkVertexWrites(description, error) &&
+         ValidateFragmentCoords(description, error);
 }
 
 }  // namespace tgfx
