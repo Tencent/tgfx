@@ -46,9 +46,8 @@ void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
         args.irBuilder->CreateValue(SLType::Float, Precision::High, IRValueKind::Uniform, kg);
     const auto kbValue =
         args.irBuilder->CreateValue(SLType::Float, Precision::High, IRValueKind::Uniform, kb);
-    const auto result =
-        args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::Luma), SLType::Float4,
-                                   {args.inputValue, krValue, kgValue, kbValue});
+    const auto result = args.irBuilder->CreateCall(OperatorID::Luma, SLType::Float4,
+                                                   {args.inputValue, krValue, kgValue, kbValue});
     args.irBuilder->StoreOutput(args.outputValue, result);
   }
 }

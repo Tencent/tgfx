@@ -44,9 +44,8 @@ void GLSLConstColorProcessor::emitCode(EmitArgs& args) const {
     const auto colorValue = args.irBuilder->CreateValue(SLType::Float4, Precision::High,
                                                         IRValueKind::Uniform, colorName);
     const auto modeValue = args.irBuilder->CreateIntConstant(static_cast<int32_t>(inputMode));
-    const auto result =
-        args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::ConstColor),
-                                   SLType::Float4, {colorValue, args.inputValue, modeValue});
+    const auto result = args.irBuilder->CreateCall(OperatorID::ConstColor, SLType::Float4,
+                                                   {colorValue, args.inputValue, modeValue});
     args.irBuilder->StoreOutput(args.outputValue, result);
   }
 }

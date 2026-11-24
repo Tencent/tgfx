@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include "gpu/SLType.h"
+#include "gpu/ir/OperatorManifest.h"
 #include "gpu/ir/ValueRef.h"
 #include "tgfx/gpu/ShaderStage.h"
 
@@ -29,24 +30,9 @@ namespace tgfx {
 
 using ExprID = uint32_t;
 using BindingID = uint32_t;
-using OperatorID = uint32_t;
 
 constexpr ExprID INVALID_EXPR_ID = static_cast<ExprID>(-1);
 constexpr BindingID INVALID_BINDING_ID = static_cast<BindingID>(-1);
-constexpr OperatorID INVALID_OPERATOR_ID = static_cast<OperatorID>(-1);
-
-/// Temporary stable IDs for the dual-write phase; the generated operator table replaces this.
-enum class BuiltinOperator : OperatorID {
-  Luma = 1,
-  ConstColor = 2,
-  ColorMatrix = 3,
-  AlphaThreshold = 4,
-  YUVToRGB = 5,
-  Clamp = 6,
-  DeviceCoord = 7,
-  MulAlpha = 8,
-  AlphaModulate = 9,
-};
 
 enum class Precision : uint8_t {
   Default,
@@ -60,6 +46,7 @@ enum class IRValueKind : uint8_t {
   Attribute,
   Varying,
   Uniform,
+  UniformArray,
   Sampler,
   Local,
   Expr,
@@ -188,6 +175,18 @@ struct UniformBlockIR {
   uint32_t size = 0;
 };
 
+struct UniformArrayIR {
+  std::string name = {};
+  SLType elementType = SLType::Void;
+  Precision precision = Precision::Default;
+  ShaderStage stage = ShaderStage::Fragment;
+  uint32_t count = 0;
+  uint32_t binding = 0;
+  uint32_t offset = 0;
+  uint32_t stride = 0;
+  uint32_t size = 0;
+};
+
 struct SamplerIR {
   std::string name = {};
   SLType type = SLType::Void;
@@ -198,6 +197,7 @@ struct InterfaceIR {
   std::vector<AttributeIR> attributes = {};
   std::vector<VaryingIR> varyings = {};
   std::vector<UniformIR> uniforms = {};
+  std::vector<UniformArrayIR> uniformArrays = {};
   std::vector<UniformBlockIR> uniformBlocks = {};
   std::vector<SamplerIR> samplers = {};
   std::vector<ResourceBinding> bindings = {};

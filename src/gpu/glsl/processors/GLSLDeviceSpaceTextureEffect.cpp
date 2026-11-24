@@ -61,16 +61,15 @@ void GLSLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
                                                            Precision::High, IRValueKind::Uniform);
       const auto fragCoordValue = args.irBuilder->CreateBuiltin("gl_FragCoord", SLType::Float4);
       const auto xyValue = args.irBuilder->CreateSwizzle(fragCoordValue, SLType::Float2, "xy");
-      const auto deviceCoordValue =
-          args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::DeviceCoord),
-                                     SLType::Float2, {matrixValue, xyValue}, "deviceCoord");
+      const auto deviceCoordValue = args.irBuilder->CreateCall(
+          OperatorID::DeviceCoord, SLType::Float2, {matrixValue, xyValue}, "deviceCoord");
       const auto samplerValue = args.samplerValue(sampler);
       if (samplerValue != INVALID_VALUE_ID) {
         const auto deviceReadValue = args.irBuilder->CreateTextureSample(
             samplerValue, deviceCoordValue, SLType::Float4, "deviceRead", SLType::Texture2DSampler,
             swizzleCode);
-        const auto op = textureProxy->isAlphaOnly() ? BuiltinOperator::AlphaModulate
-                                                    : BuiltinOperator::MulAlpha;
+        const auto op =
+            textureProxy->isAlphaOnly() ? OperatorID::AlphaModulate : OperatorID::MulAlpha;
         const auto result =
             args.irBuilder->CreateCall(static_cast<OperatorID>(op), SLType::Float4,
                                        {deviceReadValue, args.inputValue}, args.outputColor);
@@ -100,15 +99,14 @@ void GLSLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
                                                            Precision::High, IRValueKind::Uniform);
       const auto fragCoordValue = args.irBuilder->CreateBuiltin("gl_FragCoord", SLType::Float4);
       const auto xyValue = args.irBuilder->CreateSwizzle(fragCoordValue, SLType::Float2, "xy");
-      const auto deviceCoordValue =
-          args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::DeviceCoord),
-                                     SLType::Float2, {matrixValue, xyValue}, "deviceCoord");
+      const auto deviceCoordValue = args.irBuilder->CreateCall(
+          OperatorID::DeviceCoord, SLType::Float2, {matrixValue, xyValue}, "deviceCoord");
       const auto readValue =
           args.irBuilder->CreateTextureSample(samplerValue, deviceCoordValue, SLType::Float4,
                                               "deviceRead", SLType::Texture2DSampler, swizzleCode);
       const auto alphaValue = args.irBuilder->CreateSwizzle(readValue, SLType::Float, "a");
       const auto op =
-          textureProxy->isAlphaOnly() ? BuiltinOperator::AlphaModulate : BuiltinOperator::MulAlpha;
+          textureProxy->isAlphaOnly() ? OperatorID::AlphaModulate : OperatorID::MulAlpha;
       const auto result =
           args.irBuilder->CreateCall(static_cast<OperatorID>(op), SLType::Float4,
                                      {textureProxy->isAlphaOnly() ? alphaValue : readValue,

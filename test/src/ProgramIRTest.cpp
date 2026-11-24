@@ -34,7 +34,7 @@ TEST(ProgramIRTest, BuildsTypedCallAndStore) {
   ASSERT_NE(kg, INVALID_VALUE_ID);
   ASSERT_NE(kb, INVALID_VALUE_ID);
 
-  const auto result = builder.CreateCall(7, SLType::Float4, {input, kr, kg, kb});
+  const auto result = builder.CreateCall(OperatorID::Luma, SLType::Float4, {input, kr, kg, kb});
   ASSERT_NE(result, INVALID_VALUE_ID);
   builder.StoreOutput(input, result);
 
@@ -45,7 +45,7 @@ TEST(ProgramIRTest, BuildsTypedCallAndStore) {
   ASSERT_EQ(builder.IR().statements.size(), 1u);
   const auto& call = builder.IR().exprs.back();
   EXPECT_EQ(call.kind, IRExprKind::Call);
-  EXPECT_EQ(call.op, 7u);
+  EXPECT_EQ(call.op, OperatorID::Luma);
   EXPECT_EQ(call.args, (std::vector<ValueID>{input, kr, kg, kb}));
   EXPECT_EQ(builder.IR().statements[0].kind, IRStatementKind::StoreOutput);
 }
@@ -140,6 +140,41 @@ TEST(ProgramIRTest, LaysOutUniformsWithStd140) {
   EXPECT_TRUE(ValidateProgramIR(builder.IR(), &error)) << error;
 }
 
+TEST(ProgramIRTest, LaysOutUniformArraysWithStd140) {
+  ProgramIRBuilder builder = {};
+  const auto id = builder.AddUniformArray(
+      {"Kernel", SLType::Float4, Precision::High, ShaderStage::Fragment, 17});
+  ASSERT_NE(id, INVALID_VALUE_ID);
+  ASSERT_EQ(builder.Interface().uniformArrays.size(), 1u);
+  const auto& array = builder.Interface().uniformArrays[0];
+  EXPECT_EQ(array.elementType, SLType::Float4);
+  EXPECT_EQ(array.count, 17u);
+  EXPECT_EQ(array.offset, 0u);
+  EXPECT_EQ(array.stride, 16u);
+  EXPECT_EQ(array.size, 272u);
+  ASSERT_EQ(builder.Interface().uniformBlocks.size(), 1u);
+  EXPECT_EQ(builder.Interface().uniformBlocks[0].size, 272u);
+
+  std::string error;
+  EXPECT_TRUE(ValidateProgramIR(builder.IR(), &error)) << error;
+}
+
+TEST(ProgramIRTest, RejectsUniformArrayOutsideBlock) {
+  ProgramIR program = {};
+  UniformArrayIR array = {};
+  array.name = "Kernel";
+  array.elementType = SLType::Float4;
+  array.stage = ShaderStage::Fragment;
+  array.count = 17;
+  array.stride = 16;
+  array.size = 272;
+  program.interface.uniformArrays.push_back(array);
+
+  std::string error;
+  EXPECT_FALSE(ValidateProgramIR(program, &error));
+  EXPECT_NE(error.find("no uniform block"), std::string::npos);
+}
+
 TEST(ProgramIRTest, RejectsUniformBlockBindingMismatch) {
   ProgramIR program = {};
   UniformBlockIR block = {};
@@ -191,26 +226,49 @@ TEST(ProgramIRTest, RecordsDeviceSpaceRead) {
       builder.CreateValue(SLType::Float3x3, Precision::High, IRValueKind::Uniform, "matrix");
   const auto fragCoord = builder.CreateBuiltin("gl_FragCoord", SLType::Float4);
   const auto xy = builder.CreateSwizzle(fragCoord, SLType::Float2, "xy");
-  const auto coord = builder.CreateCall(static_cast<OperatorID>(BuiltinOperator::DeviceCoord),
-                                        SLType::Float2, {matrix, xy}, "deviceCoord");
+  const auto coord =
+      builder.CreateCall(OperatorID::DeviceCoord, SLType::Float2, {matrix, xy}, "deviceCoord");
   const auto sampler =
       builder.CreateValue(SLType::Texture2DSampler, Precision::Default, IRValueKind::Sampler);
   const auto read = builder.CreateTextureSample(sampler, coord, SLType::Float4, "deviceRead",
                                                 SLType::Texture2DSampler);
-  const auto alpha = builder.CreateSwizzle(read, SLType::Float, "a");
+  const auto input =
+      builder.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "inputColor");
   const auto output =
       builder.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "outputColor");
-  const auto result = builder.CreateCall(static_cast<OperatorID>(BuiltinOperator::MulAlpha),
-                                         SLType::Float4, {read, alpha}, "outputColor");
+  const auto result =
+      builder.CreateCall(OperatorID::MulAlpha, SLType::Float4, {read, input}, "outputColor");
   builder.StoreOutput(output, result);
 
   std::string error;
   ASSERT_TRUE(ValidateProgramIR(builder.IR(), &error)) << error;
   ASSERT_EQ(builder.IR().statements.size(), 1u);
   EXPECT_EQ(builder.IR().exprs.back().kind, IRExprKind::Call);
-  EXPECT_EQ(builder.IR().exprs.back().op, static_cast<OperatorID>(BuiltinOperator::MulAlpha));
+  EXPECT_EQ(builder.IR().exprs.back().op, OperatorID::MulAlpha);
   EXPECT_EQ(builder.IR().values[coord].debugName, "deviceCoord");
   EXPECT_EQ(builder.IR().values[read].debugName, "deviceRead");
+}
+
+TEST(ProgramIRTest, RejectsUnknownOperatorCall) {
+  ProgramIR program = {};
+  IRValue value = {};
+  value.id = 0;
+  value.type = SLType::Float4;
+  value.kind = IRValueKind::Expr;
+  value.definingExpr = 0;
+  program.values.push_back(value);
+
+  IRExpr expr = {};
+  expr.id = 0;
+  expr.kind = IRExprKind::Call;
+  expr.result = 0;
+  expr.type = SLType::Float4;
+  expr.op = static_cast<OperatorID>(999);
+  program.exprs.push_back(expr);
+
+  std::string error;
+  EXPECT_FALSE(ValidateProgramIR(program, &error));
+  EXPECT_NE(error.find("unknown operator"), std::string::npos);
 }
 
 TEST(ProgramIRTest, RejectsForwardReferences) {
@@ -232,7 +290,7 @@ TEST(ProgramIRTest, RejectsForwardReferences) {
   expr.result = 0;
   expr.args = {1};
   expr.type = SLType::Float4;
-  expr.op = 1;
+  expr.op = OperatorID::Luma;
   program.exprs = {expr};
 
   std::string error;

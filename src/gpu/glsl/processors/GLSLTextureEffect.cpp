@@ -194,13 +194,11 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
         const auto zero = args.irBuilder->CreateConstant(0.0f);
         const auto one = args.irBuilder->CreateConstant(1.0f);
         const auto clampedColor =
-            args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::Clamp),
-                                       SLType::Float4, {colorValue, zero, one});
+            args.irBuilder->CreateCall(OperatorID::Clamp, SLType::Float4, {colorValue, zero, one});
         const auto alphaSample = args.irBuilder->CreateTextureSample(
             alphaSampler, coordValue, SLType::Float4, "alpha", SLType::Texture2DSampler);
         const auto clampedAlpha =
-            args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::Clamp),
-                                       SLType::Float4, {alphaSample, zero, one});
+            args.irBuilder->CreateCall(OperatorID::Clamp, SLType::Float4, {alphaSample, zero, one});
         const auto alphaR = args.irBuilder->CreateSwizzle(clampedAlpha, SLType::Float, "r");
         const auto colorRgb = args.irBuilder->CreateSwizzle(clampedColor, SLType::Float3, "rgb");
         const auto premultiplied =
@@ -290,7 +288,7 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
       const auto hasAlphaValue = args.irBuilder->CreateIntConstant(0);
       const auto alphaValue = args.irBuilder->CreateConstant(1.0f);
       const auto result = args.irBuilder->CreateCall(
-          static_cast<OperatorID>(BuiltinOperator::YUVToRGB), SLType::Float4,
+          OperatorID::YUVToRGB, SLType::Float4,
           {yuvValue, matrixValue, limitedRangeValue, hasAlphaValue, alphaValue});
       args.irBuilder->StoreOutput(args.outputValue, result);
     }
@@ -316,7 +314,7 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
       const auto alphaValue =
           args.irBuilder->InternValue("yuv_a", SLType::Float, Precision::High, IRValueKind::Local);
       const auto result = args.irBuilder->CreateCall(
-          static_cast<OperatorID>(BuiltinOperator::YUVToRGB), SLType::Float4,
+          OperatorID::YUVToRGB, SLType::Float4,
           {yuvValue, matrixValue, limitedRangeValue, hasAlphaValue, alphaValue});
       args.irBuilder->StoreOutput(args.outputValue, result);
     }

@@ -40,9 +40,8 @@ void GLSLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
   if (args.irBuilder != nullptr) {
     const auto thresholdValue = args.irBuilder->CreateValue(
         SLType::Float, Precision::High, IRValueKind::Uniform, thresholdUniformName);
-    const auto result =
-        args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::AlphaThreshold),
-                                   SLType::Float4, {args.inputValue, thresholdValue});
+    const auto result = args.irBuilder->CreateCall(OperatorID::AlphaThreshold, SLType::Float4,
+                                                   {args.inputValue, thresholdValue});
     args.irBuilder->StoreOutput(args.outputValue, result);
   }
 }

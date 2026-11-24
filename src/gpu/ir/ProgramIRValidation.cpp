@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/ir/ProgramIRValidation.h"
+#include "gpu/ir/OperatorManifest.h"
 
 namespace tgfx {
 namespace {
@@ -68,6 +69,28 @@ bool ValidateExpr(const ProgramIR& program, const IRExpr& expr, std::string* err
   if (expr.kind == IRExprKind::Call && expr.op == INVALID_OPERATOR_ID) {
     *error = "a call needs an operator id";
     return false;
+  }
+  if (expr.kind == IRExprKind::Call) {
+    const auto* operatorDesc = FindOperator(expr.op);
+    if (operatorDesc == nullptr) {
+      *error = "a call references an unknown operator";
+      return false;
+    }
+    if (expr.type != operatorDesc->returnType) {
+      *error = "a call result type does not match the operator manifest";
+      return false;
+    }
+    if (expr.args.size() != operatorDesc->params.size()) {
+      *error = "a call argument count does not match the operator manifest";
+      return false;
+    }
+    for (size_t index = 0; index < expr.args.size(); ++index) {
+      const auto& argument = program.values[expr.args[index]];
+      if (argument.type != operatorDesc->params[index]) {
+        *error = "a call argument type does not match the operator manifest";
+        return false;
+      }
+    }
   }
   if (expr.kind == IRExprKind::TextureSample && expr.args.size() != 2) {
     *error = "a texture sample needs a sampler and a coordinate";
@@ -157,6 +180,31 @@ bool ValidateInterface(const InterfaceIR& interface, std::string* error) {
     }
     if (uniform.offset + uniform.size > block->size) {
       *error = "uniform '" + uniform.name + "' exceeds its uniform block";
+      return false;
+    }
+  }
+  for (const auto& array : interface.uniformArrays) {
+    if (array.name.empty() || array.elementType == SLType::Void || array.count == 0) {
+      *error = "a uniform array has invalid metadata";
+      return false;
+    }
+    if (array.stride == 0 || array.stride % 16 != 0 || array.size != array.stride * array.count) {
+      *error = "uniform array '" + array.name + "' has invalid std140 layout";
+      return false;
+    }
+    const UniformBlockIR* block = nullptr;
+    for (const auto& candidate : interface.uniformBlocks) {
+      if (candidate.stage == array.stage) {
+        block = &candidate;
+        break;
+      }
+    }
+    if (block == nullptr) {
+      *error = "uniform array '" + array.name + "' has no uniform block";
+      return false;
+    }
+    if (array.offset + array.size > block->size) {
+      *error = "uniform array '" + array.name + "' exceeds its uniform block";
       return false;
     }
   }

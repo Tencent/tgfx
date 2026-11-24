@@ -42,6 +42,8 @@ class ProgramIRBuilder {
 
   ValueID AddUniform(UniformIR uniform);
 
+  ValueID AddUniformArray(UniformArrayIR array);
+
   ValueID AddSampler(SamplerIR sampler);
 
   const InterfaceIR& Interface() const {

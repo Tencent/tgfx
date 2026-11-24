@@ -184,6 +184,34 @@ ValueID ProgramIRBuilder::AddUniform(UniformIR uniform) {
   return id;
 }
 
+ValueID ProgramIRBuilder::AddUniformArray(UniformArrayIR array) {
+  array.binding = array.stage == ShaderStage::Vertex ? 0 : 1;
+  const auto layout = LayoutOf(array.elementType);
+  auto& cursor = array.stage == ShaderStage::Vertex ? vertexUniformCursor : fragmentUniformCursor;
+  if (layout.size == 0 || array.count == 0) {
+    return INVALID_VALUE_ID;
+  }
+  array.offset = AlignUp(cursor, layout.alignment);
+  array.stride = layout.arrayStride;
+  array.size = array.stride * array.count;
+  cursor = array.offset + array.size;
+  const auto id =
+      InternValue(array.name, array.elementType, array.precision, IRValueKind::UniformArray);
+  if (!HasUniformBinding(array.stage)) {
+    ResourceBinding binding = {};
+    binding.kind = BindingKind::UniformBuffer;
+    binding.binding = array.binding;
+    binding.stage = array.stage;
+    binding.type = SLType::Void;
+    binding.precision = Precision::Default;
+    ir.interface.bindings.push_back(binding);
+  }
+  auto& block = EnsureUniformBlock(array.stage, array.binding);
+  block.size = AlignUp(cursor, 16);
+  ir.interface.uniformArrays.push_back(std::move(array));
+  return id;
+}
+
 ValueID ProgramIRBuilder::AddSampler(SamplerIR sampler) {
   for (const auto& existing : ir.interface.samplers) {
     if (existing.name == sampler.name) {

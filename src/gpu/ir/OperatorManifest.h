@@ -1,0 +1,54 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License") you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include <cstdint>
+#include <vector>
+#include "gpu/SLType.h"
+
+namespace tgfx {
+
+/// Stable operator identifiers. The manifest is the single source of truth; do not assign these
+/// values by hand in call sites.
+enum class OperatorID : uint32_t {
+  Luma = 1,
+  ConstColor = 2,
+  ColorMatrix = 3,
+  AlphaThreshold = 4,
+  YUVToRGB = 5,
+  Clamp = 6,
+  DeviceCoord = 7,
+  MulAlpha = 8,
+  AlphaModulate = 9,
+};
+
+constexpr OperatorID INVALID_OPERATOR_ID = static_cast<OperatorID>(-1);
+
+struct OperatorDesc {
+  OperatorID id = INVALID_OPERATOR_ID;
+  const char* debugName = nullptr;
+  const char* glslSymbol = nullptr;
+  SLType returnType = SLType::Void;
+  std::vector<SLType> params = {};
+};
+
+/// Returns the manifest entry for an operator, or null when the id is unknown.
+const OperatorDesc* FindOperator(OperatorID id);
+
+}  // namespace tgfx
