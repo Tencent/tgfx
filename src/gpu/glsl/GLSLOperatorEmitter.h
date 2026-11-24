@@ -31,6 +31,11 @@ class GLSLOperatorEmitter {
   /// call, the operator is unknown, or an argument has no printable name.
   static bool EmitCall(const ProgramIR& program, ValueID result, std::string* expression,
                        std::string* error = nullptr);
+
+  /// Emits the value as a GLSL expression, ignoring its debug name when it has a defining
+  /// expression. Resource values still use their debug names.
+  static bool EmitValue(const ProgramIR& program, ValueID value, std::string* expression,
+                        std::string* error = nullptr);
 };
 
 }  // namespace tgfx

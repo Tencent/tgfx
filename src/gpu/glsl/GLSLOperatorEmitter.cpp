@@ -239,6 +239,23 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
     }
     case IRExprKind::Call:
       return GLSLOperatorEmitter::EmitCall(program, id, expression, error);
+    case IRExprKind::TextureSample: {
+      if (expr.args.size() != 2) {
+        return Fail(error, "a texture sample needs a sampler and a coordinate");
+      }
+      std::string sampler = {};
+      std::string coord = {};
+      if (!ValueName(program, expr.args[0], &sampler, error) ||
+          !ValueName(program, expr.args[1], &coord, error)) {
+        return false;
+      }
+      if (expr.samplerSwizzleCode < 0) {
+        return Fail(error, "a texture sample has no reader swizzle");
+      }
+      *expression = "tgfxTextureSample(" + sampler + ", " + coord + ", vec4(0.0), 0, " +
+                    std::to_string(expr.samplerSwizzleCode) + ")";
+      return true;
+    }
     case IRExprKind::Builtin:
       *expression = expr.builtin;
       return true;
@@ -295,6 +312,18 @@ bool GLSLOperatorEmitter::EmitCall(const ProgramIR& program, ValueID result,
   out += ")";
   *expression = std::move(out);
   return true;
+}
+
+bool GLSLOperatorEmitter::EmitValue(const ProgramIR& program, ValueID value,
+                                    std::string* expression, std::string* error) {
+  if (value == INVALID_VALUE_ID || value >= program.values.size()) {
+    return Fail(error, "the value has an invalid id");
+  }
+  const auto kind = program.values[value].kind;
+  if (kind == IRValueKind::Expr || kind == IRValueKind::Field) {
+    return EmitExpression(program, value, expression, error);
+  }
+  return ValueName(program, value, expression, error);
 }
 
 }  // namespace tgfx

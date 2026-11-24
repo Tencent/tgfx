@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLDeviceSpaceTextureEffect.h"
+#include "gpu/glsl/GLSLOperatorEmitter.h"
 
 namespace tgfx {
 PlacementPtr<DeviceSpaceTextureEffect> DeviceSpaceTextureEffect::Make(
@@ -45,37 +46,53 @@ void GLSLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
   auto mulEntry = fragBuilder->appendFunction(textureProxy->isAlphaOnly() ? "tgfxAlphaModulate"
                                                                           : "tgfxMulAlpha");
   if (!coordEntry.empty() && !readEntry.empty() && !mulEntry.empty() && swizzleCode >= 0) {
-    // The coordinate, the read and the alpha modulation are three named values, so a bytecode
-    // route records the whole block.
+    if (args.irBuilder == nullptr || args.inputValue == INVALID_VALUE_ID ||
+        args.outputValue == INVALID_VALUE_ID) {
+      return;
+    }
+    const auto samplerValue = args.samplerValue(sampler);
+    if (samplerValue == INVALID_VALUE_ID) {
+      args.irBuilder->MarkFailed("the device-space sampler has no IR value");
+      return;
+    }
+    const auto matrixValue = args.irBuilder->InternValue(deviceCoordMatrixName, SLType::Float3x3,
+                                                         Precision::High, IRValueKind::Uniform);
+    const auto fragCoordValue = args.irBuilder->CreateBuiltin("gl_FragCoord", SLType::Float4);
+    const auto xyValue = args.irBuilder->CreateSwizzle(fragCoordValue, SLType::Float2, "xy");
+    const auto deviceCoordValue = args.irBuilder->CreateCall(
+        OperatorID::DeviceCoord, SLType::Float2, {matrixValue, xyValue}, "deviceCoord");
+    const auto deviceReadValue =
+        args.irBuilder->CreateTextureSample(samplerValue, deviceCoordValue, SLType::Float4,
+                                            "deviceRead", SLType::Texture2DSampler, swizzleCode);
+    const auto op = textureProxy->isAlphaOnly() ? OperatorID::AlphaModulate : OperatorID::MulAlpha;
+    const auto result =
+        args.irBuilder->CreateCall(static_cast<OperatorID>(op), SLType::Float4,
+                                   {deviceReadValue, args.inputValue}, args.outputColor);
+    args.irBuilder->StoreOutput(args.outputValue, result);
+
+    std::string coordExpression = {};
+    std::string readExpression = {};
+    std::string mulExpression = {};
+    std::string error = {};
+    if (!GLSLOperatorEmitter::EmitValue(args.irBuilder->IR(), deviceCoordValue, &coordExpression,
+                                        &error) ||
+        !GLSLOperatorEmitter::EmitValue(args.irBuilder->IR(), deviceReadValue, &readExpression,
+                                        &error) ||
+        !GLSLOperatorEmitter::EmitValue(args.irBuilder->IR(), result, &mulExpression, &error)) {
+      args.irBuilder->MarkFailed(error);
+      return;
+    }
     const auto samplerName = uniformHandler->getSamplerVariable(sampler).name();
     fragBuilder->codeAppend("vec2 deviceCoord;");
-    fragBuilder->appendCall("deviceCoord", coordEntry, {deviceCoordMatrixName, "gl_FragCoord.xy"});
+    fragBuilder->appendCall("deviceCoord", coordEntry, {deviceCoordMatrixName, "gl_FragCoord.xy"},
+                            "", coordExpression);
     fragBuilder->codeAppend("vec4 deviceRead;");
     fragBuilder->appendCall(
         "deviceRead", readEntry,
-        {samplerName, "deviceCoord", "vec4(0.0)", "0", std::to_string(swizzleCode)});
-    fragBuilder->appendCall(args.outputColor, mulEntry, {"deviceRead", args.inputColor});
-    if (args.irBuilder != nullptr && args.inputValue != INVALID_VALUE_ID &&
-        args.outputValue != INVALID_VALUE_ID) {
-      const auto matrixValue = args.irBuilder->InternValue(deviceCoordMatrixName, SLType::Float3x3,
-                                                           Precision::High, IRValueKind::Uniform);
-      const auto fragCoordValue = args.irBuilder->CreateBuiltin("gl_FragCoord", SLType::Float4);
-      const auto xyValue = args.irBuilder->CreateSwizzle(fragCoordValue, SLType::Float2, "xy");
-      const auto deviceCoordValue = args.irBuilder->CreateCall(
-          OperatorID::DeviceCoord, SLType::Float2, {matrixValue, xyValue}, "deviceCoord");
-      const auto samplerValue = args.samplerValue(sampler);
-      if (samplerValue != INVALID_VALUE_ID) {
-        const auto deviceReadValue = args.irBuilder->CreateTextureSample(
-            samplerValue, deviceCoordValue, SLType::Float4, "deviceRead", SLType::Texture2DSampler,
-            swizzleCode);
-        const auto op =
-            textureProxy->isAlphaOnly() ? OperatorID::AlphaModulate : OperatorID::MulAlpha;
-        const auto result =
-            args.irBuilder->CreateCall(static_cast<OperatorID>(op), SLType::Float4,
-                                       {deviceReadValue, args.inputValue}, args.outputColor);
-        args.irBuilder->StoreOutput(args.outputValue, result);
-      }
-    }
+        {samplerName, "deviceCoord", "vec4(0.0)", "0", std::to_string(swizzleCode)}, "",
+        readExpression);
+    fragBuilder->appendCall(args.outputColor, mulEntry, {"deviceRead", args.inputColor}, "",
+                            mulExpression);
     return;
   }
   fragBuilder->codeAppendf("highp vec3 deviceCoord = %s * vec3(gl_FragCoord.xy, 1.0);",
