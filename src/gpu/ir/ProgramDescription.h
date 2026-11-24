@@ -84,6 +84,7 @@ struct VaryingDesc {
   VaryingID id = 0;
   uint8_t location = 0;
   bool produced = false;
+  bool flat = false;
 };
 
 struct UniformDesc {

@@ -188,6 +188,11 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
 
 std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   fragmentShaderBuilder()->declareCustomOutputColor();
+  for (const auto& varying : _varyingHandler.getVaryings()) {
+    description.interface.varyings.push_back(
+        {varying.name(), varying.type(), varying.id(), 0, false, varying.isFlat()});
+    description.values.Intern(varying.name(), varying.type(), ValueOrigin::Varying);
+  }
   finalizeShaders();
   for (const auto& attribute : getProgramInfo()->getVertexAttributes()) {
     description.interface.attributes.push_back({attribute.name()});
@@ -196,10 +201,6 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   for (const auto& attribute : getProgramInfo()->getInstanceAttributes()) {
     description.interface.attributes.push_back({attribute.name()});
     description.values.Intern(attribute.name(), SLType::Void, ValueOrigin::Attribute);
-  }
-  for (const auto& varying : _varyingHandler.getVaryings()) {
-    description.interface.varyings.push_back({varying.name(), varying.type(), varying.id()});
-    description.values.Intern(varying.name(), varying.type(), ValueOrigin::Varying);
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Vertex)) {
     description.interface.uniforms.push_back({uniform.name()});

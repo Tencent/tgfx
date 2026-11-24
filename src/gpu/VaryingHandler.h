@@ -49,6 +49,10 @@ class Varying {
     return _id;
   }
 
+  bool isFlat() const {
+    return _isFlat;
+  }
+
  private:
   SLType _type = SLType::Void;
   std::string _name;

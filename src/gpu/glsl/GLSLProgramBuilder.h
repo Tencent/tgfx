@@ -33,6 +33,10 @@ class GLSLProgramBuilder : public ProgramBuilder {
   std::string getUniformBlockDeclaration(ShaderStage stage,
                                          const std::vector<Uniform>& uniforms) const override;
 
+  const InterfaceDesc* programInterface() const override {
+    return &description.interface;
+  }
+
  private:
   GLSLProgramBuilder(Context* context, const ProgramInfo* programInfo);
 

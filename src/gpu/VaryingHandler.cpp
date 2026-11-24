@@ -78,11 +78,26 @@ void VaryingHandler::appendDecls(const std::vector<ShaderVar>& vars, std::string
 
 void VaryingHandler::getDeclarations(std::string* inputDecls, std::string* outputDecls,
                                      ShaderStage stage) const {
+  const auto* interface = programBuilder->programInterface();
+  if (interface == nullptr) {
+    if (stage == ShaderStage::Vertex) {
+      appendDecls(vertexInputs, inputDecls, ShaderStage::Vertex);
+      appendDecls(vertexOutputs, outputDecls, ShaderStage::Vertex);
+    } else {
+      appendDecls(fragInputs, inputDecls, ShaderStage::Fragment);
+    }
+    return;
+  }
+  auto* varyings = stage == ShaderStage::Vertex ? outputDecls : inputDecls;
   if (stage == ShaderStage::Vertex) {
     appendDecls(vertexInputs, inputDecls, ShaderStage::Vertex);
-    appendDecls(vertexOutputs, outputDecls, ShaderStage::Vertex);
-  } else {
-    appendDecls(fragInputs, inputDecls, ShaderStage::Fragment);
+  }
+  for (const auto& varying : interface->varyings) {
+    ShaderVar var(
+        varying.name, varying.type,
+        varying.flat ? ShaderVar::TypeModifier::FlatVarying : ShaderVar::TypeModifier::Varying);
+    varyings->append(programBuilder->getShaderVarDeclarations(var, stage));
+    varyings->append(";\n");
   }
 }
 }  // namespace tgfx
