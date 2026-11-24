@@ -133,6 +133,11 @@ ValueID ProgramIRBuilder::AddAttribute(AttributeIR attribute) {
 }
 
 ValueID ProgramIRBuilder::AddVarying(VaryingIR varying) {
+  for (const auto& existing : ir.interface.varyings) {
+    if (existing.name == varying.name) {
+      return InternValue(existing.name, existing.type, existing.precision, IRValueKind::Varying);
+    }
+  }
   const auto precision = Precision::High;
   varying.location = nextVaryingLocation++;
   const auto id = InternValue(varying.name, varying.type, precision, IRValueKind::Varying);

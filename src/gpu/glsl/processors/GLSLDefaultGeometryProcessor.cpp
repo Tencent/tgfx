@@ -67,6 +67,13 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->storeVarying(coverageVar.vsOut(), coverage.name());
     fragBuilder->storeCoverage(args.outputCoverage, coverageVar.fsIn(), true);
+    if (args.irBuilder != nullptr) {
+      const auto coverageVarying =
+          args.irBuilder->AddVarying({coverageVar.name(), coverageVar.type(), Precision::High, 0});
+      const auto coverageValue = args.irBuilder->InternValue(
+          coverage.name(), SLType::Float, Precision::High, IRValueKind::Attribute);
+      args.irBuilder->StoreVarying({coverageVarying, ""}, coverageValue);
+    }
   } else {
     fragBuilder->storeCoverage(args.outputCoverage, "1.0", true);
   }

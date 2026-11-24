@@ -266,6 +266,11 @@ bool ValidateProgramIR(const ProgramIR& program, std::string* error) {
       return false;
     }
   }
+  for (const auto& statement : program.vertexStatements) {
+    if (!ValidateStatement(program, statement, error)) {
+      return false;
+    }
+  }
   return ValidateInterface(program.interface, error);
 }
 

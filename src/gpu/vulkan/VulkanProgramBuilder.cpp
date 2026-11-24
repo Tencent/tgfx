@@ -34,6 +34,7 @@
 #include "gpu/shaders/contract/FragmentLibrary.h"
 #include "gpu/shaders/contract/OpTable.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
+#include "gpu/spirv/SPIRVProgramBuilder.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -239,7 +240,132 @@ bool VulkanProgramBuilder::checkSamplerCounts() {
   return true;
 }
 
+std::shared_ptr<Program> VulkanProgramBuilder::buildIRProgram() {
+  if (programInfo->numColorFragmentProcessors() != programInfo->numFragmentProcessors() ||
+      programInfo->getXferFacts().shaderBlend()) {
+    return nullptr;
+  }
+  const auto& program = programIRBuilder().IR();
+  if (program.vertexStatements.empty() || program.statements.empty() ||
+      !program.interface.varyings.empty()) {
+    return nullptr;
+  }
+  bool hasOutput = false;
+  for (const auto& statement : program.statements) {
+    if (statement.kind == IRStatementKind::StoreOutput) {
+      hasOutput = true;
+      break;
+    }
+  }
+  if (!hasOutput) {
+    return nullptr;
+  }
+  for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Vertex)) {
+    const auto type = ShaderVar(uniform).type();
+    if (uniform.count() > 1) {
+      programIRBuilder().AddUniformArray(
+          {uniform.name(), type, Precision::Default, ShaderStage::Vertex, uniform.count()});
+    } else {
+      programIRBuilder().AddUniform(
+          {uniform.name(), type, Precision::Default, ShaderStage::Vertex, uniform.count()});
+    }
+  }
+  for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Fragment)) {
+    const auto type = ShaderVar(uniform).type();
+    if (uniform.count() > 1) {
+      programIRBuilder().AddUniformArray(
+          {uniform.name(), type, Precision::Default, ShaderStage::Fragment, uniform.count()});
+    } else {
+      programIRBuilder().AddUniform(
+          {uniform.name(), type, Precision::Default, ShaderStage::Fragment, uniform.count()});
+    }
+  }
+  for (const auto& sampler : _uniformHandler.getSamplers()) {
+    programIRBuilder().AddSampler({sampler.name(), ShaderVar(sampler).type(), 0});
+  }
+  for (const auto& varying : _varyingHandler.getVaryings()) {
+    programIRBuilder().AddVarying(
+        {varying.name(), varying.type(), Precision::High, 0, varying.isFlat()});
+  }
+
+  SPIRVProgramModules modules = {};
+  std::string error = {};
+  if (!SPIRVProgramBuilder::Build(programIRBuilder().IR(), &modules, &error)) {
+    LOGE("VulkanProgramBuilder: the SPIR-V IR route failed: %s", error.c_str());
+    return nullptr;
+  }
+  auto* gpu = context->gpu();
+  auto toBytes = [](const std::vector<uint32_t>& words) {
+    std::vector<uint8_t> bytes(words.size() * sizeof(uint32_t));
+    std::memcpy(bytes.data(), words.data(), bytes.size());
+    return bytes;
+  };
+  ShaderModuleDescriptor vertexDesc = {};
+  vertexDesc.format = ShaderCodeFormat::SPIRV;
+  vertexDesc.stage = ShaderStage::Vertex;
+  vertexDesc.binaryData = toBytes(modules.vertex);
+  ShaderModuleDescriptor fragmentDesc = {};
+  fragmentDesc.format = ShaderCodeFormat::SPIRV;
+  fragmentDesc.stage = ShaderStage::Fragment;
+  fragmentDesc.binaryData = toBytes(modules.fragment);
+  for (const auto& binding : modules.layout.bindings()) {
+    if (binding.type != SLType::Void) {
+      continue;
+    }
+    if (binding.stage == ShaderStage::Vertex) {
+      vertexDesc.uniformSlots[binding.name] = binding.binding;
+    } else {
+      fragmentDesc.uniformSlots[binding.name] = binding.binding;
+    }
+  }
+  auto vertexShader = gpu->createShaderModule(vertexDesc);
+  auto fragmentShader = gpu->createShaderModule(fragmentDesc);
+  if (vertexShader == nullptr || fragmentShader == nullptr) {
+    LOGE("VulkanProgramBuilder: the IR shader modules could not be created");
+    return nullptr;
+  }
+
+  BindingLayout bindingLayout = {};
+  if (!modules.layout.BuildBindingLayout(&bindingLayout, &error)) {
+    LOGE("VulkanProgramBuilder: %s", error.c_str());
+    return nullptr;
+  }
+  RenderPipelineDescriptor descriptor = {};
+  const auto& attributes = programInfo->getVertexAttributes();
+  VertexBufferLayout vertexLayout(attributes);
+  for (size_t index = 0; index < attributes.size(); ++index) {
+    vertexLayout.shaderLocations.push_back(static_cast<uint32_t>(index));
+  }
+  descriptor.vertex.bindAttributesByLocation = true;
+  descriptor.vertex.bufferLayouts = {vertexLayout};
+  descriptor.vertex.module = vertexShader;
+  descriptor.fragment.module = fragmentShader;
+  descriptor.fragment.colorAttachments.push_back(programInfo->getPipelineColorAttachment());
+  descriptor.layout = bindingLayout;
+  descriptor.primitive = {programInfo->getCullMode(), FrontFace::CW};
+  descriptor.multisample.count = programInfo->getSampleCount();
+  descriptor.depthStencil = programInfo->getDepthStencil();
+  auto pipeline = gpu->createRenderPipeline(descriptor);
+  if (pipeline == nullptr) {
+    LOGE("VulkanProgramBuilder: the IR render pipeline could not be created");
+    return nullptr;
+  }
+  auto vertexUniformData = _uniformHandler.makeUniformData(ShaderStage::Vertex);
+  auto fragmentUniformData = _uniformHandler.makeUniformData(ShaderStage::Fragment);
+  LOGI("VulkanProgramBuilder: built an IR program (%zu bindings)",
+       modules.layout.bindings().size());
+  return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
+                                   std::move(fragmentUniformData), nullptr);
+}
+
 std::shared_ptr<Program> VulkanProgramBuilder::finalize() {
+  if (auto program = buildIRProgram()) {
+    return program;
+  }
+  return finalizeLegacy();
+}
+
+std::shared_ptr<Program> VulkanProgramBuilder::finalizeLegacy() {
   ChainProgramPlan plan = {};
   // The declared members, in the handler's declaration order; the std140 offsets are derived
   // here because this route owns the only uniform block the shader declares.

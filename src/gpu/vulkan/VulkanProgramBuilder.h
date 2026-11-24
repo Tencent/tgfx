@@ -51,6 +51,10 @@ class VulkanProgramBuilder : public ProgramBuilder {
 
   std::shared_ptr<Program> finalize();
 
+  std::shared_ptr<Program> buildIRProgram();
+
+  std::shared_ptr<Program> finalizeLegacy();
+
   UniformHandler* uniformHandler() override {
     return &_uniformHandler;
   }
