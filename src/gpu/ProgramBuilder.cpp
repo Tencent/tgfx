@@ -134,9 +134,9 @@ std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* proc
       processor, GetPointer(transformedCoordVars, transformedCoordVarsIdx));
   FragmentProcessor::TextureSamplers textureSamplers(processor, GetPointer(texSamplers, 0));
   const auto inputValue =
-      programIR.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, input);
+      programIR.InternValue(input, SLType::Float4, Precision::High, IRValueKind::Local);
   const auto outputValue =
-      programIR.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, output);
+      programIR.InternValue(output, SLType::Float4, Precision::High, IRValueKind::Local);
   FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output, input,
                                    subsetVarName, &coords, &textureSamplers, {}, &programIR,
                                    inputValue, outputValue);

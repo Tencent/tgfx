@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <unordered_map>
 #include "gpu/ir/ProgramIR.h"
 
 namespace tgfx {
@@ -30,6 +31,22 @@ class ProgramIRBuilder {
 
   ValueID CreateValue(SLType type, Precision precision, IRValueKind kind,
                       std::string debugName = {});
+
+  /// Returns the existing value for a name, or creates one. Resource and local names are unique
+  /// after processor mangling, so this keeps the interface and the dual-write path on one ID.
+  ValueID InternValue(const std::string& name, SLType type, Precision precision, IRValueKind kind);
+
+  ValueID AddAttribute(AttributeIR attribute);
+
+  ValueID AddVarying(VaryingIR varying);
+
+  ValueID AddUniform(UniformIR uniform);
+
+  ValueID AddSampler(SamplerIR sampler);
+
+  const InterfaceIR& Interface() const {
+    return ir.interface;
+  }
 
   ValueID CreateConstant(float value, Precision precision = Precision::High);
 
@@ -59,6 +76,7 @@ class ProgramIRBuilder {
   ValueID AddExpr(IRExpr expr);
 
   ProgramIR ir = {};
+  std::unordered_map<std::string, ValueID> valuesByName = {};
 };
 
 }  // namespace tgfx

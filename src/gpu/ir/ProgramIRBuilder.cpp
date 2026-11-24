@@ -37,9 +37,55 @@ ValueID ProgramIRBuilder::CreateValue(SLType type, Precision precision, IRValueK
   value.type = type;
   value.precision = precision;
   value.kind = kind;
-  value.debugName = std::move(debugName);
+  value.debugName = debugName;
+  const auto id = value.id;
   ir.values.push_back(std::move(value));
-  return ir.values.back().id;
+  if (!debugName.empty()) {
+    valuesByName.emplace(debugName, id);
+  }
+  return id;
+}
+
+ValueID ProgramIRBuilder::InternValue(const std::string& name, SLType type, Precision precision,
+                                      IRValueKind kind) {
+  if (name.empty()) {
+    return CreateValue(type, precision, kind);
+  }
+  const auto found = valuesByName.find(name);
+  if (found != valuesByName.end()) {
+    auto& value = ir.values[found->second];
+    if (value.type == SLType::Void && type != SLType::Void) {
+      value.type = type;
+    }
+    return found->second;
+  }
+  return CreateValue(type, precision, kind, name);
+}
+
+ValueID ProgramIRBuilder::AddAttribute(AttributeIR attribute) {
+  const auto precision = Precision::High;
+  const auto id = InternValue(attribute.name, attribute.type, precision, IRValueKind::Attribute);
+  ir.interface.attributes.push_back(std::move(attribute));
+  return id;
+}
+
+ValueID ProgramIRBuilder::AddVarying(VaryingIR varying) {
+  const auto precision = Precision::High;
+  const auto id = InternValue(varying.name, varying.type, precision, IRValueKind::Varying);
+  ir.interface.varyings.push_back(std::move(varying));
+  return id;
+}
+
+ValueID ProgramIRBuilder::AddUniform(UniformIR uniform) {
+  const auto id = InternValue(uniform.name, uniform.type, uniform.precision, IRValueKind::Uniform);
+  ir.interface.uniforms.push_back(std::move(uniform));
+  return id;
+}
+
+ValueID ProgramIRBuilder::AddSampler(SamplerIR sampler) {
+  const auto id = InternValue(sampler.name, sampler.type, Precision::Default, IRValueKind::Sampler);
+  ir.interface.samplers.push_back(std::move(sampler));
+  return id;
 }
 
 ValueID ProgramIRBuilder::AddExpr(IRExpr expr) {

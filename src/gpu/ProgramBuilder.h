@@ -84,6 +84,10 @@ class ProgramBuilder {
 
   ProgramBuilder(Context* context, const ProgramInfo* programInfo);
 
+  ProgramIRBuilder& programIRBuilder() {
+    return programIR;
+  }
+
   bool emitAndInstallProcessors();
 
   void finalizeShaders();

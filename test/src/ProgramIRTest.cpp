@@ -75,6 +75,30 @@ TEST(ProgramIRTest, RecordsFieldAssignment) {
   EXPECT_EQ(builder.IR().statements[0].dst.swizzle, "x");
 }
 
+TEST(ProgramIRTest, InternsInterfaceResources) {
+  ProgramIRBuilder builder = {};
+  const auto attributeValue =
+      builder.InternValue("position", SLType::Float2, Precision::High, IRValueKind::Attribute);
+  const auto attributeId = builder.AddAttribute({"position", SLType::Float2, Precision::High, 0});
+  EXPECT_EQ(attributeId, attributeValue);
+  EXPECT_EQ(builder.Interface().attributes.size(), 1u);
+
+  const auto uniformValue =
+      builder.InternValue("color", SLType::Float4, Precision::High, IRValueKind::Uniform);
+  const auto uniformId =
+      builder.AddUniform({"color", SLType::Float4, Precision::High, ShaderStage::Fragment, 1});
+  EXPECT_EQ(uniformId, uniformValue);
+  EXPECT_EQ(builder.Interface().uniforms.size(), 1u);
+
+  const auto samplerId = builder.AddSampler({"sampler", SLType::Texture2DSampler, 0});
+  ASSERT_NE(samplerId, INVALID_VALUE_ID);
+  EXPECT_EQ(builder.Interface().samplers.size(), 1u);
+
+  const auto varyingId = builder.AddVarying({"vColor", SLType::Float4, Precision::High, 0, false});
+  ASSERT_NE(varyingId, INVALID_VALUE_ID);
+  EXPECT_EQ(builder.Interface().varyings.size(), 1u);
+}
+
 TEST(ProgramIRTest, RejectsForwardReferences) {
   ProgramIR program = {};
   IRValue first = {};

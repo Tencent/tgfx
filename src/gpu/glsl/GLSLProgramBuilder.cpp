@@ -245,6 +245,20 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     description.interface.samplers.push_back({sampler.name(), type});
     description.values.Intern(sampler.name(), type, ValueOrigin::Sampler);
   }
+  for (const auto& attribute : description.interface.attributes) {
+    programIRBuilder().AddAttribute({attribute.name, attribute.type, Precision::High, 0});
+  }
+  for (const auto& varying : description.interface.varyings) {
+    programIRBuilder().AddVarying(
+        {varying.name, varying.type, Precision::High, varying.location, varying.flat});
+  }
+  for (const auto& uniform : description.interface.uniforms) {
+    programIRBuilder().AddUniform(
+        {uniform.name, uniform.type, Precision::Default, uniform.stage, uniform.count});
+  }
+  for (const auto& sampler : description.interface.samplers) {
+    programIRBuilder().AddSampler({sampler.name, sampler.type, 0});
+  }
   finalizeShaders();
   std::string validationError;
   if (!ValidateProgramDescription(&description, &validationError)) {
