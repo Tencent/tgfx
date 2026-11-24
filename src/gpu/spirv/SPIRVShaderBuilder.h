@@ -79,6 +79,7 @@ class SPIRVShaderBuilder {
   void EnsureLinkageCapability();
   uint32_t EnsureAttribute(const ProgramIR& program, const IRValue& value, std::string* error);
   uint32_t EnsureVarying(const ProgramIR& program, const IRValue& value, std::string* error);
+  uint32_t EmitValueAsValue(const ProgramIR& program, ValueID value, std::string* error);
   void AddEntryPointInterface(uint32_t id);
   uint32_t LoadSampler(const ProgramIR& program, ValueID sampler, std::string* error);
   bool EnsureUniformBlock(const ProgramIR& program, std::string* error);

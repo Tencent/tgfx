@@ -319,13 +319,36 @@ bool SPIRVShaderBuilder::StoreVarying(const ProgramIR& program, const LValue& ds
   if (variable == 0) {
     return false;
   }
-  uint32_t source = 0;
-  if (!EmitValue(program, value, &source, error)) {
+  const auto source = EmitValueAsValue(program, value, error);
+  if (source == 0) {
     return false;
   }
   writer.Sink(&writer.func);
   writer.Inst(spirv::kOpStore, {variable, source});
   return true;
+}
+
+uint32_t SPIRVShaderBuilder::EmitValueAsValue(const ProgramIR& program, ValueID value,
+                                              std::string* error) {
+  uint32_t id = 0;
+  if (!EmitValue(program, value, &id, error)) {
+    return 0;
+  }
+  if (value == INVALID_VALUE_ID || value >= program.values.size()) {
+    return id;
+  }
+  const auto& irValue = program.values[value];
+  if (irValue.kind == IRValueKind::Local && irValue.definingExpr == INVALID_EXPR_ID) {
+    const auto type = TypeId(irValue.type, error);
+    if (type == 0) {
+      return 0;
+    }
+    writer.Sink(&writer.func);
+    const auto loaded = writer.NewId();
+    writer.Inst(spirv::kOpLoad, {type, loaded, id});
+    return loaded;
+  }
+  return id;
 }
 
 uint32_t SPIRVShaderBuilder::LoadSampler(const ProgramIR& program, ValueID sampler,
@@ -716,8 +739,11 @@ bool SPIRVShaderBuilder::Assign(const ProgramIR& program, const LValue& dst, Val
     return Fail(error, "the SPIR-V builder does not support swizzled assignment yet");
   }
   uint32_t target = 0;
-  uint32_t source = 0;
-  if (!EmitValue(program, dst.base, &target, error) || !EmitValue(program, value, &source, error)) {
+  if (!EmitValue(program, dst.base, &target, error)) {
+    return false;
+  }
+  const auto source = EmitValueAsValue(program, value, error);
+  if (source == 0) {
     return false;
   }
   writer.Sink(&writer.func);
@@ -1320,8 +1346,8 @@ bool SPIRVShaderBuilder::StoreOutput(const ProgramIR& program, ValueID value, st
   if (!begun) {
     return Fail(error, "the SPIR-V shader builder has not begun");
   }
-  uint32_t source = 0;
-  if (!EmitValue(program, value, &source, error)) {
+  const auto source = EmitValueAsValue(program, value, error);
+  if (source == 0) {
     return false;
   }
   writer.Sink(&writer.func);
