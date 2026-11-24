@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/ir/ProgramValidation.h"
+#include "gpu/shaders/contract/OpTable.h"
 
 namespace tgfx {
 namespace {
@@ -89,6 +90,70 @@ VaryingDesc* FindVaryingByID(InterfaceDesc* interface, VaryingID id) {
   return nullptr;
 }
 
+SLType ShaderTypeOf(OpTable::Param param) {
+  switch (param) {
+    case OpTable::Param::Float:
+      return SLType::Float;
+    case OpTable::Param::Int:
+      return SLType::Int;
+    case OpTable::Param::Vec2:
+      return SLType::Float2;
+    case OpTable::Param::Vec3:
+      return SLType::Float3;
+    case OpTable::Param::Vec4:
+      return SLType::Float4;
+    case OpTable::Param::Mat3:
+      return SLType::Float3x3;
+    case OpTable::Param::Mat4:
+      return SLType::Float4x4;
+    case OpTable::Param::IVec4:
+      return SLType::Int4;
+    default:
+      return SLType::Void;
+  }
+}
+
+const OpTable::Row* FindOperator(const std::string& functionName) {
+  for (size_t index = 0; index < OpTable::RowCount(); ++index) {
+    const auto* row = OpTable::Rows() + index;
+    if (row->exportName != nullptr && functionName == row->exportName) {
+      return row;
+    }
+  }
+  return nullptr;
+}
+
+bool ValidateFragmentCalls(ProgramDescription* description, std::string* error) {
+  for (const auto& instruction : description->fragment.instructions) {
+    if (instruction.kind != FragmentInstructionKind::Call) {
+      continue;
+    }
+    const auto* row = FindOperator(instruction.function);
+    if (row == nullptr || row->args == nullptr) {
+      continue;
+    }
+    if (instruction.argRefs.size() != row->argCount) {
+      *error = "the call to '" + instruction.function + "' has " +
+               std::to_string(instruction.argRefs.size()) +
+               " arguments, but the operator table "
+               "declares " +
+               std::to_string(row->argCount);
+      return false;
+    }
+    for (size_t index = 0; index < instruction.argRefs.size(); ++index) {
+      const auto expected = ShaderTypeOf(row->args[index].type);
+      const auto actual = instruction.argRefs[index].type;
+      if (expected != SLType::Void && actual != SLType::Void && actual != expected) {
+        *error = "the argument " + std::to_string(index) + " of '" + instruction.function +
+                 "' is " + TypeName(actual) + ", but the operator table declares " +
+                 TypeName(expected);
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 bool ValidateFragmentCoords(ProgramDescription* description, std::string* error) {
   for (const auto& instruction : description->fragment.instructions) {
     if (instruction.varying == INVALID_VARYING) {
@@ -158,7 +223,7 @@ bool ValidateProgramDescription(ProgramDescription* description, std::string* er
     return false;
   }
   return AssignIDs(description, error) && LinkVertexWrites(description, error) &&
-         ValidateFragmentCoords(description, error);
+         ValidateFragmentCoords(description, error) && ValidateFragmentCalls(description, error);
 }
 
 }  // namespace tgfx

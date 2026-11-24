@@ -113,6 +113,29 @@ TEST(ProgramValidationTest, AcceptsProjectingProjectiveVarying) {
   EXPECT_TRUE(ValidateProgramDescription(&description, &error)) << error;
 }
 
+TEST(ProgramValidationTest, RejectsOperatorArgumentCountMismatch) {
+  auto description = ValidDescription();
+  FragmentInstruction call = {};
+  call.kind = FragmentInstructionKind::Call;
+  call.function = "pmApplyLuma";
+  call.argRefs.resize(2);
+  description.fragment.instructions.push_back(call);
+  std::string error;
+  EXPECT_FALSE(ValidateProgramDescription(&description, &error));
+  EXPECT_NE(error.find("operator table"), std::string::npos);
+}
+
+TEST(ProgramValidationTest, AcceptsMatchingOperatorArgumentCount) {
+  auto description = ValidDescription();
+  FragmentInstruction call = {};
+  call.kind = FragmentInstructionKind::Call;
+  call.function = "pmApplyLuma";
+  call.argRefs.resize(4);
+  description.fragment.instructions.push_back(call);
+  std::string error;
+  EXPECT_TRUE(ValidateProgramDescription(&description, &error)) << error;
+}
+
 TEST(ProgramValidationTest, RejectsUndeclaredWrite) {
   auto description = ValidDescription();
   description.vertexCalls[0].dst = "vMissing";
