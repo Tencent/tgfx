@@ -5623,7 +5623,7 @@ TGFX_TEST(VectorLayerTest, TextSetTextBlob) {
  * rendered pixels are checked directly because a new baseline is not required for the empty state.
  */
 static int CountNonWhitePixels(Surface* surface, int width, int height) {
-  std::vector<uint32_t> pixels(static_cast<size_t>(width) * height);
+  std::vector<uint32_t> pixels(static_cast<size_t>(width) * static_cast<size_t>(height));
   auto info = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
   if (!surface->readPixels(info, pixels.data())) {
     return -1;
