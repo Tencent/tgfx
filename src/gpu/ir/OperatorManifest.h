@@ -64,6 +64,9 @@ struct OperatorDesc {
   const char* glslSymbol = nullptr;
   SLType returnType = SLType::Void;
   std::vector<OperatorParam> params = {};
+  const char* prelude = nullptr;
+  std::vector<const char*> includes = {};
+  bool leafSamplers = false;
 };
 
 /// Returns the manifest entry for an operator, or null when the id is unknown.

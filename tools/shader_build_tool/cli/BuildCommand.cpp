@@ -857,70 +857,58 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         report->composedByTag[profileTag].push_back(std::move(framePayload));
       }
     }
-    // One linkable SPIR-V module per new IR operator, keyed by OperatorID. The manifest owns
-    // the id and symbol; the OpTable row supplies only the include/prelude recipe.
+    // One linkable SPIR-V module per new IR operator. The manifest owns the id, symbol, return
+    // type, parameters and include recipe; nothing here reads the old chain table.
     for (size_t operatorIndex = 0; operatorIndex < OperatorCount(); ++operatorIndex) {
       const auto* desc = OperatorAt(operatorIndex);
-      if (desc == nullptr || desc->glslSymbol == nullptr) {
+      if (desc == nullptr || desc->glslSymbol == nullptr || desc->includes.empty()) {
         continue;
       }
-      const OpTable::Row* row = nullptr;
-      for (size_t rowIndex = 0; rowIndex < OpTable::RowCount(); ++rowIndex) {
-        const auto& candidate = OpTable::Rows()[rowIndex];
-        if (candidate.exportName != nullptr &&
-            std::strcmp(candidate.exportName, desc->glslSymbol) == 0) {
-          row = &candidate;
+      bool unsupported = false;
+      for (const auto& param : desc->params) {
+        if (param.isArray) {
+          unsupported = true;
           break;
         }
       }
-      if (row == nullptr || !row->admitted) {
+      if (unsupported) {
         continue;
       }
       std::string text = "#version 450\n";
-      if (row->prelude != nullptr) {
-        text += row->prelude;
+      if (desc->prelude != nullptr) {
+        text += desc->prelude;
       }
       bool needsDummySampler = false;
-      for (size_t argument = 0; argument < row->argCount; ++argument) {
-        if (row->args[argument].type == OpTable::Param::SampledImage) {
+      for (const auto& param : desc->params) {
+        if (param.type == SLType::Texture2DSampler) {
           needsDummySampler = true;
         }
       }
-      const bool dummyDstDeclared =
-          row->special != nullptr && std::strcmp(row->special, "porterDuff") == 0;
-      if (needsDummySampler && !dummyDstDeclared) {
+      if (needsDummySampler) {
         text += "layout(set = 2, binding = 15) uniform sampler2D dummyLeafTex;\n";
       }
-      if (row->leafSamplers) {
+      if (desc->leafSamplers) {
         for (int sampler = 0; sampler < 4; ++sampler) {
           text += "layout(set = 2, binding = " + std::to_string(sampler) +
                   ") uniform sampler2D TextureSampler_" + std::to_string(sampler) + ";\n";
         }
       }
-      for (size_t includeIndex = 0; includeIndex < row->includeCount; ++includeIndex) {
-        const char* include = row->includes[includeIndex];
-        if (strcmp(include, "entry/ChainLeafFetch.glsl") == 0) {
-          if (strippedLeafFetch.empty()) {
-            strippedLeafFetch = stripFetchHelpers(readExpanded(include));
-          }
-          text += strippedLeafFetch;
-        } else {
-          text += readExpanded(include);
-        }
+      for (const auto* include : desc->includes) {
+        text += readExpanded(include);
       }
       text += "\nlayout(location = 0) out vec4 dummyOut;\nvoid main() {\n  dummyOut = ";
       std::string widenPrefix;
       std::string widenSuffix;
-      switch (row->returnType) {
-        case OpTable::Param::Float:
+      switch (desc->returnType) {
+        case SLType::Float:
           widenPrefix = "vec4(";
           widenSuffix = ")";
           break;
-        case OpTable::Param::Vec2:
+        case SLType::Float2:
           widenPrefix = "vec4(";
           widenSuffix = ", 0.0, 0.0)";
           break;
-        case OpTable::Param::Vec3:
+        case SLType::Float3:
           widenPrefix = "vec4(";
           widenSuffix = ", 0.0)";
           break;
@@ -930,42 +918,51 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       text += widenPrefix;
       text += desc->glslSymbol;
       text += "(";
-      for (size_t argument = 0; argument < row->argCount; ++argument) {
+      for (size_t argument = 0; argument < desc->params.size(); ++argument) {
         if (argument > 0) {
           text += ", ";
         }
-        switch (row->args[argument].type) {
-          case OpTable::Param::Float:
+        const auto& param = desc->params[argument];
+        if (param.isArray) {
+          text += "vec4[" + std::to_string(param.arrayCount) + "](";
+          for (uint32_t element = 0; element < param.arrayCount; ++element) {
+            if (element > 0) {
+              text += ", ";
+            }
+            text += "vec4(1.0)";
+          }
+          text += ")";
+          continue;
+        }
+        switch (param.type) {
+          case SLType::Float:
             text += "0.0";
             break;
-          case OpTable::Param::Int:
+          case SLType::Int:
             text += "0";
             break;
-          case OpTable::Param::Vec2:
+          case SLType::Float2:
             text += "vec2(1.0)";
             break;
-          case OpTable::Param::Vec3:
+          case SLType::Float3:
             text += "vec3(1.0)";
             break;
-          case OpTable::Param::Vec4:
+          case SLType::Float4:
             text += "vec4(1.0)";
             break;
-          case OpTable::Param::Mat3:
+          case SLType::Float3x3:
             text += "mat3(1.0)";
             break;
-          case OpTable::Param::Mat4:
+          case SLType::Float4x4:
             text += "mat4(1.0)";
             break;
-          case OpTable::Param::IVec4:
+          case SLType::Int4:
             text += "ivec4(0)";
             break;
-          case OpTable::Param::SampledImage:
-            text += dummyDstDeclared ? "dummyDstTex" : "dummyLeafTex";
+          case SLType::Texture2DSampler:
+            text += "dummyLeafTex";
             break;
-          case OpTable::Param::Vec4Array8:
-            text +=
-                "vec4[8](vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), "
-                "vec4(1.0), vec4(1.0), vec4(1.0))";
+          default:
             break;
         }
       }
@@ -983,23 +980,60 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       }
       std::string reflectError;
       const auto reflected = ReflectFunctionSignature(patched, desc->glslSymbol, &reflectError);
-      if (reflected.size() != row->argCount) {
+      if (reflected.size() != desc->params.size()) {
         RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
                          desc->glslSymbol, profileTag, -1, -1,
-                         "the operator declares " + std::to_string(row->argCount) +
+                         "the operator declares " + std::to_string(desc->params.size()) +
                              " parameters but the module compiled " +
                              std::to_string(reflected.size()) +
                              (reflectError.empty() ? std::string() : ": " + reflectError));
         continue;
       }
       bool signatureMatches = true;
-      for (size_t argument = 0; argument < row->argCount; ++argument) {
-        if (reflected[argument] != row->args[argument].type) {
+      for (size_t argument = 0; argument < desc->params.size(); ++argument) {
+        const auto& param = desc->params[argument];
+        OpTable::Param expected = OpTable::Param::Vec4;
+        if (param.isArray) {
+          expected = OpTable::Param::Vec4Array8;
+        } else {
+          switch (param.type) {
+            case SLType::Float:
+              expected = OpTable::Param::Float;
+              break;
+            case SLType::Int:
+              expected = OpTable::Param::Int;
+              break;
+            case SLType::Float2:
+              expected = OpTable::Param::Vec2;
+              break;
+            case SLType::Float3:
+              expected = OpTable::Param::Vec3;
+              break;
+            case SLType::Float4:
+              expected = OpTable::Param::Vec4;
+              break;
+            case SLType::Float3x3:
+              expected = OpTable::Param::Mat3;
+              break;
+            case SLType::Float4x4:
+              expected = OpTable::Param::Mat4;
+              break;
+            case SLType::Int4:
+              expected = OpTable::Param::IVec4;
+              break;
+            case SLType::Texture2DSampler:
+              expected = OpTable::Param::SampledImage;
+              break;
+            default:
+              break;
+          }
+        }
+        if (reflected[argument] != expected) {
           signatureMatches = false;
           RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
                            desc->glslSymbol, profileTag, -1, -1,
                            "parameter " + std::to_string(argument) + " of " + desc->glslSymbol +
-                               " drifted from the operator table");
+                               " drifted from the manifest");
         }
       }
       if (!signatureMatches) {
