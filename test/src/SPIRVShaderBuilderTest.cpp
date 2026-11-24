@@ -171,6 +171,31 @@ TEST(SPIRVShaderBuilderTest, EmitsTextureSample) {
   EXPECT_TRUE(ContainsOpcode(words, spirv::kOpDecorate));
 }
 
+TEST(SPIRVShaderBuilderTest, EmitsUniformBlockLoad) {
+  ProgramIRBuilder program = {};
+  const auto uniform =
+      program.AddUniform({"Color", SLType::Float4, Precision::High, ShaderStage::Fragment, 1});
+  const auto load = program.CreateLoad(uniform, SLType::Float4);
+  const auto output =
+      program.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "outputColor");
+  program.StoreOutput(output, load);
+
+  SPIRVShaderBuilder builder(ShaderStage::Fragment);
+  std::string error = {};
+  ASSERT_TRUE(builder.Begin(&error)) << error;
+  uint32_t valueId = 0;
+  ASSERT_TRUE(builder.EmitValue(program.IR(), load, &valueId, &error)) << error;
+  ASSERT_TRUE(builder.StoreOutput(program.IR(), load, &error)) << error;
+  const auto words = builder.Finish(&error);
+  ASSERT_FALSE(words.empty()) << error;
+  WriteIfRequested(words);
+
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpTypeStruct));
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpMemberDecorate));
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpAccessChain));
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpLoad));
+}
+
 TEST(SPIRVShaderBuilderTest, RejectsUnsupportedExpressions) {
   ProgramIRBuilder program = {};
   const auto input =

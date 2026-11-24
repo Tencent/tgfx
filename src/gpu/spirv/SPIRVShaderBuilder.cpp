@@ -227,6 +227,110 @@ uint32_t SPIRVShaderBuilder::LoadSampler(const ProgramIR& program, ValueID sampl
   return loadId;
 }
 
+uint32_t SPIRVShaderBuilder::IntConstantId(int32_t value, std::string* error) {
+  IRExpr expr = {};
+  expr.kind = IRExprKind::ConstantInt;
+  expr.type = SLType::Int;
+  expr.constantBits = static_cast<uint32_t>(value);
+  return ConstantId(expr, error);
+}
+
+bool SPIRVShaderBuilder::EnsureUniformBlock(const ProgramIR& program, std::string* error) {
+  if (uniformBlockDeclared) {
+    return true;
+  }
+  uniformBlockDeclared = true;
+  const UniformBlockIR* block = nullptr;
+  for (const auto& candidate : program.interface.uniformBlocks) {
+    if (candidate.stage == stage) {
+      block = &candidate;
+      break;
+    }
+  }
+  if (block == nullptr) {
+    return true;
+  }
+  std::vector<const UniformIR*> uniforms = {};
+  for (const auto& uniform : program.interface.uniforms) {
+    if (uniform.stage == stage) {
+      uniforms.push_back(&uniform);
+    }
+  }
+  if (uniforms.empty()) {
+    return true;
+  }
+
+  std::vector<uint32_t> memberTypes = {};
+  for (const auto* uniform : uniforms) {
+    const auto typeId = TypeId(uniform->type, error);
+    if (typeId == 0) {
+      return false;
+    }
+    memberTypes.push_back(typeId);
+    uniformMemberIndices[uniform->name] = static_cast<uint32_t>(memberTypes.size() - 1);
+  }
+
+  auto* saved = writer.sink;
+  writer.Sink(&writer.decl);
+  uniformBlockTypeId = writer.NewId();
+  std::vector<uint32_t> structOperands = {uniformBlockTypeId};
+  structOperands.insert(structOperands.end(), memberTypes.begin(), memberTypes.end());
+  writer.Inst(spirv::kOpTypeStruct, structOperands);
+  uniformBlockPointerId = writer.NewId();
+  writer.Inst(spirv::kOpTypePointer,
+              {uniformBlockPointerId, spirv::kStorageUniform, uniformBlockTypeId});
+  uniformBlockVariableId = writer.NewId();
+  writer.Inst(spirv::kOpVariable,
+              {uniformBlockPointerId, uniformBlockVariableId, spirv::kStorageUniform});
+
+  writer.Sink(&writer.ann);
+  writer.Inst(spirv::kOpDecorate, {uniformBlockTypeId, spirv::kDecorationBlock});
+  writer.Inst(spirv::kOpDecorate, {uniformBlockVariableId, spirv::kDecorationDescriptorSet, 0});
+  writer.Inst(spirv::kOpDecorate,
+              {uniformBlockVariableId, spirv::kDecorationBinding, block->binding});
+  for (size_t index = 0; index < uniforms.size(); ++index) {
+    const auto* uniform = uniforms[index];
+    writer.Inst(spirv::kOpMemberDecorate, {uniformBlockTypeId, static_cast<uint32_t>(index),
+                                           spirv::kDecorationOffset, uniform->offset});
+    if (uniform->type == SLType::Float2x2 || uniform->type == SLType::Float3x3 ||
+        uniform->type == SLType::Float4x4) {
+      writer.Inst(spirv::kOpMemberDecorate, {uniformBlockTypeId, static_cast<uint32_t>(index),
+                                             spirv::kDecorationMatrixStride, 16});
+      writer.Inst(spirv::kOpMemberDecorate,
+                  {uniformBlockTypeId, static_cast<uint32_t>(index), spirv::kDecorationColMajor});
+    }
+  }
+  writer.Sink(saved);
+  return true;
+}
+
+uint32_t SPIRVShaderBuilder::EmitUniformValue(const ProgramIR& program, const IRValue& value,
+                                              std::string* error) {
+  if (!EnsureUniformBlock(program, error)) {
+    return 0;
+  }
+  const auto member = uniformMemberIndices.find(value.debugName);
+  if (member == uniformMemberIndices.end()) {
+    Fail(error, "the uniform has no member in the SPIR-V block");
+    return 0;
+  }
+  const auto typeId = TypeId(value.type, error);
+  const auto pointer = PointerTypeId(value.type, spirv::kStorageUniform, error);
+  if (typeId == 0 || pointer == 0) {
+    return 0;
+  }
+  const auto memberId = IntConstantId(static_cast<int32_t>(member->second), error);
+  if (memberId == 0) {
+    return 0;
+  }
+  writer.Sink(&writer.func);
+  const auto accessId = writer.NewId();
+  writer.Inst(spirv::kOpAccessChain, {pointer, accessId, uniformBlockVariableId, memberId});
+  const auto loadId = writer.NewId();
+  writer.Inst(spirv::kOpLoad, {typeId, loadId, accessId});
+  return loadId;
+}
+
 bool SPIRVShaderBuilder::Begin(std::string* error) {
   if (begun) {
     return Fail(error, "the SPIR-V shader builder has already begun");
@@ -347,6 +451,10 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
       if (expr.args.size() != 1) {
         Fail(error, "a load needs one source");
         return 0;
+      }
+      if (program.values[expr.args[0]].kind == IRValueKind::Uniform) {
+        uint32_t loaded = 0;
+        return EmitValue(program, expr.args[0], &loaded, error) ? loaded : 0;
       }
       uint32_t source = 0;
       if (!EmitValue(program, expr.args[0], &source, error)) {
@@ -520,6 +628,18 @@ bool SPIRVShaderBuilder::EmitValue(const ProgramIR& program, ValueID value, uint
     return true;
   }
   const auto& irValue = program.values[value];
+  if (irValue.kind == IRValueKind::Uniform) {
+    const auto id = EmitUniformValue(program, irValue, error);
+    if (id == 0) {
+      return false;
+    }
+    valueIds.emplace(value, id);
+    *resultId = id;
+    return true;
+  }
+  if (irValue.kind == IRValueKind::UniformArray) {
+    return Fail(error, "the SPIR-V builder does not load array uniforms yet");
+  }
   if (irValue.definingExpr == INVALID_EXPR_ID || irValue.definingExpr >= program.exprs.size()) {
     return Fail(error, "the value has no defining expression");
   }

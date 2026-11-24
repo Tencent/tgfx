@@ -64,7 +64,10 @@ class SPIRVShaderBuilder {
  private:
   uint32_t TypeId(SLType type, std::string* error);
   uint32_t ConstantId(const IRExpr& expr, std::string* error);
+  uint32_t IntConstantId(int32_t value, std::string* error);
   uint32_t LoadSampler(const ProgramIR& program, ValueID sampler, std::string* error);
+  bool EnsureUniformBlock(const ProgramIR& program, std::string* error);
+  uint32_t EmitUniformValue(const ProgramIR& program, const IRValue& value, std::string* error);
   uint32_t EmitExpr(const ProgramIR& program, const IRExpr& expr, std::string* error);
   uint32_t PointerTypeId(SLType type, uint32_t storageClass, std::string* error);
 
@@ -90,7 +93,12 @@ class SPIRVShaderBuilder {
   uint32_t imageTypeId = 0;
   uint32_t samplerTypeId = 0;
   uint32_t sampledImageTypeId = 0;
+  uint32_t uniformBlockTypeId = 0;
+  uint32_t uniformBlockPointerId = 0;
+  uint32_t uniformBlockVariableId = 0;
+  bool uniformBlockDeclared = false;
   std::unordered_map<uint32_t, uint32_t> samplerValues = {};
+  std::unordered_map<std::string, uint32_t> uniformMemberIndices = {};
   std::vector<ImportedFunction> importedFunctions = {};
   bool begun = false;
   bool finished = false;
