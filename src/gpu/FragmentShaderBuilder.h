@@ -160,6 +160,12 @@ class FragmentShaderBuilder : public ShaderBuilder {
  protected:
   virtual std::string colorOutputName() = 0;
 
+  void recordFragmentInstruction(FragmentInstruction instruction) {
+    if (fragmentProgramRecorder != nullptr) {
+      fragmentProgramRecorder->instructions.push_back(std::move(instruction));
+    }
+  }
+
   std::vector<FragmentSourceRecord>* sourceRecorder = nullptr;
 
   friend class ProgramBuilder;

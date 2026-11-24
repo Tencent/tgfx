@@ -76,7 +76,8 @@ void ShaderBuilder::codeAppend(const std::string& str) {
     appendEnterIfNotEmpty(Type::Code);
   }
   atLineStart = code[code.size() - 1] == '\n';
-  if (fragmentProgramRecorder != nullptr && shaderStage() == ShaderStage::Fragment) {
+  if (fragmentProgramRecorder != nullptr && rawCaptureEnabled &&
+      shaderStage() == ShaderStage::Fragment) {
     FragmentInstruction instruction = {};
     instruction.kind = FragmentInstructionKind::RawText;
     instruction.text = code.substr(start);

@@ -180,12 +180,25 @@ class ShaderBuilder {
 
   void appendIndentationIfNeeded(const std::string& code);
 
+  size_t codeTextSize() const {
+    return shaderStrings[Type::Code].size();
+  }
+
+  std::string codeTextFrom(size_t offset) const {
+    return shaderStrings[Type::Code].substr(offset);
+  }
+
+  void setRawCaptureEnabled(bool enabled) {
+    rawCaptureEnabled = enabled;
+  }
+
   std::string getDeclarations(const std::vector<ShaderVar>& vars, ShaderStage stage) const;
 
   std::vector<std::string> shaderStrings;
   std::set<std::string> emittedFunctions = {};
   std::vector<CallRecord>* callRecorder = nullptr;
   FragmentProgram* fragmentProgramRecorder = nullptr;
+  bool rawCaptureEnabled = true;
   int tempCallIndex = 0;
   uint32_t emitOrder = 0;
   int clampedCoordIndex = 0;

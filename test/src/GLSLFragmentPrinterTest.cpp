@@ -33,6 +33,7 @@ TEST(GLSLFragmentPrinterTest, ReplaysRawTextAndClosesMain) {
   call.kind = FragmentInstructionKind::Call;
   call.output = "result";
   call.function = "pmApplyLuma";
+  call.text = "    vec4 result = pmApplyLuma(color, vec3(1.0));\n";
   program.instructions.push_back(call);
 
   FragmentInstruction second = {};
@@ -41,7 +42,9 @@ TEST(GLSLFragmentPrinterTest, ReplaysRawTextAndClosesMain) {
   program.instructions.push_back(second);
 
   const std::string text = PrintGLSLFragmentProgram(program);
-  EXPECT_EQ(text, "    vec4 color = vec4(1.0);\n    color *= result;\n}\n");
+  EXPECT_EQ(text,
+            "    vec4 color = vec4(1.0);\n    vec4 result = pmApplyLuma(color, vec3(1.0));\n"
+            "    color *= result;\n}\n");
 }
 
 }  // namespace tgfx

@@ -84,6 +84,10 @@ void FragmentShaderBuilder::recordStageRoot(const std::string& outputVar) {
   record.dst = outputVar;
   record.order = nextEmitOrder();
   sourceRecorder->push_back(std::move(record));
+  FragmentInstruction instruction = {};
+  instruction.kind = FragmentInstructionKind::Root;
+  instruction.output = outputVar;
+  recordFragmentInstruction(std::move(instruction));
 }
 
 void FragmentShaderBuilder::aliasValue(const std::string& dstName, const std::string& srcName,
@@ -97,7 +101,17 @@ void FragmentShaderBuilder::aliasValue(const std::string& dstName, const std::st
     record.order = nextEmitOrder();
     sourceRecorder->push_back(std::move(record));
   }
+  const size_t start = codeTextSize();
+  setRawCaptureEnabled(false);
   codeAppendf("%s %s = %s;", declaration.c_str(), dstName.c_str(), srcName.c_str());
+  setRawCaptureEnabled(true);
+  FragmentInstruction instruction = {};
+  instruction.kind = FragmentInstructionKind::Alias;
+  instruction.output = dstName;
+  instruction.src = srcName;
+  instruction.declaration = declaration;
+  instruction.text = codeTextFrom(start);
+  recordFragmentInstruction(std::move(instruction));
 }
 
 void FragmentShaderBuilder::copyValue(const std::string& dstName, const std::string& srcName) {
@@ -109,7 +123,16 @@ void FragmentShaderBuilder::copyValue(const std::string& dstName, const std::str
     record.order = nextEmitOrder();
     sourceRecorder->push_back(std::move(record));
   }
+  const size_t start = codeTextSize();
+  setRawCaptureEnabled(false);
   codeAppendf("%s = %s;", dstName.c_str(), srcName.c_str());
+  setRawCaptureEnabled(true);
+  FragmentInstruction instruction = {};
+  instruction.kind = FragmentInstructionKind::Alias;
+  instruction.output = dstName;
+  instruction.src = srcName;
+  instruction.text = codeTextFrom(start);
+  recordFragmentInstruction(std::move(instruction));
 }
 
 void FragmentShaderBuilder::storeColor(const std::string& outputVar, const std::string& srcName) {
@@ -121,7 +144,16 @@ void FragmentShaderBuilder::storeColor(const std::string& outputVar, const std::
     record.order = nextEmitOrder();
     sourceRecorder->push_back(std::move(record));
   }
+  const size_t start = codeTextSize();
+  setRawCaptureEnabled(false);
   codeAppendf("%s = %s;", outputVar.c_str(), srcName.c_str());
+  setRawCaptureEnabled(true);
+  FragmentInstruction instruction = {};
+  instruction.kind = FragmentInstructionKind::StoreColor;
+  instruction.output = outputVar;
+  instruction.src = srcName;
+  instruction.text = codeTextFrom(start);
+  recordFragmentInstruction(std::move(instruction));
 }
 
 void FragmentShaderBuilder::storeCoverage(const std::string& outputVar, const std::string& srcName,
@@ -135,11 +167,21 @@ void FragmentShaderBuilder::storeCoverage(const std::string& outputVar, const st
     record.order = nextEmitOrder();
     sourceRecorder->push_back(std::move(record));
   }
+  const size_t start = codeTextSize();
+  setRawCaptureEnabled(false);
   if (splat) {
     codeAppendf("%s = vec4(%s);", outputVar.c_str(), srcName.c_str());
   } else {
     codeAppendf("%s = %s;", outputVar.c_str(), srcName.c_str());
   }
+  setRawCaptureEnabled(true);
+  FragmentInstruction instruction = {};
+  instruction.kind = FragmentInstructionKind::StoreCoverage;
+  instruction.output = outputVar;
+  instruction.src = srcName;
+  instruction.splat = splat;
+  instruction.text = codeTextFrom(start);
+  recordFragmentInstruction(std::move(instruction));
 }
 
 void FragmentShaderBuilder::combineColorWithCoverage(const std::string& outputVar,
@@ -154,7 +196,17 @@ void FragmentShaderBuilder::combineColorWithCoverage(const std::string& outputVa
     record.order = nextEmitOrder();
     sourceRecorder->push_back(std::move(record));
   }
+  const size_t start = codeTextSize();
+  setRawCaptureEnabled(false);
   codeAppendf("%s = %s * %s;", outputVar.c_str(), colorVar.c_str(), coverageVar.c_str());
+  setRawCaptureEnabled(true);
+  FragmentInstruction instruction = {};
+  instruction.kind = FragmentInstructionKind::Combine;
+  instruction.output = outputVar;
+  instruction.src = colorVar;
+  instruction.operand = coverageVar;
+  instruction.text = codeTextFrom(start);
+  recordFragmentInstruction(std::move(instruction));
 }
 
 void FragmentShaderBuilder::onBeforeChildProcEmitCode(const FragmentProcessor* child) const {
@@ -179,8 +231,17 @@ std::string FragmentShaderBuilder::emitPerspTextCoord(const ShaderVar& coordVar)
       record.order = nextEmitOrder();
       sourceRecorder->push_back(std::move(record));
     }
+    const size_t start = codeTextSize();
+    setRawCaptureEnabled(false);
     codeAppendf("highp vec2 %s = %s.xy / %s.z;", perspCoordName.c_str(), coordVar.name().c_str(),
                 coordVar.name().c_str());
+    setRawCaptureEnabled(true);
+    FragmentInstruction instruction = {};
+    instruction.kind = FragmentInstructionKind::Project;
+    instruction.output = perspCoordName;
+    instruction.src = coordVar.name();
+    instruction.text = codeTextFrom(start);
+    recordFragmentInstruction(std::move(instruction));
     return perspCoordName;
   }
   DEBUG_ASSERT(false);

@@ -92,21 +92,35 @@ struct InterfaceDesc {
 enum class FragmentInstructionKind : uint8_t {
   /// A statement chunk the existing FP emission produced; replayed verbatim.
   RawText,
-  /// A structured call the FP emission recorded; the printer can render it from the fields.
+  /// A structured call the FP emission recorded.
   Call,
+  Alias,
+  StoreColor,
+  StoreCoverage,
+  Combine,
+  Project,
+  Root,
 };
 
 struct FragmentInstruction {
   FragmentInstructionKind kind = FragmentInstructionKind::RawText;
-  /// The call's output variable.
+  /// The call's or store's output variable.
   std::string output = {};
   /// The entry function name.
   std::string function = {};
+  /// The call's or store's value operand.
+  std::string src = {};
   /// The call arguments, in call order.
   std::vector<std::string> args = {};
   /// The optional wrapper the call site applies around the function result.
   std::string wrapType = {};
-  /// The raw statement chunk, already indented exactly as the inline emission spelled it.
+  /// The coverage operand of a combine.
+  std::string operand = {};
+  /// The alias declaration spelling ("vec4", "highp vec2").
+  std::string declaration = {};
+  /// A coverage store wraps a scalar source in vec4(...).
+  bool splat = false;
+  /// The statement text, already indented exactly as the inline emission spelled it.
   std::string text = {};
 };
 

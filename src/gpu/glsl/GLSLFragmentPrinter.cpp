@@ -23,7 +23,7 @@ namespace tgfx {
 std::string PrintGLSLFragmentProgram(const FragmentProgram& program) {
   std::string out = {};
   for (const auto& instruction : program.instructions) {
-    if (instruction.kind == FragmentInstructionKind::RawText) {
+    if (!instruction.text.empty()) {
       out += instruction.text;
     }
   }

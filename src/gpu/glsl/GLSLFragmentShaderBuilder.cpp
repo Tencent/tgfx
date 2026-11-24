@@ -61,15 +61,8 @@ void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
     record.order = nextEmitOrder();
     callRecorder->push_back(std::move(record));
   }
-  if (fragmentProgramRecorder != nullptr) {
-    FragmentInstruction instruction = {};
-    instruction.kind = FragmentInstructionKind::Call;
-    instruction.output = outputVar;
-    instruction.function = functionName;
-    instruction.args.assign(args.begin(), args.end());
-    instruction.wrapType = wrapType;
-    fragmentProgramRecorder->instructions.push_back(std::move(instruction));
-  }
+  const size_t start = codeTextSize();
+  setRawCaptureEnabled(false);
   codeAppendf("%s = ", outputVar.c_str());
   if (!wrapType.empty()) {
     codeAppendf("%s(", wrapType.c_str());
@@ -88,6 +81,17 @@ void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
     codeAppend(")");
   }
   codeAppend(";");
+  setRawCaptureEnabled(true);
+  if (fragmentProgramRecorder != nullptr) {
+    FragmentInstruction instruction = {};
+    instruction.kind = FragmentInstructionKind::Call;
+    instruction.output = outputVar;
+    instruction.function = functionName;
+    instruction.args.assign(args.begin(), args.end());
+    instruction.wrapType = wrapType;
+    instruction.text = codeTextFrom(start);
+    fragmentProgramRecorder->instructions.push_back(std::move(instruction));
+  }
 }
 
 std::string GLSLFragmentShaderBuilder::appendTempCall(const std::string& functionName,
@@ -97,14 +101,8 @@ std::string GLSLFragmentShaderBuilder::appendTempCall(const std::string& functio
     return "";
   }
   const std::string temp = "tgfxTemp" + std::to_string(tempCallIndex++);
-  if (fragmentProgramRecorder != nullptr) {
-    FragmentInstruction instruction = {};
-    instruction.kind = FragmentInstructionKind::Call;
-    instruction.output = temp;
-    instruction.function = functionName;
-    instruction.args.assign(args.begin(), args.end());
-    fragmentProgramRecorder->instructions.push_back(std::move(instruction));
-  }
+  const size_t start = codeTextSize();
+  setRawCaptureEnabled(false);
   codeAppendf("vec4 %s = %s(", temp.c_str(), entry.c_str());
   bool first = true;
   for (const auto& arg : args) {
@@ -115,6 +113,16 @@ std::string GLSLFragmentShaderBuilder::appendTempCall(const std::string& functio
     codeAppend(arg);
   }
   codeAppend(");");
+  setRawCaptureEnabled(true);
+  if (fragmentProgramRecorder != nullptr) {
+    FragmentInstruction instruction = {};
+    instruction.kind = FragmentInstructionKind::Call;
+    instruction.output = temp;
+    instruction.function = functionName;
+    instruction.args.assign(args.begin(), args.end());
+    instruction.text = codeTextFrom(start);
+    fragmentProgramRecorder->instructions.push_back(std::move(instruction));
+  }
   return temp;
 }
 
