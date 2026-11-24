@@ -57,11 +57,11 @@ void ShaderBuilder::setPrecisionQualifier(const std::string& precision) {
 
 ValueRef ShaderBuilder::internValue(const std::string& name, SLType type, ValueOrigin origin) {
   if (valueTable == nullptr) {
-    return {};
+    return ValueRef(name, type, origin);
   }
   const auto id = valueTable->Intern(name, type, origin);
   const auto* value = valueTable->Find(id);
-  return value != nullptr ? *value : ValueRef{};
+  return value != nullptr ? *value : ValueRef(name, type, origin);
 }
 
 void ShaderBuilder::codeAppendf(const char* format, ...) {

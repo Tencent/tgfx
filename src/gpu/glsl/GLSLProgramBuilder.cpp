@@ -133,6 +133,7 @@ GLSLProgramBuilder::GLSLProgramBuilder(Context* context, const ProgramInfo* prog
     : ProgramBuilder(context, programInfo), _varyingHandler(this), _uniformHandler(this),
       _vertexBuilder(this), _fragBuilder(this) {
   _vertexBuilder.setVertexRecorder(&description.vertexCalls);
+  _vertexBuilder.setValueTable(&description.values);
   _fragBuilder.setFragmentRecorder(&description.fragment);
   _fragBuilder.setValueTable(&description.values);
 }

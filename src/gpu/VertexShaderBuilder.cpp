@@ -122,10 +122,10 @@ void VertexShaderBuilder::recordVertexCall(VertexCallKind kind, const std::strin
   }
   VertexCallRecord record = {};
   record.kind = kind;
-  record.dst = dst;
-  record.src = src;
-  record.operand = operand;
-  record.extra = extra;
+  record.dst = internValue(dst, resultType, ValueOrigin::Local);
+  record.src = internValue(src, SLType::Void, ValueOrigin::Local);
+  record.operand = internValue(operand, SLType::Void, ValueOrigin::Uniform);
+  record.extra = internValue(extra, SLType::Void, ValueOrigin::Literal);
   record.hasPerspective = hasPerspective;
   record.declaresResult = declaresResult;
   record.resultType = resultType;

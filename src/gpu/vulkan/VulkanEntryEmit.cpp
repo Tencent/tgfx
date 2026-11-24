@@ -609,88 +609,90 @@ bool EmitVulkanVertexBody(const std::vector<VertexCallRecord>& calls, const Layo
       case VertexCallKind::StoreVarying: {
         VaryingSlot slot = {};
         uint32_t value = 0;
-        if (!loadVarying(call.dst, &slot) || !valueOf(call.src, &value)) {
-          *error = "a varying store reads " + call.src + " which the stage cannot resolve";
+        if (!loadVarying(call.dst.name, &slot) || !valueOf(call.src.name, &value)) {
+          *error = "a varying store reads " + call.src.name + " which the stage cannot resolve";
           return false;
         }
         writer.Inst(kOpStore, {slot.variable, value});
-        storedVaryings.insert(call.dst);
+        storedVaryings.insert(call.dst.name);
         break;
       }
       case VertexCallKind::TransformPoint:
       case VertexCallKind::TransformVarying: {
         uint32_t xy = 0;
-        if (!transform(call.src, call.operand, call.hasPerspective, &xy)) {
-          *error = "a point transform reads " + call.src + "/" + call.operand +
+        if (!transform(call.src.name, call.operand.name, call.hasPerspective, &xy)) {
+          *error = "a point transform reads " + call.src.name + "/" + call.operand.name +
                    " which the stage cannot resolve";
           return false;
         }
         if (call.kind == VertexCallKind::TransformPoint) {
-          values[call.dst] = xy;
+          values[call.dst.name] = xy;
           break;
         }
         VaryingSlot slot = {};
-        if (!loadVarying(call.dst, &slot)) {
-          *error = "a transform writes an undeclared varying " + call.dst;
+        if (!loadVarying(call.dst.name, &slot)) {
+          *error = "a transform writes an undeclared varying " + call.dst.name;
           return false;
         }
         writer.Inst(kOpStore, {slot.variable, xy});
-        storedVaryings.insert(call.dst);
+        storedVaryings.insert(call.dst.name);
         break;
       }
       case VertexCallKind::TransformPointAdd: {
         uint32_t xy = 0;
         uint32_t addend = 0;
-        if (!transform(call.src, call.operand, false, &xy) || !valueOf(call.extra, &addend)) {
-          *error = "a shifted transform reads " + call.src + "/" + call.extra +
+        if (!transform(call.src.name, call.operand.name, false, &xy) ||
+            !valueOf(call.extra.name, &addend)) {
+          *error = "a shifted transform reads " + call.src.name + "/" + call.extra.name +
                    " which the stage cannot resolve";
           return false;
         }
         const uint32_t sum = writer.NewId();
         writer.Inst(kOpFAdd, {types.vec2, sum, xy, addend});
-        values[call.dst] = sum;
+        values[call.dst.name] = sum;
         break;
       }
       case VertexCallKind::MultiplyVec2: {
         uint32_t first = 0;
         uint32_t second = 0;
-        if (!valueOf(call.src, &first) || !valueOf(call.operand, &second)) {
-          *error = "a multiply reads " + call.src + "/" + call.operand +
+        if (!valueOf(call.src.name, &first) || !valueOf(call.operand.name, &second)) {
+          *error = "a multiply reads " + call.src.name + "/" + call.operand.name +
                    " which the stage cannot resolve";
           return false;
         }
         const uint32_t product = writer.NewId();
         writer.Inst(kOpFMul, {types.vec2, product, first, second});
-        values[call.dst] = product;
+        values[call.dst.name] = product;
         break;
       }
       case VertexCallKind::SwizzleVec2: {
         uint32_t source = 0;
-        if (!valueOf(call.src, &source)) {
-          *error = "a swizzle reads " + call.src + " which the stage cannot resolve";
+        if (!valueOf(call.src.name, &source)) {
+          *error = "a swizzle reads " + call.src.name + " which the stage cannot resolve";
           return false;
         }
-        const uint32_t first = call.extra == "zw" ? 2 : 0;
-        values[call.dst] = Shuffle2(&module, source, first, first + 1);
+        const uint32_t first = call.extra.name == "zw" ? 2 : 0;
+        values[call.dst.name] = Shuffle2(&module, source, first, first + 1);
         break;
       }
       case VertexCallKind::ComposeVec4: {
         uint32_t first = 0;
         uint32_t second = 0;
-        if (!valueOf(call.src, &first) || !valueOf(call.operand, &second)) {
-          *error = "a vec4 compose reads " + call.src + "/" + call.operand +
+        if (!valueOf(call.src.name, &first) || !valueOf(call.operand.name, &second)) {
+          *error = "a vec4 compose reads " + call.src.name + "/" + call.operand.name +
                    " which the stage cannot resolve";
           return false;
         }
         const uint32_t id = writer.NewId();
         writer.Inst(kOpCompositeConstruct, {types.vec4, id, first, second});
-        values[call.dst] = id;
+        values[call.dst.name] = id;
         break;
       }
       case VertexCallKind::NormalizeRect: {
         uint32_t source = 0;
-        if (!valueOf(call.src, &source)) {
-          *error = "a rect normalization reads " + call.src + " which the stage cannot resolve";
+        if (!valueOf(call.src.name, &source)) {
+          *error =
+              "a rect normalization reads " + call.src.name + " which the stage cannot resolve";
           return false;
         }
         const uint32_t low = Shuffle2(&module, source, 0, 1);
@@ -701,14 +703,14 @@ bool EmitVulkanVertexBody(const std::vector<VertexCallRecord>& calls, const Layo
         writer.Inst(kOpExtInst, {types.vec2, maximum, glslSet, kGLSLStd450FMax, low, high});
         const uint32_t id = writer.NewId();
         writer.Inst(kOpCompositeConstruct, {types.vec4, id, minimum, maximum});
-        values[call.src] = id;
+        values[call.src.name] = id;
         break;
       }
       case VertexCallKind::StorePosition: {
         uint32_t source = 0;
         uint32_t adjust = 0;
-        if (!valueOf(call.src, &source) || !valueOf(RTAdjustName, &adjust)) {
-          *error = "the clip-space write cannot resolve " + call.src + " or " + RTAdjustName;
+        if (!valueOf(call.src.name, &source) || !valueOf(RTAdjustName, &adjust)) {
+          *error = "the clip-space write cannot resolve " + call.src.name + " or " + RTAdjustName;
           return false;
         }
         const uint32_t scale = Shuffle2(&module, adjust, 0, 2);

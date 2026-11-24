@@ -27,15 +27,16 @@ constexpr char Indent[] = "    ";
 void AppendTransformPoint(std::string* out, const VertexCall& call) {
   if (call.hasPerspective) {
     *out += Indent;
-    *out +=
-        "highp vec3 " + call.dst + "Temp = " + call.operand + " * vec3(" + call.src + ", 1.0);\n";
+    *out += "highp vec3 " + call.dst.name + "Temp = " + call.operand.name + " * vec3(" +
+            call.src.name + ", 1.0);\n";
     *out += Indent;
-    *out += "highp vec2 " + call.dst + " = " + call.dst + "Temp.xy / " + call.dst + "Temp.z;\n";
+    *out += "highp vec2 " + call.dst.name + " = " + call.dst.name + "Temp.xy / " + call.dst.name +
+            "Temp.z;\n";
     return;
   }
   *out += Indent;
-  *out +=
-      "highp vec2 " + call.dst + " = (" + call.operand + " * vec3(" + call.src + ", 1.0)).xy;\n";
+  *out += "highp vec2 " + call.dst.name + " = (" + call.operand.name + " * vec3(" + call.src.name +
+          ", 1.0)).xy;\n";
 }
 
 std::string PrefixOf(const FragmentInstruction& instruction) {
@@ -81,7 +82,7 @@ std::string GLSLPrinter::PrintVertexProgram(const std::vector<VertexCall>& calls
     switch (call.kind) {
       case VertexCallKind::StoreVarying:
         out += Indent;
-        out += call.dst + " = " + call.src + ";\n";
+        out += call.dst.name + " = " + call.src.name + ";\n";
         break;
       case VertexCallKind::TransformPoint:
         AppendTransformPoint(&out, call);
@@ -89,41 +90,44 @@ std::string GLSLPrinter::PrintVertexProgram(const std::vector<VertexCall>& calls
       case VertexCallKind::TransformVarying:
         out += Indent;
         if (call.hasPerspective) {
-          out += call.dst + " = " + call.operand + " * vec3(" + call.src + ", 1);\n";
+          out += call.dst.name + " = " + call.operand.name + " * vec3(" + call.src.name + ", 1);\n";
         } else {
-          out += call.dst + " = (" + call.operand + " * vec3(" + call.src + ", 1)).xy;\n";
+          out += call.dst.name + " = (" + call.operand.name + " * vec3(" + call.src.name +
+                 ", 1)).xy;\n";
         }
         break;
       case VertexCallKind::TransformPointAdd:
         out += Indent;
-        out += "highp vec2 " + call.dst + " = (" + call.operand + " * vec3(" + call.src +
-               ", 1.0)).xy + " + call.extra + ";\n";
+        out += "highp vec2 " + call.dst.name + " = (" + call.operand.name + " * vec3(" +
+               call.src.name + ", 1.0)).xy + " + call.extra.name + ";\n";
         break;
       case VertexCallKind::MultiplyVec2:
         out += Indent;
         if (call.declaresResult) {
-          out += "highp vec2 " + call.dst + " = ";
+          out += "highp vec2 " + call.dst.name + " = ";
         } else {
-          out += call.dst + " = ";
+          out += call.dst.name + " = ";
         }
-        out += call.src + " * " + call.operand + ";\n";
+        out += call.src.name + " * " + call.operand.name + ";\n";
         break;
       case VertexCallKind::SwizzleVec2:
         out += Indent;
-        out += "highp vec2 " + call.dst + " = " + call.src + "." + call.extra + ";\n";
+        out +=
+            "highp vec2 " + call.dst.name + " = " + call.src.name + "." + call.extra.name + ";\n";
         break;
       case VertexCallKind::ComposeVec4:
         out += Indent;
-        out += "highp vec4 " + call.dst + " = vec4(" + call.src + ", " + call.operand + ");\n";
+        out += "highp vec4 " + call.dst.name + " = vec4(" + call.src.name + ", " +
+               call.operand.name + ");\n";
         break;
       case VertexCallKind::NormalizeRect:
         out += Indent;
-        out += call.src + " = vec4(min(" + call.src + ".xy, " + call.src + ".zw), max(" + call.src +
-               ".xy, " + call.src + ".zw));\n";
+        out += call.src.name + " = vec4(min(" + call.src.name + ".xy, " + call.src.name +
+               ".zw), max(" + call.src.name + ".xy, " + call.src.name + ".zw));\n";
         break;
       case VertexCallKind::StorePosition:
         out += Indent;
-        out += "gl_Position = vec4(" + call.src + ".xy * " + RTAdjustName + ".xz + " +
+        out += "gl_Position = vec4(" + call.src.name + ".xy * " + RTAdjustName + ".xz + " +
                RTAdjustName + ".yw, 0, 1);\n";
         break;
     }

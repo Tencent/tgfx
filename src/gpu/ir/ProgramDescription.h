@@ -61,10 +61,10 @@ enum class VertexCallKind : uint8_t {
 /// them with ValueIDs without changing the record's order.
 struct VertexCall {
   VertexCallKind kind = VertexCallKind::StoreVarying;
-  std::string dst = {};
-  std::string src = {};
-  std::string operand = {};
-  std::string extra = {};
+  ValueRef dst = {};
+  ValueRef src = {};
+  ValueRef operand = {};
+  ValueRef extra = {};
   bool hasPerspective = false;
   /// MultiplyVec2's declaration form: true spells "highp vec2 dst = ...".
   bool declaresResult = false;

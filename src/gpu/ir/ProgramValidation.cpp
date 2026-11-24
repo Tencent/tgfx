@@ -198,9 +198,9 @@ bool LinkVertexWrites(ProgramDescription* description, std::string* error) {
         call.kind != VertexCallKind::TransformVarying) {
       continue;
     }
-    auto* varying = FindVarying(&description->interface, call.dst);
+    auto* varying = FindVarying(&description->interface, call.dst.name);
     if (varying == nullptr) {
-      *error = "the vertex stage writes undeclared varying '" + call.dst + "'";
+      *error = "the vertex stage writes undeclared varying '" + call.dst.name + "'";
       return false;
     }
     if (call.resultType != SLType::Void && call.resultType != varying->type) {
