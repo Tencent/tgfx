@@ -130,30 +130,27 @@ void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
             const auto radiusValue = args.irBuilder->InternValue(
                 radiusName, SLType::Int, Precision::High, IRValueKind::Uniform);
             const auto subsetValue =
-                subset == "vec4(0.0)"
-                    ? zero4
-                    : args.irBuilder->InternValue(subset, SLType::Float4, Precision::High,
-                                                  IRValueKind::Uniform);
+                tiledRead && tiled.subset != INVALID_VALUE_ID ? tiled.subset : zero4;
             const auto clampValue =
-                clamp == "vec4(0.0)"
-                    ? zero4
-                    : args.irBuilder->InternValue(clamp, SLType::Float4, Precision::High,
-                                                  IRValueKind::Uniform);
+                tiledRead && tiled.clamp != INVALID_VALUE_ID ? tiled.clamp : zero4;
             const auto dimensionValue =
-                dimension == "vec2(1.0)"
-                    ? one2
-                    : args.irBuilder->InternValue(dimension, SLType::Float2, Precision::High,
-                                                  IRValueKind::Uniform);
+                tiledRead && tiled.dimensions != INVALID_VALUE_ID ? tiled.dimensions : one2;
             const auto kernelValue = args.irBuilder->InternValue(
                 kernelName, SLType::Float4, Precision::High, IRValueKind::UniformArray);
             const auto modeXValue =
                 args.irBuilder->CreateIntConstant(tiledRead ? tiled.shaderModeX : 0);
             const auto modeYValue =
                 args.irBuilder->CreateIntConstant(tiledRead ? tiled.shaderModeY : 0);
+            const auto seamFlags =
+                TiledFlags(TiledReadFlag::RepeatX) | TiledFlags(TiledReadFlag::RepeatY);
+            const auto borderFlags = TiledFlags(TiledReadFlag::BorderLinearX) |
+                                     TiledFlags(TiledReadFlag::BorderLinearY) |
+                                     TiledFlags(TiledReadFlag::BorderNearestX) |
+                                     TiledFlags(TiledReadFlag::BorderNearestY);
             const auto seamValue =
-                args.irBuilder->CreateIntConstant(tiledRead && tiled.seamBlend ? 1 : 0);
+                args.irBuilder->CreateIntConstant((tiled.flags & seamFlags) != 0 ? 1 : 0);
             const auto borderValue =
-                args.irBuilder->CreateIntConstant(tiledRead && tiled.borderPass ? 1 : 0);
+                args.irBuilder->CreateIntConstant((tiled.flags & borderFlags) != 0 ? 1 : 0);
             const auto result = args.irBuilder->CreateCall(
                 OperatorID::GaussianBlur1D, SLType::Float4,
                 {samplerValue, coordValue, texelSizeValue, radiusValue, subsetValue, modeXValue,
