@@ -75,6 +75,7 @@ struct VertexCall {
 
 struct AttributeDesc {
   std::string name = {};
+  SLType type = SLType::Void;
   AttributeID id = 0;
 };
 

@@ -90,7 +90,16 @@ void VaryingHandler::getDeclarations(std::string* inputDecls, std::string* outpu
   }
   auto* varyings = stage == ShaderStage::Vertex ? outputDecls : inputDecls;
   if (stage == ShaderStage::Vertex) {
-    appendDecls(vertexInputs, inputDecls, ShaderStage::Vertex);
+    auto* attributes = interface->attributes.empty() ? &vertexInputs : nullptr;
+    if (attributes != nullptr) {
+      appendDecls(*attributes, inputDecls, ShaderStage::Vertex);
+    } else {
+      for (const auto& attribute : interface->attributes) {
+        ShaderVar var(attribute.name, attribute.type, ShaderVar::TypeModifier::Attribute);
+        inputDecls->append(programBuilder->getShaderVarDeclarations(var, stage));
+        inputDecls->append(";\n");
+      }
+    }
   }
   for (const auto& varying : interface->varyings) {
     ShaderVar var(
