@@ -1619,13 +1619,26 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
   if (args.backgroundHandler != nullptr) {
     sourcePtr = args.backgroundHandler->getCachedLayerStyleSource(this);
   }
+  const int probePass = gCaptureProbe.inCapture ? 1 : 0;
+  const int probeDepth = std::min(gCaptureProbe.depth, CaptureProbe::MaxDepth - 1);
+  if (sourcePtr != nullptr) {
+    ++gCaptureProbe.sourceCacheHits[probePass][probeDepth];
+  }
   std::unique_ptr<LayerStyleSource> ownedSource;
-  if (sourcePtr == nullptr) {
+  if (sourcePtr == nullptr && !_layerStyles.empty()) {
     const auto probeStart = std::chrono::steady_clock::now();
+    ++gCaptureProbe.depth;
+    gCaptureProbe.maxDepth = std::max(gCaptureProbe.maxDepth, gCaptureProbe.depth);
     ownedSource = getLayerStyleSource(args, canvas->getMatrix(), alpha);
+    --gCaptureProbe.depth;
     const auto probeMs =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - probeStart)
             .count();
+    ++gCaptureProbe.sourceCalls[probePass][probeDepth];
+    if (ownedSource != nullptr) {
+      ++gCaptureProbe.sourceNonNull[probePass][probeDepth];
+    }
+    gCaptureProbe.sourceMs[probePass][probeDepth] += probeMs;
     if (gCaptureProbe.inCapture) {
       ++gCaptureProbe.styleSources;
       gCaptureProbe.styleSourceMs += probeMs;

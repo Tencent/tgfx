@@ -745,6 +745,21 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
         gCaptureProbe.missing - captureProbe.missing, gCaptureProbe.fallbacks,
         gCaptureProbe.fallbackMs, gCaptureProbe.drawStyleSources - captureProbe.drawStyleSources,
         gCaptureProbe.drawStyleSourceMs - captureProbe.drawStyleSourceMs);
+    for (int pass = 0; pass < 2; ++pass) {
+      const auto& p = gCaptureProbe;
+      if (p.sourceCalls[pass][0] == 0 && p.sourceCacheHits[pass][0] == 0) {
+        continue;
+      }
+      std::printf(
+          "[CAP-SRC] pass=%s maxDepth=%d d0=%d/%d/%d/%.1f d1=%d/%d/%d/%.1f d2=%d/%d/%d/%.1f "
+          "d3=%d/%d/%d/%.1f\n",
+          pass == 0 ? "draw" : "capture", p.maxDepth, p.sourceCalls[pass][0],
+          p.sourceNonNull[pass][0], p.sourceCacheHits[pass][0], p.sourceMs[pass][0],
+          p.sourceCalls[pass][1], p.sourceNonNull[pass][1], p.sourceCacheHits[pass][1],
+          p.sourceMs[pass][1], p.sourceCalls[pass][2], p.sourceNonNull[pass][2],
+          p.sourceCacheHits[pass][2], p.sourceMs[pass][2], p.sourceCalls[pass][3],
+          p.sourceNonNull[pass][3], p.sourceCacheHits[pass][3], p.sourceMs[pass][3]);
+    }
   }
   drawScreenTasks(std::move(screenTasks), std::move(skippedRects), surface, autoClear);
   return dirtyRects;
