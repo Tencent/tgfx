@@ -36,6 +36,7 @@ enum class OperatorID : uint32_t {
   DeviceCoord = 7,
   MulAlpha = 8,
   AlphaModulate = 9,
+  GaussianBlur1D = 10,
 };
 
 constexpr OperatorID INVALID_OPERATOR_ID = static_cast<OperatorID>(-1);

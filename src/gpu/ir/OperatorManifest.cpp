@@ -68,6 +68,13 @@ const std::vector<OperatorDesc>& Operators() {
        "tgfxAlphaModulate",
        SLType::Float4,
        {SLType::Float4, SLType::Float4}},
+      {OperatorID::GaussianBlur1D,
+       "GaussianBlur1D",
+       "gaussianBlur1D",
+       SLType::Float4,
+       {SLType::Texture2DSampler, SLType::Float2, SLType::Float2, SLType::Int, SLType::Float4,
+        SLType::Int, SLType::Int, SLType::Float4, SLType::Float2, SLType::Int, SLType::Int,
+        SLType::Float4}},
   };
   return operators;
 }

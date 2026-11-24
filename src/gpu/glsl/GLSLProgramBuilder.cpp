@@ -234,12 +234,26 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     description.interface.uniforms.push_back(
         {uniform.name(), type, ShaderStage::Vertex, uniform.count()});
     description.values.Intern(uniform.name(), type, ValueOrigin::Uniform);
+    if (uniform.count() > 1) {
+      programIRBuilder().AddUniformArray(
+          {uniform.name(), type, Precision::Default, ShaderStage::Vertex, uniform.count()});
+    } else {
+      programIRBuilder().AddUniform(
+          {uniform.name(), type, Precision::Default, ShaderStage::Vertex, uniform.count()});
+    }
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Fragment)) {
     const auto type = ShaderVar(uniform).type();
     description.interface.uniforms.push_back(
         {uniform.name(), type, ShaderStage::Fragment, uniform.count()});
     description.values.Intern(uniform.name(), type, ValueOrigin::Uniform);
+    if (uniform.count() > 1) {
+      programIRBuilder().AddUniformArray(
+          {uniform.name(), type, Precision::Default, ShaderStage::Fragment, uniform.count()});
+    } else {
+      programIRBuilder().AddUniform(
+          {uniform.name(), type, Precision::Default, ShaderStage::Fragment, uniform.count()});
+    }
   }
   for (const auto& sampler : _uniformHandler.getSamplers()) {
     const auto type = ShaderVar(sampler).type();

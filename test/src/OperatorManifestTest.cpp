@@ -43,6 +43,15 @@ TEST(OperatorManifestTest, ExposesDeviceCoordSignature) {
   EXPECT_EQ(desc->params[1], SLType::Float2);
 }
 
+TEST(OperatorManifestTest, ExposesGaussianBlurSignature) {
+  const auto* desc = FindOperator(OperatorID::GaussianBlur1D);
+  ASSERT_NE(desc, nullptr);
+  EXPECT_EQ(desc->returnType, SLType::Float4);
+  ASSERT_EQ(desc->params.size(), 12u);
+  EXPECT_EQ(desc->params[0], SLType::Texture2DSampler);
+  EXPECT_EQ(desc->params[11], SLType::Float4);
+}
+
 TEST(OperatorManifestTest, RejectsUnknownOperators) {
   EXPECT_EQ(FindOperator(static_cast<OperatorID>(999)), nullptr);
 }

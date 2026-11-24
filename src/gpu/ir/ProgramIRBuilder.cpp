@@ -185,6 +185,12 @@ ValueID ProgramIRBuilder::AddUniform(UniformIR uniform) {
 }
 
 ValueID ProgramIRBuilder::AddUniformArray(UniformArrayIR array) {
+  for (const auto& existing : ir.interface.uniformArrays) {
+    if (existing.name == array.name) {
+      return InternValue(existing.name, existing.elementType, existing.precision,
+                         IRValueKind::UniformArray);
+    }
+  }
   array.binding = array.stage == ShaderStage::Vertex ? 0 : 1;
   const auto layout = LayoutOf(array.elementType);
   auto& cursor = array.stage == ShaderStage::Vertex ? vertexUniformCursor : fragmentUniformCursor;
