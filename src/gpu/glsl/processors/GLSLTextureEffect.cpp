@@ -136,9 +136,7 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
     if (recorded) {
       fragBuilder->storeColor(args.outputColor, readName);
     } else {
-      // The read stayed text: keep the store text too, so the runtime route declines the draw
-      // instead of reading a value it cannot name.
-      fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), readName.c_str());
+      fragBuilder->storeColor(args.outputColor, readName);
     }
     return;
   }
@@ -146,7 +144,7 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
       fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
   bool recorded = false;
   const auto readName = fragBuilder->readTexture(textureSampler, finalCoordName, "", "", &recorded);
-  fragBuilder->codeAppendf("vec4 color = %s;", readName.c_str());
+  fragBuilder->aliasValue("color", readName, "vec4");
   if (alphaStart != Point::Zero()) {
     fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
     auto alphaStartName =
@@ -160,7 +158,7 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
     fragBuilder->codeAppend("alpha = clamp(alpha, 0.0, 1.0);");
     fragBuilder->codeAppend("color = vec4(color.rgb * alpha.r, alpha.r);");
   }
-  fragBuilder->codeAppendf("%s = color;", args.outputColor.c_str());
+  fragBuilder->storeColor(args.outputColor, "color");
 }
 
 void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
