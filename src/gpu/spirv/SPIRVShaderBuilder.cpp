@@ -438,9 +438,10 @@ bool SPIRVShaderBuilder::Begin(std::string* error) {
   if (begun) {
     return Fail(error, "the SPIR-V shader builder has already begun");
   }
-  if (stage != ShaderStage::Fragment) {
-    return Fail(error, "the phase-2 SPIR-V builder supports fragment shaders only");
+  if (stage != ShaderStage::Fragment && stage != ShaderStage::Vertex) {
+    return Fail(error, "the SPIR-V builder supports vertex and fragment shaders only");
   }
+  const bool fragment = stage == ShaderStage::Fragment;
 
   writer.Sink(&writer.pre);
   writer.Inst(spirv::kOpCapability, {spirv::kCapabilityShader});
@@ -449,17 +450,24 @@ bool SPIRVShaderBuilder::Begin(std::string* error) {
 
   mainId = writer.NewId();
   outputId = writer.NewId();
-  fragCoordId = writer.NewId();
+  if (fragment) {
+    fragCoordId = writer.NewId();
+  }
   writer.Sink(&writer.mode);
   {
-    auto operands = std::vector<uint32_t>{spirv::kExecutionModelFragment, mainId};
+    auto operands = std::vector<uint32_t>{
+        fragment ? spirv::kExecutionModelFragment : spirv::kExecutionModelVertex, mainId};
     const auto name = spirv::NameWords("main");
     operands.insert(operands.end(), name.begin(), name.end());
     operands.push_back(outputId);
-    operands.push_back(fragCoordId);
+    if (fragment) {
+      operands.push_back(fragCoordId);
+    }
     writer.Inst(spirv::kOpEntryPoint, operands);
   }
-  writer.Inst(spirv::kOpExecutionMode, {mainId, spirv::kExecutionModeOriginUpperLeft});
+  if (fragment) {
+    writer.Inst(spirv::kOpExecutionMode, {mainId, spirv::kExecutionModeOriginUpperLeft});
+  }
 
   writer.Sink(&writer.debug);
   {
@@ -470,15 +478,19 @@ bool SPIRVShaderBuilder::Begin(std::string* error) {
   }
   {
     auto operands = std::vector<uint32_t>{outputId};
-    const auto name = spirv::NameWords("outputColor");
+    const auto name = spirv::NameWords(fragment ? "outputColor" : "gl_Position");
     operands.insert(operands.end(), name.begin(), name.end());
     writer.Inst(spirv::kOpName, operands);
   }
 
   writer.Sink(&writer.ann);
-  writer.Inst(spirv::kOpDecorate, {outputId, spirv::kDecorationLocation, 0});
-  writer.Inst(spirv::kOpDecorate,
-              {fragCoordId, spirv::kDecorationBuiltIn, spirv::kBuiltInFragCoord});
+  if (fragment) {
+    writer.Inst(spirv::kOpDecorate, {outputId, spirv::kDecorationLocation, 0});
+    writer.Inst(spirv::kOpDecorate,
+                {fragCoordId, spirv::kDecorationBuiltIn, spirv::kBuiltInFragCoord});
+  } else {
+    writer.Inst(spirv::kOpDecorate, {outputId, spirv::kDecorationBuiltIn, spirv::kBuiltInPosition});
+  }
 
   writer.Sink(&writer.decl);
   const auto voidType = TypeId(SLType::Void, error);
@@ -487,12 +499,17 @@ bool SPIRVShaderBuilder::Begin(std::string* error) {
     return false;
   }
   const auto outputPointer = PointerTypeId(SLType::Float4, spirv::kStorageOutput, error);
-  const auto inputPointer = PointerTypeId(SLType::Float4, spirv::kStorageInput, error);
-  if (outputPointer == 0 || inputPointer == 0) {
+  if (outputPointer == 0) {
     return false;
   }
   writer.Inst(spirv::kOpVariable, {outputPointer, outputId, spirv::kStorageOutput});
-  writer.Inst(spirv::kOpVariable, {inputPointer, fragCoordId, spirv::kStorageInput});
+  if (fragment) {
+    const auto inputPointer = PointerTypeId(SLType::Float4, spirv::kStorageInput, error);
+    if (inputPointer == 0) {
+      return false;
+    }
+    writer.Inst(spirv::kOpVariable, {inputPointer, fragCoordId, spirv::kStorageInput});
+  }
   outputPointerId = outputId;
   const auto functionType = writer.NewId();
   writer.Inst(spirv::kOpTypeFunction, {functionType, voidType});
@@ -573,7 +590,7 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
       return id;
     }
     case IRExprKind::Builtin: {
-      if (expr.builtin != "gl_FragCoord") {
+      if (stage != ShaderStage::Fragment || expr.builtin != "gl_FragCoord") {
         Fail(error, "the builtin read is not supported by the SPIR-V builder yet");
         return 0;
       }
@@ -874,6 +891,13 @@ std::vector<uint32_t> SPIRVShaderBuilder::Finish(std::string* error) {
   writer.Finish(&out);
   finished = true;
   return out;
+}
+
+SPIRVFragmentShaderBuilder::SPIRVFragmentShaderBuilder()
+    : SPIRVShaderBuilder(ShaderStage::Fragment) {
+}
+
+SPIRVVertexShaderBuilder::SPIRVVertexShaderBuilder() : SPIRVShaderBuilder(ShaderStage::Vertex) {
 }
 
 }  // namespace tgfx

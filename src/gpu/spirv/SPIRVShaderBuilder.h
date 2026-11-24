@@ -111,4 +111,14 @@ class SPIRVShaderBuilder {
   bool finished = false;
 };
 
+class SPIRVFragmentShaderBuilder : public SPIRVShaderBuilder {
+ public:
+  SPIRVFragmentShaderBuilder();
+};
+
+class SPIRVVertexShaderBuilder : public SPIRVShaderBuilder {
+ public:
+  SPIRVVertexShaderBuilder();
+};
+
 }  // namespace tgfx

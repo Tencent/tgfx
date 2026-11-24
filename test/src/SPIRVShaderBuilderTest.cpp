@@ -236,6 +236,30 @@ TEST(SPIRVShaderBuilderTest, ImportsArrayFunctionParameter) {
   EXPECT_TRUE(ContainsOpcode(words, spirv::kOpFunctionParameter));
 }
 
+TEST(SPIRVShaderBuilderTest, EmitsVertexPosition) {
+  ProgramIRBuilder program = {};
+  const auto zero = program.CreateConstant(0.0f);
+  const auto one = program.CreateConstant(1.0f);
+  const auto position = program.CreateConstruct(SLType::Float4, {zero, zero, zero, one});
+  const auto output =
+      program.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "gl_Position");
+  program.StoreOutput(output, position);
+
+  SPIRVVertexShaderBuilder builder;
+  std::string error = {};
+  ASSERT_TRUE(builder.Begin(&error)) << error;
+  uint32_t valueId = 0;
+  ASSERT_TRUE(builder.EmitValue(program.IR(), position, &valueId, &error)) << error;
+  ASSERT_TRUE(builder.StoreOutput(program.IR(), position, &error)) << error;
+  const auto words = builder.Finish(&error);
+  ASSERT_FALSE(words.empty()) << error;
+  WriteIfRequested(words);
+
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpEntryPoint));
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpDecorate));
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpStore));
+}
+
 TEST(SPIRVShaderBuilderTest, RejectsUnsupportedExpressions) {
   ProgramIRBuilder program = {};
   const auto input =
