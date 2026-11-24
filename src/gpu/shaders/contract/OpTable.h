@@ -162,8 +162,9 @@ inline constexpr const char* kBlendIncludes[] = {"xp/xp_blend_colors.inc"};
 // ---- Texture -------------------------------------------------------------------------------
 inline constexpr Arg kTextureArgs[] = {
     {Param::Vec4, Source::CallArg, 0},  // the prefetched leaf (a LeafTex register)
-    {Param::Vec4, Source::CallArg, 1}, {Param::Vec4, Source::CallArg, 2},
-    {Param::Int, Source::CallArg, 3},  {Param::Int, Source::CallArg, 4},
+    {Param::Vec4, Source::CallArg, 1},
+    {Param::Vec4, Source::CallArg, 2},
+    {Param::Int, Source::CallArg, 3},  // the selector flags
 };
 inline constexpr const char* kTextureIncludes[] = {"source/texture_sampling.inc",
                                                    "ops/Texture.glsl"};

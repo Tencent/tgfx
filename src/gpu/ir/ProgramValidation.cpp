@@ -150,6 +150,14 @@ bool ValidateFragmentCalls(ProgramDescription* description, std::string* error) 
         return false;
       }
     }
+    const auto expectedResult = ShaderTypeOf(row->returnType);
+    const auto actualResult = instruction.outputRef.type;
+    if (expectedResult != SLType::Void && actualResult != SLType::Void &&
+        expectedResult != actualResult) {
+      *error = "the call to '" + instruction.function + "' returns " + TypeName(expectedResult) +
+               ", but its output is " + TypeName(actualResult);
+      return false;
+    }
   }
   return true;
 }

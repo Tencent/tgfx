@@ -140,8 +140,10 @@ void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
     instruction.kind = FragmentInstructionKind::Call;
     instruction.output = outputVar;
     instruction.function = functionName;
-    instruction.outputRef = internValue(outputVar, SLType::Void, ValueOrigin::CallResult);
     const auto* row = FindOperator(functionName);
+    const SLType resultType =
+        row != nullptr && wrapType.empty() ? ShaderTypeOf(row->returnType) : SLType::Void;
+    instruction.outputRef = internValue(outputVar, resultType, ValueOrigin::CallResult);
     const bool typed = row != nullptr && row->args != nullptr && row->argCount == args.size();
     for (size_t index = 0; index < args.size(); ++index) {
       const auto& arg = args[index];

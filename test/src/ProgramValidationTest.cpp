@@ -136,6 +136,19 @@ TEST(ProgramValidationTest, AcceptsMatchingOperatorArgumentCount) {
   EXPECT_TRUE(ValidateProgramDescription(&description, &error)) << error;
 }
 
+TEST(ProgramValidationTest, RejectsOperatorReturnTypeMismatch) {
+  auto description = ValidDescription();
+  FragmentInstruction call = {};
+  call.kind = FragmentInstructionKind::Call;
+  call.function = "pmApplyLuma";
+  call.argRefs.resize(4);
+  call.outputRef.type = SLType::Float2;
+  description.fragment.instructions.push_back(call);
+  std::string error;
+  EXPECT_FALSE(ValidateProgramDescription(&description, &error));
+  EXPECT_NE(error.find("returns"), std::string::npos);
+}
+
 TEST(ProgramValidationTest, RejectsUndeclaredWrite) {
   auto description = ValidDescription();
   description.vertexCalls[0].dst = "vMissing";
