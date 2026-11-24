@@ -192,21 +192,45 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     extraSubsetName = args.inputSubset;
   }
   auto finalCoordName = fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
+  auto recordSample = [&](size_t samplerIndex, const std::string& coordName,
+                          const std::string& baseName, const std::string& swizzle,
+                          const std::string& field, SLType type) {
+    if (args.irBuilder == nullptr) {
+      return;
+    }
+    const auto sampler = args.samplerValue(textureSamplers[samplerIndex]);
+    const auto coordinate =
+        args.irBuilder->InternValue(coordName, SLType::Float2, Precision::High, IRValueKind::Local);
+    if (sampler == INVALID_VALUE_ID || coordinate == INVALID_VALUE_ID) {
+      return;
+    }
+    const auto sample = args.irBuilder->CreateTextureSample(sampler, coordinate, SLType::Float4, {},
+                                                            SLType::Texture2DSampler);
+    const auto channel = args.irBuilder->CreateSwizzle(sample, type, swizzle);
+    const auto base =
+        args.irBuilder->InternValue(baseName, baseName == "yuv" ? SLType::Float3 : SLType::Float,
+                                    Precision::High, IRValueKind::Local);
+    args.irBuilder->Assign({base, field}, channel);
+  };
   fragBuilder->codeAppend("vec3 yuv;");
   fragBuilder->aliasValue(
       "yuv.x", fragBuilder->textureLookupExpression(textureSamplers[0], finalCoordName) + ".r", "");
+  recordSample(0, finalCoordName, "yuv", "r", "x", SLType::Float);
   if (yuvTexture->yuvFormat() == YUVFormat::I420) {
     auto chromaCoord = fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
     fragBuilder->aliasValue(
         "yuv.y", fragBuilder->textureLookupExpression(textureSamplers[1], chromaCoord) + ".r", "");
+    recordSample(1, chromaCoord, "yuv", "r", "y", SLType::Float);
     chromaCoord = fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
     fragBuilder->aliasValue(
         "yuv.z", fragBuilder->textureLookupExpression(textureSamplers[2], chromaCoord) + ".r", "");
+    recordSample(2, chromaCoord, "yuv", "r", "z", SLType::Float);
   } else if (yuvTexture->yuvFormat() == YUVFormat::NV12) {
     auto chromaCoord = fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
     fragBuilder->aliasValue(
         "yuv.yz", fragBuilder->textureLookupExpression(textureSamplers[1], chromaCoord) + ".ra",
         "");
+    recordSample(1, chromaCoord, "yuv", "ra", "yz", SLType::Float2);
   }
   auto mat3Name = uniformHandler->addUniform("Mat3ColorConversion", UniformFormat::Float3x3,
                                              ShaderStage::Fragment);
@@ -227,6 +251,7 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     fragBuilder->aliasValue(
         "yuv_a", fragBuilder->textureLookupExpression(textureSamplers[0], alphaVertexColor) + ".r",
         "float");
+    recordSample(0, alphaVertexColor, "yuv_a", "r", "", SLType::Float);
     fragBuilder->appendCall(args.outputColor, entry, {"yuv", mat3Name, limitedRange, "1", "yuv_a"});
   }
 }
