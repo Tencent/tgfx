@@ -102,4 +102,12 @@ const OperatorDesc* FindOperator(OperatorID id) {
   return nullptr;
 }
 
+size_t OperatorCount() {
+  return Operators().size();
+}
+
+const OperatorDesc* OperatorAt(size_t index) {
+  return index < Operators().size() ? &Operators()[index] : nullptr;
+}
+
 }  // namespace tgfx

@@ -46,6 +46,7 @@
 #include "emit/ChainOpsGLSL.h"
 #include "emit/ComposedShapes.h"
 #include "emit/ProfileEmitter.h"
+#include "gpu/ir/OperatorManifest.h"
 #include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/Layout.h"
@@ -856,38 +857,48 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         report->composedByTag[profileTag].push_back(std::move(framePayload));
       }
     }
-    // The linker's operator library: one module per admitted table row, straight from the
-    // operator table — its includes, prelude and sampler declarations build the wrapper, the row's
-    // parameter list spells the dummy entry, and the compiled signature is reflected back against
-    // the row so a drift between the GLSL source and the table fails this build.
-    for (size_t rowIndex = 0; rowIndex < OpTable::RowCount(); ++rowIndex) {
-      const OpTable::Row& row = OpTable::Rows()[rowIndex];
-      if (!row.admitted) {
-        continue;  // only the linkable slice ships modules
+    // One linkable SPIR-V module per new IR operator, keyed by OperatorID. The manifest owns
+    // the id and symbol; the OpTable row supplies only the include/prelude recipe.
+    for (size_t operatorIndex = 0; operatorIndex < OperatorCount(); ++operatorIndex) {
+      const auto* desc = OperatorAt(operatorIndex);
+      if (desc == nullptr || desc->glslSymbol == nullptr) {
+        continue;
+      }
+      const OpTable::Row* row = nullptr;
+      for (size_t rowIndex = 0; rowIndex < OpTable::RowCount(); ++rowIndex) {
+        const auto& candidate = OpTable::Rows()[rowIndex];
+        if (candidate.exportName != nullptr &&
+            std::strcmp(candidate.exportName, desc->glslSymbol) == 0) {
+          row = &candidate;
+          break;
+        }
+      }
+      if (row == nullptr || !row->admitted) {
+        continue;
       }
       std::string text = "#version 450\n";
-      if (row.prelude != nullptr) {
-        text += row.prelude;
+      if (row->prelude != nullptr) {
+        text += row->prelude;
       }
       bool needsDummySampler = false;
-      for (size_t argument = 0; argument < row.argCount; ++argument) {
-        if (row.args[argument].type == OpTable::Param::SampledImage) {
+      for (size_t argument = 0; argument < row->argCount; ++argument) {
+        if (row->args[argument].type == OpTable::Param::SampledImage) {
           needsDummySampler = true;
         }
       }
       const bool dummyDstDeclared =
-          row.special != nullptr && std::strcmp(row.special, "porterDuff") == 0;
+          row->special != nullptr && std::strcmp(row->special, "porterDuff") == 0;
       if (needsDummySampler && !dummyDstDeclared) {
         text += "layout(set = 2, binding = 15) uniform sampler2D dummyLeafTex;\n";
       }
-      if (row.leafSamplers) {
+      if (row->leafSamplers) {
         for (int sampler = 0; sampler < 4; ++sampler) {
           text += "layout(set = 2, binding = " + std::to_string(sampler) +
                   ") uniform sampler2D TextureSampler_" + std::to_string(sampler) + ";\n";
         }
       }
-      for (size_t includeIndex = 0; includeIndex < row.includeCount; ++includeIndex) {
-        const char* include = row.includes[includeIndex];
+      for (size_t includeIndex = 0; includeIndex < row->includeCount; ++includeIndex) {
+        const char* include = row->includes[includeIndex];
         if (strcmp(include, "entry/ChainLeafFetch.glsl") == 0) {
           if (strippedLeafFetch.empty()) {
             strippedLeafFetch = stripFetchHelpers(readExpanded(include));
@@ -898,11 +909,9 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         }
       }
       text += "\nlayout(location = 0) out vec4 dummyOut;\nvoid main() {\n  dummyOut = ";
-      // A row whose function returns something narrower than vec4 widens at the wrapper: a scalar
-      // wraps whole, a vec2 pads with zeros, a vec3 appends one zero.
       std::string widenPrefix;
       std::string widenSuffix;
-      switch (row.returnType) {
+      switch (row->returnType) {
         case OpTable::Param::Float:
           widenPrefix = "vec4(";
           widenSuffix = ")";
@@ -919,13 +928,13 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
           break;
       }
       text += widenPrefix;
-      text += row.exportName;
+      text += desc->glslSymbol;
       text += "(";
-      for (size_t argument = 0; argument < row.argCount; ++argument) {
+      for (size_t argument = 0; argument < row->argCount; ++argument) {
         if (argument > 0) {
           text += ", ";
         }
-        switch (row.args[argument].type) {
+        switch (row->args[argument].type) {
           case OpTable::Param::Float:
             text += "0.0";
             break;
@@ -955,8 +964,8 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
             break;
           case OpTable::Param::Vec4Array8:
             text +=
-                "vec4[8](vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), "
-                "vec4(1.0), vec4(1.0))";
+                "vec4[8](vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), vec4(1.0), "
+                "vec4(1.0), vec4(1.0), vec4(1.0))";
             break;
         }
       }
@@ -964,31 +973,32 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
       text += widenSuffix;
       text += ";\n}\n";
       std::string buildError;
-      auto patched = CompileSPIRVLibraryModule(text, row.exportName, row.exportName, &buildError);
+      auto patched =
+          CompileSPIRVLibraryModule(text, desc->glslSymbol, desc->glslSymbol, &buildError);
       if (patched.empty()) {
         RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
-                         row.exportName, profileTag, -1, -1,
+                         desc->glslSymbol, profileTag, -1, -1,
                          std::string("the SPIR-V operator module did not build: ") + buildError);
         continue;
       }
       std::string reflectError;
-      const auto reflected = ReflectFunctionSignature(patched, row.exportName, &reflectError);
-      if (reflected.size() != row.argCount) {
+      const auto reflected = ReflectFunctionSignature(patched, desc->glslSymbol, &reflectError);
+      if (reflected.size() != row->argCount) {
         RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
-                         row.exportName, profileTag, -1, -1,
-                         "the operator table declares " + std::to_string(row.argCount) +
+                         desc->glslSymbol, profileTag, -1, -1,
+                         "the operator declares " + std::to_string(row->argCount) +
                              " parameters but the module compiled " +
                              std::to_string(reflected.size()) +
                              (reflectError.empty() ? std::string() : ": " + reflectError));
         continue;
       }
       bool signatureMatches = true;
-      for (size_t argument = 0; argument < row.argCount; ++argument) {
-        if (reflected[argument] != row.args[argument].type) {
+      for (size_t argument = 0; argument < row->argCount; ++argument) {
+        if (reflected[argument] != row->args[argument].type) {
           signatureMatches = false;
           RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
-                           row.exportName, profileTag, -1, -1,
-                           "parameter " + std::to_string(argument) + " of " + row.exportName +
+                           desc->glslSymbol, profileTag, -1, -1,
+                           "parameter " + std::to_string(argument) + " of " + desc->glslSymbol +
                                " drifted from the operator table");
         }
       }
@@ -996,8 +1006,8 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         continue;
       }
       ComposedPayload payload;
-      payload.name = row.exportName;
-      payload.id = FragmentPackSPIRVOpBase | static_cast<uint32_t>(row.id);
+      payload.name = desc->glslSymbol;
+      payload.id = FragmentPackSPIRVOpBase | static_cast<uint32_t>(desc->id);
       const auto* bytes = reinterpret_cast<const uint8_t*>(patched.data());
       payload.blob.assign(bytes, bytes + patched.size() * sizeof(uint32_t));
       report->composedByTag[profileTag].push_back(std::move(payload));

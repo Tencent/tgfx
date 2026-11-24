@@ -69,4 +69,9 @@ struct OperatorDesc {
 /// Returns the manifest entry for an operator, or null when the id is unknown.
 const OperatorDesc* FindOperator(OperatorID id);
 
+/// Iterates the manifest without exposing its storage. The build tool walks this list to emit one
+/// SPIR-V module per operator, keyed by the operator id.
+size_t OperatorCount();
+const OperatorDesc* OperatorAt(size_t index);
+
 }  // namespace tgfx

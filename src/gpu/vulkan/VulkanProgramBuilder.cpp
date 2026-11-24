@@ -46,17 +46,18 @@ OperatorBundle BuildOperatorBundle(Context* context) {
   if (cache == nullptr) {
     return OperatorBundle(std::move(artifacts));
   }
-  for (uint32_t id = 1; id <= 12; ++id) {
-    const auto* desc = FindOperator(static_cast<OperatorID>(id));
+  for (size_t index = 0; index < OperatorCount(); ++index) {
+    const auto* desc = OperatorAt(index);
     if (desc == nullptr || desc->glslSymbol == nullptr) {
       continue;
     }
-    const auto* blob = cache->findComposed(FragmentPackSPIRVOpBase | id);
+    const auto* blob =
+        cache->findComposed(FragmentPackSPIRVOpBase | static_cast<uint32_t>(desc->id));
     if (blob == nullptr || blob->data.size() % sizeof(uint32_t) != 0) {
       continue;
     }
     OperatorArtifact artifact = {};
-    artifact.id = static_cast<OperatorID>(id);
+    artifact.id = desc->id;
     artifact.backend = OperatorBackend::SPIRV;
     artifact.symbol = desc->glslSymbol;
     const auto* words = reinterpret_cast<const uint32_t*>(blob->data.data());
