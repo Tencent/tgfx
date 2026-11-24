@@ -359,13 +359,10 @@ jobs:
       # the test build below, because CMake preloads it into the WASM file system at link time.
       # A restore only counts when the primary key matches, so a stale fallback or a cold start
       # regenerates the reference on pull requests too; only main pushes save it back for reuse.
-      # The reference is rebuilt from a temporary archive of origin/main, so its absolute source
-      # paths differ on every run and can never hit the ccache. An empty wrapper disables ccache
-      # so the reference build does not flood the shared cache with unusable entries.
+      # The reference is rebuilt from a temporary archive of origin/main, which update_baseline.sh
+      # keeps in a fixed session tree layout so ccache can reuse the unchanged translation units.
       - name: Update Reference Cache
         if: ${{ steps.reference-cache.outputs.cache-hit != 'true' }}
-        env:
-          EM_COMPILER_WRAPPER: ''
         run: |
           source web/emsdk/emsdk_env.sh
           bash update_baseline.sh USE_WEBGL --skip-images
@@ -540,12 +537,9 @@ jobs:
           cd web/test
           npm install
 
-      # See the web-webgl job for the reference cache regeneration rule and the restore ordering,
-      # including why the wrapper is disabled for this step.
+      # See the web-webgl job for the reference cache regeneration rule and the restore ordering.
       - name: Update Reference Cache
         if: ${{ steps.reference-cache.outputs.cache-hit != 'true' }}
-        env:
-          EM_COMPILER_WRAPPER: ''
         run: |
           source web/emsdk/emsdk_env.sh
           bash update_baseline.sh USE_WEBGPU --skip-images

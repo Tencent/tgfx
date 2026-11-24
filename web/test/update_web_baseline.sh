@@ -63,6 +63,14 @@ SOURCE_DIR="$SESSION/source"
 BUILD_DIR="$SESSION/build"
 RUNTIME_DIR="$SESSION/runtime"
 mkdir -p "$SOURCE_DIR" "$RUNTIME_DIR"
+# Every run builds the pinned main source from a fresh session directory, so the absolute paths
+# in the compiler command line differ each time and ccache would miss unconditionally. base_dir
+# makes ccache rewrite those paths relative to the working directory, and because source/ and
+# build/ stay siblings the relative form is identical across runs, letting unchanged translation
+# units hit. Disabling the working-directory hash is safe here because the command line only uses
+# absolute paths, so the directory cannot change how a path resolves.
+export CCACHE_BASEDIR="$SESSION"
+export CCACHE_NOHASHDIR=true
 echo "Generating $BACKEND reference from origin/main ${REFERENCE_COMMIT:0:9} in $SESSION"
 git archive "$REFERENCE_COMMIT" | tar -x -C "$SOURCE_DIR"
 node "$SCRIPT_DIR/reference_source.js" "$SOURCE_DIR"
