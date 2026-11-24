@@ -103,7 +103,8 @@ std::string GLSLFragmentShaderBuilder::dstColor() {
 void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
                                            const std::string& functionName,
                                            const std::vector<ValueRef>& args,
-                                           const std::string& wrapType) {
+                                           const std::string& wrapType,
+                                           const std::string& expression) {
   if (callRecorder != nullptr) {
     CallRecord record = {};
     record.output = outputVar;
@@ -120,16 +121,20 @@ void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
   if (!wrapType.empty()) {
     codeAppendf("%s(", wrapType.c_str());
   }
-  codeAppendf("%s(", functionName.c_str());
-  bool first = true;
-  for (const auto& arg : args) {
-    if (!first) {
-      codeAppend(", ");
+  if (!expression.empty()) {
+    codeAppend(expression);
+  } else {
+    codeAppendf("%s(", functionName.c_str());
+    bool first = true;
+    for (const auto& arg : args) {
+      if (!first) {
+        codeAppend(", ");
+      }
+      first = false;
+      codeAppend(arg.name);
     }
-    first = false;
-    codeAppend(arg.name);
+    codeAppend(")");
   }
-  codeAppend(")");
   if (!wrapType.empty()) {
     codeAppend(")");
   }

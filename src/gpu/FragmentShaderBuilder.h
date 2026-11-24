@@ -84,7 +84,8 @@ class FragmentShaderBuilder : public ShaderBuilder {
    * builder resolves the names into its own instruction forms instead.
    */
   virtual void appendCall(const std::string& outputVar, const std::string& functionName,
-                          const std::vector<ValueRef>& args, const std::string& wrapType = "") = 0;
+                          const std::vector<ValueRef>& args, const std::string& wrapType = "",
+                          const std::string& expression = "") = 0;
 
   /**
    * One structured call whose result lands in a builder-named temporary, for the call sites that
