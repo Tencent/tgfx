@@ -388,12 +388,20 @@ class DisplayList {
   void captureBackgroundsByLevel(
       Surface* surface, const std::vector<DrawTask>& tileTasks, float zoomScale,
       std::vector<std::unique_ptr<BackgroundSnapshotMap>>* levelSnapshots,
-      std::vector<int>* taskSnapshotIndex) const;
+      std::vector<int>* taskSnapshotIndex, std::vector<bool>* taskSnapshotCover) const;
+
+  // Whether the task's background styles all read their backdrop from the tile, so the tile needs
+  // no captured snapshot.
+  bool needsCapture(const DrawTask& task) const;
+
+  bool needsCapture(Layer* layer, const Rect& globalRect, float parentAlpha, bool offscreen,
+                    std::vector<Rect>* drawnBounds) const;
 
   std::vector<Rect> drawTileTasks(
       const std::vector<DrawTask>& tileTasks,
       const std::vector<std::unique_ptr<BackgroundSnapshotMap>>& levelSnapshots,
-      const std::vector<int>& taskSnapshotIndex, Surface* surface, float zoomScale);
+      const std::vector<int>& taskSnapshotIndex, const std::vector<bool>& taskSnapshotCover,
+      Surface* surface, float zoomScale);
 
   void drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
                        Surface* surface, bool autoClear) const;

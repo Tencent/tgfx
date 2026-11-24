@@ -677,7 +677,7 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
 // from the tile: offscreen composites (blend modes, group alpha, filters, masks, 3D) do not write
 // to the tile, and a style whose sample area leaves the tile or meets an earlier style output has
 // no valid backdrop there either.
-bool DisplayList::needsCapture(const Layer* layer, const Rect& globalRect, float parentAlpha,
+bool DisplayList::needsCapture(Layer* layer, const Rect& globalRect, float parentAlpha,
                                bool offscreen, std::vector<Rect>* drawnBounds) const {
   const bool isRoot = layer->_parent == nullptr;
   if (!isRoot) {
@@ -697,7 +697,9 @@ bool DisplayList::needsCapture(const Layer* layer, const Rect& globalRect, float
       (alpha < 1.0f && layer->bitFields.allowsGroupOpacity) || !layer->_filters.empty() ||
       layer->hasValidMask();
   for (const auto& style : layer->_layerStyles) {
-    if (style == nullptr || !NeedsBackgroundSource(style->extraSourceType())) {
+    if (style == nullptr ||
+        (style->extraSourceType() & static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) ==
+            0) {
       continue;
     }
     const bool onTile = !childOffscreen && style->position() == LayerStylePosition::Below;
