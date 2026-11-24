@@ -25,6 +25,7 @@
 #include "core/utils/Log.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
+#include "gpu/ir/ProgramIRValidation.h"
 #include "gpu/ir/ProgramValidation.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/GPU.h"
@@ -261,6 +262,10 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   }
   finalizeShaders();
   std::string validationError;
+  if (!ValidateProgramIR(programIRBuilder().IR(), &validationError)) {
+    LOGE("GLSLProgramBuilder: %s", validationError.c_str());
+    return nullptr;
+  }
   if (!ValidateProgramDescription(&description, &validationError)) {
     LOGE("GLSLProgramBuilder: %s", validationError.c_str());
     return nullptr;

@@ -97,6 +97,25 @@ TEST(ProgramIRTest, InternsInterfaceResources) {
   const auto varyingId = builder.AddVarying({"vColor", SLType::Float4, Precision::High, 0, false});
   ASSERT_NE(varyingId, INVALID_VALUE_ID);
   EXPECT_EQ(builder.Interface().varyings.size(), 1u);
+  EXPECT_EQ(builder.Interface().attributes[0].location, 0u);
+  EXPECT_EQ(builder.Interface().varyings[0].location, 0u);
+  EXPECT_EQ(builder.Interface().samplers[0].binding, 0u);
+
+  std::string error;
+  EXPECT_TRUE(ValidateProgramIR(builder.IR(), &error)) << error;
+}
+
+TEST(ProgramIRTest, RejectsDuplicateSamplerBindings) {
+  ProgramIR program = {};
+  ResourceBinding first = {};
+  first.kind = BindingKind::Sampler;
+  first.binding = 3;
+  first.stage = ShaderStage::Fragment;
+  program.interface.bindings = {first, first};
+
+  std::string error;
+  EXPECT_FALSE(ValidateProgramIR(program, &error));
+  EXPECT_NE(error.find("duplicate"), std::string::npos);
 }
 
 TEST(ProgramIRTest, RejectsForwardReferences) {

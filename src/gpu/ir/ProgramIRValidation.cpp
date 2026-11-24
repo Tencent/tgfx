@@ -108,6 +108,29 @@ bool ValidateStatement(const ProgramIR& program, const IRStatement& statement, s
   return true;
 }
 
+bool ValidateInterface(const InterfaceIR& interface, std::string* error) {
+  for (size_t i = 0; i < interface.bindings.size(); ++i) {
+    const auto& first = interface.bindings[i];
+    if (first.kind != BindingKind::Attribute && first.kind != BindingKind::Varying &&
+        first.kind != BindingKind::Sampler) {
+      continue;
+    }
+    for (size_t j = i + 1; j < interface.bindings.size(); ++j) {
+      const auto& second = interface.bindings[j];
+      if (first.kind != second.kind || first.stage != second.stage) {
+        continue;
+      }
+      const bool duplicate = first.kind == BindingKind::Sampler ? first.binding == second.binding
+                                                                : first.location == second.location;
+      if (duplicate) {
+        *error = "the interface contains a duplicate resource binding";
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 }  // namespace
 
 bool ValidateProgramIR(const ProgramIR& program, std::string* error) {
@@ -141,7 +164,7 @@ bool ValidateProgramIR(const ProgramIR& program, std::string* error) {
       return false;
     }
   }
-  return true;
+  return ValidateInterface(program.interface, error);
 }
 
 }  // namespace tgfx

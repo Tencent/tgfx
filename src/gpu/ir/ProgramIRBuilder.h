@@ -75,8 +75,13 @@ class ProgramIRBuilder {
  private:
   ValueID AddExpr(IRExpr expr);
 
+  bool HasUniformBinding(ShaderStage stage) const;
+
   ProgramIR ir = {};
   std::unordered_map<std::string, ValueID> valuesByName = {};
+  uint32_t nextAttributeLocation = 0;
+  uint32_t nextVaryingLocation = 0;
+  uint32_t nextSamplerBinding = 0;
 };
 
 }  // namespace tgfx

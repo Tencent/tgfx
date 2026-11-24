@@ -64,26 +64,71 @@ ValueID ProgramIRBuilder::InternValue(const std::string& name, SLType type, Prec
 
 ValueID ProgramIRBuilder::AddAttribute(AttributeIR attribute) {
   const auto precision = Precision::High;
+  attribute.location = nextAttributeLocation++;
   const auto id = InternValue(attribute.name, attribute.type, precision, IRValueKind::Attribute);
+  ResourceBinding binding = {};
+  binding.kind = BindingKind::Attribute;
+  binding.location = attribute.location;
+  binding.stage = ShaderStage::Vertex;
+  binding.type = attribute.type;
+  binding.precision = precision;
+  ir.interface.bindings.push_back(binding);
   ir.interface.attributes.push_back(std::move(attribute));
   return id;
 }
 
 ValueID ProgramIRBuilder::AddVarying(VaryingIR varying) {
   const auto precision = Precision::High;
+  varying.location = nextVaryingLocation++;
   const auto id = InternValue(varying.name, varying.type, precision, IRValueKind::Varying);
+  for (const auto stage : {ShaderStage::Vertex, ShaderStage::Fragment}) {
+    ResourceBinding binding = {};
+    binding.kind = BindingKind::Varying;
+    binding.location = varying.location;
+    binding.stage = stage;
+    binding.type = varying.type;
+    binding.precision = precision;
+    ir.interface.bindings.push_back(binding);
+  }
   ir.interface.varyings.push_back(std::move(varying));
   return id;
 }
 
+bool ProgramIRBuilder::HasUniformBinding(ShaderStage stage) const {
+  for (const auto& binding : ir.interface.bindings) {
+    if (binding.kind == BindingKind::UniformBuffer && binding.stage == stage) {
+      return true;
+    }
+  }
+  return false;
+}
+
 ValueID ProgramIRBuilder::AddUniform(UniformIR uniform) {
+  uniform.binding = uniform.stage == ShaderStage::Vertex ? 0 : 1;
   const auto id = InternValue(uniform.name, uniform.type, uniform.precision, IRValueKind::Uniform);
+  if (!HasUniformBinding(uniform.stage)) {
+    ResourceBinding binding = {};
+    binding.kind = BindingKind::UniformBuffer;
+    binding.binding = uniform.binding;
+    binding.stage = uniform.stage;
+    binding.type = SLType::Void;
+    binding.precision = Precision::Default;
+    ir.interface.bindings.push_back(binding);
+  }
   ir.interface.uniforms.push_back(std::move(uniform));
   return id;
 }
 
 ValueID ProgramIRBuilder::AddSampler(SamplerIR sampler) {
+  sampler.binding = nextSamplerBinding++;
   const auto id = InternValue(sampler.name, sampler.type, Precision::Default, IRValueKind::Sampler);
+  ResourceBinding binding = {};
+  binding.kind = BindingKind::Sampler;
+  binding.binding = sampler.binding;
+  binding.stage = ShaderStage::Fragment;
+  binding.type = sampler.type;
+  binding.precision = Precision::Default;
+  ir.interface.bindings.push_back(binding);
   ir.interface.samplers.push_back(std::move(sampler));
   return id;
 }
