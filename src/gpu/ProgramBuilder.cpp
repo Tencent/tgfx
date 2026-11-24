@@ -139,7 +139,7 @@ std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* proc
       programIR.InternValue(output, SLType::Float4, Precision::High, IRValueKind::Local);
   FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output, input,
                                    subsetVarName, &coords, &textureSamplers, {}, &programIR,
-                                   inputValue, outputValue);
+                                   inputValue, outputValue, &samplerValues);
 
   processor->emitCode(args);
   fragmentShaderBuilder()->codeAppend("}");
@@ -170,7 +170,15 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
 SamplerHandle ProgramBuilder::emitSampler(std::shared_ptr<Texture> texture,
                                           const std::string& name) {
   ++numFragmentSamplers;
-  return uniformHandler()->addSampler(texture, name);
+  const auto handle = uniformHandler()->addSampler(texture, name);
+  const auto samplerVar = uniformHandler()->getSamplerVariable(handle);
+  const auto value =
+      programIR.AddSampler({samplerVar.name(), samplerVar.type(), static_cast<uint32_t>(0)});
+  if (samplerValues.size() <= handle.toIndex()) {
+    samplerValues.resize(handle.toIndex() + 1, INVALID_VALUE_ID);
+  }
+  samplerValues[handle.toIndex()] = value;
+  return handle;
 }
 
 void ProgramBuilder::emitFSOutputSwizzle() {

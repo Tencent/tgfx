@@ -138,6 +138,17 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
     } else {
       fragBuilder->storeColor(args.outputColor, readName);
     }
+    if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID) {
+      const auto sampler = args.samplerValue(textureSampler);
+      const auto coordType = (*args.transformedCoords)[0].type();
+      const auto coordValue =
+          args.irBuilder->InternValue(texCoordName, coordType, Precision::High, IRValueKind::Local);
+      if (sampler != INVALID_VALUE_ID && coordValue != INVALID_VALUE_ID) {
+        const auto sample =
+            args.irBuilder->CreateTextureSample(sampler, coordValue, SLType::Float4);
+        args.irBuilder->StoreOutput(args.outputValue, sample);
+      }
+    }
     return;
   }
   const auto finalCoordName =

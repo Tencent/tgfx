@@ -207,7 +207,7 @@ void FragmentProcessor::internalEmitChild(
   EmitArgs childArgs(fragBuilder, args.uniformHandler, outputColor,
                      inputName.empty() ? "vec4(1.0)" : inputName, args.inputSubset, &coordVars,
                      &textureSamplers, std::move(coordFunc), args.irBuilder, childInputValue,
-                     childOutputValue);
+                     childOutputValue, args.samplerValues);
   childProcessor(childIndex)->emitCode(childArgs);
   fragBuilder->codeAppend("}\n");
 

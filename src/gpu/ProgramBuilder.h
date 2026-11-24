@@ -99,6 +99,7 @@ class ProgramBuilder {
   std::vector<CoordValue> transformedCoordVars = {};
   std::string subsetVarName = {};
   ProgramIRBuilder programIR = {};
+  std::vector<ValueID> samplerValues = {};
 
   /**
    * Generates a possibly mangled name for a stage variable and writes it to the fragment shader.

@@ -236,14 +236,16 @@ class FragmentProcessor : public Processor {
              const TransformedCoordVars* transformedCoords, const TextureSamplers* textureSamplers,
              std::function<std::string(std::string_view)> coordFunc = {},
              ProgramIRBuilder* irBuilder = nullptr, ValueID inputValue = INVALID_VALUE_ID,
-             ValueID outputValue = INVALID_VALUE_ID)
+             ValueID outputValue = INVALID_VALUE_ID,
+             const std::vector<ValueID>* samplerValues = nullptr)
         : fragBuilder(fragBuilder), uniformHandler(uniformHandler),
           outputColor(std::move(outputColor)), inputColor(std::move(inputColor)),
           transformedCoords(transformedCoords), textureSamplers(textureSamplers),
           coordFunc(std::move(coordFunc)), inputSubset(std::move(inputSubset)),
           inputColorValue(this->inputColor, SLType::Float4, ValueOrigin::Local),
           outputColorValue(this->outputColor, SLType::Float4, ValueOrigin::Local),
-          irBuilder(irBuilder), inputValue(inputValue), outputValue(outputValue) {
+          irBuilder(irBuilder), inputValue(inputValue), outputValue(outputValue),
+          samplerValues(samplerValues) {
     }
 
     /**
@@ -276,6 +278,14 @@ class FragmentProcessor : public Processor {
     ProgramIRBuilder* irBuilder = nullptr;
     ValueID inputValue = INVALID_VALUE_ID;
     ValueID outputValue = INVALID_VALUE_ID;
+    const std::vector<ValueID>* samplerValues = nullptr;
+
+    ValueID samplerValue(SamplerHandle handle) const {
+      if (samplerValues == nullptr || handle.toIndex() >= samplerValues->size()) {
+        return INVALID_VALUE_ID;
+      }
+      return (*samplerValues)[handle.toIndex()];
+    }
   };
 
   /**

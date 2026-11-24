@@ -185,6 +185,11 @@ ValueID ProgramIRBuilder::AddUniform(UniformIR uniform) {
 }
 
 ValueID ProgramIRBuilder::AddSampler(SamplerIR sampler) {
+  for (const auto& existing : ir.interface.samplers) {
+    if (existing.name == sampler.name) {
+      return InternValue(existing.name, existing.type, Precision::Default, IRValueKind::Sampler);
+    }
+  }
   sampler.binding = nextSamplerBinding++;
   const auto id = InternValue(sampler.name, sampler.type, Precision::Default, IRValueKind::Sampler);
   ResourceBinding binding = {};
