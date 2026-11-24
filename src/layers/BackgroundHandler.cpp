@@ -18,6 +18,7 @@
 
 #include "BackgroundHandler.h"
 #include <algorithm>
+#include <chrono>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/PictureUtils.h"
@@ -33,6 +34,13 @@
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
+
+CaptureProbe gCaptureProbe = {};
+
+static double ProbeMsSince(std::chrono::steady_clock::time_point start) {
+  return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
+      .count();
+}
 
 namespace {
 
@@ -383,6 +391,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
                        visibleLocal.top * contentScale - contentOffset.y,
                        visibleLocal.width() * contentScale, visibleLocal.height() * contentScale);
   }
+  const auto probeStart = std::chrono::steady_clock::now();
   auto bgImage = bgSource->getBackgroundImage();
   if (bgImage == nullptr) {
     return;
@@ -416,6 +425,8 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   }
   snapshots->snapshots[BackgroundSnapshotKey{layer, style}].push_back(
       BackgroundSnapshotEntry{std::move(image), offset});
+  ++gCaptureProbe.snapshots;
+  gCaptureProbe.snapshotMs += ProbeMsSince(probeStart);
 }
 
 const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* layer) const {
@@ -486,6 +497,13 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
 void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
                                              float alpha, LayerStyle* style,
                                              const LayerStyleSource* source) {
+  struct ProbeScope {
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    ~ProbeScope() {
+      ++gCaptureProbe.bgStyles;
+      gCaptureProbe.bgStyleMs += ProbeMsSince(start);
+    }
+  } probeScope;
   if (source == nullptr || FloatNearlyZero(source->contentScale)) {
     return;
   }
@@ -526,6 +544,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     auto& entry = it->second[cursor++];
     bgImage = entry.image;
     bgOffset = entry.offset;
+    ++gCaptureProbe.snapshotReads;
   } else {
     // Picture-canvas path: capture was skipped because there is no GPU context. Synthesize the
     // backdrop on the fly by walking ancestors and prior siblings via PictureRecorder.

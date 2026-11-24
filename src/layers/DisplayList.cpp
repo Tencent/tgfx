@@ -697,6 +697,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   std::vector<std::unique_ptr<BackgroundSnapshotMap>> levelSnapshots = {};
   std::vector<int> taskSnapshotIndex = {};
   // TEMP probe: how much of a tiled frame the per-level background captures take.
+  gCaptureProbe.reset();
   const auto captureStart = std::chrono::steady_clock::now();
   captureBackgroundsByLevel(surface, tileTasks, zoomScale, &levelSnapshots, &taskSnapshotIndex);
   const double captureMs =
@@ -706,7 +707,37 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     std::printf("[CAP-FRAME] tasks=%zu levels=%zu ms=%.1f\n", tileTasks.size(),
                 levelSnapshots.size(), captureMs);
   }
+  const auto drawStart = std::chrono::steady_clock::now();
+  const auto captureProbe = gCaptureProbe;
   auto dirtyRects = drawTileTasks(tileTasks, levelSnapshots, taskSnapshotIndex, surface, zoomScale);
+  if (_root->hasBackgroundStyle(1.0f) && !tileTasks.empty()) {
+    const double drawMs =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - drawStart)
+            .count();
+    std::printf(
+        "[CAP-DRAW] tasks=%zu ms=%.1f tileReads=0 tileReadMs=0.0 snapReads=%d missing=0 "
+        "fallbacks=0 fallbackMs=0.0 drawSrcN=%d drawSrcMs=%.1f bgStyleN=%d bgStyleMs=%.1f\n",
+        tileTasks.size(), drawMs, gCaptureProbe.snapshotReads - captureProbe.snapshotReads,
+        gCaptureProbe.drawStyleSources - captureProbe.drawStyleSources,
+        gCaptureProbe.drawStyleSourceMs - captureProbe.drawStyleSourceMs,
+        gCaptureProbe.bgStyles - captureProbe.bgStyles,
+        gCaptureProbe.bgStyleMs - captureProbe.bgStyleMs);
+    for (int pass = 0; pass < 2; ++pass) {
+      const auto& p = gCaptureProbe;
+      if (p.sourceCalls[pass][0] == 0 && p.sourceCacheHits[pass][0] == 0) {
+        continue;
+      }
+      std::printf(
+          "[CAP-SRC] pass=%s maxDepth=%d d0=%d/%d/%d/%.1f d1=%d/%d/%d/%.1f d2=%d/%d/%d/%.1f "
+          "d3=%d/%d/%d/%.1f\n",
+          pass == 0 ? "draw" : "capture", p.maxDepth, p.sourceCalls[pass][0],
+          p.sourceNonNull[pass][0], p.sourceCacheHits[pass][0], p.sourceMs[pass][0],
+          p.sourceCalls[pass][1], p.sourceNonNull[pass][1], p.sourceCacheHits[pass][1],
+          p.sourceMs[pass][1], p.sourceCalls[pass][2], p.sourceNonNull[pass][2],
+          p.sourceCacheHits[pass][2], p.sourceMs[pass][2], p.sourceCalls[pass][3],
+          p.sourceNonNull[pass][3], p.sourceCacheHits[pass][3], p.sourceMs[pass][3]);
+    }
+  }
   drawScreenTasks(std::move(screenTasks), std::move(skippedRects), surface, autoClear);
   return dirtyRects;
 }
@@ -749,12 +780,20 @@ void DisplayList::captureBackgroundsByLevel(
       // One capture serves every tile of this level: the capturer culls the layers no background
       // style samples inside the rects it covers, so a capture spanning more than the tiles that
       // need it costs the surface, not the drawing.
+      const auto before = gCaptureProbe;
       const auto levelStart = std::chrono::steady_clock::now();
       auto map = captureBackgrounds(surface, levelRects, Matrix::MakeScale(rasterScale));
-      std::printf(
-          "[CAP-LEVEL] level=%d tiles=%zu ms=%.1f\n", level, levelEntry.second.size(),
+      const double levelMs =
           std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - levelStart)
-              .count());
+              .count();
+      const double sourceMs = gCaptureProbe.styleSourceMs - before.styleSourceMs;
+      const double snapMs = gCaptureProbe.snapshotMs - before.snapshotMs;
+      std::printf(
+          "[CAP-LEVEL] level=%d tiles=%zu ms=%.1f tasks=%zu srcN=%d srcMs=%.1f snapN=%d "
+          "snapMs=%.1f restMs=%.1f\n",
+          level, levelEntry.second.size(), levelMs, levelEntry.second.size(),
+          gCaptureProbe.styleSources - before.styleSources, sourceMs,
+          gCaptureProbe.snapshots - before.snapshots, snapMs, levelMs - sourceMs - snapMs);
       auto snapshotIndex = static_cast<int>(levelSnapshots->size());
       levelSnapshots->push_back(std::move(map));
       for (auto index : levelEntry.second) {
@@ -1928,8 +1967,10 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   if (_backgroundColor != Color::Transparent()) {
     bgSource->getCanvas()->drawColor(_backgroundColor, BlendMode::SrcOver);
   }
+  gCaptureProbe.inCapture = true;
   BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get(), cullWorldRects,
                           worldRects, 1.0f);
+  gCaptureProbe.inCapture = false;
   return snapshotMap;
 }
 
