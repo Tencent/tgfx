@@ -178,6 +178,55 @@ uint32_t SPIRVShaderBuilder::ConstantId(const IRExpr& expr, std::string* error) 
   return id;
 }
 
+void SPIRVShaderBuilder::AddEntryPointInterface(uint32_t id) {
+  for (size_t index = 0; index < writer.mode.size();) {
+    const auto instruction = writer.mode[index];
+    const auto wordCount = instruction >> 16;
+    const auto opcode = instruction & 0xFFFFu;
+    if (wordCount == 0) {
+      return;
+    }
+    if (opcode == spirv::kOpEntryPoint) {
+      writer.mode.insert(writer.mode.begin() + static_cast<ptrdiff_t>(index + wordCount), id);
+      writer.mode[index] = ((wordCount + 1) << 16) | opcode;
+      return;
+    }
+    index += wordCount;
+  }
+}
+
+uint32_t SPIRVShaderBuilder::EnsureAttribute(const ProgramIR& program, const IRValue& value,
+                                             std::string* error) {
+  const AttributeIR* attribute = nullptr;
+  for (const auto& candidate : program.interface.attributes) {
+    if (candidate.name == value.debugName) {
+      attribute = &candidate;
+      break;
+    }
+  }
+  if (attribute == nullptr) {
+    Fail(error, "the vertex attribute is missing from the interface");
+    return 0;
+  }
+  const auto typeId = TypeId(value.type, error);
+  const auto pointer = PointerTypeId(value.type, spirv::kStorageInput, error);
+  if (typeId == 0 || pointer == 0) {
+    return 0;
+  }
+  auto* saved = writer.sink;
+  writer.Sink(&writer.decl);
+  const auto variableId = writer.NewId();
+  writer.Inst(spirv::kOpVariable, {pointer, variableId, spirv::kStorageInput});
+  writer.Sink(&writer.ann);
+  writer.Inst(spirv::kOpDecorate, {variableId, spirv::kDecorationLocation, attribute->location});
+  writer.Sink(&writer.func);
+  const auto loadId = writer.NewId();
+  writer.Inst(spirv::kOpLoad, {typeId, loadId, variableId});
+  writer.Sink(saved);
+  AddEntryPointInterface(variableId);
+  return loadId;
+}
+
 uint32_t SPIRVShaderBuilder::LoadSampler(const ProgramIR& program, ValueID sampler,
                                          std::string* error) {
   const auto found = samplerValues.find(sampler);
@@ -583,7 +632,8 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
         Fail(error, "a load needs one source");
         return 0;
       }
-      if (program.values[expr.args[0]].kind == IRValueKind::Uniform) {
+      const auto sourceKind = program.values[expr.args[0]].kind;
+      if (sourceKind == IRValueKind::Uniform || sourceKind == IRValueKind::Attribute) {
         uint32_t loaded = 0;
         return EmitValue(program, expr.args[0], &loaded, error) ? loaded : 0;
       }
@@ -770,6 +820,15 @@ bool SPIRVShaderBuilder::EmitValue(const ProgramIR& program, ValueID value, uint
   }
   if (irValue.kind == IRValueKind::UniformArray) {
     const auto id = EmitUniformArrayValue(program, irValue, error);
+    if (id == 0) {
+      return false;
+    }
+    valueIds.emplace(value, id);
+    *resultId = id;
+    return true;
+  }
+  if (irValue.kind == IRValueKind::Attribute) {
+    const auto id = EnsureAttribute(program, irValue, error);
     if (id == 0) {
       return false;
     }

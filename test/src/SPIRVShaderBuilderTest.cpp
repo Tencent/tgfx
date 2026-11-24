@@ -24,9 +24,12 @@
 #if defined(TGFX_USE_VULKAN)
 #include <cstring>
 #include <memory>
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/RenderPass.h"
 #include "tgfx/gpu/RenderPipeline.h"
 #include "tgfx/gpu/ShaderModule.h"
+#include "tgfx/gpu/Texture.h"
 #include "utils/ContextScope.h"
 #endif
 
@@ -292,6 +295,37 @@ std::vector<uint8_t> WordsToBytes(const std::vector<uint32_t>& words) {
   return bytes;
 }
 
+std::shared_ptr<ShaderModule> MakeAttributeVertexModule(GPU* gpu, std::string* error) {
+  ProgramIRBuilder program = {};
+  const auto positionAttr = program.AddAttribute({"aPosition", SLType::Float2, Precision::High, 0});
+  const auto position = program.CreateLoad(positionAttr, SLType::Float2);
+  const auto zero = program.CreateConstant(0.0f);
+  const auto one = program.CreateConstant(1.0f);
+  const auto clipPosition = program.CreateConstruct(SLType::Float4, {position, zero, one});
+  const auto output =
+      program.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "gl_Position");
+  program.StoreOutput(output, clipPosition);
+
+  SPIRVVertexShaderBuilder builder;
+  if (!builder.Begin(error)) {
+    return nullptr;
+  }
+  uint32_t value = 0;
+  if (!builder.EmitValue(program.IR(), clipPosition, &value, error) ||
+      !builder.StoreOutput(program.IR(), clipPosition, error)) {
+    return nullptr;
+  }
+  const auto words = builder.Finish(error);
+  if (words.empty()) {
+    return nullptr;
+  }
+  ShaderModuleDescriptor descriptor = {};
+  descriptor.format = ShaderCodeFormat::SPIRV;
+  descriptor.stage = ShaderStage::Vertex;
+  descriptor.binaryData = WordsToBytes(words);
+  return gpu->createShaderModule(descriptor);
+}
+
 std::shared_ptr<ShaderModule> MakeVertexModule(GPU* gpu, std::string* error) {
   ProgramIRBuilder program = {};
   const auto zero = program.CreateConstant(0.0f);
@@ -446,6 +480,96 @@ TEST(SPIRVShaderBuilderTest, VulkanAcceptsUniformAndSamplerPipeline) {
   pipelineDesc.layout.textureSamplers = {{"TextureSampler_0", 0, ShaderVisibility::Fragment}};
   auto pipeline = gpu->createRenderPipeline(pipelineDesc);
   ASSERT_TRUE(pipeline != nullptr) << "the UBO or sampler layout did not match the SPIR-V";
+}
+
+TEST(SPIRVShaderBuilderTest, VulkanDrawsGeneratedTriangle) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  if (context->backend() != Backend::Vulkan) {
+    GTEST_SKIP() << "the Vulkan backend is not active";
+  }
+  auto* gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+
+  std::string error = {};
+  auto vertexModule = MakeAttributeVertexModule(gpu, &error);
+  ASSERT_TRUE(vertexModule != nullptr) << error;
+
+  ProgramIRBuilder fragmentProgram = {};
+  const auto zero = fragmentProgram.CreateConstant(0.0f);
+  const auto one = fragmentProgram.CreateConstant(1.0f);
+  const auto color = fragmentProgram.CreateConstruct(SLType::Float4, {zero, zero, zero, one});
+  const auto output = fragmentProgram.CreateValue(SLType::Float4, Precision::High,
+                                                  IRValueKind::Local, "outputColor");
+  fragmentProgram.StoreOutput(output, color);
+
+  SPIRVFragmentShaderBuilder fragmentBuilder;
+  ASSERT_TRUE(fragmentBuilder.Begin(&error)) << error;
+  uint32_t value = 0;
+  ASSERT_TRUE(fragmentBuilder.EmitValue(fragmentProgram.IR(), color, &value, &error)) << error;
+  ASSERT_TRUE(fragmentBuilder.StoreOutput(fragmentProgram.IR(), color, &error)) << error;
+  const auto fragmentWords = fragmentBuilder.Finish(&error);
+  ASSERT_FALSE(fragmentWords.empty()) << error;
+
+  ShaderModuleDescriptor fragmentDesc = {};
+  fragmentDesc.format = ShaderCodeFormat::SPIRV;
+  fragmentDesc.stage = ShaderStage::Fragment;
+  fragmentDesc.binaryData = WordsToBytes(fragmentWords);
+  auto fragmentModule = gpu->createShaderModule(fragmentDesc);
+  ASSERT_TRUE(fragmentModule != nullptr);
+
+  RenderPipelineDescriptor pipelineDesc = {};
+  Attribute positionAttribute = {"aPosition", VertexFormat::Float2};
+  pipelineDesc.vertex.bufferLayouts = {VertexBufferLayout({positionAttribute})};
+  pipelineDesc.vertex.module = vertexModule;
+  pipelineDesc.fragment.module = fragmentModule;
+  pipelineDesc.fragment.colorAttachments.push_back({});
+  auto pipeline = gpu->createRenderPipeline(pipelineDesc);
+  ASSERT_TRUE(pipeline != nullptr);
+
+  struct Vertex {
+    float x;
+    float y;
+  };
+  const Vertex vertices[] = {{-1.0f, -1.0f}, {1.0f, -1.0f}, {-1.0f, 1.0f}, {1.0f, 1.0f}};
+  auto vertexBuffer = gpu->createBuffer(sizeof(vertices), GPUBufferUsage::VERTEX);
+  ASSERT_TRUE(vertexBuffer != nullptr);
+  auto* mapped = static_cast<Vertex*>(vertexBuffer->map());
+  ASSERT_TRUE(mapped != nullptr);
+  std::memcpy(mapped, vertices, sizeof(vertices));
+  vertexBuffer->unmap();
+
+  constexpr int SIZE = 64;
+  TextureDescriptor renderTextureDesc(
+      SIZE, SIZE, PixelFormat::RGBA_8888, false, 1,
+      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
+  auto renderTexture = gpu->createTexture(renderTextureDesc);
+  ASSERT_TRUE(renderTexture != nullptr);
+
+  auto encoder = gpu->createCommandEncoder();
+  ASSERT_TRUE(encoder != nullptr);
+  RenderPassDescriptor renderPassDesc(renderTexture, LoadAction::Clear, StoreAction::Store,
+                                      PMColor::Transparent());
+  auto renderPass = encoder->beginRenderPass(renderPassDesc);
+  ASSERT_TRUE(renderPass != nullptr);
+  renderPass->setPipeline(std::move(pipeline));
+  renderPass->setVertexBuffer(0, vertexBuffer);
+  renderPass->draw(PrimitiveType::TriangleStrip, 4, 1);
+  renderPass->end();
+
+  auto commandBuffer = encoder->finish();
+  ASSERT_TRUE(commandBuffer != nullptr);
+  gpu->queue()->submit(commandBuffer);
+  gpu->queue()->waitUntilCompleted();
+
+  auto surface =
+      Surface::MakeFrom(context, renderTexture->getBackendTexture(), ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  uint32_t centerPixel = 0;
+  ASSERT_TRUE(surface->readPixels(info, &centerPixel, SIZE / 2, SIZE / 2));
+  EXPECT_EQ(centerPixel, 0xFF000000u) << "the generated shaders did not draw the triangle";
 }
 #endif
 
