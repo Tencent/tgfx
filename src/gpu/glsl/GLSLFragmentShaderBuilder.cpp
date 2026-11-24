@@ -120,6 +120,8 @@ std::string GLSLFragmentShaderBuilder::appendTempCall(const std::string& functio
     instruction.output = temp;
     instruction.function = functionName;
     instruction.args.assign(args.begin(), args.end());
+    instruction.declaresResult = true;
+    instruction.resultType = "vec4";
     instruction.text = codeTextFrom(start);
     fragmentProgramRecorder->instructions.push_back(std::move(instruction));
   }

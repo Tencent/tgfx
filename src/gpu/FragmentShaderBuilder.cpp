@@ -76,14 +76,13 @@ std::string FragmentShaderBuilder::readTexture(SamplerHandle handle, const std::
 }
 
 void FragmentShaderBuilder::recordStageRoot(const std::string& outputVar) {
-  if (sourceRecorder == nullptr) {
-    return;
+  if (sourceRecorder != nullptr) {
+    FragmentSourceRecord record = {};
+    record.kind = FragmentSourceRecord::Kind::Root;
+    record.dst = outputVar;
+    record.order = nextEmitOrder();
+    sourceRecorder->push_back(std::move(record));
   }
-  FragmentSourceRecord record = {};
-  record.kind = FragmentSourceRecord::Kind::Root;
-  record.dst = outputVar;
-  record.order = nextEmitOrder();
-  sourceRecorder->push_back(std::move(record));
   FragmentInstruction instruction = {};
   instruction.kind = FragmentInstructionKind::Root;
   instruction.output = outputVar;

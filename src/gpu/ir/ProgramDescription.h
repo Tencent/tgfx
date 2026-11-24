@@ -120,7 +120,12 @@ struct FragmentInstruction {
   std::string declaration = {};
   /// A coverage store wraps a scalar source in vec4(...).
   bool splat = false;
-  /// The statement text, already indented exactly as the inline emission spelled it.
+  /// A temp call declares its result ("vec4 temp = ...").
+  bool declaresResult = false;
+  /// The declaration type of a temp call.
+  std::string resultType = {};
+  /// The statement text, already indented exactly as the inline emission spelled it. The printer
+  /// uses its leading whitespace as the statement prefix and rebuilds the statement from fields.
   std::string text = {};
 };
 

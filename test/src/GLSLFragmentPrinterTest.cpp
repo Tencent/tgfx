@@ -33,6 +33,9 @@ TEST(GLSLFragmentPrinterTest, ReplaysRawTextAndClosesMain) {
   call.kind = FragmentInstructionKind::Call;
   call.output = "result";
   call.function = "pmApplyLuma";
+  call.args = {"color", "vec3(1.0)"};
+  call.declaresResult = true;
+  call.resultType = "vec4";
   call.text = "    vec4 result = pmApplyLuma(color, vec3(1.0));\n";
   program.instructions.push_back(call);
 
