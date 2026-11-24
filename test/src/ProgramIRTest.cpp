@@ -1,0 +1,119 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License") you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "gpu/ir/ProgramIRBuilder.h"
+#include "gpu/ir/ProgramIRValidation.h"
+#include "gtest/gtest.h"
+
+namespace tgfx {
+
+TEST(ProgramIRTest, BuildsTypedCallAndStore) {
+  ProgramIRBuilder builder = {};
+  const auto input =
+      builder.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "inputColor");
+  const auto kr = builder.CreateConstant(0.299f);
+  const auto kg = builder.CreateConstant(0.587f);
+  const auto kb = builder.CreateConstant(0.114f);
+  ASSERT_NE(input, INVALID_VALUE_ID);
+  ASSERT_NE(kr, INVALID_VALUE_ID);
+  ASSERT_NE(kg, INVALID_VALUE_ID);
+  ASSERT_NE(kb, INVALID_VALUE_ID);
+
+  const auto result = builder.CreateCall(7, SLType::Float4, {input, kr, kg, kb});
+  ASSERT_NE(result, INVALID_VALUE_ID);
+  builder.StoreOutput(input, result);
+
+  std::string error;
+  ASSERT_TRUE(ValidateProgramIR(builder.IR(), &error)) << error;
+  ASSERT_EQ(builder.IR().values.size(), 5u);
+  ASSERT_EQ(builder.IR().exprs.size(), 4u);
+  ASSERT_EQ(builder.IR().statements.size(), 1u);
+  const auto& call = builder.IR().exprs.back();
+  EXPECT_EQ(call.kind, IRExprKind::Call);
+  EXPECT_EQ(call.op, 7u);
+  EXPECT_EQ(call.args, (std::vector<ValueID>{input, kr, kg, kb}));
+  EXPECT_EQ(builder.IR().statements[0].kind, IRStatementKind::StoreOutput);
+}
+
+TEST(ProgramIRTest, KeepsFloatConstantsAsBits) {
+  ProgramIRBuilder builder = {};
+  const auto value = builder.CreateConstant(0.1f);
+  ASSERT_NE(value, INVALID_VALUE_ID);
+  ASSERT_EQ(builder.IR().exprs.size(), 1u);
+  EXPECT_EQ(builder.IR().exprs[0].constantBits, FloatBits(0.1f));
+}
+
+TEST(ProgramIRTest, RecordsFieldAssignment) {
+  ProgramIRBuilder builder = {};
+  const auto yuv = builder.CreateValue(SLType::Float3, Precision::High, IRValueKind::Local, "yuv");
+  const auto sampler =
+      builder.CreateValue(SLType::Texture2DSampler, Precision::Default, IRValueKind::Sampler);
+  const auto coord = builder.CreateValue(SLType::Float2, Precision::High, IRValueKind::Local);
+  const auto sample = builder.CreateTextureSample(sampler, coord, SLType::Float4);
+  const auto red = builder.CreateSwizzle(sample, SLType::Float, "r");
+  builder.Assign({yuv, "x"}, red);
+
+  std::string error;
+  ASSERT_TRUE(ValidateProgramIR(builder.IR(), &error)) << error;
+  ASSERT_EQ(builder.IR().statements.size(), 1u);
+  EXPECT_EQ(builder.IR().statements[0].dst.base, yuv);
+  EXPECT_EQ(builder.IR().statements[0].dst.swizzle, "x");
+}
+
+TEST(ProgramIRTest, RejectsForwardReferences) {
+  ProgramIR program = {};
+  IRValue first = {};
+  first.id = 0;
+  first.type = SLType::Float4;
+  first.kind = IRValueKind::Expr;
+  first.definingExpr = 0;
+  IRValue second = {};
+  second.id = 1;
+  second.type = SLType::Float4;
+  second.kind = IRValueKind::Local;
+  program.values = {first, second};
+
+  IRExpr expr = {};
+  expr.id = 0;
+  expr.kind = IRExprKind::Call;
+  expr.result = 0;
+  expr.args = {1};
+  expr.type = SLType::Float4;
+  expr.op = 1;
+  program.exprs = {expr};
+
+  std::string error;
+  EXPECT_FALSE(ValidateProgramIR(program, &error));
+  EXPECT_NE(error.find("later value"), std::string::npos);
+}
+
+TEST(ProgramIRTest, RejectsResourceWithDefinition) {
+  ProgramIR program = {};
+  IRValue value = {};
+  value.id = 0;
+  value.type = SLType::Float4;
+  value.kind = IRValueKind::Uniform;
+  value.definingExpr = 0;
+  program.values = {value};
+
+  std::string error;
+  EXPECT_FALSE(ValidateProgramIR(program, &error));
+  EXPECT_NE(error.find("cannot have a defining expression"), std::string::npos);
+}
+
+}  // namespace tgfx
