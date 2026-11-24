@@ -73,9 +73,25 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
       const auto coverageValue = args.irBuilder->InternValue(
           coverage.name(), SLType::Float, Precision::High, IRValueKind::Attribute);
       args.irBuilder->StoreVarying({coverageVarying, ""}, coverageValue);
+      args.irBuilder->SetStage(ShaderStage::Fragment);
+      const auto coverageInput = args.irBuilder->InternValue(coverageVar.fsIn(), SLType::Float,
+                                                             Precision::High, IRValueKind::Varying);
+      const auto coverage4 = args.irBuilder->CreateConstruct(
+          SLType::Float4, {coverageInput, coverageInput, coverageInput, coverageInput});
+      const auto coverageOutput = args.irBuilder->CreateValue(
+          SLType::Float4, Precision::High, IRValueKind::Local, args.outputCoverage);
+      args.irBuilder->Assign({coverageOutput, ""}, coverage4);
     }
   } else {
     fragBuilder->storeCoverage(args.outputCoverage, "1.0", true);
+    if (args.irBuilder != nullptr) {
+      args.irBuilder->SetStage(ShaderStage::Fragment);
+      const auto one = args.irBuilder->CreateConstant(1.0f);
+      const auto coverage4 = args.irBuilder->CreateConstruct(SLType::Float4, {one, one, one, one});
+      const auto coverageOutput = args.irBuilder->CreateValue(
+          SLType::Float4, Precision::High, IRValueKind::Local, args.outputCoverage);
+      args.irBuilder->Assign({coverageOutput, ""}, coverage4);
+    }
   }
 
   auto colorName =

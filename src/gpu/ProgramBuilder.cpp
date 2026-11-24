@@ -172,8 +172,30 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
 
   std::string inputColor = !colorIn.empty() ? colorIn : "vec4(1.0)";
   std::string inputCoverage = !coverageIn.empty() ? coverageIn : "vec4(1.0)";
+  auto findIRValue = [&](const std::string& name) {
+    for (const auto& value : programIRBuilder().IR().values) {
+      if (value.debugName == name) {
+        return value.id;
+      }
+    }
+    return INVALID_VALUE_ID;
+  };
+  const auto inputColorValue =
+      findIRValue(inputColor) != INVALID_VALUE_ID
+          ? findIRValue(inputColor)
+          : programIRBuilder().InternValue(inputColor, SLType::Float4, Precision::High,
+                                           IRValueKind::Local);
+  const auto inputCoverageValue =
+      findIRValue(inputCoverage) != INVALID_VALUE_ID
+          ? findIRValue(inputCoverage)
+          : programIRBuilder().InternValue(inputCoverage, SLType::Float4, Precision::High,
+                                           IRValueKind::Local);
+  const auto outputValue = programIRBuilder().CreateValue(SLType::Float4, Precision::High,
+                                                          IRValueKind::Local, "fragmentOutput");
   XferProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), inputColor, inputCoverage,
-                               fragmentShaderBuilder()->colorOutputName(), dstTextureSamplerHandle);
+                               fragmentShaderBuilder()->colorOutputName(), dstTextureSamplerHandle,
+                               &programIRBuilder(), inputColorValue, inputCoverageValue,
+                               outputValue);
   xferProcessor->emitCode(args);
   bool hasOutput = false;
   for (const auto& statement : programIRBuilder().IR().statements) {

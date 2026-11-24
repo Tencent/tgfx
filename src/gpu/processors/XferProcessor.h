@@ -23,20 +23,26 @@
 #include "gpu/UniformData.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/aot/ir/XferFacts.h"
+#include "gpu/ir/ProgramIR.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
+class ProgramIRBuilder;
 
 class XferProcessor : public Processor {
  public:
   struct EmitArgs {
     EmitArgs(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
              std::string inputColor, std::string inputCoverage, std::string outputColor,
-             const SamplerHandle dstTextureSamplerHandle)
+             const SamplerHandle dstTextureSamplerHandle, ProgramIRBuilder* irBuilder = nullptr,
+             ValueID inputColorValue = INVALID_VALUE_ID,
+             ValueID inputCoverageValue = INVALID_VALUE_ID, ValueID outputValue = INVALID_VALUE_ID)
         : fragBuilder(fragBuilder), uniformHandler(uniformHandler),
           inputColor(std::move(inputColor)), inputCoverage(std::move(inputCoverage)),
-          outputColor(std::move(outputColor)), dstTextureSamplerHandle(dstTextureSamplerHandle) {
+          outputColor(std::move(outputColor)), dstTextureSamplerHandle(dstTextureSamplerHandle),
+          irBuilder(irBuilder), inputColorValue(inputColorValue),
+          inputCoverageValue(inputCoverageValue), outputValue(outputValue) {
     }
     FragmentShaderBuilder* fragBuilder;
     UniformHandler* uniformHandler;
@@ -44,6 +50,10 @@ class XferProcessor : public Processor {
     const std::string inputCoverage;
     const std::string outputColor;
     const SamplerHandle dstTextureSamplerHandle;
+    ProgramIRBuilder* irBuilder = nullptr;
+    ValueID inputColorValue = INVALID_VALUE_ID;
+    ValueID inputCoverageValue = INVALID_VALUE_ID;
+    ValueID outputValue = INVALID_VALUE_ID;
   };
 
   virtual const TextureView* dstTextureView() const {

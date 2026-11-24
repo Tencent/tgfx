@@ -57,6 +57,9 @@ class SPIRVShaderBuilder {
 
   bool StoreOutput(const ProgramIR& program, ValueID value, std::string* error = nullptr);
 
+  bool StoreOutput(const ProgramIR& program, ValueID dst, ValueID value,
+                   std::string* error = nullptr);
+
   /// Imports a bundle function and returns its module-local id. The declaration is appended after
   /// the main function in Finish so a function is never declared inside another function.
   uint32_t ImportFunction(const OperatorDesc& desc, const OperatorArtifact& artifact,

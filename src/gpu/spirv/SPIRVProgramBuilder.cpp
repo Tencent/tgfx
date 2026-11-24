@@ -49,7 +49,7 @@ bool BuildStage(const ProgramIR& program, const std::vector<IRStatement>& statem
         }
         break;
       case IRStatementKind::StoreOutput:
-        if (!builder->StoreOutput(program, statement.src, error)) {
+        if (!builder->StoreOutput(program, statement.dst.base, statement.src, error)) {
           return false;
         }
         break;

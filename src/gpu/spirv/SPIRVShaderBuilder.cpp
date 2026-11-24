@@ -1168,8 +1168,8 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
     case IRExprKind::Construct: {
       std::vector<uint32_t> args = {};
       for (const auto argument : expr.args) {
-        uint32_t id = 0;
-        if (!EmitValue(program, argument, &id, error)) {
+        const auto id = EmitValueAsValue(program, argument, error);
+        if (id == 0) {
           return 0;
         }
         args.push_back(id);
@@ -1190,8 +1190,8 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
         Fail(error, "a swizzle needs one source and a swizzle spelling");
         return 0;
       }
-      uint32_t source = 0;
-      if (!EmitValue(program, expr.args[0], &source, error)) {
+      const auto source = EmitValueAsValue(program, expr.args[0], error);
+      if (source == 0) {
         return 0;
       }
       std::vector<uint32_t> indices = {};
@@ -1227,10 +1227,9 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
         Fail(error, "a binary expression needs two operands");
         return 0;
       }
-      uint32_t left = 0;
-      uint32_t right = 0;
-      if (!EmitValue(program, expr.args[0], &left, error) ||
-          !EmitValue(program, expr.args[1], &right, error)) {
+      const auto left = EmitValueAsValue(program, expr.args[0], error);
+      const auto right = EmitValueAsValue(program, expr.args[1], error);
+      if (left == 0 || right == 0) {
         return 0;
       }
       const auto type = TypeId(expr.type, error);
@@ -1343,6 +1342,11 @@ bool SPIRVShaderBuilder::EmitValue(const ProgramIR& program, ValueID value, uint
 }
 
 bool SPIRVShaderBuilder::StoreOutput(const ProgramIR& program, ValueID value, std::string* error) {
+  return StoreOutput(program, INVALID_VALUE_ID, value, error);
+}
+
+bool SPIRVShaderBuilder::StoreOutput(const ProgramIR& program, ValueID dst, ValueID value,
+                                     std::string* error) {
   if (!begun) {
     return Fail(error, "the SPIR-V shader builder has not begun");
   }
@@ -1350,8 +1354,16 @@ bool SPIRVShaderBuilder::StoreOutput(const ProgramIR& program, ValueID value, st
   if (source == 0) {
     return false;
   }
+  uint32_t target = outputPointerId;
+  if (stage == ShaderStage::Fragment && dst != INVALID_VALUE_ID && dst < program.values.size() &&
+      program.values[dst].debugName != "fragmentOutput" &&
+      program.values[dst].debugName != "outputColor") {
+    if (!EmitValue(program, dst, &target, error)) {
+      return false;
+    }
+  }
   writer.Sink(&writer.func);
-  writer.Inst(spirv::kOpStore, {outputPointerId, source});
+  writer.Inst(spirv::kOpStore, {target, source});
   return true;
 }
 

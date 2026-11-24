@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLEmptyXferProcessor.h"
+#include "gpu/ir/ProgramIRBuilder.h"
 
 namespace tgfx {
 const EmptyXferProcessor* EmptyXferProcessor::GetInstance() {
@@ -25,6 +26,12 @@ const EmptyXferProcessor* EmptyXferProcessor::GetInstance() {
 }
 
 void GLSLEmptyXferProcessor::emitCode(const EmitArgs& args) const {
+  if (args.irBuilder != nullptr && args.inputColorValue != INVALID_VALUE_ID &&
+      args.inputCoverageValue != INVALID_VALUE_ID && args.outputValue != INVALID_VALUE_ID) {
+    const auto result = args.irBuilder->CreateBinary(IRBinaryOp::Mul, SLType::Float4,
+                                                     args.inputColorValue, args.inputCoverageValue);
+    args.irBuilder->StoreOutput(args.outputValue, result);
+  }
   args.fragBuilder->combineColorWithCoverage(args.outputColor, args.inputColor, args.inputCoverage);
 }
 }  // namespace tgfx
