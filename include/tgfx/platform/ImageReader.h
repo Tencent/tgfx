@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <atomic>
+#include <cstdint>
 #include <mutex>
 #include "tgfx/core/ImageBuffer.h"
 
@@ -31,6 +31,11 @@ class ImageStream;
  * texture bound to one Context and must be rendered with that Context. Reads consume immediately
  * available contents with a bounded number of attempts, without waiting for producer notifications
  * or selecting a target timestamp. GPU, driver, and lock operations have no bounded completion time.
+ * Delivery is written while generating a texture on the rendering thread; other threads may query
+ * buffer state and timestamp for reconciliation. Reads and these queries share the reader's mutex,
+ * including the native texture lifetime check. Queries are thread-safe, not lock-free, and may wait
+ * for an in-flight bounded read. Observe Ready after texture generation finishes, then read the
+ * timestamp; this does not reserve the texture against a subsequent read or acquisition.
  * Delivered pixels remain valid only until their buffer expires. Preserve an independent rendered
  * output to retain pixels across later source reads.
  */
@@ -83,10 +88,16 @@ class ImageReader {
   uint64_t bufferVersion = 0;
   uint64_t textureVersion = 0;
   static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<ImageStream> stream);
+  struct ReadResult {
+    std::shared_ptr<TextureView> texture = nullptr;
+    bool delivered = false;
+    int64_t timestamp = -1;
+  };
+  int64_t textureTimestamp = -1;
+
+  // Both helpers require locker to be held by ImageReaderBuffer.
   bool checkExpired(uint64_t version);
-  std::shared_ptr<TextureView> readTexture(uint64_t version, Context* context, bool mipmapped,
-                                           std::atomic<ImageBufferState>& state,
-                                           std::atomic<int64_t>& timestamp);
+  ReadResult readTexture(uint64_t version, Context* context, bool mipmapped);
   friend class ImageReaderBuffer;
   friend class ImageStream;
 };

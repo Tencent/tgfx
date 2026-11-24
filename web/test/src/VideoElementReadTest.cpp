@@ -27,6 +27,7 @@ namespace {
 
 // Canvas pixels exercise the real upload helpers without video decoding or asynchronous seeks.
 // WebGPU's video upload guard requires source dimensions even for a supported canvas source.
+// clang-format off
 EM_JS(bool, InstallCanvasUploadFixture, (), {
   const source = document.createElement('canvas');
   source.width = 2;
@@ -48,17 +49,17 @@ EM_JS(bool, InstallCanvasUploadFixture, (), {
     uploadToTexture: helper.uploadToTexture,
     uploadVideoToWebGPUTexture: helper.uploadVideoToWebGPUTexture
   };
-  if (typeof fixture.uploadToTexture == = 'function') {
+  if (typeof fixture.uploadToTexture === 'function') {
     helper.uploadToTexture = function() {
-      if (arguments[1] == = source) {
+      if (arguments[1] === source) {
         fixture.uploads++;
       }
       return fixture.uploadToTexture.apply(this, arguments);
     };
   }
-  if (typeof fixture.uploadVideoToWebGPUTexture == = 'function') {
+  if (typeof fixture.uploadVideoToWebGPUTexture === 'function') {
     helper.uploadVideoToWebGPUTexture = function() {
-      if (arguments[0] == = source) {
+      if (arguments[0] === source) {
         fixture.uploads++;
       }
       return fixture.uploadVideoToWebGPUTexture.apply(this, arguments);
@@ -73,10 +74,10 @@ EM_JS(void, RemoveCanvasUploadFixture, (), {
   if (!fixture) {
     return;
   }
-  if (typeof fixture.uploadToTexture == = 'function') {
+  if (typeof fixture.uploadToTexture === 'function') {
     Module.tgfx.uploadToTexture = fixture.uploadToTexture;
   }
-  if (typeof fixture.uploadVideoToWebGPUTexture == = 'function') {
+  if (typeof fixture.uploadVideoToWebGPUTexture === 'function') {
     Module.tgfx.uploadVideoToWebGPUTexture = fixture.uploadVideoToWebGPUTexture;
   }
   delete Module.videoElementReadFixture;
@@ -89,6 +90,7 @@ EM_JS(void, PaintCanvasSource, (bool blue), {
   context.fillStyle = blue ? '#0000ff' : '#ff0000';
   context.fillRect(0, 0, 2, 2);
 });
+// clang-format on
 
 class CanvasUploadFixture {
  public:

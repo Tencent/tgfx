@@ -36,14 +36,16 @@ class ImageReaderBuffer : public ImageBuffer {
     return false;
   }
   bool expired() const override {
-    return delivery.load(std::memory_order_acquire) == ImageBufferState::Expired ||
-           reader->checkExpired(version);
+    std::lock_guard<std::mutex> lock(reader->locker);
+    return isExpired();
   }
   ImageBufferState state() const override {
-    return expired() ? ImageBufferState::Expired : delivery.load(std::memory_order_acquire);
+    std::lock_guard<std::mutex> lock(reader->locker);
+    return isExpired() ? ImageBufferState::Expired : delivery;
   }
   int64_t timestamp() const override {
-    return deliveredTimestamp.load(std::memory_order_acquire);
+    std::lock_guard<std::mutex> lock(reader->locker);
+    return deliveredTimestamp;
   }
   const std::shared_ptr<ColorSpace>& colorSpace() const override {
     return reader->colorSpace();
@@ -51,14 +53,29 @@ class ImageReaderBuffer : public ImageBuffer {
 
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override {
-    return reader->readTexture(version, context, mipmapped, delivery, deliveredTimestamp);
+    std::lock_guard<std::mutex> lock(reader->locker);
+    if (isExpired()) {
+      return nullptr;
+    }
+    auto result = reader->readTexture(version, context, mipmapped);
+    if (!result.delivered) {
+      delivery = ImageBufferState::Expired;
+      return nullptr;
+    }
+    deliveredTimestamp = result.timestamp;
+    delivery = ImageBufferState::Ready;
+    return result.texture;
   }
 
  private:
+  // Requires reader->locker. Do not call the locking public expired() while holding this mutex.
+  bool isExpired() const {
+    return delivery == ImageBufferState::Expired || reader->checkExpired(version);
+  }
   std::shared_ptr<ImageReader> reader;
   uint64_t version;
-  mutable std::atomic<ImageBufferState> delivery = ImageBufferState::Pending;
-  mutable std::atomic<int64_t> deliveredTimestamp = -1;
+  mutable ImageBufferState delivery = ImageBufferState::Pending;
+  mutable int64_t deliveredTimestamp = -1;
 };
 
 std::shared_ptr<ImageReader> ImageReader::MakeFrom(std::shared_ptr<ImageStream> stream) {
@@ -88,23 +105,15 @@ std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {
   return acquireBuffer();
 }
 bool ImageReader::checkExpired(uint64_t version) {
-  std::lock_guard<std::mutex> lock(locker);
   return version != textureVersion && version < bufferVersion;
 }
-std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t version, Context* context,
-                                                      bool mipmapped,
-                                                      std::atomic<ImageBufferState>& state,
-                                                      std::atomic<int64_t>& timestamp) {
-  std::lock_guard<std::mutex> lock(locker);
-  if (state.load() == ImageBufferState::Expired) {
-    return nullptr;
-  }
+ImageReader::ReadResult ImageReader::readTexture(uint64_t version, Context* context,
+                                                 bool mipmapped) {
   if (version == textureVersion) {
-    return textureView;
+    return {textureView, true, textureTimestamp};
   }
   if (version < bufferVersion) {
-    state.store(ImageBufferState::Expired, std::memory_order_release);
-    return nullptr;
+    return {};
   }
   // Bound one read when a producer continuously queues images and timestamps never stop advancing.
   // This limits consumption attempts, not driver/GPU execution time or the distance to a target.
@@ -137,12 +146,10 @@ std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t version, Context*
     }
   }
   if (!delivered || textureView == nullptr) {
-    state.store(ImageBufferState::Expired, std::memory_order_release);
-    return nullptr;
+    return {};
   }
   textureVersion = version;
-  timestamp.store(deliveredTimestamp, std::memory_order_relaxed);
-  state.store(ImageBufferState::Ready, std::memory_order_release);
-  return textureView;
+  textureTimestamp = deliveredTimestamp;
+  return {textureView, true, deliveredTimestamp};
 }
 }  // namespace tgfx

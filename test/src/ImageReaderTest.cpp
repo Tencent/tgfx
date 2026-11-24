@@ -16,11 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <atomic>
 #include <deque>
+#include <thread>
 #include "gpu/resources/TextureView.h"
 #include "platform/ImageStream.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/platform/ImageReader.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -113,6 +116,50 @@ static void ExpectIdentity(Context* context, const std::shared_ptr<TextureView>&
   EXPECT_EQ(pixels[3], 255);
 }
 }  // namespace
+
+TGFX_TEST_PRIVATE(ImageReaderTest, ConcurrentQueriesObserveRenderingThreadDelivery) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<ThreeStateStream>();
+      auto reader = ImageReader::MakeFrom(stream); stream->push(3, 3000);
+      auto buffer = reader->acquireBuffer(); std::atomic<bool> started = false;
+      std::atomic<bool> stop = false; std::atomic<bool> invalid = false;
+      std::atomic<int> readyObservations = 0; std::thread observer([&] {
+        EXPECT_EQ(buffer->state(), ImageBufferState::Pending);
+        EXPECT_EQ(buffer->timestamp(), -1);
+        started.store(true);
+        while (!stop.load()) {
+          if (buffer->state() == ImageBufferState::Ready) {
+            if (buffer->timestamp() != 3000 || buffer->expired()) {
+              invalid.store(true);
+            }
+            readyObservations.fetch_add(1);
+          }
+          std::this_thread::yield();
+        }
+      });
+      while (!started.load()) { std::this_thread::yield(); } auto texture =
+          TextureView::MakeFrom(context, buffer);
+      while (readyObservations.load() == 0 && texture != nullptr) {
+        std::this_thread::yield();
+      } stop.store(true);
+      observer.join(); ExpectIdentity(context, texture, 3); EXPECT_FALSE(invalid.load());
+      EXPECT_GT(readyObservations.load(), 0);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, FailedCredentialCannotBeRevivedByReaderResult) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<ThreeStateStream>();
+      auto reader = ImageReader::MakeFrom(stream); auto failed = reader->acquireBuffer();
+      EXPECT_EQ(TextureView::MakeFrom(context, failed), nullptr);
+      EXPECT_EQ(failed->state(), ImageBufferState::Expired); auto attempts = stream->reads;
+      stream->push(1, 1000); EXPECT_EQ(TextureView::MakeFrom(context, failed), nullptr);
+      EXPECT_EQ(stream->reads, attempts); EXPECT_EQ(failed->timestamp(), -1);
+      auto next = reader->acquireBuffer();
+      ExpectIdentity(context, TextureView::MakeFrom(context, next), 1);
+      EXPECT_EQ(next->timestamp(), 1000); EXPECT_EQ(failed->timestamp(), -1);)
+}
 
 TGFX_TEST_PRIVATE(ImageReaderTest, LegacyAdapterPerformsOneOperationPerAcquisition) {
   TGFX_PRIVATE_ACCESS(

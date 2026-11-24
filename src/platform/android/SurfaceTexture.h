@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <mutex>
 #include "platform/ImageStream.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/platform/android/Global.h"
 
 namespace tgfx {
@@ -72,7 +74,6 @@ class SurfaceTexture : public ImageStream {
   Global<jobject> surfaceTexture;
   bool frameAvailable = false;
   bool textureSizeResolved = false;
-  bool hasLatchedFrame = false;
   int64_t lastLatchedTimestamp = -1;
   ISize textureSize = {};
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;

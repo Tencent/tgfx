@@ -18,13 +18,18 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include "tgfx/core/ColorSpace.h"
-#include "tgfx/platform/ImageReader.h"
 
 namespace tgfx {
 class TextureView;
 class Context;
+class ImageReader;
+
+/** Abstract source of continuously updated pixels, consumed through ImageReader's deferred buffers.
+ * Use a platform subclass to create and update native textures. Reader callbacks are serialized
+ * within one reader; sources shared by different readers must synchronize their own mutable state. */
 class ImageStream {
  public:
   virtual ~ImageStream() = default;

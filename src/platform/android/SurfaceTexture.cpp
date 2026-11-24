@@ -347,6 +347,9 @@ void SurfaceTexture::releaseExternalOESTexture(Context* context, unsigned textur
   if (env != nullptr) {
     env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_detachFromGLContext);
     if (!env->ExceptionCheck()) {
+      // Successful detach deletes the associated GL texture; do not delete its name a second time.
+      // Requires the owning GL context to be current. See SurfaceTexture.detachFromGLContext():
+      // https://developer.android.com/reference/android/graphics/SurfaceTexture#detachFromGLContext()
       return;
     }
     env->ExceptionClear();
@@ -367,7 +370,6 @@ SurfaceTexture::FrameUpdateResult SurfaceTexture::updateTexImage() {
   if (env == nullptr) {
     return {false, lastLatchedTimestamp, textureSize, false};
   }
-  auto notified = frameAvailable;
   frameAvailable = false;
   auto previous = lastLatchedTimestamp;
   if (!latchTexture(env)) {
@@ -378,12 +380,10 @@ SurfaceTexture::FrameUpdateResult SurfaceTexture::updateTexImage() {
     env->ExceptionClear();
     return {false, previous, textureSize, true, true};
   }
-  auto advanced = !hasLatchedFrame || notified || timestamp != previous;
-  hasLatchedFrame = true;
   lastLatchedTimestamp = timestamp;
   resolveTextureSize(env);
   // Every actual latch can replace pixels, even when its timestamp equals the previous one.
-  return {advanced, timestamp, textureSize, true, false};
+  return {true, timestamp, textureSize, true, false};
 }
 
 void SurfaceTexture::resolveTextureSize(JNIEnv* env) {
