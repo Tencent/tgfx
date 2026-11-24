@@ -69,4 +69,33 @@ TEST(SPIRVProgramBuilderTest, BuildsVertexAndFragmentModules) {
   WriteIfRequested("TGFX_SPIRV_FRAGMENT_OUT", modules.fragment);
 }
 
+TEST(SPIRVProgramBuilderTest, BuildsFromOneStagedProgram) {
+  ProgramIRBuilder program = {};
+  program.SetStage(ShaderStage::Vertex);
+  const auto attribute = program.AddAttribute({"aPosition", SLType::Float2, Precision::High, 0});
+  const auto varying = program.AddVarying({"vColor", SLType::Float4, Precision::High, 0});
+  const auto position = program.CreateLoad(attribute, SLType::Float2);
+  const auto zero = program.CreateConstant(0.0f);
+  const auto one = program.CreateConstant(1.0f);
+  const auto clipPosition = program.CreateConstruct(SLType::Float4, {position, zero, one});
+  const auto red = program.CreateConstruct(SLType::Float4, {one, zero, zero, one});
+  const auto positionOutput =
+      program.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "gl_Position");
+  program.StoreOutput(positionOutput, clipPosition);
+  program.StoreVarying({varying, ""}, red);
+
+  program.SetStage(ShaderStage::Fragment);
+  const auto colorOutput =
+      program.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "outputColor");
+  program.StoreOutput(colorOutput, varying);
+
+  SPIRVProgramModules modules = {};
+  std::string error = {};
+  ASSERT_TRUE(SPIRVProgramBuilder::Build(program.IR(), &modules, &error)) << error;
+  EXPECT_FALSE(modules.vertex.empty());
+  EXPECT_FALSE(modules.fragment.empty());
+  WriteIfRequested("TGFX_SPIRV_VERTEX_OUT", modules.vertex);
+  WriteIfRequested("TGFX_SPIRV_FRAGMENT_OUT", modules.fragment);
+}
+
 }  // namespace tgfx

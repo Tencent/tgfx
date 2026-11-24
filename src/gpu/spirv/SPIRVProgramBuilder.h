@@ -37,6 +37,9 @@ class SPIRVProgramBuilder {
  public:
   static bool Build(const ProgramIR& vertexProgram, const ProgramIR& fragmentProgram,
                     SPIRVProgramModules* modules, std::string* error = nullptr);
+
+  static bool Build(const ProgramIR& program, SPIRVProgramModules* modules,
+                    std::string* error = nullptr);
 };
 
 }  // namespace tgfx

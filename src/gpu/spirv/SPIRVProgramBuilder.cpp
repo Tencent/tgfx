@@ -29,8 +29,8 @@ bool Fail(std::string* error, const char* message) {
   return false;
 }
 
-bool BuildStage(const ProgramIR& program, ShaderStage stage, std::vector<uint32_t>* words,
-                std::string* error) {
+bool BuildStage(const ProgramIR& program, const std::vector<IRStatement>& statements,
+                ShaderStage stage, std::vector<uint32_t>* words, std::string* error) {
   SPIRVVertexShaderBuilder vertexBuilder = {};
   SPIRVFragmentShaderBuilder fragmentBuilder = {};
   SPIRVShaderBuilder* builder = stage == ShaderStage::Vertex
@@ -39,7 +39,7 @@ bool BuildStage(const ProgramIR& program, ShaderStage stage, std::vector<uint32_
   if (!builder->Begin(error) || !builder->DeclareLocals(program, error)) {
     return false;
   }
-  for (const auto& statement : program.statements) {
+  for (const auto& statement : statements) {
     switch (statement.kind) {
       case IRStatementKind::Assign:
         if (!builder->Assign(program, statement.dst, statement.src, error)) {
@@ -78,8 +78,12 @@ bool SPIRVProgramBuilder::Build(const ProgramIR& vertexProgram, const ProgramIR&
   modules->vertex.clear();
   modules->fragment.clear();
   modules->layout = {};
-  if (!BuildStage(vertexProgram, ShaderStage::Vertex, &modules->vertex, error) ||
-      !BuildStage(fragmentProgram, ShaderStage::Fragment, &modules->fragment, error)) {
+  const auto& vertexStatements = vertexProgram.vertexStatements.empty()
+                                     ? vertexProgram.statements
+                                     : vertexProgram.vertexStatements;
+  if (!BuildStage(vertexProgram, vertexStatements, ShaderStage::Vertex, &modules->vertex, error) ||
+      !BuildStage(fragmentProgram, fragmentProgram.statements, ShaderStage::Fragment,
+                  &modules->fragment, error)) {
     return false;
   }
   SPIRVInterfaceLayout vertexLayout = {};
@@ -88,6 +92,23 @@ bool SPIRVProgramBuilder::Build(const ProgramIR& vertexProgram, const ProgramIR&
       !fragmentLayout.Build(fragmentProgram.interface, error) ||
       !modules->layout.Append(vertexLayout, error) ||
       !modules->layout.Append(fragmentLayout, error)) {
+    return false;
+  }
+  return true;
+}
+
+bool SPIRVProgramBuilder::Build(const ProgramIR& program, SPIRVProgramModules* modules,
+                                std::string* error) {
+  if (modules == nullptr) {
+    return Fail(error, "the SPIR-V program modules are null");
+  }
+  modules->vertex.clear();
+  modules->fragment.clear();
+  modules->layout = {};
+  if (!BuildStage(program, program.vertexStatements, ShaderStage::Vertex, &modules->vertex,
+                  error) ||
+      !BuildStage(program, program.statements, ShaderStage::Fragment, &modules->fragment, error) ||
+      !modules->layout.Build(program.interface, error)) {
     return false;
   }
   return true;

@@ -76,6 +76,8 @@ class ProgramIRBuilder {
                               ValueID strictSubset = INVALID_VALUE_ID,
                               ValueID drawSubset = INVALID_VALUE_ID);
 
+  void SetStage(ShaderStage stage);
+
   void Assign(LValue dst, ValueID src);
 
   void StoreOutput(ValueID dst, ValueID src);
@@ -107,6 +109,7 @@ class ProgramIRBuilder {
 
   ProgramIR ir = {};
   std::string failure = {};
+  ShaderStage currentStage = ShaderStage::Fragment;
   std::unordered_map<std::string, ValueID> valuesByName = {};
   uint32_t nextAttributeLocation = 0;
   uint32_t nextVaryingLocation = 0;

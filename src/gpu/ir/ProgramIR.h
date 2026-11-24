@@ -226,6 +226,7 @@ struct ProgramIR {
   std::vector<IRValue> values = {};
   std::vector<IRExpr> exprs = {};
   std::vector<IRStatement> statements = {};
+  std::vector<IRStatement> vertexStatements = {};
 };
 
 /// Returns the IEEE-754 binary32 bits of a float, without a double round-trip.
