@@ -172,6 +172,19 @@ TEST(ProgramIRTest, RejectsDuplicateSamplerBindings) {
   EXPECT_NE(error.find("duplicate"), std::string::npos);
 }
 
+TEST(ProgramIRTest, RecordsBuiltinReads) {
+  ProgramIRBuilder builder = {};
+  const auto fragCoord = builder.CreateBuiltin("gl_FragCoord", SLType::Float4);
+  ASSERT_NE(fragCoord, INVALID_VALUE_ID);
+  ASSERT_EQ(builder.IR().exprs.size(), 1u);
+  EXPECT_EQ(builder.IR().exprs[0].kind, IRExprKind::Builtin);
+  EXPECT_EQ(builder.IR().exprs[0].builtin, "gl_FragCoord");
+  EXPECT_EQ(builder.IR().values[fragCoord].debugName, "gl_FragCoord");
+
+  std::string error;
+  EXPECT_TRUE(ValidateProgramIR(builder.IR(), &error)) << error;
+}
+
 TEST(ProgramIRTest, RejectsForwardReferences) {
   ProgramIR program = {};
   IRValue first = {};

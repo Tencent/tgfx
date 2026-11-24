@@ -73,6 +73,10 @@ bool ValidateExpr(const ProgramIR& program, const IRExpr& expr, std::string* err
     *error = "a texture sample needs a sampler and a coordinate";
     return false;
   }
+  if (expr.kind == IRExprKind::Builtin && expr.builtin.empty()) {
+    *error = "a builtin read needs a name";
+    return false;
+  }
   return true;
 }
 

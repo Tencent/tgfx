@@ -43,6 +43,9 @@ enum class BuiltinOperator : OperatorID {
   AlphaThreshold = 4,
   YUVToRGB = 5,
   Clamp = 6,
+  DeviceCoord = 7,
+  MulAlpha = 8,
+  AlphaModulate = 9,
 };
 
 enum class Precision : uint8_t {
@@ -89,6 +92,7 @@ enum class IRExprKind : uint8_t {
   Binary,
   Call,
   TextureSample,
+  Builtin,
 };
 
 /// One typed expression. Values are always referenced by ValueID; the constant payload is kept as
@@ -103,6 +107,7 @@ struct IRExpr {
   OperatorID op = INVALID_OPERATOR_ID;
   IRBinaryOp binaryOp = IRBinaryOp::Add;
   std::string swizzle = {};
+  std::string builtin = {};
   SLType samplerType = SLType::Void;
   int32_t samplerSwizzleCode = -1;
   bool subsetClamped = false;

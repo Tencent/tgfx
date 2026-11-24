@@ -55,6 +55,28 @@ void GLSLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
         "deviceRead", readEntry,
         {samplerName, "deviceCoord", "vec4(0.0)", "0", std::to_string(swizzleCode)});
     fragBuilder->appendCall(args.outputColor, mulEntry, {"deviceRead", args.inputColor});
+    if (args.irBuilder != nullptr && args.inputValue != INVALID_VALUE_ID &&
+        args.outputValue != INVALID_VALUE_ID) {
+      const auto matrixValue = args.irBuilder->InternValue(deviceCoordMatrixName, SLType::Float3x3,
+                                                           Precision::High, IRValueKind::Uniform);
+      const auto fragCoordValue = args.irBuilder->CreateBuiltin("gl_FragCoord", SLType::Float4);
+      const auto xyValue = args.irBuilder->CreateSwizzle(fragCoordValue, SLType::Float2, "xy");
+      const auto deviceCoordValue =
+          args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::DeviceCoord),
+                                     SLType::Float2, {matrixValue, xyValue}, "deviceCoord");
+      const auto samplerValue = args.samplerValue(sampler);
+      if (samplerValue != INVALID_VALUE_ID) {
+        const auto deviceReadValue = args.irBuilder->CreateTextureSample(
+            samplerValue, deviceCoordValue, SLType::Float4, "deviceRead", SLType::Texture2DSampler,
+            swizzleCode);
+        const auto op = textureProxy->isAlphaOnly() ? BuiltinOperator::AlphaModulate
+                                                    : BuiltinOperator::MulAlpha;
+        const auto result =
+            args.irBuilder->CreateCall(static_cast<OperatorID>(op), SLType::Float4,
+                                       {deviceReadValue, args.inputValue}, args.outputColor);
+        args.irBuilder->StoreOutput(args.outputValue, result);
+      }
+    }
     return;
   }
   fragBuilder->codeAppendf("highp vec3 deviceCoord = %s * vec3(gl_FragCoord.xy, 1.0);",

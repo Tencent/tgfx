@@ -283,13 +283,22 @@ ValueID ProgramIRBuilder::CreateBinary(IRBinaryOp op, SLType type, ValueID left,
   return AddExpr(std::move(expr), debugName);
 }
 
-ValueID ProgramIRBuilder::CreateCall(OperatorID op, SLType type, const std::vector<ValueID>& args) {
+ValueID ProgramIRBuilder::CreateCall(OperatorID op, SLType type, const std::vector<ValueID>& args,
+                                     std::string debugName) {
   IRExpr expr = {};
   expr.kind = IRExprKind::Call;
   expr.type = type;
   expr.op = op;
   expr.args = args;
-  return AddExpr(std::move(expr));
+  return AddExpr(std::move(expr), debugName);
+}
+
+ValueID ProgramIRBuilder::CreateBuiltin(const std::string& builtin, SLType type) {
+  IRExpr expr = {};
+  expr.kind = IRExprKind::Builtin;
+  expr.type = type;
+  expr.builtin = builtin;
+  return AddExpr(std::move(expr), builtin);
 }
 
 ValueID ProgramIRBuilder::CreateTextureSample(ValueID sampler, ValueID coordinate, SLType type,
