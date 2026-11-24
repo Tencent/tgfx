@@ -135,6 +135,7 @@ GLSLProgramBuilder::GLSLProgramBuilder(Context* context, const ProgramInfo* prog
       _vertexBuilder(this), _fragBuilder(this) {
   _vertexBuilder.setVertexRecorder(&description.vertexCalls);
   _fragBuilder.setFragmentRecorder(&description.fragment);
+  _fragBuilder.setValueTable(&description.values);
 }
 
 std::string GLSLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
@@ -191,21 +192,27 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   finalizeShaders();
   for (const auto& attribute : getProgramInfo()->getVertexAttributes()) {
     description.interface.attributes.push_back({attribute.name()});
+    description.values.Intern(attribute.name(), SLType::Void, ValueOrigin::Attribute);
   }
   for (const auto& attribute : getProgramInfo()->getInstanceAttributes()) {
     description.interface.attributes.push_back({attribute.name()});
+    description.values.Intern(attribute.name(), SLType::Void, ValueOrigin::Attribute);
   }
   for (const auto& varying : _varyingHandler.getVaryings()) {
     description.interface.varyings.push_back({varying.name(), varying.type(), varying.id()});
+    description.values.Intern(varying.name(), varying.type(), ValueOrigin::Varying);
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Vertex)) {
     description.interface.uniforms.push_back({uniform.name()});
+    description.values.Intern(uniform.name(), SLType::Void, ValueOrigin::Uniform);
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Fragment)) {
     description.interface.uniforms.push_back({uniform.name()});
+    description.values.Intern(uniform.name(), SLType::Void, ValueOrigin::Uniform);
   }
   for (const auto& sampler : _uniformHandler.getSamplers()) {
     description.interface.samplers.push_back({sampler.name()});
+    description.values.Intern(sampler.name(), SLType::Void, ValueOrigin::Sampler);
   }
   std::string validationError;
   if (!ValidateProgramDescription(&description, &validationError)) {

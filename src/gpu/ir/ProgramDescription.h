@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include "gpu/SLType.h"
+#include "gpu/ir/ValueRef.h"
 
 namespace tgfx {
 
@@ -123,12 +124,16 @@ struct FragmentInstruction {
   FragmentInstructionKind kind = FragmentInstructionKind::RawText;
   /// The call's or store's output variable.
   std::string output = {};
+  /// The typed handle of the output; INVALID_VALUE_ID until the value table sees the name.
+  ValueRef outputRef = {};
   /// The entry function name.
   std::string function = {};
   /// The call's or store's value operand.
   std::string src = {};
   /// The call arguments, in call order.
   std::vector<std::string> args = {};
+  /// The typed handles of the call arguments, parallel to args.
+  std::vector<ValueRef> argRefs = {};
   /// The optional wrapper the call site applies around the function result.
   std::string wrapType = {};
   /// The coverage operand of a combine.
@@ -162,6 +167,7 @@ struct ProgramDescription {
   InterfaceDesc interface = {};
   std::vector<VertexCall> vertexCalls = {};
   FragmentProgram fragment = {};
+  ValueTable values = {};
 };
 
 }  // namespace tgfx

@@ -88,6 +88,10 @@ void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
     instruction.output = outputVar;
     instruction.function = functionName;
     instruction.args.assign(args.begin(), args.end());
+    instruction.outputRef = internValue(outputVar, SLType::Void, ValueOrigin::CallResult);
+    for (const auto& arg : args) {
+      instruction.argRefs.push_back(internValue(arg, SLType::Void, ValueOrigin::Literal));
+    }
     instruction.wrapType = wrapType;
     instruction.text = codeTextFrom(start);
     fragmentProgramRecorder->instructions.push_back(std::move(instruction));
@@ -120,6 +124,10 @@ std::string GLSLFragmentShaderBuilder::appendTempCall(const std::string& functio
     instruction.output = temp;
     instruction.function = functionName;
     instruction.args.assign(args.begin(), args.end());
+    instruction.outputRef = internValue(temp, SLType::Float4, ValueOrigin::CallResult);
+    for (const auto& arg : args) {
+      instruction.argRefs.push_back(internValue(arg, SLType::Void, ValueOrigin::Literal));
+    }
     instruction.declaresResult = true;
     instruction.resultType = "vec4";
     instruction.text = codeTextFrom(start);

@@ -105,6 +105,11 @@ class ShaderBuilder {
     fragmentProgramRecorder = program;
   }
 
+  /// The symbol table the builder interns call outputs and arguments into.
+  void setValueTable(ValueTable* table) {
+    valueTable = table;
+  }
+
   /**
    * The next position in the stage's emission order, shared by every kind of record.
    */
@@ -192,12 +197,15 @@ class ShaderBuilder {
     rawCaptureEnabled = enabled;
   }
 
+  ValueRef internValue(const std::string& name, SLType type, ValueOrigin origin);
+
   std::string getDeclarations(const std::vector<ShaderVar>& vars, ShaderStage stage) const;
 
   std::vector<std::string> shaderStrings;
   std::set<std::string> emittedFunctions = {};
   std::vector<CallRecord>* callRecorder = nullptr;
   FragmentProgram* fragmentProgramRecorder = nullptr;
+  ValueTable* valueTable = nullptr;
   bool rawCaptureEnabled = true;
   int tempCallIndex = 0;
   uint32_t emitOrder = 0;
