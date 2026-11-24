@@ -46,6 +46,11 @@ class SubtreeCache {
 
   bool hasCache(Context* context, int longEdge) const;
 
+  // TEMP probe: whether an entry for longEdge was ever added, regardless of its texture.
+  bool hasEntry(int longEdge) const {
+    return cacheEntries.find(makeSizeKey(longEdge)) != cacheEntries.end();
+  }
+
   void draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint) const;
 
  private:

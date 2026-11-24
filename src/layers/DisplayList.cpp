@@ -733,6 +733,19 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   const auto captureProbe = gCaptureProbe;
   auto dirtyRects = drawTileTasks(tileTasks, levelSnapshots, taskSnapshotIndex, taskSnapshotCover,
                                   surface, zoomScale);
+  if (!tileTasks.empty()) {
+    const auto& p = gCaptureProbe;
+    if (p.subtreeHits + p.subtreeNewBuilds + p.subtreeRebuilds + p.subtreeRefused > 0) {
+      std::printf(
+          "[SUB-CACHE] tasks=%zu zoom=%lld hits=%d new=%d rebuilt=%d refused=%d buildMs=%.1f "
+          "edges=%d/%d/%d/%d/%d/%d/%d\n",
+          tileTasks.size(), static_cast<long long>(_zoomScaleInt), p.subtreeHits,
+          p.subtreeNewBuilds, p.subtreeRebuilds, p.subtreeRefused, p.subtreeBuildMs,
+          p.subtreeBuildsByEdge[5], p.subtreeBuildsByEdge[6], p.subtreeBuildsByEdge[7],
+          p.subtreeBuildsByEdge[8], p.subtreeBuildsByEdge[9], p.subtreeBuildsByEdge[10],
+          p.subtreeBuildsByEdge[11]);
+    }
+  }
   if (hasBackgroundStyle && !tileTasks.empty()) {
     const double drawMs =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - drawStart)

@@ -55,6 +55,15 @@ struct CaptureProbe {
   // Background styles drawn by the consumer, including their backdrop reads (CPU side only).
   int bgStyles = 0;
   double bgStyleMs = 0.0;
+  // Subtree cache lookups: hits, builds of a size never built for the layer, rebuilds of a size
+  // whose texture was purged, and lookups refused (cache disabled or size over the limit).
+  int subtreeHits = 0;
+  int subtreeNewBuilds = 0;
+  int subtreeRebuilds = 0;
+  int subtreeRefused = 0;
+  double subtreeBuildMs = 0.0;
+  // Builds per long edge, indexed by log2(longEdge) (5 = 32 px ... 11 = 2048 px).
+  int subtreeBuildsByEdge[16] = {};
   // Style source recordings split by nesting depth (0, 1, 2, 3+) and by pass (0: draw, 1: capture).
   // A recording at depth N runs inside the subtree drawing of a recording at depth N - 1, so the
   // inclusive time at depth 0 minus that at depth 1 is the cost depth 0 spends on its own.

@@ -1508,11 +1508,32 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
                                           const Rect& layerBounds) {
   if (subtreeCache->hasCache(args.context, longEdge)) {
+    ++gCaptureProbe.subtreeHits;
     return subtreeCache.get();
   }
   if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.subtreeCacheMaxSize) {
+    ++gCaptureProbe.subtreeRefused;
     return nullptr;
   }
+  if (subtreeCache->hasEntry(longEdge)) {
+    ++gCaptureProbe.subtreeRebuilds;
+  } else {
+    ++gCaptureProbe.subtreeNewBuilds;
+  }
+  int edgeIndex = 0;
+  while ((1 << (edgeIndex + 1)) <= longEdge && edgeIndex < 15) {
+    ++edgeIndex;
+  }
+  ++gCaptureProbe.subtreeBuildsByEdge[edgeIndex];
+  const auto buildStart = std::chrono::steady_clock::now();
+  struct BuildTimer {
+    std::chrono::steady_clock::time_point start;
+    ~BuildTimer() {
+      gCaptureProbe.subtreeBuildMs +=
+          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
+              .count();
+    }
+  } buildTimer{buildStart};
   auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
   if (FloatNearlyZero(maxBoundsSize)) {
     return nullptr;
