@@ -185,6 +185,34 @@ TEST(ProgramIRTest, RecordsBuiltinReads) {
   EXPECT_TRUE(ValidateProgramIR(builder.IR(), &error)) << error;
 }
 
+TEST(ProgramIRTest, RecordsDeviceSpaceRead) {
+  ProgramIRBuilder builder = {};
+  const auto matrix =
+      builder.CreateValue(SLType::Float3x3, Precision::High, IRValueKind::Uniform, "matrix");
+  const auto fragCoord = builder.CreateBuiltin("gl_FragCoord", SLType::Float4);
+  const auto xy = builder.CreateSwizzle(fragCoord, SLType::Float2, "xy");
+  const auto coord = builder.CreateCall(static_cast<OperatorID>(BuiltinOperator::DeviceCoord),
+                                        SLType::Float2, {matrix, xy}, "deviceCoord");
+  const auto sampler =
+      builder.CreateValue(SLType::Texture2DSampler, Precision::Default, IRValueKind::Sampler);
+  const auto read = builder.CreateTextureSample(sampler, coord, SLType::Float4, "deviceRead",
+                                                SLType::Texture2DSampler);
+  const auto alpha = builder.CreateSwizzle(read, SLType::Float, "a");
+  const auto output =
+      builder.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "outputColor");
+  const auto result = builder.CreateCall(static_cast<OperatorID>(BuiltinOperator::MulAlpha),
+                                         SLType::Float4, {read, alpha}, "outputColor");
+  builder.StoreOutput(output, result);
+
+  std::string error;
+  ASSERT_TRUE(ValidateProgramIR(builder.IR(), &error)) << error;
+  ASSERT_EQ(builder.IR().statements.size(), 1u);
+  EXPECT_EQ(builder.IR().exprs.back().kind, IRExprKind::Call);
+  EXPECT_EQ(builder.IR().exprs.back().op, static_cast<OperatorID>(BuiltinOperator::MulAlpha));
+  EXPECT_EQ(builder.IR().values[coord].debugName, "deviceCoord");
+  EXPECT_EQ(builder.IR().values[read].debugName, "deviceRead");
+}
+
 TEST(ProgramIRTest, RejectsForwardReferences) {
   ProgramIR program = {};
   IRValue first = {};

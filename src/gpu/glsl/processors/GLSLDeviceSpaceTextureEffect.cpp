@@ -92,6 +92,31 @@ void GLSLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = %s * %s.a;", args.outputColor.c_str(), args.outputColor.c_str(),
                              args.inputColor.c_str());
   }
+  if (args.irBuilder != nullptr && args.inputValue != INVALID_VALUE_ID &&
+      args.outputValue != INVALID_VALUE_ID) {
+    const auto samplerValue = args.samplerValue(sampler);
+    if (samplerValue != INVALID_VALUE_ID) {
+      const auto matrixValue = args.irBuilder->InternValue(deviceCoordMatrixName, SLType::Float3x3,
+                                                           Precision::High, IRValueKind::Uniform);
+      const auto fragCoordValue = args.irBuilder->CreateBuiltin("gl_FragCoord", SLType::Float4);
+      const auto xyValue = args.irBuilder->CreateSwizzle(fragCoordValue, SLType::Float2, "xy");
+      const auto deviceCoordValue =
+          args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::DeviceCoord),
+                                     SLType::Float2, {matrixValue, xyValue}, "deviceCoord");
+      const auto readValue =
+          args.irBuilder->CreateTextureSample(samplerValue, deviceCoordValue, SLType::Float4,
+                                              "deviceRead", SLType::Texture2DSampler, swizzleCode);
+      const auto alphaValue = args.irBuilder->CreateSwizzle(readValue, SLType::Float, "a");
+      const auto op =
+          textureProxy->isAlphaOnly() ? BuiltinOperator::AlphaModulate : BuiltinOperator::MulAlpha;
+      const auto result =
+          args.irBuilder->CreateCall(static_cast<OperatorID>(op), SLType::Float4,
+                                     {textureProxy->isAlphaOnly() ? alphaValue : readValue,
+                                      textureProxy->isAlphaOnly() ? args.inputValue : alphaValue},
+                                     args.outputColor);
+      args.irBuilder->StoreOutput(args.outputValue, result);
+    }
+  }
 }
 
 void GLSLDeviceSpaceTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
