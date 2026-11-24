@@ -28,13 +28,14 @@ class ImageStream;
 
 /**
  * Defers sequential image delivery until texture generation. All acquired buffers share a native
- * texture bound to one Context and must be rendered with that Context. Reads consume immediately
- * available contents with a bounded number of attempts, without waiting for producer notifications
- * or selecting a target timestamp. GPU, driver, and lock operations have no bounded completion time.
+ * texture bound to one Context and must be rendered with that Context. A new credential performs
+ * one source read, without draining queued frames, waiting for producer notifications, or selecting
+ * a target timestamp. The platform can still return its latest image and skip intermediate frames.
+ * GPU, driver, and lock operations have no bounded completion time.
  * Delivery is written while generating a texture on the rendering thread; other threads may query
  * buffer state and timestamp for reconciliation. Reads and these queries share the reader's mutex,
  * including the native texture lifetime check. Queries are thread-safe, not lock-free, and may wait
- * for an in-flight bounded read. Observe Ready after texture generation finishes, then read the
+ * for an in-flight source read. Observe Ready after texture generation finishes, then read the
  * timestamp; this does not reserve the texture against a subsequent read or acquisition.
  * Delivered pixels remain valid only until their buffer expires. Preserve an independent rendered
  * output to retain pixels across later source reads.

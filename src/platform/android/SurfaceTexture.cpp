@@ -264,8 +264,8 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
   }
   auto result = updateTexImage();
   if (textureView != nullptr) {
-    return {std::move(textureView), result.advanced, result.timestamp,
-            result.contentChanged,  result.failed,   true};
+    return {std::move(textureView), result.advanced, result.timestamp, result.contentChanged,
+            result.failed};
   }
   if (!result.advanced) {
     releaseExternalOESTexture(context, textureID);
@@ -291,8 +291,8 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
   auto texture = gpu->makeResource<GLTexture>(
       descriptor, static_cast<unsigned>(GL_TEXTURE_EXTERNAL_OES), textureID);
   textureView = Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
-  return {std::move(textureView), result.advanced, result.timestamp,
-          result.contentChanged,  result.failed,   true};
+  return {std::move(textureView), result.advanced, result.timestamp, result.contentChanged,
+          result.failed};
 }
 
 bool SurfaceTexture::latchTexture(JNIEnv* env) {

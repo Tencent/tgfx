@@ -115,41 +115,22 @@ ImageReader::ReadResult ImageReader::readTexture(uint64_t version, Context* cont
   if (version < bufferVersion) {
     return {};
   }
-  // Bound one read when a producer continuously queues images and timestamps never stop advancing.
-  // This limits consumption attempts, not driver/GPU execution time or the distance to a target.
-  constexpr int MAX_CONSUMPTIONS = 8;
-  bool delivered = false;
-  int64_t deliveredTimestamp = -1;
-  for (int count = 0; count < MAX_CONSUMPTIONS; count++) {
-    auto result = stream->onReadTexture(context, mipmapped, textureView);
-    if (result.advanced || result.contentChanged || result.texture != textureView) {
-      textureVersion = 0;
-      if (textureView) {
-        textureView->removeUniqueKey();
-      }
-      if (result.texture && result.texture != textureView) {
-        result.texture->removeUniqueKey();
-      }
+  auto result = stream->onReadTexture(context, mipmapped, textureView);
+  if (result.advanced || result.contentChanged || result.texture != textureView) {
+    textureVersion = 0;
+    if (textureView) {
+      textureView->removeUniqueKey();
     }
-    textureView = std::move(result.texture);
-    if (textureView == nullptr || result.failed) {
-      delivered = false;
-      break;
-    }
-    if (!result.advanced) {
-      break;
-    }
-    delivered = true;
-    deliveredTimestamp = result.timestamp;
-    if (!result.canContinue) {
-      break;
+    if (result.texture && result.texture != textureView) {
+      result.texture->removeUniqueKey();
     }
   }
-  if (!delivered) {
+  textureView = std::move(result.texture);
+  if (textureView == nullptr || result.failed || !result.advanced) {
     return {};
   }
   textureVersion = version;
-  textureTimestamp = deliveredTimestamp;
-  return {textureView, true, deliveredTimestamp};
+  textureTimestamp = result.timestamp;
+  return {textureView, true, result.timestamp};
 }
 }  // namespace tgfx

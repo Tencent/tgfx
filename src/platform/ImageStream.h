@@ -62,16 +62,14 @@ class ImageStream {
     /** False only if the previous texture and pixels stayed unchanged throughout this callback.
      * Native latches and unknown mutations must report true, including when they fail. */
     bool contentChanged = true;
-    /** A failure invalidates the whole read, including earlier successful drain iterations.
+    /** A failure prevents delivery even if a texture is retained or content changed.
      * An empty queue instead reports advanced=false and failed=false. */
     bool failed = true;
-    /** Allows another consumption attempt in this read, without promising queued content.
-     * Legacy create/update sources perform one operation and do not opt into draining. */
-    bool canContinue = false;
   };
 
-  /** Adapts legacy callbacks with one create/update operation. Queue-aware sources can override
-   * this and explicitly opt into bounded draining. All reads must avoid notification waits. */
+  /** Performs one create/update operation for a credential. Sources can override this to return
+   * actual delivery metadata, but must not drain queued frames or wait for producer notifications.
+   * Scheduling another attempt belongs to the caller. */
   virtual TextureReadResult onReadTexture(Context* context, bool mipmapped,
                                           std::shared_ptr<TextureView> texture) {
     bool advanced;
