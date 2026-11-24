@@ -84,6 +84,18 @@ class ProgramIRBuilder {
     return ir;
   }
 
+  void MarkFailed(std::string error) {
+    failure = std::move(error);
+  }
+
+  bool Failed() const {
+    return !failure.empty();
+  }
+
+  const std::string& Failure() const {
+    return failure;
+  }
+
  private:
   ValueID AddExpr(IRExpr expr, const std::string& debugName = {});
 
@@ -92,6 +104,7 @@ class ProgramIRBuilder {
   UniformBlockIR& EnsureUniformBlock(ShaderStage stage, uint32_t binding);
 
   ProgramIR ir = {};
+  std::string failure = {};
   std::unordered_map<std::string, ValueID> valuesByName = {};
   uint32_t nextAttributeLocation = 0;
   uint32_t nextVaryingLocation = 0;

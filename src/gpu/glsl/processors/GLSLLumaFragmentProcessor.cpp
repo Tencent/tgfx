@@ -35,30 +35,32 @@ void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
   if (entry.empty()) {
     return;
   }
-  ValueID result = INVALID_VALUE_ID;
-  if (args.irBuilder != nullptr && args.inputValue != INVALID_VALUE_ID &&
-      args.outputValue != INVALID_VALUE_ID) {
-    const auto krValue =
-        args.irBuilder->InternValue(kr, SLType::Float, Precision::High, IRValueKind::Uniform);
-    const auto kgValue =
-        args.irBuilder->InternValue(kg, SLType::Float, Precision::High, IRValueKind::Uniform);
-    const auto kbValue =
-        args.irBuilder->InternValue(kb, SLType::Float, Precision::High, IRValueKind::Uniform);
-    result = args.irBuilder->CreateCall(OperatorID::Luma, SLType::Float4,
-                                        {args.inputValue, krValue, kgValue, kbValue});
-    args.irBuilder->StoreOutput(args.outputValue, result);
+  if (args.irBuilder == nullptr || args.inputValue == INVALID_VALUE_ID ||
+      args.outputValue == INVALID_VALUE_ID) {
+    return;
   }
+  const auto krValue =
+      args.irBuilder->InternValue(kr, SLType::Float, Precision::High, IRValueKind::Uniform);
+  const auto kgValue =
+      args.irBuilder->InternValue(kg, SLType::Float, Precision::High, IRValueKind::Uniform);
+  const auto kbValue =
+      args.irBuilder->InternValue(kb, SLType::Float, Precision::High, IRValueKind::Uniform);
+  const auto result = args.irBuilder->CreateCall(OperatorID::Luma, SLType::Float4,
+                                                 {args.inputValue, krValue, kgValue, kbValue});
+  args.irBuilder->StoreOutput(args.outputValue, result);
   std::string expression = {};
   std::string error = {};
-  const bool emitted =
-      result != INVALID_VALUE_ID &&
-      GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error);
+  if (result == INVALID_VALUE_ID ||
+      !GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error)) {
+    args.irBuilder->MarkFailed(error.empty() ? "the luma operator could not be emitted" : error);
+    return;
+  }
   args.fragBuilder->appendCall(
       args.outputColor, entry,
       {args.inputColorValue, ValueRef(kr, SLType::Float, ValueOrigin::Uniform),
        ValueRef(kg, SLType::Float, ValueOrigin::Uniform),
        ValueRef(kb, SLType::Float, ValueOrigin::Uniform)},
-      "", emitted ? expression : std::string());
+      "", expression);
 }
 
 void GLSLLumaFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

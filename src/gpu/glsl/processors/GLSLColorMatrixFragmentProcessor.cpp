@@ -42,27 +42,30 @@ void GLSLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
   if (entry.empty()) {
     return;
   }
-  ValueID result = INVALID_VALUE_ID;
-  if (args.irBuilder != nullptr && args.inputValue != INVALID_VALUE_ID &&
-      args.outputValue != INVALID_VALUE_ID) {
-    const auto matrixValue = args.irBuilder->InternValue(matrixUniformName, SLType::Float4x4,
-                                                         Precision::High, IRValueKind::Uniform);
-    const auto vectorValue = args.irBuilder->InternValue(vectorUniformName, SLType::Float4,
-                                                         Precision::High, IRValueKind::Uniform);
-    result = args.irBuilder->CreateCall(OperatorID::ColorMatrix, SLType::Float4,
-                                        {args.inputValue, matrixValue, vectorValue});
-    args.irBuilder->StoreOutput(args.outputValue, result);
+  if (args.irBuilder == nullptr || args.inputValue == INVALID_VALUE_ID ||
+      args.outputValue == INVALID_VALUE_ID) {
+    return;
   }
+  const auto matrixValue = args.irBuilder->InternValue(matrixUniformName, SLType::Float4x4,
+                                                       Precision::High, IRValueKind::Uniform);
+  const auto vectorValue = args.irBuilder->InternValue(vectorUniformName, SLType::Float4,
+                                                       Precision::High, IRValueKind::Uniform);
+  const auto result = args.irBuilder->CreateCall(OperatorID::ColorMatrix, SLType::Float4,
+                                                 {args.inputValue, matrixValue, vectorValue});
+  args.irBuilder->StoreOutput(args.outputValue, result);
   std::string expression = {};
   std::string error = {};
-  const bool emitted =
-      result != INVALID_VALUE_ID &&
-      GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error);
+  if (result == INVALID_VALUE_ID ||
+      !GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error)) {
+    args.irBuilder->MarkFailed(error.empty() ? "the color-matrix operator could not be emitted"
+                                             : error);
+    return;
+  }
   fragBuilder->appendCall(
       args.outputColor, entry,
       {args.inputColorValue, ValueRef(matrixUniformName, SLType::Float4x4, ValueOrigin::Uniform),
        ValueRef(vectorUniformName, SLType::Float4, ValueOrigin::Uniform)},
-      "", emitted ? expression : std::string());
+      "", expression);
 }
 
 void GLSLColorMatrixFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

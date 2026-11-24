@@ -41,7 +41,38 @@ std::string FormatFloat(float value) {
   return text;
 }
 
+const char* GLSLTypeName(SLType type) {
+  switch (type) {
+    case SLType::Float:
+      return "float";
+    case SLType::Float2:
+      return "vec2";
+    case SLType::Float3:
+      return "vec3";
+    case SLType::Float4:
+      return "vec4";
+    case SLType::Int:
+      return "int";
+    case SLType::Int2:
+      return "ivec2";
+    case SLType::Int3:
+      return "ivec3";
+    case SLType::Int4:
+      return "ivec4";
+    case SLType::Float2x2:
+      return "mat2";
+    case SLType::Float3x3:
+      return "mat3";
+    case SLType::Float4x4:
+      return "mat4";
+    default:
+      return nullptr;
+  }
+}
+
 bool ValueName(const ProgramIR& program, ValueID id, std::string* name, std::string* error);
+bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expression,
+                    std::string* error);
 
 bool IntConstantOf(const ProgramIR& program, ValueID id, int32_t* value) {
   if (id == INVALID_VALUE_ID || id >= program.values.size()) {
@@ -116,11 +147,108 @@ bool ValueName(const ProgramIR& program, ValueID id, std::string* name, std::str
     *name = FormatFloat(valueAsFloat);
     return true;
   }
-  if (value.debugName.empty()) {
-    return Fail(error, "an operator argument has no printable name");
+  if (!value.debugName.empty()) {
+    *name = value.debugName;
+    return true;
   }
-  *name = value.debugName;
-  return true;
+  if (value.kind == IRValueKind::Expr || value.kind == IRValueKind::Field) {
+    return EmitExpression(program, id, name, error);
+  }
+  if (error != nullptr) {
+    *error = "an operator argument has no printable name (id=" + std::to_string(id) +
+             ", type=" + std::to_string(static_cast<int>(value.type)) +
+             ", kind=" + std::to_string(static_cast<int>(value.kind)) + ")";
+  }
+  return false;
+}
+
+bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expression,
+                    std::string* error) {
+  const auto& value = program.values[id];
+  if (value.definingExpr == INVALID_EXPR_ID || value.definingExpr >= program.exprs.size()) {
+    return Fail(error, "an operator argument expression has no definition");
+  }
+  const auto& expr = program.exprs[value.definingExpr];
+  switch (expr.kind) {
+    case IRExprKind::Swizzle: {
+      std::string source = {};
+      if (!ValueName(program, expr.args[0], &source, error)) {
+        return false;
+      }
+      *expression = source + "." + expr.swizzle;
+      return true;
+    }
+    case IRExprKind::Construct: {
+      const char* typeName = GLSLTypeName(expr.type);
+      if (typeName == nullptr) {
+        return Fail(error, "a construct expression has no GLSL type");
+      }
+      std::vector<std::string> args(expr.args.size());
+      bool sameArgument = true;
+      for (size_t index = 0; index < expr.args.size(); ++index) {
+        if (!ValueName(program, expr.args[index], &args[index], error)) {
+          return false;
+        }
+        if (index != 0 && expr.args[index] != expr.args[0]) {
+          sameArgument = false;
+        }
+      }
+      std::string out = typeName;
+      out += "(";
+      if (expr.args.empty()) {
+        return Fail(error, "a construct expression has no arguments");
+      }
+      if (sameArgument) {
+        out += args[0];
+      } else {
+        for (size_t index = 0; index < args.size(); ++index) {
+          if (index != 0) {
+            out += ", ";
+          }
+          out += args[index];
+        }
+      }
+      out += ")";
+      *expression = std::move(out);
+      return true;
+    }
+    case IRExprKind::Binary: {
+      std::string left = {};
+      std::string right = {};
+      if (!ValueName(program, expr.args[0], &left, error) ||
+          !ValueName(program, expr.args[1], &right, error)) {
+        return false;
+      }
+      const char* op = nullptr;
+      switch (expr.binaryOp) {
+        case IRBinaryOp::Add:
+          op = "+";
+          break;
+        case IRBinaryOp::Sub:
+          op = "-";
+          break;
+        case IRBinaryOp::Mul:
+          op = "*";
+          break;
+        case IRBinaryOp::Div:
+          op = "/";
+          break;
+      }
+      *expression = left + " " + op + " " + right;
+      return true;
+    }
+    case IRExprKind::Call:
+      return GLSLOperatorEmitter::EmitCall(program, id, expression, error);
+    case IRExprKind::Builtin:
+      *expression = expr.builtin;
+      return true;
+    case IRExprKind::ConstantFloat:
+    case IRExprKind::ConstantInt:
+      return Fail(error, "a constant must be named through its value");
+    default:
+      break;
+  }
+  return Fail(error, "an operator argument expression cannot be emitted as GLSL");
 }
 
 }  // namespace

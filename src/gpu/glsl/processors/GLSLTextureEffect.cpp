@@ -277,9 +277,9 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
   }
   const std::string limitedRange =
       std::to_string(IsLimitedYUVColorRange(yuvTexture->yuvColorSpace()) ? 1 : 0);
-  auto emitYUVCall = [&](bool hasAlpha) -> std::string {
+  auto emitYUVCall = [&](bool hasAlpha, std::string* expression) -> bool {
     if (args.irBuilder == nullptr || args.outputValue == INVALID_VALUE_ID) {
-      return {};
+      return false;
     }
     const auto yuvValue =
         args.irBuilder->InternValue("yuv", SLType::Float3, Precision::High, IRValueKind::Local);
@@ -296,17 +296,22 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
         OperatorID::YUVToRGB, SLType::Float4,
         {yuvValue, matrixValue, limitedRangeValue, hasAlphaValue, alphaValue});
     if (result == INVALID_VALUE_ID) {
-      return {};
+      args.irBuilder->MarkFailed("the YUV operator could not be recorded");
+      return false;
     }
     args.irBuilder->StoreOutput(args.outputValue, result);
-    std::string expression = {};
     std::string error = {};
-    return GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error)
-               ? expression
-               : std::string();
+    if (!GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, expression, &error)) {
+      args.irBuilder->MarkFailed(error);
+      return false;
+    }
+    return true;
   };
   if (alphaStart == Point::Zero()) {
-    const auto expression = emitYUVCall(false);
+    std::string expression = {};
+    if (!emitYUVCall(false, &expression)) {
+      return;
+    }
     fragBuilder->appendCall(args.outputColor, entry, {"yuv", mat3Name, limitedRange, "0", "1.0"},
                             "", expression);
   } else {
@@ -319,7 +324,10 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
         "yuv_a", fragBuilder->textureLookupExpression(textureSamplers[0], alphaVertexColor) + ".r",
         "float");
     recordSample(0, alphaVertexColor, "yuv_a", "r", "", SLType::Float);
-    const auto expression = emitYUVCall(true);
+    std::string expression = {};
+    if (!emitYUVCall(true, &expression)) {
+      return;
+    }
     fragBuilder->appendCall(args.outputColor, entry, {"yuv", mat3Name, limitedRange, "1", "yuv_a"},
                             "", expression);
   }

@@ -114,57 +114,64 @@ void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
         for (int slot = 0; slot < 17; ++slot) {
           callArgs.push_back(kernelName + "[" + std::to_string(slot) + "]");
         }
-        ValueID result = INVALID_VALUE_ID;
+        if (args.irBuilder == nullptr) {
+          return;
+        }
+        if (args.outputValue == INVALID_VALUE_ID || childCoords[0].type() != SLType::Float2) {
+          args.irBuilder->MarkFailed("the gaussian blur coordinate is not a vec2");
+          return;
+        }
+        const auto samplerValue = args.samplerValue(childSamplers[0]);
+        if (samplerValue == INVALID_VALUE_ID) {
+          args.irBuilder->MarkFailed("the gaussian blur sampler has no IR value");
+          return;
+        }
+        const auto zero = args.irBuilder->CreateConstant(0.0f);
+        const auto one = args.irBuilder->CreateConstant(1.0f);
+        const auto zero4 =
+            args.irBuilder->CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
+        const auto one2 = args.irBuilder->CreateConstruct(SLType::Float2, {one, one});
+        const auto coordValue = args.irBuilder->InternValue(childCoords[0].name(), SLType::Float2,
+                                                            Precision::High, IRValueKind::Local);
+        const auto texelSizeValue = args.irBuilder->InternValue(
+            texelSizeName, SLType::Float2, Precision::High, IRValueKind::Uniform);
+        const auto radiusValue = args.irBuilder->InternValue(radiusName, SLType::Int,
+                                                             Precision::High, IRValueKind::Uniform);
+        const auto subsetValue =
+            tiledRead && tiled.subset != INVALID_VALUE_ID ? tiled.subset : zero4;
+        const auto clampValue = tiledRead && tiled.clamp != INVALID_VALUE_ID ? tiled.clamp : zero4;
+        const auto dimensionValue =
+            tiledRead && tiled.dimensions != INVALID_VALUE_ID ? tiled.dimensions : one2;
+        const auto kernelValue = args.irBuilder->InternValue(
+            kernelName, SLType::Float4, Precision::High, IRValueKind::UniformArray);
+        const auto modeXValue =
+            args.irBuilder->CreateIntConstant(tiledRead ? tiled.shaderModeX : 0);
+        const auto modeYValue =
+            args.irBuilder->CreateIntConstant(tiledRead ? tiled.shaderModeY : 0);
+        const auto seamFlags =
+            TiledFlags(TiledReadFlag::RepeatX) | TiledFlags(TiledReadFlag::RepeatY);
+        const auto borderFlags =
+            TiledFlags(TiledReadFlag::BorderLinearX) | TiledFlags(TiledReadFlag::BorderLinearY) |
+            TiledFlags(TiledReadFlag::BorderNearestX) | TiledFlags(TiledReadFlag::BorderNearestY);
+        const auto seamValue =
+            args.irBuilder->CreateIntConstant((tiled.flags & seamFlags) != 0 ? 1 : 0);
+        const auto borderValue =
+            args.irBuilder->CreateIntConstant((tiled.flags & borderFlags) != 0 ? 1 : 0);
+        const auto result = args.irBuilder->CreateCall(
+            OperatorID::GaussianBlur1D, SLType::Float4,
+            {samplerValue, coordValue, texelSizeValue, radiusValue, subsetValue, modeXValue,
+             modeYValue, clampValue, dimensionValue, seamValue, borderValue, kernelValue},
+            args.outputColor);
+        if (result == INVALID_VALUE_ID) {
+          args.irBuilder->MarkFailed("the gaussian blur call could not be recorded");
+          return;
+        }
+        args.irBuilder->StoreOutput(args.outputValue, result);
         std::string expression = {};
         std::string error = {};
-        if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID &&
-            childCoords[0].type() == SLType::Float2) {
-          const auto samplerValue = args.samplerValue(childSamplers[0]);
-          if (samplerValue != INVALID_VALUE_ID) {
-            const auto zero = args.irBuilder->CreateConstant(0.0f);
-            const auto one = args.irBuilder->CreateConstant(1.0f);
-            const auto zero4 =
-                args.irBuilder->CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
-            const auto one2 = args.irBuilder->CreateConstruct(SLType::Float2, {one, one});
-            const auto coordValue = args.irBuilder->InternValue(
-                childCoords[0].name(), SLType::Float2, Precision::High, IRValueKind::Local);
-            const auto texelSizeValue = args.irBuilder->InternValue(
-                texelSizeName, SLType::Float2, Precision::High, IRValueKind::Uniform);
-            const auto radiusValue = args.irBuilder->InternValue(
-                radiusName, SLType::Int, Precision::High, IRValueKind::Uniform);
-            const auto subsetValue =
-                tiledRead && tiled.subset != INVALID_VALUE_ID ? tiled.subset : zero4;
-            const auto clampValue =
-                tiledRead && tiled.clamp != INVALID_VALUE_ID ? tiled.clamp : zero4;
-            const auto dimensionValue =
-                tiledRead && tiled.dimensions != INVALID_VALUE_ID ? tiled.dimensions : one2;
-            const auto kernelValue = args.irBuilder->InternValue(
-                kernelName, SLType::Float4, Precision::High, IRValueKind::UniformArray);
-            const auto modeXValue =
-                args.irBuilder->CreateIntConstant(tiledRead ? tiled.shaderModeX : 0);
-            const auto modeYValue =
-                args.irBuilder->CreateIntConstant(tiledRead ? tiled.shaderModeY : 0);
-            const auto seamFlags =
-                TiledFlags(TiledReadFlag::RepeatX) | TiledFlags(TiledReadFlag::RepeatY);
-            const auto borderFlags = TiledFlags(TiledReadFlag::BorderLinearX) |
-                                     TiledFlags(TiledReadFlag::BorderLinearY) |
-                                     TiledFlags(TiledReadFlag::BorderNearestX) |
-                                     TiledFlags(TiledReadFlag::BorderNearestY);
-            const auto seamValue =
-                args.irBuilder->CreateIntConstant((tiled.flags & seamFlags) != 0 ? 1 : 0);
-            const auto borderValue =
-                args.irBuilder->CreateIntConstant((tiled.flags & borderFlags) != 0 ? 1 : 0);
-            result = args.irBuilder->CreateCall(
-                OperatorID::GaussianBlur1D, SLType::Float4,
-                {samplerValue, coordValue, texelSizeValue, radiusValue, subsetValue, modeXValue,
-                 modeYValue, clampValue, dimensionValue, seamValue, borderValue, kernelValue},
-                args.outputColor);
-            args.irBuilder->StoreOutput(args.outputValue, result);
-            if (result != INVALID_VALUE_ID &&
-                !GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error)) {
-              expression.clear();
-            }
-          }
+        if (!GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error)) {
+          args.irBuilder->MarkFailed(error);
+          return;
         }
         fragBuilder->appendCall(args.outputColor, entry, callArgs, "", expression);
         return;

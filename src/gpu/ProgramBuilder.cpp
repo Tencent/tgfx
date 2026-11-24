@@ -49,6 +49,10 @@ bool ProgramBuilder::emitAndInstallProcessors() {
   emitAndInstallXferProc(inputColor, inputCoverage);
   emitFSOutputSwizzle();
 
+  if (programIR.Failed()) {
+    LOGE("ProgramBuilder: %s", programIR.Failure().c_str());
+    return false;
+  }
   std::string validationError;
   if (!ValidateProgramIR(programIR.IR(), &validationError)) {
     LOGE("ProgramBuilder: %s", validationError.c_str());
