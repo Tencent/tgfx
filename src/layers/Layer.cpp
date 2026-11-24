@@ -29,6 +29,7 @@
 #include "compositing3d/Layer3DContext.h"
 #include "core/Matrix3DUtils.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/GpuProbe.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/PictureUtils.h"
@@ -1530,6 +1531,7 @@ SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
 bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alpha,
                                  BlendMode blendMode,
                                  const std::shared_ptr<MaskFilter>& maskFilter) {
+  GpuProbeTag probeTag("subtreeCache");
   // Non-leaf nodes in 3D rendering context layer tree have caching disabled.
   DEBUG_ASSERT(!canPreserve3D());
   auto layerBounds = getBounds();
@@ -1552,6 +1554,7 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
 
 void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode,
                           const std::shared_ptr<MaskFilter>& maskFilter) {
+  GpuProbeTag probeTag("offscreen");
   // preserve3D layers never require offscreen rendering; their effects (filters, group opacity,
   // mask filter, non-SrcOver blend) are intentionally not supported because each preserve3D
   // middle node is rasterized as a flat quad before BSP compositing. Non-preserve3D leaves may
@@ -1622,7 +1625,10 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
     const auto probeStart = std::chrono::steady_clock::now();
     ++gCaptureProbe.depth;
     gCaptureProbe.maxDepth = std::max(gCaptureProbe.maxDepth, gCaptureProbe.depth);
-    ownedSource = getLayerStyleSource(args, canvas->getMatrix(), alpha);
+    {
+      GpuProbeTag probeTag("srcRecord");
+      ownedSource = getLayerStyleSource(args, canvas->getMatrix(), alpha);
+    }
     --gCaptureProbe.depth;
     const auto probeMs =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - probeStart)
@@ -1808,6 +1814,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
 
 void Layer::drawByStarting3DContext(const DrawArgs& args, Canvas* canvas, const Matrix3D& matrix3D,
                                     LayerDrawFunc drawFunc, float alpha) {
+  GpuProbeTag probeTag("3d");
   DEBUG_ASSERT(canPreserve3D());
   // args.render3DContext may be non-null when this preserve3D layer is nested inside a
   // non-preserve3D leaf that is being rasterized in an outer 3D context. The nested context is
@@ -2012,6 +2019,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                             const LayerStyleSource* source, LayerStylePosition position) {
+  GpuProbeTag probeTag("style");
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
   for (const auto& layerStyle : _layerStyles) {
     DEBUG_ASSERT(layerStyle != nullptr);

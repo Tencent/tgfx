@@ -151,6 +151,8 @@ class OpsCompositor {
   std::shared_ptr<TextureProxy> clipTexture = nullptr;
   bool hasRectToRectDraw = false;
   PendingOpType pendingType = PendingOpType::Unknown;
+  // TEMP probe: the GpuProbe tag active when the pending ops started.
+  const char* pendingTag = "other";
   ClipStack pendingClip = {};
   Brush pendingBrush = {};
   std::shared_ptr<Image> pendingImage = nullptr;

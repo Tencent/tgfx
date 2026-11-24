@@ -25,6 +25,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "core/utils/DecomposeRects.h"
+#include "core/utils/GpuProbe.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/TileSortCompareFunc.h"
@@ -1485,6 +1486,7 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
 }
 
 bool DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots) const {
+  GpuProbeTag probeTag("tile");
   auto surface = surfaceCaches[task.sourceIndex()].get();
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
@@ -1875,6 +1877,7 @@ bool DisplayList::HasVisibleBackgroundStyle(const Layer* layer, const Rect& unio
 
 std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     Surface* surface, const std::vector<Rect>& renderRects, const Matrix& viewMatrix) const {
+  GpuProbeTag probeTag("capture");
   DEBUG_ASSERT(surface != nullptr);
   if (!_root->hasBackgroundStyle(1.0f)) {
     return nullptr;

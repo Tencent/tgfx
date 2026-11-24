@@ -19,6 +19,7 @@
 #include "BackgroundHandler.h"
 #include <algorithm>
 #include <chrono>
+#include "core/utils/GpuProbe.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/PictureUtils.h"
@@ -302,6 +303,7 @@ float BackgroundCapturer::consumerContentScale(float contentScale) const {
 void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
                                              float /*alpha*/, LayerStyle* style,
                                              const LayerStyleSource* source) {
+  GpuProbeTag probeTag("capSnap");
   if (snapshots == nullptr || bgSource == nullptr || source == nullptr || canvas == nullptr) {
     return;
   }
@@ -497,6 +499,7 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
 void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
                                              float alpha, LayerStyle* style,
                                              const LayerStyleSource* source) {
+  GpuProbeTag probeTag("bgStyle");
   struct ProbeScope {
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
     ~ProbeScope() {
