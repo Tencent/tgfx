@@ -24,8 +24,14 @@
 
 namespace tgfx {
 class FragmentProcessor;
+class ProgramIRBuilder;
 
 static constexpr char CUSTOM_COLOR_OUTPUT_NAME[] = "tgfx_FragColor";
+
+struct TextureReadResult {
+  std::string name = {};
+  ValueID value = INVALID_VALUE_ID;
+};
 
 /// One recorded stage-output write: the geometry stage's own color or coverage, or the plain xfer
 /// formula that multiplies the color chain by the coverage chain. A bytecode route reads these to
@@ -115,11 +121,13 @@ class FragmentShaderBuilder : public ShaderBuilder {
 
   /**
    * Reads one sampler at the named coordinate into a local and records the read when the plan can
-   * carry it (a 2D sampler with the identity channel swizzle). Returns the local's name.
+   * carry it. The typed value is filled when a ProgramIRBuilder is supplied.
    */
-  std::string readTexture(SamplerHandle handle, const std::string& coordName,
-                          const std::string& strictSubset, const std::string& drawSubset,
-                          bool* recorded);
+  TextureReadResult readTexture(SamplerHandle handle, const std::string& coordName,
+                                const std::string& strictSubset, const std::string& drawSubset,
+                                bool* recorded, ProgramIRBuilder* irBuilder = nullptr,
+                                ValueID samplerValue = INVALID_VALUE_ID,
+                                SLType coordType = SLType::Void);
 
   /**
    * Records that a call already stored the stage's final output and folded its coverage: the

@@ -20,6 +20,7 @@
 #include "ProgramBuilder.h"
 #include "SLType.h"
 #include "core/utils/Log.h"
+#include "gpu/ir/ProgramIRBuilder.h"
 
 namespace tgfx {
 FragmentShaderBuilder::FragmentShaderBuilder(ProgramBuilder* program) : ShaderBuilder(program) {
@@ -61,9 +62,12 @@ std::string FragmentShaderBuilder::clampToSubsets(const std::string& coordName,
   return out;
 }
 
-std::string FragmentShaderBuilder::readTexture(SamplerHandle handle, const std::string& coordName,
-                                               const std::string& strictSubset,
-                                               const std::string& drawSubset, bool* recorded) {
+TextureReadResult FragmentShaderBuilder::readTexture(SamplerHandle handle,
+                                                     const std::string& coordName,
+                                                     const std::string& strictSubset,
+                                                     const std::string& drawSubset, bool* recorded,
+                                                     ProgramIRBuilder* irBuilder,
+                                                     ValueID samplerValue, SLType coordType) {
   if (recorded != nullptr) {
     *recorded = false;
   }
@@ -90,11 +94,28 @@ std::string FragmentShaderBuilder::readTexture(SamplerHandle handle, const std::
     if (recorded != nullptr) {
       *recorded = true;
     }
-    return temp;
+    TextureReadResult result = {temp, INVALID_VALUE_ID};
+    if (irBuilder != nullptr && samplerValue != INVALID_VALUE_ID && coordType != SLType::Void) {
+      const auto coordValue =
+          irBuilder->InternValue(coordName, coordType, Precision::High, IRValueKind::Local);
+      if (coordValue != INVALID_VALUE_ID) {
+        result.value =
+            irBuilder->CreateTextureSample(samplerValue, coordValue, SLType::Float4, temp);
+      }
+    }
+    return result;
   }
   const auto finalCoord = clampToSubsets(coordName, strictSubset, drawSubset);
   aliasValue(temp, textureLookupExpression(handle, finalCoord), "vec4");
-  return temp;
+  TextureReadResult result = {temp, INVALID_VALUE_ID};
+  if (irBuilder != nullptr && samplerValue != INVALID_VALUE_ID && coordType != SLType::Void) {
+    const auto coordValue =
+        irBuilder->InternValue(finalCoord, coordType, Precision::High, IRValueKind::Local);
+    if (coordValue != INVALID_VALUE_ID) {
+      result.value = irBuilder->CreateTextureSample(samplerValue, coordValue, SLType::Float4, temp);
+    }
+  }
+  return result;
 }
 
 void FragmentShaderBuilder::recordStageRoot(const std::string& outputVar) {

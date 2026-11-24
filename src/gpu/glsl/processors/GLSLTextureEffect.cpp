@@ -131,31 +131,23 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   // plan cannot name, so those draws stay on their fallback.
   if (alphaStart == Point::Zero()) {
     bool recorded = false;
-    const auto readName = fragBuilder->readTexture(textureSampler, texCoordName, extraSubsetName,
-                                                   subsetName, &recorded);
-    if (recorded) {
-      fragBuilder->storeColor(args.outputColor, readName);
-    } else {
-      fragBuilder->storeColor(args.outputColor, readName);
-    }
-    if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID) {
-      const auto sampler = args.samplerValue(textureSampler);
-      const auto coordType = (*args.transformedCoords)[0].type();
-      const auto coordValue =
-          args.irBuilder->InternValue(texCoordName, coordType, Precision::High, IRValueKind::Local);
-      if (sampler != INVALID_VALUE_ID && coordValue != INVALID_VALUE_ID) {
-        const auto sample =
-            args.irBuilder->CreateTextureSample(sampler, coordValue, SLType::Float4, readName);
-        args.irBuilder->StoreOutput(args.outputValue, sample);
-      }
+    const auto read = fragBuilder->readTexture(
+        textureSampler, texCoordName, extraSubsetName, subsetName, &recorded, args.irBuilder,
+        args.samplerValue(textureSampler), (*args.transformedCoords)[0].type());
+    fragBuilder->storeColor(args.outputColor, read.name);
+    if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID &&
+        read.value != INVALID_VALUE_ID) {
+      args.irBuilder->StoreOutput(args.outputValue, read.value);
     }
     return;
   }
   const auto finalCoordName =
       fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
   bool recorded = false;
-  const auto readName = fragBuilder->readTexture(textureSampler, finalCoordName, "", "", &recorded);
-  fragBuilder->aliasValue("color", readName, "vec4");
+  const auto read = fragBuilder->readTexture(textureSampler, finalCoordName, "", "", &recorded,
+                                             args.irBuilder, args.samplerValue(textureSampler),
+                                             (*args.transformedCoords)[0].type());
+  fragBuilder->aliasValue("color", read.name, "vec4");
   if (alphaStart != Point::Zero()) {
     fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
     auto alphaStartName =
