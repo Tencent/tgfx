@@ -93,25 +93,7 @@ std::string FragmentShaderBuilder::readTexture(SamplerHandle handle, const std::
     return temp;
   }
   const auto finalCoord = clampToSubsets(coordName, strictSubset, drawSubset);
-  const size_t start = codeTextSize();
-  setRawCaptureEnabled(false);
-  codeAppendf("vec4 %s = ", temp.c_str());
-  appendTextureLookup(handle, finalCoord);
-  codeAppend(";");
-  setRawCaptureEnabled(true);
-  const std::string text = codeTextFrom(start);
-  const std::string prefix = "vec4 " + temp + " = ";
-  const size_t begin = text.find(prefix);
-  const size_t end = text.rfind(';');
-  FragmentInstruction instruction = {};
-  instruction.kind = FragmentInstructionKind::Alias;
-  instruction.output = temp;
-  instruction.declaration = "vec4";
-  instruction.text = text;
-  if (begin != std::string::npos && end != std::string::npos && end > begin + prefix.size()) {
-    instruction.src = text.substr(begin + prefix.size(), end - begin - prefix.size());
-  }
-  recordFragmentInstruction(std::move(instruction));
+  aliasValue(temp, textureLookupExpression(handle, finalCoord), "vec4");
   return temp;
 }
 
@@ -142,7 +124,10 @@ void FragmentShaderBuilder::aliasValue(const std::string& dstName, const std::st
   }
   const size_t start = codeTextSize();
   setRawCaptureEnabled(false);
-  codeAppendf("%s %s = %s;", declaration.c_str(), dstName.c_str(), srcName.c_str());
+  if (!declaration.empty()) {
+    codeAppendf("%s ", declaration.c_str());
+  }
+  codeAppendf("%s = %s;", dstName.c_str(), srcName.c_str());
   setRawCaptureEnabled(true);
   FragmentInstruction instruction = {};
   instruction.kind = FragmentInstructionKind::Alias;

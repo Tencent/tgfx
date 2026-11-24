@@ -75,6 +75,10 @@ class ShaderBuilder {
    */
   void appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName);
 
+  /// Builds the sampler expression without writing it, for call sites that record the read as an
+  /// instruction instead of raw text.
+  std::string textureLookupExpression(SamplerHandle samplerHandle, const std::string& coordName);
+
   /**
    * Called by Processors to add code to one of the shaders.
    */

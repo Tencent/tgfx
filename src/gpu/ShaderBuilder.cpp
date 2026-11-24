@@ -184,7 +184,8 @@ int ShaderBuilder::ReadSwizzleCode(const Swizzle& swizzle) {
   return -1;
 }
 
-void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName) {
+std::string ShaderBuilder::textureLookupExpression(SamplerHandle samplerHandle,
+                                                   const std::string& coordName) {
   auto uniformHandler = programBuilder->uniformHandler();
   auto sampler = uniformHandler->getSamplerVariable(samplerHandle);
   const char* reader = TextureReaderName(sampler.type());
@@ -194,15 +195,21 @@ void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::
   const bool carriesSubset = sampler.type() == SLType::Texture2DSampler;
   const int swizzleCode =
       carriesSubset ? ReadSwizzleCode(uniformHandler->getSamplerSwizzle(samplerHandle)) : -1;
+  std::string expression = {};
   if (entry.empty()) {
-    codeAppendf("texture(%s, %s)", sampler.name().c_str(), coordName.c_str());
+    expression = "texture(" + sampler.name() + ", " + coordName + ")";
   } else if (carriesSubset && swizzleCode >= 0) {
-    codeAppendf("%s(%s, %s, vec4(0.0), 0, %d)", entry.c_str(), sampler.name().c_str(),
-                coordName.c_str(), swizzleCode);
+    expression = entry + "(" + sampler.name() + ", " + coordName + ", vec4(0.0), 0, " +
+                 std::to_string(swizzleCode) + ")";
   } else {
-    codeAppendf("%s(%s, %s)", entry.c_str(), sampler.name().c_str(), coordName.c_str());
+    expression = entry + "(" + sampler.name() + ", " + coordName + ")";
   }
-  codeAppend(TextureSwizzleString(uniformHandler->getSamplerSwizzle(samplerHandle)));
+  expression += TextureSwizzleString(uniformHandler->getSamplerSwizzle(samplerHandle));
+  return expression;
+}
+
+void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName) {
+  codeAppend(textureLookupExpression(samplerHandle, coordName));
 }
 
 void ShaderBuilder::addFeature(uint32_t featureBit, const std::string& extensionName) {

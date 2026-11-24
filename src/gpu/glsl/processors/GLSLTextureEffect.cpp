@@ -177,23 +177,20 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
   }
   auto finalCoordName = fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
   fragBuilder->codeAppend("vec3 yuv;");
-  fragBuilder->codeAppend("yuv.x = ");
-  fragBuilder->appendTextureLookup(textureSamplers[0], finalCoordName);
-  fragBuilder->codeAppend(".r;");
+  fragBuilder->aliasValue(
+      "yuv.x", fragBuilder->textureLookupExpression(textureSamplers[0], finalCoordName) + ".r", "");
   if (yuvTexture->yuvFormat() == YUVFormat::I420) {
     auto chromaCoord = fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
-    fragBuilder->codeAppend("yuv.y = ");
-    fragBuilder->appendTextureLookup(textureSamplers[1], chromaCoord);
-    fragBuilder->codeAppend(".r;");
+    fragBuilder->aliasValue(
+        "yuv.y", fragBuilder->textureLookupExpression(textureSamplers[1], chromaCoord) + ".r", "");
     chromaCoord = fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
-    fragBuilder->codeAppend("yuv.z = ");
-    fragBuilder->appendTextureLookup(textureSamplers[2], chromaCoord);
-    fragBuilder->codeAppend(".r;");
+    fragBuilder->aliasValue(
+        "yuv.z", fragBuilder->textureLookupExpression(textureSamplers[2], chromaCoord) + ".r", "");
   } else if (yuvTexture->yuvFormat() == YUVFormat::NV12) {
     auto chromaCoord = fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
-    fragBuilder->codeAppend("yuv.yz = ");
-    fragBuilder->appendTextureLookup(textureSamplers[1], chromaCoord);
-    fragBuilder->codeAppend(".ra;");
+    fragBuilder->aliasValue(
+        "yuv.yz", fragBuilder->textureLookupExpression(textureSamplers[1], chromaCoord) + ".ra",
+        "");
   }
   auto mat3Name = uniformHandler->addUniform("Mat3ColorConversion", UniformFormat::Float3x3,
                                              ShaderStage::Fragment);
@@ -209,11 +206,11 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     auto alphaStartName =
         uniformHandler->addUniform("AlphaStart", UniformFormat::Float2, ShaderStage::Fragment);
     std::string alphaVertexColor = "alphaVertexColor";
-    fragBuilder->codeAppendf("highp vec2 %s = %s + %s;", alphaVertexColor.c_str(),
-                             finalCoordName.c_str(), alphaStartName.c_str());
-    fragBuilder->codeAppend("float yuv_a = ");
-    fragBuilder->appendTextureLookup(textureSamplers[0], alphaVertexColor);
-    fragBuilder->codeAppend(".r;");
+    fragBuilder->aliasValue("alphaVertexColor", finalCoordName + " + " + alphaStartName,
+                            "highp vec2");
+    fragBuilder->aliasValue(
+        "yuv_a", fragBuilder->textureLookupExpression(textureSamplers[0], alphaVertexColor) + ".r",
+        "float");
     fragBuilder->appendCall(args.outputColor, entry, {"yuv", mat3Name, limitedRange, "1", "yuv_a"});
   }
 }
