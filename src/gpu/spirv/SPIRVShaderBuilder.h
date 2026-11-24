@@ -35,6 +35,10 @@ class SPIRVShaderBuilder {
   explicit SPIRVShaderBuilder(ShaderStage stage);
   ~SPIRVShaderBuilder() = default;
 
+  void SetOperatorBundle(const OperatorBundle* value) {
+    operatorBundle = value;
+  }
+
   bool Begin(std::string* error = nullptr);
 
   /// Declares function-local variables for values that are assigned in the IR. Must be called
@@ -66,6 +70,7 @@ class SPIRVShaderBuilder {
 
  private:
   uint32_t TypeId(SLType type, std::string* error);
+  uint32_t BoolTypeId(std::string* error);
   uint32_t ConstantId(const IRExpr& expr, std::string* error);
   uint32_t IntConstantId(int32_t value, std::string* error);
   uint32_t ArrayTypeId(SLType elementType, uint32_t count, uint32_t stride, bool decorateStride,
@@ -102,6 +107,7 @@ class SPIRVShaderBuilder {
   uint32_t outputPointerId = 0;
   uint32_t outputId = 0;
   uint32_t fragCoordId = 0;
+  uint32_t boolTypeId = 0;
   uint32_t imageTypeId = 0;
   uint32_t samplerTypeId = 0;
   uint32_t sampledImageTypeId = 0;
@@ -116,6 +122,8 @@ class SPIRVShaderBuilder {
   std::unordered_map<std::string, uint32_t> uniformArrayTypeIds = {};
   std::unordered_map<std::string, uint32_t> uniformArrayPointerIds = {};
   std::vector<ImportedFunction> importedFunctions = {};
+  std::vector<std::vector<uint32_t>> importedModules = {};
+  const OperatorBundle* operatorBundle = nullptr;
   bool begun = false;
   bool finished = false;
 };

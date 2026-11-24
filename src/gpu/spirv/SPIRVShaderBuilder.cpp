@@ -19,11 +19,21 @@
 #include "SPIRVShaderBuilder.h"
 #include <algorithm>
 #include "SPIRVInterfaceLayout.h"
+#if defined(TGFX_USE_VULKAN)
+#include "gpu/aot/chain/ChainSPIRVBody.h"
+#endif
 
 namespace tgfx {
 namespace {
 
 bool Fail(std::string* error, const char* message) {
+  if (error != nullptr) {
+    *error = message;
+  }
+  return false;
+}
+
+bool Fail(std::string* error, const std::string& message) {
   if (error != nullptr) {
     *error = message;
   }
@@ -57,6 +67,21 @@ bool IsFloatVector(SLType type) {
 }  // namespace
 
 SPIRVShaderBuilder::SPIRVShaderBuilder(ShaderStage stage) : stage(stage) {
+}
+
+uint32_t SPIRVShaderBuilder::BoolTypeId(std::string* error) {
+  if (boolTypeId != 0) {
+    return boolTypeId;
+  }
+  auto* saved = writer.sink;
+  writer.Sink(&writer.decl);
+  boolTypeId = writer.NewId();
+  writer.Inst(spirv::kOpTypeBool, {boolTypeId});
+  writer.Sink(saved);
+  if (boolTypeId == 0 && error != nullptr) {
+    *error = "the SPIR-V bool type could not be declared";
+  }
+  return boolTypeId;
 }
 
 uint32_t SPIRVShaderBuilder::TypeId(SLType type, std::string* error) {
@@ -750,6 +775,325 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
       writer.Inst(spirv::kOpImageSampleImplicitLod, {type, id, sampledImage, coordinate});
       return id;
     }
+    case IRExprKind::Call: {
+      const auto* desc = FindOperator(expr.op);
+      if (desc == nullptr) {
+        Fail(error, "the operator is missing from the manifest");
+        return 0;
+      }
+      if (operatorBundle != nullptr) {
+        const auto* artifact = operatorBundle->Find(expr.op, OperatorBackend::SPIRV);
+        if (artifact != nullptr && !artifact->spirv.empty()) {
+          const auto functionId = ImportFunction(*desc, *artifact, error);
+          if (functionId == 0) {
+            return 0;
+          }
+          std::vector<uint32_t> arguments = {};
+          for (const auto argument : expr.args) {
+            uint32_t id = 0;
+            if (!EmitValue(program, argument, &id, error)) {
+              return 0;
+            }
+            arguments.push_back(id);
+          }
+          return EmitFunctionCall(expr.result, expr.type, arguments, functionId, error);
+        }
+      }
+      auto arg = [&](size_t index, uint32_t* id) {
+        return index < expr.args.size() && EmitValue(program, expr.args[index], id, error);
+      };
+      auto splat = [&](uint32_t scalar, SLType vectorType, uint32_t* id) {
+        const auto type = TypeId(vectorType, error);
+        if (type == 0) {
+          return false;
+        }
+        writer.Sink(&writer.func);
+        *id = writer.NewId();
+        writer.Inst(spirv::kOpCompositeConstruct, {type, *id, scalar, scalar, scalar, scalar});
+        return true;
+      };
+      auto extractScalar = [&](uint32_t source, uint32_t index, uint32_t* id) {
+        const auto type = TypeId(SLType::Float, error);
+        if (type == 0) {
+          return false;
+        }
+        writer.Sink(&writer.func);
+        *id = writer.NewId();
+        writer.Inst(spirv::kOpCompositeExtract, {type, *id, source, index});
+        return true;
+      };
+      auto extractVector = [&](uint32_t source, SLType type, const std::vector<uint32_t>& indices,
+                               uint32_t* id) {
+        const auto typeId = TypeId(type, error);
+        if (typeId == 0) {
+          return false;
+        }
+        writer.Sink(&writer.func);
+        *id = writer.NewId();
+        std::vector<uint32_t> operands = {typeId, *id, source, source};
+        operands.insert(operands.end(), indices.begin(), indices.end());
+        writer.Inst(spirv::kOpVectorShuffle, operands);
+        return true;
+      };
+      auto floatConstant = [&](float value) {
+        IRExpr constant = {};
+        constant.kind = IRExprKind::ConstantFloat;
+        constant.type = SLType::Float;
+        constant.constantBits = FloatBits(value);
+        return ConstantId(constant, error);
+      };
+      if (expr.op == OperatorID::ColorMatrix) {
+        uint32_t color = 0;
+        uint32_t matrix = 0;
+        uint32_t translate = 0;
+        if (!arg(0, &color) || !arg(1, &matrix) || !arg(2, &translate)) {
+          return 0;
+        }
+        const auto floatType = TypeId(SLType::Float, error);
+        const auto float3 = TypeId(SLType::Float3, error);
+        const auto float4 = TypeId(SLType::Float4, error);
+        if (floatType == 0 || float3 == 0 || float4 == 0) {
+          return 0;
+        }
+        uint32_t alpha = 0;
+        uint32_t rgb = 0;
+        if (!extractScalar(color, 3, &alpha) ||
+            !extractVector(color, SLType::Float3, {0, 1, 2}, &rgb)) {
+          return 0;
+        }
+        const auto epsilon = floatConstant(1.0e-4f);
+        if (epsilon == 0) {
+          return 0;
+        }
+        writer.Sink(&writer.func);
+        const auto maxAlpha = writer.NewId();
+        writer.Inst(spirv::kOpFMax, {floatType, maxAlpha, alpha, epsilon});
+        uint32_t alpha4 = 0;
+        uint32_t alpha3 = 0;
+        if (!splat(maxAlpha, SLType::Float4, &alpha4) ||
+            !extractVector(alpha4, SLType::Float3, {0, 1, 2}, &alpha3)) {
+          return 0;
+        }
+        const auto normalizedRgb = writer.NewId();
+        writer.Inst(spirv::kOpFDiv, {float3, normalizedRgb, rgb, alpha3});
+        const auto normalized = writer.NewId();
+        writer.Inst(spirv::kOpCompositeConstruct, {float4, normalized, normalizedRgb, alpha});
+        const auto transformed = writer.NewId();
+        writer.Inst(spirv::kOpMatrixTimesVector, {float4, transformed, matrix, normalized});
+        const auto shifted = writer.NewId();
+        writer.Inst(spirv::kOpFAdd, {float4, shifted, transformed, translate});
+        const auto zero = floatConstant(0.0f);
+        const auto one = floatConstant(1.0f);
+        if (zero == 0 || one == 0) {
+          return 0;
+        }
+        uint32_t zero4 = 0;
+        uint32_t one4 = 0;
+        if (!splat(zero, SLType::Float4, &zero4) || !splat(one, SLType::Float4, &one4)) {
+          return 0;
+        }
+        writer.Sink(&writer.func);
+        const auto clampedLow = writer.NewId();
+        writer.Inst(spirv::kOpFMax, {float4, clampedLow, shifted, zero4});
+        const auto clamped = writer.NewId();
+        writer.Inst(spirv::kOpFMin, {float4, clamped, clampedLow, one4});
+        const auto clampedRgb = writer.NewId();
+        writer.Inst(spirv::kOpVectorShuffle, {float3, clampedRgb, clamped, clamped, 0, 1, 2});
+        const auto clampedAlpha = writer.NewId();
+        writer.Inst(spirv::kOpCompositeExtract, {floatType, clampedAlpha, clamped, 3});
+        const auto premultiplied = writer.NewId();
+        writer.Inst(spirv::kOpVectorTimesScalar, {float3, premultiplied, clampedRgb, clampedAlpha});
+        const auto result = writer.NewId();
+        writer.Inst(spirv::kOpCompositeConstruct, {float4, result, premultiplied, clampedAlpha});
+        return result;
+      }
+      if (expr.op == OperatorID::AlphaThreshold) {
+        uint32_t color = 0;
+        uint32_t threshold = 0;
+        if (!arg(0, &color) || !arg(1, &threshold)) {
+          return 0;
+        }
+        const auto floatType = TypeId(SLType::Float, error);
+        const auto float3 = TypeId(SLType::Float3, error);
+        const auto float4 = TypeId(SLType::Float4, error);
+        const auto boolType = BoolTypeId(error);
+        if (floatType == 0 || float3 == 0 || float4 == 0 || boolType == 0) {
+          return 0;
+        }
+        uint32_t alpha = 0;
+        uint32_t rgb = 0;
+        if (!extractScalar(color, 3, &alpha) ||
+            !extractVector(color, SLType::Float3, {0, 1, 2}, &rgb)) {
+          return 0;
+        }
+        uint32_t alpha4 = 0;
+        uint32_t alpha3 = 0;
+        if (!splat(alpha, SLType::Float4, &alpha4) ||
+            !extractVector(alpha4, SLType::Float3, {0, 1, 2}, &alpha3)) {
+          return 0;
+        }
+        const auto zero = floatConstant(0.0f);
+        const auto one = floatConstant(1.0f);
+        if (zero == 0 || one == 0) {
+          return 0;
+        }
+        writer.Sink(&writer.func);
+        const auto normalizedRgb = writer.NewId();
+        writer.Inst(spirv::kOpFDiv, {float3, normalizedRgb, rgb, alpha3});
+        const auto thresholdGreater = writer.NewId();
+        writer.Inst(spirv::kOpFOrdGreaterThan, {boolType, thresholdGreater, threshold, alpha});
+        const auto step = writer.NewId();
+        writer.Inst(spirv::kOpSelect, {floatType, step, thresholdGreater, zero, one});
+        const auto result = writer.NewId();
+        writer.Inst(spirv::kOpCompositeConstruct, {float4, result, normalizedRgb, step});
+        uint32_t zero4 = 0;
+        uint32_t one4 = 0;
+        if (!splat(zero, SLType::Float4, &zero4) || !splat(one, SLType::Float4, &one4)) {
+          return 0;
+        }
+        const auto clampedLow = writer.NewId();
+        writer.Inst(spirv::kOpFMax, {float4, clampedLow, result, zero4});
+        const auto clamped = writer.NewId();
+        writer.Inst(spirv::kOpFMin, {float4, clamped, clampedLow, one4});
+        const auto alphaPositive = writer.NewId();
+        writer.Inst(spirv::kOpFOrdGreaterThan, {boolType, alphaPositive, alpha, zero});
+        const auto finalResult = writer.NewId();
+        writer.Inst(spirv::kOpSelect, {float4, finalResult, alphaPositive, clamped, zero4});
+        return finalResult;
+      }
+      if (expr.op == OperatorID::ConstColor) {
+        uint32_t constColor = 0;
+        uint32_t inputColor = 0;
+        uint32_t mode = 0;
+        if (!arg(0, &constColor) || !arg(1, &inputColor) || !arg(2, &mode)) {
+          return 0;
+        }
+        const auto float4 = TypeId(SLType::Float4, error);
+        const auto boolType = BoolTypeId(error);
+        if (float4 == 0 || boolType == 0) {
+          return 0;
+        }
+        uint32_t alpha = 0;
+        uint32_t alphaSplat = 0;
+        if (!extractScalar(inputColor, 3, &alpha) || !splat(alpha, SLType::Float4, &alphaSplat)) {
+          return 0;
+        }
+        writer.Sink(&writer.func);
+        const auto multiplied = writer.NewId();
+        writer.Inst(spirv::kOpFMul, {float4, multiplied, constColor, inputColor});
+        const auto alphaMultiplied = writer.NewId();
+        writer.Inst(spirv::kOpFMul, {float4, alphaMultiplied, constColor, alphaSplat});
+        const auto modeOne = IntConstantId(1, error);
+        const auto modeTwo = IntConstantId(2, error);
+        if (modeOne == 0 || modeTwo == 0) {
+          return 0;
+        }
+        const auto isModeOne = writer.NewId();
+        writer.Inst(spirv::kOpIEqual, {boolType, isModeOne, mode, modeOne});
+        const auto isModeTwo = writer.NewId();
+        writer.Inst(spirv::kOpIEqual, {boolType, isModeTwo, mode, modeTwo});
+        const auto withAlpha = writer.NewId();
+        writer.Inst(spirv::kOpSelect, {float4, withAlpha, isModeTwo, alphaMultiplied, constColor});
+        const auto result = writer.NewId();
+        writer.Inst(spirv::kOpSelect, {float4, result, isModeOne, multiplied, withAlpha});
+        return result;
+      }
+      if (expr.op == OperatorID::Luma) {
+        uint32_t color = 0;
+        uint32_t kr = 0;
+        uint32_t kg = 0;
+        uint32_t kb = 0;
+        if (!arg(0, &color) || !arg(1, &kr) || !arg(2, &kg) || !arg(3, &kb)) {
+          return 0;
+        }
+        const auto float3 = TypeId(SLType::Float3, error);
+        const auto float4 = TypeId(SLType::Float4, error);
+        const auto floatType = TypeId(SLType::Float, error);
+        if (float3 == 0 || float4 == 0 || floatType == 0) {
+          return 0;
+        }
+        writer.Sink(&writer.func);
+        const auto rgb = writer.NewId();
+        writer.Inst(spirv::kOpVectorShuffle, {float3, rgb, color, color, 0, 1, 2});
+        const auto weights = writer.NewId();
+        writer.Inst(spirv::kOpCompositeConstruct, {float3, weights, kr, kg, kb});
+        const auto luma = writer.NewId();
+        writer.Inst(spirv::kOpDot, {floatType, luma, rgb, weights});
+        const auto result = writer.NewId();
+        writer.Inst(spirv::kOpCompositeConstruct, {float4, result, luma, luma, luma, luma});
+        return result;
+      }
+      if (expr.op == OperatorID::DeviceCoord) {
+        uint32_t matrix = 0;
+        uint32_t coord = 0;
+        if (!arg(0, &matrix) || !arg(1, &coord)) {
+          return 0;
+        }
+        const auto float3 = TypeId(SLType::Float3, error);
+        const auto float2 = TypeId(SLType::Float2, error);
+        if (float3 == 0 || float2 == 0) {
+          return 0;
+        }
+        IRExpr oneExpr = {};
+        oneExpr.kind = IRExprKind::ConstantFloat;
+        oneExpr.type = SLType::Float;
+        oneExpr.constantBits = FloatBits(1.0f);
+        const auto one = ConstantId(oneExpr, error);
+        if (one == 0) {
+          return 0;
+        }
+        writer.Sink(&writer.func);
+        const auto position = writer.NewId();
+        writer.Inst(spirv::kOpCompositeConstruct, {float3, position, coord, one});
+        const auto transformed = writer.NewId();
+        writer.Inst(spirv::kOpMatrixTimesVector, {float3, transformed, matrix, position});
+        const auto result = writer.NewId();
+        writer.Inst(spirv::kOpVectorShuffle, {float2, result, transformed, transformed, 0, 1});
+        return result;
+      }
+      if (expr.op == OperatorID::MulAlpha || expr.op == OperatorID::AlphaModulate) {
+        uint32_t first = 0;
+        uint32_t second = 0;
+        if (!arg(0, &first) || !arg(1, &second)) {
+          return 0;
+        }
+        const auto alphaSource = expr.op == OperatorID::MulAlpha ? second : first;
+        const auto colorSource = expr.op == OperatorID::MulAlpha ? first : second;
+        uint32_t alpha = 0;
+        uint32_t splatted = 0;
+        if (!extractScalar(alphaSource, 3, &alpha) || !splat(alpha, SLType::Float4, &splatted)) {
+          return 0;
+        }
+        const auto float4 = TypeId(SLType::Float4, error);
+        if (float4 == 0) {
+          return 0;
+        }
+        writer.Sink(&writer.func);
+        const auto result = writer.NewId();
+        writer.Inst(spirv::kOpFMul, {float4, result, colorSource, splatted});
+        return result;
+      }
+      if (expr.op == OperatorID::Clamp) {
+        uint32_t value = 0;
+        uint32_t low = 0;
+        uint32_t high = 0;
+        if (!arg(0, &value) || !arg(1, &low) || !arg(2, &high)) {
+          return 0;
+        }
+        const auto type = TypeId(expr.type, error);
+        if (type == 0) {
+          return 0;
+        }
+        writer.Sink(&writer.func);
+        const auto upper = writer.NewId();
+        writer.Inst(spirv::kOpFMax, {type, upper, value, low});
+        const auto result = writer.NewId();
+        writer.Inst(spirv::kOpFMin, {type, result, upper, high});
+        return result;
+      }
+      Fail(error, std::string("the operator '") + desc->debugName + "' has no SPIR-V lowering yet");
+      return 0;
+    }
     case IRExprKind::Construct: {
       std::vector<uint32_t> args = {};
       for (const auto argument : expr.args) {
@@ -956,6 +1300,9 @@ uint32_t SPIRVShaderBuilder::ImportFunction(const OperatorDesc& desc,
       return existing.id;
     }
   }
+  if (!artifact.spirv.empty()) {
+    importedModules.push_back(artifact.spirv);
+  }
 
   ImportedFunction imported = {};
   imported.symbol = artifact.symbol;
@@ -1039,6 +1386,19 @@ std::vector<uint32_t> SPIRVShaderBuilder::Finish(std::string* error) {
 
   std::vector<uint32_t> out = {};
   writer.Finish(&out);
+#if defined(TGFX_USE_VULKAN)
+  if (!importedModules.empty()) {
+    std::vector<std::vector<uint32_t>> modules = {out};
+    modules.insert(modules.end(), importedModules.begin(), importedModules.end());
+    std::vector<uint32_t> linked = {};
+    std::string linkError = {};
+    if (!LinkChainSPIRV(modules, &linked, &linkError)) {
+      Fail(error, linkError);
+      return {};
+    }
+    out = std::move(linked);
+  }
+#endif
   finished = true;
   return out;
 }

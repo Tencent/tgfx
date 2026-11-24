@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "gpu/ir/OperatorBundle.h"
 #include "gpu/spirv/SPIRVInterfaceLayout.h"
 
 namespace tgfx {
@@ -36,10 +37,11 @@ struct SPIRVProgramModules {
 class SPIRVProgramBuilder {
  public:
   static bool Build(const ProgramIR& vertexProgram, const ProgramIR& fragmentProgram,
-                    SPIRVProgramModules* modules, std::string* error = nullptr);
+                    SPIRVProgramModules* modules, std::string* error = nullptr,
+                    const OperatorBundle* operatorBundle = nullptr);
 
   static bool Build(const ProgramIR& program, SPIRVProgramModules* modules,
-                    std::string* error = nullptr);
+                    std::string* error = nullptr, const OperatorBundle* operatorBundle = nullptr);
 };
 
 }  // namespace tgfx

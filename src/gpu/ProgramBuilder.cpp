@@ -175,6 +175,34 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
   XferProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), inputColor, inputCoverage,
                                fragmentShaderBuilder()->colorOutputName(), dstTextureSamplerHandle);
   xferProcessor->emitCode(args);
+  bool hasOutput = false;
+  for (const auto& statement : programIRBuilder().IR().statements) {
+    if (statement.kind == IRStatementKind::StoreOutput) {
+      hasOutput = true;
+      break;
+    }
+  }
+  if (!hasOutput) {
+    ValueID source = INVALID_VALUE_ID;
+    for (const auto& value : programIRBuilder().IR().values) {
+      if (value.debugName == inputColor) {
+        source = value.id;
+        break;
+      }
+    }
+    if (source == INVALID_VALUE_ID && (inputColor == "vec4(1.0)" || inputColor == "1.0")) {
+      const auto white = programIRBuilder().CreateConstant(1.0f);
+      source = programIRBuilder().CreateConstruct(SLType::Float4, {white, white, white, white});
+    } else if (source == INVALID_VALUE_ID && (inputColor == "vec4(0.0)" || inputColor == "0.0")) {
+      const auto black = programIRBuilder().CreateConstant(0.0f);
+      source = programIRBuilder().CreateConstruct(SLType::Float4, {black, black, black, black});
+    }
+    if (source != INVALID_VALUE_ID) {
+      const auto output = programIRBuilder().CreateValue(SLType::Float4, Precision::High,
+                                                         IRValueKind::Local, "fragmentOutput");
+      programIRBuilder().StoreOutput(output, source);
+    }
+  }
   fragmentShaderBuilder()->codeAppend("}");
 }
 
