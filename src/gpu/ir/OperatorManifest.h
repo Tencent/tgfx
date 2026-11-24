@@ -43,12 +43,27 @@ enum class OperatorID : uint32_t {
 
 constexpr OperatorID INVALID_OPERATOR_ID = static_cast<OperatorID>(-1);
 
+struct OperatorParam {
+  SLType type = SLType::Void;
+  bool isArray = false;
+  uint32_t arrayCount = 0;
+
+  OperatorParam() = default;
+
+  OperatorParam(SLType type) : type(type) {
+  }
+
+  OperatorParam(SLType type, bool isArray, uint32_t arrayCount)
+      : type(type), isArray(isArray), arrayCount(arrayCount) {
+  }
+};
+
 struct OperatorDesc {
   OperatorID id = INVALID_OPERATOR_ID;
   const char* debugName = nullptr;
   const char* glslSymbol = nullptr;
   SLType returnType = SLType::Void;
-  std::vector<SLType> params = {};
+  std::vector<OperatorParam> params = {};
 };
 
 /// Returns the manifest entry for an operator, or null when the id is unknown.

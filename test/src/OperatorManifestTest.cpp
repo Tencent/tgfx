@@ -28,10 +28,10 @@ TEST(OperatorManifestTest, ExposesLumaSignature) {
   EXPECT_STREQ(desc->glslSymbol, "pmApplyLuma");
   EXPECT_EQ(desc->returnType, SLType::Float4);
   ASSERT_EQ(desc->params.size(), 4u);
-  EXPECT_EQ(desc->params[0], SLType::Float4);
-  EXPECT_EQ(desc->params[1], SLType::Float);
-  EXPECT_EQ(desc->params[2], SLType::Float);
-  EXPECT_EQ(desc->params[3], SLType::Float);
+  EXPECT_EQ(desc->params[0].type, SLType::Float4);
+  EXPECT_EQ(desc->params[1].type, SLType::Float);
+  EXPECT_EQ(desc->params[2].type, SLType::Float);
+  EXPECT_EQ(desc->params[3].type, SLType::Float);
 }
 
 TEST(OperatorManifestTest, ExposesDeviceCoordSignature) {
@@ -39,8 +39,8 @@ TEST(OperatorManifestTest, ExposesDeviceCoordSignature) {
   ASSERT_NE(desc, nullptr);
   EXPECT_EQ(desc->returnType, SLType::Float2);
   ASSERT_EQ(desc->params.size(), 2u);
-  EXPECT_EQ(desc->params[0], SLType::Float3x3);
-  EXPECT_EQ(desc->params[1], SLType::Float2);
+  EXPECT_EQ(desc->params[0].type, SLType::Float3x3);
+  EXPECT_EQ(desc->params[1].type, SLType::Float2);
 }
 
 TEST(OperatorManifestTest, ExposesGaussianBlurSignature) {
@@ -48,8 +48,10 @@ TEST(OperatorManifestTest, ExposesGaussianBlurSignature) {
   ASSERT_NE(desc, nullptr);
   EXPECT_EQ(desc->returnType, SLType::Float4);
   ASSERT_EQ(desc->params.size(), 12u);
-  EXPECT_EQ(desc->params[0], SLType::Texture2DSampler);
-  EXPECT_EQ(desc->params[11], SLType::Float4);
+  EXPECT_EQ(desc->params[0].type, SLType::Texture2DSampler);
+  EXPECT_EQ(desc->params[11].type, SLType::Float4);
+  EXPECT_TRUE(desc->params[11].isArray);
+  EXPECT_EQ(desc->params[11].arrayCount, 17u);
 }
 
 TEST(OperatorManifestTest, ExposesTiledSampleSignature) {
@@ -57,10 +59,10 @@ TEST(OperatorManifestTest, ExposesTiledSampleSignature) {
   ASSERT_NE(desc, nullptr);
   EXPECT_EQ(desc->returnType, SLType::Float4);
   ASSERT_EQ(desc->params.size(), 9u);
-  EXPECT_EQ(desc->params[0], SLType::Texture2DSampler);
-  EXPECT_EQ(desc->params[2], SLType::Float4);
-  EXPECT_EQ(desc->params[7], SLType::Int);
-  EXPECT_EQ(desc->params[8], SLType::Float4);
+  EXPECT_EQ(desc->params[0].type, SLType::Texture2DSampler);
+  EXPECT_EQ(desc->params[2].type, SLType::Float4);
+  EXPECT_EQ(desc->params[7].type, SLType::Int);
+  EXPECT_EQ(desc->params[8].type, SLType::Float4);
 }
 
 TEST(OperatorManifestTest, RejectsUnknownOperators) {

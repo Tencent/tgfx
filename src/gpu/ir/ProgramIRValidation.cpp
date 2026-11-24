@@ -86,11 +86,11 @@ bool ValidateExpr(const ProgramIR& program, const IRExpr& expr, std::string* err
     }
     for (size_t index = 0; index < expr.args.size(); ++index) {
       const auto& argument = program.values[expr.args[index]];
-      if (argument.type != operatorDesc->params[index]) {
+      if (argument.type != operatorDesc->params[index].type) {
         *error = "argument " + std::to_string(index) + " of '" +
                  (operatorDesc->debugName != nullptr ? operatorDesc->debugName : "?") + "' is " +
                  std::to_string(static_cast<int>(argument.type)) + ", expected " +
-                 std::to_string(static_cast<int>(operatorDesc->params[index]));
+                 std::to_string(static_cast<int>(operatorDesc->params[index].type));
         return false;
       }
     }

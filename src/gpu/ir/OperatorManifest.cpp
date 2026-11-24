@@ -74,7 +74,7 @@ const std::vector<OperatorDesc>& Operators() {
        SLType::Float4,
        {SLType::Texture2DSampler, SLType::Float2, SLType::Float2, SLType::Int, SLType::Float4,
         SLType::Int, SLType::Int, SLType::Float4, SLType::Float2, SLType::Int, SLType::Int,
-        SLType::Float4}},
+        OperatorParam(SLType::Float4, true, 17)}},
       {OperatorID::TiledSample,
        "TiledSample",
        "tgfxTiledSample",
