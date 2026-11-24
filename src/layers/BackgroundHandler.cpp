@@ -596,7 +596,10 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   auto contentBounds =
       Rect::MakeXYWH(contentOffset.x * contentScaleToLocal, contentOffset.y * contentScaleToLocal,
                      contentWidth * contentScaleToLocal, contentHeight * contentScaleToLocal);
-  if (tileBackdrop.has_value() && canvas->getSurface() == tileBackdrop->surface &&
+  // A tile that carries a capture of its own reads the snapshot, which the picture was recorded
+  // against; only a tile that skipped the capture reads its live pixels.
+  if (tileBackdrop.has_value() && !tileBackdrop->snapshotsCover &&
+      canvas->getSurface() == tileBackdrop->surface &&
       style->position() == LayerStylePosition::Below &&
       CanReadTileBackdrop(layer, tileBackdrop->globalRect, drawnBackdropBounds)) {
     bgImage = makeTileBackdrop(args, canvas, contentBounds, source->contentScale, &bgOffset);
