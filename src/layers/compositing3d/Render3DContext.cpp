@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cstdio>
 #include "Render3DContext.h"
 #include <algorithm>
 #include <cmath>
@@ -257,6 +258,7 @@ bool Render3DContext::primeCompositorFromOuterCanvas(Canvas* outerCanvas) {
     return false;
   }
   auto outerSnapshot = outerSurface->makeImageSnapshot();
+  std::printf("[3D-PRIME] %dx%d\n", outerSurface->width(), outerSurface->height());
   if (outerSnapshot == nullptr) {
     return false;
   }
