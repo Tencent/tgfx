@@ -19,6 +19,7 @@
 #include "tgfx/core/Surface.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/CopyPixels.h"
+#include <cstdio>
 #include "core/utils/GpuProbe.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -386,6 +387,8 @@ bool Surface::aboutToDraw(bool discardContent) {
     return true;
   }
   ++gGpuProbe.cow;
+  std::printf("[GPU-COW] %dx%d uses=%ld tag=%s\n", renderTarget->width(), renderTarget->height(),
+              static_cast<long>(oldContent ? oldContent.use_count() : 0), gGpuProbe.tag);
   gGpuProbe.cowPx += static_cast<double>(renderTarget->width()) * renderTarget->height();
   ++gGpuProbe.current().cow;
   gGpuProbe.current().cowPx += static_cast<double>(renderTarget->width()) * renderTarget->height();
