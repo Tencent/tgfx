@@ -284,14 +284,20 @@ jobs:
           key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-web-
 
+      # The reference archive is validated against the origin/main commit, not against the worktree
+      # version.json, so keying by that commit avoids regenerating an identical reference whenever
+      # a pull request accepts new baselines.
+      - name: Get Reference Commit
+        id: reference-commit
+        run: echo "sha=$(git rev-parse origin/main)" >> "$GITHUB_OUTPUT"
+
       - name: Get Reference Cache
         id: reference-cache
         uses: actions/cache/restore@v4
         with:
           path: |
             test/baseline/.cache/webgl
-          key: autotest-web-webgl-${{ hashFiles('test/baseline/version.json') }}
-          restore-keys: autotest-web-webgl-
+          key: autotest-web-webgl-ref-${{ steps.reference-commit.outputs.sha }}
 
       - name: Get Browser Cache
         id: browser-cache
@@ -339,7 +345,15 @@ jobs:
           npm install depsync -g
           depsync
 
+      - name: Get Web Test Dependencies Cache
+        id: web-test-deps-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: web/test/node_modules
+          key: web-test-node-modules-webgl-${{ hashFiles('web/test/package.json') }}
+
       - name: Install Web Test Dependencies
+        if: ${{ steps.web-test-deps-cache.outputs.cache-hit != 'true' }}
         run: |
           cd web/test
           npm install
@@ -407,7 +421,14 @@ jobs:
         with:
           path: |
             test/baseline/.cache/webgl
-          key: autotest-web-webgl-${{ hashFiles('test/baseline/version.json') }}
+          key: autotest-web-webgl-ref-${{ steps.reference-commit.outputs.sha }}
+
+      - name: Save Web Test Dependencies Cache
+        if: ${{ (github.event_name == 'push') && (steps.web-test-deps-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: web/test/node_modules
+          key: web-test-node-modules-webgl-${{ hashFiles('web/test/package.json') }}
 
       # A sha-based key keeps every push saving a fresh snapshot, while pull requests restore the
       # most recent one through the prefix fallback. Entries are small (about 60 MB per backend).
@@ -471,14 +492,17 @@ jobs:
           key: third-party-web-webgpu-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-web-webgpu-
 
+      - name: Get Reference Commit
+        id: reference-commit
+        run: echo "sha=$(git rev-parse origin/main)" >> "$GITHUB_OUTPUT"
+
       - name: Get Reference Cache
         id: reference-cache
         uses: actions/cache/restore@v4
         with:
           path: |
             test/baseline/.cache/webgpu
-          key: autotest-web-webgpu-${{ hashFiles('test/baseline/version.json') }}
-          restore-keys: autotest-web-webgpu-
+          key: autotest-web-webgpu-ref-${{ steps.reference-commit.outputs.sha }}
 
       - name: Get Browser Cache
         id: browser-cache
@@ -526,7 +550,15 @@ jobs:
           npm install depsync -g
           depsync
 
+      - name: Get Web Test Dependencies Cache
+        id: web-test-deps-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: web/test/node_modules
+          key: web-test-node-modules-webgpu-${{ hashFiles('web/test/package.json') }}
+
       - name: Install Web Test Dependencies
+        if: ${{ steps.web-test-deps-cache.outputs.cache-hit != 'true' }}
         run: |
           cd web/test
           npm install
@@ -584,7 +616,14 @@ jobs:
         with:
           path: |
             test/baseline/.cache/webgpu
-          key: autotest-web-webgpu-${{ hashFiles('test/baseline/version.json') }}
+          key: autotest-web-webgpu-ref-${{ steps.reference-commit.outputs.sha }}
+
+      - name: Save Web Test Dependencies Cache
+        if: ${{ (github.event_name == 'push') && (steps.web-test-deps-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: web/test/node_modules
+          key: web-test-node-modules-webgpu-${{ hashFiles('web/test/package.json') }}
 
       # See the web-webgl job for the key rotation rationale behind this cache.
       - name: Save Ccache Cache
