@@ -656,6 +656,9 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   matrix.preTranslate(contentOffset.x, contentOffset.y);
   canvas->concat(matrix);
 
+  std::printf("[BG-SRC] contentOffset=(%.1f,%.1f) bgOffset=(%.1f,%.1f) scale=%.2f size=%dx%d\n",
+              contentOffset.x, contentOffset.y, bgOffset.x, bgOffset.y, source->contentScale,
+              bgImage->width(), bgImage->height());
   auto backgroundOffset = bgOffset - contentOffset;
   LayerStyleInput styleInput = {};
   styleInput.content = contentSource;
