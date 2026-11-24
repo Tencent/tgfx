@@ -1462,7 +1462,7 @@ bool DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
   viewMatrix.postTranslate(offsetX, offsetY);
   auto clipRect = tileRect;
   clipRect.offset(offsetX, offsetY);
-  return drawRootLayer(surface, clipRect, viewMatrix, true, snapshots);
+  return drawRootLayer(surface, clipRect, viewMatrix, true, snapshots, true);
 }
 
 void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
@@ -1555,7 +1555,8 @@ void DisplayList::resetCaches() {
 }
 
 bool DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                                bool autoClear, BackgroundSnapshotMap* snapshots) const {
+                                bool autoClear, BackgroundSnapshotMap* snapshots,
+                                bool readTileBackdrop) const {
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   auto context = surface->getContext();
@@ -1591,6 +1592,12 @@ bool DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   // passes, so sharing is gated on both.
   BackgroundConsumer consumer(snapshots, snapshots != nullptr && _backgroundColor.isOpaque() &&
                                              snapshots->multiPass && snapshots->styleShareCompact);
+  if (readTileBackdrop) {
+    BackgroundConsumer::TileBackdrop backdrop = {};
+    backdrop.surface = surface;
+    backdrop.globalRect = renderRect;
+    consumer.setTileBackdrop(backdrop);
+  }
   args.backgroundHandler = snapshots ? &consumer : BackgroundHandler::NoOp();
   // The clear and the background color above must not count as content.
   auto drawingManager = context->drawingManager();

@@ -25,6 +25,7 @@
 #include "layers/BackgroundSource.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
+#include "layers/contents/LayerContent.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
@@ -483,6 +484,87 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
   return it->second.get();
 }
 
+
+bool BackgroundConsumer::CanReadTileBackdrop(const Layer* layer, const Rect& globalRect,
+                                             const std::vector<Rect>& drawnBounds) {
+  // The style samples its content area widened by the blur range.
+  auto sampleBounds = layer->renderBounds;
+  sampleBounds.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
+  if (!globalRect.contains(sampleBounds)) {
+    return false;
+  }
+  return std::none_of(drawnBounds.begin(), drawnBounds.end(), [&](const Rect& bounds) {
+    return Rect::Intersects(bounds, sampleBounds);
+  });
+}
+
+bool BackgroundConsumer::CoversOwnStyleOutput(Layer* layer, float alpha) {
+  if (alpha < 1.0f || layer->contentBounds == nullptr || layer->contentBounds->isEmpty()) {
+    return false;
+  }
+  auto content = layer->getContent();
+  if (content == nullptr || !content->contourEqualsOpaqueContent(false)) {
+    return false;
+  }
+  // A style drawing from the layer's whole content masks its output by the children too, so they
+  // must stay inside the opaque fill; one drawing from the geometry is masked by the fill alone.
+  for (const auto& style : layer->_layerStyles) {
+    if (style != nullptr && style->contentSource() != LayerStyleContentSource::Geometry) {
+      for (const auto& child : layer->_children) {
+        if (child->bitFields.visible && child->_alpha > 0 && child->maskOwner == nullptr &&
+            !child->renderBounds.isEmpty() &&
+            !layer->contentBounds->contains(child->renderBounds)) {
+          return false;
+        }
+      }
+      break;
+    }
+  }
+  return true;
+}
+
+std::shared_ptr<Image> BackgroundConsumer::makeTileBackdrop(const DrawArgs& args, Canvas* canvas,
+                                                            const Rect& contentBounds,
+                                                            float contentScale,
+                                                            Point* offset) const {
+  DEBUG_ASSERT(tileBackdrop.has_value());
+  Matrix deviceToLocal = Matrix::I();
+  if (!canvas->getMatrix().invert(&deviceToLocal)) {
+    return nullptr;
+  }
+  // Copy only the content rect out of the tile, then drop the snapshot before anything else is
+  // drawn into the tile: holding it past the next draw would trigger the surface's copy-on-write
+  // of the whole atlas. The copy also keeps the backdrop a separate texture from the tile it is
+  // composited back into.
+  auto snapshot = tileBackdrop->surface->makeImageSnapshot();
+  if (snapshot == nullptr) {
+    return nullptr;
+  }
+  Point copyOffset = {};
+  auto backdropCopy = MakeDetachedBgCopy(args.context, snapshot, deviceToLocal, contentBounds,
+                                         &copyOffset, args.dstColorSpace);
+  snapshot = nullptr;
+  if (backdropCopy == nullptr) {
+    return nullptr;
+  }
+  // Same layout as a captured snapshot: the layer's content rect in style space.
+  auto bounds = contentBounds;
+  bounds.scale(contentScale, contentScale);
+  bounds.roundOut();
+  PictureRecorder recorder = {};
+  auto* recording = recorder.beginRecording();
+  recording->scale(contentScale, contentScale);
+  recording->concat(deviceToLocal);
+  recording->translate(copyOffset.x, copyOffset.y);
+  recording->drawImage(std::move(backdropCopy));
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return nullptr;
+  }
+  return PictureUtils::ToImageWithOffset(std::move(picture), offset, &bounds,
+                                          args.dstColorSpace);
+}
+
 void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
                                              float alpha, LayerStyle* style,
                                              const LayerStyleSource* source) {
@@ -510,7 +592,16 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   const auto contentHeight = static_cast<float>(contentSource->image()->height());
   std::shared_ptr<Image> bgImage = nullptr;
   Point bgOffset = {};
-  if (snapshots != nullptr) {
+  auto contentScaleToLocal = 1.0f / source->contentScale;
+  auto contentBounds =
+      Rect::MakeXYWH(contentOffset.x * contentScaleToLocal, contentOffset.y * contentScaleToLocal,
+                     contentWidth * contentScaleToLocal, contentHeight * contentScaleToLocal);
+  if (tileBackdrop.has_value() && canvas->getSurface() == tileBackdrop->surface &&
+      style->position() == LayerStylePosition::Below &&
+      CanReadTileBackdrop(layer, tileBackdrop->globalRect, drawnBackdropBounds)) {
+    bgImage = makeTileBackdrop(args, canvas, contentBounds, source->contentScale, &bgOffset);
+  }
+  if (bgImage == nullptr && snapshots != nullptr) {
     BackgroundSnapshotKey key{layer, style};
     auto it = snapshots->snapshots.find(key);
     if (it == snapshots->snapshots.end()) {
@@ -529,10 +620,6 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   } else {
     // Picture-canvas path: capture was skipped because there is no GPU context. Synthesize the
     // backdrop on the fly by walking ancestors and prior siblings via PictureRecorder.
-    auto contentScaleToLocal = 1.0f / source->contentScale;
-    auto contentBounds =
-        Rect::MakeXYWH(contentOffset.x * contentScaleToLocal, contentOffset.y * contentScaleToLocal,
-                       contentWidth * contentScaleToLocal, contentHeight * contentScaleToLocal);
     bgImage =
         layer->synthesizeBackgroundImage(args, source->contentScale, contentBounds, &bgOffset);
     if (bgImage == nullptr) {
@@ -618,6 +705,11 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   }
 
   style->draw(canvas, styleInput, alpha);
+  // Whatever its source, the style's output ends up in the tile, where later styles sample it,
+  // unless the layer's own opaque content hides it.
+  if (tileBackdrop.has_value() && !CoversOwnStyleOutput(layer, alpha)) {
+    drawnBackdropBounds.push_back(layer->renderBounds);
+  }
 }
 
 void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,

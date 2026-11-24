@@ -280,12 +280,50 @@ class BackgroundConsumer : public BackgroundHandler {
       : snapshots(snapshots), shareStyleOutput(shareStyleOutput) {
   }
 
+  // The tile this consumer draws into, so a background style can read its backdrop from the pixels
+  // already drawn there instead of from a captured snapshot.
+  struct TileBackdrop {
+    Surface* surface = nullptr;
+    // The rect being drawn, in global coordinates.
+    Rect globalRect = {};
+  };
+
+  void setTileBackdrop(const TileBackdrop& backdrop) {
+    tileBackdrop = backdrop;
+  }
+
+  /**
+   * Returns true when layer can read its backdrop from the tile: every pixel the style samples,
+   * widened by the blur range, lies inside the tile, and none of them carries the output of a
+   * background style drawn earlier in the tile, which a captured backdrop would not contain.
+   * drawnBounds holds the bounds of those earlier styles in global coordinates, in draw order.
+   */
+  static bool CanReadTileBackdrop(const Layer* layer, const Rect& globalRect,
+                                  const std::vector<Rect>& drawnBounds);
+
+  /**
+   * Returns true when layer, drawn at alpha, fully covers the output of its own background styles:
+   * its content is a single opaque fill whose bounds hold the whole style area. The tile then shows
+   * the layer's content wherever the style drew, the same pixels a captured backdrop holds, so
+   * later styles may still read the tile there.
+   */
+  static bool CoversOwnStyleOutput(Layer* layer, float alpha);
+
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                            LayerStyle* style, const LayerStyleSource* source) override;
 
   const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
 
  private:
+  // Copies the tile pixels the style samples into a detached image laid out like a captured
+  // snapshot: the layer's content rect in style space.
+  std::shared_ptr<Image> makeTileBackdrop(const DrawArgs& args, Canvas* canvas,
+                                          const Rect& contentBounds, float contentScale,
+                                          Point* offset) const;
+
+  std::optional<TileBackdrop> tileBackdrop = std::nullopt;
+  // Bounds of the background styles drawn so far into this tile, in global coordinates.
+  std::vector<Rect> drawnBackdropBounds = {};
   BackgroundSnapshotMap* snapshots = nullptr;
   bool shareStyleOutput = false;
   // Per-consumer read cursors: each (Layer, LayerStyle) entry list is consumed in dispatch order
