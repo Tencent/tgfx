@@ -37,12 +37,14 @@ if node "$SCRIPT_DIR/reference_cache.js" --check "$BACKEND" "$REFERENCE_COMMIT";
     exit 0
 fi
 
-# Reuse the worktree dependencies only when their declarations match the pinned source. The
-# lockfiles are not tracked by git, so only DEPS and web/package.json can be compared here.
-# A pull request may legitimately change the dependencies and the baselines together, so a
-# mismatch selects an isolated install of the pinned dependencies instead of rejecting the run.
+# Reuse the worktree dependencies only when their declarations match the pinned source: DEPS pulls
+# the third-party repositories, vendor.json lists which vendored libraries are built from them into
+# third_party/out, and web/package.json holds the JS build dependencies. Lockfiles are not tracked
+# by git, so the installed versions cannot be compared here. A pull request may legitimately change
+# the dependencies and the baselines together, so a mismatch selects an isolated install of the
+# pinned dependencies instead of rejecting the run.
 REUSE_DEPS=ON
-if ! git diff --quiet "$REFERENCE_COMMIT" -- DEPS web/package.json; then
+if ! git diff --quiet "$REFERENCE_COMMIT" -- DEPS vendor.json web/package.json; then
     REUSE_DEPS=OFF
 fi
 if [ "$REUSE_DEPS" = "ON" ] && { [ ! -d "$PROJECT_ROOT/third_party/vendor_tools" ] || [ ! -f "$PROJECT_ROOT/web/node_modules/rollup/dist/bin/rollup" ]; }; then
