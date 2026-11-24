@@ -18,6 +18,7 @@
 
 #include "GeometryProcessor.h"
 #include "gpu/ir/CoordinateBinder.h"
+#include "gpu/ir/ProgramIRBuilder.h"
 
 namespace tgfx {
 
@@ -87,6 +88,29 @@ void GeometryProcessor::emitTransforms(EmitArgs& args, VertexShaderBuilder* vert
     // For perspective: pass vec3 directly, division happens in fragment shader.
     // For non-perspective: compute vec2 directly as an optimization.
     vertexBuilder->transformVarying(varying.vsOut(), uvCoordsVar.name(), uniName, hasPerspective);
+    if (args.irBuilder != nullptr) {
+      auto sourceKind = IRValueKind::Local;
+      for (const auto& attribute : args.irBuilder->IR().interface.attributes) {
+        if (attribute.name == uvCoordsVar.name()) {
+          sourceKind = IRValueKind::Attribute;
+          break;
+        }
+      }
+      const auto source = args.irBuilder->InternValue(uvCoordsVar.name(), uvCoordsVar.type(),
+                                                      Precision::High, sourceKind);
+      const auto matrix = args.irBuilder->InternValue(uniName, SLType::Float3x3, Precision::High,
+                                                      IRValueKind::Uniform);
+      const auto one = args.irBuilder->CreateConstant(1.0f);
+      const auto position = args.irBuilder->CreateConstruct(SLType::Float3, {source, one});
+      const auto transformed =
+          args.irBuilder->CreateBinary(IRBinaryOp::Mul, SLType::Float3, matrix, position);
+      const auto coord = hasPerspective
+                             ? transformed
+                             : args.irBuilder->CreateSwizzle(transformed, SLType::Float2, "xy");
+      const auto varyingValue = args.irBuilder->AddVarying(
+          {varying.name(), varyingType, Precision::High, 0, varying.isFlat()});
+      args.irBuilder->StoreVarying({varyingValue, ""}, coord);
+    }
     onEmitTransform(args, vertexBuilder, varyingHandler, uniformHandler, uniName, hasPerspective,
                     i);
     ++i;

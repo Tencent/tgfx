@@ -94,8 +94,15 @@ TextureReadResult FragmentShaderBuilder::readTexture(
     }
     TextureReadResult result = {temp, INVALID_VALUE_ID};
     if (irBuilder != nullptr && samplerValue != INVALID_VALUE_ID && coordType != SLType::Void) {
+      auto coordKind = IRValueKind::Local;
+      for (const auto& varying : irBuilder->IR().interface.varyings) {
+        if (varying.name == coordName) {
+          coordKind = IRValueKind::Varying;
+          break;
+        }
+      }
       const auto coordValue =
-          irBuilder->InternValue(coordName, coordType, Precision::High, IRValueKind::Local);
+          irBuilder->InternValue(coordName, coordType, Precision::High, coordKind);
       if (coordValue != INVALID_VALUE_ID) {
         result.value = irBuilder->CreateTextureSample(
             samplerValue, coordValue, SLType::Float4, temp, sampler.type(), swizzleCode,
@@ -108,8 +115,15 @@ TextureReadResult FragmentShaderBuilder::readTexture(
   aliasValue(temp, textureLookupExpression(handle, finalCoord), "vec4");
   TextureReadResult result = {temp, INVALID_VALUE_ID};
   if (irBuilder != nullptr && samplerValue != INVALID_VALUE_ID && coordType != SLType::Void) {
+    auto coordKind = IRValueKind::Local;
+    for (const auto& varying : irBuilder->IR().interface.varyings) {
+      if (varying.name == finalCoord) {
+        coordKind = IRValueKind::Varying;
+        break;
+      }
+    }
     const auto coordValue =
-        irBuilder->InternValue(finalCoord, coordType, Precision::High, IRValueKind::Local);
+        irBuilder->InternValue(finalCoord, coordType, Precision::High, coordKind);
     if (coordValue != INVALID_VALUE_ID) {
       result.value = irBuilder->CreateTextureSample(samplerValue, coordValue, SLType::Float4, temp,
                                                     sampler.type(), swizzleCode, clampInside,

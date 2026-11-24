@@ -93,6 +93,7 @@ bool VulkanProgramBuilder::checkSamplerCounts() {
 
 std::shared_ptr<Program> VulkanProgramBuilder::buildIRProgram() {
   const auto& program = programIRBuilder().IR();
+
   if (program.vertexStatements.empty() || program.statements.empty()) {
     return nullptr;
   }

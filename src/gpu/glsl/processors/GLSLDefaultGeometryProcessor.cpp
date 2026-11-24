@@ -97,6 +97,14 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
   auto colorName =
       args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->storeColor(args.outputColor, colorName);
+  if (args.irBuilder != nullptr) {
+    args.irBuilder->SetStage(ShaderStage::Fragment);
+    const auto colorValue = args.irBuilder->InternValue(colorName, SLType::Float4, Precision::High,
+                                                        IRValueKind::Uniform);
+    const auto colorOutput = args.irBuilder->InternValue(args.outputColor, SLType::Float4,
+                                                         Precision::High, IRValueKind::Local);
+    args.irBuilder->StoreOutput(colorOutput, colorValue);
+  }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
   args.vertBuilder->storePosition(positionName);
