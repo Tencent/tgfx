@@ -177,8 +177,13 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
       const auto alphaSampler = args.samplerValue(textureSampler);
       const auto alphaStartValue = args.irBuilder->InternValue(
           alphaStartName, SLType::Float2, Precision::High, IRValueKind::Uniform);
-      const auto coordValue = args.irBuilder->InternValue(alphaVertexColor, SLType::Float2,
-                                                          Precision::High, IRValueKind::Local);
+      const auto finalCoordValue = args.irBuilder->InternValue(finalCoordName, SLType::Float2,
+                                                               Precision::High, IRValueKind::Local);
+      const auto coordValue =
+          finalCoordValue != INVALID_VALUE_ID && alphaStartValue != INVALID_VALUE_ID
+              ? args.irBuilder->CreateBinary(IRBinaryOp::Add, SLType::Float2, finalCoordValue,
+                                             alphaStartValue, alphaVertexColor)
+              : INVALID_VALUE_ID;
       if (alphaSampler != INVALID_VALUE_ID && alphaStartValue != INVALID_VALUE_ID &&
           coordValue != INVALID_VALUE_ID) {
         const auto colorValue = args.irBuilder->InternValue("color", SLType::Float4,

@@ -273,13 +273,14 @@ ValueID ProgramIRBuilder::CreateConstruct(SLType type, const std::vector<ValueID
   return AddExpr(std::move(expr));
 }
 
-ValueID ProgramIRBuilder::CreateBinary(IRBinaryOp op, SLType type, ValueID left, ValueID right) {
+ValueID ProgramIRBuilder::CreateBinary(IRBinaryOp op, SLType type, ValueID left, ValueID right,
+                                       std::string debugName) {
   IRExpr expr = {};
   expr.kind = IRExprKind::Binary;
   expr.type = type;
   expr.binaryOp = op;
   expr.args = {left, right};
-  return AddExpr(std::move(expr));
+  return AddExpr(std::move(expr), debugName);
 }
 
 ValueID ProgramIRBuilder::CreateCall(OperatorID op, SLType type, const std::vector<ValueID>& args) {

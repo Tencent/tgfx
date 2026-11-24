@@ -58,7 +58,8 @@ class ProgramIRBuilder {
 
   ValueID CreateConstruct(SLType type, const std::vector<ValueID>& args);
 
-  ValueID CreateBinary(IRBinaryOp op, SLType type, ValueID left, ValueID right);
+  ValueID CreateBinary(IRBinaryOp op, SLType type, ValueID left, ValueID right,
+                       std::string debugName = {});
 
   ValueID CreateCall(OperatorID op, SLType type, const std::vector<ValueID>& args);
 
