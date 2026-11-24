@@ -65,6 +65,7 @@ enum : uint16_t {
   kOpCompositeExtract = 81,
   kOpImageSampleImplicitLod = 87,
   kOpFAdd = 129,
+  kOpFSub = 130,
   kOpFMul = 133,
   kOpFDiv = 136,
   kOpMatrixTimesVector = 145,
