@@ -61,12 +61,11 @@ class VectorLayer : public Layer {
    */
   void setContents(std::vector<std::shared_ptr<VectorElement>> value);
 
-  /**
-   * Applies every enabled element and forwards the surviving painter draws and own geometries to
-   * the sink. The result is the same preparation the renderer consumes, exposed without converting
-   * the draws to layer content. Returns false when the sink is null.
+  /** Freezes draws within limits before delivery to sink; optional usage receives success/failure costs.
+   * Null sink or exhausted limits return false without callbacks; owned op fields may be retained.
    */
-  bool prepareDraws(VectorDrawSink* sink) const;
+  bool prepareDraws(VectorDrawSink* sink, const VectorPrepareLimits& limits,
+                    VectorPrepareUsage* usage = nullptr) const;
 
  protected:
   VectorLayer() = default;

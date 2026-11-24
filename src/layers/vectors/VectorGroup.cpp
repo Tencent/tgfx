@@ -161,26 +161,46 @@ Matrix VectorGroup::getMatrix() {
 
 void VectorGroup::apply(VectorContext* context) {
   DEBUG_ASSERT(context != nullptr);
+  if (!context->budget->enterGroup()) {
+    return;
+  }
   auto groupMatrix = getMatrix();
 
-  VectorContext groupContext = {};
+  VectorContext groupContext(context->budget);
 
   for (const auto& element : _elements) {
     DEBUG_ASSERT(element != nullptr);
-    if (element->enabled()) {
+    if (element->enabled() && groupContext.prepareElement(element.get())) {
       element->apply(&groupContext);
     }
+    if (context->budget->failed) {
+      context->budget->leaveGroup();
+      return;
+    }
+  }
+  context->budget->leaveGroup();
+  if (!context->budget->consumeMetadata(groupContext.geometries.size()) ||
+      !context->budget->consumeMetadata(groupContext.painters.size())) {
+    return;
   }
 
   // Merge geometries with group transform
   for (auto& geometry : groupContext.geometries) {
+    if (!context->addDependency(geometry.get(), VectorGeometryDependency::Kind::GroupTransform,
+                                sourceTag() != nullptr ? sourceTag() : this, this)) {
+      return;
+    }
     geometry->matrix.postConcat(groupMatrix);
     context->geometries.push_back(std::move(geometry));
   }
 
   // Merge painters with alpha
   for (auto& painter : groupContext.painters) {
-    painter->applyAlpha(_alpha);
+    painter->applyAlpha(_alpha, sourceTag() != nullptr ? sourceTag() : this, this,
+                        VectorAlphaFactor::Kind::Group);
+    if (context->budget->failed) {
+      return;
+    }
     context->painters.push_back(std::move(painter));
   }
 }

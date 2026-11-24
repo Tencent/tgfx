@@ -18,43 +18,91 @@
 
 #include "Painter.h"
 #include "VectorContext.h"
-#include "tgfx/layers/LayerRecorder.h"
+#include "core/utils/Types.h"
+#include "tgfx/layers/vectors/Gradient.h"
+#include "tgfx/layers/vectors/ImagePattern.h"
+#include "tgfx/layers/vectors/SolidColor.h"
 
 namespace tgfx {
 
-class RecorderPainterSink : public PainterSink {
- public:
-  explicit RecorderPainterSink(LayerRecorder* recorder) : _recorder(recorder) {
-  }
-
-  void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint, const Matrix& matrix,
-                const Geometry* /*source*/, std::shared_ptr<ColorSource> /*colorSource*/,
-                const void* /*painterTag*/) override {
-    _recorder->setMatrix(matrix);
-    _recorder->addShape(std::move(shape), &paint);
-    _recorder->resetMatrix();
-  }
-
-  void addGlyphRun(std::shared_ptr<TextBlob> textBlob, std::shared_ptr<Shape> shape,
-                   std::vector<LayerPaint> paints, const Matrix& matrix, const Geometry* /*source*/,
-                   std::shared_ptr<ColorSource> /*colorSource*/,
-                   const void* /*painterTag*/) override {
-    _recorder->setMatrix(matrix);
-    for (const auto& paint : paints) {
-      if (shape != nullptr) {
-        _recorder->addShape(shape, &paint);
-      } else if (textBlob != nullptr) {
-        _recorder->addTextBlob(textBlob, &paint);
-      }
+VectorColorSnapshot VectorColorSnapshot::Capture(const ColorSource* source) {
+  DEBUG_ASSERT(source != nullptr);
+  VectorColorSnapshot snapshot = {};
+  snapshot.fitsToGeometry = source->fitsToGeometry();
+  switch (Types::Get(source)) {
+    case Types::ColorSourceType::SolidColor:
+      snapshot.color = static_cast<const SolidColor*>(source)->color();
+      break;
+    case Types::ColorSourceType::ImagePattern: {
+      const auto* pattern = static_cast<const ImagePattern*>(source);
+      snapshot.kind = Kind::ImagePattern;
+      snapshot.image = pattern->image();
+      snapshot.tileModeX = pattern->tileModeX();
+      snapshot.tileModeY = pattern->tileModeY();
+      snapshot.sampling = pattern->samplingOptions();
+      snapshot.matrix = pattern->matrix();
+      snapshot.scaleMode = pattern->scaleMode();
+      break;
     }
-    _recorder->resetMatrix();
+    case Types::ColorSourceType::Gradient: {
+      const auto* gradient = static_cast<const Gradient*>(source);
+      snapshot.colors = gradient->colors();
+      snapshot.positions = gradient->positions();
+      snapshot.matrix = gradient->matrix();
+      switch (gradient->type()) {
+        case GradientType::None:
+          DEBUG_ASSERT(false);
+          break;
+        case GradientType::Linear: {
+          const auto* linear = static_cast<const LinearGradient*>(gradient);
+          snapshot.kind = Kind::Linear;
+          snapshot.start = linear->startPoint();
+          snapshot.end = linear->endPoint();
+          break;
+        }
+        case GradientType::Radial: {
+          const auto* radial = static_cast<const RadialGradient*>(gradient);
+          snapshot.kind = Kind::Radial;
+          snapshot.center = radial->center();
+          snapshot.radius = radial->radius();
+          break;
+        }
+        case GradientType::Conic: {
+          const auto* conic = static_cast<const ConicGradient*>(gradient);
+          snapshot.kind = Kind::Conic;
+          snapshot.center = conic->center();
+          snapshot.startAngle = conic->startAngle();
+          snapshot.endAngle = conic->endAngle();
+          break;
+        }
+        case GradientType::Diamond: {
+          const auto* diamond = static_cast<const DiamondGradient*>(gradient);
+          snapshot.kind = Kind::Diamond;
+          snapshot.center = diamond->center();
+          snapshot.radius = diamond->radius();
+          break;
+        }
+      }
+      break;
+    }
   }
+  return snapshot;
+}
 
- private:
-  LayerRecorder* _recorder = nullptr;
-};
+void Painter::applyAlpha(float groupAlpha, const void* sourceTag, const void* runtimeEndpoint,
+                         VectorAlphaFactor::Kind kind) {
+  if (budget != nullptr && !budget->consumeMetadata(1)) {
+    return;
+  }
+  alphaFactors.push_back({kind, sourceTag, groupAlpha, runtimeEndpoint});
+  alpha *= groupAlpha;
+}
 
 void Painter::captureGeometries(VectorContext* context) {
+  if (!context->budget->consumeCaptures(context->geometries.size()) ||
+      !context->budget->consumeMetadata(context->geometries.size())) {
+    return;
+  }
   geometries.reserve(context->geometries.size());
   innerMatrices.reserve(context->geometries.size());
   for (auto& geometry : context->geometries) {
@@ -63,56 +111,102 @@ void Painter::captureGeometries(VectorContext* context) {
   }
 }
 
-void Painter::draw(LayerRecorder* recorder) {
-  RecorderPainterSink sink(recorder);
-  draw(&sink);
+static void CaptureShaderFold(const LayerPaint& paint, VectorPaintSnapshot* snapshot) {
+  Color color = Color::Transparent();
+  snapshot->shaderIsSolid = paint.shader != nullptr && paint.shader->asColor(&color);
+  snapshot->shaderSolidColor = snapshot->shaderIsSolid ? color : Color::Transparent();
 }
 
-void Painter::draw(PainterSink* sink) {
+void Painter::draw(VectorDrawSink* sink) {
   for (size_t i = 0; i < geometries.size(); i++) {
+    if (budget != nullptr && budget->failed) {
+      return;
+    }
     auto* geometry = geometries[i];
     const auto& innerMatrix = innerMatrices[i];
     auto outerMatrix = computeOuterMatrix(i);
-
     if (geometry->hasText()) {
-      for (const auto& run : geometry->getGlyphRuns()) {
+      const auto& runs = geometry->getGlyphRuns();
+      for (size_t runIndex = 0; runIndex < runs.size(); runIndex++) {
+        const auto& run = runs[runIndex];
+        if (budget != nullptr && !budget->consumeTextPoints(run.textBlob.get(), nullptr)) {
+          return;
+        }
         auto emit = prepareGlyphRun(run, i);
-        if (emit.paints.empty()) {
+        if (budget != nullptr && budget->failed) {
+          return;
+        }
+        if (emit.paints.empty() || (emit.shape == nullptr && emit.textBlob == nullptr)) {
           continue;
         }
-        auto runMatrix = run.matrix;
-        runMatrix.postConcat(innerMatrix);
-        runMatrix.postConcat(outerMatrix);
-        sink->addGlyphRun(std::move(emit.textBlob), std::move(emit.shape), std::move(emit.paints),
-                          runMatrix, geometry, colorSource, sourceTag);
+        DEBUG_ASSERT(emit.paints.size() == emit.paintSnapshots.size());
+        for (size_t paintIndex = 0; paintIndex < emit.paints.size(); paintIndex++) {
+          CaptureShaderFold(emit.paints[paintIndex], &emit.paintSnapshots[paintIndex]);
+        }
+        auto op = makeDrawOp(i);
+        if (budget != nullptr && budget->failed) {
+          return;
+        }
+        op.matrix = run.matrix;
+        op.matrix.postConcat(innerMatrix);
+        op.matrix.postConcat(outerMatrix);
+        op.runOrdinal = runIndex;
+        op.textBlob = std::move(emit.textBlob);
+        op.shape = std::move(emit.shape);
+        op.paints = std::move(emit.paints);
+        op.paintSnapshots = std::move(emit.paintSnapshots);
+        sink->drawGlyphRun(op);
       }
       continue;
     }
-
+    if (budget != nullptr &&
+        (!budget->consumeDraws(1) || !budget->consumePoints(geometry->pointCount))) {
+      return;
+    }
     auto shape = geometry->getShape();
     if (shape == nullptr) {
       continue;
     }
     shape = Shape::ApplyMatrix(shape, innerMatrix);
     if (shape == nullptr) {
-      // innerMatrix is non-invertible (e.g. a degenerate scale); skip to avoid handing a null
-      // shape to prepareShape, which subclasses are allowed to dereference.
       continue;
     }
     auto paint = makeBasePaint();
-    shape = prepareShape(std::move(shape), i, &paint);
+    VectorPaintSnapshot snapshot = {};
+    shape = prepareShape(std::move(shape), i, &paint, &snapshot);
+    if (budget != nullptr && budget->failed) {
+      return;
+    }
     if (shape == nullptr) {
       continue;
     }
-    sink->addShape(std::move(shape), paint, outerMatrix, geometry, colorSource, sourceTag);
+    CaptureShaderFold(paint, &snapshot);
+    auto op = makeDrawOp(i);
+    if (budget != nullptr && budget->failed) {
+      return;
+    }
+    op.shape = std::move(shape);
+    op.matrix = outerMatrix;
+    op.paints.push_back(std::move(paint));
+    op.paintSnapshots.push_back(std::move(snapshot));
+    sink->drawShape(op);
   }
 }
 
-std::shared_ptr<Shader> Painter::wrapShaderWithFit(const Rect& innerBounds) const {
-  if (colorSource == nullptr || !colorSource->fitsToGeometry()) {
+std::shared_ptr<Shader> Painter::wrapShaderWithFit(const VectorPaintSnapshot& snapshot) const {
+  if (!snapshot.colorSource.fitsToGeometry) {
     return shader;
   }
-  return shader->makeWithMatrix(colorSource->getFitMatrix(innerBounds));
+  return shader->makeWithMatrix(snapshot.fitMatrix);
+}
+
+bool Painter::canClone() const {
+  return budget == nullptr ||
+         (budget->consumePainters(1) && budget->consumeCaptures(geometries.size()) &&
+          budget->consumeMetadata(innerMatrices.size()) &&
+          budget->consumeMetadata(alphaFactors.size()) &&
+          budget->consumePoints(colorSnapshot.colors.size()) &&
+          budget->consumePoints(colorSnapshot.positions.size()));
 }
 
 LayerPaint Painter::makeBasePaint() const {
@@ -121,6 +215,72 @@ LayerPaint Painter::makeBasePaint() const {
   paint.placement = placement;
   paint.color.alpha = alpha;
   return paint;
+}
+
+VectorPaintSnapshot Painter::makeBaseSnapshot(const Rect& bounds, float glyphAlpha) const {
+  VectorPaintSnapshot snapshot = {};
+  if (budget != nullptr &&
+      (!budget->consumePoints(colorSnapshot.colors.size()) ||
+       !budget->consumePoints(colorSnapshot.positions.size()) ||
+       !budget->consumeMetadata(alphaFactors.size()) || !budget->consumeMetadata(1))) {
+    return snapshot;
+  }
+  snapshot.colorSource = colorSnapshot;
+  snapshot.alphaFactors = alphaFactors;
+  snapshot.scopePainterAlpha = alpha;
+  snapshot.glyphAlpha = glyphAlpha;
+  snapshot.fitBounds = bounds;
+  if (colorSnapshot.fitsToGeometry) {
+    snapshot.fitMatrix = colorSource->getFitMatrix(bounds);
+  }
+  return snapshot;
+}
+
+VectorPaintSnapshot Painter::makeOverlaySnapshot(const Rect& bounds, const Color& color,
+                                                 float glyphAlpha) const {
+  VectorPaintSnapshot snapshot = {};
+  if (budget != nullptr &&
+      (!budget->consumeMetadata(alphaFactors.size()) || !budget->consumeMetadata(1))) {
+    return snapshot;
+  }
+  snapshot.alphaFactors = alphaFactors;
+  snapshot.role = VectorPaintSnapshot::Role::Overlay;
+  snapshot.colorSource.color = color;
+  snapshot.scopePainterAlpha = alpha;
+  snapshot.glyphAlpha = glyphAlpha;
+  snapshot.overrideWeight = color.alpha;
+  snapshot.fitBounds = bounds;
+  return snapshot;
+}
+
+VectorDrawOp Painter::makeDrawOp(size_t index) const {
+  const auto* geometry = geometries[index];
+  VectorDrawOp op = {};
+  if (budget != nullptr) {
+    if (!budget->consumeMetadata(geometry->copyProvenance.size()) ||
+        !budget->consumeMetadata(geometry->sourceProvenance.size()) ||
+        !budget->consumeMetadata(geometry->dependencies.size())) {
+      return op;
+    }
+    for (const auto& origin : geometry->sourceProvenance) {
+      if (!budget->consumeMetadata(origin.copyProvenance.size())) {
+        return op;
+      }
+    }
+  }
+  op.dependencies = geometry->dependencies;
+  op.geometry = geometry;
+  op.geometryOrdinal = geometry->ordinal;
+  op.sourceTag = geometry->sourceTag;
+  op.sourceEndpoint = geometry->sourceEndpoint;
+  op.sourceProvenance = geometry->sourceProvenance;
+  op.copyProvenance = geometry->copyProvenance;
+  op.painterTag = sourceTag;
+  op.painterEndpoint = runtimeEndpoint;
+  op.colorSource = colorSource;
+  op.capturedInnerMatrix = innerMatrices[index];
+  op.finalMatrix = geometry->matrix;
+  return op;
 }
 
 Matrix Painter::computeOuterMatrix(size_t index) const {

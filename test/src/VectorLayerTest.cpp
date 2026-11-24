@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <limits>
+#include "layers/contents/LayerContent.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/PathMeasure.h"
 #include "tgfx/core/RSXform.h"
@@ -23,6 +25,7 @@
 #include "tgfx/core/UTF.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
+#include "tgfx/layers/LayerRecorder.h"
 #include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/layerstyles/GlassStyle.h"
@@ -66,6 +69,10 @@ class ContentShapeVectorLayer final : public VectorLayer {
 
   std::optional<StyledShape> getContentShapeForTesting() {
     return onGetContentShape();
+  }
+
+  void recordForTesting(LayerRecorder* recorder) {
+    onUpdateContent(recorder);
   }
 };
 
@@ -5674,16 +5681,20 @@ class CollectingVectorDrawSink : public VectorDrawSink {
  public:
   void drawShape(const VectorDrawOp& op) override {
     shapes.push_back(op);
+    draws.push_back(op);
   }
 
   void drawGlyphRun(const VectorDrawOp& op) override {
     glyphRuns.push_back(op);
+    draws.push_back(op);
   }
 
   void drawOwnGeometry(const VectorDrawOp& op) override {
     ownGeometries.push_back(op);
+    draws.push_back(op);
   }
 
+  std::vector<VectorDrawOp> draws = {};
   std::vector<VectorDrawOp> shapes = {};
   std::vector<VectorDrawOp> glyphRuns = {};
   std::vector<VectorDrawOp> ownGeometries = {};
@@ -5700,7 +5711,7 @@ TGFX_TEST(VectorLayerTest, PrepareDraws) {
   filledStyle->setSourceTag(filledStyle.get());
   filledLayer->setContents({filledRectangle, filledStyle});
   CollectingVectorDrawSink filledSink = {};
-  ASSERT_TRUE(filledLayer->prepareDraws(&filledSink));
+  ASSERT_TRUE(filledLayer->prepareDraws(&filledSink, VectorPrepareLimits{}));
   ASSERT_EQ(filledSink.shapes.size(), 1u);
   EXPECT_EQ(filledSink.glyphRuns.size(), 0u);
   EXPECT_EQ(filledSink.ownGeometries.size(), 0u);
@@ -5713,14 +5724,14 @@ TGFX_TEST(VectorLayerTest, PrepareDraws) {
   EXPECT_EQ(filledSink.shapes[0].paints[0].color, Color::White());
 
   filledRectangle->setSourceTag(filledRectangle.get());
-  ASSERT_TRUE(filledLayer->prepareDraws(&filledSink));
+  ASSERT_TRUE(filledLayer->prepareDraws(&filledSink, VectorPrepareLimits{}));
   ASSERT_EQ(filledSink.shapes.size(), 2u);
   EXPECT_EQ(filledSink.shapes[1].sourceTag, filledRectangle.get());
 
   auto ownLayer = VectorLayer::Make();
   ownLayer->setContents({MakeRoundedRectangle()});
   CollectingVectorDrawSink ownSink = {};
-  ASSERT_TRUE(ownLayer->prepareDraws(&ownSink));
+  ASSERT_TRUE(ownLayer->prepareDraws(&ownSink, VectorPrepareLimits{}));
   EXPECT_EQ(ownSink.shapes.size(), 0u);
   ASSERT_EQ(ownSink.ownGeometries.size(), 1u);
   EXPECT_TRUE(ownSink.ownGeometries[0].shape != nullptr);
@@ -5735,12 +5746,1111 @@ TGFX_TEST(VectorLayerTest, PrepareDraws) {
   textSpan->setPosition({20, 40});
   textLayer->setContents({textSpan, MakeFillStyle(Color::Black())});
   CollectingVectorDrawSink textSink = {};
-  ASSERT_TRUE(textLayer->prepareDraws(&textSink));
+  ASSERT_TRUE(textLayer->prepareDraws(&textSink, VectorPrepareLimits{}));
   ASSERT_EQ(textSink.glyphRuns.size(), 1u);
   EXPECT_TRUE(textSink.glyphRuns[0].textBlob != nullptr);
   ASSERT_EQ(textSink.glyphRuns[0].paints.size(), 1u);
   EXPECT_EQ(textSink.glyphRuns[0].matrix, Matrix::MakeTrans(20, 40));
   EXPECT_TRUE(textSink.glyphRuns[0].colorSource != nullptr);
+}
+
+class ColorMutatingVectorDrawSink : public CollectingVectorDrawSink {
+ public:
+  explicit ColorMutatingVectorDrawSink(std::shared_ptr<LinearGradient> source)
+      : source(std::move(source)) {
+  }
+
+  void drawShape(const VectorDrawOp& op) override {
+    CollectingVectorDrawSink::drawShape(op);
+    source->setColors({Color::Green(), Color::White()});
+    source->setStartPoint({8, 9});
+    source->setMatrix(Matrix::MakeTrans(40, 50));
+    source->setFitsToGeometry(false);
+  }
+
+ private:
+  std::shared_ptr<LinearGradient> source = nullptr;
+};
+
+TGFX_TEST(VectorLayerTest, OwnedPreparedColorSnapshots) {
+  auto solid = SolidColor::Make(Color::Red());
+  auto solidSnapshot = VectorColorSnapshot::Capture(solid.get());
+  solid->setColor(Color::Green());
+  EXPECT_EQ(solidSnapshot.kind, VectorColorSnapshot::Kind::Solid);
+  EXPECT_EQ(solidSnapshot.color, Color::Red());
+  EXPECT_FALSE(solidSnapshot.fitsToGeometry);
+
+  auto linear = Gradient::MakeLinear({0, 0}, {1, 0}, {Color::Red(), Color::Blue()}, {0, 1});
+  linear->setMatrix(Matrix::MakeTrans(2, 3));
+  auto layer = VectorLayer::Make();
+  auto first = MakeRoundedRectangle();
+  auto second = MakeRoundedRectangle();
+  second->setPosition({250, 100});
+  layer->setContents({first, second, FillStyle::Make(linear)});
+  ColorMutatingVectorDrawSink sink(linear);
+  ASSERT_TRUE(layer->prepareDraws(&sink, VectorPrepareLimits{}));
+  ASSERT_EQ(sink.shapes.size(), 2u);
+  for (const auto& op : sink.shapes) {
+    ASSERT_EQ(op.paintSnapshots.size(), op.paints.size());
+    const auto& paint = op.paintSnapshots[0];
+    EXPECT_EQ(paint.role, VectorPaintSnapshot::Role::Base);
+    EXPECT_EQ(paint.colorSource.kind, VectorColorSnapshot::Kind::Linear);
+    EXPECT_EQ(paint.colorSource.colors, (std::vector<Color>{Color::Red(), Color::Blue()}));
+    EXPECT_EQ(paint.colorSource.positions, (std::vector<float>{0, 1}));
+    EXPECT_EQ(paint.colorSource.start, Point::Zero());
+    EXPECT_EQ(paint.colorSource.end, Point(1, 0));
+    EXPECT_EQ(paint.colorSource.matrix, Matrix::MakeTrans(2, 3));
+    EXPECT_TRUE(paint.colorSource.fitsToGeometry);
+    auto fit = Matrix::MakeScale(paint.fitBounds.width(), paint.fitBounds.height());
+    fit.postTranslate(paint.fitBounds.left, paint.fitBounds.top);
+    EXPECT_EQ(paint.fitMatrix, fit);
+  }
+  EXPECT_EQ(sink.shapes[0].paintSnapshots[0].fitBounds, Rect::MakeXYWH(50, 50, 100, 100));
+  EXPECT_EQ(sink.shapes[1].paintSnapshots[0].fitBounds, Rect::MakeXYWH(200, 50, 100, 100));
+
+  auto radial = Gradient::MakeRadial({3, 4}, 5, {Color::Red(), Color::Blue()}, {0, 1});
+  radial->setFitsToGeometry(false);
+  auto radialSnapshot = VectorColorSnapshot::Capture(radial.get());
+  radial->setCenter({8, 9});
+  radial->setRadius(10);
+  EXPECT_EQ(radialSnapshot.kind, VectorColorSnapshot::Kind::Radial);
+  EXPECT_EQ(radialSnapshot.center, Point(3, 4));
+  EXPECT_EQ(radialSnapshot.radius, 5);
+  EXPECT_FALSE(radialSnapshot.fitsToGeometry);
+
+  auto conic = Gradient::MakeConic({3, 4}, 30, 300, {Color::Red(), Color::Blue()}, {0, 1});
+  auto conicSnapshot = VectorColorSnapshot::Capture(conic.get());
+  conic->setStartAngle(60);
+  conic->setEndAngle(180);
+  EXPECT_EQ(conicSnapshot.kind, VectorColorSnapshot::Kind::Conic);
+  EXPECT_EQ(conicSnapshot.center, Point(3, 4));
+  EXPECT_EQ(conicSnapshot.startAngle, 30);
+  EXPECT_EQ(conicSnapshot.endAngle, 300);
+
+  auto diamond = Gradient::MakeDiamond({3, 4}, 5, {Color::Red(), Color::Blue()}, {0, 1});
+  auto diamondSnapshot = VectorColorSnapshot::Capture(diamond.get());
+  diamond->setRadius(10);
+  EXPECT_EQ(diamondSnapshot.kind, VectorColorSnapshot::Kind::Diamond);
+  EXPECT_EQ(diamondSnapshot.center, Point(3, 4));
+  EXPECT_EQ(diamondSnapshot.radius, 5);
+
+  auto image = MakeImage("resources/apitest/checker_128.png");
+  ASSERT_TRUE(image != nullptr);
+  SamplingOptions sampling(FilterMode::Nearest, MipmapMode::None);
+  auto pattern = ImagePattern::Make(image, TileMode::Repeat, TileMode::Mirror, sampling);
+  pattern->setScaleMode(ScaleMode::Stretch);
+  pattern->setMatrix(Matrix::MakeTrans(2, 3));
+  layer->setContents({first, FillStyle::Make(pattern)});
+  CollectingVectorDrawSink patternSink = {};
+  auto expectedFit = pattern->getFitMatrix(Rect::MakeXYWH(50, 50, 100, 100));
+  ASSERT_TRUE(layer->prepareDraws(&patternSink, VectorPrepareLimits{}));
+  ASSERT_EQ(patternSink.shapes.size(), 1u);
+  ASSERT_EQ(patternSink.shapes[0].paintSnapshots.size(), 1u);
+  const auto& patternPaint = patternSink.shapes[0].paintSnapshots[0];
+  pattern->setImage(nullptr);
+  pattern->setScaleMode(ScaleMode::None);
+  pattern->setTileModeX(TileMode::Clamp);
+  pattern->setSamplingOptions({});
+  EXPECT_EQ(patternPaint.colorSource.kind, VectorColorSnapshot::Kind::ImagePattern);
+  EXPECT_FALSE(patternPaint.shaderIsSolid);
+  EXPECT_EQ(patternPaint.shaderSolidColor, Color::Transparent());
+  EXPECT_EQ(patternPaint.colorSource.image, image);
+  EXPECT_EQ(patternPaint.colorSource.tileModeX, TileMode::Repeat);
+  EXPECT_EQ(patternPaint.colorSource.tileModeY, TileMode::Mirror);
+  EXPECT_EQ(patternPaint.colorSource.sampling, sampling);
+  EXPECT_EQ(patternPaint.colorSource.scaleMode, ScaleMode::Stretch);
+  EXPECT_EQ(patternPaint.colorSource.matrix, Matrix::MakeTrans(2, 3));
+  EXPECT_TRUE(patternPaint.colorSource.fitsToGeometry);
+  EXPECT_EQ(patternPaint.fitMatrix, expectedFit);
+}
+
+TGFX_TEST(VectorLayerTest, PreparedBaseOverlayRunSnapshots) {
+  auto typeface = GetTestTypeface();
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 36);
+  auto text = Text::Make(TextBlob::MakeFrom("ABC", font));
+  text->setPosition({20, 40});
+  text->setSourceTag(text.get());
+  auto selector = std::make_shared<RangeSelector>();
+  selector->setUnit(SelectorUnit::Index);
+  selector->setStart(0);
+  selector->setEnd(1);
+  auto modifier = TextModifier::Make();
+  modifier->setSelectors({selector});
+  modifier->setFillColor(Color(1, 0, 0, 0.5f));
+  modifier->setStrokeColor(Color(0, 1, 0, 0.5f));
+  modifier->setAlpha(0.5f);
+  auto gradient = Gradient::MakeLinear({0, 0}, {1, 0}, {Color::Blue(), Color::White()}, {0, 1});
+  auto fill = FillStyle::Make(gradient);
+  fill->setAlpha(0.5f);
+  fill->setSourceTag(fill.get());
+  auto stroke = StrokeStyle::Make(gradient);
+  stroke->setStrokeWidth(4);
+  stroke->setStrokeAlign(StrokeAlign::Inside);
+  stroke->setDashes({4, 4});
+  stroke->setAlpha(0.5f);
+  stroke->setSourceTag(stroke.get());
+  auto group = VectorGroup::Make();
+  group->setAlpha(0.5f);
+  group->setPosition({50, 60});
+  group->setElements({text, modifier, fill, stroke});
+  auto layer = VectorLayer::Make();
+  layer->setContents({group});
+  CollectingVectorDrawSink sink = {};
+  ASSERT_TRUE(layer->prepareDraws(&sink, VectorPrepareLimits{}));
+  ASSERT_EQ(sink.glyphRuns.size(), 4u);
+  for (size_t i = 0; i < sink.glyphRuns.size(); i++) {
+    const auto& op = sink.glyphRuns[i];
+    EXPECT_EQ(op.drawOrdinal, i);
+    EXPECT_EQ(op.geometryOrdinal, 0u);
+    EXPECT_EQ(op.runOrdinal, i % 2);
+    EXPECT_EQ(op.sourceTag, text.get());
+    EXPECT_EQ(op.capturedInnerMatrix, Matrix::MakeTrans(20, 40));
+    EXPECT_EQ(op.finalMatrix, Matrix::MakeTrans(70, 100));
+    EXPECT_EQ(op.paintSnapshots.size(), op.paints.size());
+    const auto& base = op.paintSnapshots[0];
+    EXPECT_EQ(base.role, VectorPaintSnapshot::Role::Base);
+    EXPECT_EQ(base.colorSource.kind, VectorColorSnapshot::Kind::Linear);
+    EXPECT_FALSE(base.shaderIsSolid);
+    EXPECT_EQ(base.shaderSolidColor, Color::Transparent());
+    EXPECT_EQ(base.colorSource.colors, (std::vector<Color>{Color::Blue(), Color::White()}));
+    EXPECT_FLOAT_EQ(base.scopePainterAlpha, 0.25f);
+    EXPECT_FLOAT_EQ(base.glyphAlpha, i % 2 == 0 ? 0.5f : 1);
+    EXPECT_FLOAT_EQ(op.paints[0].color.alpha, base.scopePainterAlpha * base.glyphAlpha);
+    EXPECT_FLOAT_EQ(base.overrideWeight, 0);
+    if (i % 2 == 0) {
+      ASSERT_EQ(op.paintSnapshots.size(), 2u);
+      const auto& overlay = op.paintSnapshots[1];
+      EXPECT_EQ(overlay.role, VectorPaintSnapshot::Role::Overlay);
+      EXPECT_EQ(overlay.colorSource.kind, VectorColorSnapshot::Kind::Solid);
+      EXPECT_TRUE(overlay.shaderIsSolid);
+      EXPECT_EQ(overlay.shaderSolidColor, overlay.colorSource.color);
+      EXPECT_EQ(overlay.colorSource.color, i == 0 ? Color(1, 0, 0, 0.5f) : Color(0, 1, 0, 0.5f));
+      EXPECT_FLOAT_EQ(overlay.overrideWeight, 0.5f);
+      EXPECT_FLOAT_EQ(overlay.scopePainterAlpha, 0.25f);
+      EXPECT_FLOAT_EQ(overlay.glyphAlpha, 0.5f);
+      EXPECT_FLOAT_EQ(op.paints[1].color.alpha, 0.125f);
+      EXPECT_EQ(overlay.fitBounds, base.fitBounds);
+      EXPECT_EQ(overlay.fitMatrix, Matrix::I());
+      EXPECT_FALSE(overlay.colorSource.fitsToGeometry);
+    } else {
+      ASSERT_EQ(op.paintSnapshots.size(), 1u);
+    }
+  }
+  EXPECT_EQ(sink.glyphRuns[0].paintSnapshots[0].fitBounds,
+            sink.glyphRuns[2].paintSnapshots[0].fitBounds);
+  EXPECT_EQ(sink.glyphRuns[0].paintSnapshots[0].fitMatrix,
+            sink.glyphRuns[2].paintSnapshots[0].fitMatrix);
+  EXPECT_TRUE(sink.glyphRuns[0].textBlob != nullptr);
+  EXPECT_TRUE(sink.glyphRuns[2].shape != nullptr);
+
+  gradient->setColors({Color::Green(), Color::Red()});
+  modifier->setFillColor(Color::Red());
+  modifier->setStrokeColor(Color::Green());
+  CollectingVectorDrawSink fullSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&fullSink, VectorPrepareLimits{}));
+  ASSERT_EQ(fullSink.glyphRuns.size(), 4u);
+  for (size_t i = 0; i < fullSink.glyphRuns.size(); i += 2) {
+    const auto& op = fullSink.glyphRuns[i];
+    ASSERT_EQ(op.paintSnapshots.size(), 1u);
+    EXPECT_EQ(op.paintSnapshots[0].role, VectorPaintSnapshot::Role::Overlay);
+    EXPECT_FLOAT_EQ(op.paintSnapshots[0].overrideWeight, 1);
+    EXPECT_TRUE(op.paintSnapshots[0].shaderIsSolid);
+    EXPECT_EQ(op.paintSnapshots[0].shaderSolidColor, op.paintSnapshots[0].colorSource.color);
+    EXPECT_EQ(op.paintSnapshots[0].colorSource.color, i == 0 ? Color::Red() : Color::Green());
+  }
+  EXPECT_EQ(sink.glyphRuns[0].paintSnapshots[0].colorSource.colors,
+            (std::vector<Color>{Color::Blue(), Color::White()}));
+  EXPECT_EQ(sink.glyphRuns[0].paintSnapshots[1].colorSource.color, Color(1, 0, 0, 0.5f));
+
+  auto repeater = Repeater::Make();
+  repeater->setCopies(2);
+  repeater->setOrder(RepeaterOrder::AboveOriginal);
+  repeater->setPosition({100, 0});
+  repeater->setStartAlpha(0.5f);
+  repeater->setEndAlpha(0.5f);
+  group->setElements({text, modifier, fill, stroke, repeater});
+  CollectingVectorDrawSink copySink = {};
+  ASSERT_TRUE(layer->prepareDraws(&copySink, VectorPrepareLimits{}));
+  ASSERT_EQ(copySink.glyphRuns.size(), 8u);
+  for (size_t i = 0; i < copySink.glyphRuns.size(); i++) {
+    const auto& op = copySink.glyphRuns[i];
+    EXPECT_EQ(op.drawOrdinal, i);
+    EXPECT_EQ(op.geometryOrdinal, i / 4);
+    EXPECT_EQ(op.runOrdinal, i % 2);
+    ASSERT_EQ(op.copyProvenance.size(), 1u);
+    EXPECT_EQ(op.copyProvenance[0].copyIndex, i / 4);
+    EXPECT_FLOAT_EQ(op.paintSnapshots[0].scopePainterAlpha, 0.125f);
+  }
+}
+
+TGFX_TEST(VectorLayerTest, PreparedDrawCopyAndMergeIdentity) {
+  auto first = MakeRoundedRectangle();
+  auto second = MakeRoundedRectangle();
+  second->setPosition({250, 100});
+  first->setSourceTag(first.get());
+  second->setSourceTag(second.get());
+  auto fill = MakeFillStyle(Color::Red());
+  auto stroke = MakeStrokeStyle(Color::Blue(), 4);
+  auto repeater = Repeater::Make();
+  repeater->setCopies(2);
+  repeater->setOrder(RepeaterOrder::AboveOriginal);
+  repeater->setPosition({0, 100});
+  repeater->setStartAlpha(0.5f);
+  repeater->setEndAlpha(0.5f);
+  repeater->setSourceTag(repeater.get());
+  auto layer = VectorLayer::Make();
+  layer->setContents({first, second, fill, stroke, repeater});
+  CollectingVectorDrawSink sink = {};
+  CollectingVectorDrawSink repeatedSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&sink, VectorPrepareLimits{}));
+  ASSERT_TRUE(layer->prepareDraws(&repeatedSink, VectorPrepareLimits{}));
+  ASSERT_EQ(sink.shapes.size(), 8u);
+  ASSERT_EQ(repeatedSink.shapes.size(), 8u);
+  for (size_t i = 0; i < sink.shapes.size(); i++) {
+    const auto& op = sink.shapes[i];
+    EXPECT_EQ(op.drawOrdinal, i);
+    EXPECT_EQ(op.geometryOrdinal, i / 4 * 2 + i % 2);
+    EXPECT_EQ(op.geometryOrdinal, repeatedSink.shapes[i].geometryOrdinal);
+    EXPECT_EQ(op.sourceTag, i % 2 == 0 ? first.get() : second.get());
+    ASSERT_EQ(op.copyProvenance.size(), 1u);
+    EXPECT_EQ(op.copyProvenance[0].sourceTag, repeater.get());
+    EXPECT_EQ(op.copyProvenance[0].copyIndex, i / 4);
+    EXPECT_EQ(op.copyProvenance[0].progress, static_cast<float>(i / 4));
+    EXPECT_EQ(op.copyProvenance[0].matrix, Matrix::MakeTrans(0, i / 4 * 100));
+    EXPECT_FLOAT_EQ(op.copyProvenance[0].alpha, 0.5f);
+    EXPECT_FLOAT_EQ(op.paintSnapshots[0].scopePainterAlpha, 0.5f);
+    ASSERT_EQ(op.sourceProvenance.size(), 1u);
+    EXPECT_EQ(op.sourceProvenance[0].sourceTag, op.sourceTag);
+    ASSERT_EQ(op.sourceProvenance[0].copyProvenance.size(), 1u);
+  }
+  EXPECT_NE(sink.shapes[0].drawOrdinal, sink.shapes[2].drawOrdinal);
+  EXPECT_EQ(sink.shapes[0].geometryOrdinal, sink.shapes[2].geometryOrdinal);
+  EXPECT_NE(sink.shapes[0].geometryOrdinal, sink.shapes[4].geometryOrdinal);
+
+  auto outerRepeater = Repeater::Make();
+  outerRepeater->setCopies(2);
+  outerRepeater->setOrder(RepeaterOrder::AboveOriginal);
+  outerRepeater->setPosition({200, 0});
+  outerRepeater->setSourceTag(outerRepeater.get());
+  layer->setContents({first, second, fill, stroke, repeater, outerRepeater});
+  CollectingVectorDrawSink nestedSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&nestedSink, VectorPrepareLimits{}));
+  ASSERT_EQ(nestedSink.shapes.size(), 16u);
+  for (size_t i = 0; i < nestedSink.shapes.size(); i++) {
+    const auto& op = nestedSink.shapes[i];
+    ASSERT_EQ(op.copyProvenance.size(), 2u);
+    EXPECT_EQ(op.copyProvenance[0].sourceTag, repeater.get());
+    EXPECT_EQ(op.copyProvenance[0].copyIndex, i % 8 / 4);
+    EXPECT_EQ(op.copyProvenance[1].sourceTag, outerRepeater.get());
+    EXPECT_EQ(op.copyProvenance[1].copyIndex, i / 8);
+    ASSERT_EQ(op.sourceProvenance.size(), 1u);
+    ASSERT_EQ(op.sourceProvenance[0].copyProvenance.size(), 2u);
+  }
+
+  auto merge = MergePath::Make();
+  merge->setSourceTag(merge.get());
+  layer->setContents({first, second, repeater, merge, fill});
+  CollectingVectorDrawSink mergedSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&mergedSink, VectorPrepareLimits{}));
+  ASSERT_EQ(mergedSink.shapes.size(), 1u);
+  const auto& merged = mergedSink.shapes[0];
+  EXPECT_EQ(merged.sourceTag, merge.get());
+  EXPECT_EQ(merged.sourceEndpoint, merge.get());
+  EXPECT_EQ(merged.painterEndpoint, fill.get());
+  ASSERT_EQ(merged.sourceProvenance.size(), 4u);
+  for (size_t i = 0; i < merged.sourceProvenance.size(); i++) {
+    EXPECT_EQ(merged.sourceProvenance[i].sourceTag, i % 2 == 0 ? first.get() : second.get());
+    EXPECT_EQ(merged.sourceProvenance[i].runtimeEndpoint, i % 2 == 0 ? first.get() : second.get());
+    ASSERT_EQ(merged.sourceProvenance[i].copyProvenance.size(), 1u);
+    EXPECT_EQ(merged.sourceProvenance[i].copyProvenance[0].copyIndex, i / 2);
+  }
+
+  layer->setContents({first});
+  CollectingVectorDrawSink ownSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&ownSink, VectorPrepareLimits{}));
+  ASSERT_EQ(ownSink.ownGeometries.size(), 1u);
+  EXPECT_EQ(ownSink.ownGeometries[0].sourceTag, first.get());
+  EXPECT_EQ(ownSink.ownGeometries[0].geometryOrdinal, 0u);
+  EXPECT_TRUE(ownSink.ownGeometries[0].paints.empty());
+  EXPECT_TRUE(ownSink.ownGeometries[0].paintSnapshots.empty());
+  EXPECT_EQ(ownSink.ownGeometries[0].colorSource, nullptr);
+}
+
+TGFX_TEST(VectorLayerTest, PreparedRecorderOutputEquivalent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto typeface = GetTestTypeface();
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 36);
+  auto layer = ContentShapeVectorLayer::Make();
+  auto gradient = Gradient::MakeLinear({0, 0}, {1, 1}, {Color::Red(), Color::Blue()}, {0, 1});
+  auto shapeGroup = VectorGroup::Make();
+  auto repeater = Repeater::Make();
+  repeater->setCopies(2);
+  repeater->setPosition({150, 0});
+  shapeGroup->setElements({MakeRoundedRectangle(), FillStyle::Make(gradient),
+                           MakeStrokeStyle(Color::Green(), 4), repeater});
+  shapeGroup->setAlpha(0.5f);
+  auto text = Text::Make(TextBlob::MakeFrom("ABC", font));
+  text->setPosition({50, 240});
+  auto modifier = TextModifier::Make();
+  modifier->setFillColor(Color(1, 0, 0, 0.5f));
+  auto selector = std::make_shared<RangeSelector>();
+  selector->setUnit(SelectorUnit::Index);
+  selector->setStart(0);
+  selector->setEnd(1);
+  modifier->setSelectors({selector});
+  auto textGroup = VectorGroup::Make();
+  textGroup->setElements({text, modifier, MakeFillStyle(Color::Blue())});
+  auto own = MakeRoundedRectangle();
+  own->setPosition({350, 240});
+  layer->setContents({shapeGroup, textGroup, own});
+
+  LayerRecorder actualRecorder = {};
+  layer->recordForTesting(&actualRecorder);
+  CollectingVectorDrawSink sink = {};
+  ASSERT_TRUE(layer->prepareDraws(&sink, VectorPrepareLimits{}));
+  ASSERT_FALSE(sink.draws.empty());
+  LayerRecorder replayRecorder = {};
+  for (const auto& op : sink.draws) {
+    replayRecorder.setMatrix(op.matrix);
+    if (op.paints.empty()) {
+      replayRecorder.addShape(op.shape, nullptr);
+    }
+    for (const auto& paint : op.paints) {
+      if (op.shape != nullptr) {
+        replayRecorder.addShape(op.shape, &paint);
+      } else {
+        replayRecorder.addTextBlob(op.textBlob, &paint);
+      }
+    }
+    replayRecorder.resetMatrix();
+  }
+  std::unique_ptr<LayerContent> actualContent = nullptr;
+  std::unique_ptr<LayerContent> replayContent = nullptr;
+  TGFX_PRIVATE_ACCESS(actualContent = actualRecorder.finishRecording();
+                      replayContent = replayRecorder.finishRecording());
+  ASSERT_TRUE(actualContent != nullptr);
+  ASSERT_TRUE(replayContent != nullptr);
+  EXPECT_EQ(actualContent->getBounds(false), replayContent->getBounds(false));
+  EXPECT_EQ(actualContent->getBounds(true), replayContent->getBounds(true));
+  EXPECT_EQ(actualContent->getTightBounds(Matrix::I(), true),
+            replayContent->getTightBounds(Matrix::I(), true));
+  EXPECT_EQ(actualContent->hasBlendMode(), replayContent->hasBlendMode());
+  auto actualSurface = Surface::Make(context, 450, 350);
+  auto replaySurface = Surface::Make(context, 450, 350);
+  ASSERT_TRUE(actualSurface != nullptr);
+  ASSERT_TRUE(replaySurface != nullptr);
+  actualSurface->getCanvas()->clear(Color::White());
+  replaySurface->getCanvas()->clear(Color::White());
+  auto actualForeground = actualContent->drawDefault(actualSurface->getCanvas(), 1, true);
+  auto replayForeground = replayContent->drawDefault(replaySurface->getCanvas(), 1, true);
+  EXPECT_EQ(actualForeground, replayForeground);
+  if (actualForeground) {
+    actualContent->drawForeground(actualSurface->getCanvas(), 1, true);
+    replayContent->drawForeground(replaySurface->getCanvas(), 1, true);
+  }
+  auto info = ImageInfo::Make(450, 350, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  std::vector<uint32_t> actualPixels(450 * 350);
+  std::vector<uint32_t> replayPixels(450 * 350);
+  ASSERT_TRUE(actualSurface->readPixels(info, actualPixels.data()));
+  ASSERT_TRUE(replaySurface->readPixels(info, replayPixels.data()));
+  EXPECT_EQ(actualPixels, replayPixels);
+}
+
+TGFX_TEST(VectorLayerTest, PreparedDrawBudgetExhaustion) {
+  auto layer = VectorLayer::Make();
+  auto rectangle = MakeRoundedRectangle();
+  auto fill = MakeFillStyle(Color::Red());
+  layer->setContents({rectangle, fill});
+  VectorPrepareLimits limits = {};
+  limits.maxDraws = 0;
+  CollectingVectorDrawSink zeroDrawSink = {};
+  EXPECT_FALSE(layer->prepareDraws(&zeroDrawSink, limits));
+  EXPECT_TRUE(zeroDrawSink.draws.empty());
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(rectangle->_cachedShape, nullptr));
+
+  auto polystar = Polystar::Make();
+  polystar->setPointCount(100);
+  layer->setContents({polystar, fill});
+  limits = {};
+  limits.maxGeometryPoints = 10;
+  CollectingVectorDrawSink pointSink = {};
+  EXPECT_FALSE(layer->prepareDraws(&pointSink, limits));
+  EXPECT_TRUE(pointSink.draws.empty());
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(polystar->_cachedShape, nullptr));
+  polystar->setPointCount(std::numeric_limits<float>::infinity());
+  limits = {};
+  CollectingVectorDrawSink infinitePointSink = {};
+  EXPECT_FALSE(layer->prepareDraws(&infinitePointSink, limits));
+  EXPECT_TRUE(infinitePointSink.draws.empty());
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(polystar->_cachedShape, nullptr));
+
+  auto child = VectorGroup::Make();
+  child->setElements({rectangle, fill});
+  auto parent = VectorGroup::Make();
+  parent->setElements({child});
+  layer->setContents({parent});
+  limits = {};
+  limits.maxDepth = 1;
+  CollectingVectorDrawSink depthSink = {};
+  EXPECT_FALSE(layer->prepareDraws(&depthSink, limits));
+  EXPECT_TRUE(depthSink.draws.empty());
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(rectangle->_cachedShape, nullptr));
+
+  auto repeater = Repeater::Make();
+  repeater->setCopies(2);
+  layer->setContents({rectangle, fill, repeater});
+  limits = {};
+  limits.maxDraws = 2;
+  CollectingVectorDrawSink copyAllocationSink = {};
+  EXPECT_FALSE(layer->prepareDraws(&copyAllocationSink, limits));
+  EXPECT_TRUE(copyAllocationSink.draws.empty());
+  limits.maxDraws = 3;
+  limits.maxCopies = 2;
+  CollectingVectorDrawSink exactCopySink = {};
+  ASSERT_TRUE(layer->prepareDraws(&exactCopySink, limits));
+  EXPECT_EQ(exactCopySink.shapes.size(), 2u);
+  repeater->setCopies(std::numeric_limits<float>::quiet_NaN());
+  CollectingVectorDrawSink nanCopySink = {};
+  EXPECT_FALSE(layer->prepareDraws(&nanCopySink, limits));
+  EXPECT_TRUE(nanCopySink.draws.empty());
+  repeater->setCopies(std::numeric_limits<float>::infinity());
+  CollectingVectorDrawSink infiniteCopySink = {};
+  EXPECT_FALSE(layer->prepareDraws(&infiniteCopySink, limits));
+  EXPECT_TRUE(infiniteCopySink.draws.empty());
+  repeater->setCopies(100);
+  CollectingVectorDrawSink copyCountSink = {};
+  EXPECT_FALSE(layer->prepareDraws(&copyCountSink, limits));
+  EXPECT_TRUE(copyCountSink.draws.empty());
+
+  repeater->setCopies(2);
+  auto firstGroup = VectorGroup::Make();
+  auto secondGroup = VectorGroup::Make();
+  firstGroup->setElements({rectangle, fill, repeater});
+  secondGroup->setElements({rectangle, fill, repeater});
+  layer->setContents({firstGroup, secondGroup});
+  limits = {};
+  limits.maxCopies = 2;
+  CollectingVectorDrawSink sharedCopySink = {};
+  EXPECT_FALSE(layer->prepareDraws(&sharedCopySink, limits));
+  EXPECT_TRUE(sharedCopySink.draws.empty());
+
+  auto gradient = Gradient::MakeLinear({0, 0}, {1, 0}, {Color::Red(), Color::Blue()}, {0, 1});
+  layer->setContents({rectangle, FillStyle::Make(gradient)});
+  limits = {};
+  limits.maxGeometryPoints = 20;
+  CollectingVectorDrawSink stopSink = {};
+  EXPECT_FALSE(layer->prepareDraws(&stopSink, limits));
+  EXPECT_TRUE(stopSink.draws.empty());
+
+  auto typeface = GetTestTypeface();
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 36);
+  auto text = Text::Make(TextBlob::MakeFrom("ABC", font));
+  layer->setContents({text, fill});
+  limits = {};
+  limits.maxGlyphs = 2;
+  CollectingVectorDrawSink glyphSink = {};
+  EXPECT_FALSE(layer->prepareDraws(&glyphSink, limits));
+  EXPECT_TRUE(glyphSink.draws.empty());
+  limits.maxGlyphs = 3;
+  CollectingVectorDrawSink exactGlyphSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&exactGlyphSink, limits));
+  EXPECT_EQ(exactGlyphSink.glyphRuns.size(), 1u);
+  auto modifier = TextModifier::Make();
+  modifier->setFillColor(Color::Blue());
+  layer->setContents({text, modifier, fill});
+  CollectingVectorDrawSink expandedGlyphSink = {};
+  EXPECT_FALSE(layer->prepareDraws(&expandedGlyphSink, limits));
+  EXPECT_TRUE(expandedGlyphSink.draws.empty());
+}
+
+TGFX_TEST(VectorLayerTest, PreparedAlphaFactorScopeAndZeroRecovery) {
+  auto rectangle = MakeRoundedRectangle();
+  auto innerFill = MakeFillStyle(Color::Red());
+  innerFill->setAlpha(0.5f);
+  innerFill->setSourceTag(innerFill.get());
+  auto group = VectorGroup::Make();
+  group->setSourceTag(group.get());
+  group->setAlpha(0);
+  group->setElements({rectangle, innerFill});
+  auto outerFill = MakeFillStyle(Color::Blue());
+  outerFill->setAlpha(0.25f);
+  outerFill->setSourceTag(outerFill.get());
+  auto layer = VectorLayer::Make();
+  layer->setContents({group, outerFill});
+  CollectingVectorDrawSink zeroSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&zeroSink, VectorPrepareLimits{}));
+  ASSERT_EQ(zeroSink.shapes.size(), 2u);
+  const auto& inner = zeroSink.shapes[0].paintSnapshots[0];
+  const auto& outer = zeroSink.shapes[1].paintSnapshots[0];
+  ASSERT_EQ(inner.alphaFactors.size(), 2u);
+  EXPECT_EQ(inner.alphaFactors[0].kind, VectorAlphaFactor::Kind::Painter);
+  EXPECT_EQ(inner.alphaFactors[0].sourceTag, innerFill.get());
+  EXPECT_FLOAT_EQ(inner.alphaFactors[0].alpha, 0.5f);
+  EXPECT_EQ(inner.alphaFactors[1].kind, VectorAlphaFactor::Kind::Group);
+  EXPECT_EQ(inner.alphaFactors[1].sourceTag, group.get());
+  EXPECT_FLOAT_EQ(inner.alphaFactors[1].alpha, 0);
+  EXPECT_FLOAT_EQ(inner.scopePainterAlpha, 0);
+  ASSERT_EQ(outer.alphaFactors.size(), 1u);
+  EXPECT_EQ(outer.alphaFactors[0].kind, VectorAlphaFactor::Kind::Painter);
+  EXPECT_EQ(outer.alphaFactors[0].sourceTag, outerFill.get());
+  EXPECT_FLOAT_EQ(outer.scopePainterAlpha, 0.25f);
+
+  group->setAlpha(0.5f);
+  CollectingVectorDrawSink recoveredSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&recoveredSink, VectorPrepareLimits{}));
+  ASSERT_EQ(recoveredSink.shapes.size(), 2u);
+  EXPECT_FLOAT_EQ(recoveredSink.shapes[0].paintSnapshots[0].scopePainterAlpha, 0.25f);
+  EXPECT_FLOAT_EQ(recoveredSink.shapes[1].paintSnapshots[0].scopePainterAlpha, 0.25f);
+  EXPECT_FLOAT_EQ(inner.scopePainterAlpha, 0);
+  EXPECT_FLOAT_EQ(inner.alphaFactors[1].alpha, 0);
+}
+
+TGFX_TEST(VectorLayerTest, PreparedPostCaptureModifierDependencies) {
+  auto typeface = GetTestTypeface();
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 36);
+  auto text = Text::Make(TextBlob::MakeFrom("AB", font));
+  text->setPosition({0, 40});
+  auto fill = MakeFillStyle(Color::Blue());
+  auto selector = std::make_shared<RangeSelector>();
+  selector->setSourceTag(selector.get());
+  selector->setUnit(SelectorUnit::Index);
+  selector->setStart(0);
+  selector->setEnd(1);
+  auto modifier = TextModifier::Make();
+  modifier->setSourceTag(modifier.get());
+  modifier->setSelectors({selector});
+  modifier->setAlpha(0);
+  auto textPath = TextPath::Make();
+  textPath->setSourceTag(textPath.get());
+  Path path = {};
+  path.moveTo(0, 0);
+  path.lineTo(200, 0);
+  textPath->setPath(path);
+  auto group = VectorGroup::Make();
+  group->setSourceTag(group.get());
+  group->setPosition({50, 50});
+  group->setElements({text, fill, modifier, textPath});
+  auto layer = VectorLayer::Make();
+  layer->setContents({group});
+  CollectingVectorDrawSink sink = {};
+  ASSERT_TRUE(layer->prepareDraws(&sink, VectorPrepareLimits{}));
+  ASSERT_EQ(sink.glyphRuns.size(), 2u);
+  EXPECT_FLOAT_EQ(sink.glyphRuns[0].paintSnapshots[0].glyphAlpha, 0);
+  EXPECT_FLOAT_EQ(sink.glyphRuns[1].paintSnapshots[0].glyphAlpha, 1);
+  for (const auto& op : sink.glyphRuns) {
+    ASSERT_EQ(op.dependencies.size(), 4u);
+    EXPECT_EQ(op.dependencies[0].kind, VectorGeometryDependency::Kind::TextModifier);
+    EXPECT_EQ(op.dependencies[0].sourceTag, modifier.get());
+    EXPECT_EQ(op.dependencies[1].kind, VectorGeometryDependency::Kind::TextSelector);
+    EXPECT_EQ(op.dependencies[1].sourceTag, selector.get());
+    EXPECT_EQ(op.dependencies[2].kind, VectorGeometryDependency::Kind::TextPath);
+    EXPECT_EQ(op.dependencies[2].sourceTag, textPath.get());
+    EXPECT_EQ(op.dependencies[3].kind, VectorGeometryDependency::Kind::GroupTransform);
+    EXPECT_EQ(op.dependencies[3].sourceTag, group.get());
+  }
+  modifier->setAlpha(1);
+  CollectingVectorDrawSink recoveredSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&recoveredSink, VectorPrepareLimits{}));
+  ASSERT_EQ(recoveredSink.glyphRuns.size(), 1u);
+  EXPECT_FLOAT_EQ(recoveredSink.glyphRuns[0].paintSnapshots[0].glyphAlpha, 1);
+  EXPECT_FLOAT_EQ(sink.glyphRuns[0].paintSnapshots[0].glyphAlpha, 0);
+}
+
+TGFX_TEST(VectorLayerTest, PreparedZeroLimitsAndSourceNoops) {
+  auto layer = VectorLayer::Make();
+  auto repeater = Repeater::Make();
+  repeater->setCopies(2);
+  repeater->setSourceTag(repeater.get());
+  layer->setContents({repeater});
+  VectorPrepareLimits limits = {};
+  limits.maxDraws = 0;
+  limits.maxGeometryPoints = 0;
+  limits.maxGlyphs = 0;
+  limits.maxCopies = 0;
+  limits.maxDepth = 0;
+  CollectingVectorDrawSink emptySink = {};
+  ASSERT_TRUE(layer->prepareDraws(&emptySink, limits));
+  EXPECT_TRUE(emptySink.draws.empty());
+  repeater->setCopies(-2);
+  CollectingVectorDrawSink emptyNegativeSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&emptyNegativeSink, limits));
+  EXPECT_TRUE(emptyNegativeSink.draws.empty());
+  layer->setContents({ShapePath::Make(), MakeFillStyle(Color::Red())});
+  CollectingVectorDrawSink emptyPathSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&emptyPathSink, limits));
+  EXPECT_TRUE(emptyPathSink.draws.empty());
+
+  auto rectangle = MakeRoundedRectangle();
+  auto fill = MakeFillStyle(Color::Red());
+  layer->setContents({rectangle, fill, repeater});
+  limits = {};
+  limits.maxCopies = 0;
+  CollectingVectorDrawSink negativeSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&negativeSink, limits));
+  ASSERT_EQ(negativeSink.shapes.size(), 1u);
+  EXPECT_TRUE(negativeSink.shapes[0].copyProvenance.empty());
+  ASSERT_EQ(negativeSink.shapes[0].dependencies.size(), 1u);
+  EXPECT_EQ(negativeSink.shapes[0].dependencies[0].kind, VectorGeometryDependency::Kind::Repeater);
+  EXPECT_EQ(negativeSink.shapes[0].dependencies[0].sourceTag, repeater.get());
+  repeater->setCopies(0);
+  CollectingVectorDrawSink zeroCopySink = {};
+  ASSERT_TRUE(layer->prepareDraws(&zeroCopySink, limits));
+  EXPECT_TRUE(zeroCopySink.draws.empty());
+
+  auto polystar = Polystar::Make();
+  polystar->setPointCount(-2);
+  layer->setContents({polystar, fill});
+  limits.maxDraws = 3;
+  limits.maxGeometryPoints = 0;
+  limits.maxGlyphs = 0;
+  limits.maxDepth = 0;
+  CollectingVectorDrawSink negativePointSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&negativePointSink, limits));
+  EXPECT_TRUE(negativePointSink.draws.empty());
+
+  layer->setContents({});
+  limits.maxDraws = std::numeric_limits<size_t>::max();
+  CollectingVectorDrawSink overflowSink = {};
+  EXPECT_FALSE(layer->prepareDraws(&overflowSink, limits));
+  EXPECT_TRUE(overflowSink.draws.empty());
+}
+
+TGFX_TEST(VectorLayerTest, PreparedKnownGlyphPointAndWrapperBudgets) {
+  auto typeface = GetTestTypeface();
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 36);
+  auto blob = TextBlob::MakeFrom("ABC", font);
+  ASSERT_TRUE(blob != nullptr);
+  size_t points = 0;
+  for (const auto& run : *blob) {
+    for (size_t i = 0; i < run.glyphCount; i++) {
+      Path path = {};
+      if (run.font.getPath(run.glyphs[i], &path)) {
+        points += static_cast<size_t>(path.countPoints());
+      }
+    }
+  }
+  ASSERT_GT(points, 0u);
+  auto text = Text::Make(blob);
+  auto layer = VectorLayer::Make();
+  layer->setContents({text, MakeFillStyle(Color::Red())});
+  VectorPrepareLimits limits = {};
+  limits.maxGeometryPoints = points - 1;
+  CollectingVectorDrawSink sourcePointSink = {};
+  EXPECT_FALSE(layer->prepareDraws(&sourcePointSink, limits));
+  EXPECT_TRUE(sourcePointSink.draws.empty());
+  limits.maxGeometryPoints = points * 2;
+  limits.maxGlyphs = 3;
+  CollectingVectorDrawSink exactPointSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&exactPointSink, limits));
+  EXPECT_EQ(exactPointSink.glyphRuns.size(), 1u);
+
+  auto stroke = MakeStrokeStyle(Color::Blue(), 4);
+  stroke->setStrokeAlign(StrokeAlign::Inside);
+  layer->setContents({text, stroke});
+  CollectingVectorDrawSink wrapperSink = {};
+  EXPECT_FALSE(layer->prepareDraws(&wrapperSink, limits));
+  EXPECT_TRUE(wrapperSink.draws.empty());
+  limits.maxGlyphs = 6;
+  CollectingVectorDrawSink exactWrapperSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&exactWrapperSink, limits));
+  ASSERT_EQ(exactWrapperSink.glyphRuns.size(), 1u);
+  EXPECT_TRUE(exactWrapperSink.glyphRuns[0].shape != nullptr);
+}
+
+TGFX_TEST(VectorLayerTest, PreparedDashNormalizationBudget) {
+  auto layer = VectorLayer::Make();
+  auto stroke = MakeStrokeStyle(Color::Blue(), 4);
+  stroke->setDashes({3, 4, 5});
+  layer->setContents({MakeRoundedRectangle(), stroke});
+  VectorPrepareLimits limits = {};
+  limits.maxGeometryPoints = 37;
+  CollectingVectorDrawSink rejectedSink = {};
+  EXPECT_FALSE(layer->prepareDraws(&rejectedSink, limits));
+  EXPECT_TRUE(rejectedSink.draws.empty());
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(stroke->_cachedDashEffect, nullptr));
+  limits.maxGeometryPoints = 55;
+  CollectingVectorDrawSink acceptedSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&acceptedSink, limits));
+  ASSERT_EQ(acceptedSink.shapes.size(), 1u);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(stroke->_cachedDashEffect != nullptr));
+}
+
+TGFX_TEST(VectorLayerTest, PreparedRuntimeEndpointsDistinguishAuthoredReuse) {
+  int geometryTag = 0;
+  int painterTag = 0;
+  int groupTag = 0;
+  int repeaterTag = 0;
+  auto firstRectangle = MakeRoundedRectangle();
+  auto lastRectangle = MakeRoundedRectangle();
+  firstRectangle->setSourceTag(&geometryTag);
+  lastRectangle->setSourceTag(&geometryTag);
+  auto firstFill = MakeFillStyle(Color::Red());
+  auto lastFill = MakeFillStyle(Color::Blue());
+  firstFill->setSourceTag(&painterTag);
+  lastFill->setSourceTag(&painterTag);
+  firstFill->setAlpha(0.5f);
+  lastFill->setAlpha(0.75f);
+  auto firstGroup = VectorGroup::Make();
+  auto lastGroup = VectorGroup::Make();
+  firstGroup->setSourceTag(&groupTag);
+  lastGroup->setSourceTag(&groupTag);
+  firstGroup->setAlpha(0.25f);
+  lastGroup->setAlpha(0.5f);
+  firstGroup->setElements({firstRectangle, firstFill});
+  lastGroup->setElements({lastRectangle, lastFill});
+  auto layer = VectorLayer::Make();
+  layer->setContents({firstGroup, lastGroup});
+  CollectingVectorDrawSink sink = {};
+  ASSERT_TRUE(layer->prepareDraws(&sink, VectorPrepareLimits{}));
+  ASSERT_EQ(sink.shapes.size(), 2u);
+  const auto& first = sink.shapes[0];
+  const auto& last = sink.shapes[1];
+  EXPECT_EQ(first.sourceTag, last.sourceTag);
+  EXPECT_EQ(first.painterTag, last.painterTag);
+  EXPECT_EQ(first.sourceEndpoint, firstRectangle.get());
+  EXPECT_EQ(last.sourceEndpoint, lastRectangle.get());
+  EXPECT_EQ(first.painterEndpoint, firstFill.get());
+  EXPECT_EQ(last.painterEndpoint, lastFill.get());
+  EXPECT_NE(first.sourceEndpoint, last.sourceEndpoint);
+  EXPECT_NE(first.painterEndpoint, last.painterEndpoint);
+  ASSERT_EQ(first.sourceProvenance.size(), 1u);
+  ASSERT_EQ(last.sourceProvenance.size(), 1u);
+  EXPECT_EQ(first.sourceProvenance[0].runtimeEndpoint, firstRectangle.get());
+  EXPECT_EQ(last.sourceProvenance[0].runtimeEndpoint, lastRectangle.get());
+  ASSERT_EQ(first.dependencies.size(), 1u);
+  ASSERT_EQ(last.dependencies.size(), 1u);
+  EXPECT_EQ(first.dependencies[0].sourceTag, last.dependencies[0].sourceTag);
+  EXPECT_NE(first.dependencies[0].runtimeEndpoint, lastGroup.get());
+  EXPECT_EQ(last.dependencies[0].runtimeEndpoint, lastGroup.get());
+  const auto& firstPaint = first.paintSnapshots[0];
+  const auto& lastPaint = last.paintSnapshots[0];
+  ASSERT_EQ(firstPaint.alphaFactors.size(), 2u);
+  ASSERT_EQ(lastPaint.alphaFactors.size(), 2u);
+  EXPECT_EQ(firstPaint.alphaFactors[0].runtimeEndpoint, firstFill.get());
+  EXPECT_EQ(lastPaint.alphaFactors[0].runtimeEndpoint, lastFill.get());
+  EXPECT_NE(firstPaint.alphaFactors[1].runtimeEndpoint, lastGroup.get());
+  EXPECT_EQ(lastPaint.alphaFactors[1].runtimeEndpoint, lastGroup.get());
+  EXPECT_FLOAT_EQ(firstPaint.scopePainterAlpha, 0.125f);
+  EXPECT_FLOAT_EQ(lastPaint.scopePainterAlpha, 0.375f);
+
+  lastGroup->setAlpha(0.75f);
+  lastFill->setAlpha(1);
+  lastRectangle->setSize({80, 80});
+  CollectingVectorDrawSink updatedSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&updatedSink, VectorPrepareLimits{}));
+  ASSERT_EQ(updatedSink.shapes.size(), 2u);
+  EXPECT_FLOAT_EQ(updatedSink.shapes[0].paintSnapshots[0].scopePainterAlpha, 0.125f);
+  EXPECT_FLOAT_EQ(updatedSink.shapes[1].paintSnapshots[0].scopePainterAlpha, 0.75f);
+  EXPECT_EQ(updatedSink.shapes[0].shape->getPath().getBounds(), first.shape->getPath().getBounds());
+  EXPECT_NE(updatedSink.shapes[1].shape->getPath().getBounds(), last.shape->getPath().getBounds());
+  EXPECT_FLOAT_EQ(lastPaint.scopePainterAlpha, 0.375f);
+
+  auto firstRepeater = Repeater::Make();
+  auto lastRepeater = Repeater::Make();
+  firstRepeater->setSourceTag(&repeaterTag);
+  lastRepeater->setSourceTag(&repeaterTag);
+  firstRepeater->setCopies(2);
+  lastRepeater->setCopies(2);
+  firstRepeater->setOrder(RepeaterOrder::AboveOriginal);
+  lastRepeater->setOrder(RepeaterOrder::AboveOriginal);
+  firstRepeater->setStartAlpha(0.5f);
+  firstRepeater->setEndAlpha(0.5f);
+  lastRepeater->setStartAlpha(0.75f);
+  lastRepeater->setEndAlpha(0.75f);
+  lastGroup->setElements({lastRectangle, lastFill, firstRepeater, lastRepeater});
+  CollectingVectorDrawSink repeatedSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&repeatedSink, VectorPrepareLimits{}));
+  ASSERT_EQ(repeatedSink.shapes.size(), 5u);
+  for (size_t i = 1; i < repeatedSink.shapes.size(); i++) {
+    const auto& op = repeatedSink.shapes[i];
+    EXPECT_EQ(op.sourceEndpoint, lastRectangle.get());
+    EXPECT_EQ(op.painterEndpoint, lastFill.get());
+    EXPECT_EQ(op.sourceProvenance[0].runtimeEndpoint, lastRectangle.get());
+    ASSERT_EQ(op.copyProvenance.size(), 2u);
+    EXPECT_EQ(op.copyProvenance[0].sourceTag, op.copyProvenance[1].sourceTag);
+    EXPECT_EQ(op.copyProvenance[0].runtimeEndpoint, firstRepeater.get());
+    EXPECT_EQ(op.copyProvenance[1].runtimeEndpoint, lastRepeater.get());
+    ASSERT_EQ(op.paintSnapshots[0].alphaFactors.size(), 4u);
+    EXPECT_EQ(op.paintSnapshots[0].alphaFactors[0].runtimeEndpoint, lastFill.get());
+    EXPECT_EQ(op.paintSnapshots[0].alphaFactors[1].runtimeEndpoint, firstRepeater.get());
+    EXPECT_EQ(op.paintSnapshots[0].alphaFactors[2].runtimeEndpoint, lastRepeater.get());
+    EXPECT_EQ(op.paintSnapshots[0].alphaFactors[3].runtimeEndpoint, lastGroup.get());
+    EXPECT_FLOAT_EQ(op.paintSnapshots[0].scopePainterAlpha, 0.28125f);
+  }
+  firstRepeater->setCopies(-2);
+  CollectingVectorDrawSink negativeSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&negativeSink, VectorPrepareLimits{}));
+  ASSERT_EQ(negativeSink.shapes.size(), 3u);
+  for (size_t i = 1; i < negativeSink.shapes.size(); i++) {
+    const auto& op = negativeSink.shapes[i];
+    ASSERT_EQ(op.copyProvenance.size(), 1u);
+    EXPECT_EQ(op.copyProvenance[0].runtimeEndpoint, lastRepeater.get());
+    ASSERT_EQ(op.dependencies.size(), 3u);
+    EXPECT_EQ(op.dependencies[0].runtimeEndpoint, firstRepeater.get());
+    EXPECT_EQ(op.dependencies[1].runtimeEndpoint, lastRepeater.get());
+    EXPECT_EQ(op.dependencies[2].runtimeEndpoint, lastGroup.get());
+    EXPECT_FLOAT_EQ(op.paintSnapshots[0].scopePainterAlpha, 0.5625f);
+  }
+}
+
+TGFX_TEST(VectorLayerTest, PreparedRuntimeModifierAndSelectorEndpoints) {
+  auto typeface = GetTestTypeface();
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 36);
+  int textTag = 0;
+  int modifierTag = 0;
+  int selectorTag = 0;
+  auto firstText = Text::Make(TextBlob::MakeFrom("AB", font));
+  auto lastText = Text::Make(TextBlob::MakeFrom("AB", font));
+  firstText->setSourceTag(&textTag);
+  lastText->setSourceTag(&textTag);
+  auto firstSelector = std::make_shared<RangeSelector>();
+  auto lastSelector = std::make_shared<RangeSelector>();
+  firstSelector->setSourceTag(&selectorTag);
+  lastSelector->setSourceTag(&selectorTag);
+  firstSelector->setUnit(SelectorUnit::Index);
+  lastSelector->setUnit(SelectorUnit::Index);
+  firstSelector->setStart(0);
+  lastSelector->setStart(0);
+  firstSelector->setEnd(1);
+  lastSelector->setEnd(1);
+  auto firstModifier = TextModifier::Make();
+  auto lastModifier = TextModifier::Make();
+  firstModifier->setSourceTag(&modifierTag);
+  lastModifier->setSourceTag(&modifierTag);
+  firstModifier->setSelectors({firstSelector});
+  lastModifier->setSelectors({lastSelector});
+  firstModifier->setAlpha(0.5f);
+  lastModifier->setAlpha(0.75f);
+  auto firstGroup = VectorGroup::Make();
+  auto lastGroup = VectorGroup::Make();
+  firstGroup->setElements({firstText, firstModifier, MakeFillStyle(Color::Red())});
+  lastGroup->setElements({lastText, lastModifier, MakeFillStyle(Color::Blue())});
+  auto layer = VectorLayer::Make();
+  layer->setContents({firstGroup, lastGroup});
+  CollectingVectorDrawSink sink = {};
+  ASSERT_TRUE(layer->prepareDraws(&sink, VectorPrepareLimits{}));
+  ASSERT_EQ(sink.glyphRuns.size(), 4u);
+  for (size_t i = 0; i < sink.glyphRuns.size(); i++) {
+    const auto& op = sink.glyphRuns[i];
+    const bool isFirst = i < 2;
+    EXPECT_EQ(op.sourceTag, &textTag);
+    EXPECT_EQ(op.sourceEndpoint, isFirst ? firstText.get() : lastText.get());
+    ASSERT_EQ(op.dependencies.size(), 3u);
+    EXPECT_EQ(op.dependencies[0].sourceTag, &modifierTag);
+    EXPECT_EQ(op.dependencies[0].runtimeEndpoint,
+              isFirst ? firstModifier.get() : lastModifier.get());
+    EXPECT_EQ(op.dependencies[1].sourceTag, &selectorTag);
+    EXPECT_EQ(op.dependencies[1].runtimeEndpoint,
+              isFirst ? firstSelector.get() : lastSelector.get());
+  }
+  EXPECT_FLOAT_EQ(sink.glyphRuns[0].paintSnapshots[0].glyphAlpha, 0.5f);
+  EXPECT_FLOAT_EQ(sink.glyphRuns[2].paintSnapshots[0].glyphAlpha, 0.75f);
+  lastModifier->setAlpha(1);
+  CollectingVectorDrawSink updatedSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&updatedSink, VectorPrepareLimits{}));
+  ASSERT_EQ(updatedSink.glyphRuns.size(), 3u);
+  EXPECT_FLOAT_EQ(updatedSink.glyphRuns[0].paintSnapshots[0].glyphAlpha, 0.5f);
+  EXPECT_FLOAT_EQ(updatedSink.glyphRuns[2].paintSnapshots[0].glyphAlpha, 1);
+  EXPECT_EQ(updatedSink.glyphRuns[2].dependencies[0].runtimeEndpoint, lastModifier.get());
+  EXPECT_FLOAT_EQ(sink.glyphRuns[2].paintSnapshots[0].glyphAlpha, 0.75f);
+}
+
+class UsageObservingVectorDrawSink : public CollectingVectorDrawSink {
+ public:
+  explicit UsageObservingVectorDrawSink(const VectorPrepareUsage* usage) : usage(usage) {
+  }
+
+  void drawShape(const VectorDrawOp& op) override {
+    observed = *usage;
+    CollectingVectorDrawSink::drawShape(op);
+  }
+
+  VectorPrepareUsage observed = {};
+
+ private:
+  const VectorPrepareUsage* usage = nullptr;
+};
+
+TGFX_TEST(VectorLayerTest, PreparedUsageTracksCumulativeWorkAndFailures) {
+  auto rectangle = MakeRoundedRectangle();
+  auto fill = MakeFillStyle(Color::Red());
+  auto repeater = Repeater::Make();
+  repeater->setCopies(2);
+  auto group = VectorGroup::Make();
+  group->setElements({rectangle, fill, repeater});
+  auto layer = VectorLayer::Make();
+  layer->setContents({group});
+  VectorPrepareUsage usage = {};
+  UsageObservingVectorDrawSink sink(&usage);
+  VectorPrepareLimits limits = {};
+  ASSERT_TRUE(layer->prepareDraws(&sink, limits, &usage));
+  ASSERT_EQ(sink.shapes.size(), 2u);
+  EXPECT_EQ(usage.draws, 2u);
+  EXPECT_EQ(usage.geometries, 3u);
+  EXPECT_EQ(usage.painters, 3u);
+  EXPECT_EQ(usage.captures, 3u);
+  EXPECT_EQ(usage.geometryPoints, 85u);
+  EXPECT_EQ(usage.glyphs, 0u);
+  EXPECT_EQ(usage.copies, 2u);
+  EXPECT_GT(usage.metadataEntries, usage.draws);
+  EXPECT_EQ(usage.peakDepth, 1u);
+  EXPECT_EQ(sink.observed.geometryPoints, usage.geometryPoints);
+  EXPECT_EQ(sink.observed.metadataEntries, usage.metadataEntries);
+  EXPECT_EQ(sink.observed.geometries, usage.geometries);
+
+  limits.maxDraws = 2;
+  CollectingVectorDrawSink failureSink = {};
+  EXPECT_FALSE(layer->prepareDraws(&failureSink, limits, &usage));
+  EXPECT_TRUE(failureSink.draws.empty());
+  EXPECT_EQ(usage.draws, 0u);
+  EXPECT_EQ(usage.geometries, 1u);
+  EXPECT_EQ(usage.painters, 1u);
+  EXPECT_EQ(usage.captures, 1u);
+  EXPECT_EQ(usage.geometryPoints, 17u);
+  EXPECT_EQ(usage.copies, 2u);
+  EXPECT_GT(usage.metadataEntries, 0u);
+  EXPECT_EQ(usage.peakDepth, 1u);
+
+  auto second = MakeRoundedRectangle();
+  auto merge = MergePath::Make();
+  merge->setMode(MergePathOp::Union);
+  layer->setContents({rectangle, second, merge, fill});
+  CollectingVectorDrawSink mergeSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&mergeSink, VectorPrepareLimits{}, &usage));
+  ASSERT_EQ(mergeSink.shapes.size(), 1u);
+  EXPECT_EQ(usage.geometries, 3u);
+  EXPECT_EQ(usage.draws, 1u);
+  EXPECT_EQ(usage.painters, 1u);
+  EXPECT_EQ(usage.captures, 1u);
+  EXPECT_EQ(usage.geometryPoints, 102u);
+  EXPECT_GT(usage.geometryPoints,
+            static_cast<size_t>(mergeSink.shapes[0].shape->getPath().countPoints()));
+  EXPECT_EQ(usage.copies, 0u);
+  EXPECT_EQ(usage.peakDepth, 0u);
+
+  EXPECT_FALSE(layer->prepareDraws(nullptr, VectorPrepareLimits{}, &usage));
+  EXPECT_EQ(usage.draws, 0u);
+  EXPECT_EQ(usage.geometries, 0u);
+  EXPECT_EQ(usage.painters, 0u);
+  EXPECT_EQ(usage.captures, 0u);
+  EXPECT_EQ(usage.geometryPoints, 0u);
+  EXPECT_EQ(usage.glyphs, 0u);
+  EXPECT_EQ(usage.copies, 0u);
+  EXPECT_EQ(usage.metadataEntries, 0u);
+  EXPECT_EQ(usage.peakDepth, 0u);
+
+  layer->setContents({repeater});
+  limits = {};
+  limits.maxDraws = 0;
+  limits.maxGeometryPoints = 0;
+  limits.maxGlyphs = 0;
+  limits.maxCopies = 0;
+  limits.maxDepth = 0;
+  CollectingVectorDrawSink emptySink = {};
+  ASSERT_TRUE(layer->prepareDraws(&emptySink, limits, &usage));
+  EXPECT_TRUE(emptySink.draws.empty());
+  EXPECT_EQ(usage.draws, 0u);
+  EXPECT_EQ(usage.geometries, 0u);
+  EXPECT_EQ(usage.geometryPoints, 0u);
+  EXPECT_EQ(usage.copies, 0u);
+  EXPECT_EQ(usage.metadataEntries, 0u);
+  EXPECT_EQ(usage.peakDepth, 0u);
+}
+
+TGFX_TEST(VectorLayerTest, PreparedShaderSolidFoldSnapshots) {
+  const Color red(1, 0, 0, 0.5f);
+  const Color blue(0, 0, 1, 0.75f);
+  auto rectangle = MakeRoundedRectangle();
+  auto solid = SolidColor::Make(red);
+  auto fill = FillStyle::Make(solid);
+  fill->setAlpha(0.25f);
+  auto group = VectorGroup::Make();
+  group->setAlpha(0.5f);
+  group->setElements({rectangle, fill});
+  auto layer = VectorLayer::Make();
+  layer->setContents({group});
+  CollectingVectorDrawSink solidSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&solidSink, VectorPrepareLimits{}));
+  ASSERT_EQ(solidSink.shapes.size(), 1u);
+  const auto& solidSnapshot = solidSink.shapes[0].paintSnapshots[0];
+  EXPECT_TRUE(solidSnapshot.shaderIsSolid);
+  EXPECT_EQ(solidSnapshot.shaderSolidColor, red);
+  EXPECT_FLOAT_EQ(solidSnapshot.scopePainterAlpha, 0.125f);
+  EXPECT_FLOAT_EQ(solidSnapshot.shaderSolidColor.alpha, 0.5f);
+  solid->setColor(Color::Green());
+  EXPECT_EQ(solidSnapshot.shaderSolidColor, red);
+
+  auto linear = Gradient::MakeLinear({0, 0}, {0, 0}, {red, blue}, {0, 1});
+  linear->setMatrix(Matrix::MakeRotate(90));
+  layer->setContents({rectangle, FillStyle::Make(linear)});
+  CollectingVectorDrawSink linearSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&linearSink, VectorPrepareLimits{}));
+  ASSERT_EQ(linearSink.shapes.size(), 1u);
+  const auto& linearSnapshot = linearSink.shapes[0].paintSnapshots[0];
+  EXPECT_EQ(linearSnapshot.colorSource.kind, VectorColorSnapshot::Kind::Linear);
+  EXPECT_TRUE(linearSnapshot.shaderIsSolid);
+  EXPECT_EQ(linearSnapshot.shaderSolidColor, red);
+  EXPECT_FALSE(linearSnapshot.fitMatrix.isIdentity());
+  linear->setEndPoint({1, 0});
+  CollectingVectorDrawSink nonSolidSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&nonSolidSink, VectorPrepareLimits{}));
+  ASSERT_EQ(nonSolidSink.shapes.size(), 1u);
+  EXPECT_FALSE(nonSolidSink.shapes[0].paintSnapshots[0].shaderIsSolid);
+  EXPECT_EQ(nonSolidSink.shapes[0].paintSnapshots[0].shaderSolidColor, Color::Transparent());
+  EXPECT_TRUE(linearSnapshot.shaderIsSolid);
+  EXPECT_EQ(linearSnapshot.shaderSolidColor, red);
+
+  auto radial = Gradient::MakeRadial({0, 0}, 0, {red, blue}, {0, 1});
+  layer->setContents({rectangle, FillStyle::Make(radial)});
+  CollectingVectorDrawSink radialSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&radialSink, VectorPrepareLimits{}));
+  ASSERT_EQ(radialSink.shapes.size(), 1u);
+  EXPECT_EQ(radialSink.shapes[0].paintSnapshots[0].colorSource.kind,
+            VectorColorSnapshot::Kind::Radial);
+  EXPECT_TRUE(radialSink.shapes[0].paintSnapshots[0].shaderIsSolid);
+  EXPECT_EQ(radialSink.shapes[0].paintSnapshots[0].shaderSolidColor, blue);
+
+  auto conic = Gradient::MakeConic({0, 0}, 30, 30, {red, blue}, {0, 1});
+  layer->setContents({rectangle, FillStyle::Make(conic)});
+  CollectingVectorDrawSink conicSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&conicSink, VectorPrepareLimits{}));
+  ASSERT_EQ(conicSink.shapes.size(), 1u);
+  EXPECT_EQ(conicSink.shapes[0].paintSnapshots[0].colorSource.kind,
+            VectorColorSnapshot::Kind::Conic);
+  EXPECT_TRUE(conicSink.shapes[0].paintSnapshots[0].shaderIsSolid);
+  EXPECT_EQ(conicSink.shapes[0].paintSnapshots[0].shaderSolidColor, red);
+
+  auto diamond = Gradient::MakeDiamond({0, 0}, 0, {red, blue}, {0, 1});
+  layer->setContents({rectangle, FillStyle::Make(diamond)});
+  CollectingVectorDrawSink diamondSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&diamondSink, VectorPrepareLimits{}));
+  ASSERT_EQ(diamondSink.shapes.size(), 1u);
+  EXPECT_TRUE(diamondSink.shapes[0].paintSnapshots[0].shaderIsSolid);
+  EXPECT_EQ(diamondSink.shapes[0].paintSnapshots[0].shaderSolidColor, blue);
+
+  auto singleStop = Gradient::MakeLinear({0, 0}, {1, 0}, {Color::Green()});
+  layer->setContents({rectangle, FillStyle::Make(singleStop)});
+  CollectingVectorDrawSink singleStopSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&singleStopSink, VectorPrepareLimits{}));
+  ASSERT_EQ(singleStopSink.shapes.size(), 1u);
+  EXPECT_TRUE(singleStopSink.shapes[0].paintSnapshots[0].shaderIsSolid);
+  EXPECT_EQ(singleStopSink.shapes[0].paintSnapshots[0].shaderSolidColor, Color::Green());
+
+  auto equalStops = Gradient::MakeLinear({0, 0}, {1, 0}, {red, red}, {0, 1});
+  layer->setContents({rectangle, FillStyle::Make(equalStops)});
+  CollectingVectorDrawSink equalStopSink = {};
+  ASSERT_TRUE(layer->prepareDraws(&equalStopSink, VectorPrepareLimits{}));
+  ASSERT_EQ(equalStopSink.shapes.size(), 1u);
+  EXPECT_FALSE(equalStopSink.shapes[0].paintSnapshots[0].shaderIsSolid);
+  EXPECT_EQ(equalStopSink.shapes[0].paintSnapshots[0].shaderSolidColor, Color::Transparent());
 }
 
 }  // namespace tgfx

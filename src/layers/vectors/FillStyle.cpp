@@ -42,12 +42,15 @@ class FillPainter : public Painter {
   PathFillType fillRule = PathFillType::Winding;
 
   std::unique_ptr<Painter> clone() const override {
+    if (!canClone()) {
+      return nullptr;
+    }
     return std::make_unique<FillPainter>(*this);
   }
 
  protected:
   std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t /*index*/,
-                                      LayerPaint* paint) override {
+                                      LayerPaint* paint, VectorPaintSnapshot* snapshot) override {
     const auto bounds = innerShape->getPath().getBounds();
     // Skip sub-pixel paths. The geometry layer clamps zero-sized shapes to a sub-pixel
     // extent so the stroker can still produce cap/join geometry; fill should honor the
@@ -59,7 +62,8 @@ class FillPainter : public Painter {
       innerShape = Shape::ApplyFillType(innerShape, fillRule);
     }
     // Use the resolved path bounds so the fit region matches the actual fill footprint rather than the conservative cover.
-    paint->shader = wrapShaderWithFit(bounds);
+    *snapshot = makeBaseSnapshot(bounds);
+    paint->shader = wrapShaderWithFit(*snapshot);
     return innerShape;
   }
 
@@ -68,16 +72,25 @@ class FillPainter : public Painter {
     if (run.textBlob == nullptr) {
       return emit;
     }
-    emit.textBlob = run.textBlob;
-    // Tight bounds keep the fit region in step with the visible glyph extents instead of the conservative blob cover.
-    auto baseShader = wrapShaderWithFit(run.textBlob->getTightBounds());
     float blendFactor = run.style.fillColor.alpha;
+    size_t paintCount = (blendFactor < 1.0f ? 1 : 0) + (blendFactor > 0.0f ? 1 : 0);
+    if (budget != nullptr && !budget->consumeDraws(paintCount)) {
+      return emit;
+    }
+    emit.textBlob = run.textBlob;
+    auto bounds = run.textBlob->getTightBounds();
+    auto baseSnapshot = makeBaseSnapshot(bounds, run.style.alpha);
+    if (budget != nullptr && budget->failed) {
+      return {};
+    }
+    auto baseShader = wrapShaderWithFit(baseSnapshot);
     float runAlpha = alpha * run.style.alpha;
     if (blendFactor < 1.0f) {
       auto paint = makeBasePaint();
       paint.color.alpha = runAlpha;
       paint.shader = baseShader;
       emit.paints.push_back(std::move(paint));
+      emit.paintSnapshots.push_back(std::move(baseSnapshot));
     }
     if (blendFactor > 0.0f) {
       const auto& fillColor = run.style.fillColor;
@@ -87,6 +100,7 @@ class FillPainter : public Painter {
       paint.shader = Shader::MakeColorShader(overlayColor);
       paint.color.alpha = runAlpha;
       emit.paints.push_back(std::move(paint));
+      emit.paintSnapshots.push_back(makeOverlaySnapshot(bounds, overlayColor, run.style.alpha));
     }
     return emit;
   }
@@ -154,6 +168,10 @@ void FillStyle::apply(VectorContext* context) {
   if (_colorSource == nullptr || context->geometries.empty()) {
     return;
   }
+  if (!context->budget->consumePainters(1) || !context->budget->consumeMetadata(1) ||
+      !context->budget->consumeColorSource(_colorSource.get())) {
+    return;
+  }
   auto shader = _colorSource->getShader();
   if (shader == nullptr) {
     return;
@@ -162,12 +180,20 @@ void FillStyle::apply(VectorContext* context) {
   auto painter = std::make_unique<FillPainter>();
   painter->shader = std::move(shader);
   painter->colorSource = _colorSource;
+  painter->colorSnapshot = VectorColorSnapshot::Capture(_colorSource.get());
   painter->sourceTag = sourceTag();
+  painter->runtimeEndpoint = this;
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
+  painter->budget = context->budget.get();
+  painter->alphaFactors.push_back({VectorAlphaFactor::Kind::Painter,
+                                   sourceTag() != nullptr ? sourceTag() : this, _alpha, this});
   painter->placement = _placement;
   painter->fillRule = ToPathFillType(_fillRule);
   painter->captureGeometries(context);
+  if (context->budget->failed) {
+    return;
+  }
   context->painters.push_back(std::move(painter));
 }
 

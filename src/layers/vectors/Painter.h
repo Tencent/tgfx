@@ -22,33 +22,13 @@
 #include "Geometry.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Shader.h"
-#include "tgfx/layers/LayerPaint.h"
 #include "tgfx/layers/StrokeAlign.h"
+#include "tgfx/layers/VectorDraw.h"
 #include "tgfx/layers/vectors/ColorSource.h"
 
 namespace tgfx {
 
-class LayerRecorder;
 class VectorContext;
-
-/**
- * Receives the final prepared draw operations of a Painter traversal. Implementations decide how
- * the operations are recorded; the traversal, matrix composition, and preparation hooks stay
- * shared between normal rendering and export consumers.
- */
-class PainterSink {
- public:
-  virtual ~PainterSink() = default;
-
-  virtual void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint, const Matrix& matrix,
-                        const Geometry* source, std::shared_ptr<ColorSource> colorSource,
-                        const void* painterTag) = 0;
-
-  virtual void addGlyphRun(std::shared_ptr<TextBlob> textBlob, std::shared_ptr<Shape> shape,
-                           std::vector<LayerPaint> paints, const Matrix& matrix,
-                           const Geometry* source, std::shared_ptr<ColorSource> colorSource,
-                           const void* painterTag) = 0;
-};
 
 /**
  * Describes the fill/stroke style of a drawing operation.
@@ -68,42 +48,24 @@ struct PainterStyle {
   StrokeAlign strokeAlign = StrokeAlign::Center;
 };
 
-/**
- * Painter is the base class for objects that perform draw operations on a list of Geometries.
- * It owns the shared traversal flow: walking each captured geometry, splitting the matrix into the
- * inner part (the transform from the shape's defining space into the painter's enclosing group
- * space, captured at apply() time) and the outer part (any further transforms accumulated from
- * outer groups during merging). The outer part is forwarded to the recorder as a CTM so it
- * uniformly affects both the shape and the shader. Subclasses customize how each Geometry is
- * turned into final shapes/text blobs by overriding the prepare hooks.
+/** Prepares captured geometry with a shared traversal, preserving inner-space fit and outer CTM.
+ * Subclasses supply shape and glyph paints alongside their owned snapshots.
  */
 class Painter {
  public:
   virtual ~Painter() = default;
 
-  /**
-   * Applies an alpha multiplier to this painter.
-   */
-  void applyAlpha(float groupAlpha) {
-    alpha *= groupAlpha;
-  }
+  /** Applies groupAlpha and records kind's author sourceTag and current-frame runtimeEndpoint. */
+  void applyAlpha(float groupAlpha, const void* sourceTag, const void* runtimeEndpoint,
+                  VectorAlphaFactor::Kind kind);
 
   /**
    * Captures geometry pointers and snapshots their current matrices as the inner-space transforms.
    */
   void captureGeometries(VectorContext* context);
 
-  /**
-   * Performs the shared traversal: for each captured Geometry, walk shape and glyph runs and emit
-   * them through the recorder under the proper CTM.
-   */
-  void draw(LayerRecorder* recorder);
-
-  /**
-   * Performs the same traversal as draw(LayerRecorder*), forwarding the prepared operations to
-   * the sink instead of recording them as layer content.
-   */
-  void draw(PainterSink* sink);
+  /** Walks captured shapes and glyph runs and delivers prepared operations to sink. */
+  void draw(VectorDrawSink* sink);
 
   /**
    * Creates a copy of this painter.
@@ -117,59 +79,52 @@ class Painter {
 
   std::shared_ptr<Shader> shader = nullptr;
   std::shared_ptr<ColorSource> colorSource = nullptr;
+  VectorColorSnapshot colorSnapshot = {};
   /**
    * Opaque identity of the style element that created this painter. tgfx never dereferences it.
    */
   const void* sourceTag = nullptr;
+  const void* runtimeEndpoint = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   float alpha = 1.0f;
+  std::vector<VectorAlphaFactor> alphaFactors = {};
+  class VectorPrepareBudget* budget = nullptr;
   LayerPlacement placement = LayerPlacement::Background;
   std::vector<Geometry*> geometries = {};
   std::vector<Matrix> innerMatrices = {};
 
  protected:
-  /**
-   * Subclass hook for shape geometries. The supplied innerShape has already been mapped into the
-   * enclosing group space (i.e. Shape::ApplyMatrix(originalShape, innerMatrices[index])), so any
-   * bounds read from it are in that space. innerShape is guaranteed non-null; the base `draw`
-   * skips geometries whose ApplyMatrix result is null (degenerate innerMatrix). outerMatrix is
-   * applied as CTM around the emit, and the shader wrapped via wrapShaderWithFit lives in the
-   * same inner-group space as the bounds. Subclasses may further modify the shape and must
-   * populate paint.shader; style, stroke, strokeAlign and pathEffect may be set when applicable.
-   * Return nullptr to skip emission.
+  /** Prepares non-null innerShape for geometry index; fills paint and snapshot, or null skips emission.
+   * Shape and fit bounds are in the captured painter's inner space, before the outer CTM.
    */
   virtual std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t index,
-                                              LayerPaint* paint) = 0;
+                                              LayerPaint* paint, VectorPaintSnapshot* snapshot) = 0;
 
-  /**
-   * Subclass hook for glyph runs. Unlike prepareShape, the TextBlob stays in run-local space:
-   * run.matrix, innerMatrix, and outerMatrix are all folded into the recorder CTM, so bounds read
-   * from run.textBlob (e.g. getTightBounds()) are in run-local space and the shader returned by
-   * wrapShaderWithFit must use the same space. A run emits at most one drawable kind — when
-   * neither `textBlob` nor `shape` is set, populated paints are skipped; otherwise either the
-   * TextBlob or the Shape is emitted, possibly with multiple paints (e.g. a base paint plus a
-   * fill-color overlay). Stroke alignment and path effects are carried on each paint and applied
-   * by ShapeContent at draw time. Return with empty paints to skip emission explicitly.
-   */
+  /** One run-local drawable and its paints with one matching snapshot per paint. */
   struct GlyphRunEmit {
     std::shared_ptr<TextBlob> textBlob = nullptr;
     std::shared_ptr<Shape> shape = nullptr;
     std::vector<LayerPaint> paints = {};
+    std::vector<VectorPaintSnapshot> paintSnapshots = {};
   };
+  /** Prepares run for geometry index in run-local space; empty paints skip emission. */
   virtual GlyphRunEmit prepareGlyphRun(const StyledGlyphRun& run, size_t index) = 0;
 
-  /**
-   * Wraps the painter's shader with a fit matrix derived from the supplied inner-space bounds.
-   * Returns the original shader unchanged when the color source does not opt into per-geometry
-   * fit. Callers must ensure `shader` is non-null whenever `colorSource->fitsToGeometry()` is
-   * true; the fit branch dereferences the shader pointer.
-   */
-  std::shared_ptr<Shader> wrapShaderWithFit(const Rect& innerBounds) const;
+  /** Applies snapshot's exact fit matrix to the painter shader, or returns it without fitting. */
+  std::shared_ptr<Shader> wrapShaderWithFit(const VectorPaintSnapshot& snapshot) const;
 
-  /**
-   * Builds a base LayerPaint pre-populated with the painter's blendMode/alpha/placement.
-   */
+  /** Checks every copied painter field against the shared budget before clone allocation. */
+  bool canClone() const;
+
+  /** Builds a base LayerPaint with the painter's blend mode, alpha, and placement. */
   LayerPaint makeBasePaint() const;
+
+  /** Captures a base paint's exact fit bounds and supplied glyph alpha multiplier. */
+  VectorPaintSnapshot makeBaseSnapshot(const Rect& bounds, float glyphAlpha = 1) const;
+
+  /** Captures an overlay color, its exact measurement bounds, and glyph alpha multiplier. */
+  VectorPaintSnapshot makeOverlaySnapshot(const Rect& bounds, const Color& color,
+                                          float glyphAlpha) const;
 
   /**
    * Returns the fill/stroke style of this painter.
@@ -177,10 +132,7 @@ class Painter {
   virtual PainterStyle onGetStyle() const = 0;
 
  private:
-  /**
-   * Computes outerMatrix = inv(innerMatrix) * geometry->matrix for the geometry at the given
-   * index. Returns the identity matrix when the inner matrix is not invertible.
-   */
+  VectorDrawOp makeDrawOp(size_t index) const;
   Matrix computeOuterMatrix(size_t index) const;
 };
 

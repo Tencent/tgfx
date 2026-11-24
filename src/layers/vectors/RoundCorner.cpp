@@ -49,6 +49,11 @@ void RoundCorner::apply(VectorContext* context) {
   }
   auto geometries = context->getShapeGeometries();
   for (auto& geometry : geometries) {
+    if (!context->addDependency(geometry, VectorGeometryDependency::Kind::RoundCorner,
+                                sourceTag() != nullptr ? sourceTag() : this, this) ||
+        !context->budget->consumePoints(geometry->pointCount)) {
+      return;
+    }
     geometry->shape = Shape::ApplyEffect(geometry->shape, _cachedEffect);
   }
 }

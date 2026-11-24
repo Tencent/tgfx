@@ -59,12 +59,34 @@ void MergePath::apply(VectorContext* context) {
 
   auto pathOp = ToPathOp(_mode);
   std::shared_ptr<Shape> mergedShape = nullptr;
+  std::vector<VectorGeometryOrigin> origins = {};
+  std::vector<VectorGeometryDependency> dependencies = {};
+  size_t pointCount = 0;
   for (auto* geometry : geometries) {
     if (geometry->shape == nullptr) {
       continue;
     }
+    if (!context->budget->consumePoints(geometry->pointCount) ||
+        !context->budget->consumeMetadata(geometry->sourceProvenance.size()) ||
+        !context->budget->consumeMetadata(geometry->dependencies.size()) ||
+        geometry->pointCount > context->budget->limits.maxGeometryPoints - pointCount) {
+      context->budget->failed = true;
+      return;
+    }
+    for (const auto& origin : geometry->sourceProvenance) {
+      if (!context->budget->consumeMetadata(origin.copyProvenance.size())) {
+        return;
+      }
+    }
+    pointCount += geometry->pointCount;
     auto shapeWithMatrix = Shape::ApplyMatrix(geometry->shape, geometry->matrix);
     mergedShape = Shape::Merge(mergedShape, shapeWithMatrix, pathOp);
+    if (shapeWithMatrix != nullptr) {
+      origins.insert(origins.end(), geometry->sourceProvenance.begin(),
+                     geometry->sourceProvenance.end());
+      dependencies.insert(dependencies.end(), geometry->dependencies.begin(),
+                          geometry->dependencies.end());
+    }
   }
 
   context->geometries.clear();
@@ -72,6 +94,15 @@ void MergePath::apply(VectorContext* context) {
 
   if (mergedShape) {
     context->addShape(std::move(mergedShape), sourceTag());
+    if (context->budget->failed) {
+      return;
+    }
+    auto* geometry = context->geometries.back().get();
+    geometry->pointCount = pointCount;
+    geometry->sourceProvenance = std::move(origins);
+    geometry->dependencies = std::move(dependencies);
+    context->addDependency(geometry, VectorGeometryDependency::Kind::Merge,
+                           sourceTag() != nullptr ? sourceTag() : this, this);
   }
 }
 

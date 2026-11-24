@@ -145,12 +145,23 @@ class TextSelector : public LayerProperty {
    */
   void setWeight(float value);
 
+  /** Returns the opaque authored selector endpoint identity, never dereferenced by tgfx. */
+  const void* sourceTag() const {
+    return _sourceTag;
+  }
+
+  /** Associates tag with this selector for owned prepared-draw dependency correlation. */
+  void setSourceTag(const void* tag) {
+    _sourceTag = tag;
+  }
+
  protected:
   TextSelector() = default;
 
  private:
   SelectorMode _mode = SelectorMode::Add;
   float _weight = 1.0f;
+  const void* _sourceTag = nullptr;
 
   friend class TextModifier;
 };

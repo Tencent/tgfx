@@ -42,17 +42,18 @@ class StrokePainter : public Painter {
   StrokeAlign strokeAlign = StrokeAlign::Center;
 
   std::unique_ptr<Painter> clone() const override {
+    if (!canClone()) {
+      return nullptr;
+    }
     return std::make_unique<StrokePainter>(*this);
   }
 
  protected:
   std::shared_ptr<Shape> prepareShape(std::shared_ptr<Shape> innerShape, size_t /*index*/,
-                                      LayerPaint* paint) override {
-    // Derive the fit shader from the pre-stroke geometry bounds. SVG and Figma both compute
-    // gradient fit boxes from the fill geometry only and ignore stroke width, so dash, stroke
-    // alignment and stroke width never affect the fit region. Reading getPath() here also
-    // primes Shape::getPath()'s atomic cache for the recorder's later use.
-    paint->shader = wrapShaderWithFit(innerShape->getPath().getBounds());
+                                      LayerPaint* paint, VectorPaintSnapshot* snapshot) override {
+    auto bounds = innerShape->getPath().getBounds();
+    *snapshot = makeBaseSnapshot(bounds);
+    paint->shader = wrapShaderWithFit(*snapshot);
     paint->style = PaintStyle::Stroke;
     paint->stroke = stroke;
     paint->strokeAlign = strokeAlign;
@@ -65,11 +66,20 @@ class StrokePainter : public Painter {
     if (run.textBlob == nullptr) {
       return emit;
     }
+    float blendFactor = run.style.strokeColor.alpha;
+    size_t paintCount = (blendFactor < 1.0f ? 1 : 0) + (blendFactor > 0.0f ? 1 : 0);
+    if (budget != nullptr && !budget->consumeDraws(paintCount)) {
+      return emit;
+    }
     Stroke runStroke = stroke;
     runStroke.width = BlendStrokeWidth(stroke.width, run.style);
 
-    // Tight glyph bounds keep color glyphs intact (no text-to-shape conversion for measurement).
-    auto baseShader = wrapShaderWithFit(run.textBlob->getTightBounds());
+    auto bounds = run.textBlob->getTightBounds();
+    auto baseSnapshot = makeBaseSnapshot(bounds, run.style.alpha);
+    if (budget != nullptr && budget->failed) {
+      return {};
+    }
+    auto baseShader = wrapShaderWithFit(baseSnapshot);
 
     // Emit path: non-center alignment or an active path effect require converting the text blob
     // into a shape so that ShapeContent can drive the clip/expand pipeline. When neither applies
@@ -77,6 +87,9 @@ class StrokePainter : public Painter {
     // path.
     bool nonCenterAlign = strokeAlign != StrokeAlign::Center;
     if (pathEffect != nullptr || nonCenterAlign) {
+      if (budget != nullptr && !budget->consumeTextGlyphs(run.textBlob.get())) {
+        return {};
+      }
       emit.shape = Shape::MakeFrom(run.textBlob);
       if (emit.shape == nullptr) {
         return emit;
@@ -85,7 +98,6 @@ class StrokePainter : public Painter {
       emit.textBlob = run.textBlob;
     }
 
-    float blendFactor = run.style.strokeColor.alpha;
     float runAlpha = alpha * run.style.alpha;
     if (blendFactor < 1.0f) {
       auto p = makeBasePaint();
@@ -96,6 +108,7 @@ class StrokePainter : public Painter {
       p.strokeAlign = strokeAlign;
       p.pathEffect = pathEffect;
       emit.paints.push_back(std::move(p));
+      emit.paintSnapshots.push_back(std::move(baseSnapshot));
     }
     if (blendFactor > 0.0f) {
       const auto& strokeColor = run.style.strokeColor;
@@ -109,6 +122,7 @@ class StrokePainter : public Painter {
       p.strokeAlign = strokeAlign;
       p.pathEffect = pathEffect;
       emit.paints.push_back(std::move(p));
+      emit.paintSnapshots.push_back(makeOverlaySnapshot(bounds, overlayColor, run.style.alpha));
     }
     return emit;
   }
@@ -236,6 +250,11 @@ void StrokeStyle::apply(VectorContext* context) {
   if (_colorSource == nullptr || _stroke.width <= 0.0f || context->geometries.empty()) {
     return;
   }
+  if (!context->budget->consumePainters(1) || !context->budget->consumeMetadata(1) ||
+      !context->budget->consumeColorSource(_colorSource.get()) ||
+      (_cachedDashEffect == nullptr && !context->budget->consumeDashPattern(_dashes.size()))) {
+    return;
+  }
   auto shader = _colorSource->getShader();
   if (shader == nullptr) {
     return;
@@ -244,9 +263,14 @@ void StrokeStyle::apply(VectorContext* context) {
   auto painter = std::make_unique<StrokePainter>();
   painter->shader = std::move(shader);
   painter->colorSource = _colorSource;
+  painter->colorSnapshot = VectorColorSnapshot::Capture(_colorSource.get());
   painter->sourceTag = sourceTag();
+  painter->runtimeEndpoint = this;
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
+  painter->budget = context->budget.get();
+  painter->alphaFactors.push_back({VectorAlphaFactor::Kind::Painter,
+                                   sourceTag() != nullptr ? sourceTag() : this, _alpha, this});
   painter->placement = _placement;
   painter->stroke = _stroke;
   painter->strokeAlign = _strokeAlign;
@@ -255,6 +279,9 @@ void StrokeStyle::apply(VectorContext* context) {
   }
   painter->pathEffect = _cachedDashEffect;
   painter->captureGeometries(context);
+  if (context->budget->failed) {
+    return;
+  }
   context->painters.push_back(std::move(painter));
 }
 

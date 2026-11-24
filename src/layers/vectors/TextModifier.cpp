@@ -182,12 +182,40 @@ void TextModifier::apply(VectorContext* context) {
 
   size_t totalCount = 0;
   for (auto* geometry : glyphGeometries) {
+    if (geometry->glyphs.size() > context->budget->limits.maxGlyphs - totalCount) {
+      context->budget->fail(VectorPrepareUsage::Limit::Glyphs);
+      return;
+    }
     totalCount += geometry->glyphs.size();
   }
   if (totalCount == 0) {
     return;
   }
 
+  size_t selectorEntries = 0;
+  if (!context->budget->multiply(totalCount, 2, &selectorEntries)) {
+    return;
+  }
+  for (const auto& selector : _selectors) {
+    if (selector == nullptr || !context->budget->consumeGlyphs(selectorEntries)) {
+      context->budget->failed = true;
+      return;
+    }
+  }
+  for (auto* geometry : glyphGeometries) {
+    if (!context->addDependency(geometry, VectorGeometryDependency::Kind::TextModifier,
+                                sourceTag() != nullptr ? sourceTag() : this, this)) {
+      return;
+    }
+    for (const auto& selector : _selectors) {
+      if (!context->addDependency(
+              geometry, VectorGeometryDependency::Kind::TextSelector,
+              selector->sourceTag() != nullptr ? selector->sourceTag() : selector.get(),
+              selector.get())) {
+        return;
+      }
+    }
+  }
   size_t globalIndex = 0;
   for (auto* geometry : glyphGeometries) {
     for (auto& glyph : geometry->glyphs) {
