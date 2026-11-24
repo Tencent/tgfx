@@ -23,6 +23,7 @@
 #include "gtest/gtest.h"
 #if defined(TGFX_USE_VULKAN)
 #include <cstring>
+#include <memory>
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/RenderPipeline.h"
 #include "tgfx/gpu/ShaderModule.h"
@@ -283,6 +284,45 @@ TEST(SPIRVShaderBuilderTest, RejectsUnsupportedExpressions) {
 }
 
 #if defined(TGFX_USE_VULKAN)
+namespace {
+
+std::vector<uint8_t> WordsToBytes(const std::vector<uint32_t>& words) {
+  std::vector<uint8_t> bytes(words.size() * sizeof(uint32_t));
+  std::memcpy(bytes.data(), words.data(), bytes.size());
+  return bytes;
+}
+
+std::shared_ptr<ShaderModule> MakeVertexModule(GPU* gpu, std::string* error) {
+  ProgramIRBuilder program = {};
+  const auto zero = program.CreateConstant(0.0f);
+  const auto one = program.CreateConstant(1.0f);
+  const auto position = program.CreateConstruct(SLType::Float4, {zero, zero, zero, one});
+  const auto output =
+      program.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "gl_Position");
+  program.StoreOutput(output, position);
+
+  SPIRVVertexShaderBuilder builder;
+  if (!builder.Begin(error)) {
+    return nullptr;
+  }
+  uint32_t value = 0;
+  if (!builder.EmitValue(program.IR(), position, &value, error) ||
+      !builder.StoreOutput(program.IR(), position, error)) {
+    return nullptr;
+  }
+  const auto words = builder.Finish(error);
+  if (words.empty()) {
+    return nullptr;
+  }
+  ShaderModuleDescriptor descriptor = {};
+  descriptor.format = ShaderCodeFormat::SPIRV;
+  descriptor.stage = ShaderStage::Vertex;
+  descriptor.binaryData = WordsToBytes(words);
+  return gpu->createShaderModule(descriptor);
+}
+
+}  // namespace
+
 TEST(SPIRVShaderBuilderTest, VulkanAcceptsGeneratedModules) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -353,6 +393,59 @@ TEST(SPIRVShaderBuilderTest, VulkanAcceptsGeneratedModules) {
   pipelineDesc.fragment.colorAttachments.push_back({});
   auto pipeline = gpu->createRenderPipeline(pipelineDesc);
   ASSERT_TRUE(pipeline != nullptr) << "the generated SPIR-V modules did not form a pipeline";
+}
+
+TEST(SPIRVShaderBuilderTest, VulkanAcceptsUniformAndSamplerPipeline) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  if (context->backend() != Backend::Vulkan) {
+    GTEST_SKIP() << "the Vulkan backend is not active";
+  }
+  auto* gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+
+  std::string error = {};
+  auto vertexModule = MakeVertexModule(gpu, &error);
+  ASSERT_TRUE(vertexModule != nullptr) << error;
+
+  ProgramIRBuilder program = {};
+  const auto tint =
+      program.AddUniform({"Tint", SLType::Float4, Precision::High, ShaderStage::Fragment, 1});
+  const auto sampler = program.AddSampler({"TextureSampler_0", SLType::Texture2DSampler, 0});
+  const auto zero = program.CreateConstant(0.0f);
+  const auto coord = program.CreateConstruct(SLType::Float2, {zero, zero});
+  const auto sample = program.CreateTextureSample(sampler, coord, SLType::Float4, "textureColor",
+                                                  SLType::Texture2DSampler);
+  const auto color = program.CreateBinary(IRBinaryOp::Mul, SLType::Float4, sample, tint);
+  const auto output =
+      program.CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "outputColor");
+  program.StoreOutput(output, color);
+
+  SPIRVFragmentShaderBuilder fragmentBuilder;
+  ASSERT_TRUE(fragmentBuilder.Begin(&error)) << error;
+  uint32_t value = 0;
+  ASSERT_TRUE(fragmentBuilder.EmitValue(program.IR(), color, &value, &error)) << error;
+  ASSERT_TRUE(fragmentBuilder.StoreOutput(program.IR(), color, &error)) << error;
+  const auto fragmentWords = fragmentBuilder.Finish(&error);
+  ASSERT_FALSE(fragmentWords.empty()) << error;
+
+  ShaderModuleDescriptor fragmentDesc = {};
+  fragmentDesc.format = ShaderCodeFormat::SPIRV;
+  fragmentDesc.stage = ShaderStage::Fragment;
+  fragmentDesc.binaryData = WordsToBytes(fragmentWords);
+  fragmentDesc.uniformSlots = {{"Tint", 0}};
+  auto fragmentModule = gpu->createShaderModule(fragmentDesc);
+  ASSERT_TRUE(fragmentModule != nullptr);
+
+  RenderPipelineDescriptor pipelineDesc = {};
+  pipelineDesc.vertex.module = vertexModule;
+  pipelineDesc.fragment.module = fragmentModule;
+  pipelineDesc.fragment.colorAttachments.push_back({});
+  pipelineDesc.layout.uniformBlocks = {{"Tint", 0, ShaderVisibility::Fragment}};
+  pipelineDesc.layout.textureSamplers = {{"TextureSampler_0", 0, ShaderVisibility::Fragment}};
+  auto pipeline = gpu->createRenderPipeline(pipelineDesc);
+  ASSERT_TRUE(pipeline != nullptr) << "the UBO or sampler layout did not match the SPIR-V";
 }
 #endif
 
