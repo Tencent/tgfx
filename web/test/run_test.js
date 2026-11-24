@@ -27,14 +27,16 @@ if (!['verify', 'reference'].includes(MODE)) {
   console.error(`Invalid mode: "${MODE}". Must be one of: verify, reference`);
   process.exit(1);
 }
-if (MODE === 'reference' && (!/^[0-9a-f]{40}$/.test(REFERENCE_COMMIT) ||
-    !WEB_TEST_DIR.startsWith(path.join(__dirname, `build-reference-${BACKEND}`) + path.sep))) {
-  console.error('Reference generation requires a pinned main commit and isolated runtime directory.');
-  process.exit(1);
-}
 const ALLOWED_BACKENDS = new Set(['webgl', 'webgpu']);
 if (!ALLOWED_BACKENDS.has(BACKEND)) {
   console.error(`Invalid backend: "${BACKEND}". Must be one of: ${[...ALLOWED_BACKENDS].join(', ')}`);
+  process.exit(1);
+}
+// The isolated runtime directory is named after the backend, so a misspelled backend has to be
+// rejected above or this check reports a missing commit and directory instead.
+if (MODE === 'reference' && (!/^[0-9a-f]{40}$/.test(REFERENCE_COMMIT) ||
+    !WEB_TEST_DIR.startsWith(path.join(__dirname, `build-reference-${BACKEND}`) + path.sep))) {
+  console.error('Reference generation requires a pinned main commit and isolated runtime directory.');
   process.exit(1);
 }
 
@@ -55,6 +57,12 @@ function startHttpServer() {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let started = false;
+    // A rejected start never reaches the stopHttpServer call in the caller's finally block, so the
+    // child has to be reaped here or it keeps the port and the next run fails with EADDRINUSE.
+    const fail = (error) => {
+      server.kill('SIGTERM');
+      reject(error);
+    };
     const onData = (data) => {
       const text = data.toString();
       if (!started && text.includes('Hit CTRL-C to stop')) {
@@ -64,10 +72,12 @@ function startHttpServer() {
     };
     server.stdout.on('data', onData);
     server.stderr.on('data', onData);
-    server.on('error', reject);
+    server.on('error', (error) => {
+      if (!started) fail(error);
+    });
     setTimeout(() => {
       if (!started) {
-        reject(new Error('http-server failed to start within 10 seconds'));
+        fail(new Error('http-server failed to start within 10 seconds'));
       }
     }, 10000);
   });
@@ -249,6 +259,8 @@ async function run() {
     if (pendingDownloads.size > 0) {
       throw new Error('Downloads did not complete within 60 seconds');
     }
+    // Puppeteer reports a download as finished before the file handle is released, so give the CDP
+    // download stream a moment to close before the archives are extracted.
     await new Promise(function(resolve) { setTimeout(resolve, 1000); });
 
   } catch (err) {

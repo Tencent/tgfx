@@ -92,7 +92,9 @@ function RunScenario(options) {
       child_process: {
         spawn(command, args) {
           spawnCalls.push([command, args]);
-          queueMicrotask(function() { server.stdout.emit('data', 'Hit CTRL-C to stop'); });
+          if (!options.serverNeverStarts) {
+            queueMicrotask(function() { server.stdout.emit('data', 'Hit CTRL-C to stop'); });
+          }
           return server;
         },
       },
@@ -122,7 +124,8 @@ function RunScenario(options) {
       process: {
         argv: ['node', 'run_test.js', `--backend=${backend}`, `--mode=${mode}`].concat(
           mode === 'reference' ? [`--reference-commit=${commit}`,
-            `--web-root=${path.join(__dirname, `build-reference-${backend}`, 'session/runtime')}`] : []),
+            `--web-root=${options.webRoot ||
+              path.join(__dirname, `build-reference-${backend}`, 'session/runtime')}`] : []),
         platform: 'darwin',
         execPath: process.execPath,
         env: options.env || {},
@@ -136,7 +139,8 @@ function RunScenario(options) {
         error(...args) { output.push(args.join(' ')); },
       },
       setTimeout(callback, delay) {
-        if (delay <= 1000 || (options.pageTimeout && delay === 60000)) {
+        if (delay <= 1000 || (options.pageTimeout && delay === 60000) ||
+            (options.serverNeverStarts && delay === 10000)) {
           queueMicrotask(callback);
         }
         return 0;
@@ -338,3 +342,32 @@ test('invalid mode reports the mode error instead of reference requirements', { 
       return line.includes('Reference generation requires a pinned main commit');
     }));
   });
+
+// The sandboxed process.exit only resolves the scenario and lets the script continue, so this
+// asserts the reported order instead of the absence of the later message.
+test('invalid backend reports the backend error before reference requirements', { timeout: 2000 },
+  async function() {
+    const result = await RunScenario({
+      mode: 'reference',
+      backend: 'webgp',
+      webRoot: path.join(__dirname, 'build-reference-webgl', 'session/runtime'),
+      messages: [SUCCESS, DONE],
+    });
+    assert.equal(result.code, 1);
+    const backendLine = result.output.findIndex(function(line) {
+      return line.includes('Invalid backend: "webgp"');
+    });
+    const requirementLine = result.output.findIndex(function(line) {
+      return line.includes('Reference generation requires a pinned main commit');
+    });
+    assert.ok(backendLine >= 0, 'the misspelled backend must be rejected');
+    assert.ok(requirementLine < 0 || backendLine < requirementLine,
+      'the backend error must be reported before the reference requirements');
+  });
+
+test('http-server start timeout terminates the child', { timeout: 2000 }, async function() {
+  const result = await RunScenario({ serverNeverStarts: true, messages: [SUCCESS, DONE] });
+  assert.equal(result.code, 1);
+  assert.ok(result.output.some(function(line) { return line.includes('Fatal error:'); }));
+  assert.ok(result.serverSignals.includes('SIGTERM'), 'the child must be terminated on failure');
+});
