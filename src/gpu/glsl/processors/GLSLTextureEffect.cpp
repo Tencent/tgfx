@@ -19,6 +19,7 @@
 #include "GLSLTextureEffect.h"
 #include <unordered_map>
 #include "core/utils/Log.h"
+#include "gpu/glsl/GLSLOperatorEmitter.h"
 
 namespace tgfx {
 static std::array<float, 12> AlignMat3(const float* mat3) {
@@ -276,22 +277,38 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
   }
   const std::string limitedRange =
       std::to_string(IsLimitedYUVColorRange(yuvTexture->yuvColorSpace()) ? 1 : 0);
-  if (alphaStart == Point::Zero()) {
-    fragBuilder->appendCall(args.outputColor, entry, {"yuv", mat3Name, limitedRange, "0", "1.0"});
-    if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID) {
-      const auto yuvValue =
-          args.irBuilder->InternValue("yuv", SLType::Float3, Precision::High, IRValueKind::Local);
-      const auto matrixValue = args.irBuilder->InternValue(mat3Name, SLType::Float3x3,
-                                                           Precision::High, IRValueKind::Uniform);
-      const auto limitedRangeValue = args.irBuilder->CreateIntConstant(
-          IsLimitedYUVColorRange(yuvTexture->yuvColorSpace()) ? 1 : 0);
-      const auto hasAlphaValue = args.irBuilder->CreateIntConstant(0);
-      const auto alphaValue = args.irBuilder->CreateConstant(1.0f);
-      const auto result = args.irBuilder->CreateCall(
-          OperatorID::YUVToRGB, SLType::Float4,
-          {yuvValue, matrixValue, limitedRangeValue, hasAlphaValue, alphaValue});
-      args.irBuilder->StoreOutput(args.outputValue, result);
+  auto emitYUVCall = [&](bool hasAlpha) -> std::string {
+    if (args.irBuilder == nullptr || args.outputValue == INVALID_VALUE_ID) {
+      return {};
     }
+    const auto yuvValue =
+        args.irBuilder->InternValue("yuv", SLType::Float3, Precision::High, IRValueKind::Local);
+    const auto matrixValue = args.irBuilder->InternValue(mat3Name, SLType::Float3x3,
+                                                         Precision::High, IRValueKind::Uniform);
+    const auto limitedRangeValue = args.irBuilder->CreateIntConstant(
+        IsLimitedYUVColorRange(yuvTexture->yuvColorSpace()) ? 1 : 0);
+    const auto hasAlphaValue = args.irBuilder->CreateIntConstant(hasAlpha ? 1 : 0);
+    const auto alphaValue = hasAlpha
+                                ? args.irBuilder->InternValue("yuv_a", SLType::Float,
+                                                              Precision::High, IRValueKind::Local)
+                                : args.irBuilder->CreateConstant(1.0f);
+    const auto result = args.irBuilder->CreateCall(
+        OperatorID::YUVToRGB, SLType::Float4,
+        {yuvValue, matrixValue, limitedRangeValue, hasAlphaValue, alphaValue});
+    if (result == INVALID_VALUE_ID) {
+      return {};
+    }
+    args.irBuilder->StoreOutput(args.outputValue, result);
+    std::string expression = {};
+    std::string error = {};
+    return GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error)
+               ? expression
+               : std::string();
+  };
+  if (alphaStart == Point::Zero()) {
+    const auto expression = emitYUVCall(false);
+    fragBuilder->appendCall(args.outputColor, entry, {"yuv", mat3Name, limitedRange, "0", "1.0"},
+                            "", expression);
   } else {
     auto alphaStartName =
         uniformHandler->addUniform("AlphaStart", UniformFormat::Float2, ShaderStage::Fragment);
@@ -302,22 +319,9 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
         "yuv_a", fragBuilder->textureLookupExpression(textureSamplers[0], alphaVertexColor) + ".r",
         "float");
     recordSample(0, alphaVertexColor, "yuv_a", "r", "", SLType::Float);
-    fragBuilder->appendCall(args.outputColor, entry, {"yuv", mat3Name, limitedRange, "1", "yuv_a"});
-    if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID) {
-      const auto yuvValue =
-          args.irBuilder->InternValue("yuv", SLType::Float3, Precision::High, IRValueKind::Local);
-      const auto matrixValue = args.irBuilder->InternValue(mat3Name, SLType::Float3x3,
-                                                           Precision::High, IRValueKind::Uniform);
-      const auto limitedRangeValue = args.irBuilder->CreateIntConstant(
-          IsLimitedYUVColorRange(yuvTexture->yuvColorSpace()) ? 1 : 0);
-      const auto hasAlphaValue = args.irBuilder->CreateIntConstant(1);
-      const auto alphaValue =
-          args.irBuilder->InternValue("yuv_a", SLType::Float, Precision::High, IRValueKind::Local);
-      const auto result = args.irBuilder->CreateCall(
-          OperatorID::YUVToRGB, SLType::Float4,
-          {yuvValue, matrixValue, limitedRangeValue, hasAlphaValue, alphaValue});
-      args.irBuilder->StoreOutput(args.outputValue, result);
-    }
+    const auto expression = emitYUVCall(true);
+    fragBuilder->appendCall(args.outputColor, entry, {"yuv", mat3Name, limitedRange, "1", "yuv_a"},
+                            "", expression);
   }
 }
 
