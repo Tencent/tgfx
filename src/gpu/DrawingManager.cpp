@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
+#include <cstdio>
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
+#include "core/utils/GpuProbe.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
@@ -78,6 +80,10 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     // Mipmap generation samples the whole backing store, including unwritten padding.
     clearColor = PMColor::Transparent();
   }
+  ++gGpuProbe.passes;
+  gGpuProbe.passPx += static_cast<double>(renderTarget->width()) * renderTarget->height();
+  ++gGpuProbe.drawOps;
+  ++gGpuProbe.passesPerTarget[renderTarget.get()];
   auto task = allocator->make<OpsRenderTask>(allocator, std::move(renderTarget), std::move(drawOps),
                                              clearColor);
   drawingBuffer->renderTasks.emplace_back(std::move(task));
@@ -104,6 +110,10 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
+  ++gGpuProbe.passes;
+  gGpuProbe.passPx += static_cast<double>(renderTarget->width()) * renderTarget->height();
+  gGpuProbe.drawOps += static_cast<int>(drawOps.size());
+  ++gGpuProbe.passesPerTarget[renderTarget.get()];
   auto task = allocator->make<OpsRenderTask>(allocator, std::move(renderTarget), std::move(drawOps),
                                              clearColor);
   drawingBuffer->renderTasks.emplace_back(std::move(task));
@@ -120,6 +130,8 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
+  ++gGpuProbe.runtimeTasks;
+  ++gGpuProbe.passesPerTarget[renderTarget.get()];
   auto task = allocator->make<RuntimeDrawTask>(allocator, std::move(renderTarget),
                                                std::move(inputs), std::move(effect), offset);
   drawingBuffer->renderTasks.emplace_back(std::move(task));
@@ -132,6 +144,7 @@ void DrawingManager::addGenerateMipmapsTask(std::shared_ptr<TextureProxy> textur
   }
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
+  ++gGpuProbe.mipmapTasks;
   auto task = allocator->make<GenerateMipmapsTask>(allocator, std::move(textureProxy));
   drawingBuffer->renderTasks.emplace_back(std::move(task));
 }
@@ -144,6 +157,8 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   }
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
+  ++gGpuProbe.copyTasks;
+  gGpuProbe.copyPx += static_cast<double>(dest->width()) * dest->height();
   auto task = allocator->make<RenderTargetCopyTask>(allocator, std::move(source), std::move(dest),
                                                     srcX, srcY);
   drawingBuffer->renderTasks.emplace_back(std::move(task));
@@ -307,6 +322,25 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
   context->proxyProvider()->flushSharedVertexBuffer();
   context->proxyProvider()->flushSharedInstanceBuffer();
   atlasTaskMap.clear();
+  if (gGpuProbe.passes > 0 || gGpuProbe.copyTasks > 0) {
+    auto& p = gGpuProbe;
+    int splitTargets = 0;
+    int extraPasses = 0;
+    for (const auto& entry : p.passesPerTarget) {
+      if (entry.second > 1) {
+        ++splitTargets;
+        extraPasses += entry.second - 1;
+      }
+    }
+    std::printf(
+        "[GPU-FLUSH] passes=%d passMpx=%.2f ops=%d targets=%zu splitTargets=%d extraPasses=%d "
+        "runtime=%d mipmaps=%d copies=%d copyMpx=%.2f cow=%d cowMpx=%.2f newRT=%d newRTMpx=%.2f "
+        "blurs=%d blurMpx=%.2f rasterized=%d snapshots=%d\n",
+        p.passes, p.passPx / 1e6, p.drawOps, p.passesPerTarget.size(), splitTargets, extraPasses,
+        p.runtimeTasks, p.mipmapTasks, p.copyTasks, p.copyPx / 1e6, p.cow, p.cowPx / 1e6,
+        p.newTargets, p.newTargetPx / 1e6, p.blurs, p.blurPx / 1e6, p.rasterized, p.snapshots);
+  }
+  gGpuProbe.reset();
 
   if (currentBuffer->empty()) {
     currentBuffer->reset();

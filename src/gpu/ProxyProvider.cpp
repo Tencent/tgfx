@@ -23,6 +23,7 @@
 #include "core/ShapeRasterizer.h"
 #include "core/ShapeVertexSource.h"
 #include "core/StencilCoverPathTessellator.h"
+#include "core/utils/GpuProbe.h"
 #include "core/utils/HardwareBufferUtil.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/USE.h"
@@ -614,6 +615,8 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   if (!TextureView::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
+  ++gGpuProbe.newTargets;
+  gGpuProbe.newTargetPx += static_cast<double>(width) * height;
   if (auto proxy = findOrWrapTextureProxy(uniqueKey)) {
     proxy->_width = width;
     proxy->_height = height;

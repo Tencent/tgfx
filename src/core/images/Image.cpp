@@ -27,6 +27,7 @@
 #include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/GpuProbe.h"
 #include "core/utils/WeakMap.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
@@ -209,6 +210,7 @@ std::shared_ptr<Image> Image::makeScaled(int newWidth, int newHeight,
 }
 
 std::shared_ptr<Image> Image::makeRasterized() const {
+  ++gGpuProbe.rasterized;
   auto result = std::make_shared<RasterizedImage>(UniqueKey::Make(), weakThis.lock());
   result->weakThis = result;
   return result;
