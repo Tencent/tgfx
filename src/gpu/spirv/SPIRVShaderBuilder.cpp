@@ -185,6 +185,20 @@ uint32_t SPIRVShaderBuilder::PointerTypeId(SLType type, uint32_t storageClass, s
   return id;
 }
 
+uint32_t SPIRVShaderBuilder::PointerTypeIdFor(uint32_t pointeeType, uint32_t storageClass,
+                                              std::string* error) {
+  if (pointeeType == 0) {
+    Fail(error, "the pointer's pointee type is invalid");
+    return 0;
+  }
+  auto* saved = writer.sink;
+  writer.Sink(&writer.decl);
+  const auto id = writer.NewId();
+  writer.Inst(spirv::kOpTypePointer, {id, storageClass, pointeeType});
+  writer.Sink(saved);
+  return id;
+}
+
 uint32_t SPIRVShaderBuilder::ConstantId(const IRExpr& expr, std::string* error) {
   const auto key = (static_cast<uint64_t>(expr.type) << 32) | expr.constantBits;
   const auto found = constantIds.find(key);
@@ -393,10 +407,12 @@ uint32_t SPIRVShaderBuilder::ArrayTypeId(SLType elementType, uint32_t count, uin
 }
 
 uint32_t SPIRVShaderBuilder::FunctionParamTypeId(const OperatorParam& param, std::string* error) {
-  if (!param.isArray) {
-    return TypeId(param.type, error);
+  const auto valueType = param.isArray ? ArrayTypeId(param.type, param.arrayCount, 0, false, error)
+                                       : TypeId(param.type, error);
+  if (valueType == 0) {
+    return 0;
   }
-  return ArrayTypeId(param.type, param.arrayCount, 0, false, error);
+  return PointerTypeIdFor(valueType, spirv::kStorageFunction, error);
 }
 
 void SPIRVShaderBuilder::EnsureLinkageCapability() {
@@ -766,6 +782,18 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
       if (sampledImage == 0 || !EmitValue(program, expr.args[1], &coordinate, error)) {
         return 0;
       }
+      const auto& coordinateValue = program.values[expr.args[1]];
+      if (coordinateValue.kind == IRValueKind::Local &&
+          coordinateValue.definingExpr == INVALID_EXPR_ID) {
+        const auto coordinateType = TypeId(coordinateValue.type, error);
+        if (coordinateType == 0) {
+          return 0;
+        }
+        writer.Sink(&writer.func);
+        const auto loaded = writer.NewId();
+        writer.Inst(spirv::kOpLoad, {coordinateType, loaded, coordinate});
+        coordinate = loaded;
+      }
       const auto type = TypeId(expr.type, error);
       if (type == 0) {
         return 0;
@@ -781,6 +809,23 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
         Fail(error, "the operator is missing from the manifest");
         return 0;
       }
+      auto loadArgument = [&](ValueID value, uint32_t* id) {
+        if (!EmitValue(program, value, id, error)) {
+          return false;
+        }
+        const auto& irValue = program.values[value];
+        if (irValue.kind == IRValueKind::Local && irValue.definingExpr == INVALID_EXPR_ID) {
+          const auto type = TypeId(irValue.type, error);
+          if (type == 0) {
+            return false;
+          }
+          writer.Sink(&writer.func);
+          const auto loaded = writer.NewId();
+          writer.Inst(spirv::kOpLoad, {type, loaded, *id});
+          *id = loaded;
+        }
+        return true;
+      };
       if (operatorBundle != nullptr) {
         const auto* artifact = operatorBundle->Find(expr.op, OperatorBackend::SPIRV);
         if (artifact != nullptr && !artifact->spirv.empty()) {
@@ -791,7 +836,7 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
           std::vector<uint32_t> arguments = {};
           for (const auto argument : expr.args) {
             uint32_t id = 0;
-            if (!EmitValue(program, argument, &id, error)) {
+            if (!loadArgument(argument, &id)) {
               return 0;
             }
             arguments.push_back(id);
@@ -800,7 +845,7 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
         }
       }
       auto arg = [&](size_t index, uint32_t* id) {
-        return index < expr.args.size() && EmitValue(program, expr.args[index], id, error);
+        return index < expr.args.size() && loadArgument(expr.args[index], id);
       };
       auto splat = [&](uint32_t scalar, SLType vectorType, uint32_t* id) {
         const auto type = TypeId(vectorType, error);
@@ -1300,7 +1345,7 @@ uint32_t SPIRVShaderBuilder::ImportFunction(const OperatorDesc& desc,
       return existing.id;
     }
   }
-  if (!artifact.spirv.empty()) {
+  if (artifact.spirv.size() > 5 && artifact.spirv[0] == 0x07230203u) {
     importedModules.push_back(artifact.spirv);
   }
 
@@ -1346,10 +1391,47 @@ uint32_t SPIRVShaderBuilder::EmitFunctionCall(ValueID result, SLType returnType,
   if (typeId == 0) {
     return 0;
   }
+  const ImportedFunction* imported = nullptr;
+  for (const auto& candidate : importedFunctions) {
+    if (candidate.id == functionId) {
+      imported = &candidate;
+      break;
+    }
+  }
+  if (imported == nullptr || imported->paramTypeIds.size() != args.size()) {
+    Fail(error, "the SPIR-V operator function arguments do not match its declaration");
+    return 0;
+  }
   writer.Sink(&writer.func);
+  auto declareFunctionVariable = [&](uint32_t pointerType, uint32_t id) {
+    size_t offset = 0;
+    while (offset < writer.func.size()) {
+      const auto instruction = writer.func[offset];
+      const auto wordCount = instruction >> 16;
+      const auto opcode = instruction & 0xFFFFu;
+      if (wordCount == 0) {
+        break;
+      }
+      if (opcode == spirv::kOpLabel) {
+        const std::vector<uint32_t> variable = {(4u << 16) | spirv::kOpVariable, pointerType, id,
+                                                spirv::kStorageFunction};
+        writer.func.insert(writer.func.begin() + static_cast<ptrdiff_t>(offset + wordCount),
+                           variable.begin(), variable.end());
+        return;
+      }
+      offset += wordCount;
+    }
+  };
+  std::vector<uint32_t> callArgs = {};
+  for (size_t index = 0; index < args.size(); ++index) {
+    const auto variableId = writer.NewId();
+    declareFunctionVariable(imported->paramTypeIds[index], variableId);
+    writer.Inst(spirv::kOpStore, {variableId, args[index]});
+    callArgs.push_back(variableId);
+  }
   const auto resultId = writer.NewId();
   std::vector<uint32_t> operands = {typeId, resultId, functionId};
-  operands.insert(operands.end(), args.begin(), args.end());
+  operands.insert(operands.end(), callArgs.begin(), callArgs.end());
   writer.Inst(spirv::kOpFunctionCall, operands);
   valueIds[result] = resultId;
   return resultId;

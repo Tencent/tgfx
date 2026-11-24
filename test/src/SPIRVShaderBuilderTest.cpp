@@ -234,7 +234,6 @@ TEST(SPIRVShaderBuilderTest, ImportsArrayFunctionParameter) {
   artifact.id = OperatorID::GaussianBlur1D;
   artifact.backend = OperatorBackend::SPIRV;
   artifact.symbol = "gaussianBlur1D";
-  artifact.spirv = {0x07230203u};
 
   SPIRVShaderBuilder builder(ShaderStage::Fragment);
   std::string error = {};

@@ -87,6 +87,7 @@ class SPIRVShaderBuilder {
                                  std::string* error);
   uint32_t EmitExpr(const ProgramIR& program, const IRExpr& expr, std::string* error);
   uint32_t PointerTypeId(SLType type, uint32_t storageClass, std::string* error);
+  uint32_t PointerTypeIdFor(uint32_t pointeeType, uint32_t storageClass, std::string* error);
 
   ShaderStage stage = ShaderStage::Fragment;
   spirv::Writer writer = {};
