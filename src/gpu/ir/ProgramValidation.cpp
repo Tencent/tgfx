@@ -91,18 +91,23 @@ VaryingDesc* FindVaryingByID(InterfaceDesc* interface, VaryingID id) {
 
 bool ValidateFragmentCoords(ProgramDescription* description, std::string* error) {
   for (const auto& instruction : description->fragment.instructions) {
-    if (instruction.kind != FragmentInstructionKind::Project ||
-        instruction.varying == INVALID_VARYING) {
+    if (instruction.varying == INVALID_VARYING) {
+      continue;
+    }
+    const bool project = instruction.kind == FragmentInstructionKind::Project;
+    const bool read = instruction.kind == FragmentInstructionKind::ReadVarying;
+    if (!project && !read) {
       continue;
     }
     auto* varying = FindVaryingByID(&description->interface, instruction.varying);
     if (varying == nullptr) {
-      *error =
-          "the fragment stage projects undeclared varying " + std::to_string(instruction.varying);
+      *error = "the fragment stage reads undeclared varying " + std::to_string(instruction.varying);
       return false;
     }
-    if (varying->type != SLType::Float3) {
-      *error = "the fragment stage projects varying '" + varying->name + "', which is not vec3";
+    const SLType expected = project ? SLType::Float3 : SLType::Float2;
+    if (varying->type != expected) {
+      *error = "the fragment stage reads varying '" + varying->name + "' as " + TypeName(expected) +
+               ", but it is declared as " + TypeName(varying->type);
       return false;
     }
   }

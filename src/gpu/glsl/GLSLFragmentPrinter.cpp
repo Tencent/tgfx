@@ -93,6 +93,8 @@ std::string PrintGLSLFragmentProgram(const FragmentProgram& program) {
         out += PrefixOf(instruction);
         out += instruction.output + " = " + instruction.src + " * " + instruction.operand + ";\n";
         break;
+      case FragmentInstructionKind::ReadVarying:
+        break;
       case FragmentInstructionKind::Project:
         out += PrefixOf(instruction);
         out += "highp vec2 " + instruction.output + " = " + instruction.src + ".xy / " +

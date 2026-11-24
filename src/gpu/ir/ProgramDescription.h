@@ -115,6 +115,7 @@ enum class FragmentInstructionKind : uint8_t {
   StoreCoverage,
   Combine,
   Project,
+  ReadVarying,
   Root,
 };
 

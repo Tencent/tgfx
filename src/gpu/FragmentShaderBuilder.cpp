@@ -218,6 +218,11 @@ void FragmentShaderBuilder::onAfterChildProcEmitCode() const {
 
 std::string FragmentShaderBuilder::emitPerspTextCoord(const CoordValue& coordVar) {
   if (coordVar.type() == SLType::Float2) {
+    FragmentInstruction instruction = {};
+    instruction.kind = FragmentInstructionKind::ReadVarying;
+    instruction.src = coordVar.name();
+    instruction.varying = coordVar.varying;
+    recordFragmentInstruction(std::move(instruction));
     return coordVar.name();
   }
   if (coordVar.type() == SLType::Float3) {

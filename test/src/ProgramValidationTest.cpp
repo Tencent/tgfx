@@ -83,7 +83,19 @@ TEST(ProgramValidationTest, RejectsProjectingNonProjectiveVarying) {
   description.fragment.instructions.push_back(project);
   std::string error;
   EXPECT_FALSE(ValidateProgramDescription(&description, &error));
-  EXPECT_NE(error.find("not vec3"), std::string::npos);
+  EXPECT_NE(error.find("vec4"), std::string::npos);
+}
+
+TEST(ProgramValidationTest, RejectsReadingProjectiveVaryingAsAffine) {
+  auto description = ValidDescription();
+  FragmentInstruction read = {};
+  read.kind = FragmentInstructionKind::ReadVarying;
+  read.src = "vColor";
+  read.varying = 0;
+  description.fragment.instructions.push_back(read);
+  std::string error;
+  EXPECT_FALSE(ValidateProgramDescription(&description, &error));
+  EXPECT_NE(error.find("vec2"), std::string::npos);
 }
 
 TEST(ProgramValidationTest, AcceptsProjectingProjectiveVarying) {
