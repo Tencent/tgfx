@@ -34,11 +34,11 @@ void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
   if (entry.empty()) {
     return;
   }
-  args.fragBuilder->appendCall(args.outputColor, entry,
-                               {ValueRef(args.inputColor, SLType::Float4, ValueOrigin::Local),
-                                ValueRef(kr, SLType::Float, ValueOrigin::Uniform),
-                                ValueRef(kg, SLType::Float, ValueOrigin::Uniform),
-                                ValueRef(kb, SLType::Float, ValueOrigin::Uniform)});
+  args.fragBuilder->appendCall(
+      args.outputColor, entry,
+      {args.inputColorValue, ValueRef(kr, SLType::Float, ValueOrigin::Uniform),
+       ValueRef(kg, SLType::Float, ValueOrigin::Uniform),
+       ValueRef(kb, SLType::Float, ValueOrigin::Uniform)});
 }
 
 void GLSLLumaFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

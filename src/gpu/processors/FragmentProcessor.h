@@ -237,7 +237,9 @@ class FragmentProcessor : public Processor {
         : fragBuilder(fragBuilder), uniformHandler(uniformHandler),
           outputColor(std::move(outputColor)), inputColor(std::move(inputColor)),
           transformedCoords(transformedCoords), textureSamplers(textureSamplers),
-          coordFunc(std::move(coordFunc)), inputSubset(std::move(inputSubset)) {
+          coordFunc(std::move(coordFunc)), inputSubset(std::move(inputSubset)),
+          inputColorValue(this->inputColor, SLType::Float4, ValueOrigin::Local),
+          outputColorValue(this->outputColor, SLType::Float4, ValueOrigin::Local) {
     }
 
     /**
@@ -265,6 +267,8 @@ class FragmentProcessor : public Processor {
     const TextureSamplers* textureSamplers;
     const std::function<std::string(std::string_view)> coordFunc;
     const std::string inputSubset;
+    ValueRef inputColorValue;
+    ValueRef outputColorValue;
   };
 
   /**

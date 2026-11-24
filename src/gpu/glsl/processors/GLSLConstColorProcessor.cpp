@@ -38,8 +38,7 @@ void GLSLConstColorProcessor::emitCode(EmitArgs& args) const {
   }
   fragBuilder->appendCall(
       args.outputColor, entry,
-      {ValueRef(colorName, SLType::Float4, ValueOrigin::Uniform),
-       ValueRef(args.inputColor, SLType::Float4, ValueOrigin::Local),
+      {ValueRef(colorName, SLType::Float4, ValueOrigin::Uniform), args.inputColorValue,
        ValueRef(std::to_string(static_cast<int>(inputMode)), SLType::Int, ValueOrigin::Literal)});
 }
 
