@@ -691,7 +691,7 @@ bool DisplayList::needsCapture(Layer* layer, const Rect& globalRect, float paren
   const float alpha = isRoot ? 1.0f : parentAlpha * layer->_alpha;
   const auto blendMode =
       isRoot ? BlendMode::SrcOver : static_cast<BlendMode>(layer->bitFields.blendMode);
-  const bool childOffscreen =
+  bool childOffscreen =
       offscreen || layer->canPreserve3D() || blendMode != BlendMode::SrcOver ||
       layer->bitFields.hasBlendMode || !layer->bitFields.passThroughBackground ||
       (alpha < 1.0f && layer->bitFields.allowsGroupOpacity) || !layer->_filters.empty() ||
@@ -713,6 +713,18 @@ bool DisplayList::needsCapture(Layer* layer, const Rect& globalRect, float paren
   for (const auto& child : layer->_children) {
     if (needsCapture(child.get(), globalRect, alpha, childOffscreen, drawnBounds)) {
       return true;
+    }
+    // An earlier sibling that composites through an offscreen (or a pass-through seed) leaves
+    // pixels in the tile that a captured backdrop would compute from a different seed, so later
+    // styles sampling that area cannot read the tile.
+    const auto childBlend = static_cast<BlendMode>(child->bitFields.blendMode);
+    const bool childComposesOffscreen =
+        child->canPreserve3D() || childBlend != BlendMode::SrcOver || child->bitFields.hasBlendMode ||
+        !child->bitFields.passThroughBackground ||
+        (child->_alpha < 1.0f && child->bitFields.allowsGroupOpacity) ||
+        !child->_filters.empty() || child->hasValidMask();
+    if (childComposesOffscreen && Rect::Intersects(child->renderBounds, globalRect)) {
+      childOffscreen = true;
     }
   }
   return false;
