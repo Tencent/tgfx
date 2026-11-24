@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLAlphaThresholdFragmentProcessor.h"
+#include "gpu/glsl/GLSLOperatorEmitter.h"
 
 namespace tgfx {
 PlacementPtr<AlphaThresholdFragmentProcessor> AlphaThresholdFragmentProcessor::Make(
@@ -34,16 +35,24 @@ void GLSLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
   if (entry.empty()) {
     return;
   }
-  fragBuilder->appendCall(
-      args.outputColor, entry,
-      {args.inputColorValue, ValueRef(thresholdUniformName, SLType::Float, ValueOrigin::Uniform)});
-  if (args.irBuilder != nullptr) {
-    const auto thresholdValue = args.irBuilder->CreateValue(
-        SLType::Float, Precision::High, IRValueKind::Uniform, thresholdUniformName);
-    const auto result = args.irBuilder->CreateCall(OperatorID::AlphaThreshold, SLType::Float4,
-                                                   {args.inputValue, thresholdValue});
+  ValueID result = INVALID_VALUE_ID;
+  if (args.irBuilder != nullptr && args.inputValue != INVALID_VALUE_ID &&
+      args.outputValue != INVALID_VALUE_ID) {
+    const auto thresholdValue = args.irBuilder->InternValue(thresholdUniformName, SLType::Float,
+                                                            Precision::High, IRValueKind::Uniform);
+    result = args.irBuilder->CreateCall(OperatorID::AlphaThreshold, SLType::Float4,
+                                        {args.inputValue, thresholdValue});
     args.irBuilder->StoreOutput(args.outputValue, result);
   }
+  std::string expression = {};
+  std::string error = {};
+  const bool emitted =
+      result != INVALID_VALUE_ID &&
+      GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error);
+  fragBuilder->appendCall(
+      args.outputColor, entry,
+      {args.inputColorValue, ValueRef(thresholdUniformName, SLType::Float, ValueOrigin::Uniform)},
+      "", emitted ? expression : std::string());
 }
 
 void GLSLAlphaThresholdFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

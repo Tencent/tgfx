@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLConstColorProcessor.h"
+#include "gpu/glsl/GLSLOperatorEmitter.h"
 
 namespace tgfx {
 PlacementPtr<ConstColorProcessor> ConstColorProcessor::Make(BlockAllocator* allocator,
@@ -36,18 +37,26 @@ void GLSLConstColorProcessor::emitCode(EmitArgs& args) const {
   if (entry.empty()) {
     return;
   }
+  ValueID result = INVALID_VALUE_ID;
+  if (args.irBuilder != nullptr && args.inputValue != INVALID_VALUE_ID &&
+      args.outputValue != INVALID_VALUE_ID) {
+    const auto colorValue = args.irBuilder->InternValue(colorName, SLType::Float4, Precision::High,
+                                                        IRValueKind::Uniform);
+    const auto modeValue = args.irBuilder->CreateIntConstant(static_cast<int32_t>(inputMode));
+    result = args.irBuilder->CreateCall(OperatorID::ConstColor, SLType::Float4,
+                                        {colorValue, args.inputValue, modeValue});
+    args.irBuilder->StoreOutput(args.outputValue, result);
+  }
+  std::string expression = {};
+  std::string error = {};
+  const bool emitted =
+      result != INVALID_VALUE_ID &&
+      GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error);
   fragBuilder->appendCall(
       args.outputColor, entry,
       {ValueRef(colorName, SLType::Float4, ValueOrigin::Uniform), args.inputColorValue,
-       ValueRef(std::to_string(static_cast<int>(inputMode)), SLType::Int, ValueOrigin::Literal)});
-  if (args.irBuilder != nullptr) {
-    const auto colorValue = args.irBuilder->CreateValue(SLType::Float4, Precision::High,
-                                                        IRValueKind::Uniform, colorName);
-    const auto modeValue = args.irBuilder->CreateIntConstant(static_cast<int32_t>(inputMode));
-    const auto result = args.irBuilder->CreateCall(OperatorID::ConstColor, SLType::Float4,
-                                                   {colorValue, args.inputValue, modeValue});
-    args.irBuilder->StoreOutput(args.outputValue, result);
-  }
+       ValueRef(std::to_string(static_cast<int>(inputMode)), SLType::Int, ValueOrigin::Literal)},
+      "", emitted ? expression : std::string());
 }
 
 void GLSLConstColorProcessor::onSetData(UniformData* /*vertexUniformData*/,
