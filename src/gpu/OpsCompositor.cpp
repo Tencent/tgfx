@@ -23,6 +23,7 @@
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GeometryExtra.h"
+#include "core/utils/GpuProbe.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/StrokeUtils.h"
@@ -476,12 +477,21 @@ class PendingOpsAutoReset {
 void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush brush) {
   if (pendingType == PendingOpType::Unknown) {
     if (type != PendingOpType::Unknown) {
+      pendingTag = gGpuProbe.tag;
       pendingType = type;
       pendingClip = std::move(clip);
       pendingBrush = std::move(brush);
     }
     return;
   }
+  struct PendingTagReset {
+    OpsCompositor* compositor;
+    const char* nextTag;
+    ~PendingTagReset() {
+      compositor->pendingTag = nextTag;
+    }
+  } pendingTagReset{this, gGpuProbe.tag};
+  GpuProbeTag probeTag(pendingTag);
   PendingOpsAutoReset autoReset(this, type, std::move(clip), std::move(brush));
   // Shape is handled separately with its own bounds computation.
   if (pendingType == PendingOpType::Shape) {

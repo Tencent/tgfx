@@ -617,6 +617,8 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   }
   ++gGpuProbe.newTargets;
   gGpuProbe.newTargetPx += static_cast<double>(width) * height;
+  ++gGpuProbe.current().newTargets;
+  gGpuProbe.current().newTargetPx += static_cast<double>(width) * height;
   if (auto proxy = findOrWrapTextureProxy(uniqueKey)) {
     proxy->_width = width;
     proxy->_height = height;

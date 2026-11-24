@@ -19,6 +19,8 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
+#include <string>
 #include <unordered_map>
 
 namespace tgfx {
@@ -43,12 +45,42 @@ struct GpuProbe {
   // Passes per render target, to tell how often drawing into one target is split into several
   // passes by work on other targets in between.
   std::unordered_map<const void*, int> passesPerTarget = {};
+  // The innermost drawing step running when GPU work is recorded, set by GpuProbeTag.
+  const char* tag = "other";
+  struct TagStat {
+    int newTargets = 0;
+    double newTargetPx = 0.0;
+    int cow = 0;
+    double cowPx = 0.0;
+    int blurs = 0;
+    int snapshots = 0;
+  };
+  std::map<std::string, TagStat> tags = {};
+
+  TagStat& current() {
+    return tags[tag];
+  }
 
   void reset() {
+    auto currentTag = tag;
     *this = {};
+    tag = currentTag;
   }
 };
 
 inline GpuProbe gGpuProbe = {};
+
+class GpuProbeTag {
+ public:
+  explicit GpuProbeTag(const char* tag) : previous(gGpuProbe.tag) {
+    gGpuProbe.tag = tag;
+  }
+  ~GpuProbeTag() {
+    gGpuProbe.tag = previous;
+  }
+
+ private:
+  const char* previous = nullptr;
+};
 
 }  // namespace tgfx

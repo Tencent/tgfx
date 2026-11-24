@@ -74,6 +74,7 @@ static void Blur1D(PlacementPtr<FragmentProcessor> source,
 std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args) const {
   ++gGpuProbe.blurs;
+  ++gGpuProbe.current().blurs;
   gGpuProbe.blurPx += static_cast<double>(clipBounds.width()) * clipBounds.height();
   // The single pass and the folded crop read the source through whole-pixel offsets, so a clip that
   // reaches past the source's blur range would make the two paths disagree along the columns.

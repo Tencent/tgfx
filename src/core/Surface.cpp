@@ -274,6 +274,7 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
     return cachedImage;
   }
   ++gGpuProbe.snapshots;
+  ++gGpuProbe.current().snapshots;
   auto drawingManager = getContext()->drawingManager();
   auto renderTarget = resolveCopySource(drawingManager);
   if (renderTarget == nullptr) {
@@ -386,6 +387,8 @@ bool Surface::aboutToDraw(bool discardContent) {
   }
   ++gGpuProbe.cow;
   gGpuProbe.cowPx += static_cast<double>(renderTarget->width()) * renderTarget->height();
+  ++gGpuProbe.current().cow;
+  gGpuProbe.current().cowPx += static_cast<double>(renderTarget->width()) * renderTarget->height();
   auto newRenderTarget = renderTarget->makeRenderTargetProxy();
   if (newRenderTarget == nullptr) {
     LOGE("Surface::aboutToDraw(): Failed to make a copy of the renderTarget!");

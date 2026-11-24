@@ -18,6 +18,7 @@
 
 #include "DrawingManager.h"
 #include <cstdio>
+#include <string>
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
 #include "core/utils/GpuProbe.h"
@@ -339,6 +340,15 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
         p.passes, p.passPx / 1e6, p.drawOps, p.passesPerTarget.size(), splitTargets, extraPasses,
         p.runtimeTasks, p.mipmapTasks, p.copyTasks, p.copyPx / 1e6, p.cow, p.cowPx / 1e6,
         p.newTargets, p.newTargetPx / 1e6, p.blurs, p.blurPx / 1e6, p.rasterized, p.snapshots);
+    std::string tagLine = {};
+    char buffer[160];
+    for (const auto& entry : p.tags) {
+      const auto& t = entry.second;
+      std::snprintf(buffer, sizeof(buffer), " %s=%d/%.3f/%d/%.3f/%d/%d", entry.first.c_str(),
+                    t.newTargets, t.newTargetPx / 1e6, t.cow, t.cowPx / 1e6, t.blurs, t.snapshots);
+      tagLine += buffer;
+    }
+    std::printf("[GPU-TAG]%s\n", tagLine.c_str());
   }
   gGpuProbe.reset();
 
