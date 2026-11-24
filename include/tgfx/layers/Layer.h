@@ -806,6 +806,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   Rect renderBounds = {};                       // in global coordinates
   Rect* contentBounds = nullptr;                //  in global coordinates
   std::unique_ptr<Rect> localBounds = nullptr;  // in local coordinates
+  // Union of renderBounds of the visible layers in this subtree that draw a background-sourced
+  // style, in global coordinates.
+  Rect backgroundStyleBounds = {};
 
   // Max/min background-sourced filter outset (local units at contentScale=1) across this subtree.
   // max>0 doubles as a presence flag for background styles; min is used to decide bg surface

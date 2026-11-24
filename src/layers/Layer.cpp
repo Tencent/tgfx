@@ -1604,6 +1604,13 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
 }
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
+  // When every style has a reusable output, the outputs are drawn as they are and the layer needs
+  // no LayerStyleSource: recording it is the bulk of what drawing those styles costs.
+  if (args.backgroundHandler != nullptr &&
+      args.backgroundHandler->drawCachedStyleOutputs(args, canvas, this, alpha)) {
+    drawContents(args, canvas, alpha, nullptr);
+    return;
+  }
   // Capture and consume passes share the same per-layer LayerStyleSource via the active handler,
   // so the content, contour and geometry intermediate renders happen once per snapshot map
   // instead of once per pass.
@@ -2321,6 +2328,18 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver) ||
       (content && content->hasBlendMode())) {
     bitFields.hasBlendMode = true;
+  }
+  backgroundStyleBounds = Rect::MakeEmpty();
+  for (const auto& style : _layerStyles) {
+    if (needsBackgroundStyleOutput(style.get(), accumulatedAlpha)) {
+      backgroundStyleBounds = renderBounds;
+      break;
+    }
+  }
+  for (const auto& child : _children) {
+    if (child->maskOwner == nullptr && child->bitFields.visible && child->_alpha > 0) {
+      backgroundStyleBounds.join(child->backgroundStyleBounds);
+    }
   }
   propagateLayerState();
   bitFields.dirtyDescendents = false;

@@ -25,6 +25,7 @@
 #include "layers/BackgroundSource.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
+#include "layers/StyleOutputCache.h"
 #include "layers/contents/LayerContent.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/PictureRecorder.h"
@@ -135,25 +136,25 @@ std::shared_ptr<Picture> RecordStyleOutput(LayerStyle* style, const LayerStyleIn
   return recorder.finishRecordingAsPicture();
 }
 
-// Rasterizes a style-space picture at device resolution and stores it in the frame's style
-// output cache, so later passes composite one texture with SrcOver instead of re-running the
-// style.
-void CacheStyleOutput(BackgroundSnapshotMap* snapshots, Context* context, Layer* layer,
-                      LayerStyle* style, const std::shared_ptr<Picture>& picture,
-                      const Matrix& recordMatrix, const Rect& shapeRect,
-                      std::shared_ptr<ColorSpace> dstColorSpace) {
+// Rasterizes a recorded style output at the canvas density. Returns an output with a null image
+// when the result would be empty or too large.
+BackgroundSnapshotMap::StyleOutput MakeStyleOutput(Context* context,
+                                                   const std::shared_ptr<Picture>& picture,
+                                                   const Matrix& recordMatrix,
+                                                   const Rect& shapeRect, double areaBudget,
+                                                   std::shared_ptr<ColorSpace> dstColorSpace) {
   PictureRecorder deviceRecorder = {};
   auto* deviceRecording = deviceRecorder.beginRecording();
   deviceRecording->concat(recordMatrix);
   deviceRecording->drawPicture(picture);
   auto devicePicture = deviceRecorder.finishRecordingAsPicture();
   if (devicePicture == nullptr) {
-    return;
+    return {};
   }
   auto deviceShape = recordMatrix.mapRect(shapeRect);
   deviceShape.roundOut();
   if (deviceShape.isEmpty()) {
-    return;
+    return {};
   }
   // The visible-region bound normally keeps the cached texture at on-screen size, but it is
   // unavailable when the background surface is downsampled (the capture density no longer matches
@@ -167,30 +168,43 @@ void CacheStyleOutput(BackgroundSnapshotMap* snapshots, Context* context, Layer*
   if (context != nullptr && context->gpu() != nullptr) {
     auto limit = static_cast<float>(context->gpu()->limits()->maxTextureDimension2D);
     if (deviceShape.width() > limit || deviceShape.height() > limit) {
-      return;
+      return {};
     }
   }
-  // A texture that fits both dimensions can still be enormous (e.g. 16000x16000 RGBA is ~1GB) and
-  // this cache is rebuilt every frame, so cap the total area as well.
-  constexpr double MaxAreaFactor = 4.0;
-  auto targetArea = static_cast<double>(snapshots->renderTargetWidth) *
-                    static_cast<double>(snapshots->renderTargetHeight);
-  auto areaBudget = targetArea * MaxAreaFactor;
+  // A texture that fits both dimensions can still be enormous (e.g. 16000x16000 RGBA is ~1GB), so
+  // cap the total area as well.
   if (areaBudget > 0.0 &&
       static_cast<double>(deviceShape.width()) * static_cast<double>(deviceShape.height()) >
           areaBudget) {
-    return;
+    return {};
   }
   Point imageOffset = {};
   auto image = PictureUtils::ToImageWithOffset(std::move(devicePicture), &imageOffset, &deviceShape,
                                                dstColorSpace);
   Matrix drawMatrix = Matrix::I();
   if (image == nullptr || !recordMatrix.invert(&drawMatrix)) {
-    return;
+    return {};
   }
   drawMatrix.preTranslate(imageOffset.x, imageOffset.y);
-  snapshots->styleOutputs[BackgroundSnapshotKey{layer, style}] = {image->makeRasterized(),
-                                                                  drawMatrix};
+  return {image->makeRasterized(), drawMatrix};
+}
+
+// Rasterizes a style-space picture at device resolution and stores it in the frame's style
+// output cache, so later passes composite one texture with SrcOver instead of re-running the
+// style.
+void CacheStyleOutput(BackgroundSnapshotMap* snapshots, Context* context, Layer* layer,
+                      LayerStyle* style, const std::shared_ptr<Picture>& picture,
+                      const Matrix& recordMatrix, const Rect& shapeRect,
+                      std::shared_ptr<ColorSpace> dstColorSpace) {
+  // This cache is rebuilt every frame, so its textures are bounded by the render target area.
+  constexpr double MaxAreaFactor = 4.0;
+  auto targetArea = static_cast<double>(snapshots->renderTargetWidth) *
+                    static_cast<double>(snapshots->renderTargetHeight);
+  auto output = MakeStyleOutput(context, picture, recordMatrix, shapeRect,
+                                targetArea * MaxAreaFactor, std::move(dstColorSpace));
+  if (output.image != nullptr) {
+    snapshots->styleOutputs[BackgroundSnapshotKey{layer, style}] = std::move(output);
+  }
 }
 
 }  // namespace
@@ -484,6 +498,61 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
   return it->second.get();
 }
 
+bool BackgroundConsumer::canStoreStyleOutput(Canvas* canvas, Layer* layer,
+                                             LayerStyle* style) const {
+  if (!tileBackdrop.has_value() || tileBackdrop->styleOutputs == nullptr ||
+      !tileBackdrop->storeStyleOutputs || canvas->getSurface() != tileBackdrop->surface) {
+    return false;
+  }
+  // A key dispatched more than once in a frame (a layer split by a 3D subtree) sampled a different
+  // backdrop each time, and one output cannot stand for all of them.
+  if (snapshots != nullptr) {
+    auto entries = snapshots->snapshots.find(BackgroundSnapshotKey{layer, style});
+    if (entries != snapshots->snapshots.end() && entries->second.size() > 1) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool BackgroundConsumer::drawCachedStyleOutputs(const DrawArgs&, Canvas* canvas, Layer* layer,
+                                                float alpha) {
+  if (!tileBackdrop.has_value() || tileBackdrop->styleOutputs == nullptr ||
+      canvas->getSurface() != tileBackdrop->surface || layer->_layerStyles.empty()) {
+    return false;
+  }
+  auto contentScale = canvas->getMatrix().getMaxScale();
+  auto* cache = tileBackdrop->styleOutputs;
+  std::vector<const StyleOutputEntry*> outputs = {};
+  outputs.reserve(layer->_layerStyles.size());
+  for (const auto& style : layer->_layerStyles) {
+    if (style == nullptr || style->position() != LayerStylePosition::Below ||
+        (style->extraSourceType() & static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) ==
+            0) {
+      return false;
+    }
+    auto entry = cache->peek(BackgroundSnapshotKey{layer, style.get()}, contentScale, alpha);
+    if (entry == nullptr) {
+      return false;
+    }
+    outputs.push_back(entry);
+  }
+  for (size_t i = 0; i < outputs.size(); ++i) {
+    cache->find(BackgroundSnapshotKey{layer, layer->_layerStyles[i].get()}, contentScale, alpha);
+    AutoCanvasRestore restoreBlit(canvas);
+    canvas->concat(outputs[i]->localMatrix);
+    Paint paint = {};
+    paint.setAntiAlias(false);
+    paint.setBlendMode(BlendMode::SrcOver);
+    canvas->drawImage(outputs[i]->image, 0.0f, 0.0f, &paint);
+    // The output is in the tile now, so later styles sampling this area see it.
+    if (!CoversOwnStyleOutput(layer, alpha)) {
+      drawnBackdropBounds.push_back(layer->renderBounds);
+    }
+  }
+  return true;
+}
+
 bool BackgroundConsumer::CanReadTileBackdrop(const Layer* layer, const Rect& globalRect,
                                              const std::vector<Rect>& drawnBounds) {
   // The style samples its content area widened by the blur range.
@@ -593,28 +662,37 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   auto contentBounds =
       Rect::MakeXYWH(contentOffset.x * contentScaleToLocal, contentOffset.y * contentScaleToLocal,
                      contentWidth * contentScaleToLocal, contentHeight * contentScaleToLocal);
-  // A tile that carries a capture of its own reads the snapshot, which the picture was recorded
-  // against; only a tile that skipped the capture reads its live pixels.
-  if (tileBackdrop.has_value() && !tileBackdrop->snapshotsCover &&
-      canvas->getSurface() == tileBackdrop->surface &&
-      style->position() == LayerStylePosition::Below &&
-      CanReadTileBackdrop(layer, tileBackdrop->globalRect, drawnBackdropBounds)) {
-    bgImage = makeTileBackdrop(args, canvas, contentBounds, source->contentScale, &bgOffset);
-  }
-  if (bgImage == nullptr && snapshots != nullptr && tileBackdrop.has_value() &&
-      !tileBackdrop->snapshotsCover) {
-    // The tile could not supply the backdrop and the map was captured for other areas: skip rather
-    // than reading a snapshot that does not cover this tile.
-    return;
-  }
-  if (bgImage == nullptr && snapshots != nullptr) {
-    BackgroundSnapshotKey key{layer, style};
-    auto it = snapshots->snapshots.find(key);
-    if (it == snapshots->snapshots.end()) {
-      // Surface path: the map is authoritative, so a miss is a capture-side coverage bug.
-      // Silently skip rather than masking the bug with on-the-fly synthesis.
-      return;
+  // Reading the tile is preferred: when it is allowed, the tile holds exactly what a capture would
+  // have recorded, and a snapshot for this layer may cover only the tiles that needed one.
+  bool fromTile = false;
+  if (tileBackdrop.has_value()) {
+    fromTile = canvas->getSurface() == tileBackdrop->surface &&
+               style->position() == LayerStylePosition::Below &&
+               CanReadTileBackdrop(layer, tileBackdrop->globalRect, drawnBackdropBounds);
+    // Whatever its source, the style's output ends up in the tile, where later styles sample it,
+    // unless the layer's own opaque content hides it.
+    if (!CoversOwnStyleOutput(layer, alpha)) {
+      drawnBackdropBounds.push_back(layer->renderBounds);
     }
+    if (fromTile) {
+      bgImage = makeTileBackdrop(args, canvas, contentBounds, source->contentScale, &bgOffset);
+      fromTile = bgImage != nullptr;
+    }
+  }
+  BackgroundSnapshotKey key{layer, style};
+  // A style predicted to reuse its cached output was left out of the capture, so a snapshot found
+  // for it covers another area. Reaching here means the entry no longer matched (content scale or
+  // alpha changed), and the style must wait for the tile to be captured.
+  const bool predictedCached = tileBackdrop.has_value() && tileBackdrop->styleOutputs != nullptr &&
+                               canvas->getSurface() == tileBackdrop->surface &&
+                               style->position() == LayerStylePosition::Below &&
+                               tileBackdrop->styleOutputs->contains(key);
+  if (fromTile) {
+    // The backdrop came from the tile.
+  } else if (snapshots != nullptr && !predictedCached &&
+             (!tileBackdrop.has_value() || tileBackdrop->snapshotsCover) &&
+             snapshots->snapshots.count(key) > 0) {
+    auto it = snapshots->snapshots.find(key);
     auto& cursor = readCursors[key];
     DEBUG_ASSERT(cursor < it->second.size() && "capture/consume push-pop count mismatch");
     if (cursor >= it->second.size()) {
@@ -623,7 +701,17 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     auto& entry = it->second[cursor++];
     bgImage = entry.image;
     bgOffset = entry.offset;
-  } else if (bgImage == nullptr) {
+  } else if (snapshots != nullptr && !tileBackdrop.has_value()) {
+    // Surface path without tile reads: the map is authoritative, so a miss is a capture-side
+    // coverage bug. Silently skip rather than masking the bug with on-the-fly synthesis.
+    return;
+  } else if (tileBackdrop.has_value()) {
+    // The tile was predicted to read its own backdrop but this dispatch cannot, and no capture
+    // covers it. Synthesizing here replays the ancestors for every such style and can stall a frame
+    // for seconds, so skip the style and let the caller redraw the tile with a capture.
+    ++missingCount;
+    return;
+  } else {
     // Picture-canvas path: capture was skipped because there is no GPU context. Synthesize the
     // backdrop on the fly by walking ancestors and prior siblings via PictureRecorder.
     bgImage =
@@ -664,8 +752,37 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   // projective map of the visible rect stays inside its corner hull, so deviceShape remains a
   // valid bound.
   auto recordMatrix = canvas->getMatrix();
-  if (snapshots != nullptr && shareStyleOutput) {
-    BackgroundSnapshotKey key{layer, style};
+  if (canStoreStyleOutput(canvas, layer, style)) {
+    // The whole content is rasterized, not just the part visible in this tile: the entry is reused
+    // by other tiles and later frames.
+    auto picture = RecordStyleOutput(style, styleInput, alpha, nullptr);
+    if (picture != nullptr) {
+      auto shapeRect = Rect::MakeWH(contentWidth, contentHeight);
+      constexpr double MaxCachedStyleArea = 2048.0 * 2048.0;
+      auto output = MakeStyleOutput(args.context, picture, recordMatrix, shapeRect,
+                                    MaxCachedStyleArea, args.dstColorSpace);
+      if (output.image != nullptr) {
+        StyleOutputEntry entry = {};
+        entry.image = output.image;
+        entry.localMatrix = matrix;
+        entry.localMatrix.preConcat(output.drawMatrix);
+        entry.contentScale = source->contentScale;
+        entry.alpha = alpha;
+        entry.sampleBounds = layer->renderBounds;
+        entry.sampleBounds.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
+        tileBackdrop->styleOutputs->store(key, std::move(entry));
+        AutoCanvasRestore restoreBlit(canvas);
+        canvas->concat(output.drawMatrix);
+        Paint paint = {};
+        paint.setAntiAlias(false);
+        paint.setBlendMode(BlendMode::SrcOver);
+        canvas->drawImage(output.image, 0.0f, 0.0f, &paint);
+        return;
+      }
+    }
+  }
+  // A tile backdrop belongs to this tile alone, so its output is never shared with other passes.
+  if (snapshots != nullptr && shareStyleOutput && !fromTile) {
     auto output = snapshots->styleOutputs.find(key);
     if (output == snapshots->styleOutputs.end()) {
       // Capture pushes one entry per dispatch, so more than one entry for this key means the style
@@ -711,11 +828,6 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   }
 
   style->draw(canvas, styleInput, alpha);
-  // Whatever its source, the style's output ends up in the tile, where later styles sample it,
-  // unless the layer's own opaque content hides it.
-  if (tileBackdrop.has_value() && !CoversOwnStyleOutput(layer, alpha)) {
-    drawnBackdropBounds.push_back(layer->renderBounds);
-  }
 }
 
 void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,

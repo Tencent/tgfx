@@ -167,6 +167,16 @@ class BackgroundHandler {
   }
   virtual void endForceDrawChildren() {
   }
+
+  /**
+   * Draws the cached outputs of all of layer's styles, when every one of them is background-sourced
+   * and has a reusable output. Returns false, drawing nothing, otherwise. On success the caller
+   * draws the layer without its styles and needs no LayerStyleSource.
+   */
+  virtual bool drawCachedStyleOutputs(const DrawArgs& /*args*/, Canvas* /*canvas*/,
+                                      Layer* /*layer*/, float /*alpha*/) {
+    return false;
+  }
 };
 
 class BackgroundCapturer : public BackgroundHandler {
@@ -265,6 +275,8 @@ class BackgroundCapturer : public BackgroundHandler {
   std::optional<Matrix> _captureWorldMatrix = std::nullopt;
 };
 
+class StyleOutputCache;
+
 class BackgroundConsumer : public BackgroundHandler {
  public:
   // A null snapshots pointer means the capture pass was skipped (picture-canvas path, no GPU
@@ -289,6 +301,12 @@ class BackgroundConsumer : public BackgroundHandler {
     // Whether the snapshot map was captured for this rect. When false, a snapshot in the map may
     // have been captured for another area and holds no valid backdrop here.
     bool snapshotsCover = true;
+    // Outputs of background-sourced styles kept across frames. Only used when the backdrop color is
+    // opaque: compositing a cached output with SrcOver reproduces the style's own Src draw only
+    // over an opaque backdrop.
+    StyleOutputCache* styleOutputs = nullptr;
+    // Whether new outputs are stored. Lookups still use whatever the cache holds.
+    bool storeStyleOutputs = true;
   };
 
   void setTileBackdrop(const TileBackdrop& backdrop) {
@@ -312,12 +330,22 @@ class BackgroundConsumer : public BackgroundHandler {
    */
   static bool CoversOwnStyleOutput(Layer* layer, float alpha);
 
+  bool drawCachedStyleOutputs(const DrawArgs& args, Canvas* canvas, Layer* layer,
+                              float alpha) override;
+
+  // Background-sourced styles skipped because neither the tile nor a covering snapshot could
+  // supply their backdrop. The caller redraws the tile with a capture.
+  int missingCount = 0;
+
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
                            LayerStyle* style, const LayerStyleSource* source) override;
 
   const LayerStyleSource* getCachedLayerStyleSource(Layer* layer) const override;
 
  private:
+  // Whether the output of style on layer may be stored in the cross-frame style output cache.
+  bool canStoreStyleOutput(Canvas* canvas, Layer* layer, LayerStyle* style) const;
+
   // Copies the tile pixels the style samples into a detached image laid out like a captured
   // snapshot: the layer's content rect in style space.
   std::shared_ptr<Image> makeTileBackdrop(const DrawArgs& args, Canvas* canvas,

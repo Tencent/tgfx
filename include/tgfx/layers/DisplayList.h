@@ -19,6 +19,7 @@
 #pragma once
 
 #include <deque>
+#include <tuple>
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
 
@@ -28,6 +29,7 @@ class Tile;
 class TilePool;
 class BlankTileSet;
 class DrawTask;
+class StyleOutputCache;
 enum class TileType;
 struct BackgroundSnapshotMap;
 struct TreeLevelCoverage;
@@ -336,6 +338,12 @@ class DisplayList {
   std::unique_ptr<BlankTileSet> blankTiles;
   std::vector<std::shared_ptr<Tile>> emptyTiles = {};
   std::deque<std::vector<Rect>> lastDirtyRegions = {};
+  // Outputs of background-sourced styles kept across frames at the current zoom scale.
+  std::unique_ptr<StyleOutputCache> styleOutputCache;
+  // Tiles, as (tree level, tileX, tileY) at forceCaptureZoomScaleInt, whose last draw skipped a
+  // background-sourced style. They are captured until a draw completes without skipping.
+  std::vector<std::tuple<int, int, int>> forceCaptureTiles = {};
+  int64_t forceCaptureZoomScaleInt = 0;
 
   std::vector<Rect> renderDirect(Surface* surface, bool autoClear) const;
 
@@ -382,20 +390,42 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  bool drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots,
-                    bool snapshotsCover) const;
+  /**
+   * Draws the task into its atlas. Returns whether anything was drawn. missingBackdrops receives the
+   * number of background-sourced styles skipped because no backdrop was available for them.
+   */
+  bool drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots, bool snapshotsCover,
+                    int* missingBackdrops = nullptr) const;
 
   void captureBackgroundsByLevel(
       Surface* surface, const std::vector<DrawTask>& tileTasks, float zoomScale,
       std::vector<std::unique_ptr<BackgroundSnapshotMap>>* levelSnapshots,
       std::vector<int>* taskSnapshotIndex, std::vector<bool>* taskSnapshotCover) const;
 
-  // Whether the task's background styles all read their backdrop from the tile, so the tile needs
-  // no captured snapshot.
-  bool needsCapture(const DrawTask& task) const;
+  /**
+   * Returns the raster scale, the matrix and the clip rect a tile task is rasterized with into its
+   * atlas.
+   */
+  float getTileDrawGeometry(const DrawTask& task, Matrix* viewMatrix, Rect* clipRect) const;
 
-  bool needsCapture(Layer* layer, const Rect& globalRect, float parentAlpha, bool offscreen,
-                    std::vector<Rect>* drawnBounds) const;
+  /**
+   * Collects, in global coordinates, the areas of background-sourced styles in the task that have
+   * no cached output and cannot read their backdrop from the tile. Returns false when there are
+   * none, in which case the task needs no captured snapshot.
+   */
+  bool collectMissingBackdrops(const DrawTask& task, std::vector<Rect>* missingRects) const;
+
+  void collectMissingBackdrops(Layer* layer, const Rect& globalRect, float parentAlpha, float scale,
+                               bool offscreen, std::vector<Rect>* drawnBounds,
+                               std::vector<Rect>* missingRects) const;
+
+  bool isForceCaptured(const DrawTask& task) const;
+
+  /**
+   * Records whether the task's last draw skipped background-sourced styles. A tile whose draw
+   * skipped some is captured on every later draw until one completes without skipping.
+   */
+  void updateForceCapture(const DrawTask& task, bool skippedStyles);
 
   std::vector<Rect> drawTileTasks(
       const std::vector<DrawTask>& tileTasks,
@@ -415,7 +445,7 @@ class DisplayList {
   bool drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                      bool autoClear, BackgroundSnapshotMap* snapshots,
                      bool readTileBackdrop = false, bool snapshotsCover = true,
-                     const Rect* tileGlobalRect = nullptr) const;
+                     int* missingBackdrops = nullptr) const;
 
   std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
 
@@ -440,11 +470,13 @@ class DisplayList {
    * Captures the backdrop the background styles sample. `renderRects` are in the surface pixels of
    * `viewMatrix`, which maps the layer space to those pixels; a tile passes its own raster scale so
    * the snapshot density matches the tile it is drawn into. The layers drawn are culled to the
-   * footprints those styles sample inside it.
+   * footprints those styles sample inside it. `styleSourceRects`, in the same pixels, cover every
+   * pass drawing with the returned map; the layer style sources cached for those passes are
+   * recorded against them. Pass none to record against `renderRects`.
    */
-  std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(Surface* surface,
-                                                            const std::vector<Rect>& renderRects,
-                                                            const Matrix& viewMatrix) const;
+  std::unique_ptr<BackgroundSnapshotMap> captureBackgrounds(
+      Surface* surface, const std::vector<Rect>& renderRects, const Matrix& viewMatrix,
+      const std::vector<Rect>& styleSourceRects = {}) const;
 
   void updateMousePosition();
 };

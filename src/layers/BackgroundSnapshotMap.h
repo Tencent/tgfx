@@ -44,8 +44,10 @@ struct BackgroundSnapshotEntry {
 
 /**
  * Identifies which background snapshot belongs to which layer style. Layer* and LayerStyle* are
- * raw pointers; both are owned by shared_ptr in the layer tree and the map is built and consumed
- * within a single render invocation, so the keys are valid for the map's entire lifetime.
+ * raw pointers owned by shared_ptr in the layer tree. A snapshot map is built and consumed within a
+ * single render invocation. StyleOutputCache keeps the key across frames and drops it as soon as a
+ * dirty region touches the layer's bounds, which removing a layer or replacing its styles always
+ * produces, so a kept key never outlives the objects it points to.
  */
 struct BackgroundSnapshotKey {
   Layer* layer = nullptr;
