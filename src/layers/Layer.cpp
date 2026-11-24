@@ -19,7 +19,9 @@
 #include "tgfx/layers/Layer.h"
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -1507,6 +1509,18 @@ std::shared_ptr<Image> Layer::createBackgroundSubtreeCacheImage(const DrawArgs& 
       return nullptr;
     }
   }
+  // TEMP probe: how long a background subtree cache image takes to build.
+  struct BuildProbe {
+    Rect bounds = {};
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    ~BuildProbe() {
+      std::printf(
+          "[BGSUB] bounds=%gx%g ms=%.1f\n", bounds.width(), bounds.height(),
+          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
+              .count());
+    }
+  } buildProbe;
+  buildProbe.bounds = imageBounds;
   auto localToGlobal = getGlobalMatrix().asMatrix();
   auto globalToLocal = Matrix::I();
   if (!localToGlobal.invert(&globalToLocal)) {
