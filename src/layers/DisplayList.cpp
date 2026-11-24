@@ -1567,7 +1567,14 @@ bool DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
   viewMatrix.postTranslate(offsetX, offsetY);
   auto clipRect = tileRect;
   clipRect.offset(offsetX, offsetY);
-  return drawRootLayer(surface, clipRect, viewMatrix, true, snapshots, true, snapshotsCover);
+  Matrix inverse = Matrix::I();
+  auto tileGlobalRect = Rect::MakeEmpty();
+  if (viewMatrix.invert(&inverse)) {
+    tileGlobalRect = inverse.mapRect(clipRect);
+    tileGlobalRect.roundOut();
+  }
+  return drawRootLayer(surface, clipRect, viewMatrix, true, snapshots, true, snapshotsCover,
+                       snapshotsCover ? nullptr : &tileGlobalRect);
 }
 
 void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
@@ -1661,7 +1668,8 @@ void DisplayList::resetCaches() {
 
 bool DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                                 bool autoClear, BackgroundSnapshotMap* snapshots,
-                                bool readTileBackdrop, bool snapshotsCover) const {
+                                bool readTileBackdrop, bool snapshotsCover,
+                                const Rect* tileGlobalRect) const {
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   auto context = surface->getContext();
@@ -1700,7 +1708,7 @@ bool DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   if (readTileBackdrop) {
     BackgroundConsumer::TileBackdrop backdrop = {};
     backdrop.surface = surface;
-    backdrop.globalRect = renderRect;
+    backdrop.globalRect = tileGlobalRect != nullptr ? *tileGlobalRect : renderRect;
     backdrop.snapshotsCover = snapshotsCover;
     consumer.setTileBackdrop(backdrop);
   }
