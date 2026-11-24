@@ -670,8 +670,9 @@ Path ClipStack::getClipPath() const {
       continue;
     }
     // A failed Intersect leaves the accumulated path behind, which is not this element: applying
-    // the next one would narrow the clip by an element that was never intersected in. Keeping what
-    // the earlier elements narrowed it to is the safer of the two wrong answers, so stop here.
+    // the next one would narrow the clip by an element that was never intersected in. Keep the
+    // earlier intersection and stop. Unlike SVG nodes, where an empty path drops the node, an
+    // empty clip path means "no clipping" to callers and draws more here, not less.
     if (!result.addPath(element.getDevicePath(), PathOp::Intersect)) {
       LOGE("ClipStack::getClipPath() Failed to intersect a clip element; keeping the rest.");
       break;

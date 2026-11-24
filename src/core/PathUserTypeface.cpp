@@ -20,6 +20,7 @@
 #include "UserScalerContext.h"
 #include "core/PathRasterizer.h"
 #include "core/utils/FauxBoldScale.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Shape.h"
@@ -78,7 +79,10 @@ class PathUserScalerContext final : public UserScalerContext {
         auto strokePath = *path;
         Stroke stroke(fauxBoldSize);
         stroke.applyToPath(&strokePath);
-        path->addPath(strokePath, PathOp::Union);
+        if (!path->addPath(strokePath, PathOp::Union)) {
+          // A failed union leaves the unemboldened glyph behind, which is still correct on its own.
+          LOGE("PathUserTypeface: failed to merge the faux bold outline; keeping the glyph as is.");
+        }
       }
     }
     return true;

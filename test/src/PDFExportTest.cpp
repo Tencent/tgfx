@@ -2029,8 +2029,9 @@ TGFX_TEST(PDFExportTest, Type3CharProcUsesActualGlyphFillRule) {
   PathTypefaceBuilder builder(100);
   ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::Winding), 100.0f), 0);
   ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::EvenOdd), 100.0f), 0);
+  ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::InverseWinding), 100.0f), 0);
   // PDF reserves glyph zero when calculating the resource range. Keep an unused trailing glyph
-  // so both requested glyphs lie inside that range for a custom typeface.
+  // so all requested glyphs lie inside that range for a custom typeface.
   ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::Winding), 100.0f), 0);
   auto typeface = builder.detach();
   ASSERT_TRUE(typeface != nullptr);
@@ -2048,17 +2049,23 @@ TGFX_TEST(PDFExportTest, Type3CharProcUsesActualGlyphFillRule) {
   ASSERT_TRUE(font != nullptr);
   font->noteGlyphUsage(1);
   font->noteGlyphUsage(2);
+  font->noteGlyphUsage(3);
   document->endPage();
   document->close();
   auto pdf = stream->readString();
   ASSERT_NE(pdf.find("/Subtype /Type3"), std::string::npos);
   auto winding = ReadTestCharProc(pdf, "g1");
   auto parity = ReadTestCharProc(pdf, "g2");
+  auto inverse = ReadTestCharProc(pdf, "g3");
   ASSERT_FALSE(winding.empty());
   ASSERT_FALSE(parity.empty());
+  ASSERT_FALSE(inverse.empty());
   EXPECT_NE(winding.find("\nf\n"), std::string::npos);
   EXPECT_EQ(winding.find("\nf*\n"), std::string::npos);
   EXPECT_NE(parity.find("\nf*\n"), std::string::npos);
+  EXPECT_NE(inverse.find(" d1\n"), std::string::npos);
+  EXPECT_EQ(inverse.find("\nf\n"), std::string::npos);
+  EXPECT_EQ(inverse.find("\nf*\n"), std::string::npos);
 }
 
 }  // namespace tgfx

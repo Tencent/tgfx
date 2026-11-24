@@ -124,7 +124,8 @@ bool MaskContext::finish(Path* result) {
         auto clippedPath = record.clip.getClipPath();
         // An Intersect that fails leaves the clip path behind, which is the whole clip rather than
         // the part of it this record asks for. Unioning that into the mask would widen the mask to
-        // everything the clip allows, so the record has to be dropped instead.
+        // everything the clip allows, so abort mask extraction and let the caller fall back to the
+        // MaskFilter path.
         if (!clippedPath.addPath(record.path, PathOp::Intersect)) {
           return false;
         }
