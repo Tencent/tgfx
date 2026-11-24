@@ -18,6 +18,7 @@
 
 #include "SPIRVShaderBuilder.h"
 #include <algorithm>
+#include "SPIRVInterfaceLayout.h"
 
 namespace tgfx {
 namespace {
@@ -328,7 +329,8 @@ uint32_t SPIRVShaderBuilder::LoadSampler(const ProgramIR& program, ValueID sampl
   const auto variableId = writer.NewId();
   writer.Inst(spirv::kOpVariable, {pointer, variableId, spirv::kStorageUniformConstant});
   writer.Sink(&writer.ann);
-  writer.Inst(spirv::kOpDecorate, {variableId, spirv::kDecorationDescriptorSet, 2});
+  writer.Inst(spirv::kOpDecorate,
+              {variableId, spirv::kDecorationDescriptorSet, SPIRVInterfaceLayout::SamplerSet()});
   writer.Inst(spirv::kOpDecorate, {variableId, spirv::kDecorationBinding, binding});
   writer.Sink(&writer.func);
   const auto loadId = writer.NewId();
@@ -456,7 +458,7 @@ bool SPIRVShaderBuilder::EnsureUniformBlock(const ProgramIR& program, std::strin
   writer.Inst(spirv::kOpVariable,
               {uniformBlockPointerId, uniformBlockVariableId, spirv::kStorageUniform});
 
-  const uint32_t descriptorSet = stage == ShaderStage::Vertex ? 0 : 1;
+  const uint32_t descriptorSet = SPIRVInterfaceLayout::UniformSet(stage);
   writer.Sink(&writer.ann);
   writer.Inst(spirv::kOpDecorate, {uniformBlockTypeId, spirv::kDecorationBlock});
   writer.Inst(spirv::kOpDecorate,
