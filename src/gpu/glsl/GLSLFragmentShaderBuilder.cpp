@@ -17,10 +17,61 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLFragmentShaderBuilder.h"
+#include <cctype>
 #include "gpu/glsl/GLSLProgramBuilder.h"
+#include "gpu/shaders/contract/OpTable.h"
 
 namespace tgfx {
 static constexpr char DstColorName[] = "_dstColor";
+
+namespace {
+
+bool IsIdentifier(const std::string& text) {
+  if (text.empty() || (!std::isalpha(static_cast<unsigned char>(text[0])) && text[0] != '_')) {
+    return false;
+  }
+  for (const char character : text) {
+    if (!std::isalnum(static_cast<unsigned char>(character)) && character != '_') {
+      return false;
+    }
+  }
+  return true;
+}
+
+SLType ShaderTypeOf(OpTable::Param param) {
+  switch (param) {
+    case OpTable::Param::Float:
+      return SLType::Float;
+    case OpTable::Param::Int:
+      return SLType::Int;
+    case OpTable::Param::Vec2:
+      return SLType::Float2;
+    case OpTable::Param::Vec3:
+      return SLType::Float3;
+    case OpTable::Param::Vec4:
+      return SLType::Float4;
+    case OpTable::Param::Mat3:
+      return SLType::Float3x3;
+    case OpTable::Param::Mat4:
+      return SLType::Float4x4;
+    case OpTable::Param::IVec4:
+      return SLType::Int4;
+    default:
+      return SLType::Void;
+  }
+}
+
+const OpTable::Row* FindOperator(const std::string& functionName) {
+  for (size_t index = 0; index < OpTable::RowCount(); ++index) {
+    const auto* row = OpTable::Rows() + index;
+    if (row->exportName != nullptr && functionName == row->exportName) {
+      return row;
+    }
+  }
+  return nullptr;
+}
+
+}  // namespace
 static constexpr char SubpassInputName[] = "tgfx_SubpassInput";
 
 GLSLFragmentShaderBuilder::GLSLFragmentShaderBuilder(ProgramBuilder* program)
@@ -90,11 +141,17 @@ void GLSLFragmentShaderBuilder::appendCall(const std::string& outputVar,
     instruction.output = outputVar;
     instruction.function = functionName;
     instruction.outputRef = internValue(outputVar, SLType::Void, ValueOrigin::CallResult);
-    for (const auto& arg : args) {
+    const auto* row = FindOperator(functionName);
+    const bool typed = row != nullptr && row->args != nullptr && row->argCount == args.size();
+    for (size_t index = 0; index < args.size(); ++index) {
+      const auto& arg = args[index];
       instruction.args.push_back(arg.name);
       ValueRef ref = arg;
+      if (typed && ref.type == SLType::Void && IsIdentifier(ref.name)) {
+        ref.type = ShaderTypeOf(row->args[index].type);
+      }
       if (ref.id == INVALID_VALUE_ID) {
-        auto interned = internValue(arg.name, arg.type, arg.origin);
+        auto interned = internValue(ref.name, ref.type, ref.origin);
         if (interned.id != INVALID_VALUE_ID) {
           ref = std::move(interned);
         }
