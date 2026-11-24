@@ -60,10 +60,12 @@ class NoOpImpl : public BackgroundHandler {
 // references the copy rather than bgImage. bgImage IS bgSource->surface's cachedImage; holding a
 // reference to it during capture would trigger Surface::aboutToDraw's copy-on-write path on every
 // subsequent write to bgCanvas — a full RT reallocation plus blit that dominates GPU submit time.
-// Returns nullptr on failure (no context, over-budget, or non-invertible matrix).
+// Returns nullptr on failure (no context, over-budget, or non-invertible matrix). Sets *disjoint
+// when layerBounds lies outside bgImage, in which case there is nothing to copy.
 std::shared_ptr<Image> MakeDetachedBgCopy(Context* context, const std::shared_ptr<Image>& bgImage,
                                           const Matrix& bgPixelToLocal, const Rect& layerBounds,
-                                          Point* offset, std::shared_ptr<ColorSpace> colorSpace) {
+                                          Point* offset, std::shared_ptr<ColorSpace> colorSpace,
+                                          bool* disjoint = nullptr) {
   Matrix localToBgPixel = Matrix::I();
   if (!bgPixelToLocal.invert(&localToBgPixel)) {
     return nullptr;
@@ -71,6 +73,9 @@ std::shared_ptr<Image> MakeDetachedBgCopy(Context* context, const std::shared_pt
   auto bgPixelBounds = layerBounds;
   localToBgPixel.mapRect(&bgPixelBounds);
   if (!bgPixelBounds.intersect(Rect::MakeWH(bgImage->width(), bgImage->height()))) {
+    if (disjoint != nullptr) {
+      *disjoint = true;
+    }
     return nullptr;
   }
   bgPixelBounds.roundOut();
@@ -402,8 +407,17 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   Matrix bgPixelToLocal = worldToLocal;
   bgPixelToLocal.preConcat(bgSource->backgroundMatrix());
   Point smallBgOffset = {};
+  bool disjoint = false;
   auto smallBgImage = MakeDetachedBgCopy(args.context, bgImage, bgPixelToLocal, contentBounds,
-                                         &smallBgOffset, args.dstColorSpace);
+                                         &smallBgOffset, args.dstColorSpace, &disjoint);
+  if (disjoint) {
+    // The style's area lies outside the captured surface, so it is outside every area drawn with
+    // this capture and draws nothing there. An empty entry keeps the consumer's read cursor in
+    // step without holding the capture surface's snapshot, which would make every later draw into
+    // that surface copy it.
+    snapshots->snapshots[BackgroundSnapshotKey{layer, style}].push_back({});
+    return;
+  }
   PictureRecorder recorder = {};
   auto* recording = recorder.beginRecording();
   recording->scale(contentScale, contentScale);
@@ -549,6 +563,10 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       return;
     }
     auto& entry = it->second[cursor++];
+    if (entry.image == nullptr) {
+      // The capture found the style outside its surface, so it draws nothing here.
+      return;
+    }
     bgImage = entry.image;
     bgOffset = entry.offset;
     ++gCaptureProbe.snapshotReads;
