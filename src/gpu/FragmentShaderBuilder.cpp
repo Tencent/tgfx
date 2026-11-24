@@ -93,9 +93,25 @@ std::string FragmentShaderBuilder::readTexture(SamplerHandle handle, const std::
     return temp;
   }
   const auto finalCoord = clampToSubsets(coordName, strictSubset, drawSubset);
+  const size_t start = codeTextSize();
+  setRawCaptureEnabled(false);
   codeAppendf("vec4 %s = ", temp.c_str());
   appendTextureLookup(handle, finalCoord);
   codeAppend(";");
+  setRawCaptureEnabled(true);
+  const std::string text = codeTextFrom(start);
+  const std::string prefix = "vec4 " + temp + " = ";
+  const size_t begin = text.find(prefix);
+  const size_t end = text.rfind(';');
+  FragmentInstruction instruction = {};
+  instruction.kind = FragmentInstructionKind::Alias;
+  instruction.output = temp;
+  instruction.declaration = "vec4";
+  instruction.text = text;
+  if (begin != std::string::npos && end != std::string::npos && end > begin + prefix.size()) {
+    instruction.src = text.substr(begin + prefix.size(), end - begin - prefix.size());
+  }
+  recordFragmentInstruction(std::move(instruction));
   return temp;
 }
 
