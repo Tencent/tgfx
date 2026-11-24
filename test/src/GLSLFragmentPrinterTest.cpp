@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <string>
-#include "gpu/glsl/GLSLFragmentPrinter.h"
+#include "gpu/glsl/GLSLPrinter.h"
 #include "gtest/gtest.h"
 
 namespace tgfx {
@@ -44,7 +44,7 @@ TEST(GLSLFragmentPrinterTest, ReplaysRawTextAndClosesMain) {
   second.text = "    color *= result;\n";
   program.instructions.push_back(second);
 
-  const std::string text = PrintGLSLFragmentProgram(program);
+  const std::string text = GLSLPrinter::PrintFragmentProgram(program);
   EXPECT_EQ(text,
             "    vec4 color = vec4(1.0);\n    vec4 result = pmApplyLuma(color, vec3(1.0));\n"
             "    color *= result;\n}\n");

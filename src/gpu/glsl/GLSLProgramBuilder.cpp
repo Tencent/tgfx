@@ -21,8 +21,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-#include "GLSLFragmentPrinter.h"
-#include "GLSLVertexPrinter.h"
+#include "GLSLPrinter.h"
 #include "core/utils/Log.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
@@ -219,8 +218,8 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     LOGE("GLSLProgramBuilder: %s", validationError.c_str());
     return nullptr;
   }
-  _vertexBuilder.setCodeText(PrintGLSLVertexProgram(description.vertexCalls));
-  _fragBuilder.setCodeText(PrintGLSLFragmentProgram(description.fragment));
+  _vertexBuilder.setCodeText(GLSLPrinter::PrintVertexProgram(description.vertexCalls));
+  _fragBuilder.setCodeText(GLSLPrinter::PrintFragmentProgram(description.fragment));
   // Diagnostic dump of the emitted stage texts (TGFX_DUMP_PROGRAM=dir): the FP-tree route's
   // shader is otherwise only visible to the driver. Static counter, one file per program.
   if (const char* dumpDir = std::getenv("TGFX_DUMP_PROGRAM")) {

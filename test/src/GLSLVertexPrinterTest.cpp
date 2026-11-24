@@ -18,7 +18,7 @@
 
 #include <string>
 #include <vector>
-#include "gpu/glsl/GLSLVertexPrinter.h"
+#include "gpu/glsl/GLSLPrinter.h"
 #include "gtest/gtest.h"
 
 namespace tgfx {
@@ -37,7 +37,7 @@ TEST(GLSLVertexPrinterTest, PrintsAffineAndPosition) {
   position.src = "position";
   calls.push_back(position);
 
-  const std::string text = PrintGLSLVertexProgram(calls);
+  const std::string text = GLSLPrinter::PrintVertexProgram(calls);
   EXPECT_NE(text.find("highp vec2 local = (Matrix * vec3(position, 1.0)).xy;"), std::string::npos);
   EXPECT_NE(text.find("gl_Position = vec4(position.xy * tgfx_RTAdjust.xz"), std::string::npos);
   EXPECT_EQ(text.back(), '\n');
@@ -53,7 +53,7 @@ TEST(GLSLVertexPrinterTest, PrintsPerspectiveTransform) {
   transform.hasPerspective = true;
   calls.push_back(transform);
 
-  const std::string text = PrintGLSLVertexProgram(calls);
+  const std::string text = GLSLPrinter::PrintVertexProgram(calls);
   EXPECT_NE(text.find("highp vec3 uvTemp = Matrix * vec3(position, 1.0);"), std::string::npos);
   EXPECT_NE(text.find("highp vec2 uv = uvTemp.xy / uvTemp.z;"), std::string::npos);
 }

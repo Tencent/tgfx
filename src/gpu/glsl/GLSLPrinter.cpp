@@ -4,7 +4,7 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  Licensed under the BSD 3-Clause License (the "License") you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLSLVertexPrinter.h"
+#include "GLSLPrinter.h"
 #include "gpu/VertexShaderBuilder.h"
 
 namespace tgfx {
@@ -38,9 +38,44 @@ void AppendTransformPoint(std::string* out, const VertexCall& call) {
       "highp vec2 " + call.dst + " = (" + call.operand + " * vec3(" + call.src + ", 1.0)).xy;\n";
 }
 
+std::string PrefixOf(const FragmentInstruction& instruction) {
+  const size_t first = instruction.text.find_first_not_of(" \t");
+  if (first == std::string::npos) {
+    return "    ";
+  }
+  return instruction.text.substr(0, first);
+}
+
+std::string ArgumentsOf(const std::vector<std::string>& args) {
+  std::string out = {};
+  for (size_t index = 0; index < args.size(); ++index) {
+    if (index > 0) {
+      out += ", ";
+    }
+    out += args[index];
+  }
+  return out;
+}
+
+void AppendCall(std::string* out, const FragmentInstruction& instruction) {
+  *out += PrefixOf(instruction);
+  if (instruction.declaresResult) {
+    *out += instruction.resultType + " ";
+  }
+  *out += instruction.output + " = ";
+  if (!instruction.wrapType.empty()) {
+    *out += instruction.wrapType + "(";
+  }
+  *out += instruction.function + "(" + ArgumentsOf(instruction.args) + ")";
+  if (!instruction.wrapType.empty()) {
+    *out += ")";
+  }
+  *out += ";\n";
+}
+
 }  // namespace
 
-std::string PrintGLSLVertexProgram(const std::vector<VertexCall>& calls) {
+std::string GLSLPrinter::PrintVertexProgram(const std::vector<VertexCall>& calls) {
   std::string out = {};
   for (const auto& call : calls) {
     switch (call.kind) {
@@ -90,6 +125,56 @@ std::string PrintGLSLVertexProgram(const std::vector<VertexCall>& calls) {
         out += Indent;
         out += "gl_Position = vec4(" + call.src + ".xy * " + RTAdjustName + ".xz + " +
                RTAdjustName + ".yw, 0, 1);\n";
+        break;
+    }
+  }
+  out += "}\n";
+  return out;
+}
+
+std::string GLSLPrinter::PrintFragmentProgram(const FragmentProgram& program) {
+  std::string out = {};
+  for (const auto& instruction : program.instructions) {
+    switch (instruction.kind) {
+      case FragmentInstructionKind::RawText:
+        out += instruction.text;
+        break;
+      case FragmentInstructionKind::Call:
+        AppendCall(&out, instruction);
+        break;
+      case FragmentInstructionKind::Alias:
+        out += PrefixOf(instruction);
+        if (!instruction.declaration.empty()) {
+          out += instruction.declaration + " ";
+        }
+        out += instruction.output + " = " + instruction.src + ";\n";
+        break;
+      case FragmentInstructionKind::StoreColor:
+        out += PrefixOf(instruction);
+        out += instruction.output + " = " + instruction.src + ";\n";
+        break;
+      case FragmentInstructionKind::StoreCoverage:
+        out += PrefixOf(instruction);
+        out += instruction.output + " = ";
+        if (instruction.splat) {
+          out += "vec4(" + instruction.src + ")";
+        } else {
+          out += instruction.src;
+        }
+        out += ";\n";
+        break;
+      case FragmentInstructionKind::Combine:
+        out += PrefixOf(instruction);
+        out += instruction.output + " = " + instruction.src + " * " + instruction.operand + ";\n";
+        break;
+      case FragmentInstructionKind::ReadVarying:
+        break;
+      case FragmentInstructionKind::Project:
+        out += PrefixOf(instruction);
+        out += "highp vec2 " + instruction.output + " = " + instruction.src + ".xy / " +
+               instruction.src + ".z;\n";
+        break;
+      case FragmentInstructionKind::Root:
         break;
     }
   }
