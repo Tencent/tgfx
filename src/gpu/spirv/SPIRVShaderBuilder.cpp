@@ -111,6 +111,24 @@ uint32_t SPIRVShaderBuilder::TypeId(SLType type, std::string* error) {
       writer.Inst(spirv::kOpTypeMatrix, {id, column, count});
       break;
     }
+    case SLType::Texture2DSampler: {
+      if (imageTypeId == 0) {
+        const auto floatType = TypeId(SLType::Float, error);
+        if (floatType == 0) {
+          writer.Sink(saved);
+          return 0;
+        }
+        imageTypeId = writer.NewId();
+        writer.Inst(spirv::kOpTypeImage,
+                    {imageTypeId, floatType, spirv::kImageDim2D, 0, 0, 0, 1, 0});
+        samplerTypeId = writer.NewId();
+        writer.Inst(spirv::kOpTypeSampler, {samplerTypeId});
+        sampledImageTypeId = writer.NewId();
+        writer.Inst(spirv::kOpTypeSampledImage, {sampledImageTypeId, imageTypeId});
+      }
+      id = sampledImageTypeId;
+      break;
+    }
     default:
       writer.Sink(saved);
       Fail(error, "the SPIR-V type is not supported yet");
@@ -157,6 +175,56 @@ uint32_t SPIRVShaderBuilder::ConstantId(const IRExpr& expr, std::string* error) 
   writer.Sink(saved);
   constantIds.emplace(key, id);
   return id;
+}
+
+uint32_t SPIRVShaderBuilder::LoadSampler(const ProgramIR& program, ValueID sampler,
+                                         std::string* error) {
+  const auto found = samplerValues.find(sampler);
+  if (found != samplerValues.end()) {
+    return found->second;
+  }
+  if (sampler == INVALID_VALUE_ID || sampler >= program.values.size()) {
+    Fail(error, "the sampler has an invalid value");
+    return 0;
+  }
+  const auto& samplerValue = program.values[sampler];
+  if (samplerValue.kind != IRValueKind::Sampler || samplerValue.type != SLType::Texture2DSampler) {
+    Fail(error, "the SPIR-V builder only supports sampler2D");
+    return 0;
+  }
+  uint32_t binding = 0;
+  bool hasBinding = false;
+  for (const auto& info : program.interface.samplers) {
+    if (info.name == samplerValue.debugName) {
+      binding = info.binding;
+      hasBinding = true;
+      break;
+    }
+  }
+  if (!hasBinding) {
+    Fail(error, "the sampler has no interface binding");
+    return 0;
+  }
+  const auto sampledType = TypeId(SLType::Texture2DSampler, error);
+  const auto pointer =
+      PointerTypeId(SLType::Texture2DSampler, spirv::kStorageUniformConstant, error);
+  if (sampledType == 0 || pointer == 0) {
+    return 0;
+  }
+
+  auto* saved = writer.sink;
+  writer.Sink(&writer.decl);
+  const auto variableId = writer.NewId();
+  writer.Inst(spirv::kOpVariable, {pointer, variableId, spirv::kStorageUniformConstant});
+  writer.Sink(&writer.ann);
+  writer.Inst(spirv::kOpDecorate, {variableId, spirv::kDecorationDescriptorSet, 0});
+  writer.Inst(spirv::kOpDecorate, {variableId, spirv::kDecorationBinding, binding});
+  writer.Sink(&writer.func);
+  const auto loadId = writer.NewId();
+  writer.Inst(spirv::kOpLoad, {sampledType, loadId, variableId});
+  writer.Sink(saved);
+  samplerValues[sampler] = loadId;
+  return loadId;
 }
 
 bool SPIRVShaderBuilder::Begin(std::string* error) {
@@ -305,6 +373,29 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
       writer.Sink(&writer.func);
       const auto id = writer.NewId();
       writer.Inst(spirv::kOpLoad, {type, id, fragCoordId});
+      return id;
+    }
+    case IRExprKind::TextureSample: {
+      if (stage != ShaderStage::Fragment) {
+        Fail(error, "implicit-lod texture sampling is only available in fragment shaders");
+        return 0;
+      }
+      if (expr.args.size() != 2) {
+        Fail(error, "a texture sample needs a sampler and a coordinate");
+        return 0;
+      }
+      const auto sampledImage = LoadSampler(program, expr.args[0], error);
+      uint32_t coordinate = 0;
+      if (sampledImage == 0 || !EmitValue(program, expr.args[1], &coordinate, error)) {
+        return 0;
+      }
+      const auto type = TypeId(expr.type, error);
+      if (type == 0) {
+        return 0;
+      }
+      writer.Sink(&writer.func);
+      const auto id = writer.NewId();
+      writer.Inst(spirv::kOpImageSampleImplicitLod, {type, id, sampledImage, coordinate});
       return id;
     }
     case IRExprKind::Construct: {

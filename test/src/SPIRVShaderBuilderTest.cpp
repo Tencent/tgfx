@@ -148,6 +148,29 @@ TEST(SPIRVShaderBuilderTest, EmitsLocalLoadAndAssign) {
   EXPECT_TRUE(ContainsOpcode(words, spirv::kOpLoad));
 }
 
+TEST(SPIRVShaderBuilderTest, EmitsTextureSample) {
+  ProgramIRBuilder program = {};
+  const auto sampler = program.AddSampler({"TextureSampler_0", SLType::Texture2DSampler, 0});
+  const auto zero = program.CreateConstant(0.0f);
+  const auto coord = program.CreateConstruct(SLType::Float2, {zero, zero});
+  const auto sample = program.CreateTextureSample(sampler, coord, SLType::Float4, "textureColor",
+                                                  SLType::Texture2DSampler);
+
+  SPIRVShaderBuilder builder(ShaderStage::Fragment);
+  std::string error = {};
+  ASSERT_TRUE(builder.Begin(&error)) << error;
+  uint32_t valueId = 0;
+  ASSERT_TRUE(builder.EmitValue(program.IR(), sample, &valueId, &error)) << error;
+  ASSERT_TRUE(builder.StoreOutput(program.IR(), sample, &error)) << error;
+  const auto words = builder.Finish(&error);
+  ASSERT_FALSE(words.empty()) << error;
+  WriteIfRequested(words);
+
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpImageSampleImplicitLod));
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpVariable));
+  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpDecorate));
+}
+
 TEST(SPIRVShaderBuilderTest, RejectsUnsupportedExpressions) {
   ProgramIRBuilder program = {};
   const auto input =
