@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GeometryProcessor.h"
+#include "gpu/ir/CoordinateBinder.h"
 
 namespace tgfx {
-static constexpr char TRANSFORM_UNIFORM_PREFIX[] = "CoordTransformMatrix_";
 
 void GeometryProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
   bytesKey->write(classID());
@@ -59,11 +59,8 @@ void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix, UniformDa
                                                FPCoordTransformIter* transformIter) const {
   int i = 0;
   while (const CoordTransform* coordTransform = transformIter->next()) {
-    Matrix combined = {};
-    combined.setConcat(coordTransform->getTotalMatrix(), uvMatrix);
-    std::string uniformName = TRANSFORM_UNIFORM_PREFIX;
-    uniformName += std::to_string(i);
-    uniformData->setData(uniformName, combined);
+    uniformData->setData(CoordinateBinder::MatrixUniformName(static_cast<size_t>(i)),
+                         CoordinateBinder::CombinedMatrix(*coordTransform, uvMatrix));
     onSetTransformData(uniformData, coordTransform, i);
     ++i;
   }
@@ -76,17 +73,16 @@ void GeometryProcessor::emitTransforms(EmitArgs& args, VertexShaderBuilder* vert
   int i = 0;
   auto transformHandler = args.fpCoordTransformHandler;
   while (const CoordTransform* coordTransform = transformHandler->nextCoordTransform()) {
-    std::string strUniName = TRANSFORM_UNIFORM_PREFIX;
-    strUniName += std::to_string(i);
     auto uniName =
-        uniformHandler->addUniform(strUniName, UniformFormat::Float3x3, ShaderStage::Vertex);
-    std::string strVaryingName = "TransformedCoords_";
-    strVaryingName += std::to_string(i);
+        uniformHandler->addUniform(CoordinateBinder::MatrixUniformName(static_cast<size_t>(i)),
+                                   UniformFormat::Float3x3, ShaderStage::Vertex);
     // The final UV transform combines GP's uvMatrix and FP's coordTransform->getTotalMatrix().
     // We use coordTransform->matrix here because getTotalMatrix() preserves its perspective property.
-    const bool hasPerspective = hasUVPerspective() || coordTransform->matrix.hasPerspective();
-    const SLType varyingType = hasPerspective ? SLType::Float3 : SLType::Float2;
-    auto varying = varyingHandler->addVarying(strVaryingName, varyingType);
+    const bool hasPerspective =
+        CoordinateBinder::HasPerspective(hasUVPerspective(), *coordTransform);
+    const SLType varyingType = CoordinateBinder::VaryingType(hasPerspective);
+    auto varying = varyingHandler->addVarying(CoordinateBinder::VaryingName(static_cast<size_t>(i)),
+                                              varyingType);
     transformHandler->specifyCoordsForCurrCoordTransform(varying.name(), varyingType);
     // For perspective: pass vec3 directly, division happens in fragment shader.
     // For non-perspective: compute vec2 directly as an optimization.
