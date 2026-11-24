@@ -72,6 +72,31 @@ bool AssignIDs(ProgramDescription* description, std::string* error) {
   return true;
 }
 
+void RefreshValueRef(ValueRef* value, const ValueTable& values) {
+  if (value->name.empty()) {
+    return;
+  }
+  const auto* resolved = values.Find(value->name);
+  if (resolved != nullptr) {
+    *value = *resolved;
+  }
+}
+
+void RefreshValueTypes(ProgramDescription* description) {
+  for (auto& call : description->vertexCalls) {
+    RefreshValueRef(&call.dst, description->values);
+    RefreshValueRef(&call.src, description->values);
+    RefreshValueRef(&call.operand, description->values);
+    RefreshValueRef(&call.extra, description->values);
+  }
+  for (auto& instruction : description->fragment.instructions) {
+    RefreshValueRef(&instruction.outputRef, description->values);
+    for (auto& argument : instruction.argRefs) {
+      RefreshValueRef(&argument, description->values);
+    }
+  }
+}
+
 VaryingDesc* FindVarying(InterfaceDesc* interface, const std::string& name) {
   for (auto& varying : interface->varyings) {
     if (varying.name == name) {
@@ -152,8 +177,8 @@ bool ValidateFragmentCalls(ProgramDescription* description, std::string* error) 
     }
     const auto expectedResult = ShaderTypeOf(row->returnType);
     const auto actualResult = instruction.outputRef.type;
-    if (expectedResult != SLType::Void && actualResult != SLType::Void &&
-        expectedResult != actualResult) {
+    if (instruction.wrapType.empty() && expectedResult != SLType::Void &&
+        actualResult != SLType::Void && expectedResult != actualResult) {
       *error = "the call to '" + instruction.function + "' returns " + TypeName(expectedResult) +
                ", but its output is " + TypeName(actualResult);
       return false;
@@ -208,6 +233,12 @@ bool LinkVertexWrites(ProgramDescription* description, std::string* error) {
                " into varying '" + varying->name + "' declared as " + TypeName(varying->type);
       return false;
     }
+    if (call.kind == VertexCallKind::StoreVarying && call.src.type != SLType::Void &&
+        call.src.type != varying->type) {
+      *error = "the vertex stage stores " + std::string(TypeName(call.src.type)) +
+               " into varying '" + varying->name + "' declared as " + TypeName(varying->type);
+      return false;
+    }
     call.varying = varying->id;
     varying->produced = true;
   }
@@ -230,8 +261,12 @@ bool ValidateProgramDescription(ProgramDescription* description, std::string* er
   if (description == nullptr || error == nullptr) {
     return false;
   }
-  return AssignIDs(description, error) && LinkVertexWrites(description, error) &&
-         ValidateFragmentCoords(description, error) && ValidateFragmentCalls(description, error);
+  if (!AssignIDs(description, error)) {
+    return false;
+  }
+  RefreshValueTypes(description);
+  return LinkVertexWrites(description, error) && ValidateFragmentCoords(description, error) &&
+         ValidateFragmentCalls(description, error);
 }
 
 }  // namespace tgfx

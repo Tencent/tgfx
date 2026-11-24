@@ -73,6 +73,15 @@ TEST(ProgramValidationTest, RejectsVaryingWriteTypeMismatch) {
   EXPECT_NE(error.find("vColor"), std::string::npos);
 }
 
+TEST(ProgramValidationTest, RejectsStoreVaryingSourceTypeMismatch) {
+  auto description = ValidDescription();
+  description.vertexCalls[0].kind = VertexCallKind::StoreVarying;
+  description.vertexCalls[0].src.type = SLType::Float3;
+  std::string error;
+  EXPECT_FALSE(ValidateProgramDescription(&description, &error));
+  EXPECT_NE(error.find("stores vec3"), std::string::npos);
+}
+
 TEST(ProgramValidationTest, RejectsProjectingNonProjectiveVarying) {
   auto description = ValidDescription();
   FragmentInstruction project = {};
