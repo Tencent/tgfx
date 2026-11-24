@@ -42,7 +42,9 @@ void GLSLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
     return;
   }
   fragBuilder->appendCall(args.outputColor, entry,
-                          {args.inputColor, matrixUniformName, vectorUniformName});
+                          {ValueRef(args.inputColor, SLType::Float4, ValueOrigin::Local),
+                           ValueRef(matrixUniformName, SLType::Float4x4, ValueOrigin::Uniform),
+                           ValueRef(vectorUniformName, SLType::Float4, ValueOrigin::Uniform)});
 }
 
 void GLSLColorMatrixFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
