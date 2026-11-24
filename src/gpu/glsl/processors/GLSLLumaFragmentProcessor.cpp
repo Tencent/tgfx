@@ -39,6 +39,18 @@ void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
       {args.inputColorValue, ValueRef(kr, SLType::Float, ValueOrigin::Uniform),
        ValueRef(kg, SLType::Float, ValueOrigin::Uniform),
        ValueRef(kb, SLType::Float, ValueOrigin::Uniform)});
+  if (args.irBuilder != nullptr) {
+    const auto krValue =
+        args.irBuilder->CreateValue(SLType::Float, Precision::High, IRValueKind::Uniform, kr);
+    const auto kgValue =
+        args.irBuilder->CreateValue(SLType::Float, Precision::High, IRValueKind::Uniform, kg);
+    const auto kbValue =
+        args.irBuilder->CreateValue(SLType::Float, Precision::High, IRValueKind::Uniform, kb);
+    const auto result =
+        args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::Luma), SLType::Float4,
+                                   {args.inputValue, krValue, kgValue, kbValue});
+    args.irBuilder->StoreOutput(args.outputValue, result);
+  }
 }
 
 void GLSLLumaFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

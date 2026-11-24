@@ -26,6 +26,7 @@
 #include "gpu/UniformData.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/ir/CoordValue.h"
+#include "gpu/ir/ProgramIRBuilder.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
@@ -233,13 +234,16 @@ class FragmentProcessor : public Processor {
     EmitArgs(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
              std::string outputColor, std::string inputColor, std::string inputSubset,
              const TransformedCoordVars* transformedCoords, const TextureSamplers* textureSamplers,
-             std::function<std::string(std::string_view)> coordFunc = {})
+             std::function<std::string(std::string_view)> coordFunc = {},
+             ProgramIRBuilder* irBuilder = nullptr, ValueID inputValue = INVALID_VALUE_ID,
+             ValueID outputValue = INVALID_VALUE_ID)
         : fragBuilder(fragBuilder), uniformHandler(uniformHandler),
           outputColor(std::move(outputColor)), inputColor(std::move(inputColor)),
           transformedCoords(transformedCoords), textureSamplers(textureSamplers),
           coordFunc(std::move(coordFunc)), inputSubset(std::move(inputSubset)),
           inputColorValue(this->inputColor, SLType::Float4, ValueOrigin::Local),
-          outputColorValue(this->outputColor, SLType::Float4, ValueOrigin::Local) {
+          outputColorValue(this->outputColor, SLType::Float4, ValueOrigin::Local),
+          irBuilder(irBuilder), inputValue(inputValue), outputValue(outputValue) {
     }
 
     /**
@@ -269,6 +273,9 @@ class FragmentProcessor : public Processor {
     const std::string inputSubset;
     ValueRef inputColorValue;
     ValueRef outputColorValue;
+    ProgramIRBuilder* irBuilder = nullptr;
+    ValueID inputValue = INVALID_VALUE_ID;
+    ValueID outputValue = INVALID_VALUE_ID;
   };
 
   /**

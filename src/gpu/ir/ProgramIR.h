@@ -35,6 +35,11 @@ constexpr ExprID INVALID_EXPR_ID = static_cast<ExprID>(-1);
 constexpr BindingID INVALID_BINDING_ID = static_cast<BindingID>(-1);
 constexpr OperatorID INVALID_OPERATOR_ID = static_cast<OperatorID>(-1);
 
+/// Temporary stable IDs for the dual-write phase; the generated operator table replaces this.
+enum class BuiltinOperator : OperatorID {
+  Luma = 1,
+};
+
 enum class Precision : uint8_t {
   Default,
   Low,

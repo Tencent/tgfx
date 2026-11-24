@@ -23,6 +23,7 @@
 #include "UniformHandler.h"
 #include "VaryingHandler.h"
 #include "VertexShaderBuilder.h"
+#include "gpu/ir/ProgramIRBuilder.h"
 #include "gpu/processors/GeometryProcessor.h"
 
 namespace tgfx {
@@ -93,6 +94,7 @@ class ProgramBuilder {
   std::vector<const Processor*> currentProcessors = {};
   std::vector<CoordValue> transformedCoordVars = {};
   std::string subsetVarName = {};
+  ProgramIRBuilder programIR = {};
 
   /**
    * Generates a possibly mangled name for a stage variable and writes it to the fragment shader.
