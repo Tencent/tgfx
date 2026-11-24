@@ -286,6 +286,9 @@ class BackgroundConsumer : public BackgroundHandler {
     Surface* surface = nullptr;
     // The rect being drawn, in global coordinates.
     Rect globalRect = {};
+    // Whether the snapshot map was captured for this rect. When false, a snapshot in the map may
+    // have been captured for another area and holds no valid backdrop here.
+    bool snapshotsCover = true;
   };
 
   void setTileBackdrop(const TileBackdrop& backdrop) {

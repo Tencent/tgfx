@@ -672,6 +672,50 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   return renderRects;
 }
 
+
+// Walks the subtree a tile draws and reports whether any background style cannot read its backdrop
+// from the tile: offscreen composites (blend modes, group alpha, filters, masks, 3D) do not write
+// to the tile, and a style whose sample area leaves the tile or meets an earlier style output has
+// no valid backdrop there either.
+bool DisplayList::needsCapture(const Layer* layer, const Rect& globalRect, float parentAlpha,
+                               bool offscreen, std::vector<Rect>* drawnBounds) const {
+  const bool isRoot = layer->_parent == nullptr;
+  if (!isRoot) {
+    if (!layer->bitFields.visible || layer->_alpha <= 0 || layer->maskOwner != nullptr) {
+      return false;
+    }
+  }
+  if (!Rect::Intersects(layer->renderBounds, globalRect)) {
+    return false;
+  }
+  const float alpha = isRoot ? 1.0f : parentAlpha * layer->_alpha;
+  const auto blendMode =
+      isRoot ? BlendMode::SrcOver : static_cast<BlendMode>(layer->bitFields.blendMode);
+  const bool childOffscreen =
+      offscreen || layer->canPreserve3D() || blendMode != BlendMode::SrcOver ||
+      layer->bitFields.hasBlendMode || !layer->bitFields.passThroughBackground ||
+      (alpha < 1.0f && layer->bitFields.allowsGroupOpacity) || !layer->_filters.empty() ||
+      layer->hasValidMask();
+  for (const auto& style : layer->_layerStyles) {
+    if (style == nullptr || !NeedsBackgroundSource(style->extraSourceType())) {
+      continue;
+    }
+    const bool onTile = !childOffscreen && style->position() == LayerStylePosition::Below;
+    if (!(onTile && BackgroundConsumer::CanReadTileBackdrop(layer, globalRect, *drawnBounds))) {
+      return true;
+    }
+    if (!BackgroundConsumer::CoversOwnStyleOutput(layer, alpha)) {
+      drawnBounds->push_back(layer->renderBounds);
+    }
+  }
+  for (const auto& child : layer->_children) {
+    if (needsCapture(child.get(), globalRect, alpha, childOffscreen, drawnBounds)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
                                            const std::vector<Rect>& dirtyRegions) {
   if (!surfaceCaches.empty() && (surfaceCaches.front()->getContext() != surface->getContext() ||
@@ -696,9 +740,11 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   std::vector<std::unique_ptr<BackgroundSnapshotMap>> levelSnapshots = {};
   std::vector<int> taskSnapshotIndex = {};
+  std::vector<bool> taskSnapshotCover = {};
   // TEMP probe: how much of a tiled frame the per-level background captures take.
   const auto captureStart = std::chrono::steady_clock::now();
-  captureBackgroundsByLevel(surface, tileTasks, zoomScale, &levelSnapshots, &taskSnapshotIndex);
+  captureBackgroundsByLevel(surface, tileTasks, zoomScale, &levelSnapshots, &taskSnapshotIndex,
+                            &taskSnapshotCover);
   const double captureMs =
       std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - captureStart)
           .count();
@@ -706,7 +752,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     std::printf("[CAP-FRAME] tasks=%zu levels=%zu ms=%.1f\n", tileTasks.size(),
                 levelSnapshots.size(), captureMs);
   }
-  auto dirtyRects = drawTileTasks(tileTasks, levelSnapshots, taskSnapshotIndex, surface, zoomScale);
+  auto dirtyRects = drawTileTasks(tileTasks, levelSnapshots, taskSnapshotIndex, taskSnapshotCover,
+                                  surface, zoomScale);
   drawScreenTasks(std::move(screenTasks), std::move(skippedRects), surface, autoClear);
   return dirtyRects;
 }
@@ -714,12 +761,13 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
 void DisplayList::captureBackgroundsByLevel(
     Surface* surface, const std::vector<DrawTask>& tileTasks, float zoomScale,
     std::vector<std::unique_ptr<BackgroundSnapshotMap>>* levelSnapshots,
-    std::vector<int>* taskSnapshotIndex) const {
+    std::vector<int>* taskSnapshotIndex, std::vector<bool>* taskSnapshotCover) const {
   // Each capture serves all tiles of one raster scale, so a tile is captured with the density it
   // is drawn with. That is what lets tree tiles take part: their scale is 2^-level, not the
   // current zoom.
   levelSnapshots->clear();
   taskSnapshotIndex->assign(tileTasks.size(), -1);
+  taskSnapshotCover->assign(tileTasks.size(), false);
   if (_root->hasBackgroundStyle(1.0f)) {
     // Group by level first: one capture transform cannot serve two raster scales.
     std::vector<std::pair<int, std::vector<size_t>>> levels = {};
@@ -743,12 +791,18 @@ void DisplayList::captureBackgroundsByLevel(
       }
       std::vector<Rect> levelRects = {};
       levelRects.reserve(levelEntry.second.size());
+      std::vector<size_t> capturedTasks = {};
       for (auto index : levelEntry.second) {
-        levelRects.push_back(tileTasks[index].tileRect());
+        if (needsCapture(tileTasks[index])) {
+          levelRects.push_back(tileTasks[index].tileRect());
+          capturedTasks.push_back(index);
+        }
       }
-      // One capture serves every tile of this level: the capturer culls the layers no background
-      // style samples inside the rects it covers, so a capture spanning more than the tiles that
-      // need it costs the surface, not the drawing.
+      // Tiles whose styles all read the tile need no snapshot at all; the rest share one capture,
+      // which the capturer culls to the layers a background style samples.
+      if (levelRects.empty()) {
+        continue;
+      }
       const auto levelStart = std::chrono::steady_clock::now();
       auto map = captureBackgrounds(surface, levelRects, Matrix::MakeScale(rasterScale));
       std::printf(
@@ -757,8 +811,9 @@ void DisplayList::captureBackgroundsByLevel(
               .count());
       auto snapshotIndex = static_cast<int>(levelSnapshots->size());
       levelSnapshots->push_back(std::move(map));
-      for (auto index : levelEntry.second) {
+      for (auto index : capturedTasks) {
         (*taskSnapshotIndex)[index] = snapshotIndex;
+        (*taskSnapshotCover)[index] = true;
       }
     }
   }
@@ -767,16 +822,18 @@ void DisplayList::captureBackgroundsByLevel(
 std::vector<Rect> DisplayList::drawTileTasks(
     const std::vector<DrawTask>& tileTasks,
     const std::vector<std::unique_ptr<BackgroundSnapshotMap>>& levelSnapshots,
-    const std::vector<int>& taskSnapshotIndex, Surface* surface, float zoomScale) {
+    const std::vector<int>& taskSnapshotIndex, const std::vector<bool>& taskSnapshotCover,
+    Surface* surface, float zoomScale) {
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   for (size_t taskIndex = 0; taskIndex < tileTasks.size(); ++taskIndex) {
     const auto& task = tileTasks[taskIndex];
     auto isTreeTask = task.treeLevel() != EXACT_LEVEL;
     auto snapshotIndex = taskSnapshotIndex[taskIndex];
+    const bool snapshotsCover = taskSnapshotCover[taskIndex];
     auto* snapshots =
         snapshotIndex >= 0 ? levelSnapshots[static_cast<size_t>(snapshotIndex)].get() : nullptr;
-    auto hasContent = drawTileTask(task, snapshots);
+    auto hasContent = drawTileTask(task, snapshots, snapshotsCover);
     if (!hasContent && task.coversTiles()) {
       recycleBlankTiles(task);
     }
@@ -1445,7 +1502,33 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
-bool DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots) const {
+bool DisplayList::needsCapture(const DrawTask& task) const {
+  auto rasterScale = task.treeLevel() == EXACT_LEVEL
+                         ? ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision)
+                         : GetTileRasterScale(task.treeLevel());
+  if (FloatNearlyZero(rasterScale)) {
+    return true;
+  }
+  auto viewMatrix = Matrix::MakeScale(rasterScale);
+  const auto& tileRect = task.tileRect();
+  const auto& sourceRect = task.sourceRect();
+  const auto offsetX = sourceRect.left - tileRect.left;
+  const auto offsetY = sourceRect.top - tileRect.top;
+  viewMatrix.postTranslate(offsetX, offsetY);
+  auto clipRect = tileRect;
+  clipRect.offset(offsetX, offsetY);
+  Matrix inverse = Matrix::I();
+  if (!viewMatrix.invert(&inverse)) {
+    return true;
+  }
+  auto globalRect = inverse.mapRect(clipRect);
+  globalRect.roundOut();
+  std::vector<Rect> drawnBounds = {};
+  return needsCapture(_root.get(), globalRect, 1.0f, false, &drawnBounds);
+}
+
+bool DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots,
+                               bool snapshotsCover) const {
   auto surface = surfaceCaches[task.sourceIndex()].get();
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
@@ -1462,7 +1545,7 @@ bool DisplayList::drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snap
   viewMatrix.postTranslate(offsetX, offsetY);
   auto clipRect = tileRect;
   clipRect.offset(offsetX, offsetY);
-  return drawRootLayer(surface, clipRect, viewMatrix, true, snapshots, true);
+  return drawRootLayer(surface, clipRect, viewMatrix, true, snapshots, true, snapshotsCover);
 }
 
 void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
@@ -1556,7 +1639,7 @@ void DisplayList::resetCaches() {
 
 bool DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
                                 bool autoClear, BackgroundSnapshotMap* snapshots,
-                                bool readTileBackdrop) const {
+                                bool readTileBackdrop, bool snapshotsCover) const {
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   auto context = surface->getContext();
@@ -1596,6 +1679,7 @@ bool DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
     BackgroundConsumer::TileBackdrop backdrop = {};
     backdrop.surface = surface;
     backdrop.globalRect = renderRect;
+    backdrop.snapshotsCover = snapshotsCover;
     consumer.setTileBackdrop(backdrop);
   }
   args.backgroundHandler = snapshots ? &consumer : BackgroundHandler::NoOp();

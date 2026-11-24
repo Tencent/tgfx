@@ -601,6 +601,12 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       CanReadTileBackdrop(layer, tileBackdrop->globalRect, drawnBackdropBounds)) {
     bgImage = makeTileBackdrop(args, canvas, contentBounds, source->contentScale, &bgOffset);
   }
+  if (bgImage == nullptr && snapshots != nullptr && tileBackdrop.has_value() &&
+      !tileBackdrop->snapshotsCover) {
+    // The tile could not supply the backdrop and the map was captured for other areas: skip rather
+    // than reading a snapshot that does not cover this tile.
+    return;
+  }
   if (bgImage == nullptr && snapshots != nullptr) {
     BackgroundSnapshotKey key{layer, style};
     auto it = snapshots->snapshots.find(key);
