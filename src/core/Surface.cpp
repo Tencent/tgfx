@@ -19,6 +19,7 @@
 #include "tgfx/core/Surface.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/CopyPixels.h"
+#include "core/utils/GpuProbe.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/PixelFormatUtil.h"
@@ -272,6 +273,7 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   if (cachedImage != nullptr) {
     return cachedImage;
   }
+  ++gGpuProbe.snapshots;
   auto drawingManager = getContext()->drawingManager();
   auto renderTarget = resolveCopySource(drawingManager);
   if (renderTarget == nullptr) {
@@ -382,6 +384,8 @@ bool Surface::aboutToDraw(bool discardContent) {
   if (renderTarget->externallyOwned()) {
     return true;
   }
+  ++gGpuProbe.cow;
+  gGpuProbe.cowPx += static_cast<double>(renderTarget->width()) * renderTarget->height();
   auto newRenderTarget = renderTarget->makeRenderTargetProxy();
   if (newRenderTarget == nullptr) {
     LOGE("Surface::aboutToDraw(): Failed to make a copy of the renderTarget!");
