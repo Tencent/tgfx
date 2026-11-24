@@ -163,53 +163,75 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
                                              (*args.transformedCoords)[0].type());
   fragBuilder->aliasValue("color", read.name, "vec4");
   if (alphaStart != Point::Zero()) {
-    fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
+    if (args.irBuilder == nullptr || args.outputValue == INVALID_VALUE_ID ||
+        read.value == INVALID_VALUE_ID) {
+      return;
+    }
     auto alphaStartName =
         uniformHandler->addUniform("AlphaStart", UniformFormat::Float2, ShaderStage::Fragment);
-    std::string alphaVertexColor = "alphaVertexColor";
-    fragBuilder->codeAppendf("highp vec2 %s = %s + %s;", alphaVertexColor.c_str(),
-                             finalCoordName.c_str(), alphaStartName.c_str());
-    fragBuilder->codeAppend("vec4 alpha = ");
-    fragBuilder->appendTextureLookup(textureSampler, alphaVertexColor);
-    fragBuilder->codeAppend(";");
-    fragBuilder->codeAppend("alpha = clamp(alpha, 0.0, 1.0);");
-    fragBuilder->codeAppend("color = vec4(color.rgb * alpha.r, alpha.r);");
-    if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID) {
-      const auto alphaSampler = args.samplerValue(textureSampler);
-      const auto alphaStartValue = args.irBuilder->InternValue(
-          alphaStartName, SLType::Float2, Precision::High, IRValueKind::Uniform);
-      const auto finalCoordValue = args.irBuilder->InternValue(finalCoordName, SLType::Float2,
-                                                               Precision::High, IRValueKind::Local);
-      const auto coordValue =
-          finalCoordValue != INVALID_VALUE_ID && alphaStartValue != INVALID_VALUE_ID
-              ? args.irBuilder->CreateBinary(IRBinaryOp::Add, SLType::Float2, finalCoordValue,
-                                             alphaStartValue, alphaVertexColor)
-              : INVALID_VALUE_ID;
-      if (alphaSampler != INVALID_VALUE_ID && alphaStartValue != INVALID_VALUE_ID &&
-          coordValue != INVALID_VALUE_ID) {
-        const auto colorValue = args.irBuilder->InternValue("color", SLType::Float4,
-                                                            Precision::High, IRValueKind::Local);
-        if (read.value != INVALID_VALUE_ID) {
-          args.irBuilder->Assign({colorValue, ""}, read.value);
-        }
-        const auto zero = args.irBuilder->CreateConstant(0.0f);
-        const auto one = args.irBuilder->CreateConstant(1.0f);
-        const auto clampedColor =
-            args.irBuilder->CreateCall(OperatorID::Clamp, SLType::Float4, {colorValue, zero, one});
-        const auto alphaSample = args.irBuilder->CreateTextureSample(
-            alphaSampler, coordValue, SLType::Float4, "alpha", SLType::Texture2DSampler);
-        const auto clampedAlpha =
-            args.irBuilder->CreateCall(OperatorID::Clamp, SLType::Float4, {alphaSample, zero, one});
-        const auto alphaR = args.irBuilder->CreateSwizzle(clampedAlpha, SLType::Float, "r");
-        const auto colorRgb = args.irBuilder->CreateSwizzle(clampedColor, SLType::Float3, "rgb");
-        const auto premultiplied =
-            args.irBuilder->CreateBinary(IRBinaryOp::Mul, SLType::Float3, colorRgb, alphaR);
-        const auto result =
-            args.irBuilder->CreateConstruct(SLType::Float4, {premultiplied, alphaR});
-        args.irBuilder->Assign({colorValue, ""}, result);
-        args.irBuilder->StoreOutput(args.outputValue, result);
-      }
+    const auto alphaSampler = args.samplerValue(textureSampler);
+    const auto alphaStartValue = args.irBuilder->InternValue(alphaStartName, SLType::Float2,
+                                                             Precision::High, IRValueKind::Uniform);
+    const auto finalCoordValue = args.irBuilder->InternValue(finalCoordName, SLType::Float2,
+                                                             Precision::High, IRValueKind::Local);
+    const auto coordValue =
+        finalCoordValue != INVALID_VALUE_ID && alphaStartValue != INVALID_VALUE_ID
+            ? args.irBuilder->CreateBinary(IRBinaryOp::Add, SLType::Float2, finalCoordValue,
+                                           alphaStartValue, "alphaVertexColor")
+            : INVALID_VALUE_ID;
+    const auto colorValue =
+        args.irBuilder->InternValue("color", SLType::Float4, Precision::High, IRValueKind::Local);
+    if (alphaSampler == INVALID_VALUE_ID || coordValue == INVALID_VALUE_ID) {
+      args.irBuilder->MarkFailed("the alpha texture coordinate could not be recorded");
+      return;
     }
+    args.irBuilder->Assign({colorValue, ""}, read.value);
+    const auto alphaValue =
+        args.irBuilder->InternValue("alpha", SLType::Float4, Precision::High, IRValueKind::Local);
+    const auto zero = args.irBuilder->CreateConstant(0.0f);
+    const auto one = args.irBuilder->CreateConstant(1.0f);
+    const auto clampedColor =
+        args.irBuilder->CreateCall(OperatorID::Clamp, SLType::Float4, {colorValue, zero, one});
+    const auto alphaSample = args.irBuilder->CreateTextureSample(
+        alphaSampler, coordValue, SLType::Float4, "alphaRead", SLType::Texture2DSampler);
+    args.irBuilder->Assign({alphaValue, ""}, alphaSample);
+    const auto clampedAlpha =
+        args.irBuilder->CreateCall(OperatorID::Clamp, SLType::Float4, {alphaValue, zero, one});
+    args.irBuilder->Assign({colorValue, ""}, clampedColor);
+    args.irBuilder->Assign({alphaValue, ""}, clampedAlpha);
+    const auto alphaR = args.irBuilder->CreateSwizzle(alphaValue, SLType::Float, "r");
+    const auto colorRgb = args.irBuilder->CreateSwizzle(colorValue, SLType::Float3, "rgb");
+    const auto premultiplied =
+        args.irBuilder->CreateBinary(IRBinaryOp::Mul, SLType::Float3, colorRgb, alphaR);
+    const auto result = args.irBuilder->CreateConstruct(SLType::Float4, {premultiplied, alphaR});
+    if (result == INVALID_VALUE_ID) {
+      args.irBuilder->MarkFailed("the alpha modulation could not be recorded");
+      return;
+    }
+    args.irBuilder->Assign({colorValue, ""}, result);
+    args.irBuilder->StoreOutput(args.outputValue, result);
+
+    std::string coordExpression = {};
+    std::string colorExpression = {};
+    std::string alphaExpression = {};
+    std::string resultExpression = {};
+    std::string error = {};
+    if (!GLSLOperatorEmitter::EmitValue(args.irBuilder->IR(), coordValue, &coordExpression,
+                                        &error) ||
+        !GLSLOperatorEmitter::EmitValue(args.irBuilder->IR(), clampedColor, &colorExpression,
+                                        &error) ||
+        !GLSLOperatorEmitter::EmitValue(args.irBuilder->IR(), clampedAlpha, &alphaExpression,
+                                        &error) ||
+        !GLSLOperatorEmitter::EmitValue(args.irBuilder->IR(), result, &resultExpression, &error)) {
+      args.irBuilder->MarkFailed(error);
+      return;
+    }
+    fragBuilder->aliasValue("color", colorExpression, "");
+    fragBuilder->aliasValue("alphaVertexColor", coordExpression, "highp vec2");
+    fragBuilder->aliasValue(
+        "alpha", fragBuilder->textureLookupExpression(textureSampler, "alphaVertexColor"), "vec4");
+    fragBuilder->aliasValue("alpha", alphaExpression, "");
+    fragBuilder->aliasValue("color", resultExpression, "");
   }
   fragBuilder->storeColor(args.outputColor, "color");
 }
