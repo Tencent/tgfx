@@ -166,7 +166,7 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(
   auto height = FloatCeilToInt(bounds.height());
   return PathRasterizer::MakeFrom(width, height, std::move(shape), true,
 #ifdef TGFX_USE_TEXT_GAMMA_CORRECTION
-                                  true
+                                  !hasFauxBold
 #else
                                   false
 #endif

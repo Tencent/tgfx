@@ -27,6 +27,7 @@
 #include "FTUtil.h"
 #include "core/utils/ClearPixels.h"
 #include "core/utils/ColorSpaceHelper.h"
+#include "core/utils/FauxBoldScale.h"
 #include "core/utils/GammaCorrection.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -34,6 +35,7 @@
 #include "skcms.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/core/UTF.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
@@ -517,13 +519,22 @@ bool FTScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
     // Fall through to normal path generation if no color layers found
   }
 
-  if (!loadOutlineGlyph(face, glyphID, fauxBold, fauxItalic)) {
+  const bool pathFauxBold = fauxBold && !FT_HAS_COLOR(face);
+  if (!loadOutlineGlyph(face, glyphID, fauxBold && !pathFauxBold, fauxItalic, pathFauxBold)) {
     path->reset();
     return false;
   }
   if (!GenerateGlyphPath(face, path)) {
     path->reset();
     return false;
+  }
+  if (pathFauxBold && !path->isEmpty()) {
+    auto strokePath = *path;
+    Stroke stroke(textSize * FauxBoldScale(textSize));
+    if (!stroke.applyToPath(&strokePath) || !path->addPath(strokePath, PathOp::Union)) {
+      path->reset();
+      return false;
+    }
   }
   return true;
 }
@@ -602,6 +613,15 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
 }
 
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
+  if (fauxBold && !hasColor()) {
+    Path path;
+    if (!generatePath(glyphID, true, fauxItalic, &path)) {
+      return {};
+    }
+    auto bounds = path.getBounds();
+    bounds.roundOut();
+    return bounds;
+  }
 #if defined(__ANDROID__) || defined(ANDROID)
   if (ftTypeface()->hasColor() && ftTypeface()->hasOutlines() && GlyphRenderer::IsAvailable()) {
     Rect rect = {};
@@ -781,7 +801,7 @@ Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
 
 Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
                                         Matrix* matrix) const {
-  if (!hasColor() && stroke != nullptr) {
+  if (!hasColor() && (stroke != nullptr || fauxBold)) {
     return {};
   }
   if (!hasColor()) {
@@ -931,7 +951,7 @@ FTTypeface* FTScalerContext::ftTypeface() const {
 }
 
 bool FTScalerContext::loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxBold,
-                                       bool fauxItalic) const {
+                                       bool fauxItalic, bool noHinting) const {
   // FT_IS_SCALABLE is documented to mean the face contains outline glyphs.
   if (!FT_IS_SCALABLE(face) || setupSize(fauxItalic)) {
     return false;
@@ -939,6 +959,9 @@ bool FTScalerContext::loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxB
   auto flags = loadGlyphFlags;
   flags |= FT_LOAD_NO_BITMAP;  // ignore embedded bitmaps so we're sure to get the outline
   flags &= ~FT_LOAD_RENDER;    // don't scan convert (we just want the outline)
+  if (noHinting) {
+    flags |= FT_LOAD_NO_HINTING;
+  }
   auto err = FT_Load_Glyph(face, glyphID, flags);
   if (err != FT_Err_Ok || face->glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
     return false;
