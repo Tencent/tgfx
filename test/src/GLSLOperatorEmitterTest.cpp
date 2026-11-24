@@ -80,8 +80,10 @@ TEST(GLSLOperatorEmitterTest, EmitsUniformArrayArgument) {
   std::string error = {};
   ASSERT_TRUE(GLSLOperatorEmitter::EmitCall(builder.IR(), result, &expression, &error)) << error;
   EXPECT_EQ(expression,
-            "gaussianBlur1D(sampler, coord, texel, radius, subset, 1, 0, clamp, dimension, 0, 0, "
-            "Kernel)");
+            "gaussianBlur1D(sampler, coord, texel, radius, subset, 0, 1, 1, 0, subset, clamp, "
+            "dimension, 0, 0, Kernel[0], Kernel[1], Kernel[2], Kernel[3], Kernel[4], Kernel[5], "
+            "Kernel[6], Kernel[7], Kernel[8], Kernel[9], Kernel[10], Kernel[11], Kernel[12], "
+            "Kernel[13], Kernel[14], Kernel[15], Kernel[16])");
 }
 
 TEST(GLSLOperatorEmitterTest, RejectsNonCallValues) {

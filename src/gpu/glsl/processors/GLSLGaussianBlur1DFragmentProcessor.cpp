@@ -21,6 +21,7 @@
 #include <cmath>
 #include <string>
 #include <string_view>
+#include "gpu/glsl/GLSLOperatorEmitter.h"
 
 namespace tgfx {
 
@@ -113,7 +114,9 @@ void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
         for (int slot = 0; slot < 17; ++slot) {
           callArgs.push_back(kernelName + "[" + std::to_string(slot) + "]");
         }
-        fragBuilder->appendCall(args.outputColor, entry, callArgs);
+        ValueID result = INVALID_VALUE_ID;
+        std::string expression = {};
+        std::string error = {};
         if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID &&
             childCoords[0].type() == SLType::Float2) {
           const auto samplerValue = args.samplerValue(childSamplers[0]);
@@ -151,14 +154,19 @@ void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
                 args.irBuilder->CreateIntConstant((tiled.flags & seamFlags) != 0 ? 1 : 0);
             const auto borderValue =
                 args.irBuilder->CreateIntConstant((tiled.flags & borderFlags) != 0 ? 1 : 0);
-            const auto result = args.irBuilder->CreateCall(
+            result = args.irBuilder->CreateCall(
                 OperatorID::GaussianBlur1D, SLType::Float4,
                 {samplerValue, coordValue, texelSizeValue, radiusValue, subsetValue, modeXValue,
                  modeYValue, clampValue, dimensionValue, seamValue, borderValue, kernelValue},
                 args.outputColor);
             args.irBuilder->StoreOutput(args.outputValue, result);
+            if (result != INVALID_VALUE_ID &&
+                !GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error)) {
+              expression.clear();
+            }
           }
         }
+        fragBuilder->appendCall(args.outputColor, entry, callArgs, "", expression);
         return;
       }
     }
