@@ -145,7 +145,7 @@ ImageReader::ReadResult ImageReader::readTexture(uint64_t version, Context* cont
       break;
     }
   }
-  if (!delivered || textureView == nullptr) {
+  if (!delivered) {
     return {};
   }
   textureVersion = version;
