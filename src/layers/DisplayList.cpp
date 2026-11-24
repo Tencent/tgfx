@@ -801,8 +801,16 @@ void DisplayList::captureBackgroundsByLevel(
         }
       }
       // Tiles whose styles all read the tile need no snapshot at all; the rest share one capture,
-      // which the capturer culls to the layers a background style samples.
+      // which the capturer culls to the layers a background style samples. The read-only tiles
+      // still get an empty map: a null one would swap the consumer for the NoOp handler and the
+      // styles would not be drawn at all.
       if (levelRects.empty()) {
+        auto emptyMap = std::make_unique<BackgroundSnapshotMap>();
+        auto snapshotIndex = static_cast<int>(levelSnapshots->size());
+        levelSnapshots->push_back(std::move(emptyMap));
+        for (auto index : levelEntry.second) {
+          (*taskSnapshotIndex)[index] = snapshotIndex;
+        }
         continue;
       }
       const auto levelStart = std::chrono::steady_clock::now();
