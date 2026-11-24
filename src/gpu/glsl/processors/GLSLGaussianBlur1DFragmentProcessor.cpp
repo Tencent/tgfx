@@ -114,6 +114,54 @@ void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
           callArgs.push_back(kernelName + "[" + std::to_string(slot) + "]");
         }
         fragBuilder->appendCall(args.outputColor, entry, callArgs);
+        if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID &&
+            childCoords[0].type() == SLType::Float2) {
+          const auto samplerValue = args.samplerValue(childSamplers[0]);
+          if (samplerValue != INVALID_VALUE_ID) {
+            const auto zero = args.irBuilder->CreateConstant(0.0f);
+            const auto one = args.irBuilder->CreateConstant(1.0f);
+            const auto zero4 =
+                args.irBuilder->CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
+            const auto one2 = args.irBuilder->CreateConstruct(SLType::Float2, {one, one});
+            const auto coordValue = args.irBuilder->InternValue(
+                childCoords[0].name(), SLType::Float2, Precision::High, IRValueKind::Local);
+            const auto texelSizeValue = args.irBuilder->InternValue(
+                texelSizeName, SLType::Float2, Precision::High, IRValueKind::Uniform);
+            const auto radiusValue = args.irBuilder->InternValue(
+                radiusName, SLType::Int, Precision::High, IRValueKind::Uniform);
+            const auto subsetValue =
+                subset == "vec4(0.0)"
+                    ? zero4
+                    : args.irBuilder->InternValue(subset, SLType::Float4, Precision::High,
+                                                  IRValueKind::Uniform);
+            const auto clampValue =
+                clamp == "vec4(0.0)"
+                    ? zero4
+                    : args.irBuilder->InternValue(clamp, SLType::Float4, Precision::High,
+                                                  IRValueKind::Uniform);
+            const auto dimensionValue =
+                dimension == "vec2(1.0)"
+                    ? one2
+                    : args.irBuilder->InternValue(dimension, SLType::Float2, Precision::High,
+                                                  IRValueKind::Uniform);
+            const auto kernelValue = args.irBuilder->InternValue(
+                kernelName, SLType::Float4, Precision::High, IRValueKind::UniformArray);
+            const auto modeXValue =
+                args.irBuilder->CreateIntConstant(tiledRead ? tiled.shaderModeX : 0);
+            const auto modeYValue =
+                args.irBuilder->CreateIntConstant(tiledRead ? tiled.shaderModeY : 0);
+            const auto seamValue =
+                args.irBuilder->CreateIntConstant(tiledRead && tiled.seamBlend ? 1 : 0);
+            const auto borderValue =
+                args.irBuilder->CreateIntConstant(tiledRead && tiled.borderPass ? 1 : 0);
+            const auto result = args.irBuilder->CreateCall(
+                OperatorID::GaussianBlur1D, SLType::Float4,
+                {samplerValue, coordValue, texelSizeValue, radiusValue, subsetValue, modeXValue,
+                 modeYValue, clampValue, dimensionValue, seamValue, borderValue, kernelValue},
+                args.outputColor);
+            args.irBuilder->StoreOutput(args.outputValue, result);
+          }
+        }
         return;
       }
     }
