@@ -18,6 +18,7 @@
 
 #include "GLSLPorterDuffXferProcessor.h"
 #include "gpu/glsl/GLSLBlend.h"
+#include "gpu/ir/ProgramIRBuilder.h"
 
 namespace tgfx {
 PlacementPtr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlockAllocator* allocator,
@@ -35,6 +36,12 @@ void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   auto uniformHandler = args.uniformHandler;
   const auto& dstColor = fragBuilder->dstColor();
+  if (args.irBuilder != nullptr && args.inputColorValue != INVALID_VALUE_ID &&
+      args.inputCoverageValue != INVALID_VALUE_ID && args.outputValue != INVALID_VALUE_ID) {
+    const auto result = args.irBuilder->CreateBinary(IRBinaryOp::Mul, SLType::Float4,
+                                                     args.inputColorValue, args.inputCoverageValue);
+    args.irBuilder->StoreOutput(args.outputValue, result);
+  }
 
   if (args.dstTextureSamplerHandle.isValid()) {
     // While shaders typically don't output negative coverage, we use <= as a precaution against

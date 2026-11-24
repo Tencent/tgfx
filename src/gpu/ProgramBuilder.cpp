@@ -180,16 +180,24 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
     }
     return INVALID_VALUE_ID;
   };
-  const auto inputColorValue =
-      findIRValue(inputColor) != INVALID_VALUE_ID
-          ? findIRValue(inputColor)
-          : programIRBuilder().InternValue(inputColor, SLType::Float4, Precision::High,
-                                           IRValueKind::Local);
-  const auto inputCoverageValue =
-      findIRValue(inputCoverage) != INVALID_VALUE_ID
-          ? findIRValue(inputCoverage)
-          : programIRBuilder().InternValue(inputCoverage, SLType::Float4, Precision::High,
-                                           IRValueKind::Local);
+  auto resolveInput = [&](const std::string& name) {
+    const auto existing = findIRValue(name);
+    if (existing != INVALID_VALUE_ID) {
+      return existing;
+    }
+    if (name == "vec4(1.0)" || name == "1.0") {
+      const auto one = programIRBuilder().CreateConstant(1.0f);
+      return programIRBuilder().CreateConstruct(SLType::Float4, {one, one, one, one});
+    }
+    if (name == "vec4(0.0)" || name == "0.0") {
+      const auto zero = programIRBuilder().CreateConstant(0.0f);
+      return programIRBuilder().CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
+    }
+    return programIRBuilder().InternValue(name, SLType::Float4, Precision::High,
+                                          IRValueKind::Local);
+  };
+  const auto inputColorValue = resolveInput(inputColor);
+  const auto inputCoverageValue = resolveInput(inputCoverage);
   const auto outputValue = programIRBuilder().CreateValue(SLType::Float4, Precision::High,
                                                           IRValueKind::Local, "fragmentOutput");
   XferProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), inputColor, inputCoverage,
