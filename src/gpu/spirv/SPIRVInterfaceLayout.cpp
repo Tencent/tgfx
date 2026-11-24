@@ -67,4 +67,20 @@ bool SPIRVInterfaceLayout::Build(const InterfaceIR& interface, std::string* erro
   return true;
 }
 
+bool SPIRVInterfaceLayout::Append(const SPIRVInterfaceLayout& other, std::string* error) {
+  for (const auto& binding : other.descriptorBindings) {
+    for (const auto& existing : descriptorBindings) {
+      if (existing.set == binding.set && existing.binding == binding.binding) {
+        if (error != nullptr) {
+          *error = "descriptor set " + std::to_string(binding.set) + " binding " +
+                   std::to_string(binding.binding) + " is declared twice";
+        }
+        return false;
+      }
+    }
+    descriptorBindings.push_back(binding);
+  }
+  return true;
+}
+
 }  // namespace tgfx
