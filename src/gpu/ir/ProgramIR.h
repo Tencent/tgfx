@@ -101,6 +101,9 @@ struct IRExpr {
   OperatorID op = INVALID_OPERATOR_ID;
   IRBinaryOp binaryOp = IRBinaryOp::Add;
   std::string swizzle = {};
+  SLType samplerType = SLType::Void;
+  int32_t samplerSwizzleCode = -1;
+  bool subsetClamped = false;
 };
 
 /// A destination value, optionally narrowed to a swizzle such as yuv.x.

@@ -100,7 +100,8 @@ TextureReadResult FragmentShaderBuilder::readTexture(SamplerHandle handle,
           irBuilder->InternValue(coordName, coordType, Precision::High, IRValueKind::Local);
       if (coordValue != INVALID_VALUE_ID) {
         result.value =
-            irBuilder->CreateTextureSample(samplerValue, coordValue, SLType::Float4, temp);
+            irBuilder->CreateTextureSample(samplerValue, coordValue, SLType::Float4, temp,
+                                           sampler.type(), swizzleCode, clampInside);
       }
     }
     return result;
@@ -112,7 +113,8 @@ TextureReadResult FragmentShaderBuilder::readTexture(SamplerHandle handle,
     const auto coordValue =
         irBuilder->InternValue(finalCoord, coordType, Precision::High, IRValueKind::Local);
     if (coordValue != INVALID_VALUE_ID) {
-      result.value = irBuilder->CreateTextureSample(samplerValue, coordValue, SLType::Float4, temp);
+      result.value = irBuilder->CreateTextureSample(samplerValue, coordValue, SLType::Float4, temp,
+                                                    sampler.type(), swizzleCode, clampInside);
     }
   }
   return result;

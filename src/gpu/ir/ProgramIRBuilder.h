@@ -63,7 +63,8 @@ class ProgramIRBuilder {
   ValueID CreateCall(OperatorID op, SLType type, const std::vector<ValueID>& args);
 
   ValueID CreateTextureSample(ValueID sampler, ValueID coordinate, SLType type,
-                              std::string debugName = {});
+                              std::string debugName = {}, SLType samplerType = SLType::Void,
+                              int32_t samplerSwizzleCode = -1, bool subsetClamped = false);
 
   void Assign(LValue dst, ValueID src);
 
