@@ -26,21 +26,50 @@ namespace tgfx {
 class TextureView;
 class ImageStream;
 
-/** Deferred sequential consumption. Reads never wait for producer notifications.
- * Each read drains immediately available contents with a fixed bound, without a target or deadline.
- * A buffer reports Pending until read, Ready once delivered, or terminal Expired when not delivered.
- * Ready reports a successful native read, not that it matches any caller's expected timestamp.
- * All buffers share a context-bound native texture, so prior delivered buffers have limited lifetime.
- * Acquisition itself does not dequeue. Redraw is valid only while the buffer has not expired.
- * Preserve an independent rendered output when retaining pixels across later source reads.
+/**
+ * Defers sequential image delivery until texture generation. All acquired buffers share a native
+ * texture bound to one Context and must be rendered with that Context. Reads consume immediately
+ * available contents with a bounded number of attempts, without waiting for producer notifications
+ * or selecting a target timestamp. GPU, driver, and lock operations have no bounded completion time.
+ * Delivered pixels remain valid only until their buffer expires. Preserve an independent rendered
+ * output to retain pixels across later source reads.
  */
 class ImageReader {
  public:
   virtual ~ImageReader() = default;
+
+  /**
+   * Returns the width of the source images in pixels.
+   */
   int width() const;
+
+  /**
+   * Returns the height of the source images in pixels.
+   */
   int height() const;
+
+  /**
+   * Returns the ColorSpace of the source images, or nullptr if unspecified.
+   */
   const std::shared_ptr<ColorSpace>& colorSpace() const;
+
+  /**
+   * Acquires a Pending buffer without dequeuing source contents. Its first texture-generation read
+   * delivers Ready pixels or reaches terminal Expired if no content is delivered, without waiting
+   * for a producer notification. An Expired buffer cannot retry; acquire a new buffer instead.
+   * Each acquisition expires older undelivered Pending buffers. A previously Ready buffer remains
+   * available for redraw while the shared native contents are known unchanged, but expires after a
+   * later native mutation or a failed read whose effect on those contents is unknown.
+   * Ready means successful delivery, not a match for a caller's target frame. Use timestamp() for
+   * the actual delivered presentation timestamp after texture generation completes.
+   */
   std::shared_ptr<ImageBuffer> acquireBuffer();
+
+  /**
+   * Forwards to acquireBuffer() with identical deferred-delivery and lifetime semantics.
+   * Retained without deprecation for existing zero-argument source calls. It does not restore the
+   * former notification wait or guarantee compatibility with previously compiled binaries.
+   */
   std::shared_ptr<ImageBuffer> acquireNextBuffer();
 
  protected:

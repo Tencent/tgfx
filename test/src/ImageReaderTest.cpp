@@ -25,6 +25,36 @@
 
 namespace tgfx {
 namespace {
+class LegacyImageStream : public ImageStream {
+ public:
+  LegacyImageStream() : ImageStream(1, 1) {
+  }
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return space;
+  }
+  int creates = 0;
+  int updates = 0;
+  bool fails = false;
+
+ protected:
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override {
+    creates++;
+    if (fails) {
+      return nullptr;
+    }
+    uint8_t pixels[] = {7, 0, 0, 255};
+    return TextureView::MakeFormat(context, 1, 1, pixels, sizeof(pixels), PixelFormat::RGBA_8888,
+                                   mipmapped);
+  }
+  bool onUpdateTexture(std::shared_ptr<TextureView>) override {
+    updates++;
+    return !fails;
+  }
+
+ private:
+  std::shared_ptr<ColorSpace> space = nullptr;
+};
+
 class ThreeStateStream : public ImageStream {
  public:
   ThreeStateStream() : ImageStream(1, 1) {
@@ -58,7 +88,7 @@ class ThreeStateStream : public ImageStream {
     texture = TextureView::MakeFormat(context, 1, 1, pixels, sizeof(pixels), PixelFormat::RGBA_8888,
                                       mipmapped);
     boundTimestamp = frame.timestamp;
-    return {std::move(texture), true, boundTimestamp, true, false};
+    return {std::move(texture), true, boundTimestamp, true, false, true};
   }
 
  private:
@@ -83,6 +113,51 @@ static void ExpectIdentity(Context* context, const std::shared_ptr<TextureView>&
   EXPECT_EQ(pixels[3], 255);
 }
 }  // namespace
+
+TGFX_TEST_PRIVATE(ImageReaderTest, LegacyAdapterPerformsOneOperationPerAcquisition) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<LegacyImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); auto first = reader->acquireBuffer();
+      ExpectIdentity(context, TextureView::MakeFrom(context, first), 7);
+      EXPECT_EQ(stream->creates, 1); EXPECT_EQ(stream->updates, 0);
+      EXPECT_EQ(first->state(), ImageBufferState::Ready); EXPECT_EQ(first->timestamp(), -1);
+      auto second = reader->acquireBuffer(); auto texture = TextureView::MakeFrom(context, second);
+      ExpectIdentity(context, texture, 7); EXPECT_EQ(stream->creates, 1);
+      EXPECT_EQ(stream->updates, 1); EXPECT_EQ(TextureView::MakeFrom(context, second), texture);
+      EXPECT_EQ(stream->updates, 1);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, LegacyAdapterFailureCanRecoverWithNewCredential) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<LegacyImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); stream->fails = true;
+      auto first = reader->acquireBuffer();
+      EXPECT_EQ(TextureView::MakeFrom(context, first), nullptr);
+      EXPECT_EQ(first->state(), ImageBufferState::Expired); EXPECT_EQ(stream->creates, 1);
+      stream->fails = false; auto next = reader->acquireBuffer();
+      ExpectIdentity(context, TextureView::MakeFrom(context, next), 7);
+      EXPECT_EQ(stream->creates, 2); stream->fails = true; auto failed = reader->acquireBuffer();
+      EXPECT_EQ(TextureView::MakeFrom(context, failed), nullptr); EXPECT_EQ(stream->updates, 1);
+      EXPECT_EQ(failed->state(), ImageBufferState::Expired); stream->fails = false;
+      auto recovered = reader->acquireBuffer();
+      ExpectIdentity(context, TextureView::MakeFrom(context, recovered), 7);
+      EXPECT_EQ(stream->updates, 2); EXPECT_EQ(recovered->state(), ImageBufferState::Ready);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, LegacyAdapterInitializesNewReaderWithUnchangedPixels) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<LegacyImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); auto first = reader->acquireBuffer();
+      ExpectIdentity(context, TextureView::MakeFrom(context, first), 7);
+      auto replacementStream = std::make_shared<LegacyImageStream>();
+      auto replacementReader = ImageReader::MakeFrom(replacementStream);
+      auto next = replacementReader->acquireBuffer();
+      ExpectIdentity(context, TextureView::MakeFrom(context, next), 7);
+      EXPECT_EQ(replacementStream->creates, 1); EXPECT_EQ(replacementStream->updates, 0);)
+}
 
 TGFX_TEST_PRIVATE(ImageReaderTest, LateNotificationWithoutNewContentDoesNotPublish) {
   TGFX_PRIVATE_ACCESS(

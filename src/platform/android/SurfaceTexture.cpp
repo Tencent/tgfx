@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "platform/android/SurfaceTexture.h"
-#include <chrono>
 #include "HandlerThread.h"
 #include "JNIUtil.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -26,7 +25,6 @@
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLTexture.h"
 #include "gpu/resources/DefaultTextureView.h"
-#include "tgfx/core/Clock.h"
 
 namespace tgfx {
 static Global<jclass> SurfaceTextureClass;
@@ -207,7 +205,6 @@ void SurfaceTexture::notifyFrameAvailable() {
   // frame-available event until you have called the SurfaceTexture.updateTexImage().
   std::lock_guard<std::mutex> autoLock(locker);
   frameAvailable = true;
-  condition.notify_all();
 }
 
 static ISize ComputeTextureSize(const float matrix[16], int width, int height) {
@@ -256,8 +253,8 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
   if (textureView == nullptr) {
     {
       std::lock_guard<std::mutex> lock(locker);
-      if (!frameAvailable && !hasLatchedFrame) {
-        return {nullptr, false, -1, false, false};
+      if (!frameAvailable) {
+        return {nullptr, false, lastLatchedTimestamp, false, false};
       }
     }
     textureID = makeExternalOESTexture(context);
@@ -267,8 +264,8 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
   }
   auto result = updateTexImage();
   if (textureView != nullptr) {
-    return {std::move(textureView), result.advanced, result.timestamp, result.contentChanged,
-            result.failed};
+    return {std::move(textureView), result.advanced, result.timestamp,
+            result.contentChanged,  result.failed,   true};
   }
   if (!result.advanced) {
     releaseExternalOESTexture(context, textureID);
@@ -294,8 +291,8 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
   auto texture = gpu->makeResource<GLTexture>(
       descriptor, static_cast<unsigned>(GL_TEXTURE_EXTERNAL_OES), textureID);
   textureView = Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
-  return {std::move(textureView), result.advanced, result.timestamp, result.contentChanged,
-          result.failed};
+  return {std::move(textureView), result.advanced, result.timestamp,
+          result.contentChanged,  result.failed,   true};
 }
 
 bool SurfaceTexture::latchTexture(JNIEnv* env) {
@@ -360,6 +357,11 @@ void SurfaceTexture::releaseExternalOESTexture(Context* context, unsigned textur
 
 SurfaceTexture::FrameUpdateResult SurfaceTexture::updateTexImage() {
   std::unique_lock<std::mutex> lock(locker);
+  // No notification is not proof of an empty native queue, but no JNI call is proof this read
+  // leaves its content unchanged. A late notification is handled by a later acquisition.
+  if (!frameAvailable) {
+    return {false, lastLatchedTimestamp, textureSize, false, false};
+  }
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
@@ -380,6 +382,7 @@ SurfaceTexture::FrameUpdateResult SurfaceTexture::updateTexImage() {
   hasLatchedFrame = true;
   lastLatchedTimestamp = timestamp;
   resolveTextureSize(env);
+  // Every actual latch can replace pixels, even when its timestamp equals the previous one.
   return {advanced, timestamp, textureSize, true, false};
 }
 

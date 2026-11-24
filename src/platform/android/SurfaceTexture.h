@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <condition_variable>
 #include "platform/ImageStream.h"
 #include "tgfx/platform/android/Global.h"
 
@@ -70,7 +69,6 @@ class SurfaceTexture : public ImageStream {
 
  private:
   std::mutex locker = {};
-  std::condition_variable condition = {};
   Global<jobject> surfaceTexture;
   bool frameAvailable = false;
   bool textureSizeResolved = false;

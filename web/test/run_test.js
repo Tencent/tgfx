@@ -8,7 +8,9 @@ const WEB_TEST_DIR = __dirname;
 const PROJECT_ROOT = path.resolve(WEB_TEST_DIR, '../..');
 const DOWNLOADS_DIR = path.join(WEB_TEST_DIR, '.downloads');
 const PORT = 8082;
-const TEST_URL = `http://127.0.0.1:${PORT}/index.html`;
+const filterArg = process.argv.find(a => a.startsWith('--filter='));
+const TEST_FILTER = filterArg ? filterArg.slice('--filter='.length) : '';
+const TEST_URL = `http://127.0.0.1:${PORT}/index.html${TEST_FILTER ? `?filter=${encodeURIComponent(TEST_FILTER)}` : ''}`;
 const TIMEOUT_MS = 10 * 60 * 1000;
 
 // Determine backend from --backend argument (default: webgl).

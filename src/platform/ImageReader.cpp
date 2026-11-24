@@ -106,17 +106,19 @@ std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t version, Context*
     state.store(ImageBufferState::Expired, std::memory_order_release);
     return nullptr;
   }
+  // Bound one read when a producer continuously queues images and timestamps never stop advancing.
+  // This limits consumption attempts, not driver/GPU execution time or the distance to a target.
   constexpr int MAX_CONSUMPTIONS = 8;
   bool delivered = false;
   int64_t deliveredTimestamp = -1;
   for (int count = 0; count < MAX_CONSUMPTIONS; count++) {
     auto result = stream->onReadTexture(context, mipmapped, textureView);
-    if (result.contentChanged || result.texture != textureView) {
+    if (result.advanced || result.contentChanged || result.texture != textureView) {
       textureVersion = 0;
       if (textureView) {
         textureView->removeUniqueKey();
       }
-      if (result.texture) {
+      if (result.texture && result.texture != textureView) {
         result.texture->removeUniqueKey();
       }
     }
@@ -130,6 +132,9 @@ std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t version, Context*
     }
     delivered = true;
     deliveredTimestamp = result.timestamp;
+    if (!result.canContinue) {
+      break;
+    }
   }
   if (!delivered || textureView == nullptr) {
     state.store(ImageBufferState::Expired, std::memory_order_release);

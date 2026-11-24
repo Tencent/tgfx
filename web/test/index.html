@@ -99,7 +99,10 @@
             };
         }
         // When Asyncify is enabled, ccall returns a Promise; await handles both Asyncify and non-Asyncify cases.
-        const result = await module.ccall('RunAllTests', 'number', [], [], {async: true});
+        const filter = new URLSearchParams(window.location.search).get('filter');
+        const result = filter
+            ? await module.ccall('RunTest', 'number', ['string'], [filter], {async: true})
+            : await module.ccall('RunAllTests', 'number', [], [], {async: true});
         console.log('All tests finished with exit code:', result);
         exitCodeReported = true;
         await downloadOutputDir(module.FS, '/test/baseline-out', 'baseline-out.zip');
