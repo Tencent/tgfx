@@ -173,6 +173,39 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
     fragBuilder->codeAppend(";");
     fragBuilder->codeAppend("alpha = clamp(alpha, 0.0, 1.0);");
     fragBuilder->codeAppend("color = vec4(color.rgb * alpha.r, alpha.r);");
+    if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID) {
+      const auto alphaSampler = args.samplerValue(textureSampler);
+      const auto alphaStartValue = args.irBuilder->InternValue(
+          alphaStartName, SLType::Float2, Precision::High, IRValueKind::Uniform);
+      const auto coordValue = args.irBuilder->InternValue(alphaVertexColor, SLType::Float2,
+                                                          Precision::High, IRValueKind::Local);
+      if (alphaSampler != INVALID_VALUE_ID && alphaStartValue != INVALID_VALUE_ID &&
+          coordValue != INVALID_VALUE_ID) {
+        const auto colorValue = args.irBuilder->InternValue("color", SLType::Float4,
+                                                            Precision::High, IRValueKind::Local);
+        if (read.value != INVALID_VALUE_ID) {
+          args.irBuilder->Assign({colorValue, ""}, read.value);
+        }
+        const auto zero = args.irBuilder->CreateConstant(0.0f);
+        const auto one = args.irBuilder->CreateConstant(1.0f);
+        const auto clampedColor =
+            args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::Clamp),
+                                       SLType::Float4, {colorValue, zero, one});
+        const auto alphaSample = args.irBuilder->CreateTextureSample(
+            alphaSampler, coordValue, SLType::Float4, "alpha", SLType::Texture2DSampler);
+        const auto clampedAlpha =
+            args.irBuilder->CreateCall(static_cast<OperatorID>(BuiltinOperator::Clamp),
+                                       SLType::Float4, {alphaSample, zero, one});
+        const auto alphaR = args.irBuilder->CreateSwizzle(clampedAlpha, SLType::Float, "r");
+        const auto colorRgb = args.irBuilder->CreateSwizzle(clampedColor, SLType::Float3, "rgb");
+        const auto premultiplied =
+            args.irBuilder->CreateBinary(IRBinaryOp::Mul, SLType::Float3, colorRgb, alphaR);
+        const auto result =
+            args.irBuilder->CreateConstruct(SLType::Float4, {premultiplied, alphaR});
+        args.irBuilder->Assign({colorValue, ""}, result);
+        args.irBuilder->StoreOutput(args.outputValue, result);
+      }
+    }
   }
   fragBuilder->storeColor(args.outputColor, "color");
 }

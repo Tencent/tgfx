@@ -42,6 +42,7 @@ enum class BuiltinOperator : OperatorID {
   ColorMatrix = 3,
   AlphaThreshold = 4,
   YUVToRGB = 5,
+  Clamp = 6,
 };
 
 enum class Precision : uint8_t {
