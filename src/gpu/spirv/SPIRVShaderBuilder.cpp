@@ -827,7 +827,18 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
       writer.Sink(&writer.func);
       const auto id = writer.NewId();
       writer.Inst(spirv::kOpImageSampleImplicitLod, {type, id, sampledImage, coordinate});
-      return id;
+      if (expr.samplerSwizzleCode <= 0 || expr.samplerSwizzleCode > 5 ||
+          type != TypeId(SLType::Float4, error)) {
+        return id;
+      }
+      static constexpr uint32_t swizzleIndices[6][4] = {
+          {0, 1, 2, 3}, {0, 0, 0, 0}, {0, 0, 0, 3}, {0, 1, 0, 1}, {3, 3, 3, 3}, {2, 1, 0, 3},
+      };
+      const auto swizzled = writer.NewId();
+      const auto& indices = swizzleIndices[expr.samplerSwizzleCode];
+      writer.Inst(spirv::kOpVectorShuffle,
+                  {type, swizzled, id, id, indices[0], indices[1], indices[2], indices[3]});
+      return swizzled;
     }
     case IRExprKind::Call: {
       const auto* desc = FindOperator(expr.op);
