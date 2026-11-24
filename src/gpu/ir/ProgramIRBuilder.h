@@ -82,6 +82,8 @@ class ProgramIRBuilder {
   uint32_t nextAttributeLocation = 0;
   uint32_t nextVaryingLocation = 0;
   uint32_t nextSamplerBinding = 0;
+  uint32_t vertexUniformCursor = 0;
+  uint32_t fragmentUniformCursor = 0;
 };
 
 }  // namespace tgfx

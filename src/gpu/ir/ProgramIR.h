@@ -164,6 +164,10 @@ struct UniformIR {
   ShaderStage stage = ShaderStage::Fragment;
   uint32_t count = 1;
   uint32_t binding = 0;
+  /// std140 offsets and sizes, matching the CPU-side UniformData layout.
+  uint32_t offset = 0;
+  uint32_t size = 0;
+  uint32_t arrayStride = 0;
 };
 
 struct SamplerIR {

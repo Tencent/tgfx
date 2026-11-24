@@ -105,6 +105,26 @@ TEST(ProgramIRTest, InternsInterfaceResources) {
   EXPECT_TRUE(ValidateProgramIR(builder.IR(), &error)) << error;
 }
 
+TEST(ProgramIRTest, LaysOutUniformsWithStd140) {
+  ProgramIRBuilder builder = {};
+  builder.AddUniform({"u0", SLType::Float4, Precision::High, ShaderStage::Fragment, 1});
+  builder.AddUniform({"u1", SLType::Float, Precision::High, ShaderStage::Fragment, 1});
+  builder.AddUniform({"u2", SLType::Float4, Precision::High, ShaderStage::Fragment, 1});
+  builder.AddUniform({"u3", SLType::Float3, Precision::High, ShaderStage::Fragment, 1});
+  builder.AddUniform({"u4", SLType::Float4, Precision::High, ShaderStage::Fragment, 2});
+
+  const auto& uniforms = builder.Interface().uniforms;
+  ASSERT_EQ(uniforms.size(), 5u);
+  EXPECT_EQ(uniforms[0].offset, 0u);
+  EXPECT_EQ(uniforms[1].offset, 16u);
+  EXPECT_EQ(uniforms[2].offset, 32u);
+  EXPECT_EQ(uniforms[3].offset, 48u);
+  EXPECT_EQ(uniforms[3].size, 12u);
+  EXPECT_EQ(uniforms[4].offset, 64u);
+  EXPECT_EQ(uniforms[4].arrayStride, 16u);
+  EXPECT_EQ(uniforms[4].size, 32u);
+}
+
 TEST(ProgramIRTest, RejectsDuplicateSamplerBindings) {
   ProgramIR program = {};
   ResourceBinding first = {};
