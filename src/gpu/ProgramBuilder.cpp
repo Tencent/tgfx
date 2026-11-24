@@ -78,11 +78,18 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
   vertexShaderBuilder()->codeAppendf("// Processor%d : %s\n", processorIndex,
                                      geometryProcessor->name().c_str());
 
+  for (const auto& attribute : geometryProcessor->vertexAttributes()) {
+    programIRBuilder().AddAttribute(
+        {ShaderVar(attribute).name(), ShaderVar(attribute).type(), Precision::High, 0});
+  }
   GeometryProcessor::FPCoordTransformHandler transformHandler(programInfo, &transformedCoordVars);
   GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(),
                                    uniformHandler(), getContext()->shaderCaps(), *outputColor,
-                                   *outputCoverage, &transformHandler, &subsetVarName);
+                                   *outputCoverage, &transformHandler, &subsetVarName,
+                                   &programIRBuilder());
+  programIRBuilder().SetStage(ShaderStage::Vertex);
   geometryProcessor->emitCode(args);
+  programIRBuilder().SetStage(ShaderStage::Fragment);
   fragmentShaderBuilder()->codeAppend("}");
 }
 

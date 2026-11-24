@@ -113,6 +113,11 @@ const IRValue* ProgramIRBuilder::FindValue(const std::string& name) const {
 }
 
 ValueID ProgramIRBuilder::AddAttribute(AttributeIR attribute) {
+  for (const auto& existing : ir.interface.attributes) {
+    if (existing.name == attribute.name) {
+      return InternValue(existing.name, existing.type, existing.precision, IRValueKind::Attribute);
+    }
+  }
   const auto precision = Precision::High;
   attribute.location = nextAttributeLocation++;
   const auto id = InternValue(attribute.name, attribute.type, precision, IRValueKind::Attribute);

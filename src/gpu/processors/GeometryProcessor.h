@@ -31,6 +31,8 @@
 #include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
+class ProgramIRBuilder;
+
 class GeometryProcessor : public Processor {
  public:
   // Use only for easy-to-use aliases.
@@ -71,11 +73,12 @@ class GeometryProcessor : public Processor {
     EmitArgs(VertexShaderBuilder* vertBuilder, FragmentShaderBuilder* fragBuilder,
              VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const ShaderCaps* caps,
              std::string outputColor, std::string outputCoverage,
-             FPCoordTransformHandler* transformHandler, std::string* outputSubset)
+             FPCoordTransformHandler* transformHandler, std::string* outputSubset,
+             ProgramIRBuilder* irBuilder = nullptr)
         : vertBuilder(vertBuilder), fragBuilder(fragBuilder), varyingHandler(varyingHandler),
           uniformHandler(uniformHandler), caps(caps), outputColor(std::move(outputColor)),
           outputCoverage(std::move(outputCoverage)), fpCoordTransformHandler(transformHandler),
-          outputSubset(outputSubset) {
+          outputSubset(outputSubset), irBuilder(irBuilder) {
     }
     VertexShaderBuilder* vertBuilder;
     FragmentShaderBuilder* fragBuilder;
@@ -86,6 +89,7 @@ class GeometryProcessor : public Processor {
     const std::string outputCoverage;
     FPCoordTransformHandler* fpCoordTransformHandler;
     std::string* outputSubset = nullptr;
+    ProgramIRBuilder* irBuilder = nullptr;
   };
 
   virtual void emitCode(EmitArgs&) const = 0;
