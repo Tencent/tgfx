@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include "GLSLFragmentPrinter.h"
 #include "GLSLVertexPrinter.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
@@ -131,6 +132,7 @@ GLSLProgramBuilder::GLSLProgramBuilder(Context* context, const ProgramInfo* prog
     : ProgramBuilder(context, programInfo), _varyingHandler(this), _uniformHandler(this),
       _vertexBuilder(this), _fragBuilder(this) {
   _vertexBuilder.setVertexRecorder(&description.vertexCalls);
+  _fragBuilder.setFragmentRecorder(&description.fragment);
 }
 
 std::string GLSLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
@@ -204,6 +206,7 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     description.interface.samplers.push_back({sampler.name()});
   }
   _vertexBuilder.setCodeText(PrintGLSLVertexProgram(description.vertexCalls));
+  _fragBuilder.setCodeText(PrintGLSLFragmentProgram(description.fragment));
   // Diagnostic dump of the emitted stage texts (TGFX_DUMP_PROGRAM=dir): the FP-tree route's
   // shader is otherwise only visible to the driver. Static counter, one file per program.
   if (const char* dumpDir = std::getenv("TGFX_DUMP_PROGRAM")) {

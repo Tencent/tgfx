@@ -18,31 +18,14 @@
 
 #pragma once
 
-#include <cstdint>
+#include <string>
+#include "gpu/ir/ProgramDescription.h"
 
 namespace tgfx {
 
-/// The shader library bundle is one file carrying the function sources of every target language.
-/// A package may keep only the sections its platform needs; the header and section table stay
-/// self-contained so a trimmed bundle still parses.
-constexpr uint32_t SHADER_LIBRARY_BUNDLE_VERSION = 1;
-constexpr uint32_t SHADER_LIBRARY_BUNDLE_HEADER_SIZE = 32;
-constexpr uint32_t SHADER_LIBRARY_BUNDLE_SECTION_SIZE = 24;
-constexpr uint32_t SHADER_LIBRARY_BUNDLE_FUNCTION_SIZE = 16;
-constexpr char SHADER_LIBRARY_BUNDLE_MAGIC[] = "TGFXSLB1";
-
-/// The output language of one section. The values are part of the file format, so new languages
-/// append instead of renumbering.
-enum class ShaderLibraryLanguage : uint32_t {
-  GLSL = 1,
-  MSL = 2,
-  HLSL = 3,
-  WGSL = 4,
-  SPIRV = 5,
-};
-
-constexpr uint32_t ShaderLibraryLanguageMask(ShaderLibraryLanguage language) {
-  return 1u << (static_cast<uint32_t>(language) - 1u);
-}
+/// Replays the fragment instructions as GLSL. This phase prints the raw statement chunks the
+/// existing FP emission produced and keeps the structured calls as metadata for the typed lowering
+/// that follows; the text ends with the closing brace of main.
+std::string PrintGLSLFragmentProgram(const FragmentProgram& program);
 
 }  // namespace tgfx

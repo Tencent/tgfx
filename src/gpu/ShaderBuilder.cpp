@@ -68,13 +68,20 @@ void ShaderBuilder::codeAppend(const std::string& str) {
   if (str.empty()) {
     return;
   }
-  appendIndentationIfNeeded(str);
   auto& code = shaderStrings[Type::Code];
+  const size_t start = code.size();
+  appendIndentationIfNeeded(str);
   code += str;
   if (NeedsAppendEnter(code)) {
     appendEnterIfNotEmpty(Type::Code);
   }
   atLineStart = code[code.size() - 1] == '\n';
+  if (fragmentProgramRecorder != nullptr && shaderStage() == ShaderStage::Fragment) {
+    FragmentInstruction instruction = {};
+    instruction.kind = FragmentInstructionKind::RawText;
+    instruction.text = code.substr(start);
+    fragmentProgramRecorder->instructions.push_back(std::move(instruction));
+  }
 }
 
 void ShaderBuilder::addFunction(const std::string& str) {

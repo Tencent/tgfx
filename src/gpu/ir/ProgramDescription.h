@@ -89,12 +89,41 @@ struct InterfaceDesc {
   std::vector<SamplerDesc> samplers = {};
 };
 
-/// One program's typed description. This phase carries the vertex stage and the interface; the
-/// fragment stage still emits its text through the existing builder until the instruction stream
-/// moves here.
+enum class FragmentInstructionKind : uint8_t {
+  /// A statement chunk the existing FP emission produced; replayed verbatim.
+  RawText,
+  /// A structured call the FP emission recorded; the printer can render it from the fields.
+  Call,
+};
+
+struct FragmentInstruction {
+  FragmentInstructionKind kind = FragmentInstructionKind::RawText;
+  /// The call's output variable.
+  std::string output = {};
+  /// The entry function name.
+  std::string function = {};
+  /// The call arguments, in call order.
+  std::vector<std::string> args = {};
+  /// The optional wrapper the call site applies around the function result.
+  std::string wrapType = {};
+  /// The raw statement chunk, already indented exactly as the inline emission spelled it.
+  std::string text = {};
+};
+
+/// The fragment stage's recorded instructions, in emission order. This phase keeps every existing
+/// statement as a raw chunk and records the structured calls beside them; the printer replays the
+/// raw chunks, so the output stays byte-identical while the call metadata is available to the
+/// typed lowering that follows.
+struct FragmentProgram {
+  std::vector<FragmentInstruction> instructions = {};
+};
+
+/// One program's typed description. The vertex stage and interface are structured; the fragment
+/// stage carries the recorded instructions above.
 struct ProgramDescription {
   InterfaceDesc interface = {};
   std::vector<VertexCall> vertexCalls = {};
+  FragmentProgram fragment = {};
 };
 
 }  // namespace tgfx

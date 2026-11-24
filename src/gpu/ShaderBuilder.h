@@ -25,6 +25,7 @@
 #include "gpu/SamplerHandle.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/Swizzle.h"
+#include "gpu/ir/ProgramDescription.h"
 #include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
@@ -97,6 +98,11 @@ class ShaderBuilder {
    */
   void setCallRecorder(std::vector<CallRecord>* records) {
     callRecorder = records;
+  }
+
+  /// The sink a GLSL fragment builder installs to record its statements and calls.
+  void setFragmentRecorder(FragmentProgram* program) {
+    fragmentProgramRecorder = program;
   }
 
   /**
@@ -179,6 +185,7 @@ class ShaderBuilder {
   std::vector<std::string> shaderStrings;
   std::set<std::string> emittedFunctions = {};
   std::vector<CallRecord>* callRecorder = nullptr;
+  FragmentProgram* fragmentProgramRecorder = nullptr;
   int tempCallIndex = 0;
   uint32_t emitOrder = 0;
   int clampedCoordIndex = 0;
