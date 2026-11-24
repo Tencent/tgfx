@@ -77,6 +77,8 @@ class ProgramIRBuilder {
 
   bool HasUniformBinding(ShaderStage stage) const;
 
+  UniformBlockIR& EnsureUniformBlock(ShaderStage stage, uint32_t binding);
+
   ProgramIR ir = {};
   std::unordered_map<std::string, ValueID> valuesByName = {};
   uint32_t nextAttributeLocation = 0;

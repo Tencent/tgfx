@@ -123,6 +123,8 @@ TEST(ProgramIRTest, LaysOutUniformsWithStd140) {
   EXPECT_EQ(uniforms[4].offset, 64u);
   EXPECT_EQ(uniforms[4].arrayStride, 16u);
   EXPECT_EQ(uniforms[4].size, 32u);
+  ASSERT_EQ(builder.Interface().uniformBlocks.size(), 1u);
+  EXPECT_EQ(builder.Interface().uniformBlocks[0].size, 96u);
 }
 
 TEST(ProgramIRTest, RejectsDuplicateSamplerBindings) {

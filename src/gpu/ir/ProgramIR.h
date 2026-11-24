@@ -170,6 +170,12 @@ struct UniformIR {
   uint32_t arrayStride = 0;
 };
 
+struct UniformBlockIR {
+  ShaderStage stage = ShaderStage::Fragment;
+  uint32_t binding = 0;
+  uint32_t size = 0;
+};
+
 struct SamplerIR {
   std::string name = {};
   SLType type = SLType::Void;
@@ -180,6 +186,7 @@ struct InterfaceIR {
   std::vector<AttributeIR> attributes = {};
   std::vector<VaryingIR> varyings = {};
   std::vector<UniformIR> uniforms = {};
+  std::vector<UniformBlockIR> uniformBlocks = {};
   std::vector<SamplerIR> samplers = {};
   std::vector<ResourceBinding> bindings = {};
 };

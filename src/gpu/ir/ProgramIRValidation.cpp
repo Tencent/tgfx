@@ -109,6 +109,36 @@ bool ValidateStatement(const ProgramIR& program, const IRStatement& statement, s
 }
 
 bool ValidateInterface(const InterfaceIR& interface, std::string* error) {
+  for (size_t i = 0; i < interface.uniformBlocks.size(); ++i) {
+    const auto& block = interface.uniformBlocks[i];
+    if (block.size % 16 != 0) {
+      *error = "a uniform block size must be aligned to 16 bytes";
+      return false;
+    }
+    for (size_t j = i + 1; j < interface.uniformBlocks.size(); ++j) {
+      if (block.stage == interface.uniformBlocks[j].stage) {
+        *error = "the interface contains two uniform blocks for one stage";
+        return false;
+      }
+    }
+  }
+  for (const auto& uniform : interface.uniforms) {
+    const UniformBlockIR* block = nullptr;
+    for (const auto& candidate : interface.uniformBlocks) {
+      if (candidate.stage == uniform.stage) {
+        block = &candidate;
+        break;
+      }
+    }
+    if (block == nullptr) {
+      *error = "uniform '" + uniform.name + "' has no uniform block";
+      return false;
+    }
+    if (uniform.offset + uniform.size > block->size) {
+      *error = "uniform '" + uniform.name + "' exceeds its uniform block";
+      return false;
+    }
+  }
   for (size_t i = 0; i < interface.bindings.size(); ++i) {
     const auto& first = interface.bindings[i];
     if (first.kind != BindingKind::Attribute && first.kind != BindingKind::Varying &&

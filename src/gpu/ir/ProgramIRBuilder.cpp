@@ -145,6 +145,19 @@ bool ProgramIRBuilder::HasUniformBinding(ShaderStage stage) const {
   return false;
 }
 
+UniformBlockIR& ProgramIRBuilder::EnsureUniformBlock(ShaderStage stage, uint32_t binding) {
+  for (auto& block : ir.interface.uniformBlocks) {
+    if (block.stage == stage) {
+      return block;
+    }
+  }
+  UniformBlockIR block = {};
+  block.stage = stage;
+  block.binding = binding;
+  ir.interface.uniformBlocks.push_back(block);
+  return ir.interface.uniformBlocks.back();
+}
+
 ValueID ProgramIRBuilder::AddUniform(UniformIR uniform) {
   uniform.binding = uniform.stage == ShaderStage::Vertex ? 0 : 1;
   const auto layout = LayoutOf(uniform.type);
@@ -165,6 +178,8 @@ ValueID ProgramIRBuilder::AddUniform(UniformIR uniform) {
     binding.precision = Precision::Default;
     ir.interface.bindings.push_back(binding);
   }
+  auto& block = EnsureUniformBlock(uniform.stage, uniform.binding);
+  block.size = AlignUp(cursor, 16);
   ir.interface.uniforms.push_back(std::move(uniform));
   return id;
 }
