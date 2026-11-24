@@ -672,7 +672,6 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   return renderRects;
 }
 
-
 // Walks the subtree a tile draws and reports whether any background style cannot read its backdrop
 // from the tile: offscreen composites (blend modes, group alpha, filters, masks, 3D) do not write
 // to the tile, and a style whose sample area leaves the tile or meets an earlier style output has
@@ -691,15 +690,13 @@ bool DisplayList::needsCapture(Layer* layer, const Rect& globalRect, float paren
   const float alpha = isRoot ? 1.0f : parentAlpha * layer->_alpha;
   const auto blendMode =
       isRoot ? BlendMode::SrcOver : static_cast<BlendMode>(layer->bitFields.blendMode);
-  bool childOffscreen =
-      offscreen || layer->canPreserve3D() || blendMode != BlendMode::SrcOver ||
-      layer->bitFields.hasBlendMode || !layer->bitFields.passThroughBackground ||
-      (alpha < 1.0f && layer->bitFields.allowsGroupOpacity) || !layer->_filters.empty() ||
-      layer->hasValidMask();
+  bool childOffscreen = offscreen || layer->canPreserve3D() || blendMode != BlendMode::SrcOver ||
+                        layer->bitFields.hasBlendMode || !layer->bitFields.passThroughBackground ||
+                        (alpha < 1.0f && layer->bitFields.allowsGroupOpacity) ||
+                        !layer->_filters.empty() || layer->hasValidMask();
   for (const auto& style : layer->_layerStyles) {
-    if (style == nullptr ||
-        (style->extraSourceType() & static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) ==
-            0) {
+    if (style == nullptr || (style->extraSourceType() &
+                             static_cast<uint32_t>(LayerStyleExtraSourceType::Background)) == 0) {
       continue;
     }
     const bool onTile = !childOffscreen && style->position() == LayerStylePosition::Below;
@@ -719,10 +716,10 @@ bool DisplayList::needsCapture(Layer* layer, const Rect& globalRect, float paren
     // styles sampling that area cannot read the tile.
     const auto childBlend = static_cast<BlendMode>(child->bitFields.blendMode);
     const bool childComposesOffscreen =
-        child->canPreserve3D() || childBlend != BlendMode::SrcOver || child->bitFields.hasBlendMode ||
-        !child->bitFields.passThroughBackground ||
-        (child->_alpha < 1.0f && child->bitFields.allowsGroupOpacity) ||
-        !child->_filters.empty() || child->hasValidMask();
+        child->canPreserve3D() || childBlend != BlendMode::SrcOver ||
+        child->bitFields.hasBlendMode || !child->bitFields.passThroughBackground ||
+        (child->_alpha < 1.0f && child->bitFields.allowsGroupOpacity) || !child->_filters.empty() ||
+        child->hasValidMask();
     if (childComposesOffscreen && Rect::Intersects(child->renderBounds, globalRect)) {
       childOffscreen = true;
     }

@@ -484,26 +484,16 @@ const LayerStyleSource* BackgroundConsumer::getCachedLayerStyleSource(Layer* lay
   return it->second.get();
 }
 
-
 bool BackgroundConsumer::CanReadTileBackdrop(const Layer* layer, const Rect& globalRect,
                                              const std::vector<Rect>& drawnBounds) {
   // The style samples its content area widened by the blur range.
   auto sampleBounds = layer->renderBounds;
   sampleBounds.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
   if (!globalRect.contains(sampleBounds)) {
-    std::printf("[TILE-READ] outside sample=(%.1f,%.1f,%.1f,%.1f) tile=(%.1f,%.1f,%.1f,%.1f)\n",
-                sampleBounds.left, sampleBounds.top, sampleBounds.right, sampleBounds.bottom,
-                globalRect.left, globalRect.top, globalRect.right, globalRect.bottom);
     return false;
   }
-  const bool clear = std::none_of(drawnBounds.begin(), drawnBounds.end(), [&](const Rect& bounds) {
-    return Rect::Intersects(bounds, sampleBounds);
-  });
-  if (!clear) {
-    std::printf("[TILE-READ] earlier style output intersects, sample=(%.1f,%.1f,%.1f,%.1f)\n",
-                sampleBounds.left, sampleBounds.top, sampleBounds.right, sampleBounds.bottom);
-  }
-  return clear;
+  return std::none_of(drawnBounds.begin(), drawnBounds.end(),
+                      [&](const Rect& bounds) { return Rect::Intersects(bounds, sampleBounds); });
 }
 
 bool BackgroundConsumer::CoversOwnStyleOutput(Layer* layer, float alpha) {
@@ -546,7 +536,6 @@ std::shared_ptr<Image> BackgroundConsumer::makeTileBackdrop(const DrawArgs& args
   // composited back into.
   auto snapshot = tileBackdrop->surface->makeImageSnapshot();
   if (snapshot == nullptr) {
-    std::printf("[TILE-READ] snapshot failed\n");
     return nullptr;
   }
   Point copyOffset = {};
@@ -554,7 +543,6 @@ std::shared_ptr<Image> BackgroundConsumer::makeTileBackdrop(const DrawArgs& args
                                          &copyOffset, args.dstColorSpace);
   snapshot = nullptr;
   if (backdropCopy == nullptr) {
-    std::printf("[TILE-READ] detached copy failed\n");
     return nullptr;
   }
   // Same layout as a captured snapshot: the layer's content rect in style space.
@@ -569,11 +557,9 @@ std::shared_ptr<Image> BackgroundConsumer::makeTileBackdrop(const DrawArgs& args
   recording->drawImage(std::move(backdropCopy));
   auto picture = recorder.finishRecordingAsPicture();
   if (picture == nullptr) {
-    std::printf("[TILE-READ] picture failed\n");
     return nullptr;
   }
-  return PictureUtils::ToImageWithOffset(std::move(picture), offset, &bounds,
-                                          args.dstColorSpace);
+  return PictureUtils::ToImageWithOffset(std::move(picture), offset, &bounds, args.dstColorSpace);
 }
 
 void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer,
@@ -601,11 +587,6 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   const auto contentOffset = contentSource->imageOffset();
   const auto contentWidth = static_cast<float>(contentSource->image()->width());
   const auto contentHeight = static_cast<float>(contentSource->image()->height());
-  std::printf("[BG-DISPATCH] albedo cover=%d hasTile=%d sameSurface=%d below=%d\n",
-              tileBackdrop.has_value() ? static_cast<int>(tileBackdrop->snapshotsCover) : -1,
-              tileBackdrop.has_value() ? 1 : 0,
-              tileBackdrop.has_value() && canvas->getSurface() == tileBackdrop->surface ? 1 : 0,
-              style->position() == LayerStylePosition::Below ? 1 : 0);
   std::shared_ptr<Image> bgImage = nullptr;
   Point bgOffset = {};
   auto contentScaleToLocal = 1.0f / source->contentScale;
@@ -642,7 +623,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     auto& entry = it->second[cursor++];
     bgImage = entry.image;
     bgOffset = entry.offset;
-  } else {
+  } else if (bgImage == nullptr) {
     // Picture-canvas path: capture was skipped because there is no GPU context. Synthesize the
     // backdrop on the fly by walking ancestors and prior siblings via PictureRecorder.
     bgImage =
@@ -656,9 +637,6 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   matrix.preTranslate(contentOffset.x, contentOffset.y);
   canvas->concat(matrix);
 
-  std::printf("[BG-SRC] contentOffset=(%.1f,%.1f) bgOffset=(%.1f,%.1f) scale=%.2f size=%dx%d\n",
-              contentOffset.x, contentOffset.y, bgOffset.x, bgOffset.y, source->contentScale,
-              bgImage->width(), bgImage->height());
   auto backgroundOffset = bgOffset - contentOffset;
   LayerStyleInput styleInput = {};
   styleInput.content = contentSource;

@@ -413,8 +413,9 @@ class DisplayList {
   void resetCaches();
 
   bool drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                     bool autoClear, BackgroundSnapshotMap* snapshots, bool readTileBackdrop = false,
-                     bool snapshotsCover = true, const Rect* tileGlobalRect = nullptr) const;
+                     bool autoClear, BackgroundSnapshotMap* snapshots,
+                     bool readTileBackdrop = false, bool snapshotsCover = true,
+                     const Rect* tileGlobalRect = nullptr) const;
 
   std::vector<Rect> collectBackgroundFootprints(const Rect& worldBounds) const;
 
