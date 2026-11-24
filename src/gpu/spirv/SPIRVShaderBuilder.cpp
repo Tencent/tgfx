@@ -169,6 +169,7 @@ bool SPIRVShaderBuilder::Begin(std::string* error) {
 
   writer.Sink(&writer.pre);
   writer.Inst(spirv::kOpCapability, {spirv::kCapabilityShader});
+  writer.Inst(spirv::kOpCapability, {spirv::kCapabilityLinkage});
   writer.Inst(spirv::kOpMemoryModel, {0, 1});
 
   mainId = writer.NewId();
@@ -376,6 +377,73 @@ bool SPIRVShaderBuilder::StoreOutput(const ProgramIR& program, ValueID value, st
   return true;
 }
 
+uint32_t SPIRVShaderBuilder::ImportFunction(const OperatorDesc& desc,
+                                            const OperatorArtifact& artifact, std::string* error) {
+  if (!begun) {
+    Fail(error, "the SPIR-V shader builder has not begun");
+    return 0;
+  }
+  if (artifact.backend != OperatorBackend::SPIRV || artifact.symbol.empty()) {
+    Fail(error, "the operator bundle has no SPIR-V function for this operator");
+    return 0;
+  }
+  for (const auto& existing : importedFunctions) {
+    if (existing.symbol == artifact.symbol) {
+      return existing.id;
+    }
+  }
+
+  ImportedFunction imported = {};
+  imported.symbol = artifact.symbol;
+  imported.returnTypeId = TypeId(desc.returnType, error);
+  if (imported.returnTypeId == 0) {
+    return 0;
+  }
+  for (const auto& param : desc.params) {
+    const auto typeId = TypeId(param.type, error);
+    if (typeId == 0) {
+      return 0;
+    }
+    imported.paramTypeIds.push_back(typeId);
+  }
+
+  auto* saved = writer.sink;
+  writer.Sink(&writer.decl);
+  imported.functionType = writer.NewId();
+  std::vector<uint32_t> functionTypeOperands = {imported.functionType, imported.returnTypeId};
+  functionTypeOperands.insert(functionTypeOperands.end(), imported.paramTypeIds.begin(),
+                              imported.paramTypeIds.end());
+  writer.Inst(spirv::kOpTypeFunction, functionTypeOperands);
+  imported.id = writer.NewId();
+  writer.Sink(saved);
+  importedFunctions.push_back(std::move(imported));
+  return importedFunctions.back().id;
+}
+
+uint32_t SPIRVShaderBuilder::EmitFunctionCall(ValueID result, SLType returnType,
+                                              const std::vector<uint32_t>& args,
+                                              uint32_t functionId, std::string* error) {
+  if (!begun) {
+    Fail(error, "the SPIR-V shader builder has not begun");
+    return 0;
+  }
+  if (functionId == 0) {
+    Fail(error, "the SPIR-V operator function has no id");
+    return 0;
+  }
+  const auto typeId = TypeId(returnType, error);
+  if (typeId == 0) {
+    return 0;
+  }
+  writer.Sink(&writer.func);
+  const auto resultId = writer.NewId();
+  std::vector<uint32_t> operands = {typeId, resultId, functionId};
+  operands.insert(operands.end(), args.begin(), args.end());
+  writer.Inst(spirv::kOpFunctionCall, operands);
+  valueIds[result] = resultId;
+  return resultId;
+}
+
 std::vector<uint32_t> SPIRVShaderBuilder::Finish(std::string* error) {
   if (!begun || finished) {
     Fail(error, "the SPIR-V shader builder is not in a finishable state");
@@ -384,6 +452,27 @@ std::vector<uint32_t> SPIRVShaderBuilder::Finish(std::string* error) {
   writer.Sink(&writer.func);
   writer.Inst(spirv::kOpReturn, {});
   writer.Inst(spirv::kOpFunctionEnd, {});
+  auto mainFunction = std::move(writer.func);
+  writer.func.clear();
+
+  for (const auto& imported : importedFunctions) {
+    writer.Sink(&writer.ann);
+    std::vector<uint32_t> decoration = {imported.id, spirv::kDecorationLinkageAttributes};
+    const auto name = spirv::NameWords(imported.symbol.c_str());
+    decoration.insert(decoration.end(), name.begin(), name.end());
+    decoration.push_back(spirv::kLinkageTypeImport);
+    writer.Inst(spirv::kOpDecorate, decoration);
+
+    writer.Sink(&writer.func);
+    writer.Inst(spirv::kOpFunction, {imported.returnTypeId, imported.id, 0, imported.functionType});
+    for (const auto paramType : imported.paramTypeIds) {
+      const auto parameterId = writer.NewId();
+      writer.Inst(spirv::kOpFunctionParameter, {paramType, parameterId});
+    }
+    writer.Inst(spirv::kOpFunctionEnd, {});
+  }
+  writer.func.insert(writer.func.end(), mainFunction.begin(), mainFunction.end());
+
   std::vector<uint32_t> out = {};
   writer.Finish(&out);
   finished = true;
