@@ -199,7 +199,7 @@ std::string GLSLPrinter::PrintFragmentProgram(const FragmentProgram& program) {
 
 std::string GLSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderStage stage,
                                     const InterfaceDesc& interface, const ShaderBuilder& builder) {
-  std::string uniforms = {};
+  std::string uniforms = builder.extraUniforms();
   std::vector<UniformDesc> uniformDescriptors = {};
   for (const auto& uniform : interface.uniforms) {
     if (uniform.stage == stage) {

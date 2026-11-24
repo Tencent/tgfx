@@ -169,6 +169,10 @@ class ShaderBuilder {
     return shaderStrings[Type::PrecisionQualifier];
   }
 
+  const std::string& extraUniforms() const {
+    return shaderStrings[Type::Uniforms];
+  }
+
   const std::string& functions() const {
     return shaderStrings[Type::Functions];
   }
@@ -203,11 +207,9 @@ class ShaderBuilder {
     static const uint8_t Definitions = 2;
     static const uint8_t PrecisionQualifier = 3;
     static const uint8_t Uniforms = 4;
-    static const uint8_t Inputs = 5;
-    static const uint8_t Outputs = 6;
-    static const uint8_t Functions = 7;
-    static const uint8_t Main = 8;
-    static const uint8_t Code = 9;
+    static const uint8_t Functions = 5;
+    static const uint8_t Main = 6;
+    static const uint8_t Code = 7;
   };
 
   /**
