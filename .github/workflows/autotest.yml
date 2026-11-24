@@ -254,6 +254,10 @@ jobs:
   web-webgl:
     name: web (webgl)
     runs-on: ubuntu-latest
+    env:
+      # emcc forwards the compiler invocation to this wrapper; see the Setup ccache step.
+      EM_COMPILER_WRAPPER: ccache
+      CCACHE_MAXSIZE: 1G
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -298,6 +302,22 @@ jobs:
           key: autotest-web-puppeteer-${{ hashFiles('web/test/package.json') }}
           restore-keys: autotest-web-puppeteer-
 
+      - name: Setup ccache
+        run: |
+          if ! command -v ccache > /dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ccache
+          fi
+          ccache --version | head -1
+
+      - name: Get Ccache Cache
+        id: ccache-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-webgl-${{ github.sha }}
+          restore-keys: ccache-webgl-
+
       - name: Install Build Tools
         if: ${{ (steps.environment-cache.outputs.cache-hit != 'true') }}
         run: |
@@ -333,8 +353,13 @@ jobs:
       # the test build below, because CMake preloads it into the WASM file system at link time.
       # A restore only counts when the primary key matches, so a stale fallback or a cold start
       # regenerates the reference on pull requests too; only main pushes save it back for reuse.
+      # The reference is rebuilt from a temporary archive of origin/main, so its absolute source
+      # paths differ on every run and can never hit the ccache. An empty wrapper disables ccache
+      # so the reference build does not flood the shared cache with unusable entries.
       - name: Update Reference Cache
         if: ${{ steps.reference-cache.outputs.cache-hit != 'true' }}
+        env:
+          EM_COMPILER_WRAPPER: ''
         run: |
           source web/emsdk/emsdk_env.sh
           bash update_baseline.sh USE_WEBGL --skip-images
@@ -354,6 +379,10 @@ jobs:
         run: |
           cd web/test
           npm run autotest:webgl
+
+      - name: Ccache Statistics
+        if: ${{ always() }}
+        run: ccache -s
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -380,6 +409,15 @@ jobs:
             test/baseline/.cache/webgl
           key: autotest-web-webgl-${{ hashFiles('test/baseline/version.json') }}
 
+      # A sha-based key keeps every push saving a fresh snapshot, while pull requests restore the
+      # most recent one through the prefix fallback. Entries are small (about 60 MB per backend).
+      - name: Save Ccache Cache
+        if: ${{ (github.event_name == 'push') && (steps.ccache-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-webgl-${{ github.sha }}
+
       - name: Save Browser Cache
         if: ${{ (github.event_name == 'push') && (steps.browser-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
@@ -404,6 +442,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TGFX_WEBGPU_SWIFTSHADER: 1
+      # emcc forwards the compiler invocation to this wrapper; see the Setup ccache step.
+      EM_COMPILER_WRAPPER: ccache
+      CCACHE_MAXSIZE: 1G
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -448,6 +489,22 @@ jobs:
           key: autotest-web-puppeteer-${{ hashFiles('web/test/package.json') }}
           restore-keys: autotest-web-puppeteer-
 
+      - name: Setup ccache
+        run: |
+          if ! command -v ccache > /dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ccache
+          fi
+          ccache --version | head -1
+
+      - name: Get Ccache Cache
+        id: ccache-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-webgpu-${{ github.sha }}
+          restore-keys: ccache-webgpu-
+
       - name: Install Build Tools
         if: ${{ (steps.environment-cache.outputs.cache-hit != 'true') }}
         run: |
@@ -474,9 +531,12 @@ jobs:
           cd web/test
           npm install
 
-      # See the web-webgl job for the reference cache regeneration rule and the restore ordering.
+      # See the web-webgl job for the reference cache regeneration rule and the restore ordering,
+      # including why the wrapper is disabled for this step.
       - name: Update Reference Cache
         if: ${{ steps.reference-cache.outputs.cache-hit != 'true' }}
+        env:
+          EM_COMPILER_WRAPPER: ''
         run: |
           source web/emsdk/emsdk_env.sh
           bash update_baseline.sh USE_WEBGPU --skip-images
@@ -496,6 +556,10 @@ jobs:
         run: |
           cd web/test
           npm run autotest:webgpu
+
+      - name: Ccache Statistics
+        if: ${{ always() }}
+        run: ccache -s
 
       - name: Save Environment Cache
         if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
@@ -521,6 +585,14 @@ jobs:
           path: |
             test/baseline/.cache/webgpu
           key: autotest-web-webgpu-${{ hashFiles('test/baseline/version.json') }}
+
+      # See the web-webgl job for the key rotation rationale behind this cache.
+      - name: Save Ccache Cache
+        if: ${{ (github.event_name == 'push') && (steps.ccache-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-webgpu-${{ github.sha }}
 
       - name: Save Browser Cache
         if: ${{ (github.event_name == 'push') && (steps.browser-cache.outputs.cache-hit != 'true') }}
