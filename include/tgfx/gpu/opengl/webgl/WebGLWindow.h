@@ -33,8 +33,9 @@ class WebGLWindow : public Window {
 
   /**
    * Creates a window for a canvas held by the calling thread. The canvas must outlive the window,
-   * which must be used on that thread. The browser presents directly from the canvas. Returns
-   * nullptr if creation fails. Web builds require the GL runtime method; see README.md.
+   * which must be used on that thread. tgfx presents every submitted frame, which needs the thread
+   * to yield to its event loop. Returns nullptr if creation fails. Web builds require the GL
+   * runtime method; see README.md.
    *
    * @param canvas An HTMLCanvasElement or OffscreenCanvas.
    * @param colorSpace Optional rendering color space; defaults to sRGB.
@@ -49,11 +50,16 @@ class WebGLWindow : public Window {
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
 
+  /// Presents the canvas this window was created from after a submission.
+  void onPresent(Context* context) override;
+
  private:
   std::string canvasID;
   // Set only by the canvas object overload, in which case the render target size comes from this
   // canvas rather than from the page.
   emscripten::val canvas;
+  // Resolved at creation: whether the JS bundle can present a frame on this window's thread.
+  bool presentSupported = false;
 
   explicit WebGLWindow(std::shared_ptr<Device> device,
                        std::shared_ptr<ColorSpace> colorSpace = nullptr);

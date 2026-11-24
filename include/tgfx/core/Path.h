@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/PathTypes.h"
@@ -78,6 +79,21 @@ class Path {
    * Replaces PathFillType with its inverse.
    */
   void toggleInverseFillType();
+
+  /**
+   * Converts this path to an equivalent path that uses the winding fill rule, so that it fills the
+   * same area in formats that cannot record a fill rule. InverseEvenOdd becomes InverseWinding.
+   * Every outermost contour of a converted path runs clockwise, so converted paths can be appended
+   * together and fill the same area as their union. Paths that already use the winding rule are
+   * left unchanged and carry no such guarantee. Reversed contours change where trims and dashes
+   * start.
+   *
+   * The contours must not cross each other or themselves; otherwise the filled area may change.
+   * Contours produced by addPath() with a boolean operation do not cross.
+   * @return true if the conversion succeeded. On failure the path is left unchanged, so callers
+   * must check the result.
+   */
+  bool toWinding();
 
   /**
    * Returns true if Path contains only one line;
@@ -364,8 +380,22 @@ class Path {
 
   /**
    * Adds a src to this Path.
+   * @param src the Path to combine with this one.
+   * @param op how to combine them. Append and Extend concatenate the outlines; the rest combine the
+   * filled areas the two paths describe.
+   * @return false if the combination failed, in which case this Path is unchanged. Append and
+   * Extend always succeed, and a true result can still drop contours that could not be resolved.
    */
-  void addPath(const Path& src, PathOp op = PathOp::Append);
+  bool addPath(const Path& src, PathOp op = PathOp::Append);
+
+  /**
+   * Merges the filled areas of the given paths into one. Each path is read under its own fill rule,
+   * so paths that declare different rules can be merged. When the outlines already describe the
+   * merged area, they are kept as they are.
+   * @param sources the paths to merge. Empty produces an empty path.
+   * @return the merged path, or std::nullopt if the merge failed.
+   */
+  static std::optional<Path> Merge(const std::vector<Path>& sources);
 
   /**
    * Sets Path to its initial state. Internal storage associated with Path is released.

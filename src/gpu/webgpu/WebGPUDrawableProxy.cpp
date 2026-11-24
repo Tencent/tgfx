@@ -18,6 +18,9 @@
 
 #include "WebGPUDrawableProxy.h"
 #include <cstdio>
+#ifdef __EMSCRIPTEN__
+#include "platform/web/WebJSBindings.h"
+#endif
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/webgpu/WebGPUTypes.h"
@@ -26,9 +29,9 @@ namespace tgfx {
 
 WebGPUDrawableProxy::WebGPUDrawableProxy(Context* context, int width, int height,
                                          WGPUSurface surface, WGPUTextureFormat format,
-                                         PixelFormat pixelFormat)
+                                         PixelFormat pixelFormat, bool presentSupported)
     : _context(context), _width(width), _height(height), _surface(surface), _wgpuFormat(format),
-      _pixelFormat(pixelFormat) {
+      _pixelFormat(pixelFormat), _presentSupported(presentSupported) {
 }
 
 WebGPUDrawableProxy::~WebGPUDrawableProxy() {
@@ -109,7 +112,13 @@ void WebGPUDrawableProxy::onPresentFrame(Context*) {
 }
 
 void WebGPUDrawableProxy::present() {
-#ifndef __EMSCRIPTEN__
+#ifdef __EMSCRIPTEN__
+  // On Web the browser presents the canvas itself, on the rendering update of the thread that owns
+  // it, so a thread that runs no frame loop has to ask for one.
+  if (_presentSupported) {
+    PresentCanvasFrame();
+  }
+#else
   if (_surface != nullptr) {
     wgpuSurfacePresent(_surface);
   }

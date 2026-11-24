@@ -9,7 +9,7 @@ on:
 jobs:
   mac-opengl:
     name: mac (opengl-swiftshader)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -79,7 +79,7 @@ jobs:
 
   mac-metal:
     name: mac (metal)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -132,7 +132,7 @@ jobs:
 
   mac-vulkan:
     name: mac (vulkan-swiftshader)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4

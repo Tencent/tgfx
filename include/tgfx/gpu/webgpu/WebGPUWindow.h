@@ -40,8 +40,9 @@ class WebGPUWindow : public Window {
 
   /**
    * Creates a window for a canvas held by the calling thread. The window must be used on that
-   * thread, and the canvas must outlive it. The browser presents directly from the canvas. Returns
-   * nullptr if creation fails. Web builds require the WebGPU runtime method; see README.md.
+   * thread, and the canvas must outlive it. tgfx presents every submitted frame, which needs the
+   * thread to yield to its event loop. Returns nullptr if creation fails. Web builds require the
+   * WebGPU runtime method; see README.md.
    * @param canvas HTMLCanvasElement or OffscreenCanvas.
    * @param device Device to render with; required on threads without a default device.
    * @param colorSpace Optional drawing-buffer color space; defaults to sRGB.

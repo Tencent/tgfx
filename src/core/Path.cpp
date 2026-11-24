@@ -17,7 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Path.h"
-#include <functional>
+#include <algorithm>
+#include <cmath>
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-conversion"
 #pragma clang diagnostic ignored "-Wimplicit-int-conversion"
@@ -25,8 +26,10 @@
 #pragma clang diagnostic pop
 #include <include/core/SkPathTypes.h>
 #include <include/core/SkRect.h>
+#include <include/pathops/SkPathOps.h>
 #include "core/PathRef.h"
 #include "core/utils/AtomicCache.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
@@ -423,13 +426,9 @@ static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiu
                                        float startRadius, float endRadius, int* numBeziers) {
   std::vector<Point> points = {};
   float start = startRadius;
-  std::function<float()> increaseRadius;
-  if (startRadius < endRadius) {
-    increaseRadius = [&] { return std::min(endRadius, start + M_PI_2_F); };
-  } else {
-    increaseRadius = [&] { return std::max(endRadius, start - M_PI_2_F); };
-  }
-  float end = increaseRadius();
+  auto increasing = startRadius < endRadius;
+  float end =
+      increasing ? std::min(endRadius, start + M_PI_2_F) : std::max(endRadius, start - M_PI_2_F);
   float currentX, currentY;
   *numBeziers = 0;
   for (int i = 0; i < 4; i++) {
@@ -456,7 +455,8 @@ static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiu
       break;
     }
     start = end;
-    end = increaseRadius();
+    end =
+        increasing ? std::min(endRadius, start + M_PI_2_F) : std::max(endRadius, start - M_PI_2_F);
   }
   return points;
 }
@@ -524,17 +524,54 @@ void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) 
   writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);
 }
 
-void Path::addPath(const Path& src, PathOp op) {
-  auto& path = writableRef()->path;
-  const auto& newPath = src.pathRef->path;
+bool PathRef::UnionsByConcatenation(PathFillType firstFillType, const Rect& firstBounds,
+                                    PathFillType secondFillType, const Rect& secondBounds) {
+  if (firstFillType != secondFillType) {
+    return false;
+  }
+  // Inverse fills extend outside their bounds, so disjoint bounds do not prove disjoint areas.
+  if (firstFillType == PathFillType::InverseWinding ||
+      firstFillType == PathFillType::InverseEvenOdd) {
+    return false;
+  }
+  return !Rect::Intersects(firstBounds, secondBounds);
+}
+
+bool Path::addPath(const Path& src, PathOp op) {
+  bool concatenate = false;
+  if (op == PathOp::Union && getFillType() == src.getFillType() && !isInverseFillType()) {
+    // The bounds are read before the destination is made writable, which drops its cached bounds:
+    // reading them after that would leave the cache holding the bounds from before the merge.
+    auto bounds = getBounds();
+    auto sourceBounds = src.getBounds();
+    concatenate =
+        PathRef::UnionsByConcatenation(getFillType(), bounds, src.getFillType(), sourceBounds);
+  }
+  return PathRef::AddPath(*this, src, op, concatenate);
+}
+
+bool PathRef::AddPath(Path& destination, const Path& source, PathOp op, bool concatenate) {
+  auto& path = WriteAccess(destination);
+  const auto& newPath = ReadAccess(source);
   if (op == PathOp::Append || op == PathOp::Extend) {
-    if (path.isEmpty()) {
+    // An empty inverse path fills the whole plane, so it is not a no-op operand: overwriting it with
+    // the next one would drop the plane. Only a path with neither contours nor an inverse rule is.
+    if (path.isEmpty() && !path.isInverseFillType()) {
       path = newPath;
     } else {
       auto mode = op == PathOp::Extend ? SkPath::kExtend_AddPathMode : SkPath::kAppend_AddPathMode;
       path.addPath(newPath, mode);
     }
-    return;
+    return true;
+  }
+  if (concatenate) {
+    // An empty destination can take the operand directly instead of appending a copy of it.
+    if (path.isEmpty()) {
+      path = newPath;
+    } else {
+      path.addPath(newPath, SkPath::kAppend_AddPathMode);
+    }
+    return true;
   }
   SkPathOp pathOp;
   switch (op) {
@@ -551,7 +588,139 @@ void Path::addPath(const Path& src, PathOp op) {
       pathOp = SkPathOp::kUnion_SkPathOp;
       break;
   }
-  Op(path, newPath, pathOp, &path);
+  return Op(path, newPath, pathOp, &path);
+}
+
+struct PathAreaBounds {
+  size_t index = 0;
+  Rect bounds = {};
+  float start = 0.0f;
+  float end = 0.0f;
+};
+
+static bool ComparePathAreaBounds(const PathAreaBounds& first, const PathAreaBounds& second) {
+  return first.start < second.start || (first.start == second.start && first.index < second.index);
+}
+
+static std::vector<PathAreaBounds> SortPathAreaBounds(const std::vector<Path>& paths) {
+  Rect totalBounds = {};
+  std::vector<PathAreaBounds> bounds = {};
+  bounds.reserve(paths.size());
+  for (size_t index = 0; index < paths.size(); ++index) {
+    auto rect = paths[index].getBounds();
+    totalBounds.join(rect);
+    bounds.push_back({index, rect, 0.0f, 0.0f});
+  }
+  auto horizontal = static_cast<double>(totalBounds.right) - totalBounds.left >=
+                    static_cast<double>(totalBounds.bottom) - totalBounds.top;
+  for (auto& entry : bounds) {
+    entry.start = horizontal ? entry.bounds.left : entry.bounds.top;
+    entry.end = horizontal ? entry.bounds.right : entry.bounds.bottom;
+  }
+  std::sort(bounds.begin(), bounds.end(), ComparePathAreaBounds);
+  return bounds;
+}
+
+static bool CanConcatenateAreas(const std::vector<Path>& paths) {
+  if (paths.size() <= 1) {
+    return true;
+  }
+  auto fillType = paths.front().getFillType();
+  for (const auto& path : paths) {
+    if (path.isInverseFillType() || path.getFillType() != fillType) {
+      return false;
+    }
+  }
+  auto sortedBounds = SortPathAreaBounds(paths);
+  std::vector<const PathAreaBounds*> active = {};
+  for (const auto& entry : sortedBounds) {
+    size_t retained = 0;
+    for (const auto* previous : active) {
+      if (previous->end <= entry.start) {
+        continue;
+      }
+      active[retained++] = previous;
+      if (Rect::Intersects(entry.bounds, previous->bounds)) {
+        pk::SkPath intersection;
+        if (!pk::Op(PathRef::ReadAccess(paths[entry.index]),
+                    PathRef::ReadAccess(paths[previous->index]), pk::SkPathOp::kIntersect_SkPathOp,
+                    &intersection) ||
+            !intersection.isEmpty()) {
+          return false;
+        }
+      }
+    }
+    active.resize(retained);
+    active.push_back(&entry);
+  }
+  return true;
+}
+
+std::optional<Path> Path::Merge(const std::vector<Path>& sources) {
+  std::vector<Path> nonempty = {};
+  for (const auto& source : sources) {
+    if (!source.pathRef->path.isFinite()) {
+      return std::nullopt;
+    }
+    if (!source.isEmpty() || source.isInverseFillType()) {
+      nonempty.push_back(source);
+    }
+  }
+  Path merged = {};
+  if (nonempty.empty()) {
+    return merged;
+  }
+  // Whether the sources can simply be concatenated decides what has to be computed. Measuring it
+  // first is what keeps the common case cheap: text that does not overlap never reaches the boolean
+  // pass, and overlapping text never pays for the check that the concatenation reproduces the union
+  // -- both are expensive, and only one of them is ever needed.
+  if (CanConcatenateAreas(nonempty)) {
+    merged = nonempty.front();
+    for (size_t i = 1; i < nonempty.size(); ++i) {
+      merged.addPath(nonempty[i]);
+    }
+    return merged;
+  }
+  pk::SkOpBuilder builder;
+  // resolve() may reverse operands while testing its fast path before falling back to Op(). The
+  // neutral first operand ensures each source is resolved under its own fill rule first.
+  builder.add(pk::SkPath(), pk::SkPathOp::kUnion_SkPathOp);
+  for (const auto& source : nonempty) {
+    builder.add(source.pathRef->path, pk::SkPathOp::kUnion_SkPathOp);
+  }
+  pk::SkPath result;
+  if (!builder.resolve(&result)) {
+    return std::nullopt;
+  }
+  bool allWinding = true;
+  for (const auto& source : nonempty) {
+    allWinding = allWinding && source.getFillType() == PathFillType::Winding;
+  }
+  if (allWinding) {
+    // Retain contour order only after checking the candidate against the actual union. This is not
+    // a direction heuristic; rejection or a nonempty difference keeps the boolean result instead.
+    // Overlapping sources can still agree on the area -- two rectangles that share a strip are one
+    // outline either way -- and keeping the contours the sources came in with is what keeps such a
+    // run from being redrawn by the union.
+    auto candidate = nonempty.front();
+    for (size_t i = 1; i < nonempty.size(); ++i) {
+      candidate.addPath(nonempty[i]);
+    }
+    // Only the candidate is read as winding, and the result is left as the union wrote it. Both
+    // sides have to be read the same way for the difference to mean anything, but making them agree
+    // by rewriting the result instead would also make it agree in the cases where it must not:
+    // contours that cancel under winding are exactly why the union came back even-odd, and those
+    // runs have to keep the boolean result. Reading the candidate alone is what makes the check
+    // fail there, which is the answer those runs need.
+    PathRef::WriteAccess(candidate).setFillType(pk::SkPathFillType::kWinding);
+    pk::SkPath difference;
+    if (pk::Op(PathRef::ReadAccess(candidate), result, pk::SkPathOp::kXOR_SkPathOp, &difference) &&
+        difference.isEmpty()) {
+      return candidate;
+    }
+  }
+  merged.writableRef()->path = result;
+  return merged;
 }
 
 void Path::reset() {
@@ -711,6 +880,28 @@ std::vector<Point> Path::ConvertConicToQuads(const Point& p0, const Point& p1, c
                                              reinterpret_cast<SkPoint*>(quads.data()), pow2);
   quads.resize(1 + (2 * static_cast<size_t>(numQuads)));
   return quads;
+}
+
+bool Path::toWinding() {
+  auto fillType = getFillType();
+  if (fillType == PathFillType::Winding || fillType == PathFillType::InverseWinding) {
+    return true;
+  }
+  auto& path = PathRef::WriteAccess(*this);
+  // AsWinding() normalizes the outermost contours to clockwise and orients the counters against
+  // them, which is what makes the result safe to append. It copies the curves rather than rebuilding
+  // them, so a counter a fraction of a unit wide keeps its geometry; the SkOpBuilder path instead
+  // runs Simplify, which quantises coordinates and closes such a band up. Contours that cross each
+  // other or themselves still change the filled area, as the contract in Path.h states.
+  SkPath result;
+  if (!AsWinding(path, &result)) {
+    LOGE("Path::toWinding() failed to normalize the outline; keeping the even-odd fill rule.");
+    return false;
+  }
+  result.setFillType(fillType == PathFillType::InverseEvenOdd ? SkPathFillType::kInverseWinding
+                                                              : SkPathFillType::kWinding);
+  path = result;
+  return true;
 }
 
 }  // namespace tgfx

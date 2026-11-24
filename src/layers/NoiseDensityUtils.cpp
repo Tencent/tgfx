@@ -20,6 +20,21 @@
 
 namespace tgfx {
 
+// Rotates the noise lattice against the pixel grid. Without it, pixel centers land on lattice
+// points whenever 1 / (size * scale) is an integer, which makes gradient noise evaluate to a
+// constant and the whole layer vanish after density banding. The angle is fixed in content space,
+// so the pattern keeps the same orientation at every zoom level.
+static constexpr float NOISE_LATTICE_ROTATION = 37.0f;
+
+std::shared_ptr<Shader> MakeNoiseShader(float size, float scale, float seed) {
+  auto freq = 1.0f / (size * scale);
+  auto shader = Shader::MakeFractalNoise(freq, freq, 3, seed);
+  if (shader == nullptr) {
+    return nullptr;
+  }
+  return shader->makeWithMatrix(Matrix::MakeRotate(NOISE_LATTICE_ROTATION));
+}
+
 int ComputeLinearBucket(float density, float slope, float intercept) {
   density = std::max(0.0f, std::min(1.0f, density));
   auto value = slope * density + intercept;

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 #include "tgfx/layers/LayerProperty.h"
