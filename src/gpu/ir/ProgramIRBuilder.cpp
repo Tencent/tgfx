@@ -162,6 +162,7 @@ UniformBlockIR& ProgramIRBuilder::EnsureUniformBlock(ShaderStage stage, uint32_t
   UniformBlockIR block = {};
   block.stage = stage;
   block.binding = binding;
+  block.name = stage == ShaderStage::Vertex ? "VertexUniforms" : "FragmentUniforms";
   ir.interface.uniformBlocks.push_back(block);
   return ir.interface.uniformBlocks.back();
 }

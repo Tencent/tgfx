@@ -188,6 +188,7 @@ struct UniformBlockIR {
   ShaderStage stage = ShaderStage::Fragment;
   uint32_t binding = 0;
   uint32_t size = 0;
+  std::string name = {};
 };
 
 struct UniformArrayIR {

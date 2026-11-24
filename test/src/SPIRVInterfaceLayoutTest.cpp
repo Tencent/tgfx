@@ -33,17 +33,28 @@ TEST(SPIRVInterfaceLayoutTest, MapsUniformsAndSamplersToDescriptorSets) {
   ASSERT_TRUE(layout.Build(program.IR().interface, &error)) << error;
   ASSERT_EQ(layout.bindings().size(), 3u);
 
+  EXPECT_EQ(layout.bindings()[0].name, "VertexUniforms");
   EXPECT_EQ(layout.bindings()[0].set, 0u);
   EXPECT_EQ(layout.bindings()[0].binding, 0u);
   EXPECT_EQ(layout.bindings()[0].stage, ShaderStage::Vertex);
 
+  EXPECT_EQ(layout.bindings()[1].name, "FragmentUniforms");
   EXPECT_EQ(layout.bindings()[1].set, 1u);
   EXPECT_EQ(layout.bindings()[1].binding, 1u);
   EXPECT_EQ(layout.bindings()[1].stage, ShaderStage::Fragment);
 
+  EXPECT_EQ(layout.bindings()[2].name, "TextureSampler_0");
   EXPECT_EQ(layout.bindings()[2].set, 2u);
   EXPECT_EQ(layout.bindings()[2].binding, 0u);
   EXPECT_EQ(layout.bindings()[2].type, SLType::Texture2DSampler);
+
+  BindingLayout pipelineLayout = {};
+  ASSERT_TRUE(layout.BuildBindingLayout(&pipelineLayout, &error)) << error;
+  ASSERT_EQ(pipelineLayout.uniformBlocks.size(), 2u);
+  ASSERT_EQ(pipelineLayout.textureSamplers.size(), 1u);
+  EXPECT_EQ(pipelineLayout.uniformBlocks[0].name, "VertexUniforms");
+  EXPECT_EQ(pipelineLayout.uniformBlocks[1].name, "FragmentUniforms");
+  EXPECT_EQ(pipelineLayout.textureSamplers[0].name, "TextureSampler_0");
 }
 
 TEST(SPIRVInterfaceLayoutTest, RejectsDuplicateBindings) {

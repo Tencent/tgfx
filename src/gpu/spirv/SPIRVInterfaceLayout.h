@@ -22,11 +22,13 @@
 #include <string>
 #include <vector>
 #include "gpu/ir/ProgramIR.h"
+#include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
 
 /// One descriptor binding in the layout the SPIR-V modules declare.
 struct SPIRVDescriptorBinding {
+  std::string name = {};
   uint32_t set = 0;
   uint32_t binding = 0;
   SLType type = SLType::Void;
@@ -42,6 +44,8 @@ class SPIRVInterfaceLayout {
 
   bool Build(const InterfaceIR& interface, std::string* error = nullptr);
   bool Append(const SPIRVInterfaceLayout& other, std::string* error = nullptr);
+
+  bool BuildBindingLayout(BindingLayout* layout, std::string* error = nullptr) const;
 
   const std::vector<SPIRVDescriptorBinding>& bindings() const {
     return descriptorBindings;

@@ -47,6 +47,7 @@ bool SPIRVInterfaceLayout::Build(const InterfaceIR& interface, std::string* erro
 
   for (const auto& block : interface.uniformBlocks) {
     SPIRVDescriptorBinding binding = {};
+    binding.name = block.name;
     binding.set = UniformSet(block.stage);
     binding.binding = block.binding;
     binding.stage = block.stage;
@@ -56,12 +57,36 @@ bool SPIRVInterfaceLayout::Build(const InterfaceIR& interface, std::string* erro
   }
   for (const auto& sampler : interface.samplers) {
     SPIRVDescriptorBinding binding = {};
+    binding.name = sampler.name;
     binding.set = SamplerSet();
     binding.binding = sampler.binding;
     binding.type = sampler.type;
     binding.stage = ShaderStage::Fragment;
     if (!add(binding)) {
       return false;
+    }
+  }
+  return true;
+}
+
+bool SPIRVInterfaceLayout::BuildBindingLayout(BindingLayout* layout, std::string* error) const {
+  if (layout == nullptr) {
+    if (error != nullptr) {
+      *error = "the binding layout is null";
+    }
+    return false;
+  }
+  layout->uniformBlocks.clear();
+  layout->textureSamplers.clear();
+  unsigned logicalBinding = 0;
+  for (const auto& binding : descriptorBindings) {
+    const uint32_t visibility = binding.stage == ShaderStage::Vertex ? ShaderVisibility::Vertex
+                                                                     : ShaderVisibility::Fragment;
+    if (binding.type == SLType::Void) {
+      layout->uniformBlocks.emplace_back(binding.name, logicalBinding++, visibility);
+    } else {
+      layout->textureSamplers.emplace_back(binding.name, logicalBinding++,
+                                           ShaderVisibility::Fragment);
     }
   }
   return true;
