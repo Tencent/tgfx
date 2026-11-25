@@ -1433,13 +1433,16 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, float 
   if (!bitFields.staticSubtree) {
     return false;
   }
+  // A subtree that draws nothing has no cache to build: its bounds are empty whether it holds no
+  // content or only geometry no paint captured, and every lookup would fall back to drawing it.
+  if (getBounds().isEmpty()) {
+    return false;
+  }
   // Skip caching for leaf nodes with basic shapes (Rect, RRect) that have no filters or layer
   // styles, as they can be efficiently merged during rendering.
   if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
     auto content = getContent();
-    // Content that draws nothing stays out of the cache: either it has none, or everything it
-    // holds is geometry no paint captured, whose painted-caliber bounds are empty.
-    if (content == nullptr || getBounds().isEmpty()) {
+    if (content == nullptr) {
       return false;
     }
     auto contentType = Types::Get(content);
