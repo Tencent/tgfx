@@ -54,6 +54,9 @@ struct CaptureProbe {
   int missing = 0;
   int fallbacks = 0;
   double fallbackMs = 0.0;
+  // Level captures of the frame and the time they took.
+  int levelCaptures = 0;
+  double captureMs = 0.0;
   // Background styles drawn by the consumer, including their backdrop reads (CPU side only).
   int bgStyles = 0;
   double bgStyleMs = 0.0;

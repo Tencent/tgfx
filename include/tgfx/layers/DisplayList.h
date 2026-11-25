@@ -255,6 +255,26 @@ class DisplayList {
   }
 
   /**
+   * Returns the per-frame time budget, in seconds, for rasterizing tiles in tiled rendering mode,
+   * including the background captures they need. Zero means no limit. The default value is 0.
+   */
+  float tileTimeBudget() const {
+    return _tileTimeBudget;
+  }
+
+  /**
+   * Sets the per-frame time budget, in seconds, for rasterizing tiles in tiled rendering mode. Once
+   * a frame has spent the budget, its remaining tiles are left to later frames: a new tile shows
+   * the finest cached fallback of another scale in the meantime, or the background color when
+   * there is none, and a tile whose content changed keeps showing its outdated content. The first
+   * tile of a frame is always rasterized, so every frame makes progress. Zero or a negative value
+   * removes the limit.
+   */
+  void setTileTimeBudget(float seconds) {
+    _tileTimeBudget = seconds > 0.0f ? seconds : 0.0f;
+  }
+
+  /**
    * Returns the background color of the display list. The background is an infinite rectangle that
    * covers the entire display area and is drawn using the SrcOver blend mode during rendering.
    * It is only drawn in the DisplayList::render() path, not when calling Layer::draw() directly.
@@ -321,6 +341,7 @@ class DisplayList {
   int _tileSize = 256;
   TileUpdateMode _tileUpdateMode = TileUpdateMode::Immediate;
   int _maxTilesRefinedPerFrame = 5;
+  float _tileTimeBudget = 0.0f;
   int _subtreeCacheMaxSize = 0;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
@@ -344,6 +365,9 @@ class DisplayList {
   // background-sourced style. They are captured until a draw completes without skipping.
   std::vector<std::tuple<int, int, int>> forceCaptureTiles = {};
   int64_t forceCaptureZoomScaleInt = 0;
+  // Redraws of cached tiles whose content changed, left over by the time budget of an earlier
+  // frame. Their tiles keep the outdated content until these are drawn.
+  std::vector<DrawTask> deferredPatches = {};
 
   std::vector<Rect> renderDirect(Surface* surface, bool autoClear) const;
 
@@ -375,6 +399,31 @@ class DisplayList {
   std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
                                            std::vector<Rect>* skippedRects);
 
+  /**
+   * Returns the part of the viewport covered by the root layer, in the zoomed grid, or an empty
+   * rect when nothing is visible.
+   */
+  Rect getVisibleRenderRect(const Surface* surface) const;
+
+  /**
+   * Returns the screen tasks that display the tiles currently cached for the viewport: the exact
+   * tile of each cell, or else the finest complete fallback. Cells nothing covers are appended to
+   * skippedRects.
+   */
+  std::vector<DrawTask> collectDisplayTasks(const Surface* surface,
+                                            std::vector<Rect>* skippedRects);
+
+  /**
+   * Appends the deferred patches whose tiles are still cached under the same keys.
+   */
+  void takeDeferredPatches(std::vector<DrawTask>* tileTasks);
+
+  /**
+   * Leaves the tasks that were not drawn to later frames: new tiles are returned to the free list,
+   * and redraws of cached tiles are kept as deferred patches.
+   */
+  void deferTileTasks(const std::vector<DrawTask>& tileTasks, const std::vector<bool>& drawn);
+
   size_t rasterizeTreeTiles(const Surface* surface, const std::vector<std::pair<int, int>>& cells,
                             TreeLevelCoverage* coverage, std::vector<DrawTask>* tileTasks);
 
@@ -397,10 +446,14 @@ class DisplayList {
   bool drawTileTask(const DrawTask& task, BackgroundSnapshotMap* snapshots, bool snapshotsCover,
                     int* missingBackdrops = nullptr) const;
 
-  void captureBackgroundsByLevel(
-      Surface* surface, const std::vector<DrawTask>& tileTasks, float zoomScale,
-      std::vector<std::unique_ptr<BackgroundSnapshotMap>>* levelSnapshots,
-      std::vector<int>* taskSnapshotIndex, std::vector<bool>* taskSnapshotCover) const;
+  /**
+   * Captures the backgrounds for the tasks of one tree level, listed by taskIndices. Marks in
+   * taskSnapshotCover the tasks the capture covers. Returns nullptr when the level needs no map.
+   */
+  std::unique_ptr<BackgroundSnapshotMap> captureLevelBackgrounds(
+      Surface* surface, const std::vector<DrawTask>& tileTasks,
+      const std::vector<size_t>& taskIndices, int level, float zoomScale,
+      std::vector<bool>* taskSnapshotCover) const;
 
   /**
    * Returns the raster scale, the matrix and the clip rect a tile task is rasterized with into its
@@ -427,11 +480,13 @@ class DisplayList {
    */
   void updateForceCapture(const DrawTask& task, bool skippedStyles);
 
-  std::vector<Rect> drawTileTasks(
-      const std::vector<DrawTask>& tileTasks,
-      const std::vector<std::unique_ptr<BackgroundSnapshotMap>>& levelSnapshots,
-      const std::vector<int>& taskSnapshotIndex, const std::vector<bool>& taskSnapshotCover,
-      Surface* surface, float zoomScale);
+  /**
+   * Captures the backgrounds and draws the tasks one tree level at a time. Stops once
+   * budgetSeconds has passed, if it is positive, leaving the rest undrawn; the first task is always
+   * drawn. drawn receives which tasks were drawn. Returns the dirty rects on the surface.
+   */
+  std::vector<Rect> drawTileTasks(const std::vector<DrawTask>& tileTasks, Surface* surface,
+                                  float zoomScale, double budgetSeconds, std::vector<bool>* drawn);
 
   void drawScreenTasks(std::vector<DrawTask> screenTasks, std::vector<Rect> skippedRects,
                        Surface* surface, bool autoClear) const;

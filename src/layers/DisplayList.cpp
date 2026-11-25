@@ -681,6 +681,7 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
 // no valid backdrop there either.
 std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
                                            const std::vector<Rect>& dirtyRegions) {
+  const auto frameStart = std::chrono::steady_clock::now();
   if (!surfaceCaches.empty() && (surfaceCaches.front()->getContext() != surface->getContext() ||
                                  !ColorSpace::Equals(surfaceCaches.front()->colorSpace().get(),
                                                      surface->colorSpace().get()))) {
@@ -693,6 +694,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     recycleGridTiles();
   }
   auto tileTasks = invalidateTileCaches(dirtyRegions, GetViewportRect(surface, _contentOffset));
+  takeDeferredPatches(&tileTasks);
   std::vector<Rect> skippedRects = {};
   auto screenTasks = collectScreenTasks(surface, &tileTasks, &skippedRects);
   // Skipped rects must keep the tiled path; only fall back when both are empty.
@@ -715,25 +717,37 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     forceCaptureZoomScaleInt = _zoomScaleInt;
   }
   auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  std::vector<std::unique_ptr<BackgroundSnapshotMap>> levelSnapshots = {};
-  std::vector<int> taskSnapshotIndex = {};
-  std::vector<bool> taskSnapshotCover = {};
   // TEMP probe: how much of a tiled frame the per-level background captures take.
   gCaptureProbe.reset();
-  const auto captureStart = std::chrono::steady_clock::now();
-  captureBackgroundsByLevel(surface, tileTasks, zoomScale, &levelSnapshots, &taskSnapshotIndex,
-                            &taskSnapshotCover);
-  const double captureMs =
-      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - captureStart)
-          .count();
-  if (captureMs > 2.0 || !levelSnapshots.empty()) {
-    std::printf("[CAP-FRAME] tasks=%zu levels=%zu ms=%.1f\n", tileTasks.size(),
-                levelSnapshots.size(), captureMs);
-  }
   const auto drawStart = std::chrono::steady_clock::now();
   const auto captureProbe = gCaptureProbe;
-  auto dirtyRects = drawTileTasks(tileTasks, levelSnapshots, taskSnapshotIndex, taskSnapshotCover,
-                                  surface, zoomScale);
+  double budgetSeconds = 0.0;
+  if (_tileTimeBudget > 0.0f) {
+    const auto elapsed =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - frameStart).count();
+    // A non-positive budget means no limit, so an overrun keeps the smallest positive one instead.
+    budgetSeconds = std::max(static_cast<double>(_tileTimeBudget) - elapsed, 1e-9);
+  }
+  std::vector<bool> drawn = {};
+  auto dirtyRects = drawTileTasks(tileTasks, surface, zoomScale, budgetSeconds, &drawn);
+  const auto drawnCount = static_cast<size_t>(std::count(drawn.begin(), drawn.end(), true));
+  if (drawnCount < tileTasks.size()) {
+    deferTileTasks(tileTasks, drawn);
+    skippedRects.clear();
+    screenTasks = collectDisplayTasks(surface, &skippedRects);
+    hasZoomBlurTiles = true;
+  }
+  if (!tileTasks.empty()) {
+    std::printf(
+        "[TILE-BUDGET] tasks=%zu drawn=%zu deferredPatches=%zu ms=%.1f\n", tileTasks.size(),
+        drawnCount, deferredPatches.size(),
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameStart)
+            .count());
+  }
+  if (gCaptureProbe.levelCaptures > 0 || gCaptureProbe.captureMs > 2.0) {
+    std::printf("[CAP-FRAME] tasks=%zu levels=%d ms=%.1f\n", drawnCount,
+                gCaptureProbe.levelCaptures, gCaptureProbe.captureMs);
+  }
   if (!tileTasks.empty()) {
     const auto& p = gCaptureProbe;
     if (p.subtreeHits + p.subtreeNewBuilds + p.subtreeRebuilds + p.subtreeRefused > 0) {
@@ -741,12 +755,12 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
           "[SUB-CACHE] tasks=%zu zoom=%lld hits=%d new=%d rebuilt=%d refused=%d buildMs=%.1f "
           "edges=%d/%d/%d/%d/%d/%d/%d ok=%d fail=%d/%d/%d/%d failEmpty=%d failLeaf=%d "
           "failMaxEdge=%.1f\n",
-          tileTasks.size(), static_cast<long long>(_zoomScaleInt), p.subtreeHits,
-          p.subtreeNewBuilds, p.subtreeRebuilds, p.subtreeRefused, p.subtreeBuildMs,
-          p.subtreeBuildsByEdge[5], p.subtreeBuildsByEdge[6], p.subtreeBuildsByEdge[7],
-          p.subtreeBuildsByEdge[8], p.subtreeBuildsByEdge[9], p.subtreeBuildsByEdge[10],
-          p.subtreeBuildsByEdge[11], p.subtreeOk, p.subtreeFailPicture, p.subtreeFailImage,
-          p.subtreeFailFilter, p.subtreeFailTexture, p.subtreeFailEmptyBounds, p.subtreeFailLeaf,
+          drawnCount, static_cast<long long>(_zoomScaleInt), p.subtreeHits, p.subtreeNewBuilds,
+          p.subtreeRebuilds, p.subtreeRefused, p.subtreeBuildMs, p.subtreeBuildsByEdge[5],
+          p.subtreeBuildsByEdge[6], p.subtreeBuildsByEdge[7], p.subtreeBuildsByEdge[8],
+          p.subtreeBuildsByEdge[9], p.subtreeBuildsByEdge[10], p.subtreeBuildsByEdge[11],
+          p.subtreeOk, p.subtreeFailPicture, p.subtreeFailImage, p.subtreeFailFilter,
+          p.subtreeFailTexture, p.subtreeFailEmptyBounds, p.subtreeFailLeaf,
           static_cast<double>(p.subtreeFailMaxEdge));
     }
   }
@@ -767,7 +781,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       }
     }
     if (!line.empty()) {
-      std::printf("[STYLE] tasks=%zu uniqueLive=%zu repeatLive=%d%s\n", tileTasks.size(),
+      std::printf("[STYLE] tasks=%zu uniqueLive=%zu repeatLive=%d%s\n", drawnCount,
                   sp.liveKeys.size(), sp.liveRepeatsFromPrevious, line.c_str());
     }
     sp.beginFrame();
@@ -779,7 +793,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     std::printf(
         "[CAP-DRAW] tasks=%zu ms=%.1f tileReads=%d tileReadMs=%.1f snapReads=%d missing=%d "
         "fallbacks=%d fallbackMs=%.1f drawSrcN=%d drawSrcMs=%.1f bgStyleN=%d bgStyleMs=%.1f\n",
-        tileTasks.size(), drawMs, gCaptureProbe.tileReads - captureProbe.tileReads,
+        drawnCount, drawMs - gCaptureProbe.captureMs,
+        gCaptureProbe.tileReads - captureProbe.tileReads,
         gCaptureProbe.tileReadMs - captureProbe.tileReadMs,
         gCaptureProbe.snapshotReads - captureProbe.snapshotReads,
         gCaptureProbe.missing - captureProbe.missing, gCaptureProbe.fallbacks,
@@ -807,175 +822,184 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   return dirtyRects;
 }
 
-void DisplayList::captureBackgroundsByLevel(
-    Surface* surface, const std::vector<DrawTask>& tileTasks, float zoomScale,
-    std::vector<std::unique_ptr<BackgroundSnapshotMap>>* levelSnapshots,
-    std::vector<int>* taskSnapshotIndex, std::vector<bool>* taskSnapshotCover) const {
+std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureLevelBackgrounds(
+    Surface* surface, const std::vector<DrawTask>& tileTasks,
+    const std::vector<size_t>& taskIndices, int level, float zoomScale,
+    std::vector<bool>* taskSnapshotCover) const {
   // Each capture serves all tiles of one raster scale, so a tile is captured with the density it
   // is drawn with. That is what lets tree tiles take part: their scale is 2^-level, not the
   // current zoom.
-  levelSnapshots->clear();
-  taskSnapshotIndex->assign(tileTasks.size(), -1);
-  taskSnapshotCover->assign(tileTasks.size(), false);
-  if (_root->hasBackgroundStyle(1.0f)) {
-    // Group by level first: one capture transform cannot serve two raster scales.
-    std::vector<std::pair<int, std::vector<size_t>>> levels = {};
-    for (size_t i = 0; i < tileTasks.size(); ++i) {
-      auto level = tileTasks[i].treeLevel();
-      auto it = std::find_if(levels.begin(), levels.end(),
-                             [level](const std::pair<int, std::vector<size_t>>& entry) {
-                               return entry.first == level;
-                             });
-      if (it == levels.end()) {
-        levels.push_back({level, {i}});
-      } else {
-        it->second.push_back(i);
-      }
-    }
-    for (const auto& levelEntry : levels) {
-      auto level = levelEntry.first;
-      auto rasterScale = level == EXACT_LEVEL ? zoomScale : GetTileRasterScale(level);
-      if (FloatNearlyZero(rasterScale)) {
-        continue;
-      }
-      // Only styles with neither a cached output nor a tile backdrop are captured, over their own
-      // area within each task rather than the whole tile.
-      auto viewMatrix = Matrix::MakeScale(rasterScale);
-      std::vector<Rect> captureRects = {};
-      std::vector<Rect> taskRects = {};
-      std::vector<size_t> capturedTasks = {};
-      taskRects.reserve(levelEntry.second.size());
-      const auto scanStart = std::chrono::steady_clock::now();
-      int forcedCount = 0;
-      int missingRectCount = 0;
-      for (auto index : levelEntry.second) {
-        const auto& task = tileTasks[index];
-        taskRects.push_back(task.tileRect());
-        if (isForceCaptured(task)) {
-          captureRects.push_back(task.tileRect());
-          capturedTasks.push_back(index);
-          ++forcedCount;
-          continue;
-        }
-        std::vector<Rect> missingRects = {};
-        if (!collectMissingBackdrops(task, &missingRects)) {
-          continue;
-        }
-        missingRectCount += static_cast<int>(missingRects.size());
-        // One rect per task: capture culls layers per rect, so a rect per style would multiply the
-        // cost of walking the tree by the number of styles.
-        auto missingUnion = Rect::MakeEmpty();
-        for (const auto& rect : missingRects) {
-          missingUnion.join(rect);
-        }
-        auto captureRect = viewMatrix.mapRect(missingUnion);
-        captureRect.roundOut();
-        captureRects.push_back(captureRect);
-        capturedTasks.push_back(index);
-      }
-      const double scanMs =
-          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - scanStart)
-              .count();
-      std::unique_ptr<BackgroundSnapshotMap> map = nullptr;
-      if (!captureRects.empty()) {
-        // Every task of this level draws with the map, so the layer style sources it caches are
-        // recorded against all task rects rather than the narrowed capture rects.
-        double captureArea = 0.0;
-        for (const auto& rect : captureRects) {
-          captureArea += static_cast<double>(rect.width()) * static_cast<double>(rect.height());
-        }
-        double tileArea = 0.0;
-        for (auto index : capturedTasks) {
-          const auto& rect = tileTasks[index].tileRect();
-          tileArea += static_cast<double>(rect.width()) * static_cast<double>(rect.height());
-        }
-        const auto before = gCaptureProbe;
-        const auto levelStart = std::chrono::steady_clock::now();
-        map = captureBackgrounds(surface, captureRects, viewMatrix, taskRects);
-        const double levelMs =
-            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - levelStart)
-                .count();
-        const double sourceMs = gCaptureProbe.styleSourceMs - before.styleSourceMs;
-        const double snapMs = gCaptureProbe.snapshotMs - before.snapshotMs;
-        std::printf(
-            "[CAP-LEVEL] level=%d tiles=%zu ms=%.1f tasks=%zu forced=%d missRects=%d scanMs=%.2f "
-            "areaRatio=%.2f srcN=%d srcMs=%.1f snapN=%d snapMs=%.1f restMs=%.1f\n",
-            level, capturedTasks.size(), levelMs, levelEntry.second.size(), forcedCount,
-            missingRectCount, scanMs, tileArea > 0.0 ? captureArea / tileArea : 0.0,
-            gCaptureProbe.styleSources - before.styleSources, sourceMs,
-            gCaptureProbe.snapshots - before.snapshots, snapMs, levelMs - sourceMs - snapMs);
-      } else {
-        std::printf("[CAP-SKIP] level=%d tasks=%zu scanMs=%.2f\n", level, levelEntry.second.size(),
-                    scanMs);
-        // Every task reads its backdrops from the tile, but the layer style sources are still
-        // shared: the first task records each one and the others reuse it.
-        map = std::make_unique<BackgroundSnapshotMap>();
-        map->styleSourceRects = makeStyleSourceRects(taskRects, viewMatrix);
-      }
-      if (map == nullptr) {
-        continue;
-      }
-      auto snapshotIndex = static_cast<int>(levelSnapshots->size());
-      levelSnapshots->push_back(std::move(map));
-      for (auto index : levelEntry.second) {
-        (*taskSnapshotIndex)[index] = snapshotIndex;
-      }
-      for (auto index : capturedTasks) {
-        (*taskSnapshotCover)[index] = true;
-      }
-    }
+  auto rasterScale = level == EXACT_LEVEL ? zoomScale : GetTileRasterScale(level);
+  if (FloatNearlyZero(rasterScale)) {
+    return nullptr;
   }
+  // Only styles with neither a cached output nor a tile backdrop are captured, over their own
+  // area within each task rather than the whole tile.
+  auto viewMatrix = Matrix::MakeScale(rasterScale);
+  std::vector<Rect> captureRects = {};
+  std::vector<Rect> taskRects = {};
+  std::vector<size_t> capturedTasks = {};
+  taskRects.reserve(taskIndices.size());
+  const auto scanStart = std::chrono::steady_clock::now();
+  int forcedCount = 0;
+  int missingRectCount = 0;
+  for (auto index : taskIndices) {
+    const auto& task = tileTasks[index];
+    taskRects.push_back(task.tileRect());
+    if (isForceCaptured(task)) {
+      captureRects.push_back(task.tileRect());
+      capturedTasks.push_back(index);
+      ++forcedCount;
+      continue;
+    }
+    std::vector<Rect> missingRects = {};
+    if (!collectMissingBackdrops(task, &missingRects)) {
+      continue;
+    }
+    missingRectCount += static_cast<int>(missingRects.size());
+    // One rect per task: capture culls layers per rect, so a rect per style would multiply the
+    // cost of walking the tree by the number of styles.
+    auto missingUnion = Rect::MakeEmpty();
+    for (const auto& rect : missingRects) {
+      missingUnion.join(rect);
+    }
+    auto captureRect = viewMatrix.mapRect(missingUnion);
+    captureRect.roundOut();
+    captureRects.push_back(captureRect);
+    capturedTasks.push_back(index);
+  }
+  const double scanMs =
+      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - scanStart)
+          .count();
+  std::unique_ptr<BackgroundSnapshotMap> map = nullptr;
+  if (!captureRects.empty()) {
+    // Every task of this level draws with the map, so the layer style sources it caches are
+    // recorded against all task rects rather than the narrowed capture rects.
+    double captureArea = 0.0;
+    for (const auto& rect : captureRects) {
+      captureArea += static_cast<double>(rect.width()) * static_cast<double>(rect.height());
+    }
+    double tileArea = 0.0;
+    for (auto index : capturedTasks) {
+      const auto& rect = tileTasks[index].tileRect();
+      tileArea += static_cast<double>(rect.width()) * static_cast<double>(rect.height());
+    }
+    const auto before = gCaptureProbe;
+    const auto levelStart = std::chrono::steady_clock::now();
+    map = captureBackgrounds(surface, captureRects, viewMatrix, taskRects);
+    const double levelMs =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - levelStart)
+            .count();
+    const double sourceMs = gCaptureProbe.styleSourceMs - before.styleSourceMs;
+    const double snapMs = gCaptureProbe.snapshotMs - before.snapshotMs;
+    std::printf(
+        "[CAP-LEVEL] level=%d tiles=%zu ms=%.1f tasks=%zu forced=%d missRects=%d scanMs=%.2f "
+        "areaRatio=%.2f srcN=%d srcMs=%.1f snapN=%d snapMs=%.1f restMs=%.1f\n",
+        level, capturedTasks.size(), levelMs, taskIndices.size(), forcedCount, missingRectCount,
+        scanMs, tileArea > 0.0 ? captureArea / tileArea : 0.0,
+        gCaptureProbe.styleSources - before.styleSources, sourceMs,
+        gCaptureProbe.snapshots - before.snapshots, snapMs, levelMs - sourceMs - snapMs);
+  } else {
+    std::printf("[CAP-SKIP] level=%d tasks=%zu scanMs=%.2f\n", level, taskIndices.size(), scanMs);
+    // Every task reads its backdrops from the tile, but the layer style sources are still
+    // shared: the first task records each one and the others reuse it.
+    map = std::make_unique<BackgroundSnapshotMap>();
+    map->styleSourceRects = makeStyleSourceRects(taskRects, viewMatrix);
+  }
+  for (auto index : capturedTasks) {
+    (*taskSnapshotCover)[index] = true;
+  }
+  return map;
 }
 
-std::vector<Rect> DisplayList::drawTileTasks(
-    const std::vector<DrawTask>& tileTasks,
-    const std::vector<std::unique_ptr<BackgroundSnapshotMap>>& levelSnapshots,
-    const std::vector<int>& taskSnapshotIndex, const std::vector<bool>& taskSnapshotCover,
-    Surface* surface, float zoomScale) {
+std::vector<Rect> DisplayList::drawTileTasks(const std::vector<DrawTask>& tileTasks,
+                                             Surface* surface, float zoomScale,
+                                             double budgetSeconds, std::vector<bool>* drawn) {
+  drawn->assign(tileTasks.size(), false);
+  const auto start = std::chrono::steady_clock::now();
+  size_t drawnCount = 0;
+  auto timeExpired = [&]() {
+    return budgetSeconds > 0.0 && drawnCount > 0 &&
+           std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >=
+               budgetSeconds;
+  };
+  // Group by level, keeping the order in which levels first appear: one capture transform cannot
+  // serve two raster scales.
+  std::vector<std::pair<int, std::vector<size_t>>> levels = {};
+  for (size_t i = 0; i < tileTasks.size(); ++i) {
+    auto level = tileTasks[i].treeLevel();
+    auto it = std::find_if(
+        levels.begin(), levels.end(),
+        [level](const std::pair<int, std::vector<size_t>>& entry) { return entry.first == level; });
+    if (it == levels.end()) {
+      levels.push_back({level, {i}});
+    } else {
+      it->second.push_back(i);
+    }
+  }
+  const bool hasBackgroundStyle = _root->hasBackgroundStyle(1.0f);
+  std::vector<bool> taskSnapshotCover(tileTasks.size(), false);
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
-  for (size_t taskIndex = 0; taskIndex < tileTasks.size(); ++taskIndex) {
-    const auto& task = tileTasks[taskIndex];
-    auto isTreeTask = task.treeLevel() != EXACT_LEVEL;
-    auto snapshotIndex = taskSnapshotIndex[taskIndex];
-    const bool snapshotsCover = taskSnapshotCover[taskIndex];
-    auto* snapshots =
-        snapshotIndex >= 0 ? levelSnapshots[static_cast<size_t>(snapshotIndex)].get() : nullptr;
-    int missingBackdrops = 0;
-    auto hasContent = drawTileTask(task, snapshots, snapshotsCover, &missingBackdrops);
-    updateForceCapture(task, missingBackdrops > 0);
-    if (missingBackdrops > 0) {
-      // Some styles predicted to read the tile could not, so redraw the task with a capture of its
-      // own rather than leave those styles out of the tile.
-      Matrix viewMatrix = Matrix::I();
-      Rect clipRect = {};
-      auto rasterScale = getTileDrawGeometry(task, &viewMatrix, &clipRect);
-      const auto fallbackStart = std::chrono::steady_clock::now();
-      auto taskSnapshots =
-          captureBackgrounds(surface, {task.tileRect()}, Matrix::MakeScale(rasterScale));
-      hasContent = drawTileTask(task, taskSnapshots.get(), true);
-      const double fallbackMs = std::chrono::duration<double, std::milli>(
-                                    std::chrono::steady_clock::now() - fallbackStart)
-                                    .count();
-      ++gCaptureProbe.fallbacks;
-      gCaptureProbe.fallbackMs += fallbackMs;
-      std::printf("[CAP-FALLBACK] level=%d missing=%d ms=%.1f\n", task.treeLevel(),
-                  missingBackdrops, fallbackMs);
+  for (const auto& [level, taskIndices] : levels) {
+    if (timeExpired()) {
+      break;
     }
-    if (!hasContent && task.coversTiles()) {
-      recycleBlankTiles(task);
+    std::unique_ptr<BackgroundSnapshotMap> snapshots = nullptr;
+    if (hasBackgroundStyle) {
+      const auto captureStart = std::chrono::steady_clock::now();
+      snapshots = captureLevelBackgrounds(surface, tileTasks, taskIndices, level, zoomScale,
+                                          &taskSnapshotCover);
+      ++gCaptureProbe.levelCaptures;
+      gCaptureProbe.captureMs +=
+          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - captureStart)
+              .count();
     }
-    // A grid task reports its tileRect in the zoom grid, while a tree task reports it in the raster
-    // grid of its own level. Scale the tree rect to the zoom grid first, then shift both by the
-    // content offset to reach surface pixels, which is where this frame reports its dirty rects.
-    auto dirtyRect = task.tileRect();
-    if (isTreeTask) {
-      auto displayScale = zoomScale / GetTileRasterScale(task.treeLevel());
-      dirtyRect.scale(displayScale, displayScale);
-    }
-    dirtyRect.offset(_contentOffset.x, _contentOffset.y);
-    if (dirtyRect.intersect(surfaceRect)) {
-      dirtyRects.emplace_back(dirtyRect);
+    for (auto taskIndex : taskIndices) {
+      if (timeExpired()) {
+        break;
+      }
+      const auto& task = tileTasks[taskIndex];
+      auto isTreeTask = task.treeLevel() != EXACT_LEVEL;
+      int missingBackdrops = 0;
+      auto hasContent =
+          drawTileTask(task, snapshots.get(), taskSnapshotCover[taskIndex], &missingBackdrops);
+      updateForceCapture(task, missingBackdrops > 0);
+      if (missingBackdrops > 0) {
+        // Some styles predicted to read the tile could not, so redraw the task with a capture of its
+        // own rather than leave those styles out of the tile.
+        Matrix viewMatrix = Matrix::I();
+        Rect clipRect = {};
+        auto rasterScale = getTileDrawGeometry(task, &viewMatrix, &clipRect);
+        const auto fallbackStart = std::chrono::steady_clock::now();
+        auto taskSnapshots =
+            captureBackgrounds(surface, {task.tileRect()}, Matrix::MakeScale(rasterScale));
+        hasContent = drawTileTask(task, taskSnapshots.get(), true);
+        const double fallbackMs = std::chrono::duration<double, std::milli>(
+                                      std::chrono::steady_clock::now() - fallbackStart)
+                                      .count();
+        ++gCaptureProbe.fallbacks;
+        gCaptureProbe.fallbackMs += fallbackMs;
+        std::printf("[CAP-FALLBACK] level=%d missing=%d ms=%.1f\n", task.treeLevel(),
+                    missingBackdrops, fallbackMs);
+      }
+      if (!hasContent && task.coversTiles()) {
+        recycleBlankTiles(task);
+      }
+      // A grid task reports its tileRect in the zoom grid, while a tree task reports it in the raster
+      // grid of its own level. Scale the tree rect to the zoom grid first, then shift both by the
+      // content offset to reach surface pixels, which is where this frame reports its dirty rects.
+      auto dirtyRect = task.tileRect();
+      if (isTreeTask) {
+        auto displayScale = zoomScale / GetTileRasterScale(task.treeLevel());
+        dirtyRect.scale(displayScale, displayScale);
+      }
+      dirtyRect.offset(_contentOffset.x, _contentOffset.y);
+      if (dirtyRect.intersect(surfaceRect)) {
+        dirtyRects.emplace_back(dirtyRect);
+      }
+      (*drawn)[taskIndex] = true;
+      ++drawnCount;
     }
   }
   return dirtyRects;
@@ -1117,13 +1141,16 @@ void DisplayList::invalidateTreeTiles(const std::vector<Rect>& dirtyRegions,
   }
 }
 
+static TileKey GetTileKey(const DrawTask& task, const Tile& tile, int64_t zoomScaleInt) {
+  return task.treeLevel() == EXACT_LEVEL
+             ? TileKey::MakeGrid(tile.tileX, tile.tileY, zoomScaleInt)
+             : TileKey::MakeTree(tile.tileX, tile.tileY, task.treeLevel());
+}
+
 void DisplayList::recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks) {
   for (auto& task : tileTasks) {
     for (auto& tile : task.getTiles()) {
-      auto key = task.treeLevel() == EXACT_LEVEL
-                     ? TileKey::MakeGrid(tile->tileX, tile->tileY, _zoomScaleInt)
-                     : TileKey::MakeTree(tile->tileX, tile->tileY, task.treeLevel());
-      if (auto recycled = tilePool->erase(key)) {
+      if (auto recycled = tilePool->erase(GetTileKey(task, *tile, _zoomScaleInt))) {
         emptyTiles.push_back(std::move(recycled));
       }
     }
@@ -1138,9 +1165,7 @@ void DisplayList::recycleGridTiles() {
 
 void DisplayList::recycleBlankTiles(const DrawTask& task) {
   for (auto& tile : task.getTiles()) {
-    auto key = task.treeLevel() == EXACT_LEVEL
-                   ? TileKey::MakeGrid(tile->tileX, tile->tileY, _zoomScaleInt)
-                   : TileKey::MakeTree(tile->tileX, tile->tileY, task.treeLevel());
+    auto key = GetTileKey(task, *tile, _zoomScaleInt);
     if (tilePool->erase(key) == nullptr) {
       continue;
     }
@@ -1201,15 +1226,11 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     lastZoomScaleInt = _zoomScaleInt;
   }
   hasZoomBlurTiles = false;
-  auto renderRect = GetViewportRect(surface, _contentOffset);
-
-  auto renderBounds = _root->renderBounds;
-  auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  renderBounds.scale(zoomScale, zoomScale);
-  renderBounds.roundOut();
-  if (!renderRect.intersect(renderBounds)) {
+  auto renderRect = getVisibleRenderRect(surface);
+  if (renderRect.isEmpty()) {
     return {};
   }
+  auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   const auto tileSizeFloat = static_cast<float>(_tileSize);
   const auto startX = FloatFloorToInt(renderRect.left / tileSizeFloat);
   const auto startY = FloatFloorToInt(renderRect.top / tileSizeFloat);
@@ -1461,6 +1482,88 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     }
   }
   return screenTasks;
+}
+
+Rect DisplayList::getVisibleRenderRect(const Surface* surface) const {
+  auto renderRect = GetViewportRect(surface, _contentOffset);
+  auto renderBounds = _root->renderBounds;
+  auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  renderBounds.scale(zoomScale, zoomScale);
+  renderBounds.roundOut();
+  if (!renderRect.intersect(renderBounds)) {
+    return Rect::MakeEmpty();
+  }
+  return renderRect;
+}
+
+std::vector<DrawTask> DisplayList::collectDisplayTasks(const Surface* surface,
+                                                       std::vector<Rect>* skippedRects) {
+  auto renderRect = getVisibleRenderRect(surface);
+  if (renderRect.isEmpty()) {
+    return {};
+  }
+  const auto tileSizeFloat = static_cast<float>(_tileSize);
+  const auto startX = FloatFloorToInt(renderRect.left / tileSizeFloat);
+  const auto startY = FloatFloorToInt(renderRect.top / tileSizeFloat);
+  const auto endX = FloatCeilToInt(renderRect.right / tileSizeFloat);
+  const auto endY = FloatCeilToInt(renderRect.bottom / tileSizeFloat);
+  auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  auto coverages =
+      CollectTreeCoverages(tilePool.get(), blankTiles.get(), zoomScale, renderRect, _tileSize);
+  std::vector<DrawTask> screenTasks = {};
+  for (auto tileY = startY; tileY < endY; ++tileY) {
+    for (auto tileX = startX; tileX < endX; ++tileX) {
+      auto key = TileKey::MakeGrid(tileX, tileY, _zoomScaleInt);
+      auto gridRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
+      gridRect.intersect(renderRect);
+      if (auto tile = tilePool->find(key)) {
+        screenTasks.emplace_back(tile, _tileSize, tile->getTileRect(_tileSize, &renderRect));
+      } else if (blankTiles->contains(key)) {
+        skippedRects->push_back(gridRect);
+      } else if (auto coverage = FindFinestCoverage(&coverages, gridRect, _tileSize)) {
+        AppendFallbackScreenTasks(coverage, gridRect, _tileSize, &screenTasks, skippedRects);
+      } else {
+        skippedRects->push_back(gridRect);
+      }
+    }
+  }
+  return screenTasks;
+}
+
+void DisplayList::takeDeferredPatches(std::vector<DrawTask>* tileTasks) {
+  auto patches = std::move(deferredPatches);
+  deferredPatches.clear();
+  for (auto& task : patches) {
+    // A tile recycled since then, for a zoom change or an eviction, has no outdated content left.
+    auto cached = std::all_of(
+        task.getTiles().begin(), task.getTiles().end(), [&](const std::shared_ptr<Tile>& tile) {
+          return tilePool->find(GetTileKey(task, *tile, _zoomScaleInt)) == tile;
+        });
+    if (cached) {
+      tileTasks->push_back(std::move(task));
+    }
+  }
+}
+
+void DisplayList::deferTileTasks(const std::vector<DrawTask>& tileTasks,
+                                 const std::vector<bool>& drawn) {
+  for (size_t i = 0; i < tileTasks.size(); ++i) {
+    if (drawn[i]) {
+      continue;
+    }
+    const auto& task = tileTasks[i];
+    if (!task.coversTiles()) {
+      deferredPatches.push_back(task);
+      continue;
+    }
+    // A new tile holds nothing to show yet, so it goes back to the free list and its cell is
+    // requested again by a later frame.
+    for (auto& tile : task.getTiles()) {
+      if (auto recycled = tilePool->erase(GetTileKey(task, *tile, _zoomScaleInt))) {
+        emptyTiles.push_back(std::move(recycled));
+      }
+    }
+  }
 }
 
 size_t DisplayList::rasterizeTreeTiles(const Surface* surface,

@@ -392,6 +392,83 @@ TGFX_TEST_PRIVATE(TilePoolTest, DirtyRegionPatchesFallbackTileInPlace) {
   TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tilePool->find(key), tile));
 }
 
+TGFX_TEST_PRIVATE(TilePoolTest, TimeBudgetDefersPatchesToLaterFrames) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 512, 512);
+  ASSERT_NE(surface, nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->root()->addChild(MakeSolid(4096, 4096, Color::Red()));
+  auto first = MakeSolid(50, 50, Color::Red());
+  first->setMatrix(Matrix::MakeTrans(20, 20));
+  displayList->root()->addChild(first);
+  auto second = MakeSolid(50, 50, Color::Red());
+  second->setMatrix(Matrix::MakeTrans(400, 400));
+  displayList->root()->addChild(second);
+  displayList->render(surface.get());
+  EXPECT_FALSE(displayList->hasContentChanged());
+
+  // The smallest budget runs out after the first task, so each frame patches a single tile.
+  displayList->setTileTimeBudget(1e-9f);
+  first->setColor(Color::Blue());
+  second->setColor(Color::Blue());
+  displayList->render(surface.get());
+  auto firstPixel = ReadPixel(surface, 40, 40);
+  auto secondPixel = ReadPixel(surface, 420, 420);
+  EXPECT_TRUE((firstPixel == OPAQUE_BLUE) != (secondPixel == OPAQUE_BLUE));
+  EXPECT_TRUE(firstPixel == OPAQUE_RED || secondPixel == OPAQUE_RED);
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(displayList->deferredPatches.empty()));
+  EXPECT_TRUE(displayList->hasContentChanged());
+
+  displayList->render(surface.get());
+  EXPECT_EQ(ReadPixel(surface, 40, 40), OPAQUE_BLUE);
+  EXPECT_EQ(ReadPixel(surface, 420, 420), OPAQUE_BLUE);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->deferredPatches.empty()));
+}
+
+TGFX_TEST_PRIVATE(TilePoolTest, TimeBudgetDefersNewTilesToFallbacks) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 512, 512);
+  ASSERT_NE(surface, nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileUpdateMode(TileUpdateMode::Smooth);
+  displayList->setMaxTilesRefinedPerFrame(8);
+  displayList->root()->addChild(MakeSolid(4096, 4096, Color::Red()));
+  displayList->render(surface.get());
+  // Leave part of the viewport without its exact tiles, so later frames have both grid tiles and
+  // fallback levels to rasterize.
+  displayList->setContentOffset(-256, 0);
+  displayList->render(surface.get());
+  // The smallest budget runs out after the first task, so each frame adds at most one tile.
+  displayList->setTileTimeBudget(1e-9f);
+  auto tileCount = [&]() {
+    size_t count = 0;
+    TGFX_PRIVATE_ACCESS(count = displayList->tilePool->size(TileType::Grid) +
+                                displayList->tilePool->size(TileType::Tree));
+    return count;
+  };
+  auto lastCount = tileCount();
+  int frames = 0;
+  while (displayList->hasContentChanged() && frames < 64) {
+    displayList->render(surface.get());
+    ++frames;
+    // Cells whose tiles wait for a later frame show a fallback rather than the background.
+    EXPECT_EQ(ReadPixel(surface, 10, 10), OPAQUE_RED);
+    EXPECT_EQ(ReadPixel(surface, 500, 500), OPAQUE_RED);
+    auto count = tileCount();
+    EXPECT_LE(count, lastCount + 1);
+    lastCount = count;
+  }
+  EXPECT_GT(frames, 1);
+  EXPECT_LT(frames, 64);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->deferredPatches.empty()));
+}
+
 TGFX_TEST_PRIVATE(TilePoolTest, DirtyRegionDropsTilesOutsideFallbackLevels) {
   ContextScope scope;
   auto context = scope.getContext();
