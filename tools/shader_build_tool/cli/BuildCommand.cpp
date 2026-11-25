@@ -43,10 +43,7 @@
 #include "core/ShaderSources.h"
 #include "emit/ChainOpsGLSL.h"
 #include "gpu/ir/OperatorManifest.h"
-#include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/KernelContract.h"
-#include "gpu/shaders/Layout.h"
-#include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/contract/ChainISA.h"
 #include "gpu/shaders/contract/FragmentLibrary.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
@@ -905,11 +902,6 @@ int RunBuildCommand(const BuildOptions& options) {
     }
     std::cout << "Bundles verified.\n";
     return 0;
-  }
-
-  if (FamilyCount() == 0) {
-    std::cerr << "No shaders registered in the declaration table.\n";
-    return 1;
   }
 
   const bool compiling = !options.shaderDir.empty();

@@ -36,29 +36,6 @@
 #include "spirv-tools/linker.hpp"
 
 namespace tgfx {
-bool ChainSPIRVBodySupported(const std::set<int>& usedOps, const Layout& layout, int hasXp) {
-  if (hasXp != 0 && hasXp != 1) {
-    return false;  // the framebuffer-fetch blend pass needs the frame's subpass input
-  }
-  if (hasXp == 1) {
-    bool hasDstSampler = false;
-    for (const auto& texture : layout.textures) {
-      if (texture.name == "DstTextureSampler") {
-        hasDstSampler = true;
-      }
-    }
-    if (!hasDstSampler) {
-      return false;
-    }
-  }
-  for (int op : usedOps) {
-    const OpTable::Row* row = OpTable::FindRow(op);
-    if (row == nullptr || !row->admitted) {
-      return false;
-    }
-  }
-  return true;
-}
 
 // The runtime's own gate: every module and the linked result are validated before a pipeline is
 // built from them, so a malformed emission falls back to the interpreter instead of reaching the
@@ -112,9 +89,6 @@ bool LinkChainSPIRV(const std::vector<std::vector<uint32_t>>& modules, std::vect
 
 namespace tgfx {
 
-bool ChainSPIRVBodySupported(const std::set<int>&, const Layout&, int) {
-  return false;
-}
 
 bool LinkChainSPIRV(const std::vector<std::vector<uint32_t>>&, std::vector<uint32_t>*,
                     std::string* error) {
