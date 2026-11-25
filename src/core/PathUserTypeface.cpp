@@ -149,7 +149,7 @@ class PathUserScalerContext final : public UserScalerContext {
     shape = Shape::ApplyMatrix(std::move(shape), matrix);
     auto rasterizer = PathRasterizer::MakeFrom(width, height, std::move(shape), true,
 #ifdef TGFX_USE_TEXT_GAMMA_CORRECTION
-                                               true
+                                               !fauxBold
 #else
                                                false
 #endif

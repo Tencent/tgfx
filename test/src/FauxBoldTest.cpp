@@ -18,10 +18,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include "core/PathRasterizer.h"
 #include "core/utils/FauxBoldScale.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
@@ -205,3 +207,231 @@ TGFX_TEST(FauxBoldTest, ColorGlyphKeepsItsBitmap) {
 
 }  // namespace tgfx
 #endif
+
+namespace tgfx {
+
+// A convex glyph in a 100x100 design box. Convex shapes keep the stroke band and the original
+// contour from overlapping in a way that would make appended and unioned contours differ, so this
+// fixture isolates the coverage policy instead of fill-rule composition.
+class FauxBoldOvalProvider final : public PathProvider {
+ public:
+  Path getPath() const override {
+    Path path = {};
+    path.addOval(Rect::MakeXYWH(22, 18, 56, 64));
+    path.close();
+    return path;
+  }
+
+  Rect getBounds() const override {
+    return Rect::MakeXYWH(22, 18, 56, 64);
+  }
+};
+
+class FauxBoldRectProvider final : public PathProvider {
+ public:
+  Path getPath() const override {
+    Path path = {};
+    path.addRect(Rect::MakeXYWH(20, 24, 60, 52));
+    path.close();
+    return path;
+  }
+
+  Rect getBounds() const override {
+    return Rect::MakeXYWH(20, 24, 60, 52);
+  }
+};
+
+static std::shared_ptr<Typeface> MakeFauxBoldCustomTypeface() {
+  PathTypefaceBuilder builder(100);
+  builder.setFontName("fauxCustom", "Regular");
+  builder.addGlyph(std::make_shared<FauxBoldOvalProvider>(), 100.0f);
+  builder.addGlyph(std::make_shared<FauxBoldRectProvider>(), 100.0f);
+  return builder.detach();
+}
+
+// Rasterizes the glyph's own path at the same size and offset the scaler context uses, so the
+// expectation depends only on the public path and not on how the image is produced internally.
+static Bitmap RasterizeGlyph(const Font& font, GlyphID glyphID, const Rect& bounds,
+                             bool needsGammaCorrection) {
+  Bitmap bitmap(static_cast<int>(bounds.width()), static_cast<int>(bounds.height()), true, false);
+  Path path = {};
+  if (!font.getPath(glyphID, &path) || path.isEmpty()) {
+    return bitmap;
+  }
+  auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
+  auto rasterizer = PathRasterizer::MakeFrom(bitmap.width(), bitmap.height(), std::move(path), true,
+                                             &matrix, needsGammaCorrection);
+  if (rasterizer == nullptr) {
+    return bitmap;
+  }
+  auto pixels = bitmap.lockPixels();
+  bool ok = pixels != nullptr && rasterizer->readPixels(bitmap.info(), pixels);
+  if (pixels != nullptr) {
+    bitmap.unlockPixels();
+  }
+  if (!ok) {
+    return Bitmap();
+  }
+  return bitmap;
+}
+
+TGFX_TEST(FauxBoldTest, CustomPathFauxBoldUsesRawCoverage) {
+  auto typeface = MakeFauxBoldCustomTypeface();
+  ASSERT_NE(typeface, nullptr);
+  ASSERT_TRUE(typeface->hasOutlines());
+  ASSERT_FALSE(typeface->hasColor());
+  // unitsPerEm == size keeps textScale at 1, so this test measures the coverage policy alone and
+  // does not depend on how design-space strokes are scaled.
+  constexpr float size = 100.0f;
+  {
+    Font font(typeface, size);
+    for (GlyphID glyphID : {static_cast<GlyphID>(1), static_cast<GlyphID>(2)}) {
+      SCOPED_TRACE(::testing::Message() << "glyph=" << glyphID);
+      Font regular = font;
+      Font bold = font;
+      bold.setFauxBold(true);
+      auto regularBounds = regular.getBounds(glyphID);
+      auto boldBounds = bold.getBounds(glyphID);
+      ASSERT_FALSE(regularBounds.isEmpty());
+      ASSERT_FALSE(boldBounds.isEmpty());
+      Path regularPath = {};
+      ASSERT_TRUE(regular.getPath(glyphID, &regularPath));
+      ASSERT_FALSE(regularPath.isEmpty());
+
+      // The rendered outline is the stroked and unioned one, so it must be strictly wider.
+      EXPECT_GT(boldBounds.width(), regularBounds.width());
+
+      auto rawBold = RasterizeGlyph(bold, glyphID, boldBounds, false);
+      auto correctedBold = RasterizeGlyph(bold, glyphID, boldBounds, true);
+      ASSERT_FALSE(rawBold.isEmpty());
+      ASSERT_FALSE(correctedBold.isEmpty());
+
+      // The fixture has curved and diagonal coverage, otherwise the comparison proves nothing.
+      long rawSum = 0;
+      long correctedSum = 0;
+      auto rawPixels = static_cast<const uint8_t*>(rawBold.lockPixels());
+      auto correctedPixels = static_cast<const uint8_t*>(correctedBold.lockPixels());
+      ASSERT_NE(rawPixels, nullptr);
+      ASSERT_NE(correctedPixels, nullptr);
+      for (size_t i = 0; i < rawBold.info().byteSize(); ++i) {
+        rawSum += rawPixels[i];
+        correctedSum += correctedPixels[i];
+      }
+      rawBold.unlockPixels();
+      correctedBold.unlockPixels();
+      ASSERT_GT(rawSum, 0);
+      EXPECT_GT(correctedSum, rawSum);
+
+      auto image = bold.getImage(glyphID, nullptr, nullptr);
+      ASSERT_NE(image, nullptr);
+      ASSERT_EQ(image->width(), rawBold.width());
+      ASSERT_EQ(image->height(), rawBold.height());
+
+      Bitmap actual(image->width(), image->height(), true, false);
+      auto actualPixels = actual.lockPixels();
+      ASSERT_NE(actualPixels, nullptr);
+      bool ok = image->readPixels(actual.info(), actualPixels);
+      actual.unlockPixels();
+      ASSERT_TRUE(ok);
+
+      // fauxBold must render the raw coverage, matching the CoreGraphics and FreeType backends.
+      auto expectedPixels = static_cast<const uint8_t*>(rawBold.lockPixels());
+      auto producedPixels = static_cast<const uint8_t*>(actual.lockPixels());
+      ASSERT_NE(expectedPixels, nullptr);
+      ASSERT_NE(producedPixels, nullptr);
+      int maxDifference = 0;
+      for (size_t i = 0; i < actual.info().byteSize(); ++i) {
+        maxDifference = std::max(maxDifference, std::abs(static_cast<int>(expectedPixels[i]) -
+                                                         static_cast<int>(producedPixels[i])));
+      }
+      rawBold.unlockPixels();
+      actual.unlockPixels();
+      EXPECT_LE(maxDifference, 1);
+    }
+  }
+}
+
+TGFX_TEST(FauxBoldTest, CustomPathRegularKeepsGammaCoverage) {
+  auto typeface = MakeFauxBoldCustomTypeface();
+  ASSERT_NE(typeface, nullptr);
+  Font font(typeface, 100.0f);
+  auto glyphID = static_cast<GlyphID>(1);
+  auto bounds = font.getBounds(glyphID);
+  ASSERT_FALSE(bounds.isEmpty());
+  auto corrected = RasterizeGlyph(font, glyphID, bounds, true);
+  auto raw = RasterizeGlyph(font, glyphID, bounds, false);
+  ASSERT_FALSE(corrected.isEmpty());
+  ASSERT_FALSE(raw.isEmpty());
+
+  auto image = font.getImage(glyphID, nullptr, nullptr);
+  ASSERT_NE(image, nullptr);
+  Bitmap actual(image->width(), image->height(), true, false);
+  auto actualPixels = actual.lockPixels();
+  ASSERT_NE(actualPixels, nullptr);
+  bool ok = image->readPixels(actual.info(), actualPixels);
+  actual.unlockPixels();
+  ASSERT_TRUE(ok);
+
+  auto correctedPixels = static_cast<const uint8_t*>(corrected.lockPixels());
+  auto rawPixels = static_cast<const uint8_t*>(raw.lockPixels());
+  auto producedPixels = static_cast<const uint8_t*>(actual.lockPixels());
+  ASSERT_NE(correctedPixels, nullptr);
+  ASSERT_NE(rawPixels, nullptr);
+  ASSERT_NE(producedPixels, nullptr);
+  int maxDifference = 0;
+  long correctedSum = 0;
+  long rawSum = 0;
+  for (size_t i = 0; i < actual.info().byteSize(); ++i) {
+    maxDifference = std::max(maxDifference, std::abs(static_cast<int>(correctedPixels[i]) -
+                                                     static_cast<int>(producedPixels[i])));
+    correctedSum += correctedPixels[i];
+    rawSum += rawPixels[i];
+  }
+  corrected.unlockPixels();
+  raw.unlockPixels();
+  actual.unlockPixels();
+  // Regular custom-path text keeps the text gamma correction it had before this change.
+  EXPECT_GT(correctedSum, rawSum);
+  EXPECT_LE(maxDifference, 1);
+}
+
+// Platform-independent visual lock: the same custom outline rendered as regular (top row) and
+// fauxBold (bottom row). CI collects the per-backend result; the image is not meant to match Adobe
+// output pixel for pixel.
+TGFX_TEST(FauxBoldTest, FauxBoldCoverageBaseline) {
+  auto typeface = MakeFauxBoldCustomTypeface();
+  ASSERT_NE(typeface, nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 260, 280);
+  ASSERT_NE(surface, nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  Paint paint = {};
+  paint.setColor(Color::Black());
+  Font font(typeface, 100.0f);
+  const std::vector<GlyphID> glyphs = {1, 2};
+  const std::vector<Point> regularPositions = {Point::Make(25, 110), Point::Make(140, 110)};
+  canvas->drawGlyphs(glyphs.data(), regularPositions.data(), glyphs.size(), font, paint);
+  Font bold = font;
+  bold.setFauxBold(true);
+  const std::vector<Point> boldPositions = {Point::Make(25, 255), Point::Make(140, 255)};
+  canvas->drawGlyphs(glyphs.data(), boldPositions.data(), glyphs.size(), bold, paint);
+  constexpr const char* BASELINE_KEY = "FauxBoldTest/FauxBoldCoverage";
+  bool matched = Baseline::Compare(surface, BASELINE_KEY);
+  if (!matched) {
+    // A backend that has not recorded this case yet (or a fresh checkout without the md5 cache)
+    // reports a missing reference rather than a pixel mismatch. CI records the first image through
+    // the regular update_baseline flow and later runs compare against it.
+    auto referencePath =
+        ProjectPath::Absolute(std::string("test/baseline/") + BASELINE_KEY + ".webp");
+    if (!std::filesystem::exists(referencePath)) {
+      GTEST_SKIP() << "No recorded reference for " << BASELINE_KEY
+                   << " on this backend yet; run update_baseline to create it.";
+    }
+  }
+  EXPECT_TRUE(matched);
+}
+
+}  // namespace tgfx
