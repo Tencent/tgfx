@@ -122,6 +122,18 @@ static uint32_t ReadPixel(const std::shared_ptr<Surface>& surface, int x, int y)
   return pixel;
 }
 
+// Grid tiles of earlier zoom scales stay in the pool as fallbacks, so only the current scale counts.
+static size_t CurrentGridCount(const DisplayList* displayList) {
+  size_t count = 0;
+  TGFX_PRIVATE_ACCESS(for (const auto& key
+                           : displayList->tilePool->keysOf(TileType::Grid)) {
+    if (key.scaleInt == displayList->_zoomScaleInt) {
+      ++count;
+    }
+  });
+  return count;
+}
+
 static constexpr uint32_t OPAQUE_RED = 0xFF0000FFu;
 static constexpr uint32_t OPAQUE_BLUE = 0xFFFF0000u;
 static constexpr uint32_t OPAQUE_WHITE = 0xFFFFFFFFu;
@@ -146,8 +158,8 @@ TGFX_TEST_PRIVATE(TilePoolTest, ZoomWithoutBudgetFillsViewportFromTreeLevels) {
   // A zero budget never rasterizes the exact tiles while the viewport is still, so nothing pending
   // can progress and the loop has to stop.
   EXPECT_FALSE(displayList->hasContentChanged());
-  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 0u);
-                      auto treeCount = displayList->tilePool->size(TileType::Tree);
+  EXPECT_EQ(CurrentGridCount(displayList.get()), 0u);
+  TGFX_PRIVATE_ACCESS(auto treeCount = displayList->tilePool->size(TileType::Tree);
                       EXPECT_GT(treeCount, 0u);
                       // The second zoom reuses the absolute level 3 tiles rather than adding more.
                       displayList->setZoomScale(0.75f); displayList->render(surface.get());
@@ -203,8 +215,8 @@ TGFX_TEST_PRIVATE(TilePoolTest, FastModeLeavesUncoveredCellsToTheBackground) {
   // Fast mode leaves those cells to the background and the zero budget leaves the grid empty, so no
   // frame would ever change them and the loop has to stop.
   EXPECT_FALSE(displayList->hasContentChanged());
-  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 0u);
-                      EXPECT_EQ(displayList->tilePool->size(TileType::Tree), 0u));
+  EXPECT_EQ(CurrentGridCount(displayList.get()), 0u);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tilePool->size(TileType::Tree), 0u));
 }
 
 TGFX_TEST_PRIVATE(TilePoolTest, BudgetRefinesFallbackIntoGridTiles) {
@@ -227,7 +239,7 @@ TGFX_TEST_PRIVATE(TilePoolTest, BudgetRefinesFallbackIntoGridTiles) {
     EXPECT_EQ(ReadPixel(surface, 300, 300), OPAQUE_RED);
   }
   EXPECT_FALSE(displayList->hasContentChanged());
-  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 4u));
+  EXPECT_EQ(CurrentGridCount(displayList.get()), 4u);
 }
 
 TGFX_TEST_PRIVATE(TilePoolTest, FallbackLevelsFillAfterTheExactTiles) {
@@ -252,7 +264,7 @@ TGFX_TEST_PRIVATE(TilePoolTest, FallbackLevelsFillAfterTheExactTiles) {
     // a time.
     TGFX_PRIVATE_ACCESS(auto count = displayList->tilePool->size(TileType::Tree);
                         EXPECT_GE(count, treeTiles);
-                        if (displayList->tilePool->size(TileType::Grid) == 4u) {
+                        if (CurrentGridCount(displayList.get()) == 4u) {
                           EXPECT_LE(count - treeTiles, 2u);
                         } treeTiles = count);
   }
@@ -260,8 +272,8 @@ TGFX_TEST_PRIVATE(TilePoolTest, FallbackLevelsFillAfterTheExactTiles) {
   auto level = GetTileLevel(0.7f);
   // L+2 and L+1 are what the next zoom-in uses as its own L+3 and L+2, and they are filled whether
   // or not the idle fill goes all the way down to L.
+  EXPECT_EQ(CurrentGridCount(displayList.get()), 4u);
   TGFX_PRIVATE_ACCESS(
-      EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 4u);
       EXPECT_NE(displayList->tilePool->find(TileKey::MakeTree(0, 0, level + 1)), nullptr);
       EXPECT_NE(displayList->tilePool->find(TileKey::MakeTree(0, 0, level + 2)), nullptr));
 }
@@ -308,7 +320,9 @@ TGFX_TEST_PRIVATE(TilePoolTest, FallbackLevelsKeepTheLoopAliveOnDirtyFrames) {
   // Stop as soon as the grid is complete, with the fallback levels half filled.
   for (int i = 0; i < 20 && displayList->hasContentChanged(); ++i) {
     displayList->render(surface.get());
-    TGFX_PRIVATE_ACCESS(if (displayList->tilePool->size(TileType::Grid) == 4u) { break; });
+    if (CurrentGridCount(displayList.get()) == 4u) {
+      break;
+    }
   }
   EXPECT_TRUE(displayList->hasContentChanged());
 
@@ -586,14 +600,41 @@ TGFX_TEST_PRIVATE(TilePoolTest, ZoomShowsGridTilesOfThePreviousScale) {
   displayList->render(surface.get());
   EXPECT_EQ(ReadPixel(surface, 10, 10), OPAQUE_RED);
   EXPECT_EQ(ReadPixel(surface, 500, 500), OPAQUE_RED);
-  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->staleGridScaleInt, 1000));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->staleGridScales, std::vector<int64_t>{1000}));
 
   // Content that changed under them leaves the stale tiles, which would show it outdated.
   layer->setColor(Color::Blue());
   displayList->render(surface.get());
   EXPECT_EQ(ReadPixel(surface, 10, 10), OPAQUE_WHITE);
-  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->staleGridScaleInt, 0);
-                      EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 0u));
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 0u));
+}
+
+TGFX_TEST_PRIVATE(TilePoolTest, ZoomKeepsGridTilesOfEarlierScalesUntilEvicted) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 512, 512);
+  ASSERT_NE(surface, nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileUpdateMode(TileUpdateMode::Smooth);
+  displayList->setMaxTilesRefinedPerFrame(2);
+  displayList->setBackgroundColor(Color::White());
+  displayList->root()->addChild(MakeSolid(4096, 4096, Color::Red()));
+  displayList->render(surface.get());
+  // Each step leaves most tiles to later frames, so cells the tree levels do not cover yet keep
+  // showing the grid tiles drawn before the zoom began, frame after frame.
+  displayList->setTileTimeBudget(1e-9f);
+  for (auto zoomScale : {1.3f, 1.3f, 1.7f, 1.7f, 2.2f, 2.2f, 2.9f, 2.9f}) {
+    displayList->setZoomScale(zoomScale);
+    displayList->render(surface.get());
+    for (int y = 8; y < 512; y += 64) {
+      for (int x = 8; x < 512; x += 64) {
+        ASSERT_EQ(ReadPixel(surface, x, y), OPAQUE_RED)
+            << "zoom=" << zoomScale << " x=" << x << " y=" << y;
+      }
+    }
+  }
 }
 
 TGFX_TEST_PRIVATE(TilePoolTest, DirtyRegionDropsTilesOutsideFallbackLevels) {
@@ -709,8 +750,8 @@ TGFX_TEST_PRIVATE(TilePoolTest, BlankGridTilesTakeNoSlot) {
   displayList->render(surface.get());
   EXPECT_EQ(ReadPixel(surface, 100, 100), OPAQUE_RED);
   EXPECT_EQ(ReadPixel(surface, 400, 100), OPAQUE_WHITE);
+  EXPECT_EQ(CurrentGridCount(displayList.get()), 2u);
   TGFX_PRIVATE_ACCESS(
-      EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 2u);
       EXPECT_EQ(displayList->blankTiles->size(), 2u);
 
       displayList->render(surface.get()); EXPECT_EQ(ReadPixel(surface, 400, 100), OPAQUE_WHITE);

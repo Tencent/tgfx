@@ -314,31 +314,39 @@ static void InitCoverage(TreeLevelCoverage* coverage, const Rect& renderRect, in
   coverage->blanks.resize(cellCount, false);
 }
 
-// Looks up the grid tiles of the stale zoom scale inside the viewport, as a coverage the display
-// falls back to when no tree level covers a cell. Returns an empty list when there are none.
-static std::vector<TreeLevelCoverage> CollectStaleGridCoverage(
-    const TilePool* tilePool, int64_t staleScaleInt, float staleZoomScale, float zoomScale,
-    const Rect& renderRect, int tileSize) {
-  if (staleScaleInt == 0 || tilePool->size(TileType::Grid) == 0) {
-    return {};
+// Looks up the grid tiles of earlier zoom scales inside the viewport, one coverage per scale that
+// has any, ordered from the scale closest to the current one. The display falls back to them when no
+// tree level covers a cell.
+static std::vector<TreeLevelCoverage> CollectStaleGridCoverages(
+    const TilePool* tilePool, const std::vector<int64_t>& staleScales, int zoomScalePrecision,
+    float zoomScale, const Rect& renderRect, int tileSize) {
+  std::vector<TreeLevelCoverage> coverages = {};
+  if (staleScales.empty() || tilePool->size(TileType::Grid) == 0) {
+    return coverages;
   }
-  TreeLevelCoverage coverage = {};
-  coverage.zoomToRaster = staleZoomScale / zoomScale;
-  InitCoverage(&coverage, renderRect, tileSize);
-  bool found = false;
-  for (auto tileY = coverage.startY; tileY < coverage.startY + coverage.countY; ++tileY) {
-    for (auto tileX = coverage.startX; tileX < coverage.startX + coverage.countX; ++tileX) {
-      if (auto tile = tilePool->find(TileKey::MakeGrid(tileX, tileY, staleScaleInt))) {
-        coverage.tileAt(tileX, tileY) = std::move(tile);
-        found = true;
+  for (auto scaleInt : staleScales) {
+    TreeLevelCoverage coverage = {};
+    coverage.zoomToRaster = ToZoomScaleFloat(scaleInt, zoomScalePrecision) / zoomScale;
+    InitCoverage(&coverage, renderRect, tileSize);
+    bool found = false;
+    for (auto tileY = coverage.startY; tileY < coverage.startY + coverage.countY; ++tileY) {
+      for (auto tileX = coverage.startX; tileX < coverage.startX + coverage.countX; ++tileX) {
+        if (auto tile = tilePool->find(TileKey::MakeGrid(tileX, tileY, scaleInt))) {
+          coverage.tileAt(tileX, tileY) = std::move(tile);
+          found = true;
+        }
       }
     }
+    if (found) {
+      coverages.push_back(std::move(coverage));
+    }
   }
-  if (!found) {
-    return {};
-  }
-  std::vector<TreeLevelCoverage> coverages = {};
-  coverages.push_back(std::move(coverage));
+  // A scale closer to the current one is stretched less, so it shows sharper.
+  std::stable_sort(coverages.begin(), coverages.end(),
+                   [](const TreeLevelCoverage& a, const TreeLevelCoverage& b) {
+                     return std::abs(std::log2(a.zoomToRaster)) <
+                            std::abs(std::log2(b.zoomToRaster));
+                   });
   return coverages;
 }
 
@@ -518,7 +526,6 @@ void DisplayList::setZoomScalePrecision(int precision) {
   _zoomScalePrecision = precision;
   _zoomScaleInt = ChangeZoomScalePrecision(_zoomScaleInt, oldPrecision, precision);
   lastZoomScaleInt = ChangeZoomScalePrecision(lastZoomScaleInt, oldPrecision, precision);
-  staleGridScaleInt = 0;
   recycleGridTiles();
 }
 
@@ -743,21 +750,9 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   checkTileCount(surface);
   const auto zoomChanged = lastZoomScaleInt != _zoomScaleInt;
   // No draw task outlives a frame, so nothing references the grid tiles of the previous zoom scale.
-  // The last scale that drew any is kept as a fallback until its tiles are evicted, since a moving
-  // viewport draws none at the scales it passes through.
   if (zoomChanged) {
-    auto hasLastGrid = std::any_of(
-        tilePool->keysOf(TileType::Grid).begin(), tilePool->keysOf(TileType::Grid).end(),
-        [&](const TileKey& key) { return key.scaleInt == lastZoomScaleInt; });
-    if (hasLastGrid) {
-      staleGridScaleInt = lastZoomScaleInt;
-    }
-    if (staleGridScaleInt == _zoomScaleInt) {
-      staleGridScaleInt = 0;
-    }
-    recycleGridTiles(staleGridScaleInt != 0 ? staleGridScaleInt : _zoomScaleInt);
+    retireGridTiles();
   }
-  staleGridShown = false;
   auto tileTasks = invalidateTileCaches(dirtyRegions, GetViewportRect(surface, _contentOffset));
   takeDeferredPatches(&tileTasks);
   std::vector<Rect> skippedRects = {};
@@ -798,7 +793,6 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   if (drawnCount < tileTasks.size()) {
     deferTileTasks(tileTasks, drawn);
     skippedRects.clear();
-    staleGridShown = false;
     screenTasks = collectDisplayTasks(surface, &skippedRects);
   }
   if (drawnCount < tileTasks.size() || !deferredPatches.empty()) {
@@ -911,11 +905,6 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     }
   }
   drawScreenTasks(std::move(screenTasks), std::move(skippedRects), surface, autoClear);
-  // Once every cell shows a tile of the current scale or a tree level, the stale grid tiles are no
-  // longer needed.
-  if (!staleGridShown) {
-    dropStaleGridTiles();
-  }
   return dirtyRects;
 }
 
@@ -1280,33 +1269,36 @@ void DisplayList::recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks
   }
 }
 
-void DisplayList::recycleGridTiles(int64_t keepScaleInt) {
-  if (keepScaleInt == 0) {
-    auto tiles = tilePool->clear(TileType::Grid);
-    emptyTiles.insert(emptyTiles.end(), tiles.begin(), tiles.end());
-  } else {
-    std::vector<TileKey> keys = {};
-    for (const auto& key : tilePool->keysOf(TileType::Grid)) {
-      if (key.scaleInt != keepScaleInt) {
-        keys.push_back(key);
-      }
-    }
-    for (const auto& key : keys) {
-      if (auto recycled = tilePool->erase(key)) {
-        emptyTiles.push_back(std::move(recycled));
-      }
-    }
-  }
+void DisplayList::recycleGridTiles() {
+  auto tiles = tilePool->clear(TileType::Grid);
+  emptyTiles.insert(emptyTiles.end(), tiles.begin(), tiles.end());
+  staleGridScales.clear();
   blankTiles->clearGrid();
 }
 
-void DisplayList::dropStaleGridTiles() {
-  if (staleGridScaleInt == 0) {
-    return;
+void DisplayList::retireGridTiles() {
+  // The scales a moving viewport passes through draw few grid tiles, so a handful of earlier scales
+  // is kept to still have the ones drawn before the move began.
+  static constexpr size_t MaxStaleGridScales = 4;
+  staleGridScales.erase(std::remove(staleGridScales.begin(), staleGridScales.end(), _zoomScaleInt),
+                        staleGridScales.end());
+  const auto& gridKeys = tilePool->keysOf(TileType::Grid);
+  auto hasLastGrid = std::any_of(gridKeys.begin(), gridKeys.end(), [&](const TileKey& key) {
+    return key.scaleInt == lastZoomScaleInt;
+  });
+  if (hasLastGrid && lastZoomScaleInt != _zoomScaleInt) {
+    staleGridScales.erase(
+        std::remove(staleGridScales.begin(), staleGridScales.end(), lastZoomScaleInt),
+        staleGridScales.end());
+    staleGridScales.insert(staleGridScales.begin(), lastZoomScaleInt);
+  }
+  if (staleGridScales.size() > MaxStaleGridScales) {
+    staleGridScales.resize(MaxStaleGridScales);
   }
   std::vector<TileKey> keys = {};
-  for (const auto& key : tilePool->keysOf(TileType::Grid)) {
-    if (key.scaleInt == staleGridScaleInt) {
+  for (const auto& key : gridKeys) {
+    if (key.scaleInt != _zoomScaleInt && std::find(staleGridScales.begin(), staleGridScales.end(),
+                                                   key.scaleInt) == staleGridScales.end()) {
       keys.push_back(key);
     }
   }
@@ -1315,22 +1307,24 @@ void DisplayList::dropStaleGridTiles() {
       emptyTiles.push_back(std::move(recycled));
     }
   }
-  staleGridScaleInt = 0;
+  blankTiles->clearGrid();
 }
 
 void DisplayList::invalidateStaleGridTiles(const std::vector<Rect>& dirtyRegions) {
-  if (staleGridScaleInt == 0 || dirtyRegions.empty()) {
+  if (dirtyRegions.empty()) {
     return;
   }
-  auto staleMatrix = Matrix::MakeScale(ToZoomScaleFloat(staleGridScaleInt, _zoomScalePrecision));
-  for (auto& dirtyRect : MapDirtyRegions(dirtyRegions, staleMatrix)) {
-    bool continuous = false;
-    auto tiles =
-        GetGridTilesUnderRect(tilePool.get(), staleGridScaleInt, _tileSize, dirtyRect, &continuous);
-    for (auto& tile : tiles) {
-      if (auto recycled =
-              tilePool->erase(TileKey::MakeGrid(tile->tileX, tile->tileY, staleGridScaleInt))) {
-        emptyTiles.push_back(std::move(recycled));
+  for (auto scaleInt : staleGridScales) {
+    auto staleMatrix = Matrix::MakeScale(ToZoomScaleFloat(scaleInt, _zoomScalePrecision));
+    for (auto& dirtyRect : MapDirtyRegions(dirtyRegions, staleMatrix)) {
+      bool continuous = false;
+      auto tiles =
+          GetGridTilesUnderRect(tilePool.get(), scaleInt, _tileSize, dirtyRect, &continuous);
+      for (auto& tile : tiles) {
+        if (auto recycled =
+                tilePool->erase(TileKey::MakeGrid(tile->tileX, tile->tileY, scaleInt))) {
+          emptyTiles.push_back(std::move(recycled));
+        }
       }
     }
   }
@@ -1425,9 +1419,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   if (useFallback) {
     coverages = CollectTreeCoverages(tilePool.get(), blankTiles.get(), zoomScale, renderRect,
                                      _tileSize, maxTreeLevel());
-    staleCoverages = CollectStaleGridCoverage(
-        tilePool.get(), staleGridScaleInt, ToZoomScaleFloat(staleGridScaleInt, _zoomScalePrecision),
-        zoomScale, renderRect, _tileSize);
+    staleCoverages = CollectStaleGridCoverages(tilePool.get(), staleGridScales, _zoomScalePrecision,
+                                               zoomScale, renderRect, _tileSize);
   }
   auto getGridRect = [&](const std::pair<int, int>& grid) {
     auto rect =
@@ -1560,7 +1553,6 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
         auto coverage = FindFinestCoverage(&coverages, gridRect, _tileSize);
         if (coverage == nullptr) {
           coverage = FindFinestCoverage(&staleCoverages, gridRect, _tileSize);
-          staleGridShown |= coverage != nullptr;
         }
         if (coverage != nullptr) {
           AppendFallbackScreenTasks(coverage, gridRect, _tileSize, &screenTasks, skippedRects);
@@ -1716,9 +1708,8 @@ std::vector<DrawTask> DisplayList::collectDisplayTasks(const Surface* surface,
   auto levelCount = std::max(coarsestLevel - baseLevel + 1, TREE_LEVEL_COUNT);
   auto coverages = CollectTreeCoverages(tilePool.get(), blankTiles.get(), zoomScale, renderRect,
                                         _tileSize, maxTreeLevel(), levelCount);
-  auto staleCoverages = CollectStaleGridCoverage(
-      tilePool.get(), staleGridScaleInt, ToZoomScaleFloat(staleGridScaleInt, _zoomScalePrecision),
-      zoomScale, renderRect, _tileSize);
+  auto staleCoverages = CollectStaleGridCoverages(
+      tilePool.get(), staleGridScales, _zoomScalePrecision, zoomScale, renderRect, _tileSize);
   std::vector<DrawTask> screenTasks = {};
   for (auto tileY = startY; tileY < endY; ++tileY) {
     for (auto tileX = startX; tileX < endX; ++tileX) {
@@ -1733,7 +1724,6 @@ std::vector<DrawTask> DisplayList::collectDisplayTasks(const Surface* surface,
       } else if (auto coverage = FindFinestCoverage(&coverages, gridRect, _tileSize)) {
         AppendFallbackScreenTasks(coverage, gridRect, _tileSize, &screenTasks, skippedRects);
       } else if (auto stale = FindFinestCoverage(&staleCoverages, gridRect, _tileSize)) {
-        staleGridShown = true;
         AppendFallbackScreenTasks(stale, gridRect, _tileSize, &screenTasks, skippedRects);
       } else {
         skippedRects->push_back(gridRect);
@@ -2168,7 +2158,7 @@ Matrix DisplayList::getViewMatrix() const {
 void DisplayList::resetCaches() {
   tilePool->clear(TileType::Grid);
   tilePool->clear(TileType::Tree);
-  staleGridScaleInt = 0;
+  staleGridScales.clear();
   blankTiles->clear();
   surfaceCaches = {};
   totalTileCount = 0;
