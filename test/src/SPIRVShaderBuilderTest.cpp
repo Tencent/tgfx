@@ -227,7 +227,7 @@ TEST(SPIRVShaderBuilderTest, EmitsUniformArrayLoad) {
   EXPECT_TRUE(ContainsOpcode(words, spirv::kOpLoad));
 }
 
-TEST(SPIRVShaderBuilderTest, ImportsArrayFunctionParameter) {
+TEST(SPIRVShaderBuilderTest, ImportsTheNamedSlotParameters) {
   const auto* desc = FindOperator(OperatorID::GaussianBlur1D);
   ASSERT_NE(desc, nullptr);
   OperatorArtifact artifact = {};
@@ -243,7 +243,8 @@ TEST(SPIRVShaderBuilderTest, ImportsArrayFunctionParameter) {
   ASSERT_FALSE(words.empty()) << error;
   WriteIfRequested(words);
 
-  EXPECT_TRUE(ContainsOpcode(words, spirv::kOpTypeArray));
+  // The kernel slots arrive as 17 named parameters: the imported module carries no array type.
+  EXPECT_FALSE(ContainsOpcode(words, spirv::kOpTypeArray));
   EXPECT_TRUE(ContainsOpcode(words, spirv::kOpFunctionParameter));
 }
 

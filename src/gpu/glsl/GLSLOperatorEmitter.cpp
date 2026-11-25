@@ -74,53 +74,6 @@ bool ValueName(const ProgramIR& program, ValueID id, std::string* name, std::str
 bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expression,
                     std::string* error);
 
-bool IntConstantOf(const ProgramIR& program, ValueID id, int32_t* value) {
-  if (id == INVALID_VALUE_ID || id >= program.values.size()) {
-    return false;
-  }
-  const auto& irValue = program.values[id];
-  if (irValue.kind != IRValueKind::Constant || irValue.definingExpr >= program.exprs.size()) {
-    return false;
-  }
-  const auto& constant = program.exprs[irValue.definingExpr];
-  if (constant.kind != IRExprKind::ConstantInt) {
-    return false;
-  }
-  *value = static_cast<int32_t>(constant.constantBits);
-  return true;
-}
-
-bool EmitGaussianCall(const ProgramIR& program, const IRExpr& call, std::string* expression,
-                      std::string* error) {
-  constexpr size_t KernelSlotCount = 17;
-  if (call.args.size() != 12) {
-    return Fail(error, "the gaussian call needs 12 logical arguments");
-  }
-  std::vector<std::string> names(call.args.size());
-  for (size_t index = 0; index < call.args.size(); ++index) {
-    if (!ValueName(program, call.args[index], &names[index], error)) {
-      return false;
-    }
-  }
-  int32_t modeX = 0;
-  int32_t modeY = 0;
-  if (!IntConstantOf(program, call.args[5], &modeX) ||
-      !IntConstantOf(program, call.args[6], &modeY)) {
-    return Fail(error, "the gaussian modes must be integer constants");
-  }
-  const int32_t tiledSource = modeX != 0 || modeY != 0 ? 1 : 0;
-  std::string out = "gaussianBlur1D(";
-  out += names[0] + ", " + names[1] + ", " + names[2] + ", " + names[3] + ", " + names[4] +
-         ", 0, " + std::to_string(tiledSource) + ", " + names[5] + ", " + names[6] + ", " +
-         names[4] + ", " + names[7] + ", " + names[8] + ", " + names[9] + ", " + names[10];
-  for (size_t slot = 0; slot < KernelSlotCount; ++slot) {
-    out += ", " + names[11] + "[" + std::to_string(slot) + "]";
-  }
-  out += ")";
-  *expression = std::move(out);
-  return true;
-}
-
 bool ValueName(const ProgramIR& program, ValueID id, std::string* name, std::string* error) {
   if (id == INVALID_VALUE_ID || id >= program.values.size()) {
     return Fail(error, "an operator argument has an invalid value");
@@ -292,9 +245,6 @@ bool GLSLOperatorEmitter::EmitCall(const ProgramIR& program, ValueID result,
   }
   if (call.args.size() != desc->params.size()) {
     return Fail(error, "the operator argument count does not match the manifest");
-  }
-  if (call.op == OperatorID::GaussianBlur1D) {
-    return EmitGaussianCall(program, call, expression, error);
   }
 
   std::string out = desc->glslSymbol;

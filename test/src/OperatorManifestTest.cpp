@@ -47,11 +47,15 @@ TEST(OperatorManifestTest, ExposesGaussianBlurSignature) {
   const auto* desc = FindOperator(OperatorID::GaussianBlur1D);
   ASSERT_NE(desc, nullptr);
   EXPECT_EQ(desc->returnType, SLType::Float4);
-  ASSERT_EQ(desc->params.size(), 12u);
+  // The manifest spells the kernel's exact signature: 14 logical parameters followed by the 17
+  // named kernel slots (no array crosses the module boundary).
+  ASSERT_EQ(desc->params.size(), 31u);
   EXPECT_EQ(desc->params[0].type, SLType::Texture2DSampler);
-  EXPECT_EQ(desc->params[11].type, SLType::Float4);
-  EXPECT_TRUE(desc->params[11].isArray);
-  EXPECT_EQ(desc->params[11].arrayCount, 17u);
+  EXPECT_EQ(desc->params[3].type, SLType::Int);
+  EXPECT_EQ(desc->params[13].type, SLType::Int);
+  EXPECT_EQ(desc->params[14].type, SLType::Float4);
+  EXPECT_FALSE(desc->params[14].isArray);
+  EXPECT_EQ(desc->params[30].type, SLType::Float4);
 }
 
 TEST(OperatorManifestTest, ExposesTiledSampleSignature) {

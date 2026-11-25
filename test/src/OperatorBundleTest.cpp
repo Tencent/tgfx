@@ -54,9 +54,12 @@ TEST(OperatorBundleTest, FindsBackendArtifactsByOperatorAndBackend) {
 TEST(OperatorBundleTest, KeepsLogicalArrayParameterInManifest) {
   const auto* desc = FindOperator(OperatorID::GaussianBlur1D);
   ASSERT_NE(desc, nullptr);
-  ASSERT_EQ(desc->params.size(), 12u);
-  EXPECT_TRUE(desc->params[11].isArray);
-  EXPECT_EQ(desc->params[11].arrayCount, 17u);
+  // The kernel slots arrive as 17 named vec4 parameters: the manifest must match the module's
+  // compiled signature, or the linked call's argument list no longer type-checks.
+  ASSERT_EQ(desc->params.size(), 31u);
+  EXPECT_FALSE(desc->params[14].isArray);
+  EXPECT_EQ(desc->params[14].type, SLType::Float4);
+  EXPECT_EQ(desc->params[30].type, SLType::Float4);
 }
 
 }  // namespace tgfx

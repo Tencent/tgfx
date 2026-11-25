@@ -50,7 +50,7 @@ TEST(GLSLOperatorEmitterTest, FormatsFloatConstants) {
   EXPECT_EQ(expression, "pmApplyAlphaThreshold(inputColor, 0.0)");
 }
 
-TEST(GLSLOperatorEmitterTest, EmitsUniformArrayArgument) {
+TEST(GLSLOperatorEmitterTest, EmitsTheKernelSlotsAsNamedArguments) {
   ProgramIRBuilder builder = {};
   const auto sampler = builder.InternValue("sampler", SLType::Texture2DSampler, Precision::Default,
                                            IRValueKind::Sampler);
@@ -66,24 +66,30 @@ TEST(GLSLOperatorEmitterTest, EmitsUniformArrayArgument) {
       builder.InternValue("clamp", SLType::Float4, Precision::High, IRValueKind::Uniform);
   const auto dimension =
       builder.InternValue("dimension", SLType::Float2, Precision::High, IRValueKind::Uniform);
-  const auto kernel =
-      builder.InternValue("Kernel", SLType::Float4, Precision::High, IRValueKind::UniformArray);
+  std::vector<ValueID> kernelSlotValues = {};
+  for (int slot = 0; slot < 17; ++slot) {
+    kernelSlotValues.push_back(builder.InternValue("kernelSlot" + std::to_string(slot),
+                                                   SLType::Float4, Precision::High,
+                                                   IRValueKind::Uniform));
+  }
   const auto modeX = builder.CreateIntConstant(1);
   const auto modeY = builder.CreateIntConstant(0);
   const auto seam = builder.CreateIntConstant(0);
   const auto border = builder.CreateIntConstant(0);
-  const auto result = builder.CreateCall(OperatorID::GaussianBlur1D, SLType::Float4,
-                                         {sampler, coord, texel, radius, subset, modeX, modeY,
-                                          clamp, dimension, seam, border, kernel});
+  std::vector<ValueID> args = {sampler, coord, texel, radius, subset, builder.CreateIntConstant(0),
+                               builder.CreateIntConstant(1), modeX, modeY, subset, clamp,
+                               dimension, seam, border};
+  args.insert(args.end(), kernelSlotValues.begin(), kernelSlotValues.end());
+  const auto result = builder.CreateCall(OperatorID::GaussianBlur1D, SLType::Float4, args);
 
   std::string expression = {};
   std::string error = {};
   ASSERT_TRUE(GLSLOperatorEmitter::EmitCall(builder.IR(), result, &expression, &error)) << error;
   EXPECT_EQ(expression,
             "gaussianBlur1D(sampler, coord, texel, radius, subset, 0, 1, 1, 0, subset, clamp, "
-            "dimension, 0, 0, Kernel[0], Kernel[1], Kernel[2], Kernel[3], Kernel[4], Kernel[5], "
-            "Kernel[6], Kernel[7], Kernel[8], Kernel[9], Kernel[10], Kernel[11], Kernel[12], "
-            "Kernel[13], Kernel[14], Kernel[15], Kernel[16])");
+            "dimension, 0, 0, kernelSlot0, kernelSlot1, kernelSlot2, kernelSlot3, kernelSlot4, "
+            "kernelSlot5, kernelSlot6, kernelSlot7, kernelSlot8, kernelSlot9, kernelSlot10, "
+            "kernelSlot11, kernelSlot12, kernelSlot13, kernelSlot14, kernelSlot15, kernelSlot16)");
 }
 
 TEST(GLSLOperatorEmitterTest, RejectsNonCallValues) {

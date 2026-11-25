@@ -1219,16 +1219,37 @@ bool DeriveOperatorParams(const CatalogEntry& entry, std::string* returnType,
       const auto trim = item.find_last_not_of(" \t");
       item = trim == std::string::npos ? "" : item.substr(0, trim + 1);
     }
-    const auto space = item.find(' ');
+    // Split on the last space: the type may carry a precision qualifier ("highp vec2"), which
+    // stays part of the type; the name is always the final token.
+    const auto space = item.find_last_of(" \t");
     if (space == std::string::npos || space == 0 || space + 1 >= item.size()) {
       *error = entry.name + ": the parameter '" + item + "' needs a type and a name";
       return false;
     }
-    const std::string type = item.substr(0, space);
+    std::string type = item.substr(0, space);
     const std::string name = item.substr(space + 1);
-    if (name.find(' ') != std::string::npos) {
+    if (name.find(' ') != std::string::npos || name.find('\t') != std::string::npos) {
       *error = entry.name + ": the parameter name '" + name + "' must be one token";
       return false;
+    }
+    // The array length may sit on the type ("vec4[17] kernelSlots") instead of the name.
+    const auto typeBracket = type.find('[');
+    if (typeBracket != std::string::npos) {
+      if (arrayCount != 0) {
+        *error = entry.name + ": the parameter '" + name + "' declares its array length twice";
+        return false;
+      }
+      arrayCount = static_cast<uint32_t>(std::atoi(type.c_str() + typeBracket + 1));
+      type = type.substr(0, typeBracket);
+      const auto trim = type.find_last_not_of(" \t");
+      type = trim == std::string::npos ? "" : type.substr(0, trim + 1);
+    }
+    // The precision qualifier is not part of the SLType spelling.
+    for (const char* qualifier : {"highp ", "mediump ", "lowp "}) {
+      if (type.rfind(qualifier, 0) == 0) {
+        type = type.substr(std::string(qualifier).size());
+        break;
+      }
     }
     OperatorParamInfo param = {};
     param.type = type;

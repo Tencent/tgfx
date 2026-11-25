@@ -1421,8 +1421,21 @@ bool SPIRVShaderBuilder::EmitValue(const ProgramIR& program, ValueID value, uint
     *resultId = id;
     return true;
   }
+  if (irValue.kind == IRValueKind::Sampler) {
+    // A linked operator call takes the sampler itself as an argument: load the bound descriptor
+    // the same way the texture-sample path does (the cache shares the loaded id).
+    const auto id = LoadSampler(program, value, error);
+    if (id == 0) {
+      return false;
+    }
+    valueIds.emplace(value, id);
+    *resultId = id;
+    return true;
+  }
   if (irValue.definingExpr == INVALID_EXPR_ID || irValue.definingExpr >= program.exprs.size()) {
-    return Fail(error, "the value has no defining expression");
+    return Fail(error, "the value has no defining expression (kind=" +
+                           std::to_string(static_cast<int>(irValue.kind)) + ", name='" +
+                           irValue.debugName + "')");
   }
   const auto id = EmitExpr(program, program.exprs[irValue.definingExpr], error);
   if (id == 0) {

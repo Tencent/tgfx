@@ -332,6 +332,15 @@ void AppendEmitClass(const OperatorSignature& signature, std::string* text) {
     }
     *text += ").\n";
   }
+  if (HasUniformMembers(signature)) {
+    *text += "  /// Declares the operator's uniforms once. A second call returns immediately, so both\n";
+    *text += "  /// the linked-call path and the inline paths can call it unconditionally; every program\n";
+    *text += "  /// form then carries the full uniform set the upload side fills. textNames must not be\n";
+    *text += "  /// null.\n";
+    *text += "  static void EnsureUniforms(ProgramIRBuilder* ir, UniformHandler* uniformHandler,\n";
+    *text += "                            UniformNames* textNames);\n";
+    *text += "\n";
+  }
   *text += "  static ValueID Emit(ProgramIRBuilder* ir, UniformHandler* uniformHandler,\n";
   *text += "                      UniformNames* textNames, ";
   AppendEmitSignatureParams(signature, text);
@@ -400,9 +409,55 @@ void AppendDescTable(const std::vector<const OperatorSignature*>& sorted, std::s
   *text += "}\n";
 }
 
-void AppendEmitImpl(const OperatorSignature& signature, std::string* text) {
+void AppendEnsureUniformsImpl(const OperatorSignature& signature, std::string* text) {
+  if (!HasUniformMembers(signature)) {
+    return;
+  }
   const std::string stage = signature.stage == "vertex" ? "ShaderStage::Vertex"
                                                         : "ShaderStage::Fragment";
+  *text += "void ";
+  *text += signature.opName;
+  *text += "Op::EnsureUniforms(ProgramIRBuilder* ir, UniformHandler* uniformHandler,\n";
+  *text += "                           ";
+  *text += signature.opName;
+  *text += "Op::UniformNames* textNames) {\n";
+  const std::string& firstUniform = [&]() -> const std::string& {
+    for (const auto& param : signature.params) {
+      if (param.role == OperatorParamRole::Uniform ||
+          param.role == OperatorParamRole::UniformArray) {
+        return param.name;
+      }
+    }
+    static const std::string none = {};
+    return none;
+  }();
+  *text += "  if (!textNames->";
+  *text += firstUniform;
+  *text += ".empty()) {\n    return;\n  }\n";
+  for (const auto& param : signature.params) {
+    if (param.role != OperatorParamRole::Uniform && param.role != OperatorParamRole::UniformArray) {
+      continue;
+    }
+    *text += "  textNames->";
+    *text += param.name;
+    *text += " = uniformHandler->addUniform(\"";
+    *text += param.name;
+    *text += "\", UniformFormat::";
+    *text += UniformFormatNameOf(param.type);
+    *text += ", ";
+    *text += stage;
+    *text += ");\n";
+    *text += "  ir->InternValue(textNames->";
+    *text += param.name;
+    *text += ", SLType::";
+    *text += SLTypeNameOf(param.type);
+    *text += ", Precision::High, IRValueKind::Uniform);\n";
+  }
+  *text += "}\n";
+  *text += "\n";
+}
+
+void AppendEmitImpl(const OperatorSignature& signature, std::string* text) {
   *text += "ValueID ";
   *text += signature.opName;
   *text += "Op::Emit(ProgramIRBuilder* ir, UniformHandler* uniformHandler,\n";
@@ -411,37 +466,11 @@ void AppendEmitImpl(const OperatorSignature& signature, std::string* text) {
   *text += "Op::UniformNames* textNames, ";
   AppendEmitSignatureParams(signature, text);
   *text += ") {\n";
-  if (!HasUniformMembers(signature)) {
+  if (HasUniformMembers(signature)) {
+    *text += "  EnsureUniforms(ir, uniformHandler, textNames);\n";
+  } else {
     *text += "  (void)uniformHandler;\n";
     *text += "  (void)textNames;\n";
-  }
-  for (const auto& param : signature.params) {
-    if (param.role != OperatorParamRole::Uniform && param.role != OperatorParamRole::UniformArray) {
-      continue;
-    }
-    *text += "  const std::string ";
-    *text += param.name;
-    *text += " =\n      uniformHandler->addUniform(\"";
-    *text += param.name;
-    *text += "\", UniformFormat::";
-    *text += UniformFormatNameOf(param.type);
-    *text += ", ";
-    *text += stage;
-    *text += ");\n";
-  }
-  if (HasUniformMembers(signature)) {
-    *text += "  if (textNames != nullptr) {\n";
-    for (const auto& param : signature.params) {
-      if (param.role == OperatorParamRole::Uniform ||
-          param.role == OperatorParamRole::UniformArray) {
-        *text += "    textNames->";
-        *text += param.name;
-        *text += " = ";
-        *text += param.name;
-        *text += ";\n";
-      }
-    }
-    *text += "  }\n";
   }
   for (const auto& param : signature.params) {
     if (param.role == OperatorParamRole::In && param.intLiteral) {
@@ -458,7 +487,7 @@ void AppendEmitImpl(const OperatorSignature& signature, std::string* text) {
     }
     *text += "  const auto ";
     *text += param.name;
-    *text += "Value = ir->InternValue(";
+    *text += "Value = ir->InternValue(textNames->";
     *text += param.name;
     *text += ", SLType::";
     *text += SLTypeNameOf(param.type);
@@ -573,6 +602,7 @@ bool WriteGeneratedOperators(const std::vector<OperatorSignature>& signatures,
   AppendParamTables(sorted, &source);
   AppendDescTable(sorted, &source);
   for (const OperatorSignature* signature : sorted) {
+    AppendEnsureUniformsImpl(*signature, &source);
     AppendUploadImpl(*signature, &source);
     AppendEmitImpl(*signature, &source);
   }
