@@ -98,9 +98,10 @@ void ReplaceWord(std::string* text, const char* from, const char* to) {
 
 // A call site names the function directly before its parenthesis; the parenthesis is the only
 // right boundary the name has, so the word check applies to the left side alone.
-void ReplaceCallName(std::string* text, const std::string& name) {
+void ReplaceCallNameWith(std::string* text, const std::string& name,
+                         const std::string& replacement) {
   const std::string from = name + "(";
-  const std::string to = name + "Impl(";
+  const std::string to = replacement + "(";
   size_t offset = 0;
   while ((offset = text->find(from, offset)) != std::string::npos) {
     if (offset == 0 || !IsWordChar((*text)[offset - 1])) {
@@ -110,6 +111,10 @@ void ReplaceCallName(std::string* text, const std::string& name) {
       offset += from.size();
     }
   }
+}
+
+void ReplaceCallName(std::string* text, const std::string& name) {
+  ReplaceCallNameWith(text, name, name + "Impl");
 }
 
 void DropWordWithSpace(std::string* text, const char* word) {
@@ -188,6 +193,9 @@ std::string RewriteBody(const std::string& text, const MslCallSite& callSite) {
   ReplaceWord(&out, "mat4", "float4x4");
   ReplaceWord(&out, "gl_FragCoord", "in.position");
   ReplaceWord(&out, "discard;", "discard_fragment();");
+  // GLSL inversesqrt is MSL rsqrt; the parenthesis follows the name, so the call-name form fits.
+  ReplaceCallNameWith(&out, "inversesqrt", "rsqrt");
+
   for (const auto& name : callSite.samplerFunctions) {
     ReplaceCallName(&out, name);
   }
@@ -317,9 +325,13 @@ std::string MSLPrinter::PrintVertexProgram(const std::vector<VertexCall>& calls,
                ".zw), max(" + call.src.name + ".xy, " + call.src.name + ".zw));\n";
         break;
       case VertexCallKind::StorePosition:
+        // Metal's clip-space y points the opposite way from the RTAdjust mapping the GL path
+        // feeds (the device-space origin is top-left), so the final NDC y is negated.
         out += Indent;
-        out += "out.position = float4(" + call.src.name + ".xy * " + RTAdjustName + ".xz + " +
-               RTAdjustName + ".yw, 0, 1);\n";
+        out += "float2 tgfxPosition = " + call.src.name + ".xy * " + RTAdjustName + ".xz + " +
+               RTAdjustName + ".yw;\n";
+        out += Indent;
+        out += "out.position = float4(tgfxPosition.x, -tgfxPosition.y, 0, 1);\n";
         break;
     }
   }
@@ -437,7 +449,7 @@ std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderS
       out += ";\n";
     }
     out += "};\n\n";
-  } else if (!interface.varyings.empty()) {
+  } else {
     out += "struct FragmentIn {\n";
     out += std::string(Indent) + "float4 position [[position]];\n";
     for (const auto& varying : interface.varyings) {
@@ -490,11 +502,9 @@ std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderS
   }
 
   out += "fragment float4 main0(";
-  if (!interface.varyings.empty()) {
-    out += "FragmentIn in [[stage_in]]";
-    if (!uniforms.empty() || !interface.samplers.empty()) {
-      out += ", ";
-    }
+  out += "FragmentIn in [[stage_in]]";
+  if (!uniforms.empty() || !interface.samplers.empty()) {
+    out += ", ";
   }
   if (!uniforms.empty()) {
     out += std::string("constant ") + blockName + "& fb [[buffer(0)]]";

@@ -27,8 +27,11 @@ TEST(ShaderLibraryBundleTest, EmbeddedBundleCarriesGLSLFunctions) {
   const auto& bundle = ShaderLibraryBundle::Get();
   ASSERT_TRUE(bundle.valid());
   EXPECT_TRUE(bundle.hasLanguage(ShaderLibraryLanguage::GLSL));
-  EXPECT_FALSE(bundle.hasLanguage(ShaderLibraryLanguage::MSL));
   EXPECT_GT(bundle.functionCount(ShaderLibraryLanguage::GLSL), 0u);
+  // A Metal build carries the translated section beside the GLSL one; a GL-only build does not.
+  if (bundle.hasLanguage(ShaderLibraryLanguage::MSL)) {
+    EXPECT_GT(bundle.functionCount(ShaderLibraryLanguage::MSL), 0u);
+  }
 }
 
 TEST(ShaderLibraryBundleTest, AppendFunctionExpandsDependencies) {
