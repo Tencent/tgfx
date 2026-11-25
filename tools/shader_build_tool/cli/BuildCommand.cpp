@@ -66,27 +66,6 @@ namespace {
 /// decoration). The declared families generate their constants from DeriveSpecFields; this reads
 /// back what the compiler actually saw, so a table that drifts from the text fails the build
 /// instead of silently specializing nothing.
-std::set<uint32_t> SpirvSpecIds(const std::vector<uint32_t>& spirv) {
-  std::set<uint32_t> ids = {};
-  size_t offset = 5;  // the SPIR-V header
-  while (offset < spirv.size()) {
-    const uint32_t word = spirv[offset];
-    const uint32_t opcode = word & 0xFFFFu;
-    const uint32_t wordCount = word >> 16;
-    if (wordCount == 0 || offset + wordCount > spirv.size()) {
-      break;
-    }
-    constexpr uint32_t OpDecorate = 71;
-    constexpr uint32_t DecorationSpecId = 1;
-    // OpDecorate: [target, decoration, literal...] after the opcode word — the SpecId literal
-    // sits in the first literal slot, not the target's id.
-    if (opcode == OpDecorate && wordCount >= 4 && spirv[offset + 2] == DecorationSpecId) {
-      ids.insert(spirv[offset + 3]);
-    }
-    offset += wordCount;
-  }
-  return ids;
-}
 
 std::vector<std::string> SplitByComma(const std::string& input) {
   std::vector<std::string> result;
@@ -275,6 +254,9 @@ std::string UsageText() {
          "  --library-bundle <path>\n"
          "                        Scan the function sources and write the single shader library\n"
          "                        bundle (no variant bundles are built)\n"
+         "  --library-languages <list>\n"
+         "                        Comma-separated sections the library bundle carries (glsl,\n"
+         "                        glsl,msl); the Metal section translates every function to MSL\n"
          "\n"
          "  --compress            Compress data pool with zstd in output bundles\n"
          "  --cache-dir <path>    Persistent stage cache (default: <out-dir>/stage_cache)\n"
@@ -303,6 +285,8 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options) {
   for (int i = 1; i < argc; i++) {
     if (std::strcmp(argv[i], "--library-bundle") == 0 && i + 1 < argc) {
       options->libraryBundlePath = argv[++i];
+    } else if (std::strcmp(argv[i], "--library-languages") == 0 && i + 1 < argc) {
+      options->libraryLanguages = argv[++i];
     } else if (std::strcmp(argv[i], "--shader-dir") == 0 && i + 1 < argc) {
       options->shaderDir = argv[++i];
     } else if (std::strcmp(argv[i], "--out-dir") == 0 && i + 1 < argc) {
@@ -350,59 +334,13 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options) {
 namespace {
 
 /// The layout's view of one block's fields, in declaration order, against the reflection's.
-bool BlockMatchesReflection(const Layout& layout, uint8_t block,
-                            const std::vector<UniformEntry>& reflected) {
-  size_t index = 0;
-  for (size_t field = 0; field < layout.fields.size(); ++field) {
-    if (layout.fields[field].block != block) {
-      continue;
-    }
-    if (index >= reflected.size()) {
-      return false;
-    }
-    if (reflected[index].name != layout.fieldNames[field] ||
-        reflected[index].format != static_cast<uint8_t>(layout.fields[field].format) ||
-        reflected[index].arraySize != layout.fields[field].arraySize) {
-      return false;
-    }
-    index++;
-  }
-  return index == reflected.size();
-}
 
 /// The only interface check: the reflection of the assembled text must equal the derived layout
 /// (uniforms per block, samplers, vertex inputs), or the declaration and the assembly disagree.
-bool LayoutMatchesReflection(const Layout& layout, const ReflectionResult& reflection) {
-  if (!BlockMatchesReflection(layout, 0, reflection.vertexReflection.uniforms) ||
-      !BlockMatchesReflection(layout, 1, reflection.fragmentReflection.uniforms)) {
-    return false;
-  }
-  if (reflection.vertexReflection.samplers.size() != 0 ||
-      reflection.fragmentReflection.samplers.size() != layout.textures.size()) {
-    return false;
-  }
-  for (size_t index = 0; index < layout.textures.size(); ++index) {
-    if (reflection.fragmentReflection.samplers[index].name != layout.textures[index].name) {
-      return false;
-    }
-  }
-  if (reflection.vertexReflection.vertexInputs.size() != layout.attributes.size()) {
-    return false;
-  }
-  for (size_t index = 0; index < layout.attributes.size(); ++index) {
-    const auto& attribute = layout.attributes[index];
-    const auto& input = reflection.vertexReflection.vertexInputs[index];
-    if (input.name != attribute.name || input.location != attribute.location ||
-        input.format != static_cast<uint8_t>(attribute.format)) {
-      return false;
-    }
-  }
-  return true;
-}
 
 }  // namespace
 
-void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compiler,
+void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*compiler*/,
                               BuildReport* report) {
   if (options.shaderDir.empty()) {
     return;
@@ -1058,255 +996,7 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
     }
   }
 
-  for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
-    const Family& family = Families()[familyIndex];
-    const auto info = AssembledFamilyInfo(family);
-
-    ShaderReport shaderReport;
-    shaderReport.name = family.name;
-    shaderReport.rawCount = 0;
-    shaderReport.compiledCount = 0;
-    const auto variants = EnumerateVariants(family, static_cast<uint16_t>(familyIndex));
-    shaderReport.rawCount = static_cast<uint32_t>(variants.size());
-    // A module carrying an unroll site is the interpreter assembly: its shared text reads the
-    // operator table (OP_* values) and the slot-pool capacities, which exist only as C++ constants.
-    // Those defines are injected for that family alone, so every other family's emitted text keeps
-    // its exact bytes.
-    bool familyNeedsChainContract = false;
-    for (uint8_t moduleIndex = 0; moduleIndex < family.moduleCount; ++moduleIndex) {
-      const FamilyModule& module = family.modules[moduleIndex];
-      if (module.module != nullptr && module.module->chainContract) {
-        familyNeedsChainContract = true;
-      }
-    }
-    // The gate names whose stubbed bodies already compiled once for this family: a gate's
-    // signature is the same in every variant that carries its file, so one stub compile per
-    // distinct gate proves the closed form's call sites, and a later variant only re-checks the
-    // gates it adds.
-    std::set<std::string> gatesStubValidated;
-    for (const auto& variant : variants) {
-      if (std::string(family.name) == "Chain") {
-        fprintf(stderr, "BUILD Chain variant=%u geo=%u subset=%u profile=%u gp=%u xp=%u\n",
-                VariantIdOf(static_cast<uint16_t>(familyIndex), variant.ordinal),
-                static_cast<unsigned>(variant.geometry),
-                static_cast<unsigned>(DimValueOf(family, variant, 1, 0)),
-                static_cast<unsigned>(DimValueOf(family, variant, 2, 0)),
-                static_cast<unsigned>(DimValueOf(family, variant, 2, 1)),
-                static_cast<unsigned>(DimValueOf(family, variant, 3, 0)));
-      }
-      const auto assembled = AssembleVariant(family, variant);
-      // The assembled text carries module #includes; the compiler never sees one, so the same
-      // expansion the handwritten files get runs here first.
-      std::string expandError;
-      const auto vertText =
-          ExpandStageIncludes(assembled.vertText, options.shaderDir, &expandError);
-      const auto fragText =
-          ExpandStageIncludes(assembled.fragText, options.shaderDir, &expandError);
-      // The interpreter assembly carries the chain-ops pragma the kernels use; the
-      // declared path runs the same expansion after includes so both assemblies compile the same
-      // operator table.
-      auto vertExpanded = vertText.empty() ? std::string() : ExpandChainOpsPragma(vertText);
-      auto fragExpanded = fragText.empty() ? std::string() : ExpandChainOpsPragma(fragText);
-      if (vertExpanded.empty() || fragExpanded.empty()) {
-        RecordBuildError(&report->diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
-                         info.name, "", static_cast<int>(variant.ordinal), -1,
-                         expandError.empty() ? "include expansion failed" : expandError);
-        continue;
-      }
-      auto vertDefines = assembled.vertDefines;
-      auto fragDefines = assembled.fragDefines;
-      for (const auto& contractDefine : BindingContractDefines()) {
-        vertDefines.push_back(contractDefine);
-        fragDefines.push_back(contractDefine);
-      }
-      if (familyNeedsChainContract) {
-        for (const auto& opDefine : Op::Defines()) {
-          vertDefines.push_back(opDefine);
-          fragDefines.push_back(opDefine);
-        }
-        for (const auto& capacityDefine : SlotCapacityDefines()) {
-          vertDefines.push_back(capacityDefine);
-          fragDefines.push_back(capacityDefine);
-        }
-      }
-      const auto& vertResult =
-          compiler->compileSpirv(PrependDefines(vertExpanded, vertDefines), ShaderStageType::Vertex,
-                                 info.name, variant.ordinal, false);
-      if (!vertResult.success) {
-        RecordBuildError(&report->diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl,
-                         info.name, "", static_cast<int>(variant.ordinal), -1, vertResult.error);
-        continue;
-      }
-      const auto& fragResult =
-          compiler->compileSpirv(PrependDefines(fragExpanded, fragDefines),
-                                 ShaderStageType::Fragment, info.name, variant.ordinal, false);
-      if (!fragResult.success) {
-        RecordBuildError(&report->diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl,
-                         info.name, "", -1, static_cast<int>(variant.ordinal), fragResult.error);
-        continue;
-      }
-      const auto& reflection =
-          compiler->extractReflection(info.name, variant.ordinal, variant.ordinal, vertResult.spirv,
-                                      fragResult.spirv, &report->diagnostics);
-      const auto layout = DeriveLayout(variant);
-      if (!layout.specFields.empty()) {
-        // The declared spec ids must be exactly the ids the compiled module carries; a drift
-        // would leave the runtime injecting constants the text does not read (the pixels stay
-        // right, the specialization silently stops).
-        std::set<uint32_t> expected = {0};
-        const auto modules = ModulesOf(family, variant);
-        for (const auto& field : layout.specFields) {
-          const Module* module = modules.list[field.slot];
-          const Element& element = module->elements[field.element];
-          const uint16_t count =
-              ElementCountOf(element, DimOffsetOf(family, variant, field.slot), variant);
-          const uint32_t idCount = element.type == ShaderType::Int4 ? count * 4u : 1u;
-          for (uint32_t offset = 0; offset < idCount; ++offset) {
-            expected.insert(field.firstId + offset);
-          }
-        }
-        if (SpirvSpecIds(fragResult.spirv) != expected) {
-          std::string detail = "expected:";
-          for (uint32_t id : expected) detail += " " + std::to_string(id);
-          detail += " actual:";
-          for (uint32_t id : SpirvSpecIds(fragResult.spirv)) detail += " " + std::to_string(id);
-          // SpecLayoutDrift is the code the retired tool-side drift check reported; this is the
-          // declared path's replacement for exactly that failure mode.
-          RecordBuildError(
-              &report->diagnostics, Layer::Emit, DiagnosticCode::SpecLayoutDrift, info.name, "",
-              static_cast<int>(variant.ordinal), static_cast<int>(variant.ordinal),
-              "the declared spec ids and the compiled constant_id set disagree: " + detail);
-          continue;
-        }
-      }
-      if (!LayoutMatchesReflection(layout, reflection)) {
-        RecordBuildError(&report->diagnostics, Layer::Emit, DiagnosticCode::EmitFailed, info.name,
-                         "", static_cast<int>(variant.ordinal), static_cast<int>(variant.ordinal),
-                         "the assembled text's reflection does not match the derived layout");
-        continue;
-      }
-      // The specialization table, derived from the declaration like the generated text was: the
-      // same DeriveSpecFields call feeds the accessor ids the text carries, so the table the
-      // runtime injects through cannot disagree with the constants the shader reads.
-      std::vector<SpecEntry> specEntries;
-      const auto specFields = DeriveSpecFields(family, variant);
-      if (!specFields.empty()) {
-        const auto modules = ModulesOf(family, variant);
-        for (const auto& field : specFields) {
-          const Module* module = modules.list[field.slot];
-          const Element& element = module->elements[field.element];
-          SpecEntry entry = {};
-          entry.name = ElementNameOf(module, element);
-          entry.format = static_cast<uint8_t>(ShaderTypeFormat(element.type));
-          entry.arraySize =
-              element.type == ShaderType::Int4
-                  ? ElementCountOf(element, DimOffsetOf(family, variant, field.slot), variant)
-                  : 1;
-          entry.firstId = field.firstId;
-          specEntries.push_back(std::move(entry));
-        }
-      }
-      // The gate declarations ride in the assembled fragment's inc files, so each variant scans
-      // its own expanded text: a variant that prunes a gated file carries neither the pragma nor
-      // the function, and a gate whose condition reads a field this variant's spec table does not
-      // carry stays in every form (dropped here, never wrapped). The closed gates' stub bodies
-      // are compiled once per distinct gate: a stub the call sites cannot accept fails the build
-      // here, not on a device.
-      std::vector<SpecGateInfo> supportedGates = {};
-      if (!specEntries.empty()) {
-        for (auto gate : ScanGatePragmas(fragExpanded, info.name, &report->diagnostics)) {
-          if (!GateEvaluatable(gate, specEntries)) {
-            continue;
-          }
-          if (!NormalizeGateCondition(&gate, specEntries)) {
-            RecordBuildError(
-                &report->diagnostics, Layer::Compile, DiagnosticCode::SpecGateUnmatched, info.name,
-                "", static_cast<int>(variant.ordinal), static_cast<int>(variant.ordinal),
-                "the gate '" + gate.name +
-                    "' condition is not a single-field bit test; the runtime evaluates "
-                    "`(SPEC_<field>() & <mask>) != 0` only");
-            continue;
-          }
-          supportedGates.push_back(gate);
-        }
-        std::vector<SpecGateInfo> unvalidatedGates = {};
-        for (const auto& gate : supportedGates) {
-          if (gatesStubValidated.find(gate.name) == gatesStubValidated.end()) {
-            unvalidatedGates.push_back(gate);
-          }
-        }
-        if (!unvalidatedGates.empty()) {
-          const auto stubbed = StubOutGatedFunctions(fragExpanded, unvalidatedGates);
-          if (stubbed.empty()) {
-            RecordBuildError(&report->diagnostics, Layer::Compile,
-                             DiagnosticCode::SpecGateUnmatched, info.name, "",
-                             static_cast<int>(variant.ordinal), static_cast<int>(variant.ordinal),
-                             "a gate pragma does not precede a stubbable function (scalar or "
-                             "vector return type required)");
-            continue;
-          }
-          const auto& stubResult =
-              compiler->compileSpirv(PrependDefines(stubbed, fragDefines),
-                                     ShaderStageType::Fragment, info.name, variant.ordinal, false);
-          if (!stubResult.success) {
-            RecordBuildError(&report->diagnostics, Layer::Compile,
-                             DiagnosticCode::SpecGateUnmatched, info.name, "",
-                             static_cast<int>(variant.ordinal), static_cast<int>(variant.ordinal),
-                             "the closed gates' stub form failed to compile: " + stubResult.error);
-            continue;
-          }
-          for (const auto& gate : unvalidatedGates) {
-            gatesStubValidated.insert(gate.name);
-          }
-        }
-      }
-      shaderReport.compiledCount++;
-      for (auto& emitterEntry : emitters) {
-        if (!PermutationCompilesForBackend(static_cast<uint16_t>(familyIndex), variant.ordinal,
-                                           emitterEntry.first)) {
-          continue;
-        }
-        EmitInput input;
-        input.info = &info;
-        input.familyIndex = static_cast<uint16_t>(familyIndex);
-        input.vertIndex = variant.ordinal;
-        input.fragIndex = variant.ordinal;
-        input.vertSource = &vertExpanded;
-        input.fragSource = &fragExpanded;
-        input.vertDefines = &vertDefines;
-        input.fragDefines = &fragDefines;
-        input.vertSpirv = &vertResult.spirv;
-        input.fragStage = &fragResult;
-        input.fragGates = &supportedGates;
-        input.fragSpecEntries = &specEntries;
-        input.diagnostics = &report->diagnostics;
-        auto stages = emitterEntry.second->emit(input, compiler);
-        if (!stages) {
-          continue;
-        }
-        // The chain family's pre-composed payloads retired with its interpreter text: the runtime
-        // consumer of those payloads is gone (the assembled walk serves every chain draw), so no
-        // splice runs here anymore.
-        VariantData variantData;
-        variantData.shaderName = info.name;
-        variantData.variantId = VariantIdOf(static_cast<uint16_t>(familyIndex), variant.ordinal);
-        variantData.vertPermutationIndex = variant.ordinal;
-        variantData.fragPermutationIndex = variant.ordinal;
-        variantData.profileTag = ProfileTag(emitterEntry.first);
-        variantData.payloadKind = stages->payloadKind;
-        variantData.vertexBlob = std::move(stages->vertexBlob);
-        variantData.fragmentBlob = std::move(stages->fragmentBlob);
-        variantData.vertexReflection = reflection.vertexReflection;
-        variantData.fragmentReflection = reflection.fragmentReflection;
-        variantData.fragmentReflection.specEntries = specEntries;
-        report->variants.push_back(std::move(variantData));
-      }
-    }
-    std::cout << "[" << shaderReport.name << "] raw=" << shaderReport.rawCount
-              << " compiled=" << shaderReport.compiledCount << "\n";
-    report->shaders.push_back(std::move(shaderReport));
   }
-}
 
 int RunBuildCommand(const BuildOptions& options) {
   BuildReport report;
@@ -1390,12 +1080,17 @@ int RunBuildCommand(const BuildOptions& options) {
     return 1;
   }
 
-  // Write bundle files grouped by backend (profileTag)
+  // Write bundle files grouped by backend (profileTag). Every requested backend gets a bundle:
+  // the runtime assembles its programs from the composed pools and text packs, so a bundle with
+  // no per-variant entries is still a complete artifact.
   std::vector<StampFileEntry> stampEntries = {};
-  if (!report.variants.empty()) {
+  {
     std::map<std::string, std::vector<VariantData>> byBackend;
     for (auto& v : report.variants) {
       byBackend[v.profileTag].push_back(std::move(v));
+    }
+    for (auto profile : options.backends) {
+      byBackend[ProfileTag(profile)];
     }
     for (const auto& pair : byBackend) {
       std::string filename = "shader_bundle." + pair.first + ".bin";

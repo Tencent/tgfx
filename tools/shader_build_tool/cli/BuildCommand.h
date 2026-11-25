@@ -25,6 +25,8 @@
 
 namespace tgfx {
 
+class StageCompiler;
+
 /// The parsed command line of a build run.
 struct BuildOptions {
   std::string shaderDir;
@@ -32,6 +34,9 @@ struct BuildOptions {
   /// When set, the tool only scans the fn/ directory and writes the shader library bundle the
   /// runtime embeds (no variant bundles are built).
   std::string libraryBundlePath;
+  /// The languages the library bundle carries (--library-languages, comma separated). "glsl" is
+  /// always written; "msl" adds the Metal section, which needs the compiler to translate.
+  std::string libraryLanguages = "glsl";
   std::vector<ShaderProfile> backends;
   bool compress = false;
   // Persistent stage cache. Defaults to <out-dir>/stage_cache; --no-cache keeps it memory-only.
@@ -91,11 +96,13 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options);
 /**
  * Scans <shader-dir>/fn for annotated functions (`//@function name`, `//@requires a,b`), validates
  * the graph (duplicate names, dangling requirements, cycles) and writes the single shader library
- * bundle. The GLSL section is written now; later phases append the other target languages. The
- * chain operator registry derived from the same scan lands beside the bundle.
+ * bundle. The GLSL section is always written; a non-null compiler additionally translates every
+ * function to MSL and appends the MSL section, so a Metal build assembles its shaders from the same
+ * per-function pieces. The chain operator registry derived from the same scan lands beside the
+ * bundle.
  */
 bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& outPath,
-                              std::string* error);
+                              StageCompiler* compiler, std::string* error);
 
 /// Runs the build: loads the sources, plans and compiles every family's variants through the
 /// emitters, runs the contract rules, and writes the bundles and the reports. Returns the process

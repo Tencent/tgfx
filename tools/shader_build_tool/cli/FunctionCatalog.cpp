@@ -30,6 +30,7 @@
 #include <utility>
 #include <vector>
 #include "cli/BuildCommand.h"
+#include "compile/StageCompiler.h"
 #include "gpu/shaders/contract/ShaderLibraryBundleFormat.h"
 
 namespace tgfx {
@@ -572,10 +573,443 @@ std::string RequiresOf(const CatalogEntry& entry) {
   return requires;
 }
 
+// The GLSL return type of the annotated function, precision qualifiers dropped. Empty when the
+// signature before the opening parenthesis carries no type token.
+std::string ReturnTypeOf(const std::string& source, const std::string& name) {
+  const auto nameAt = source.find(name + "(");
+  if (nameAt == std::string::npos) {
+    return "";
+  }
+  const size_t lineStart = source.rfind('\n', nameAt);
+  const size_t begin = lineStart == std::string::npos ? 0 : lineStart + 1;
+  std::istringstream words(source.substr(begin, nameAt - begin));
+  std::string word;
+  std::string type;
+  while (words >> word) {
+    if (word == "highp" || word == "mediump" || word == "lowp") {
+      continue;
+    }
+    type = word;
+  }
+  return type;
+}
+
+// One dummy value for a parameter type; a sampler parameter takes a module-level uniform instead
+// of a literal. The catalog is pure GLSL arithmetic over scalars and vectors, so the table is
+// closed and an unknown type fails the build.
+bool DummyCallArgument(const std::string& typeWithMarker, const std::string& name,
+                       std::vector<std::string>* samplerNames, std::vector<std::string>* locals,
+                       std::string* argument, std::string* error) {
+  std::string raw = typeWithMarker;
+  const auto marker = raw.find("/*@in*/");
+  if (marker != std::string::npos) {
+    raw = raw.substr(0, marker);
+  }
+  const auto trimEnd = raw.find_last_not_of(" \t");
+  if (trimEnd == std::string::npos) {
+    *error = name + ": unreadable parameter type";
+    return false;
+  }
+  raw = raw.substr(0, trimEnd + 1);
+  // The marker form may leave the parameter name glued to the type ("sampler2D planeY"), and a
+  // precision qualifier may precede the type; the type is the first token and the name the last.
+  std::string type = raw;
+  std::string argumentName = name;
+  bool writesOutput = false;
+  std::vector<std::string> tokens = {};
+  std::istringstream words(raw);
+  std::string word;
+  while (words >> word) {
+    if (word == "highp" || word == "mediump" || word == "lowp") {
+      continue;
+    }
+    if (word == "out" || word == "inout") {
+      writesOutput = true;
+      continue;
+    }
+    if (word == "in") {
+      continue;
+    }
+    tokens.push_back(word);
+  }
+  if (!tokens.empty()) {
+    type = tokens.front();
+    if (tokens.size() > 1) {
+      argumentName = tokens.back();
+    }
+  }
+  size_t arrayCount = 0;
+  const auto bracket = type.find('[');
+  std::string base = type;
+  if (bracket != std::string::npos) {
+    arrayCount = static_cast<size_t>(std::atoi(type.c_str() + bracket + 1));
+    base = type.substr(0, bracket);
+  }
+  if (base.rfind("sampler", 0) == 0) {
+    samplerNames->push_back(argumentName);
+    *argument = argumentName;
+    return true;
+  }
+  std::string scalar;
+  if (base == "float" || base == "vec2" || base == "vec3" || base == "vec4" || base == "mat3" ||
+      base == "mat4") {
+    scalar = base + "(0.0)";
+  } else if (base == "int" || base == "ivec2" || base == "ivec3" || base == "ivec4") {
+    scalar = base + "(0)";
+  } else if (base == "bool") {
+    scalar = "false";
+  } else if (base == "bvec2" || base == "bvec3" || base == "bvec4") {
+    scalar = base + "(false)";
+  } else {
+    *error = name + ": unsupported parameter type " + base;
+    return false;
+  }
+  std::string value = scalar;
+  if (arrayCount > 0) {
+    std::string elements = {};
+    for (size_t index = 0; index < arrayCount; ++index) {
+      if (index > 0) {
+        elements += ", ";
+      }
+      elements += scalar;
+    }
+    value = base + "[" + std::to_string(arrayCount) + "](" + elements + ")";
+  }
+  if (writesOutput) {
+    // An out parameter needs an lvalue: the dummy main declares one local per such parameter.
+    locals->push_back(type + " " + argumentName + " = " + value + ";");
+    *argument = argumentName;
+    return true;
+  }
+  *argument = value;
+  return true;
+}
+
+// The dependency closure of one function, callees before callers.
+bool CollectMslOrder(const std::vector<CatalogEntry>& entries, const CatalogEntry& entry,
+                     std::set<std::string>* done, std::vector<const CatalogEntry*>* ordered,
+                     std::string* error) {
+  if (!done->insert(entry.name).second) {
+    return true;
+  }
+  for (const auto& required : entry.requires) {
+    for (const auto& other : entries) {
+      if (other.name == required && !CollectMslOrder(entries, other, done, ordered, error)) {
+        return false;
+      }
+    }
+  }
+  ordered->push_back(&entry);
+  return true;
+}
+
+// One function's whole GLSL module: the dependency closure, the function and a main that calls it,
+// so the compiler keeps the function and the translator sees everything it reaches.
+std::string BuildMslModuleGLSL(const CatalogEntry& entry,
+                               const std::vector<const CatalogEntry*>& ordered,
+                               std::string* error) {
+  const auto params = SignatureParams(entry.source, entry.name);
+  if (params.empty() && entry.source.find(entry.name + "()") == std::string::npos) {
+    *error = entry.name + ": the signature is unreadable";
+    return "";
+  }
+  std::vector<std::string> samplers = {};
+  std::vector<std::string> locals = {};
+  std::string arguments = {};
+  for (size_t index = 0; index < params.size(); ++index) {
+    std::string argument;
+    if (!DummyCallArgument(params[index].first, params[index].second, &samplers, &locals, &argument,
+                           error)) {
+      return "";
+    }
+    if (index > 0) {
+      arguments += ", ";
+    }
+    arguments += argument;
+  }
+  std::string text = "#version 450\n";
+  for (size_t index = 0; index < samplers.size(); ++index) {
+    text += "layout(set = 2, binding = " + std::to_string(index) + ") uniform sampler2D " +
+            samplers[index] + ";\n";
+  }
+  for (const auto* dependency : ordered) {
+    text += dependency->source;
+    text += "\n";
+  }
+  const std::string returnType = ReturnTypeOf(entry.source, entry.name);
+  std::string prefix;
+  std::string suffix;
+  if (returnType == "float") {
+    prefix = "vec4(";
+    suffix = ")";
+  } else if (returnType == "vec2") {
+    prefix = "vec4(";
+    suffix = ", 0.0, 0.0)";
+  } else if (returnType == "vec3") {
+    prefix = "vec4(";
+    suffix = ", 0.0)";
+  } else if (returnType == "vec4") {
+    prefix = "vec4(";
+    suffix = ")";
+  } else {
+    *error = entry.name + ": unsupported return type \"" + returnType + "\"";
+    return "";
+  }
+  text += "\nlayout(location = 0) out vec4 tgfxDummyOut;\nvoid main() {\n";
+  for (const auto& local : locals) {
+    text += "  " + local + "\n";
+  }
+  text += "  tgfxDummyOut = " + prefix + entry.name + "(" + arguments + ")" + suffix + ";\n}\n";
+  return text;
+}
+
+// Removes the metal preamble and the entry point and cuts the rest into top-level blocks. The
+// catalog text is plain arithmetic, so what a translated module carries beyond its functions is
+// only the support types spirv-cross emitted for them.
+bool CollectMslBlocks(const std::string& msl, std::vector<std::string>* blocks,
+                      std::string* error) {
+  std::string body = {};
+  bool skippingStruct = false;
+  bool skippingFunction = false;
+  int functionDepth = 0;
+  size_t lineStart = 0;
+  while (lineStart <= msl.size()) {
+    size_t lineEnd = msl.find('\n', lineStart);
+    if (lineEnd == std::string::npos) {
+      lineEnd = msl.size();
+    }
+    const std::string line = msl.substr(lineStart, lineEnd - lineStart);
+    const size_t first = line.find_first_not_of(" \t");
+    const std::string trimmed = first == std::string::npos ? "" : line.substr(first);
+    if (skippingStruct) {
+      if (trimmed.find("};") != std::string::npos) {
+        skippingStruct = false;
+      }
+    } else if (skippingFunction) {
+      for (const char character : line) {
+        if (character == '{') {
+          ++functionDepth;
+        } else if (character == '}') {
+          --functionDepth;
+          if (functionDepth == 0) {
+            skippingFunction = false;
+          }
+        }
+      }
+    } else if (trimmed.empty() || trimmed.rfind("#include", 0) == 0 ||
+               trimmed.rfind("#pragma", 0) == 0 || trimmed.rfind("using namespace", 0) == 0) {
+      // The metal preamble is supplied once by the assembling shader, not per function.
+    } else if (trimmed.rfind("struct main0_", 0) == 0 ||
+               trimmed.rfind("struct tgfxDummyOut", 0) == 0) {
+      if (trimmed.find("};") == std::string::npos) {
+        skippingStruct = true;
+      }
+    } else if ((trimmed.rfind("fragment ", 0) == 0 || trimmed.rfind("vertex ", 0) == 0 ||
+                trimmed.rfind("kernel ", 0) == 0) &&
+               trimmed.find("main0(") != std::string::npos) {
+      // The signature may span lines, so entering the skip is unconditional; the brace count
+      // starts at the first '{' the head carries.
+      functionDepth = 0;
+      bool opened = false;
+      for (const char character : line) {
+        if (character == '{') {
+          ++functionDepth;
+          opened = true;
+        } else if (character == '}' && opened) {
+          --functionDepth;
+        }
+      }
+      skippingFunction = !(opened && functionDepth == 0);
+    } else {
+      // spirv-cross stamps functions with a clang attribute; the runtime assembles plain
+      // declarations, so the attribute is dropped with the rest of the metal preamble.
+      std::string kept = line;
+      size_t attributeAt = kept.find("__attribute__((");
+      while (attributeAt != std::string::npos) {
+        const auto close = kept.find("))", attributeAt);
+        if (close == std::string::npos) {
+          break;
+        }
+        kept.erase(attributeAt, close + 2 - attributeAt);
+        attributeAt = kept.find("__attribute__((", attributeAt);
+      }
+      body += kept;
+      body += '\n';
+    }
+    if (lineEnd == msl.size()) {
+      break;
+    }
+    lineStart = lineEnd + 1;
+  }
+  size_t index = 0;
+  while (index < body.size()) {
+    while (index < body.size() && std::isspace(static_cast<unsigned char>(body[index])) != 0) {
+      ++index;
+    }
+    if (index >= body.size()) {
+      break;
+    }
+    const size_t start = index;
+    const size_t open = body.find('{', index);
+    const size_t semi = body.find(';', index);
+    if (open == std::string::npos && semi == std::string::npos) {
+      break;
+    }
+    if (semi != std::string::npos && (open == std::string::npos || semi < open)) {
+      blocks->push_back(body.substr(start, semi - start + 1));
+      index = semi + 1;
+      continue;
+    }
+    int depth = 0;
+    size_t end = open;
+    for (; end < body.size(); ++end) {
+      if (body[end] == '{') {
+        ++depth;
+      } else if (body[end] == '}') {
+        --depth;
+        if (depth == 0) {
+          ++end;
+          break;
+        }
+      }
+    }
+    blocks->push_back(body.substr(start, end - start));
+    index = end;
+  }
+  if (blocks->empty()) {
+    *error = "the translated module carries no blocks";
+    return false;
+  }
+  return true;
+}
+
+// The name a top-level block defines: the identifier before the first parenthesis, or the struct
+// name when the block declares a type.
+std::string BlockName(const std::string& block) {
+  const auto paren = block.find('(');
+  if (paren == std::string::npos) {
+    std::istringstream words(block);
+    std::string word;
+    while (words >> word) {
+      if (word == "struct") {
+        std::string name;
+        words >> name;
+        return name;
+      }
+    }
+    return "";
+  }
+  size_t end = paren;
+  while (end > 0 && std::isspace(static_cast<unsigned char>(block[end - 1])) != 0) {
+    --end;
+  }
+  size_t begin = end;
+  while (begin > 0 && (std::isalnum(static_cast<unsigned char>(block[begin - 1])) != 0 ||
+                       block[begin - 1] == '_')) {
+    --begin;
+  }
+  return block.substr(begin, end - begin);
+}
+
+// Functions the MSL section cannot own. The ...Rect variants and the external-sampler read are GL
+// text only: sampler2DRect and samplerExternalOES have no Metal equivalent and no Vulkan GLSL form.
+// The entry-coupled entries read the entry's uniform block or gl_FragCoord, so they only compile
+// inside an assembled shader; the Metal entry and tail are emitted by the assembler instead of
+// being looked up in the catalog.
+bool IsMslSkippedFunction(const CatalogEntry& entry) {
+  if (entry.name.size() > 4 && entry.name.compare(entry.name.size() - 4, 4, "Rect") == 0) {
+    return true;
+  }
+  if (entry.name.rfind("chainTail_", 0) == 0) {
+    return true;
+  }
+  if (entry.source.find("samplerExternalOES") != std::string::npos) {
+    return true;
+  }
+  return entry.source.find("DstTexture") != std::string::npos ||
+         entry.source.find("XPBlendMode") != std::string::npos ||
+         entry.source.find("gl_FragCoord") != std::string::npos;
+}
+
+// Translates every catalog function to MSL and keys the result by name: each function body stands
+// alone so the runtime assembles a shader the same way it assembles GLSL, and the support types the
+// translator emitted land in one shared prelude entry.
+bool BuildCatalogMsl(const std::vector<CatalogEntry>& entries, StageCompiler* compiler,
+                     std::map<std::string, std::string>* mslByName, std::string* support,
+                     std::string* error) {
+  std::set<std::string> catalogNames = {};
+  for (const auto& entry : entries) {
+    catalogNames.insert(entry.name);
+  }
+  uint32_t moduleIndex = 0;
+  for (const auto& entry : entries) {
+    if (IsMslSkippedFunction(entry)) {
+      // An empty entry keeps the two sections aligned by name; nothing looks the name up.
+      mslByName->insert({entry.name, ""});
+      continue;
+    }
+    std::set<std::string> done = {};
+    std::vector<const CatalogEntry*> ordered = {};
+    if (!CollectMslOrder(entries, entry, &done, &ordered, error)) {
+      return false;
+    }
+    const std::string glsl = BuildMslModuleGLSL(entry, ordered, error);
+    if (glsl.empty()) {
+      return false;
+    }
+    const auto& spirv = compiler->compileSpirv(glsl, ShaderStageType::Fragment, "catalog_msl",
+                                               moduleIndex++, false);
+    if (!spirv.success) {
+      *error = "MSL section, " + entry.name + ": GLSL to SPIR-V: " + spirv.error;
+      return false;
+    }
+    const auto& msl = compiler->translateMSL(spirv.spirv, ShaderStageType::Fragment);
+    if (!msl.success) {
+      *error = "MSL section, " + entry.name + ": SPIR-V to MSL: " + msl.error;
+      return false;
+    }
+    std::vector<std::string> blocks = {};
+    if (!CollectMslBlocks(msl.text, &blocks, error)) {
+      *error = "MSL section, " + entry.name + ": " + *error;
+      return false;
+    }
+    bool found = false;
+    for (const auto& block : blocks) {
+      const std::string name = BlockName(block);
+      if (catalogNames.find(name) == catalogNames.end()) {
+        if (support->find(block) == std::string::npos) {
+          *support += block;
+          *support += '\n';
+        }
+        continue;
+      }
+      if (name == entry.name) {
+        found = true;
+      }
+      mslByName->emplace(name, block);
+    }
+    if (!found) {
+      if (const char* dumpDir = std::getenv("TGFX_MSL_DUMP")) {
+        std::ofstream dump(std::string(dumpDir) + "/" + entry.name + ".metal", std::ios::binary);
+        dump << msl.text;
+      }
+      *error = "MSL section, " + entry.name + ": the translated module lost the function";
+      return false;
+    }
+  }
+  for (const auto& name : catalogNames) {
+    if (mslByName->find(name) == mslByName->end()) {
+      *error = "MSL section: '" + name + "' was never translated";
+      return false;
+    }
+  }
+  return true;
+}
+
 }  // namespace
 
 bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& outPath,
-                              std::string* error) {
+                              StageCompiler* compiler, std::string* error) {
   if (error == nullptr) {
     return false;
   }
@@ -616,17 +1050,70 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
     offsets.push_back(offset);
   }
 
-  const uint32_t sectionOffset = SHADER_LIBRARY_BUNDLE_HEADER_SIZE;
-  const uint32_t entryTableOffset = sectionOffset + SHADER_LIBRARY_BUNDLE_SECTION_SIZE;
+  std::string mslPool = {};
+  std::vector<FunctionOffset> mslOffsets = {};
+  if (compiler != nullptr) {
+    std::map<std::string, std::string> mslByName = {};
+    std::string support = {};
+    if (!BuildCatalogMsl(entries, compiler, &mslByName, &support, error)) {
+      return false;
+    }
+    mslOffsets.reserve(sorted.size() + 1);
+    for (const CatalogEntry* entry : sorted) {
+      const auto found = mslByName.find(entry->name);
+      if (found == mslByName.end()) {
+        *error = "MSL section: '" + entry->name + "' was never translated";
+        return false;
+      }
+      FunctionOffset offset = {};
+      offset.name = static_cast<uint32_t>(mslPool.size());
+      mslPool += entry->name;
+      mslPool.push_back('\0');
+      offset.source = static_cast<uint32_t>(mslPool.size());
+      offset.sourceSize = static_cast<uint32_t>(found->second.size());
+      mslPool += found->second;
+      mslPool.push_back('\0');
+      const std::string requires = RequiresOf(*entry);
+      offset.requires = static_cast<uint32_t>(mslPool.size());
+      mslPool += requires;
+      mslPool.push_back('\0');
+      mslOffsets.push_back(offset);
+    }
+    // The support types the translator emitted travel once, under a name no catalog function can
+    // claim; the assembling shader appends them ahead of the functions.
+    FunctionOffset supportOffset = {};
+    supportOffset.name = static_cast<uint32_t>(mslPool.size());
+    mslPool += "__msl_support__";
+    mslPool.push_back('\0');
+    supportOffset.source = static_cast<uint32_t>(mslPool.size());
+    supportOffset.sourceSize = static_cast<uint32_t>(support.size());
+    mslPool += support;
+    mslPool.push_back('\0');
+    supportOffset.requires = static_cast<uint32_t>(mslPool.size());
+    mslPool.push_back('\0');
+    mslOffsets.push_back(supportOffset);
+  }
+
+  const uint32_t sectionCount = compiler != nullptr ? 2 : 1;
+  const uint32_t entryTableOffset =
+      SHADER_LIBRARY_BUNDLE_HEADER_SIZE + sectionCount * SHADER_LIBRARY_BUNDLE_SECTION_SIZE;
   const uint32_t poolOffset =
       entryTableOffset +
       static_cast<uint32_t>(offsets.size() * SHADER_LIBRARY_BUNDLE_FUNCTION_SIZE);
+  const uint32_t mslEntryOffset = poolOffset + static_cast<uint32_t>(pool.size());
+  const uint32_t mslPoolOffset =
+      mslEntryOffset +
+      static_cast<uint32_t>(mslOffsets.size() * SHADER_LIBRARY_BUNDLE_FUNCTION_SIZE);
   std::string bundle = {};
   bundle.append(SHADER_LIBRARY_BUNDLE_MAGIC, sizeof(SHADER_LIBRARY_BUNDLE_MAGIC) - 1);
   AppendU32(&bundle, SHADER_LIBRARY_BUNDLE_VERSION);
   AppendU32(&bundle, SHADER_LIBRARY_BUNDLE_HEADER_SIZE);
-  AppendU32(&bundle, 1);
-  AppendU32(&bundle, ShaderLibraryLanguageMask(ShaderLibraryLanguage::GLSL));
+  AppendU32(&bundle, sectionCount);
+  uint32_t languageMask = ShaderLibraryLanguageMask(ShaderLibraryLanguage::GLSL);
+  if (compiler != nullptr) {
+    languageMask |= ShaderLibraryLanguageMask(ShaderLibraryLanguage::MSL);
+  }
+  AppendU32(&bundle, languageMask);
   AppendU64(&bundle, HashSource(pool));
   AppendU32(&bundle, static_cast<uint32_t>(ShaderLibraryLanguage::GLSL));
   AppendU32(&bundle, static_cast<uint32_t>(offsets.size()));
@@ -634,6 +1121,14 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
   AppendU32(&bundle, poolOffset);
   AppendU32(&bundle, static_cast<uint32_t>(pool.size()));
   AppendU32(&bundle, 0);
+  if (compiler != nullptr) {
+    AppendU32(&bundle, static_cast<uint32_t>(ShaderLibraryLanguage::MSL));
+    AppendU32(&bundle, static_cast<uint32_t>(mslOffsets.size()));
+    AppendU32(&bundle, mslEntryOffset);
+    AppendU32(&bundle, mslPoolOffset);
+    AppendU32(&bundle, static_cast<uint32_t>(mslPool.size()));
+    AppendU32(&bundle, 0);
+  }
   for (const auto& offset : offsets) {
     AppendU32(&bundle, offset.name);
     AppendU32(&bundle, offset.source);
@@ -641,6 +1136,15 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
     AppendU32(&bundle, offset.requires);
   }
   bundle += pool;
+  if (compiler != nullptr) {
+    for (const auto& offset : mslOffsets) {
+      AppendU32(&bundle, offset.name);
+      AppendU32(&bundle, offset.source);
+      AppendU32(&bundle, offset.sourceSize);
+      AppendU32(&bundle, offset.requires);
+    }
+    bundle += mslPool;
+  }
   std::ofstream out(outPath, std::ios::binary);
   if (!out.is_open()) {
     *error = "cannot write " + outPath;

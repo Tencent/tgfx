@@ -32,6 +32,8 @@
 #include <string>
 #include "cli/BuildCommand.h"
 #include "compile/ShaderCompiler.h"
+#include "compile/StageCache.h"
+#include "compile/StageCompiler.h"
 
 int main(int argc, char** argv) {
   tgfx::BuildOptions options;
@@ -42,8 +44,11 @@ int main(int argc, char** argv) {
   }
   if (!options.libraryBundlePath.empty()) {
     std::string bundleError;
+    const bool withMSL = options.libraryLanguages.find("msl") != std::string::npos;
+    tgfx::StageCache stageCache;
+    tgfx::StageCompiler stageCompiler(&stageCache);
     if (!tgfx::WriteShaderLibraryBundle(options.shaderDir, options.libraryBundlePath,
-                                        &bundleError)) {
+                                        withMSL ? &stageCompiler : nullptr, &bundleError)) {
       std::cerr << "ERROR: " << bundleError << "\n";
       return 1;
     }

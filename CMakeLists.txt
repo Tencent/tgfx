@@ -1096,12 +1096,19 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     # program from this file.
     set(TGFX_SHADER_LIBRARY_BUNDLE "${TGFX_SHADER_BUNDLE_DIR}/shader_library.bundle")
     set(TGFX_SHADER_LIBRARY_REGISTRY "${TGFX_SHADER_BUNDLE_DIR}/ChainOpRegistry.inc")
+    # The Metal backend assembles its shaders from the MSL section the tool translates, so a build
+    # that enables Metal carries both sections; a GL-only build keeps the GLSL section alone.
+    set(TGFX_SHADER_LIBRARY_LANGUAGES "glsl")
+    if (TGFX_USE_METAL)
+        set(TGFX_SHADER_LIBRARY_LANGUAGES "glsl,msl")
+    endif ()
     add_custom_command(
             OUTPUT ${TGFX_SHADER_LIBRARY_BUNDLE}
             BYPRODUCTS ${TGFX_SHADER_LIBRARY_REGISTRY}
             COMMAND ${TGFX_SHADER_TOOL_COMMAND}
                     --shader-dir ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/glsl
                     --library-bundle ${TGFX_SHADER_LIBRARY_BUNDLE}
+                    --library-languages ${TGFX_SHADER_LIBRARY_LANGUAGES}
             DEPENDS ${TGFX_SHADER_TOOL_DEPENDS} ${TGFX_SHADER_SOURCES}
             COMMENT "Generating the shader library bundle")
     add_custom_target(shader_library_bundle DEPENDS ${TGFX_SHADER_LIBRARY_BUNDLE})

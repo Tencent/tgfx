@@ -41,10 +41,10 @@ SourceRuleContext RealSourceContext() {
 
 }  // namespace
 
-TEST(ContractRulesTest, TheSourceRegistryHoldsTheTwoSourceRules) {
-  // The macro-name rule retired with the stored entry files: every family's text is assembled
-  // from its declarations, so there is no per-family source left for it to scan.
-  EXPECT_EQ(MakeSourceRules().size(), 2u);
+TEST(ContractRulesTest, TheSourceRegistryHoldsTheOneSourceRule) {
+  // The macro-name and pointwise-dispatch rules retired with the stored entry files and the
+  // variant assembly: the runtime assembles from the catalog, which the spec-reader rule guards.
+  EXPECT_EQ(MakeSourceRules().size(), 1u);
 }
 
 TEST(ContractRulesTest, TheArtifactRegistryHoldsTheTwoArtifactRules) {

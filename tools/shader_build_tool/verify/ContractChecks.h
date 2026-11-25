@@ -30,12 +30,6 @@ namespace tgfx {
 // cli renders the records — so a test asserts the code and the subject fields instead of
 // capturing stderr.
 
-/// Checks the shared pointwise dispatch (operator/pointwise_color_dispatch.inc) against the op
-/// list: every operator needs an `op == OP_<NAME>` branch or a `tgfx_pointwise_exempt <Name>:
-/// <reason>` entry, every branch must name a listed operator, and an exemption must state its
-/// reason. Reports verify.pointwise-dispatch and returns the violation count.
-size_t ValidatePointwiseDispatch(const std::string& shaderDir, Diagnostics* diagnostics);
-
 /// Checks that every source reading the SPEC_ accessors declares `#pragma tgfx_spec_reader`.
 /// Reports spec.reader-undeclared and returns the violation count.
 size_t ValidateSpecReaders(const std::string& shaderDir, Diagnostics* diagnostics);

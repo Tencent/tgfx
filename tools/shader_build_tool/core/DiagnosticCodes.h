@@ -47,9 +47,6 @@ inline constexpr const char* SourcesUnreadable = "sources.unreadable";
 
 /// A reachable variant pair the declared domains cannot serve.
 
-/// A stage failed to compile to SPIR-V.
-inline constexpr const char* CompileGlsl = "compile.glsl";
-
 /// The persistent stage cache could not be opened; the build runs with the memory cache only.
 inline constexpr const char* CompileCacheDisabled = "compile.cache-disabled";
 
@@ -68,9 +65,6 @@ inline constexpr const char* SpecReader = "spec.reader-undeclared";
 /// A gate did not apply where it had to: twice-declared in one text, a pragma not followed by a
 /// stubbable function, or an expression the variant's spec table cannot evaluate.
 inline constexpr const char* SpecGateUnmatched = "spec.gate-unmatched";
-
-/// The uniform layout differs between the generic and the spec-dialect compile.
-inline constexpr const char* SpecLayoutDrift = "spec.layout-drift";
 
 /// A profile emitter could not produce its storage form for a variant.
 inline constexpr const char* EmitFailed = "emit.failed";
@@ -95,11 +89,6 @@ inline constexpr const char* VerifyNotApplicable = "verify.unverifiable";
 /// dimension, a define in the shader sources, nor a whitelisted builtin: a typo would evaluate
 /// silently to zero.
 
-/// The shared pointwise dispatch (operator/pointwise_color_dispatch.inc) does not match the op
-/// list: an operator lacks a branch or a reasoned exemption, or a branch names no listed
-/// operator.
-inline constexpr const char* VerifyPointwiseDispatch = "verify.pointwise-dispatch";
-
 // ---- output: writing the artifacts ----------------------------------------------------------
 
 /// An output file (a report, a bundle, a manifest) could not be written.
@@ -115,18 +104,15 @@ inline constexpr const char* OutputDuplicateKey = "output.duplicate-key";
 /// reports through something else).
 inline constexpr const char* AllCodes[] = {
     SourcesUnreadable,
-    CompileGlsl,
     CompileCacheDisabled,
     ReflectUnknownType,
     EmitFailed,
     EmitFormLeak,
     SpecReader,
     SpecGateUnmatched,
-    SpecLayoutDrift,
     VerifyReflection,
     VerifyBindingLayout,
     VerifyNotApplicable,
-    VerifyPointwiseDispatch,
     OutputWrite,
     OutputDuplicateKey,
 };

@@ -129,6 +129,8 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
       "gpu/shaders/FamilyDomains.h", "gpu/shaders/Layout.h",
       // runtime headers that read the declaration layer
       "gpu/aot/AOTResourceProfile.h",
+      // the operator table the composed SPIR-V pool is generated from
+      "gpu/ir/OperatorManifest.h",
       // the fragment-stage declaration language (the emitter walks these tables)
   };
   return allowed;

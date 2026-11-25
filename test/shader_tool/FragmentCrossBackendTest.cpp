@@ -102,7 +102,7 @@ struct FragmentCase {
 const FragmentCase Cases[] = {
     {"ColorMatrix", "ops/ColorMatrix.glsl", "",
      "fragColor = pmApplyColorMatrix(vColor, UMat4, UVec4);"},
-    {"Luma", "ops/Luma.glsl", "", "fragColor = pmApplyLuma(vColor, UVec4.xyz);"},
+    {"Luma", "ops/Luma.glsl", "", "fragColor = pmApplyLuma(vColor, UVec4.x, UVec4.y, UVec4.z);"},
     {"AlphaThreshold", "ops/AlphaThreshold.glsl", "",
      "fragColor = pmApplyAlphaThreshold(vColor, UFloat);"},
     {"ConstColor", "ops/ConstColor.glsl", "", "fragColor = pmApplyConstColor(UVec4, vColor, 1);"},
@@ -116,7 +116,8 @@ const FragmentCase Cases[] = {
      "fragColor = tgfxOpRRectCoverage(vColor, UVec4, UVec4B, UVec4C, UFloat, UMat3, "
      "gl_FragCoord.xy);"},
     {"ColorSpaceXform", "ops/ColorSpaceXform.glsl", "",
-     "fragColor = chainApplyColorSpaceXform(vColor);"},
+     "fragColor = chainApplyColorSpaceXform(vColor, 0, UVec4, UVec4B, 0, UVec4C, UMat3, "
+     "UVec4D, UVec4, UVec4B, 0);"},
     {"Gradient", "pipeline/chain/pointwise_gradient.inc",
      "#define NTEX 1\n#define TGFX_DECLARED_CHAIN 1\n", "fragColor = evalGradientSlot(vColor);"},
     {"PerlinNoise", "pipeline/chain/pointwise_noise.inc", "#define TGFX_DECLARED_CHAIN 1\n",

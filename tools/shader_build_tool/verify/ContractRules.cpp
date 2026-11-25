@@ -25,13 +25,6 @@ namespace tgfx {
 namespace {
 ;
 
-class PointwiseDispatchRule : public SourceRule {
- public:
-  size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
-    return ValidatePointwiseDispatch(context.shaderDir, diagnostics);
-  }
-};
-
 class SpecReaderRule : public SourceRule {
  public:
   size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
@@ -50,7 +43,6 @@ class ReflectionContractRule : public ArtifactRule {
 
 std::vector<std::unique_ptr<SourceRule>> MakeSourceRules() {
   std::vector<std::unique_ptr<SourceRule>> rules;
-  rules.push_back(std::make_unique<PointwiseDispatchRule>());
   rules.push_back(std::make_unique<SpecReaderRule>());
   return rules;
 }
