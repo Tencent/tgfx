@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLRectEffect.h"
+#include "GeneratedOperators.h"
 #include "core/utils/Log.h"
+#include "gpu/glsl/GLSLOperatorEmitter.h"
 
 namespace tgfx {
 
@@ -56,50 +58,44 @@ GLSLRectEffect::GLSLRectEffect(const Rect& localRect, const Matrix& deviceToLoca
 
 void GLSLRectEffect::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
-  auto uniformHandler = args.uniformHandler;
-
-  const auto rectName =
-      uniformHandler->addUniform("LocalRect", UniformFormat::Float4, ShaderStage::Fragment);
-  const auto antiAliasName =
-      uniformHandler->addUniform("AntiAlias", UniformFormat::Float, ShaderStage::Fragment);
-
-  // Step 1: get local-space coordinates.
-  if (needTransform()) {
-    const auto deviceToLocalName =
-        uniformHandler->addUniform("DeviceToLocal", UniformFormat::Float3x3, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("highp vec3 hl = %s * vec3(gl_FragCoord.xy, 1.0);",
-                             deviceToLocalName.c_str());
-    fragBuilder->codeAppend("highp vec2 local = hl.xy / hl.z;");
-  } else {
-    fragBuilder->codeAppend("highp vec2 local = gl_FragCoord.xy;");
+  const auto entry = fragBuilder->appendFunction("pmRectEffect");
+  if (entry.empty()) {
+    return;
   }
-
-  // Step 2: separable 1D coverage product. Clamp the signed distance to each edge into a half-pixel
-  // band, giving each axis a coverage of 0.5 on the edge, 1.0 inside, and 0.0 outside.
-  fragBuilder->codeAppendf("highp vec4 dAA = clamp(vec4(local - %s.xy, %s.zw - local), -0.5, 0.5);",
-                           rectName.c_str(), rectName.c_str());
-  fragBuilder->codeAppend("highp vec2 aaCovXY = dAA.xy + dAA.zw;");
-  // box-filter coverage: the product of the two axis coverages, giving 0.25 at the rectangle's
-  // vertex where a quarter of the pixel is inside.
-  fragBuilder->codeAppend("highp float aaCov = aaCovXY.x * aaCovXY.y;");
-  // NonAA coverage uses hard step at the original edge.
-  fragBuilder->codeAppendf(
-      "highp float nonAACov = step(%s.x, local.x) * step(local.x, %s.z) * "
-      "step(%s.y, local.y) * step(local.y, %s.w);",
-      rectName.c_str(), rectName.c_str(), rectName.c_str(), rectName.c_str());
-  fragBuilder->codeAppendf("highp float coverage = mix(nonAACov, aaCov, %s);",
-                           antiAliasName.c_str());
-  fragBuilder->codeAppendf("%s = %s * coverage;", args.outputColor.c_str(),
-                           args.inputColor.c_str());
+  if (args.irBuilder == nullptr || args.inputValue == INVALID_VALUE_ID ||
+      args.outputValue == INVALID_VALUE_ID) {
+    return;
+  }
+  RectCoverageOp::UniformNames names = {};
+  const auto fragCoordValue =
+      args.irBuilder->CreateBuiltin("gl_FragCoord", SLType::Float4);
+  const auto fragCoordXY =
+      args.irBuilder->CreateSwizzle(fragCoordValue, SLType::Float2, "xy");
+  const auto result = RectCoverageOp::Emit(args.irBuilder, args.uniformHandler, &names,
+                                           args.inputValue, fragCoordXY);
+  args.irBuilder->StoreOutput(args.outputValue, result);
+  std::string expression = {};
+  std::string error = {};
+  if (result == INVALID_VALUE_ID ||
+      !GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error)) {
+    args.irBuilder->MarkFailed(error.empty() ? "the rect operator could not be emitted" : error);
+    return;
+  }
+  fragBuilder->appendCall(
+      args.outputColor, entry,
+      {args.inputColorValue, ValueRef("gl_FragCoord.xy", SLType::Float2, ValueOrigin::Literal),
+       ValueRef(names.rect, SLType::Float4, ValueOrigin::Uniform),
+       ValueRef(names.antiAlias, SLType::Float, ValueOrigin::Uniform),
+       ValueRef(names.deviceToLocal, SLType::Float3x3, ValueOrigin::Uniform)},
+      "", expression);
 }
 
 void GLSLRectEffect::onSetData(UniformData*, UniformData* fragmentUniformData) const {
-  fragmentUniformData->setData("LocalRect", localRect);
-  const float antiAliasValue = antiAlias ? 1.0f : 0.0f;
-  fragmentUniformData->setData("AntiAlias", antiAliasValue);
-  if (needTransform()) {
-    fragmentUniformData->setData("DeviceToLocal", deviceToLocal());
-  }
+  RectCoverageUniforms uniforms = {};
+  uniforms.rect = {localRect.left, localRect.top, localRect.right, localRect.bottom};
+  uniforms.antiAlias = antiAlias ? 1.0f : 0.0f;
+  uniforms.deviceToLocal = needTransform() ? deviceToLocal() : Matrix::I();
+  uniforms.upload(fragmentUniformData);
 }
 
 }  // namespace tgfx

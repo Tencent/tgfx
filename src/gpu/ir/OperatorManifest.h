@@ -51,6 +51,8 @@ enum class OperatorID : uint32_t {
   ComplexRRectCoverage = 22,
   EllipseCoverage = 23,
   ComplexEllipseCoverage = 24,
+  RRectCoverage = 25,
+  RectCoverage = 26,
 };
 
 constexpr OperatorID INVALID_OPERATOR_ID = static_cast<OperatorID>(-1);

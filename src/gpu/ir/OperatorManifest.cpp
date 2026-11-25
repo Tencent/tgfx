@@ -198,6 +198,21 @@ const std::vector<OperatorDesc>& Operators() {
        {SLType::Float2, SLType::Float4, SLType::Float2, SLType::Float2, SLType::Int},
        nullptr,
        {"geometry/complex_ellipse_coverage.inc"}},
+      {OperatorID::RRectCoverage,
+       "RRectCoverage",
+       "pmRRectEffect",
+       SLType::Float4,
+       {SLType::Float4, SLType::Float2, SLType::Float4, SLType::Float4, SLType::Float4,
+        SLType::Float, SLType::Float3x3},
+       nullptr,
+       {"fn/ops/rrect_effect.inc"}},
+      {OperatorID::RectCoverage,
+       "RectCoverage",
+       "pmRectEffect",
+       SLType::Float4,
+       {SLType::Float4, SLType::Float2, SLType::Float4, SLType::Float, SLType::Float3x3},
+       nullptr,
+       {"fn/ops/rect_effect.inc"}},
   };
   return operators;
 }

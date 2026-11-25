@@ -45,11 +45,17 @@ void GLSLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
   auto readEntry = fragBuilder->appendFunction("tgfxTextureSample");
   auto mulEntry = fragBuilder->appendFunction(textureProxy->isAlphaOnly() ? "tgfxAlphaModulate"
                                                                           : "tgfxMulAlpha");
-  if (!coordEntry.empty() && !readEntry.empty() && !mulEntry.empty() && swizzleCode >= 0) {
-    if (args.irBuilder == nullptr || args.inputValue == INVALID_VALUE_ID ||
-        args.outputValue == INVALID_VALUE_ID) {
-      return;
-    }
+  if (args.irBuilder == nullptr) {
+    return;
+  }
+  if (coordEntry.empty() || readEntry.empty() || mulEntry.empty() || swizzleCode < 0) {
+    args.irBuilder->MarkFailed("the device-space functions are missing from the bundle");
+    return;
+  }
+  if (args.inputValue == INVALID_VALUE_ID || args.outputValue == INVALID_VALUE_ID) {
+    return;
+  }
+  {
     const auto samplerValue = args.samplerValue(sampler);
     if (samplerValue == INVALID_VALUE_ID) {
       args.irBuilder->MarkFailed("the device-space sampler has no IR value");
@@ -93,44 +99,6 @@ void GLSLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
         readExpression);
     fragBuilder->appendCall(args.outputColor, mulEntry, {"deviceRead", args.inputColor}, "",
                             mulExpression);
-    return;
-  }
-  fragBuilder->codeAppendf("highp vec3 deviceCoord = %s * vec3(gl_FragCoord.xy, 1.0);",
-                           deviceCoordMatrixName.c_str());
-  std::string coordName = "deviceCoord.xy";
-  fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
-  fragBuilder->appendTextureLookup((*args.textureSamplers)[0], coordName);
-  fragBuilder->codeAppend(";");
-  if (textureProxy->isAlphaOnly()) {
-    fragBuilder->codeAppendf("%s = %s.a * %s;", args.outputColor.c_str(), args.outputColor.c_str(),
-                             args.inputColor.c_str());
-  } else {
-    fragBuilder->codeAppendf("%s = %s * %s.a;", args.outputColor.c_str(), args.outputColor.c_str(),
-                             args.inputColor.c_str());
-  }
-  if (args.irBuilder != nullptr && args.inputValue != INVALID_VALUE_ID &&
-      args.outputValue != INVALID_VALUE_ID) {
-    const auto samplerValue = args.samplerValue(sampler);
-    if (samplerValue != INVALID_VALUE_ID) {
-      const auto matrixValue = args.irBuilder->InternValue(deviceCoordMatrixName, SLType::Float3x3,
-                                                           Precision::High, IRValueKind::Uniform);
-      const auto fragCoordValue = args.irBuilder->CreateBuiltin("gl_FragCoord", SLType::Float4);
-      const auto xyValue = args.irBuilder->CreateSwizzle(fragCoordValue, SLType::Float2, "xy");
-      const auto deviceCoordValue = args.irBuilder->CreateCall(
-          OperatorID::DeviceCoord, SLType::Float2, {matrixValue, xyValue}, "deviceCoord");
-      const auto readValue =
-          args.irBuilder->CreateTextureSample(samplerValue, deviceCoordValue, SLType::Float4,
-                                              "deviceRead", SLType::Texture2DSampler, swizzleCode);
-      const auto alphaValue = args.irBuilder->CreateSwizzle(readValue, SLType::Float, "a");
-      const auto op =
-          textureProxy->isAlphaOnly() ? OperatorID::AlphaModulate : OperatorID::MulAlpha;
-      const auto result =
-          args.irBuilder->CreateCall(static_cast<OperatorID>(op), SLType::Float4,
-                                     {textureProxy->isAlphaOnly() ? alphaValue : readValue,
-                                      textureProxy->isAlphaOnly() ? args.inputValue : alphaValue},
-                                     args.outputColor);
-      args.irBuilder->StoreOutput(args.outputValue, result);
-    }
   }
 }
 
