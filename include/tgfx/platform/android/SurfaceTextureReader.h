@@ -46,9 +46,11 @@ class SurfaceTextureReader : public ImageReader {
   jobject createInputSurface() const;
 
   /**
-   * Notifies that the previously returned ImageBuffer is now available for texture generation.
-   * Otherwise, the previous ImageBuffer will remain blocked for texture generation until this method
-   * is called. This method should be invoked by the listener provided when creating the reader.
+   * Marks source content as available for a subsequent texture read. This method should be invoked
+   * by the listener provided when creating the reader; it does not perform a read or identify a
+   * particular frame. Texture generation does not wait for this notification. If a read delivers
+   * no content, its buffer becomes terminal Expired and cannot be revived by a later notification.
+   * Acquire a new buffer for another attempt, normally after receiving the notification.
    */
   void notifyFrameAvailable();
 

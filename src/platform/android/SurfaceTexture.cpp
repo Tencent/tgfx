@@ -340,8 +340,8 @@ void SurfaceTexture::releaseExternalOESTexture(Context* context, unsigned textur
     env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_detachFromGLContext);
     if (!env->ExceptionCheck()) {
       // Successful detach deletes the associated GL texture; do not delete its name a second time.
-      // Requires the owning GL context to be current. See SurfaceTexture.detachFromGLContext():
-      // https://developer.android.com/reference/android/graphics/SurfaceTexture#detachFromGLContext()
+      // Requires the owning GL context to be current. See detachFromGLContext() in:
+      // https://developer.android.com/reference/android/graphics/SurfaceTexture
       return;
     }
     env->ExceptionClear();

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/ImageReader.h"
+#include "core/utils/Log.h"
 #include "gpu/resources/TextureView.h"
 #include "platform/ImageStream.h"
 
@@ -86,27 +87,37 @@ std::shared_ptr<ImageReader> ImageReader::MakeFrom(std::shared_ptr<ImageStream> 
   reader->weakThis = reader;
   return reader;
 }
+
 ImageReader::ImageReader(std::shared_ptr<ImageStream> stream) : stream(std::move(stream)) {
 }
+
 int ImageReader::width() const {
   return stream->width();
 }
+
 int ImageReader::height() const {
   return stream->height();
 }
+
 const std::shared_ptr<ColorSpace>& ImageReader::colorSpace() const {
   return stream->colorSpace();
 }
+
 std::shared_ptr<ImageBuffer> ImageReader::acquireBuffer() {
   std::lock_guard<std::mutex> lock(locker);
-  return std::make_shared<ImageReaderBuffer>(weakThis.lock(), ++bufferVersion);
+  auto reader = weakThis.lock();
+  DEBUG_ASSERT(reader != nullptr);
+  return std::make_shared<ImageReaderBuffer>(std::move(reader), ++bufferVersion);
 }
+
 std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {
   return acquireBuffer();
 }
+
 bool ImageReader::checkExpired(uint64_t version) {
   return version != textureVersion && version < bufferVersion;
 }
+
 ImageReader::ReadResult ImageReader::readTexture(uint64_t version, Context* context,
                                                  bool mipmapped) {
   if (version == textureVersion) {

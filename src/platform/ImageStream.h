@@ -29,7 +29,8 @@ class ImageReader;
 
 /** Abstract source of continuously updated pixels, consumed through ImageReader's deferred buffers.
  * Use a platform subclass to create and update native textures. Reader callbacks are serialized
- * within one reader; sources shared by different readers must synchronize their own mutable state. */
+ * within one reader. Sources shared by different readers must synchronize their own mutable state.
+ */
 class ImageStream {
  public:
   virtual ~ImageStream() = default;
@@ -61,7 +62,8 @@ class ImageStream {
     /** Native texture, possibly retained after an empty or failed read. Its presence alone does
      * not make this read successful. */
     std::shared_ptr<TextureView> texture = nullptr;
-    /** This read supplied valid content for a new credential; it does not match a business target. */
+    /** This read supplied valid content for a new credential, not a business target match.
+     */
     bool advanced = false;
     /** Timestamp of the bound content in nanoseconds, or -1 when unavailable. */
     int64_t timestamp = -1;
@@ -77,7 +79,8 @@ class ImageStream {
    * A missing hook or false/null result reports failure conservatively, since this adapter cannot
    * distinguish an empty queue from an error. Sources with that distinction override this method
    * without implementing legacy hooks. Overrides must perform one read without draining queued
-   * frames or waiting for producer notifications. Scheduling another attempt belongs to the caller. */
+   * frames or waiting for producer notifications. Scheduling another attempt belongs to the caller.
+   */
   virtual TextureReadResult onReadTexture(Context* context, bool mipmapped,
                                           std::shared_ptr<TextureView> texture) {
     bool advanced;
