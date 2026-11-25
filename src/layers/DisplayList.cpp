@@ -738,12 +738,15 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     if (p.subtreeHits + p.subtreeNewBuilds + p.subtreeRebuilds + p.subtreeRefused > 0) {
       std::printf(
           "[SUB-CACHE] tasks=%zu zoom=%lld hits=%d new=%d rebuilt=%d refused=%d buildMs=%.1f "
-          "edges=%d/%d/%d/%d/%d/%d/%d\n",
+          "edges=%d/%d/%d/%d/%d/%d/%d ok=%d fail=%d/%d/%d/%d failEmpty=%d failLeaf=%d "
+          "failMaxEdge=%.1f\n",
           tileTasks.size(), static_cast<long long>(_zoomScaleInt), p.subtreeHits,
           p.subtreeNewBuilds, p.subtreeRebuilds, p.subtreeRefused, p.subtreeBuildMs,
           p.subtreeBuildsByEdge[5], p.subtreeBuildsByEdge[6], p.subtreeBuildsByEdge[7],
           p.subtreeBuildsByEdge[8], p.subtreeBuildsByEdge[9], p.subtreeBuildsByEdge[10],
-          p.subtreeBuildsByEdge[11]);
+          p.subtreeBuildsByEdge[11], p.subtreeOk, p.subtreeFailPicture, p.subtreeFailImage,
+          p.subtreeFailFilter, p.subtreeFailTexture, p.subtreeFailEmptyBounds, p.subtreeFailLeaf,
+          static_cast<double>(p.subtreeFailMaxEdge));
     }
   }
   if (hasBackgroundStyle && !tileTasks.empty()) {

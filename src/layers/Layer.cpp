@@ -1480,6 +1480,7 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
   drawDirectly(drawArgs, recordingCanvas, 1.0f);
   auto picture = recorder.finishRecordingAsPicture();
   if (!picture) {
+    ++gCaptureProbe.subtreeFailPicture;
     return nullptr;
   }
 
@@ -1487,6 +1488,7 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
   auto image = PictureUtils::ToImageWithOffset(std::move(picture), &offset, &pictureBounds,
                                                args.dstColorSpace, false);
   if (image == nullptr) {
+    ++gCaptureProbe.subtreeFailImage;
     return nullptr;
   }
 
@@ -1497,12 +1499,22 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
                          -(contentBounds.top + pictureBounds.top));
     image = applyFilters(std::move(image), contentScale, contentBounds, &filterOffset);
     offset += filterOffset;
+    if (image == nullptr) {
+      ++gCaptureProbe.subtreeFailFilter;
+      return nullptr;
+    }
   }
 
   drawingMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
   drawingMatrix->preTranslate(offset.x, offset.y);
 
-  return image->makeTextureImage(args.context);
+  auto textureImage = image->makeTextureImage(args.context);
+  if (textureImage == nullptr) {
+    ++gCaptureProbe.subtreeFailTexture;
+  } else {
+    ++gCaptureProbe.subtreeOk;
+  }
+  return textureImage;
 }
 
 SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
@@ -1542,6 +1554,13 @@ SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
   auto imageMatrix = Matrix::I();
   auto image = createSubtreeCacheImage(args, cacheScale, layerBounds, &imageMatrix);
   if (image == nullptr) {
+    if (layerBounds.isEmpty()) {
+      ++gCaptureProbe.subtreeFailEmptyBounds;
+    }
+    if (_children.empty()) {
+      ++gCaptureProbe.subtreeFailLeaf;
+    }
+    gCaptureProbe.subtreeFailMaxEdge = std::max(gCaptureProbe.subtreeFailMaxEdge, maxBoundsSize);
     return nullptr;
   }
   auto textureProxy = std::static_pointer_cast<TextureImage>(image)->getTextureProxy();

@@ -64,6 +64,16 @@ struct CaptureProbe {
   double subtreeBuildMs = 0.0;
   // Builds per long edge, indexed by log2(longEdge) (5 = 32 px ... 11 = 2048 px).
   int subtreeBuildsByEdge[16] = {};
+  // Failed builds by reason: empty picture, image from the picture, filters, texture upload.
+  int subtreeFailPicture = 0;
+  int subtreeFailImage = 0;
+  int subtreeFailFilter = 0;
+  int subtreeFailTexture = 0;
+  int subtreeOk = 0;
+  // Bounds of failed layers: count with empty bounds, and the largest long edge in local units.
+  int subtreeFailEmptyBounds = 0;
+  float subtreeFailMaxEdge = 0.0f;
+  int subtreeFailLeaf = 0;
   // Style source recordings split by nesting depth (0, 1, 2, 3+) and by pass (0: draw, 1: capture).
   // A recording at depth N runs inside the subtree drawing of a recording at depth N - 1, so the
   // inclusive time at depth 0 minus that at depth 1 is the cost depth 0 spends on its own.
