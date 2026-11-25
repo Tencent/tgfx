@@ -74,7 +74,7 @@ class ProgramIRBuilder {
                               std::string debugName = {}, SLType samplerType = SLType::Void,
                               int32_t samplerSwizzleCode = -1, bool subsetClamped = false,
                               ValueID strictSubset = INVALID_VALUE_ID,
-                              ValueID drawSubset = INVALID_VALUE_ID);
+                              ValueID drawSubset = INVALID_VALUE_ID, bool coverageSample = false);
 
   void SetStage(ShaderStage stage);
 

@@ -130,7 +130,8 @@ class FragmentShaderBuilder : public ShaderBuilder {
                                 ValueID samplerValue = INVALID_VALUE_ID,
                                 SLType coordType = SLType::Void,
                                 ValueID strictSubsetValue = INVALID_VALUE_ID,
-                                ValueID drawSubsetValue = INVALID_VALUE_ID);
+                                ValueID drawSubsetValue = INVALID_VALUE_ID,
+                                bool coverageSample = false);
 
   /**
    * Records that a call already stored the stage's final output and folded its coverage: the

@@ -357,13 +357,15 @@ ValueID ProgramIRBuilder::CreateBuiltin(const std::string& builtin, SLType type)
 ValueID ProgramIRBuilder::CreateTextureSample(ValueID sampler, ValueID coordinate, SLType type,
                                               std::string debugName, SLType samplerType,
                                               int32_t samplerSwizzleCode, bool subsetClamped,
-                                              ValueID strictSubset, ValueID drawSubset) {
+                                              ValueID strictSubset, ValueID drawSubset,
+                                              bool coverageSample) {
   IRExpr expr = {};
   expr.kind = IRExprKind::TextureSample;
   expr.type = type;
   expr.args = {sampler, coordinate};
   expr.samplerType = samplerType;
   expr.samplerSwizzleCode = samplerSwizzleCode;
+  expr.coverageSample = coverageSample;
   expr.subsetClamped = subsetClamped;
   expr.strictSubset = strictSubset;
   expr.drawSubset = drawSubset;

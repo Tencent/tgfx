@@ -146,14 +146,11 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
     const auto read = fragBuilder->readTexture(
         textureSampler, texCoordName, extraSubsetName, subsetName, &recorded, args.irBuilder,
         args.samplerValue(textureSampler), (*args.transformedCoords)[0].type(), strictSubsetValue,
-        drawSubsetValue);
+        drawSubsetValue, args.isCoverage);
     fragBuilder->storeColor(args.outputColor, read.name);
     if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID &&
         read.value != INVALID_VALUE_ID) {
-      const auto value = args.isCoverage
-                             ? args.irBuilder->CreateSwizzle(read.value, SLType::Float4, "aaaa")
-                             : read.value;
-      args.irBuilder->StoreOutput(args.outputValue, value);
+      args.irBuilder->StoreOutput(args.outputValue, read.value);
     }
     return;
   }
@@ -162,7 +159,8 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   bool recorded = false;
   const auto read = fragBuilder->readTexture(textureSampler, finalCoordName, "", "", &recorded,
                                              args.irBuilder, args.samplerValue(textureSampler),
-                                             (*args.transformedCoords)[0].type());
+                                             (*args.transformedCoords)[0].type(), INVALID_VALUE_ID,
+                                             INVALID_VALUE_ID, args.isCoverage);
   fragBuilder->aliasValue("color", read.name, "vec4");
   if (alphaStart != Point::Zero()) {
     if (args.irBuilder == nullptr || args.outputValue == INVALID_VALUE_ID ||

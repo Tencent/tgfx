@@ -112,6 +112,7 @@ struct IRExpr {
   std::string builtin = {};
   SLType samplerType = SLType::Void;
   int32_t samplerSwizzleCode = -1;
+  bool coverageSample = false;
   bool subsetClamped = false;
   ValueID strictSubset = INVALID_VALUE_ID;
   ValueID drawSubset = INVALID_VALUE_ID;

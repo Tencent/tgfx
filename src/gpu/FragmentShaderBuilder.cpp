@@ -65,7 +65,8 @@ std::string FragmentShaderBuilder::clampToSubsets(const std::string& coordName,
 TextureReadResult FragmentShaderBuilder::readTexture(
     SamplerHandle handle, const std::string& coordName, const std::string& strictSubset,
     const std::string& drawSubset, bool* recorded, ProgramIRBuilder* irBuilder,
-    ValueID samplerValue, SLType coordType, ValueID strictSubsetValue, ValueID drawSubsetValue) {
+    ValueID samplerValue, SLType coordType, ValueID strictSubsetValue, ValueID drawSubsetValue,
+    bool coverageSample) {
   if (recorded != nullptr) {
     *recorded = false;
   }
@@ -106,7 +107,7 @@ TextureReadResult FragmentShaderBuilder::readTexture(
       if (coordValue != INVALID_VALUE_ID) {
         result.value = irBuilder->CreateTextureSample(
             samplerValue, coordValue, SLType::Float4, temp, sampler.type(), swizzleCode,
-            clampInside, strictSubsetValue, drawSubsetValue);
+            clampInside, strictSubsetValue, drawSubsetValue, coverageSample);
       }
     }
     return result;
@@ -125,9 +126,9 @@ TextureReadResult FragmentShaderBuilder::readTexture(
     const auto coordValue =
         irBuilder->InternValue(finalCoord, coordType, Precision::High, coordKind);
     if (coordValue != INVALID_VALUE_ID) {
-      result.value = irBuilder->CreateTextureSample(samplerValue, coordValue, SLType::Float4, temp,
-                                                    sampler.type(), swizzleCode, clampInside,
-                                                    strictSubsetValue, drawSubsetValue);
+      result.value = irBuilder->CreateTextureSample(
+          samplerValue, coordValue, SLType::Float4, temp, sampler.type(), swizzleCode, clampInside,
+          strictSubsetValue, drawSubsetValue, coverageSample);
     }
   }
   return result;

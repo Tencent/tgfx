@@ -845,6 +845,11 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
       writer.Sink(&writer.func);
       const auto id = writer.NewId();
       writer.Inst(spirv::kOpImageSampleImplicitLod, {type, id, sampledImage, coordinate});
+      if (expr.coverageSample && type == TypeId(SLType::Float4, error)) {
+        const auto coverage = writer.NewId();
+        writer.Inst(spirv::kOpVectorShuffle, {type, coverage, id, id, 3, 3, 3, 3});
+        return coverage;
+      }
       if (expr.samplerSwizzleCode <= 0 || expr.samplerSwizzleCode > 5 ||
           type != TypeId(SLType::Float4, error)) {
         return id;
