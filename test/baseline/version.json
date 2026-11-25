@@ -31,7 +31,7 @@
         "backgroundLayerBlur": "9f1da371b"
     },
     "CanvasTest": {
-        "AARRectOp": "f377f9d5d",
+        "AARRectOp": "06bef3e47",
         "AARRectOpZeroInnerRadius": "7ad889d5",
         "BlendFormula": "543054b5",
         "CMYKWithoutICCProfile": "29dde9e0",
@@ -67,8 +67,8 @@
         "LumaFilterToRec2020": "82494664",
         "LumaFilterToRec601": "82494664",
         "LumaFilterToSRGB": "82494664",
-        "Matrix3D": "200dffffa",
-        "Matrix3DShapeStroke": "b1cdb380",
+        "Matrix3D": "67b25e920",
+        "Matrix3DShapeStroke": "67b25e920",
         "MatrixShapeStroke": "eefb7a46",
         "MultiImageRect_NOSCALE_NEAREST_LINEAR": "4edccb64",
         "MultiImageRect_NOSCALE_NEAREST_NEAREST": "4edccb64",
@@ -80,9 +80,9 @@
         "NoiseShaderAlphaBlend": "a8bfb235",
         "NoiseTileSize": "a8bfb235",
         "NoiseWithThreshold": "a8bfb235",
-        "NonAARRectOp": "d30e4026",
+        "NonAARRectOp": "06bef3e47",
         "NonAARRectOpColorStroke": "e1d126b7",
-        "NonAARRectOpStroke": "33f56a231",
+        "NonAARRectOpStroke": "06bef3e47",
         "NonAARRectOpStrokeScale": "33f56a231",
         "NonAARRectOpTransform": "e1d126b7",
         "NonAARRectOpWithShader": "add41042",
@@ -95,10 +95,6 @@
         "Path_addArc_reversed6": "543054b5",
         "Path_addArc_reversed7": "543054b5",
         "Path_addArc_reversed8": "4802e56",
-        "Picture": "bd0c09cff",
-        "PictureImage": "9f1da371b",
-        "PictureImage_Path": "880d5a6c",
-        "PictureImage_Text": "80a4bd69",
         "RRectBlendMode": "1d1a7afb",
         "RawNoiseShader": "a8bfb235",
         "RawTurbulence": "a8bfb235",
@@ -113,14 +109,10 @@
         "drawPaint_shadow": "9f1da371b",
         "merge_draw_call_rect": "d010fb8",
         "merge_draw_call_rrect": "d010fb8",
-        "pic_scaled_image": "200dffffa",
-        "pic_scaled_image_origin": "3c65b221",
-        "pic_scaled_pic_clip": "200dffffa",
-        "pic_scaled_scale_up": "200dffffa",
         "saveLayer": "351c4df9"
     },
     "ClipTest": {
-        "ClipOverview": "d30e4026"
+        "ClipOverview": "06bef3e47"
     },
     "FilterTest": {
         "AlphaThreshold": "5012d73",
@@ -338,10 +330,10 @@
         "Layer_hitTestPointNested": "4d602959",
         "Matrix_3D": "200dffffa",
         "Matrix_3D_2D": "200dffffa",
-        "Matrix_3D_2D_3D": "200dffffa",
-        "Matrix_3D_2D_3D_Preserve3D": "200dffffa",
+        "Matrix_3D_2D_3D": "67b25e920",
+        "Matrix_3D_2D_3D_Preserve3D": "67b25e920",
         "Matrix_3D_Offscreen_Blend": "200dffffa",
-        "Matrix_Behind_Viewer": "200dffffa",
+        "Matrix_Behind_Viewer": "67b25e920",
         "MeshLayer": "c3630d40",
         "NestedOffscreenTiledZoom": "4e22a3749",
         "PartialDrawLayer": "200dffffa",
@@ -466,6 +458,16 @@
     },
     "PathTest": {
         "DrawInfiniteLoopPath": "898f84dd"
+    },
+    "PictureTest": {
+        "General": "06bef3e47",
+        "Image": "06bef3e47",
+        "Image_Path": "06bef3e47",
+        "Image_Text": "06bef3e47",
+        "scaled_clip": "06bef3e47",
+        "scaled_image": "06bef3e47",
+        "scaled_image_origin": "06bef3e47",
+        "scaled_scale_up": "06bef3e47"
     },
     "ReadPixelsTest": {
         "JpegCodec_Decode_Alpha8": "afd80b4",
@@ -695,7 +697,7 @@
         "CustomPathTypeface": "5a810d0b"
     },
     "VectorLayerTest": {
-        "BasicShapes": "e3e56003e",
+        "BasicShapes": "67b25e920",
         "ChainedModifiers": "8815f728",
         "ColorSourceAdvanced": "13582ab7",
         "ComplexComposition": "8815f728",

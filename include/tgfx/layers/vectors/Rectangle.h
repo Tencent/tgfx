@@ -86,6 +86,23 @@ class Rectangle : public VectorElement {
   void setRoundness(const std::array<float, 4>& values);
 
   /**
+   * Returns the corner smoothness shared by all four corners.
+   */
+  float smoothness() const {
+    return _smoothness;
+  }
+
+  /**
+   * Sets the corner smoothness shared by all four corners.
+   * Values are clamped to [0, 1]. A value of 0 produces a circular corner arc. Larger values make
+   * the curvature change more gradually, and the points where each corner meets the edges move
+   * away from the corner vertex, to (1 + smoothness) times the roundness. When an edge is too short
+   * to fit the smoothed corners at both of its ends, the smoothness is reduced.
+   * @param value corner smoothness applied uniformly to all corners
+   */
+  void setSmoothness(float value);
+
+  /**
    * Returns whether the path direction is reversed (counter-clockwise).
    */
   bool reversed() const {
@@ -111,6 +128,7 @@ class Rectangle : public VectorElement {
   Point _position = Point::Zero();
   Size _size = {100.0f, 100.0f};
   std::array<float, 4> _roundness = {};
+  float _smoothness = 0.0f;
   bool _reversed = false;
   std::shared_ptr<Shape> _cachedShape = nullptr;
 };

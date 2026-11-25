@@ -125,6 +125,18 @@ TGFX_TEST(RRectUtilsTest, ConservativeIntersect) {
     const auto b = RRect::MakeRectXY(Rect::MakeLTRB(2, 2, 90, 90), 0, 0);
     EXPECT_FALSE(RRectUtils::ConservativeIntersect(a, b).has_value());
   }
+
+  // Case 11: A smoothed RRect whose bounding rect overlaps a different RRect's, rejected; with
+  // itself, the result is the same smoothed RRect.
+  {
+    const auto smooth = RRect::MakeRectXY(Rect::MakeWH(100, 100), 20, 20, 0.5f);
+    const auto general = RRect::MakeRectXY(Rect::MakeWH(100, 100), 20, 20);
+    EXPECT_FALSE(RRectUtils::ConservativeIntersect(smooth, general).has_value());
+    EXPECT_FALSE(RRectUtils::ConservativeIntersect(general, smooth).has_value());
+    const auto result = RRectUtils::ConservativeIntersect(smooth, smooth);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, smooth);
+  }
 }
 
 TGFX_TEST(RRectUtilsTest, InnerBounds) {
@@ -169,6 +181,23 @@ TGFX_TEST(RRectUtilsTest, InnerBounds) {
     EXPECT_NEAR(inner.right, 100.f - 14.645161f, 1e-3f);
     EXPECT_NEAR(inner.bottom, 80.f - 11.716129f, 1e-3f);
   }
+
+  // Case 6: A smoothed corner keeps the diagonal inset of the general corner, which beats the
+  // strips widened to (1 + s) * r.
+  {
+    const auto rr = RRect::MakeRectXY(Rect::MakeWH(100, 100), 20, 20, 0.5f);
+    const auto inner = RRectUtils::InnerBounds(rr);
+    EXPECT_NEAR(inner.left, 5.858f, 1e-3f);
+    EXPECT_NEAR(inner.top, 5.858f, 1e-3f);
+    EXPECT_NEAR(inner.right, 100.f - 5.858f, 1e-3f);
+    EXPECT_NEAR(inner.bottom, 100.f - 5.858f, 1e-3f);
+  }
+
+  // Case 7: The strips of a smoothed corner inset by (1 + s) * r.
+  {
+    const auto rr = RRect::MakeRectXY(Rect::MakeWH(100, 100), 5, 40, 0.25f);
+    EXPECT_EQ(RRectUtils::InnerBounds(rr), Rect::MakeLTRB(6.25f, 0, 93.75f, 100));
+  }
 }
 
 TGFX_TEST(RRectUtilsTest, TryAxisAlignedTransform) {
@@ -193,12 +222,13 @@ TGFX_TEST(RRectUtilsTest, TryAxisAlignedTransform) {
     EXPECT_EQ(out->type(), RRect::Type::Simple);
   }
 
-  // Case 3: Positive scale stretches the rect and radii with no corner swap.
+  // Case 3: Positive scale stretches the rect and radii with no corner swap and keeps smoothness.
   {
     auto rRect =
-        RRect::MakeRectRadii(Rect::MakeWH(100, 80), {{{20, 10}, {10, 10}, {5, 5}, {15, 15}}});
+        RRect::MakeRectRadii(Rect::MakeWH(100, 80), {{{20, 10}, {10, 10}, {5, 5}, {15, 15}}}, 0.5f);
     auto out = RRectUtils::TryAxisAlignedTransform(rRect, Matrix::MakeScale(2, 0.5f));
     ASSERT_TRUE(out.has_value());
+    EXPECT_FLOAT_EQ(out->smoothness(), 0.5f);
     EXPECT_FLOAT_EQ(out->rect().width(), 200.f);
     EXPECT_FLOAT_EQ(out->rect().height(), 40.f);
     EXPECT_FLOAT_EQ(out->radii()[0].x, 40.f);

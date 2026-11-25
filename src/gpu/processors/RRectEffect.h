@@ -28,19 +28,20 @@ namespace tgfx {
 
 /**
  * Coverage FragmentProcessor for an affine-mapped rounded rectangle clip, in either AA or NonAA
- * mode. Accepts RRects of type Oval, Simple, or Complex; for Rect type, prefer RectEffect for
- * better performance. Perspective and degenerate matrices are not supported.
+ * mode. Accepts RRects of type Oval, Simple, or Complex without corner smoothness; for Rect type,
+ * prefer RectEffect for better performance. Perspective and degenerate matrices are not supported.
  */
 class RRectEffect : public FragmentProcessor {
  public:
   /**
-   * @param rRect       Rounded rectangle in local space. For Rect type, prefer RectEffect for
-   *                    better performance.
-   * @param matrix      Maps the local-space rRect to device space. Defaults to identity.
-   * @param antiAlias   If true, the shader produces a soft edge that ramps over one pixel centered
-   *                    on the boundary; otherwise a hard edge.
-   *
-   * Returns nullptr when the matrix has perspective or its scale components are zero.
+   * Creates a coverage FragmentProcessor for the rounded rectangle clip.
+   * @param rRect Rounded rectangle in local space without corner smoothness. For Rect type, prefer
+   *        RectEffect for better performance.
+   * @param matrix Maps the local-space rRect to device space. Defaults to identity.
+   * @param antiAlias If true, the shader produces a soft edge that ramps over one pixel centered on
+   *        the boundary; otherwise a hard edge.
+   * @return The new effect, or nullptr when the matrix has perspective or its scale components are
+   *         zero.
    */
   static PlacementPtr<RRectEffect> Make(BlockAllocator* allocator, const RRect& rRect,
                                         const Matrix& matrix = Matrix::I(), bool antiAlias = true);
@@ -52,9 +53,9 @@ class RRectEffect : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  RRectEffect(const Rect& localRect, const std::array<Point, 4>& radii, const Matrix& deviceToLocal,
+  RRectEffect(const Rect& rect, const std::array<Point, 4>& radii, const Matrix& deviceToLocal,
               bool antiAlias)
-      : FragmentProcessor(ClassID()), localRect(localRect), radii(radii), antiAlias(antiAlias),
+      : FragmentProcessor(ClassID()), rect(rect), radii(radii), antiAlias(antiAlias),
         _deviceToLocal(deviceToLocal), _needTransform(!deviceToLocal.isIdentity()) {
   }
 
@@ -68,9 +69,9 @@ class RRectEffect : public FragmentProcessor {
     return _deviceToLocal;
   }
 
-  Rect localRect = {};
-  // Per-corner radii in [TL, TR, BR, BL] order, scaled to device-equivalent units when
-  // _needTransform is true (CPU side bakes axisScales into the radii).
+  // Rect in the space that deviceToLocal maps device coordinates into.
+  Rect rect = {};
+  // Per-corner radii in [TL, TR, BR, BL] order, in the same space as rect.
   std::array<Point, 4> radii = {};
   bool antiAlias = true;
 

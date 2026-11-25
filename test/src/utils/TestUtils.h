@@ -31,6 +31,8 @@
 #include "utils/ProjectPath.h"
 
 namespace tgfx {
+class OpsRenderTask;
+class Surface;
 
 #ifdef TGFX_TEST_ACCESS_PRIVATE
 #define TGFX_TEST_PRIVATE(suite, name) TGFX_TEST(suite, name)
@@ -66,5 +68,11 @@ void RemoveFile(const std::string& key);
 
 std::shared_ptr<Image> ScaleImage(const std::shared_ptr<Image>& image, float scale,
                                   const SamplingOptions& options = {});
+
+/**
+ * Flushes the pending draws of the surface and returns the last recorded render task.
+ */
+TGFX_PRIVATE_ACCESS(
+    OpsRenderTask* FlushAndGetLastRenderTask(const std::shared_ptr<Surface>& surface);)
 
 }  // namespace tgfx

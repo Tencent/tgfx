@@ -28,6 +28,7 @@
 #include <include/core/SkRect.h>
 #include <include/pathops/SkPathOps.h>
 #include "core/PathRef.h"
+#include "core/RRectUtils.h"
 #include "core/utils/AtomicCache.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -37,6 +38,10 @@ using namespace pk;
 
 static SkPathDirection ToSkDirection(bool reversed) {
   return reversed ? SkPathDirection::kCCW : SkPathDirection::kCW;
+}
+
+static SkPoint ToSkPoint(const Point& point) {
+  return {point.x, point.y};
 }
 
 #define DistanceToControlPoint(radStep) (4 * tanf((radStep)*0.25f) / 3)
@@ -517,7 +522,184 @@ void Path::addRoundRect(const Rect& rect, const std::array<Point, 4>& radii, boo
   writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);
 }
 
+/**
+ * Bezier points of one smoothed corner of a rounded rectangle, in clockwise order.
+ * The corner contour C consists of the incoming transition curve C1, the retained arc C2 and the
+ * outgoing transition curve C3. PS is the start of C2, where C1 ends, and PE is the end of C2,
+ * where C3 starts.
+ */
+struct SmoothCornerPoints {
+  // C1.
+  Point entry = {};
+  Point entryCtrl1 = {};
+  Point entryCtrl2 = {};
+  // C2, starting at PS.
+  Point arcStart = {};
+  Point arcCtrl1 = {};
+  Point arcCtrl2 = {};
+  // C3, starting at PE.
+  Point arcEnd = {};
+  Point exitCtrl1 = {};
+  Point exitCtrl2 = {};
+  Point exit = {};
+};
+
+static void ScalePointY(Point& point, float originY, float scale) {
+  point.y = originY + (point.y - originY) * scale;
+}
+
+/**
+ * Scales the corner points vertically about the line y = originY.
+ * @param corner the corner points, scaled in place
+ * @param originY the y coordinate that stays fixed under the scale
+ * @param scale the vertical scale factor
+ */
+static void ScaleSmoothCornerY(SmoothCornerPoints& corner, float originY, float scale) {
+  ScalePointY(corner.entry, originY, scale);
+  ScalePointY(corner.entryCtrl1, originY, scale);
+  ScalePointY(corner.entryCtrl2, originY, scale);
+  ScalePointY(corner.arcStart, originY, scale);
+  ScalePointY(corner.arcCtrl1, originY, scale);
+  ScalePointY(corner.arcCtrl2, originY, scale);
+  ScalePointY(corner.arcEnd, originY, scale);
+  ScalePointY(corner.exitCtrl1, originY, scale);
+  ScalePointY(corner.exitCtrl2, originY, scale);
+  ScalePointY(corner.exit, originY, scale);
+}
+
+/**
+ * Builds the points of one smoothed corner.
+ * @param vertex the corner vertex
+ * @param entryDir the unit tangent at the entry point, along the incoming edge toward the vertex
+ * @param entryNormal the unit normal at the entry point, pointing into the shape
+ * @param exitDir the unit tangent at the exit point, along the outgoing edge away from the vertex
+ * @param exitNormal the unit normal at the exit point, pointing into the shape
+ * @param radii the corner radii on the x and y axes
+ * @param coeffs the coefficients of the smoothed corner with unit radius
+ * @return the points of the corner contour
+ */
+static SmoothCornerPoints BuildSmoothCorner(const Point& vertex, const Point& entryDir,
+                                            const Point& entryNormal, const Point& exitDir,
+                                            const Point& exitNormal, const Point& radii,
+                                            const UnitSmoothCornerCoeffs& coeffs) {
+  const auto radius = radii.x;
+  const auto start = coeffs.start * radius;
+  const auto step = coeffs.step * radius;
+  const auto arcOffsetAlong = coeffs.arcOffsetAlong * radius;
+  const auto arcOffsetCross = coeffs.arcOffsetCross * radius;
+  SmoothCornerPoints corner = {};
+  corner.entry = vertex - entryDir * start;
+  corner.entryCtrl1 = corner.entry + entryDir * (2.0f * step);
+  corner.entryCtrl2 = corner.entry + entryDir * (3.0f * step);
+  corner.arcStart = corner.entryCtrl2 + entryDir * arcOffsetAlong + entryNormal * arcOffsetCross;
+  corner.exit = vertex + exitDir * start;
+  corner.exitCtrl2 = corner.exit - exitDir * (2.0f * step);
+  corner.exitCtrl1 = corner.exit - exitDir * (3.0f * step);
+  corner.arcEnd = corner.exitCtrl1 - exitDir * arcOffsetAlong + exitNormal * arcOffsetCross;
+  const auto center = vertex + (entryNormal + exitNormal) * radius;
+  // Middle point of C2.
+  const auto mid = center - (entryNormal + exitNormal) * (radius / FLOAT_SQRT2);
+  // The tangent vectors below keep the length of the radius so that multiplying by arcHandle (a
+  // ratio of the radius) yields the actual handle length.
+  auto tangentStart = Point{center.y - corner.arcStart.y, corner.arcStart.x - center.x};
+  // Orient the tangent at PS along the direction of travel, toward mid.
+  if (tangentStart.x * (mid.x - corner.arcStart.x) + tangentStart.y * (mid.y - corner.arcStart.y) <
+      0.0f) {
+    tangentStart = {-tangentStart.x, -tangentStart.y};
+  }
+  corner.arcCtrl1 = corner.arcStart + tangentStart * coeffs.arcHandle;
+  auto tangentEnd = Point{center.y - corner.arcEnd.y, corner.arcEnd.x - center.x};
+  // Orient the tangent at PE along the direction of travel, away from mid.
+  if (tangentEnd.x * (corner.arcEnd.x - mid.x) + tangentEnd.y * (corner.arcEnd.y - mid.y) < 0.0f) {
+    tangentEnd = {-tangentEnd.x, -tangentEnd.y};
+  }
+  corner.arcCtrl2 = corner.arcEnd - tangentEnd * coeffs.arcHandle;
+  if (radii.x > 0.0f && radii.y != radii.x) {
+    ScaleSmoothCornerY(corner, vertex.y, radii.y / radii.x);
+  }
+  return corner;
+}
+
+static void AppendSmoothCorner(SkPath& path, const SmoothCornerPoints& corner, bool hasArc,
+                               bool reversed) {
+  Point points[10] = {corner.entry,     corner.entryCtrl1, corner.entryCtrl2, corner.arcStart,
+                      corner.arcCtrl1,  corner.arcCtrl2,   corner.arcEnd,     corner.exitCtrl1,
+                      corner.exitCtrl2, corner.exit};
+  if (reversed) {
+    std::reverse(points, points + 10);
+  }
+  path.cubicTo(ToSkPoint(points[1]), ToSkPoint(points[2]), ToSkPoint(points[3]));
+  if (hasArc) {
+    path.cubicTo(ToSkPoint(points[4]), ToSkPoint(points[5]), ToSkPoint(points[6]));
+  }
+  path.cubicTo(ToSkPoint(points[7]), ToSkPoint(points[8]), ToSkPoint(points[9]));
+}
+
+/**
+ * Appends a smoothed rounded rectangle to the path as a new closed contour.
+ * @param path the path that receives the contour
+ * @param rRect the smoothed rounded rectangle
+ * @param reversed whether the contour runs in the reverse direction
+ * @param startIndex the boundary point where the contour starts, numbered as for a general rounded
+ *        rectangle and taken modulo 8
+ */
+static void AddSmoothRRect(SkPath& path, const RRect& rRect, bool reversed, unsigned startIndex) {
+  const auto coeffs = RRectUtils::ComputeUnitSmoothCornerCoeffs(rRect.smoothness());
+  // Per-corner edge vectors in clockwise order (top-left, top-right, bottom-right, bottom-left):
+  // entryDir, entryNormal, exitDir, exitNormal.
+  static constexpr Point CORNER_EDGE_VECTORS[4][4] = {
+      {{0, -1}, {1, 0}, {1, 0}, {0, 1}},
+      {{1, 0}, {0, 1}, {0, 1}, {-1, 0}},
+      {{0, 1}, {-1, 0}, {-1, 0}, {0, -1}},
+      {{-1, 0}, {0, -1}, {0, -1}, {1, 0}},
+  };
+  const auto& rect = rRect.rect();
+  const Point vertices[4] = {{rect.left, rect.top},
+                             {rect.right, rect.top},
+                             {rect.right, rect.bottom},
+                             {rect.left, rect.bottom}};
+  SmoothCornerPoints corners[4] = {};
+  for (size_t i = 0; i < 4; ++i) {
+    const auto& vectors = CORNER_EDGE_VECTORS[i];
+    corners[i] = BuildSmoothCorner(vertices[i], vectors[0], vectors[1], vectors[2], vectors[3],
+                                   rRect.radii()[i], coeffs);
+  }
+  // Boundary points between corners, indexed as startIndex: even indices end a corner, odd indices
+  // start one.
+  const Point boundary[8] = {
+      corners[0].exit, corners[1].entry, corners[1].exit, corners[2].entry,
+      corners[2].exit, corners[3].entry, corners[3].exit, corners[0].entry,
+  };
+  const auto hasArc = rRect.smoothness() < 1.0f;
+  auto index = startIndex % 8;
+  path.moveTo(ToSkPoint(boundary[index]));
+  for (unsigned i = 0; i < 8; ++i) {
+    if (reversed) {
+      const auto next = (index + 7) % 8;
+      if (index % 2 == 0) {
+        AppendSmoothCorner(path, corners[index / 2], hasArc, true);
+      } else {
+        path.lineTo(ToSkPoint(boundary[next]));
+      }
+      index = next;
+    } else {
+      const auto next = (index + 1) % 8;
+      if (index % 2 == 1) {
+        AppendSmoothCorner(path, corners[(index + 1) / 2 % 4], hasArc, false);
+      } else {
+        path.lineTo(ToSkPoint(boundary[next]));
+      }
+      index = next;
+    }
+  }
+  path.close();
+}
+
 void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) {
+  if (rRect.smoothness() > 0.0f) {
+    AddSmoothRRect(writableRef()->path, rRect, reversed, startIndex);
+    return;
+  }
   SkRRect skRRect;
   skRRect.setRectRadii(ToSkRect(rRect.rect()),
                        reinterpret_cast<const SkPoint*>(rRect.radii().data()));

@@ -19,12 +19,14 @@
 #include "RRectDrawOp.h"
 #include "core/DataSource.h"
 #include "core/utils/ColorHelper.h"
+#include "core/utils/Log.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
 #include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
+#include "gpu/processors/SmoothRRectGeometryProcessor.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -36,8 +38,8 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
   }
   auto allocator = context->drawingAllocator();
   auto drawOp = allocator->make<RRectDrawOp>(allocator, provider.get());
-  drawOp->indexBufferProxy =
-      context->globalCache()->getRRectIndexBuffer(provider->hasStroke(), provider->aaType());
+  drawOp->indexBufferProxy = context->globalCache()->getRRectIndexBuffer(
+      provider->hasStroke(), provider->aaType(), provider->hasSmoothness());
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
     renderFlags |= RenderFlags::DisableAsyncTask;
@@ -53,11 +55,15 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
     commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
   hasStroke = provider->hasStroke();
-  isComplex = provider->isComplex();
+  hasComplex = provider->hasComplex();
+  isSmooth = provider->hasSmoothness();
+  unscaledGeometry = provider->hasUnscaledGeometry();
+  // The elliptical-corner processors only accept geometry with the axis scales baked in.
+  DEBUG_ASSERT(isSmooth || !unscaledGeometry);
   // MSAA shares the AA-coverage vertex layout: the quad covers more than the rounded shape,
   // so the arc boundary is evaluated inside the shader and hardware MSAA cannot provide
   // edge coverage on its own.
-  if (aaType == AAType::None) {
+  if (isSmooth || aaType == AAType::None) {
     indicesPerRRect = IndicesPerNonAARRect;
   } else {
     indicesPerRRect = hasStroke ? IndicesPerAAStrokeRRect : IndicesPerAAFillRRect;
@@ -65,15 +71,20 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
 }
 
 PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+  if (isSmooth) {
+    return SmoothRRectGeometryProcessor::Make(allocator, renderTarget->width(),
+                                              renderTarget->height(), aaType != AAType::None,
+                                              commonColor, hasStroke, unscaledGeometry);
+  }
   if (aaType == AAType::None) {
-    if (isComplex) {
+    if (hasComplex) {
       return ComplexNonAARRectGeometryProcessor::Make(
           allocator, renderTarget->width(), renderTarget->height(), hasStroke, commonColor);
     }
     return NonAARRectGeometryProcessor::Make(allocator, renderTarget->width(),
                                              renderTarget->height(), hasStroke, commonColor);
   }
-  if (isComplex) {
+  if (hasComplex) {
     return ComplexEllipseGeometryProcessor::Make(allocator, renderTarget->width(),
                                                  renderTarget->height(), hasStroke, commonColor);
   }

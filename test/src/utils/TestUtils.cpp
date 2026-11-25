@@ -21,8 +21,12 @@
 #include <fstream>
 #include "ProjectPath.h"
 #include "core/utils/Log.h"
+#include "gpu/DrawingManager.h"
+#include "gpu/RenderContext.h"
+#include "gpu/tasks/OpsRenderTask.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/core/Surface.h"
 
 namespace tgfx {
 #ifdef GENERATE_BASELINE_IMAGES
@@ -112,4 +116,10 @@ std::shared_ptr<Image> ScaleImage(const std::shared_ptr<Image>& image, float sca
   return image->makeScaled(newWidth, newHeight, options);
 }
 
+TGFX_PRIVATE_ACCESS(
+    OpsRenderTask* FlushAndGetLastRenderTask(const std::shared_ptr<Surface>& surface) {
+      surface->renderContext->flush();
+      auto drawingBuffer = surface->getContext()->drawingManager()->getDrawingBuffer();
+      return static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+    })
 }  // namespace tgfx
