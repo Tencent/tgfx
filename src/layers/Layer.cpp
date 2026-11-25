@@ -767,7 +767,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
         continue;
       }
     }
-    if (child->hasValidMask()) {
+    if (child->isClippedToMaskBounds()) {
       auto maskRelativeMatrix = child->_mask->getRelativeMatrix3D(child.get());
       maskRelativeMatrix.postConcat(childMatrix);
       auto maskBounds = child->_mask->getBoundsInternal(maskRelativeMatrix, computeTightBounds);
@@ -2234,6 +2234,15 @@ bool Layer::hasValidMask() const {
   return _mask && _mask->root() == root() && _mask->bitFields.visible;
 }
 
+bool Layer::isClippedToMaskBounds() const {
+  if (!hasValidMask()) {
+    return false;
+  }
+  auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
+  return maskType != LayerMaskType::AlphaInverted && maskType != LayerMaskType::LuminanceInverted &&
+         maskType != LayerMaskType::ContourInverted;
+}
+
 void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty,
                                float alpha) {
   const auto accumulatedAlpha = alpha * _alpha;
@@ -2325,7 +2334,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     if (child->_scrollRect) {
       clipRect = *child->_scrollRect;
     }
-    if (child->hasValidMask()) {
+    if (child->isClippedToMaskBounds()) {
       auto maskBounds = child->_mask->getBounds(child.get());
       if (clipRect.has_value()) {
         if (!clipRect->intersect(maskBounds)) {

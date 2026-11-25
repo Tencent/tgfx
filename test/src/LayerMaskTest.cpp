@@ -1079,4 +1079,43 @@ TGFX_TEST(LayerMaskTest, MaskUnderPreserve3DParent) {
   EXPECT_EQ(outsidePixel, 0xFFFFFFFFu);
 }
 
+// An inverted mask shows its layer outside the mask, so the mask's bounds must not shrink the
+// layer's bounds: with a mask that draws nothing or lies elsewhere, the whole layer is visible.
+TGFX_TEST(LayerMaskTest, InvertedMaskKeepsBounds) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto surface = Surface::Make(context, 300, 200);
+    DisplayList list;
+    Path contentPath;
+    contentPath.addRect(Rect::MakeWH(100, 100));
+    auto group = Layer::Make();
+    list.root()->addChild(group);
+    auto content = ShapeLayer::Make();
+    content->setPath(contentPath);
+    content->setFillStyle(ShapeStyle::Make(Color::Red()));
+    group->addChild(content);
+    auto disjointMask = ShapeLayer::Make();
+    disjointMask->setPath(contentPath);
+    disjointMask->setFillStyle(ShapeStyle::Make(Color::Black()));
+    disjointMask->setMatrix(Matrix::MakeTrans(200, 0));
+    list.root()->addChild(disjointMask);
+    content->setMask(disjointMask);
+
+    content->setMaskType(LayerMaskType::Alpha);
+    list.render(surface.get());
+    EXPECT_TRUE(group->getBounds().isEmpty());
+    EXPECT_TRUE(content->renderBounds.isEmpty());
+
+    for (auto type : {LayerMaskType::AlphaInverted, LayerMaskType::LuminanceInverted,
+                      LayerMaskType::ContourInverted}) {
+      content->setMaskType(type);
+      list.render(surface.get());
+      EXPECT_EQ(group->getBounds(), Rect::MakeWH(100, 100));
+      EXPECT_EQ(content->renderBounds, Rect::MakeWH(100, 100));
+    }
+  });
+}
+
 }  // namespace tgfx
