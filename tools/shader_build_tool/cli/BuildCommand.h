@@ -94,12 +94,12 @@ void PrintUsage();
 bool ParseArgs(int argc, char** argv, BuildOptions* options);
 
 /**
- * Scans <shader-dir>/fn for annotated functions (`//@function name`, `//@requires a,b`), validates
- * the graph (duplicate names, dangling requirements, cycles) and writes the single shader library
- * bundle. The GLSL section is always written; a non-null compiler additionally translates every
- * function to MSL and appends the MSL section, so a Metal build assembles its shaders from the same
- * per-function pieces. The chain operator registry derived from the same scan lands beside the
- * bundle.
+ * Scans <shader-dir>/fn for annotated functions (`//@function name [opPrefix]`), builds the call
+ * graph from the function bodies (duplicate names, dangling requirements, cycles) and writes the
+ * single shader library bundle. The GLSL section is always written; a non-null compiler additionally
+ * translates every function to MSL and appends the MSL section, so a Metal build assembles its
+ * shaders from the same per-function pieces. The chain operator registry derived from the same scan
+ * lands beside the bundle.
  */
 bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& outPath,
                               StageCompiler* compiler, std::string* error);

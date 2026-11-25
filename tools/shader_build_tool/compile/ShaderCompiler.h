@@ -26,7 +26,7 @@ namespace tgfx {
 
 enum class ShaderStageType { Vertex, Fragment };
 
-// The compiler primitives (CompileGLSL, TranslateToMSL, CompileGLSLToWGSL, CompileMSLToMetallib)
+// The compiler primitives (CompileGLSL, TranslateToMSL, CompileGLSLToWGSL)
 // moved to compile/StageCompiler.h: they are private to the compile sublayer, and StageCompiler
 // is their only caller.
 

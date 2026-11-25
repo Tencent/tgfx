@@ -41,7 +41,6 @@
 #include "core/DiagnosticCodes.h"
 #include "core/Diagnostics.h"
 #include "core/ShaderSources.h"
-#include "emit/ChainOpsGLSL.h"
 #include "gpu/ir/OperatorManifest.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/contract/ChainISA.h"

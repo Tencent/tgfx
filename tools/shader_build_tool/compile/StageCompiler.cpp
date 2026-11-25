@@ -22,17 +22,6 @@
 
 namespace tgfx {
 
-namespace {
-
-// The Metal compiler's version and the macOS SDK it targets, queried once. Part of every metallib
-// key: a new Xcode can compile the same MSL to different bytes.
-const std::string& MetalToolchainKey() {
-  static const std::string key = MetalCompilerFingerprint() + "\n" + MetalToolchainVersion();
-  return key;
-}
-
-}  // namespace
-
 StageCompiler::StageCompiler(StageCache* persistentCache) : persistentCache(persistentCache) {
 }
 
@@ -71,39 +60,6 @@ const SpirvStage& StageCompiler::compileSpirv(const std::string& source, ShaderS
     }
   }
   return spirvCache.emplace(std::move(key), std::move(entry)).first->second;
-}
-
-std::vector<uint8_t> StageCompiler::compileMetallib(const std::string& msl, ShaderStageType stage,
-                                                    std::string* error) {
-  auto key = StageCacheKey("metallib", persistentCache->toolIdentity())
-                 .add(MetalToolchainKey())
-                 .add(static_cast<uint64_t>(stage))
-                 .add(msl)
-                 .finish();
-  auto& stats = persistentCache->stats("metallib");
-  stats.requests++;
-  auto it = blobCache.find(key);
-  if (it == blobCache.end()) {
-    BlobStage entry;
-    if (persistentCache->load(key, &entry.bytes, &stats)) {
-      entry.success = true;
-    } else {
-      stats.executed++;
-      entry.bytes = CompileMSLToMetallib(msl, stage, &entry.error);
-      entry.success = !entry.bytes.empty();
-      if (entry.success) {
-        persistentCache->store(key, entry.bytes, &stats);
-      }
-    }
-    it = blobCache.emplace(std::move(key), std::move(entry)).first;
-  } else {
-    stats.memoryHits++;
-  }
-  if (!it->second.success) {
-    *error = it->second.error;
-    return {};
-  }
-  return it->second.bytes;
 }
 
 const TextStage& StageCompiler::compileWgsl(const std::string& source, ShaderStageType stage,

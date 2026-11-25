@@ -373,25 +373,6 @@ std::string MetalCompilerFingerprint() {
 #if !defined(_WIN32)
 namespace {
 
-std::vector<std::string> SplitOnSpaces(const std::string& text) {
-  std::vector<std::string> words;
-  std::string word;
-  for (char c : text) {
-    if (c == ' ' || c == '\t' || c == '\n') {
-      if (!word.empty()) {
-        words.push_back(word);
-        word.clear();
-      }
-    } else {
-      word += c;
-    }
-  }
-  if (!word.empty()) {
-    words.push_back(word);
-  }
-  return words;
-}
-
 // A directory private to this process, created on first use and removed at exit. Every scratch
 // file gets a name from a process-wide counter, so concurrent compiles in this process and other
 // shader_build_tool processes (two build directories generating at once) never share a path.
@@ -486,27 +467,6 @@ int RunProcess(const std::vector<std::string>& args, const std::string& outputPa
     return WEXITSTATUS(status);
   }
   return WIFSIGNALED(status) ? 128 + WTERMSIG(status) : -1;
-}
-
-// Runs one step of the Metal toolchain. On failure *error names the step, the exit status and the
-// tail of what the tool printed to stderr.
-bool RunMetalStep(const char* step, const std::vector<std::string>& args,
-                  const std::string& stderrPath, std::string* error) {
-  std::string spawnError;
-  int status = RunProcess(args, stderrPath, &spawnError);
-  auto output = ReadTextFile(stderrPath);
-  std::remove(stderrPath.c_str());
-  if (status == 0) {
-    return true;
-  }
-  constexpr size_t MaxOutput = 4000;
-  if (output.size() > MaxOutput) {
-    output = "..." + output.substr(output.size() - MaxOutput);
-  }
-  *error = std::string(step) + " failed" +
-           (status < 0 ? ": " + spawnError : " with exit status " + std::to_string(status)) +
-           (output.empty() ? "" : "\n" + output);
-  return false;
 }
 
 }  // namespace
@@ -633,83 +593,6 @@ std::vector<uint8_t> CompileHLSLToDXBC(const std::string& hlslSource, ShaderStag
   *error = std::string("cannot compile the ") + stageName +
            " stage to DXBC: this build of shader_build_tool has no D3DCompiler";
   return {};
-#endif
-}
-
-std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderStageType stage,
-                                          std::string* error) {
-  std::string localError;
-  if (error == nullptr) {
-    error = &localError;
-  }
-  const char* stageName = stage == ShaderStageType::Vertex ? "vertex" : "fragment";
-#if defined(_WIN32)
-  *error = std::string("cannot compile the ") + stageName +
-           " stage: the Metal toolchain (xcrun) is only available on macOS";
-  return {};
-#else
-  // xcrun metal compiles MSL to AIR, then xcrun metallib links the AIR into a .metallib. Both run
-  // without a shell, on files in this process's scratch directory.
-  auto& scratch = ScratchDir::Get();
-  auto mslPath = scratch.newFile(".metal");
-  if (mslPath.empty()) {
-    *error = scratch.error();
-    return {};
-  }
-  auto airPath = scratch.newFile(".air");
-  auto libPath = scratch.newFile(".metallib");
-  auto logPath = scratch.newFile(".log");
-  {
-    std::ofstream file(mslPath, std::ios::binary);
-    file.write(mslSource.data(), static_cast<std::streamsize>(mslSource.size()));
-    if (!file.good()) {
-      *error = "cannot write " + mslPath;
-      std::remove(mslPath.c_str());
-      return {};
-    }
-  }
-
-  // TGFX_METAL_EXTRA_FLAGS (experiment hook): extra xcrun metal arguments, split on whitespace.
-  // Used by the FMA-attribution experiments (fast-math/contraction/optimization-level controls)
-  // to rebuild the bundle under different compilation settings without touching the default
-  // pipeline. Unset in production builds.
-  std::vector<std::string> compile = {"xcrun"};
-  for (const auto& word : SplitOnSpaces(MetalCompileFlags())) {
-    compile.push_back(word);
-  }
-  if (const char* extraFlags = std::getenv("TGFX_METAL_EXTRA_FLAGS")) {
-    for (const auto& word : SplitOnSpaces(extraFlags)) {
-      compile.push_back(word);
-    }
-  }
-  compile.insert(compile.end(), {"-c", mslPath, "-o", airPath});
-  bool compiled = RunMetalStep("xcrun metal", compile, logPath, error);
-  std::remove(mslPath.c_str());
-  if (!compiled) {
-    std::remove(airPath.c_str());
-    *error = std::string("compiling the ") + stageName + " stage: " + *error;
-    return {};
-  }
-
-  auto link = SplitOnSpaces(MetalLinkCommand());
-  link.insert(link.end(), {airPath, "-o", libPath});
-  bool linked = RunMetalStep("xcrun metallib", link, logPath, error);
-  std::remove(airPath.c_str());
-  if (!linked) {
-    std::remove(libPath.c_str());
-    *error = std::string("linking the ") + stageName + " stage: " + *error;
-    return {};
-  }
-
-  std::ifstream libFile(libPath, std::ios::binary);
-  std::vector<uint8_t> data((std::istreambuf_iterator<char>(libFile)),
-                            std::istreambuf_iterator<char>());
-  libFile.close();
-  std::remove(libPath.c_str());
-  if (data.empty()) {
-    *error = std::string("the ") + stageName + " metallib is empty or unreadable";
-  }
-  return data;
 #endif
 }
 

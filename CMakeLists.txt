@@ -796,15 +796,6 @@ if ((TGFX_USE_VULKAN OR TGFX_USE_METAL) AND NOT TGFX_USE_WEBGPU)
     target_link_libraries(tgfx PUBLIC SPIRV-Tools-link SPIRV-Tools-opt SPIRV-Tools)
     target_include_directories(tgfx SYSTEM PUBLIC third_party/shaderc/third_party/spirv-tools/include)
 endif ()
-if (TGFX_USE_METAL)
-    # The Metal assembled path links the same precompiled modules at draw time and translates the
-    # linked module to MSL with the vendored SPIRV-Cross (the tool's own dependency).
-    target_include_directories(tgfx SYSTEM PRIVATE third_party/SPIRV-Cross)
-    add_vendor_target(tgfx-metal-vendor STATIC_VENDORS SPIRV-Cross)
-    add_dependencies(tgfx tgfx-metal-vendor)
-    find_vendor_libraries(tgfx-metal-vendor STATIC TGFX_METAL_VENDOR_LIBS)
-    target_link_libraries(tgfx PUBLIC ${TGFX_METAL_VENDOR_LIBS})
-endif ()
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS} "$<TARGET_FILE:tgfx_zstd>")
 target_link_libraries(tgfx PUBLIC ${TGFX_SHARED_LIBS})
 set_target_properties(tgfx PROPERTIES PREFIX "")
@@ -867,15 +858,8 @@ if (TGFX_EMBED_SHADER_BUNDLES)
   endif ()
   if (NOT CMAKE_CROSSCOMPILING)
     file(GLOB_RECURSE TGFX_SHADER_DECL_FILES CONFIGURE_DEPENDS
-            src/gpu/shaders/Family.cpp
-            src/gpu/shaders/FamilyDomains.cpp
-            src/gpu/shaders/Layout.cpp
-            src/gpu/shaders/PrecompiledShader.*
-            src/gpu/shaders/contract/ChainComposition.cpp
-            src/gpu/shaders/contract/ChainPlan.cpp
             src/gpu/shaders/contract/FragmentLibrary.cpp
-            src/gpu/shaders/contract/UniformAllocation.cpp
-            src/gpu/shaders/modules/*.h)
+            src/gpu/shaders/contract/UniformAllocation.cpp)
     add_library(tgfx_shader_declarations STATIC ${TGFX_SHADER_DECL_FILES})
     set_target_properties(tgfx_shader_declarations PROPERTIES PREFIX "")
     target_compile_options(tgfx_shader_declarations PRIVATE ${TGFX_COMPILE_OPTIONS})

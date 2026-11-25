@@ -94,13 +94,6 @@ std::string CompileGLSLToWGSL(const std::string& source, ShaderStageType stage,
 std::vector<uint8_t> CompileHLSLToDXBC(const std::string& hlslSource, ShaderStageType stage,
                                        std::string* error);
 
-/// Compiles MSL source text to Metal library binary (.metallib) using xcrun metal/metallib, run
-/// without a shell on files in a scratch directory private to this process. Returns an empty
-/// vector on failure, with *error naming the failed step, its exit status and the compiler's
-/// stderr. Always fails on Windows, which has no Metal toolchain.
-std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderStageType stage,
-                                          std::string* error);
-
 /// Owns the reuse of compiled stages of one build. Every expensive compilation (GLSL to SPIR-V,
 /// the optimized Vulkan SPIR-V, MSL to metallib, GLSL to WGSL) is looked up by a key built from
 /// everything that feeds it: the exact text the compiler receives, the stage, the compiler
@@ -118,11 +111,6 @@ class StageCompiler {
   const SpirvStage& compileSpirv(const std::string& source, ShaderStageType stage,
                                  const std::string& shaderName, uint32_t variantIndex,
                                  bool optimize);
-
-  /// Compiles MSL text to a metallib, reusing a previous compilation. Returns an empty vector
-  /// on failure, with *error naming the failed step.
-  std::vector<uint8_t> compileMetallib(const std::string& msl, ShaderStageType stage,
-                                       std::string* error);
 
   /// Translates GLSL to WGSL, reusing a previous translation of the same inputs.
   const TextStage& compileWgsl(const std::string& source, ShaderStageType stage,

@@ -672,16 +672,4 @@ const ShaderStageBlob* PrecompiledShaderCache::findFragment(uint32_t variantId) 
   return &it->second;
 }
 
-bool AssembledChainEnabledForProfile(const std::string& profileTag) {
-  static const bool forcedOn = std::getenv("TGFX_ASSEMBLED_CHAIN") != nullptr;
-  static const bool forcedOff = std::getenv("TGFX_NO_ASSEMBLED_CHAIN") != nullptr;
-  if (forcedOff) {
-    return false;
-  }
-  if (forcedOn) {
-    return true;
-  }
-  return profileTag == "opengl";
-}
-
 }  // namespace tgfx

@@ -4,175 +4,28 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under
-//  the license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-//  KIND, either express or implied. see the license for the specific language governing
-//  permissions and limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-// The direct-GLSL emitters are the only code that produces the text the GL and GLES bundles
-// store, and a rewrite that changes a single byte of it changes every stored variant. These
-// tests pin the folding, the dialect rewrites and the leak scan at the unit level, so the
-// byte-parity gate catches only what a genuinely new input form produces.
-//
-// FoldIntegerExpression pins two things beyond arithmetic: a literal beyond the int64 range
-// fails the fold instead of throwing (the tool builds with exceptions disabled), and trailing
-// garbage fails it so the caller keeps the original text.
+// FindDirectFormLeak pins the text-level checks every stored direct-GL variant must pass: the
+// dialect header must match the declared form, and no set/binding qualifier, conditional block
+// or subpass syntax may survive the rewrite.
 
-#include <cstdint>
 #include <string>
-#include "emit/GLSLDialect.h"
 #include "gtest/gtest.h"
 #include "verify/BindingLayoutRule.h"
 
 namespace tgfx {
 namespace {
-
-// The smallest fragment template that exercises every rewrite: a UBO with set/binding members,
-// a located output, a macro-built location id, and a varying input.
-const char* const FragmentTemplate = R"(#version 450
-#define OUT_ID (1 + 1)
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
-  float uValue;
-};
-layout(location = 0) in vec2 vUV;
-layout(location = OUT_ID) out vec4 fragColor;
-void main() {
-  fragColor = vec4(uValue, vUV, 1.0);
-}
-)";
-
-TEST(FoldIntegerExpressionTest, EvaluatesArithmeticWithPrecedenceAndParentheses) {
-  int64_t value = 0;
-  ASSERT_TRUE(FoldIntegerExpression("1+2*3", &value));
-  EXPECT_EQ(value, 7);
-  ASSERT_TRUE(FoldIntegerExpression("(1+2)*3", &value));
-  EXPECT_EQ(value, 9);
-  ASSERT_TRUE(FoldIntegerExpression("10-2-3", &value));
-  EXPECT_EQ(value, 5);
-  ASSERT_TRUE(FoldIntegerExpression(" 2 * ( 3 + 4 ) ", &value));
-  EXPECT_EQ(value, 14);
-}
-
-TEST(FoldIntegerExpressionTest, EvaluatesUnaryOperatorsAndZero) {
-  int64_t value = 0;
-  ASSERT_TRUE(FoldIntegerExpression("-5+2", &value));
-  EXPECT_EQ(value, -3);
-  ASSERT_TRUE(FoldIntegerExpression("+7", &value));
-  EXPECT_EQ(value, 7);
-  ASSERT_TRUE(FoldIntegerExpression("0", &value));
-  EXPECT_EQ(value, 0);
-}
-
-TEST(FoldIntegerExpressionTest, RejectsAnythingThatIsNotAnIntegerExpression) {
-  int64_t value = 0;
-  EXPECT_FALSE(FoldIntegerExpression("", &value));
-  EXPECT_FALSE(FoldIntegerExpression("a", &value));
-  EXPECT_FALSE(FoldIntegerExpression("1+", &value));
-  EXPECT_FALSE(FoldIntegerExpression("1 2", &value));
-  EXPECT_FALSE(FoldIntegerExpression("1)", &value));
-  EXPECT_FALSE(FoldIntegerExpression("2**3", &value));
-  EXPECT_FALSE(FoldIntegerExpression("(1", &value));
-}
-
-TEST(FoldIntegerExpressionTest, RejectsALiteralBeyondTheInt64Range) {
-  // std::stoll threw on this input; the fold must fail closed so the original text is kept.
-  int64_t value = 0;
-  EXPECT_FALSE(FoldIntegerExpression("9223372036854775808", &value));
-  EXPECT_FALSE(FoldIntegerExpression("-9223372036854775809", &value));
-}
-
-TEST(EmitDirectGLSLTest, RewritesTheHeaderDropsSetAndBindingAndFoldsLocations) {
-  std::string error;
-  auto text =
-      EmitDirectGLSL330(FragmentTemplate, ShaderStageType::Fragment, nullptr, nullptr, &error);
-  EXPECT_TRUE(error.empty()) << error;
-  ASSERT_FALSE(text.empty());
-  EXPECT_NE(text.find("#version 330"), std::string::npos);
-  EXPECT_EQ(text.find("#version 450"), std::string::npos);
-  EXPECT_EQ(FindDirectFormLeak(text, false).reason, nullptr) << text;
-  // The macro-built output location folds to a literal 2 and survives as a located output.
-  EXPECT_NE(text.find("layout(location = 2) out vec4 fragColor"), std::string::npos) << text;
-  // The varying input loses its location member: fragment `in` links by name in 330.
-  EXPECT_EQ(text.find("layout(location = 0) in"), std::string::npos) << text;
-  EXPECT_NE(text.find("in vec2 vUV"), std::string::npos) << text;
-}
-
-TEST(EmitDirectGLSLTest, FailsClosedWithoutAVersion450Header) {
-  std::string error;
-  EXPECT_TRUE(
-      EmitDirectGLSL330("void main() {}", ShaderStageType::Fragment, nullptr, nullptr, &error)
-          .empty());
-  // The failure carries its reason to the caller instead of printing it.
-  EXPECT_FALSE(error.empty());
-  EXPECT_NE(error.find("preprocessing failed"), std::string::npos) << error;
-}
-
-TEST(EmitDirectGLSTest, AddsTheESHeaderPrecisionsAndHighpDecoration) {
-  std::string error;
-  auto text = EmitDirectGLSLES300(FragmentTemplate, ShaderStageType::Fragment, false, nullptr,
-                                  nullptr, &error);
-  EXPECT_TRUE(error.empty()) << error;
-  ASSERT_FALSE(text.empty());
-  EXPECT_NE(text.find("#version 300 es"), std::string::npos);
-  EXPECT_NE(text.find("precision mediump float;"), std::string::npos);
-  EXPECT_NE(text.find("precision highp int;"), std::string::npos);
-  EXPECT_EQ(FindDirectFormLeak(text, true).reason, nullptr) << text;
-  // Every float-family declaration carries highp: the numerical contract of the ES dialect.
-  EXPECT_NE(text.find("highp float uValue"), std::string::npos) << text;
-  EXPECT_NE(text.find("highp vec4 fragColor"), std::string::npos) << text;
-}
-
-TEST(EmitDirectGLSTest, RewritesTheFramebufferFetchDialectOnFbfVariants) {
-  const char* const FbfTemplate = R"(#version 450
-layout(input_attachment_index = 0, set = 2, binding = 0) uniform subpassInput tgfx_SubpassInput;
-layout(location = 0) out vec4 fragColor;
-void main() {
-  vec4 dstColor = subpassLoad(tgfx_SubpassInput);
-  fragColor = dstColor;
-}
-)";
-  std::string error;
-  auto text =
-      EmitDirectGLSLES300(FbfTemplate, ShaderStageType::Fragment, true, nullptr, nullptr, &error);
-  EXPECT_TRUE(error.empty()) << error;
-  ASSERT_FALSE(text.empty());
-  EXPECT_EQ(text.find("subpassInput"), std::string::npos) << text;
-  EXPECT_EQ(text.find("subpassLoad"), std::string::npos) << text;
-  EXPECT_NE(text.find("#extension GL_EXT_shader_framebuffer_fetch : require"), std::string::npos)
-      << text;
-  EXPECT_NE(text.find("layout(location = 0) inout"), std::string::npos) << text;
-  EXPECT_EQ(FindDirectFormLeak(text, true).reason, nullptr) << text;
-}
-
-TEST(EmitDirectGLSTest, StripsTheSpecializationConstantsToMacroDefaults) {
-  // The canonical assembled text spells the spec constants with the constant_id qualifier; GL has
-  // no pipeline constants, so the qualifier must be stripped and the declaration must become the
-  // idempotent macro default the runtime specializes by inserting #define lines.
-  const char* const SpecTemplate = R"(#version 450
-layout(constant_id = 0) const int TGFX_SPEC_0 = 0;
-layout(constant_id = 7) const int TGFX_SPEC_7 = 0;
-layout(location = 0) out vec4 fragColor;
-void main() {
-  fragColor = vec4(float(TGFX_SPEC_7), 0.0, 0.0, 1.0);
-}
-)";
-  std::string error;
-  auto text = EmitDirectGLSL330(SpecTemplate, ShaderStageType::Fragment, nullptr, nullptr, &error);
-  EXPECT_TRUE(error.empty()) << error;
-  ASSERT_FALSE(text.empty());
-  EXPECT_EQ(text.find("constant_id"), std::string::npos) << text;
-  EXPECT_NE(text.find("#ifndef TGFX_SPEC_0\n#define TGFX_SPEC_0 0\n#endif"), std::string::npos)
-      << text;
-  EXPECT_NE(text.find("#ifndef TGFX_SPEC_7\n#define TGFX_SPEC_7 0\n#endif"), std::string::npos)
-      << text;
-}
 
 TEST(FindDirectFormLeakTest, AcceptsACleanTextOfEitherDialect) {
   const std::string gl =
