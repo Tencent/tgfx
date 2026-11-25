@@ -250,7 +250,13 @@ void AppendCall(std::string* out, const FragmentInstruction& instruction,
     if (index > 0) {
       *out += ", ";
     }
-    const std::string& argument = instruction.args[index];
+    std::string argument = instruction.args[index];
+    if (instruction.function.find("applyPorterDuffXP") != std::string::npos) {
+      // The destination read runs in GLSL device coordinates (origin bottom-left); the Metal
+      // fragment position starts at the top-left corner.
+      ReplaceWord(&argument, "in.position.xy",
+                  "float2(in.position.x, tgfx_FragHeight - in.position.y)");
+    }
     if (callSite.samplerNames.count(argument) != 0) {
       *out += argument + "_t, " + argument + "_s";
     } else {
@@ -441,6 +447,7 @@ std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderS
     }
     out += "struct VertexOut {\n";
     out += std::string(Indent) + "float4 position [[position]];\n";
+    out += std::string(Indent) + "float tgfx_FragHeight;\n";
     for (const auto& varying : interface.varyings) {
       out += Indent + std::string(MslTypeName(varying.type)) + " " + varying.name;
       if (varying.flat) {
@@ -452,6 +459,7 @@ std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderS
   } else {
     out += "struct FragmentIn {\n";
     out += std::string(Indent) + "float4 position [[position]];\n";
+    out += std::string(Indent) + "float tgfx_FragHeight;\n";
     for (const auto& varying : interface.varyings) {
       out += Indent + std::string(MslTypeName(varying.type)) + " " + varying.name;
       if (varying.flat) {
@@ -493,6 +501,7 @@ std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderS
     for (const auto& varying : interface.varyings) {
       out += Indent + std::string(MslTypeName(varying.type)) + " " + varying.name + " = {};\n";
     }
+    out += std::string(Indent) + "out.tgfx_FragHeight = 2.0 / " + RTAdjustName + ".z;\n";
     out += body;
     for (const auto& varying : interface.varyings) {
       out += std::string(Indent) + "out." + varying.name + " = " + varying.name + ";\n";
@@ -524,6 +533,7 @@ std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderS
   out += std::string(Indent) + "float4 ";
   out += CUSTOM_COLOR_OUTPUT_NAME;
   out += " = float4(0.0);\n";
+  out += std::string(Indent) + "float tgfx_FragHeight = in.tgfx_FragHeight;\n";
   for (const auto& varying : interface.varyings) {
     out += Indent + std::string(MslTypeName(varying.type)) + " " + varying.name + " = in." +
            varying.name + ";\n";
