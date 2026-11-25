@@ -131,7 +131,7 @@ static void ExpectCanvasPixels(Context* context, const std::shared_ptr<TextureVi
 
 }  // namespace
 
-TGFX_TEST(VideoElementReadTest, FirstAcquisitionUploadsOnce) {
+TGFX_TEST(VideoElementReadTest, FirstTextureGenerationUploadsOnce) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -171,7 +171,7 @@ TGFX_TEST(VideoElementReadTest, ReadyRedrawDoesNotUpload) {
   EXPECT_EQ(buffer->state(), ImageBufferState::Ready);
 }
 
-TGFX_TEST(VideoElementReadTest, NewAcquisitionUploadsOnce) {
+TGFX_TEST(VideoElementReadTest, NewCredentialTextureGenerationUploadsOnce) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);

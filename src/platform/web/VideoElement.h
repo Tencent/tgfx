@@ -31,7 +31,7 @@ class VideoElement : public ImageStream {
  public:
   /**
    * Creates a new VideoElement from the specified HTMLVideoElement object and the video size.
-   * Returns nullptr if the video is null or the buffer size is zero.
+   * Returns nullptr if the video is null or either dimension is non-positive.
    */
   static std::shared_ptr<VideoElement> MakeFrom(emscripten::val video, int width, int height);
 

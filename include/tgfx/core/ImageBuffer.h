@@ -52,9 +52,11 @@ enum class ImageBufferState {
 
 /**
  * ImageBuffer describes a two-dimensional array of pixels and is optimized for creating textures.
- * ImageBuffer is safe across threads. Delivered pixels remain unchanged while the buffer is Ready,
- * but deferred buffers may begin Pending and some buffers have a limited lifetime. In particular,
- * ImageReader buffers share a native texture and must not be used for redraw after they expire.
+ * Delivery state and timestamp can be queried across threads; pixel access and other properties
+ * must follow the creator's synchronization and Context requirements. Delivered pixels remain
+ * unchanged while the buffer is Ready, but deferred buffers may begin Pending and some buffers have
+ * a limited lifetime. ImageReader buffers share a native texture and must not be redrawn after
+ * expiration. Observing Ready does not reserve those pixels against later source reads.
  * Other ImageBuffers normally start Ready and only expire if explicitly stated by the creator.
  */
 class ImageBuffer {
@@ -114,8 +116,9 @@ class ImageBuffer {
   virtual bool isAlphaOnly() const = 0;
 
   /**
-   * Returns true if the buffer can no longer create textures or be used for redraw. Its properties
-   * can still be safely accessed across threads. The default implementation returns false.
+   * Returns true if the buffer can no longer create textures or be used for redraw. Expiration does
+   * not prevent metadata queries, which retain their original synchronization requirements.
+   * The default implementation returns false.
    */
   virtual bool expired() const {
     return false;
@@ -140,7 +143,9 @@ class ImageBuffer {
   }
 
   /**
-   * Returns the ColorSpace of this ImageBuffer, or nullptr if unspecified.
+   * Returns the ColorSpace of this ImageBuffer, or nullptr if unspecified. For an ImageReader
+   * buffer whose source updates its color space, serialize this query and use of the returned
+   * reference with source texture reads.
    */
   virtual const std::shared_ptr<ColorSpace>& colorSpace() const = 0;
 

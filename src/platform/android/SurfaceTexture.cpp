@@ -158,7 +158,7 @@ std::shared_ptr<SurfaceTexture> SurfaceTexture::Make(int width, int height, jobj
   }
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
-    LOGE("SurfaceImageReader::MakeFrom(): failed to create a new SurfaceTexture!");
+    LOGE("SurfaceTexture::Make(): failed to create a new SurfaceTexture!");
     return nullptr;
   }
   auto looper = GetGlobalLooper();
@@ -168,7 +168,7 @@ std::shared_ptr<SurfaceTexture> SurfaceTexture::Make(int width, int height, jobj
   SetOnFrameAvailableListener(env, stObject, listener, looper);
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
-    LOGE("SurfaceImageReader::MakeFrom(): failed to set the OnFrameAvailableListener!");
+    LOGE("SurfaceTexture::Make(): failed to set the OnFrameAvailableListener!");
     return nullptr;
   }
   return std::shared_ptr<SurfaceTexture>(new SurfaceTexture(width, height, env, stObject));
@@ -201,8 +201,7 @@ jobject SurfaceTexture::createInputSurface() const {
 }
 
 void SurfaceTexture::notifyFrameAvailable() {
-  // Note: If there is a pending frame available already, SurfaceTexture will not dispatch any new
-  // frame-available event until you have called the SurfaceTexture.updateTexImage().
+  // Notifications can be coalesced. This flag records availability, not a queued frame count.
   std::lock_guard<std::mutex> autoLock(locker);
   frameAvailable = true;
 }
@@ -270,7 +269,8 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
   // sequences whose alpha plane is packed next to the color plane, displaced alpha against color
   // and exposed the black background of the video as an outline around the content. The padding
   // rows are kept out of the sampling by the subset clamp that needSubset() enables for external
-  // textures.
+  // textures. If size recovery is unavailable or rejected, the descriptor uses the requested
+  // content size; padded sampling is not guaranteed in that fallback.
   auto descriptorWidth = result.textureSize.isEmpty() ? width() : result.textureSize.width;
   auto descriptorHeight = result.textureSize.isEmpty() ? height() : result.textureSize.height;
   TextureDescriptor descriptor = {descriptorWidth,
@@ -327,7 +327,7 @@ unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
     gl->deleteTextures(1, &textureID);
-    LOGE("NativeImageReader::makeTexture(): failed to attached to a SurfaceTexture!");
+    LOGE("SurfaceTexture::makeExternalOESTexture(): failed to attach to a SurfaceTexture!");
     return 0;
   }
   return textureID;
@@ -390,8 +390,9 @@ void SurfaceTexture::resolveTextureSize(JNIEnv* env) {
       } else {
         auto matrix = env->GetFloatArrayElements(floatArray, nullptr);
         if (matrix != nullptr) {
-          // The content size is fixed for the lifetime of a SurfaceTexture, so the buffer padding
-          // never changes after the first frame; resolve the texture size once and reuse it.
+          // This source assumes fixed content dimensions and padding. Cache the first retrieved
+          // matrix's size estimate, including an empty result that uses the content-size fallback.
+          // Later transform changes are not re-evaluated.
           textureSize = ComputeTextureSize(matrix, width(), height());
           textureSizeResolved = true;
           env->ReleaseFloatArrayElements(floatArray, matrix, JNI_ABORT);

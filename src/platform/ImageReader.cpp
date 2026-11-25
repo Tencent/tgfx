@@ -123,9 +123,6 @@ ImageReader::ReadResult ImageReader::readTexture(uint64_t version, Context* cont
   if (version == textureVersion) {
     return {textureView, true, textureTimestamp};
   }
-  if (version < bufferVersion) {
-    return {};
-  }
   auto result = stream->onReadTexture(context, mipmapped, textureView);
   if (result.advanced || result.contentChanged || result.texture != textureView) {
     textureVersion = 0;

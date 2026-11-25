@@ -272,7 +272,7 @@ TGFX_TEST_PRIVATE(ImageReaderTest, LegacyAdapterInitializesNewReaderWithUnchange
       EXPECT_EQ(replacementStream->creates, 1); EXPECT_EQ(replacementStream->updates, 0);)
 }
 
-TGFX_TEST_PRIVATE(ImageReaderTest, LateNotificationWithoutNewContentDoesNotPublish) {
+TGFX_TEST_PRIVATE(ImageReaderTest, EmptyReadPreservesPreviouslyDeliveredContent) {
   TGFX_PRIVATE_ACCESS(
       ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
       auto stream = std::make_shared<ThreeStateStream>();

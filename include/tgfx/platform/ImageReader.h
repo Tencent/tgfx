@@ -28,9 +28,10 @@ class ImageStream;
 
 /**
  * Defers sequential image delivery until texture generation. All acquired buffers share a native
- * texture bound to one Context and must be rendered with that Context. A new credential performs
- * one source read, without draining queued frames, waiting for producer notifications, or selecting
- * a target timestamp. The platform can still return its latest image and skip intermediate frames.
+ * texture bound to one Context and must be rendered with that Context. The first texture-generation
+ * attempt for a valid new credential performs one source read, without draining queued frames,
+ * waiting for producer notifications, or selecting a target timestamp. The platform can still
+ * return its latest image and skip intermediate frames.
  * GPU, driver, and lock operations have no bounded completion time.
  * Delivery is written while generating a texture on the rendering thread; other threads may query
  * buffer state and timestamp for reconciliation. Reads and these queries share the reader's mutex,
@@ -55,7 +56,9 @@ class ImageReader {
   int height() const;
 
   /**
-   * Returns the ColorSpace of the source images, or nullptr if unspecified.
+   * Returns the ColorSpace of the source images, or nullptr if unspecified. This forwards the
+   * source's reference without locking; sources with changing metadata require callers to serialize
+   * this query and use of the returned reference with texture reads.
    */
   const std::shared_ptr<ColorSpace>& colorSpace() const;
 
@@ -96,7 +99,7 @@ class ImageReader {
   };
   int64_t textureTimestamp = -1;
 
-  // Both helpers require locker to be held by ImageReaderBuffer.
+  // Called with locker held; readTexture() additionally requires a nonexpired credential.
   bool checkExpired(uint64_t version);
   ReadResult readTexture(uint64_t version, Context* context, bool mipmapped);
   friend class ImageReaderBuffer;
