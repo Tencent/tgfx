@@ -52,34 +52,11 @@ constexpr const char* DeviceToLocal = "DeviceToLocal";
 
 }  // namespace ClipContract
 
-// The pointwise color operators of the fused kernels, one row per operator: the single place an
-// operator's name, ABI value and facts are declared. Every mirror below is generated from this
-// list — the Op constants and the OP_* defines here, the AOTEffectKind and AOTChainOp members and
-// the parameter variant in the IR — so adding an operator is one row plus
-// its own semantics (parameter struct, math, bind), and removing a row fails every consumer's
-// compile instead of leaving a stale mirror behind.
-// Columns: name, ABI value (Op::*, frozen bundle compatibility), the IR parameter struct, the
-// per-slot parameter member name, and pass-boundary sensitivity — an operator that amplifies the
-// 1/255 pass-boundary rounding into a visible flip (a step function) must share its pass with its
-// input's producer (IsPassBoundarySensitive; see AOTEffectDecomposer's CanStartPassAt).
-#define TGFX_POINTWISE_OPS(X)                                                                     \
-  X(ColorMatrix, ChainISA::ColorMatrix, AOTColorMatrixParameters, colorMatrix, false)             \
-  X(Luma, ChainISA::Luma, ChainISA::LumaData, luma, false)                                        \
-  X(AlphaThreshold, ChainISA::AlphaThreshold, ChainISA::AlphaThresholdData, alphaThreshold, true) \
-  X(ColorSpaceXform, ChainISA::ColorSpaceXform, AOTColorSpaceXformParameters, colorSpaceXform,    \
-    false)                                                                                        \
-  X(ConstColor, ChainISA::ConstColor, AOTConstColorParameters, constColor, false)                 \
-  X(Blend, ChainISA::Blend, AOTBlendParameters, blend, false)
-
 namespace Op {
 
-// The op values of the chain interpreter and the pointwise slot interpreters: every one derives
-// from ChainISA's single list (contract/ChainISA.h), which is also the list Defines() turns into
-// the OP_* defines every compiled variant receives, and the AOTChainOp enum anchors to these
-// values by assignment. The single-slot interpreter dispatches on the pointwise subset, so it
-// deliberately never emits the chain-only operators (Texture, the coverage ops, the modulators).
-// The pointwise color operators also have an IR mirror (the list above), which the asserts below
-// keep aligned with the ABI values.
+// The op values of the chain interpreter: every one derives from ChainISA's single list
+// (contract/ChainISA.h), which is also the list Defines() turns into the OP_* defines every
+// compiled stage receives.
 #define TGFX_OP_CONSTANT(name, id, inputs, sensitive, defineName) \
   constexpr int name = ChainISA::name;
 TGFX_CHAIN_OPS(TGFX_OP_CONSTANT)
@@ -97,11 +74,6 @@ constexpr int AbiValues[] = {
 };
 constexpr size_t AbiValueCount = sizeof(AbiValues) / sizeof(int);
 
-constexpr int PointwiseAbiValues[] = {
-#define TGFX_OP_ABI_VALUE(name, id, params, member, passBoundarySensitive) id,
-    TGFX_POINTWISE_OPS(TGFX_OP_ABI_VALUE)
-#undef TGFX_OP_ABI_VALUE
-};
 
 constexpr bool AbiValuesUnique() {
   for (size_t i = 0; i < AbiValueCount; ++i) {
@@ -123,54 +95,16 @@ constexpr bool AbiValuesAscending() {
   return true;
 }
 
-constexpr bool PointwiseValuesInAbiSet() {
-  for (size_t i = 0; i < sizeof(PointwiseAbiValues) / sizeof(int); ++i) {
-    bool found = false;
-    for (size_t j = 0; j < AbiValueCount; ++j) {
-      if (PointwiseAbiValues[i] == AbiValues[j]) {
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      return false;
-    }
-  }
-  return true;
-}
 
 }  // namespace detail
 
 static_assert(detail::AbiValuesUnique(), "two ops share one ABI value");
 static_assert(detail::AbiValuesAscending(), "the op table must stay in ascending ABI order");
-static_assert(detail::PointwiseValuesInAbiSet(), "an IR operator is missing from ChainISA");
 static_assert(static_cast<int>(detail::AbiValueCount) == ChainISA::OpCount, "op count mismatch");
 static_assert(None == 4 && Texture == 5 && PerlinNoise == 15,
               "the op ABI values are frozen bundle compatibility");
 
-/// The operator names of the op list, in list order. shader_build_tool checks the shared GLSL
-/// dispatch (operator/pointwise_color_dispatch.inc) against this set, so an operator cannot join
-/// the list without a dispatch branch (or a declared exemption in that file).
-inline std::vector<std::string> PointwiseOpNames() {
-  return {
-#define TGFX_OP_NAME(name, id, params, member, passBoundarySensitive) #name,
-      TGFX_POINTWISE_OPS(TGFX_OP_NAME)
-#undef TGFX_OP_NAME
-  };
-}
 
-/// The OP_* macro spelling of an operator, from the table: the tool relates an operator's name to
-/// its define while checking the shared GLSL dispatch against the op list. Returns an empty
-/// string for a name the table does not carry.
-inline std::string DefineName(const std::string& name) {
-#define TGFX_OP_DEFINE_LOOKUP(opName, id, inputs, sensitive, defineName) \
-  if (name == #opName) {                                                 \
-    return #defineName;                                                  \
-  }
-  TGFX_CHAIN_OPS(TGFX_OP_DEFINE_LOOKUP)
-#undef TGFX_OP_DEFINE_LOOKUP
-  return {};
-}
 
 /// The OP_* macros every compiled variant receives, in table order (ascending by ABI value, as the
 /// asserts above require), so the output is byte-identical whatever order the rows were written.
