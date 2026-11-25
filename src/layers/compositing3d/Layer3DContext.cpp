@@ -26,7 +26,8 @@ namespace tgfx {
 
 std::shared_ptr<Layer3DContext> Layer3DContext::Make(bool opaqueMode, Context* context,
                                                      const Rect& renderRect, float contentScale,
-                                                     std::shared_ptr<ColorSpace> colorSpace) {
+                                                     std::shared_ptr<ColorSpace> colorSpace,
+                                                     const std::vector<Rect>* styleSourceRects) {
   if (opaqueMode) {
     return std::make_shared<Opaque3DContext>(renderRect, contentScale, std::move(colorSpace));
   }
@@ -34,7 +35,7 @@ std::shared_ptr<Layer3DContext> Layer3DContext::Make(bool opaqueMode, Context* c
       std::make_shared<Context3DCompositor>(*context, static_cast<int>(renderRect.width()),
                                             static_cast<int>(renderRect.height()), colorSpace);
   return std::make_shared<Render3DContext>(std::move(compositor), renderRect, contentScale,
-                                           std::move(colorSpace));
+                                           std::move(colorSpace), styleSourceRects);
 }
 
 Layer3DContext::Layer3DContext(const Rect& renderRect, float contentScale,
@@ -68,7 +69,7 @@ void Layer3DContext::collectNodes(Layer* layer, const Matrix3D& transform, float
     bounds = layer->getBounds();
   }
   if (!bounds.isEmpty()) {
-    emitNode(layer, bounds, transform, alpha, depth, layer->hasBackgroundStyle());
+    emitNode(layer, bounds, transform, alpha, depth, layer->hasBackgroundStyle(alpha));
   }
   if (!layer->canPreserve3D()) {
     return;

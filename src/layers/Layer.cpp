@@ -30,6 +30,7 @@
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/PictureUtils.h"
 #include "core/utils/Types.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
@@ -208,8 +209,9 @@ static std::shared_ptr<Layer3DContext> Create3DContext(const DrawArgs& args, Can
   }
 
   bool opaqueMode = args.opaqueContext != nullptr;
-  return Layer3DContext::Make(opaqueMode, args.context, validRenderRect, contentScale,
-                              args.dstColorSpace);
+  return Layer3DContext::Make(
+      opaqueMode, args.context, validRenderRect, contentScale, args.dstColorSpace,
+      args.backgroundHandler != nullptr ? args.backgroundHandler->styleSourceRects() : nullptr);
 }
 
 bool Layer::DefaultAllowsEdgeAntialiasing() {
@@ -913,7 +915,9 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   Rect renderRect = {};
   std::vector<Rect> renderRectsVec = {};
   if (_root && canInvert) {
-    _root->updateRenderBounds();
+    // The bounds the background styles need depend on the alpha that reaches them, so pass the
+    // draw alpha down instead of assuming an opaque draw.
+    _root->updateRenderBounds(nullptr, false, alpha);
     renderRect = localToGlobalMatrix.mapRect(clippedBounds);
     renderRectsVec = {renderRect};
     args.renderRects = &renderRectsVec;
@@ -932,7 +936,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   // the consumer falls back to on-the-fly synthesis (signalled by passing a null snapshot map).
   BackgroundSnapshotMap snapshotMap = {};
   BackgroundSnapshotMap* snapshotsPtr = nullptr;
-  bool needBackground = canInvert && !canPreserve3D() && hasBackgroundStyle();
+  bool needBackground = canInvert && !canPreserve3D() && hasBackgroundStyle(alpha);
   if (needBackground && context != nullptr) {
     auto rectForDraw = maxBackgroundOutset > 0.0f ? clippedBounds : bounds;
     Matrix backgroundMatrix = canvas->getMatrix();
@@ -954,7 +958,8 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       // rooted, or this layer's local bounds when orphan.
       Layer* captureRoot = _root ? _root : this;
       Rect captureRect = _root ? renderRect : clippedBounds;
-      BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), &snapshotMap, {captureRect});
+      BackgroundCapturer::Run(captureRoot, args, std::move(bgSource), &snapshotMap, {captureRect},
+                              {captureRect}, alpha);
       snapshotsPtr = &snapshotMap;
     }
   }
@@ -1173,7 +1178,7 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     return true;
   }
   bool needsMaskFilter = maskFilter != nullptr;
-  if (canUseSubtreeCache(args, blendMode) &&
+  if (canUseSubtreeCache(args, blendMode, alpha) &&
       drawWithSubtreeCache(args, canvas, alpha, blendMode, maskFilter)) {
     return true;
   }
@@ -1297,8 +1302,8 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
     }
   }
   Point maskImageOffset = {};
-  auto maskContentImage =
-      ToImageWithOffset(std::move(maskPicture), &maskImageOffset, &maskBounds, args.dstColorSpace);
+  auto maskContentImage = PictureUtils::ToImageWithOffset(std::move(maskPicture), &maskImageOffset,
+                                                          &maskBounds, args.dstColorSpace);
   if (maskContentImage == nullptr) {
     return MaskData(inverted);
   }
@@ -1339,7 +1344,8 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
   }
   auto picture = opaqueContext.finishRecordingAsPicture();
   auto imageOffset = Point::Zero();
-  auto image = ToImageWithOffset(std::move(picture), &imageOffset, nullptr, args.dstColorSpace);
+  auto image = PictureUtils::ToImageWithOffset(std::move(picture), &imageOffset, nullptr,
+                                               args.dstColorSpace);
   if (offset) {
     *offset = imageOffset;
   }
@@ -1397,7 +1403,7 @@ bool Layer::shouldPassThroughBackground(BlendMode blendMode) const {
   return true;
 }
 
-bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
+bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, float alpha) {
   if (canPreserve3D()) {
     return false;
   }
@@ -1411,9 +1417,15 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
     if (subtreeCache->maxSize() != args.subtreeCacheMaxSize) {
       subtreeCache = std::make_unique<SubtreeCache>(args.subtreeCacheMaxSize);
     }
+    // The cached image holds only the styles that were visible when it was recorded. A fade lowers
+    // the alpha that reaches the subtree, which brings back a background style that opaque content
+    // used to hide, so such a frame cannot be served from the cache.
+    if (alpha < 1.0f && hasBackgroundStyle(alpha)) {
+      return false;
+    }
     return true;
   }
-  if (shouldPassThroughBackground(blendMode) || hasBackgroundStyle()) {
+  if (shouldPassThroughBackground(blendMode) || hasBackgroundStyle(alpha)) {
     return false;
   }
   if (!bitFields.staticSubtree) {
@@ -1448,6 +1460,7 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
 
   auto drawArgs = args;
   drawArgs.renderFlags |= RenderFlags::DisableCache;
+  // The cache is reused across frames, so it records the whole subtree.
   drawArgs.renderRects = nullptr;
   // Cache content should be rendered to a regular texture, not to 3D compositor.
   drawArgs.render3DContext = nullptr;
@@ -1469,8 +1482,8 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
   }
 
   Point offset = {};
-  auto image =
-      ToImageWithOffset(std::move(picture), &offset, &pictureBounds, args.dstColorSpace, false);
+  auto image = PictureUtils::ToImageWithOffset(std::move(picture), &offset, &pictureBounds,
+                                               args.dstColorSpace, false);
   if (image == nullptr) {
     return nullptr;
   }
@@ -1600,7 +1613,7 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
   }
   std::unique_ptr<LayerStyleSource> ownedSource;
   if (sourcePtr == nullptr) {
-    ownedSource = getLayerStyleSource(args, canvas->getMatrix());
+    ownedSource = getLayerStyleSource(args, canvas->getMatrix(), alpha);
     if (ownedSource != nullptr && args.backgroundHandler != nullptr &&
         args.backgroundHandler->canCacheLayerStyleSource(this)) {
       sourcePtr = args.backgroundHandler->cacheLayerStyleSource(this, std::move(ownedSource));
@@ -1803,7 +1816,7 @@ bool Layer::drawChild(const DrawArgs& args, Canvas* canvas, Layer* child, float 
 }
 
 std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& args,
-                                                             const Matrix& matrix) {
+                                                             const Matrix& matrix, float alpha) {
   if (_layerStyles.empty() || args.excludeEffects) {
     return nullptr;
   }
@@ -1820,6 +1833,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   bool needsContentShape = false;
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
+    if (NeedsBackgroundSource(layerStyle->extraSourceType()) &&
+        !needsBackgroundStyleOutput(layerStyle.get(), alpha)) {
+      continue;
+    }
     if (DeclaresGeometry(layerStyle.get())) {
       bucketNeedsGeometry[index] = true;
     } else {
@@ -1850,6 +1867,15 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
   DrawArgs drawArgs = args;
   drawArgs.render3DContext = nullptr;
+  // The cached sources are reused outside the rects that limit the capture's own draw calls, so a
+  // capture pass records them against the whole area it captured. Read that range from the pass
+  // before dropping its handler: a recording that deliberately clears renderRects keeps the
+  // complete range as well, because the range belongs to the pass rather than to DrawArgs.
+  if (auto* handler = args.backgroundHandler) {
+    if (auto* styleSourceRects = handler->styleSourceRects()) {
+      drawArgs.renderRects = styleSourceRects;
+    }
+  }
   // Layer style source content is an intermediate artifact — skip background capture / consume.
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
 
@@ -1894,7 +1920,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       drawContents(drawArgs, contourCanvas, 1.0f);
       auto picture = opaqueContext.finishRecordingAsPicture();
       Point offset = {};
-      auto image = ToImageWithOffset(std::move(picture), &offset, nullptr, args.dstColorSpace);
+      auto image =
+          PictureUtils::ToImageWithOffset(std::move(picture), &offset, nullptr, args.dstColorSpace);
       if (image == nullptr) {
         bucketUsable = false;
       } else {
@@ -1958,7 +1985,9 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
       continue;
     }
     if (NeedsBackgroundSource(layerStyle->extraSourceType())) {
-      BackgroundHandler::DispatchOrSkip(args, canvas, this, alpha, layerStyle.get(), source);
+      if (needsBackgroundStyleOutput(layerStyle.get(), alpha)) {
+        BackgroundHandler::DispatchOrSkip(args, canvas, this, alpha, layerStyle.get(), source);
+      }
       continue;
     }
     drawLayerStyleDefault(args, canvas, alpha, layerStyle.get(), source);
@@ -1974,7 +2003,7 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
   // come before `this`. The current frame's `this` is the parent's stopChild, so siblings at or
   // after `this` are skipped.
   auto currentAlpha = _parent->drawBackgroundLayers(args, canvas);
-  auto parentSource = _parent->getLayerStyleSource(args, canvas->getMatrix());
+  auto parentSource = _parent->getLayerStyleSource(args, canvas->getMatrix(), currentAlpha);
   _parent->drawContents(args, canvas, currentAlpha, parentSource.get(), this);
   canvas->concat(getMatrixWithScrollRect().asMatrix());
   if (_scrollRect) {
@@ -2014,7 +2043,7 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
   subArgs.excludeEffects = false;
 
   auto currentAlpha = drawBackgroundLayers(subArgs, recordingCanvas);
-  auto belowSource = getLayerStyleSource(subArgs, recordingCanvas->getMatrix());
+  auto belowSource = getLayerStyleSource(subArgs, recordingCanvas->getMatrix(), currentAlpha);
   if (belowSource) {
     drawLayerStyles(subArgs, recordingCanvas, currentAlpha, belowSource.get(),
                     LayerStylePosition::Below);
@@ -2024,7 +2053,7 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
   if (picture == nullptr) {
     return nullptr;
   }
-  return ToImageWithOffset(std::move(picture), offset, &bounds, args.dstColorSpace);
+  return PictureUtils::ToImageWithOffset(std::move(picture), offset, &bounds, args.dstColorSpace);
 }
 
 void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, float alpha,
@@ -2113,12 +2142,14 @@ bool Layer::hasValidMask() const {
   return _mask && _mask->root() == root() && _mask->bitFields.visible;
 }
 
-void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
+void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty,
+                               float alpha) {
+  const auto accumulatedAlpha = alpha * _alpha;
   if (!forceDirty && !bitFields.dirtyDescendents) {
     if (maxBackgroundOutset > 0 || bitFields.hasBlendMode) {
       propagateLayerState();
       if (_root->hasDirtyRegions()) {
-        checkBackgroundStyles(transformer);
+        checkBackgroundStyles(transformer, accumulatedAlpha);
       }
     }
     return;
@@ -2221,10 +2252,19 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       childTransformer = RegionTransformer::MakeFromClip(*clipRect, std::move(childTransformer));
     }
     auto childForceDirty = forceDirty || child->bitFields.dirtyTransform;
-    child->updateRenderBounds(std::move(childTransformer), childForceDirty);
+    child->updateRenderBounds(std::move(childTransformer), childForceDirty, accumulatedAlpha);
     child->bitFields.dirtyTransform = false;
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);
+    }
+  }
+  bitFields.contentOpaque = content == nullptr || content->isFullyOpaque();
+  bitFields.childrenOpaque = true;
+  for (const auto& child : _children) {
+    if (child->bitFields.visible && child->_alpha > 0 && child->maskOwner == nullptr &&
+        !child->isSubtreeOpaque()) {
+      bitFields.childrenOpaque = false;
+      break;
     }
   }
   auto backOutset = 0.f;
@@ -2235,7 +2275,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   if (!renderBounds.isEmpty()) {
     for (auto& style : _layerStyles) {
       DEBUG_ASSERT(style != nullptr);
-      if (!NeedsBackgroundSource(style->extraSourceType())) {
+      if (!needsBackgroundStyleOutput(style.get(), accumulatedAlpha)) {
         continue;
       }
       auto bounds = style->filterBackground(Rect::MakeEmpty(), contentScale);
@@ -2267,7 +2307,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   if (backOutset > 0) {
     maxBackgroundOutset = std::max(backOutset, maxBackgroundOutset);
     minBackgroundOutset = std::min(downsampleOutset, minBackgroundOutset);
-    updateBackgroundBounds(contentScale, backgroundSourceRects);
+    updateBackgroundBounds(contentScale, backgroundSourceRects, accumulatedAlpha);
   }
   if (bitFields.blendMode != static_cast<uint8_t>(BlendMode::SrcOver) ||
       (content && content->hasBlendMode())) {
@@ -2277,26 +2317,27 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   bitFields.dirtyDescendents = false;
 }
 
-void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer) {
+void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer, float alpha) {
   for (auto& child : _children) {
     if (child->maxBackgroundOutset <= 0 || !child->bitFields.visible || child->_alpha <= 0) {
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
     auto childTransformer = RegionTransformer::MakeFromMatrix(childMatrix.asMatrix(), transformer);
-    child->checkBackgroundStyles(childTransformer);
+    child->checkBackgroundStyles(childTransformer, alpha * child->_alpha);
   }
   // Fast path: this layer's subtree did not change, so every current dirty rect originates from
   // outside this subtree and is a legitimate blur input candidate. Passing the live list is safe
   // because invalidateBackground collects all expanded rects locally before re-appending them.
   updateBackgroundBounds(transformer ? transformer->getMaxScale() : 1.0f,
-                         _root->currentDirtyRects());
+                         _root->currentDirtyRects(), alpha);
 }
 
-void Layer::updateBackgroundBounds(float contentScale, const std::vector<Rect>& sourceRects) {
+void Layer::updateBackgroundBounds(float contentScale, const std::vector<Rect>& sourceRects,
+                                   float alpha) {
   for (auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
-    if (NeedsBackgroundSource(style->extraSourceType())) {
+    if (needsBackgroundStyleOutput(style.get(), alpha)) {
       _root->invalidateBackground(renderBounds, style.get(), contentScale, sourceRects);
     }
   }
@@ -2329,26 +2370,55 @@ void Layer::propagateLayerState() {
   }
 }
 
-bool Layer::hasBackgroundStyle() {
-  if (!bitFields.dirtyDescendents) {
-    return maxBackgroundOutset > 0;
-  }
+bool Layer::hasOwnBackgroundStyle(float alpha) const {
   for (const auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
-    if (NeedsBackgroundSource(style->extraSourceType())) {
-      return true;
-    }
-  }
-  return hasDescendantBackgroundStyle();
-}
-
-bool Layer::hasDescendantBackgroundStyle() {
-  for (const auto& child : _children) {
-    if (child->hasBackgroundStyle()) {
+    if (needsBackgroundStyleOutput(style.get(), alpha)) {
       return true;
     }
   }
   return false;
+}
+
+bool Layer::hasBackgroundStyle(float alpha) {
+  // maxBackgroundOutset is accumulated with the alpha that reached each layer when the bounds were
+  // last built, so it answers the question only for an opaque draw.
+  if (alpha >= 1.0f && !bitFields.dirtyDescendents) {
+    return maxBackgroundOutset > 0;
+  }
+  return hasOwnBackgroundStyle(alpha) || hasDescendantBackgroundStyle(alpha);
+}
+
+bool Layer::hasDescendantBackgroundStyle(float alpha) {
+  for (const auto& child : _children) {
+    if (child->hasBackgroundStyle(alpha * child->_alpha)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool Layer::isSubtreeOpaque() const {
+  auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
+  // A contour mask clips with a path, while the other mask types can fall back to a per-pixel mask
+  // filter that attenuates the subtree and lets a background style show through.
+  const bool maskAttenuates = hasValidMask() && maskType != LayerMaskType::Contour;
+  // A layer style can paint past its content (a drop shadow, a blur), so the subtree does not
+  // cover what sits below it there.
+  return _alpha >= 1.0f && static_cast<BlendMode>(bitFields.blendMode) == BlendMode::SrcOver &&
+         _filters.empty() && _layerStyles.empty() && !maskAttenuates && !canPreserve3D() &&
+         bitFields.contentOpaque && bitFields.childrenOpaque;
+}
+
+bool Layer::needsBackgroundStyleOutput(const LayerStyle* style, float alpha) const {
+  if (style == nullptr || !NeedsBackgroundSource(style->extraSourceType())) {
+    return false;
+  }
+  if (style->isHiddenByOpaqueInput() && alpha >= 1.0f && bitFields.contentOpaque &&
+      bitFields.childrenOpaque) {
+    return false;
+  }
+  return true;
 }
 
 std::shared_ptr<BackgroundSource> Layer::createBackgroundSource(

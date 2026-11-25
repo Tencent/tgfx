@@ -43,6 +43,7 @@ std::shared_ptr<MetalCommandEncoder> MetalCommandEncoder::Make(MetalGPU* gpu) {
   }
 
   auto queue = static_cast<MetalCommandQueue*>(gpu->queue());
+  queue->flushTextureUploads();
   id<MTLCommandBuffer> commandBuffer = [queue->metalCommandQueue() commandBuffer];
   if (commandBuffer == nil) {
     return nullptr;

@@ -34,7 +34,8 @@ struct GlassGeometryParams {
   float halfH = 0.0f;
   float refractionFactor = 0.0f;
   float splay = 0.0f;
-  float depthRatio = 0.0f;
+  // Refraction thickness in layer pixels, already clamped to [0, min(halfW, halfH)].
+  float glassThickness = 0.0f;
   // Direction of the light source in degrees, clockwise (0 = light from directly above).
   float lightAngle = 0.0f;
   /**
@@ -48,12 +49,13 @@ struct GlassGeometryParams {
 
 struct GlassSDFGeometryParams : public GlassGeometryParams {
   float cornerRadius = 0.0f;
-  float glassThickness = 0.0f;
   // When false the SDF stage skips the edge light and packs a zero light response.
   bool enableEdgeLighting = false;
 };
 
 struct GlassUDFGeometryParams : public GlassGeometryParams {
+  // Layer-space distance used to sample the refraction field's central difference.
+  float gradientSampleRadiusLayerPixels = 0.0f;
   float udfPixelToLayerPixelX = 1.0f;
   float udfPixelToLayerPixelY = 1.0f;
   /**
@@ -76,13 +78,18 @@ struct GlassUDFGeometryParams : public GlassGeometryParams {
 /**
  * Computes shape-dependent refraction geometry from source UV coordinates supplied in inputColor.
  * The output is vec4(refractDirection.xy, displacementDistance, lightResponse): the
- * corner-amplified refraction field, its per-pixel offset and the packed light response. The
+ * corner-amplified refraction field, its per-pixel offset and the packed light response.
+ * refractDirection is unit-length whenever it is nonzero, and displacementDistance is nonnegative.
+ * The refraction processor bounds the final vector to the shared physical maximum: the UDF path
+ * clamps displacementDistance, while the SDF path retains its component-wise vector clamp. The
  * analytical SDF path carries the two edge terms (light-facing edge and light-away back-side rim,
  * coefficients 1 and 0.6), shading the adjacent edge faces separately and blending their responses
  * around a corner, plus a signed wide-band dark term (coefficient 0.05) on the light-facing side,
- * whose ramp is clamp(1 - edgeDistance / glassThickness, 0, 1)^2 read straight from the shape depth.
- * The mask/UDF path keeps the two edge terms only: the arbitrary-shape Figma pipeline exposes
- * exactly those two edge terms and no wide-band dark term, so none is added here.
+ * whose ramp is clamp(1 - edgeDistance / glassThickness, 0, 1)^2 read straight from the physical
+ * glass thickness.
+ * The mask/UDF path keeps the two edge terms only. Its tent-generated transition band is
+ * approximately 0.6 * glassThickness wide and it has no wide-band dark term, so its profile is not
+ * an SDF or Figma equivalent; profile alignment is outside this depth-unit change.
  */
 class GlassShapeGeometryFragmentProcessor : public FragmentProcessor {
  protected:

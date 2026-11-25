@@ -47,6 +47,7 @@ class DrawContent : public GeometryContent {
   bool hasSameGeometry(const GeometryContent* other) const override;
   bool hasBlendMode() const override;
   bool hasPaint() const override;
+  bool isFullyOpaque() const override;
 
   const BlendMode& getBlendMode() const {
     return blendMode;

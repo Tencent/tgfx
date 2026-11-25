@@ -27,6 +27,58 @@
 
 namespace tgfx {
 
+TGFX_TEST(WebGPUBackendTextureTest, StencilAttachmentCapability) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto gpu = context->gpu();
+  EXPECT_EQ(gpu->info()->backend, Backend::WebGPU);
+  EXPECT_TRUE(gpu->features()->stencilAttachmentSupported);
+  EXPECT_TRUE(gpu->isFormatRenderable(PixelFormat::DEPTH24_STENCIL8));
+  TextureDescriptor descriptor(100, 100, PixelFormat::DEPTH24_STENCIL8, false, 1,
+                               TextureUsage::RENDER_ATTACHMENT);
+  auto texture = gpu->createTexture(descriptor);
+  ASSERT_NE(texture, nullptr);
+  EXPECT_EQ(texture->format(), PixelFormat::DEPTH24_STENCIL8);
+}
+
+TGFX_TEST(WebGPUBackendTextureTest, SeparatedTextureQueries) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto gpu = context->gpu();
+  ShaderModuleDescriptor vertex;
+  vertex.stage = ShaderStage::Vertex;
+  vertex.code = R"(#version 300 es
+    out vec2 textureCoord;
+    void main() {
+      gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+      textureCoord = vec2(0.5);
+    }
+  )";
+  ShaderModuleDescriptor fragment;
+  fragment.stage = ShaderStage::Fragment;
+  fragment.code = R"(#version 300 es
+    precision highp float;
+    in vec2 textureCoord;
+    uniform sampler2D sTexture;
+    out vec4 tgfx_FragColor;
+    void main() {
+      ivec2 size = textureSize ( sTexture , 0);
+      ivec2 point = ivec2(textureCoord * vec2(size));
+      tgfx_FragColor = texelFetch ( sTexture , point, 0) + texture ( sTexture , textureCoord);
+    }
+  )";
+  RenderPipelineDescriptor descriptor;
+  descriptor.vertex.module = gpu->createShaderModule(vertex);
+  descriptor.fragment.module = gpu->createShaderModule(fragment);
+  ASSERT_NE(descriptor.vertex.module, nullptr);
+  ASSERT_NE(descriptor.fragment.module, nullptr);
+  descriptor.layout.textureSamplers = {{"sTexture", 0}};
+  descriptor.fragment.colorAttachments = {PipelineColorAttachment()};
+  EXPECT_NE(gpu->createRenderPipeline(descriptor), nullptr);
+}
+
 TGFX_TEST(WebGPUBackendTextureTest, LogicalSize) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -133,9 +185,11 @@ TGFX_TEST(WebGPUBackendTextureTest, AttachmentOnlyRenderTargetIsAccepted) {
   EXPECT_FALSE(imported->getBackendTexture().isValid());
   WebGPUTextureInfo textureInfo = {};
   ASSERT_TRUE(target.getWebGPUTextureInfo(&textureInfo));
-  BackendTexture invalidTexture(textureInfo, 16, 16);
-  EXPECT_TRUE(Image::MakeFrom(context, invalidTexture) == nullptr);
-  EXPECT_TRUE(Surface::MakeFrom(context, invalidTexture, ImageOrigin::TopLeft) == nullptr);
+  BackendTexture backendTexture(textureInfo, 16, 16);
+  // Sampling the attachment-only texture is rejected, but wrapping it as a Surface only
+  // requires the render attachment usage.
+  EXPECT_TRUE(Image::MakeFrom(context, backendTexture) == nullptr);
+  ExpectGreenSurface(Surface::MakeFrom(context, backendTexture, ImageOrigin::TopLeft));
   ExpectGreenSurface(Surface::MakeFrom(context, target, ImageOrigin::TopLeft));
 }
 
@@ -153,6 +207,33 @@ TGFX_TEST(WebGPUBackendTextureTest, RenderableTextureSurfaceIsAccepted) {
       Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::TopLeft));
   ExpectGreenSurface(
       Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft, 4));
+}
+
+TGFX_TEST(WebGPUBackendTextureTest, MinimalUsageHostTextureSurfaceIsAccepted) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "WebGPU backend not available";
+  }
+  auto gpu = static_cast<WebGPUGPU*>(context->gpu());
+  // Embedders wrap host textures with only the usage they need (RENDER_ATTACHMENT for drawing
+  // and COPY_SRC for readbacks). Such textures must be wrappable as a Surface.
+  WGPUTextureDescriptor descriptor = {};
+  descriptor.dimension = WGPUTextureDimension_2D;
+  descriptor.size = {16, 16, 1};
+  descriptor.format = WGPUTextureFormat_RGBA8Unorm;
+  descriptor.mipLevelCount = 1;
+  descriptor.sampleCount = 1;
+  descriptor.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc;
+  auto texture = wgpuDeviceCreateTexture(gpu->device(), &descriptor);
+  ASSERT_TRUE(texture != nullptr);
+  WebGPUTextureInfo info = {};
+  info.texture = texture;
+  info.format = static_cast<uint32_t>(descriptor.format);
+  BackendTexture backendTexture(info, 16, 16);
+  { ExpectGreenSurface(Surface::MakeFrom(context, backendTexture, ImageOrigin::TopLeft)); }
+  gpu->processUnreferencedResources();
+  wgpuTextureRelease(texture);
 }
 
 TGFX_TEST(WebGPUBackendTextureTest, SamplingImportDoesNotRequireCopyUsage) {

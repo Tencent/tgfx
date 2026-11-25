@@ -31,11 +31,11 @@
 #include "core/images/PictureImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/shaders/ImageShader.h"
-#include "core/shaders/MatrixShader.h"
 #include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
+#include "core/utils/ShaderUtils.h"
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "core/utils/Types.h"
@@ -89,15 +89,11 @@ static const PictureImage* GetContentPictureImage(const MaskFilter* maskFilter,
   if (Types::Get(maskFilter) != Types::MaskFilterType::Shader) {
     return nullptr;
   }
-  auto shader = static_cast<const ShaderMaskFilter*>(maskFilter)->getShader();
   // Unwrap MatrixShader wrappers, accumulating their transforms.
-  *shaderMatrix = Matrix::I();
-  while (shader && Types::Get(shader.get()) == Types::ShaderType::Matrix) {
-    auto* matrixShader = static_cast<const MatrixShader*>(shader.get());
-    shaderMatrix->preConcat(matrixShader->matrix);
-    shader = matrixShader->source;
-  }
-  if (!shader || Types::Get(shader.get()) != Types::ShaderType::Image) {
+  auto [shader, matrix] = ShaderUtils::UnwrapMatrixShader(
+      static_cast<const ShaderMaskFilter*>(maskFilter)->getShader());
+  *shaderMatrix = matrix;
+  if (shader == nullptr || Types::Get(shader.get()) != Types::ShaderType::Image) {
     return nullptr;
   }
   auto image = static_cast<const ImageShader*>(shader.get())->image;
@@ -145,10 +141,10 @@ void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
                                 const Brush& brush, const Stroke* stroke) {
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(brush)) {
-    svg = std::make_unique<ElementWriter>("svg", context, this, _pendingImages, xmlWriter.get(),
-                                          resourceBucket.get(),
-                                          exportFlags & SVGExportFlags::DisableWarnings, matrix,
-                                          brush, nullptr, _targetColorSpace, _assignColorSpace);
+    svg = std::make_unique<ElementWriter>(
+        "svg", context, this, _pendingImages, xmlWriter.get(), resourceBucket.get(),
+        exportFlags & SVGExportFlags::DisableWarnings, matrix, brush, nullptr, _targetColorSpace,
+        _assignColorSpace, rect);
     svg->addRectAttributes(rect);
   }
 
@@ -160,7 +156,8 @@ void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
 
   ElementWriter rectElement("rect", context, this, _pendingImages, xmlWriter.get(),
                             resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
-                            matrix, brush, stroke, _targetColorSpace, _assignColorSpace);
+                            matrix, brush, stroke, _targetColorSpace, _assignColorSpace,
+                            contentBounds);
 
   if (svg) {
     rectElement.addAttribute("x", 0);
@@ -197,18 +194,20 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const Matrix& matrix,
       ElementWriter circleElement("circle", context, this, _pendingImages, xmlWriter.get(),
                                   resourceBucket.get(),
                                   exportFlags & SVGExportFlags::DisableWarnings, matrix, brush,
-                                  stroke, _targetColorSpace, _assignColorSpace);
+                                  stroke, _targetColorSpace, _assignColorSpace, contentBounds);
       circleElement.addCircleAttributes(roundRect.rect());
     } else {
       ElementWriter ovalElement("ellipse", context, this, _pendingImages, xmlWriter.get(),
                                 resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
-                                matrix, brush, stroke, _targetColorSpace, _assignColorSpace);
+                                matrix, brush, stroke, _targetColorSpace, _assignColorSpace,
+                                contentBounds);
       ovalElement.addEllipseAttributes(roundRect.rect());
     }
   } else {
     ElementWriter rrectElement("rect", context, this, _pendingImages, xmlWriter.get(),
                                resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
-                               matrix, brush, stroke, _targetColorSpace, _assignColorSpace);
+                               matrix, brush, stroke, _targetColorSpace, _assignColorSpace,
+                               contentBounds);
     rrectElement.addRoundRectAttributes(roundRect);
   }
 }
@@ -218,7 +217,8 @@ void SVGExportContext::drawPath(const Path& path, const Matrix& matrix, const Cl
   applyClip(clip, matrix.mapRect(path.getBounds()));
   ElementWriter pathElement("path", context, this, _pendingImages, xmlWriter.get(),
                             resourceBucket.get(), exportFlags & SVGExportFlags::DisableWarnings,
-                            matrix, brush, nullptr, _targetColorSpace, _assignColorSpace);
+                            matrix, brush, nullptr, _targetColorSpace, _assignColorSpace,
+                            path.getBounds());
   pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
   if (path.getFillType() == PathFillType::EvenOdd) {
     pathElement.addAttribute("fill-rule", "evenodd");
@@ -407,20 +407,20 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
     // hard-edged banding from the implicit source edge at the sandbox boundary).
     auto contentMatrix = matrix;
     contentMatrix.preTranslate(outer.x - offset.x, outer.y - offset.y);
-    bound = contentMatrix.mapRect(bound);
 
     Resources resources;
     std::vector<std::string> filterIDs;
     if (filter) {
       ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                          _assignColorSpace);
-      filterIDs = defs.addImageFilterChain(filter, bound, customWriter, context, _pendingImages);
+      filterIDs = defs.addImageFilterChain(filter, bound, contentMatrix, customWriter, context,
+                                           _pendingImages);
       if (filterIDs.size() == 1) {
         resources.filter = "url(#" + filterIDs[0] + ")";
       }
     }
     auto clipPath = clip.getClipPath();
-    bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+    bool needsClip = !clipPath.isEmpty() && !clipPath.contains(contentMatrix.mapRect(bound));
     // Close any active clip group from prior draws BEFORE emitting our own <clipPath> resource
     // and brush <g>. Otherwise the <clipPath> definition would be nested inside the stale wrapper
     // and the new <g> would sit at the wrong XML depth. On exit, leave both members cleared so
@@ -445,12 +445,30 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       }
     }
     float outerAlpha = brush.color.alpha;
+    // Applying a mask to a FilterImage requires the filter to take effect first. The generic mask
+    // path attaches the mask to the drawn element itself, so it would apply before the filter on
+    // the enclosing group. Instead, the mask is set on the outermost group of the filter chain
+    // together with its filter, and SVG applies a group's filter before its mask (SVG 1.1,
+    // Section 3.4 "How groups are rendered").
+    std::string maskID;
+    if (brush.maskFilter != nullptr) {
+      ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
+                         _assignColorSpace);
+      auto maskBounds = Rect::MakeWH(filterImage->width(), filterImage->height());
+      maskID =
+          defs.addMaskResource(brush.maskFilter, context, this, _pendingImages, matrix, maskBounds)
+              .mask;
+    }
     {
-      auto groupElements = buildFilterGroupElements(
-          filterIDs, resources.filter, needsClip ? clipID : "", outerBlendStyle, outerAlpha);
+      auto groupElements =
+          buildFilterGroupElements(filterIDs, resources.filter, needsClip ? clipID : "", maskID,
+                                   outerBlendStyle, outerAlpha);
       // Strip lifted effects from the inner brush so the recursive draw does not re-emit them
       // on a nested <g>, which would both double the effect and reintroduce the isolation issue.
       Brush innerBrush = brush;
+      if (!maskID.empty()) {
+        innerBrush.maskFilter = nullptr;
+      }
       if (!outerBlendStyle.empty()) {
         innerBrush.blendMode = BlendMode::SrcOver;
       }
@@ -514,8 +532,10 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
   dstClip.addRect(dstRect);
   dstClip.transform(matrix);
   auto outerClipPath = clip.getClipPath();
-  if (!outerClipPath.isEmpty()) {
-    dstClip.addPath(outerClipPath, PathOp::Intersect);
+  if (!outerClipPath.isEmpty() && !dstClip.addPath(outerClipPath, PathOp::Intersect)) {
+    // A failed Intersect leaves the destination rectangle behind, which is the unclipped image.
+    // That is the one answer that widens what gets drawn, so drop the drawing instead.
+    return;
   }
   if (dstClip.isEmpty()) {
     return;
@@ -760,13 +780,16 @@ void SVGExportContext::exportPictureImageAsVector(const PictureImage* pictureIma
 }
 
 static void ApplyGroupAttributes(ElementWriter* element, const std::string& clipID,
-                                 const std::string& filterRef, const std::string& blendStyle,
-                                 float alpha) {
+                                 const std::string& filterRef, const std::string& maskRef,
+                                 const std::string& blendStyle, float alpha) {
   if (!clipID.empty()) {
     element->addAttribute("clip-path", "url(#" + clipID + ")");
   }
   if (!filterRef.empty()) {
     element->addAttribute("filter", filterRef);
+  }
+  if (!maskRef.empty()) {
+    element->addAttribute("mask", maskRef);
   }
   if (!blendStyle.empty()) {
     element->addAttribute("style", blendStyle);
@@ -778,12 +801,13 @@ static void ApplyGroupAttributes(ElementWriter* element, const std::string& clip
 
 std::vector<std::unique_ptr<ElementWriter>> SVGExportContext::buildFilterGroupElements(
     const std::vector<std::string>& filterIDs, const std::string& singleFilterRef,
-    const std::string& clipID, const std::string& blendStyle, float alpha) {
+    const std::string& clipID, const std::string& maskID, const std::string& blendStyle,
+    float alpha) {
   std::vector<std::unique_ptr<ElementWriter>> groupElements;
   if (filterIDs.size() > 1) {
     auto outermost = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-    ApplyGroupAttributes(outermost.get(), clipID, "url(#" + filterIDs.back() + ")", blendStyle,
-                         alpha);
+    ApplyGroupAttributes(outermost.get(), clipID, "url(#" + filterIDs.back() + ")", maskID,
+                         blendStyle, alpha);
     groupElements.push_back(std::move(outermost));
     for (size_t i = filterIDs.size() - 1; i > 0; --i) {
       auto inner = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
@@ -792,7 +816,7 @@ std::vector<std::unique_ptr<ElementWriter>> SVGExportContext::buildFilterGroupEl
     }
   } else {
     auto groupElement = std::make_unique<ElementWriter>("g", xmlWriter, resourceBucket.get());
-    ApplyGroupAttributes(groupElement.get(), clipID, singleFilterRef, blendStyle, alpha);
+    ApplyGroupAttributes(groupElement.get(), clipID, singleFilterRef, maskID, blendStyle, alpha);
     groupElements.push_back(std::move(groupElement));
   }
   return groupElements;
@@ -803,14 +827,16 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
                                  const ClipStack& clip, const Brush& brush) {
   DEBUG_ASSERT(picture != nullptr);
   std::vector<std::string> filterIDs;
-  auto bound = matrix.mapRect(picture->getBounds());
+  auto pictureBounds = picture->getBounds();
   if (imageFilter) {
     ElementWriter defs("defs", xmlWriter, resourceBucket.get(), _targetColorSpace,
                        _assignColorSpace);
-    filterIDs = defs.addImageFilterChain(imageFilter, bound, customWriter, context, _pendingImages);
+    filterIDs = defs.addImageFilterChain(imageFilter, pictureBounds, matrix, customWriter, context,
+                                         _pendingImages);
   }
   auto clipPath = clip.getClipPath();
-  bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bound);
+  auto bounds = matrix.mapRect(pictureBounds);
+  bool needsClip = !clipPath.isEmpty() && !clipPath.contains(bounds);
   std::string clipID;
   if (needsClip) {
     clipID = defineClipPath(clipPath);
@@ -832,7 +858,7 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
       singleFilterRef = "url(#" + filterIDs[0] + ")";
     }
     auto groupElements = buildFilterGroupElements(
-        filterIDs, singleFilterRef, needsClip ? clipID : "", blendStyle, brush.color.alpha);
+        filterIDs, singleFilterRef, needsClip ? clipID : "", "", blendStyle, brush.color.alpha);
     picture->playback(this, matrix, needsClip ? ClipStack{} : clip);
     groupElements.clear();
     clipGroupElement = nullptr;

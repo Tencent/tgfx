@@ -84,7 +84,12 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   if (path.isInverseFillType()) {
     Path clipPath = {};
     clipPath.addRect(Rect::MakeWH(targetInfo.width(), targetInfo.height()));
-    path.addPath(clipPath, PathOp::Intersect);
+    if (!path.addPath(clipPath, PathOp::Intersect)) {
+      // Leaving the inverse path unclipped would fill the whole surface instead of the box it was
+      // intersected with, so nothing may be rasterized.
+      ClearPixels(targetInfo, dstPixels);
+      return true;
+    }
   }
   ClearPixels(targetInfo, dstPixels);
   FTPath ftPath = {};

@@ -25,6 +25,7 @@
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
+#include "layers/CaptureCulling.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
@@ -37,6 +38,18 @@ static constexpr int MIN_TILE_SIZE = 16;
 static constexpr int MAX_TILE_SIZE = 2048;
 static constexpr int FALLBACK_GRID_SIZE = 64;
 static constexpr int MAX_ATLAS_SIZE = 8192;
+// Number of rects the per-layer cull loop can afford.
+static constexpr size_t MAX_CULL_RECTS = 32;
+
+static bool captureCullingEnabledForTests = true;
+
+bool CaptureCullingEnabledForTests() {
+  return captureCullingEnabledForTests;
+}
+
+void SetCaptureCullingEnabledForTests(bool enabled) {
+  captureCullingEnabledForTests = enabled;
+}
 
 class DrawTask {
  public:
@@ -348,7 +361,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
 std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) const {
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
-  if (_root->hasBackgroundStyle()) {
+  if (_root->hasBackgroundStyle(1.0f)) {
     snapshotMap = captureBackgrounds(surface, {surfaceRect});
   }
   drawRootLayer(surface, surfaceRect, getViewMatrix(), autoClear, snapshotMap.get());
@@ -417,7 +430,7 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   // Pass the full rect list so each replay is scoped to a single rect; otherwise Layers in the
   // gaps between scattered dirty regions get skipped.
   std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
-  if (_root->hasBackgroundStyle()) {
+  if (_root->hasBackgroundStyle(1.0f)) {
     snapshotMap = captureBackgrounds(surface, renderRects);
   }
   auto canvas = surface->getCanvas();
@@ -456,7 +469,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   }
   // tileRect is in zoom space; offset by contentOffset to line it up with surface pixel coords.
   std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
-  if (_root->hasBackgroundStyle()) {
+  if (_root->hasBackgroundStyle(1.0f)) {
     std::vector<Rect> captureRects = {};
     captureRects.reserve(tileTasks.size());
     for (auto& task : tileTasks) {
@@ -464,6 +477,8 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
       captureRect.offset(_contentOffset.x, _contentOffset.y);
       captureRects.push_back(captureRect);
     }
+    // The capture culls the layers no background style samples, using the footprints it collects
+    // for the area it covers.
     snapshotMap = captureBackgrounds(surface, captureRects);
   }
   std::vector<Rect> dirtyRects = {};
@@ -876,6 +891,50 @@ std::vector<DrawTask> DisplayList::getThrottleFallbackTasks(
   return tasks;
 }
 
+// Returns whether every cell of `tile` that holds content is also drawn by a cache at another
+// scale, so recycling the tile loses nothing that no other scale can show. The cells match the ones
+// getFallbackDrawTasks() looks at, and the live caches are read so a tile already handed out no
+// longer counts as a backup.
+static bool HasScaleBackup(const Tile& tile, float scale, int tileSize, const Rect& renderBounds,
+                           const std::vector<std::pair<float, TileCache*>>& sortedCaches) {
+  if (sortedCaches.size() < 2) {
+    return false;
+  }
+  auto tileStartX = tile.tileX * tileSize;
+  auto tileStartY = tile.tileY * tileSize;
+  auto gridCount = std::max(tileSize / FALLBACK_GRID_SIZE, 1);
+  auto gridSize = tileSize / gridCount;
+  auto scaledBounds = renderBounds;
+  scaledBounds.scale(scale, scale);
+  scaledBounds.roundOut();
+  for (int gridX = 0; gridX < gridCount; ++gridX) {
+    for (int gridY = 0; gridY < gridCount; ++gridY) {
+      auto gridStartX = tileStartX + gridX * gridSize;
+      auto gridStartY = tileStartY + gridY * gridSize;
+      auto cell = Rect::MakeXYWH(gridStartX, gridStartY, gridSize, gridSize);
+      if (!cell.intersect(scaledBounds)) {
+        continue;
+      }
+      bool covered = false;
+      for (auto& [otherScale, otherCache] : sortedCaches) {
+        if (otherScale == scale || otherCache->empty()) {
+          continue;
+        }
+        auto zoomed = cell;
+        zoomed.scale(otherScale / scale, otherScale / scale);
+        if (!otherCache->getTilesUnderRect(zoomed, true).empty()) {
+          covered = true;
+          break;
+        }
+      }
+      if (!covered) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
     const Surface* renderSurface, size_t tileCount,
     const std::vector<std::pair<float, TileCache*>>& sortedCaches) {
@@ -895,7 +954,14 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
   emptyTiles.clear();
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
-  // Reverse iterate through sorted caches to get the farest tiles first.
+  // Order the caches the farthest scale first, and the tiles farthest from the viewport center
+  // first inside a cache, as the recycling has always done.
+  struct CacheCandidates {
+    float scale = 0.0f;
+    TileCache* cache = nullptr;
+    std::vector<std::shared_ptr<Tile>> tiles = {};
+  };
+  std::vector<CacheCandidates> candidates = {};
   for (size_t i = 0, j = sortedCaches.size(); i < j;) {
     auto& [scaleS, tileCacheS] = sortedCaches.at(i);
     auto& [scaleL, tileCacheL] = sortedCaches.at(j - 1);
@@ -912,10 +978,27 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
     auto centerY = static_cast<float>(renderSurface->height()) * 0.5f - _contentOffset.y;
     centerX *= scale / currentZoomScale;
     centerY *= scale / currentZoomScale;
-    auto reusableTiles = tileCache->getReusableTiles(centerX, centerY);
-    for (auto& tile : reusableTiles) {
-      tileCache->removeTile(tile->tileX, tile->tileY);
-      tiles.push_back(std::move(tile));
+    candidates.push_back({scale, tileCache, tileCache->getReusableTiles(centerX, centerY)});
+  }
+  // A tile another scale can draw again is redundant, so it goes before the tiles that are the only
+  // copy of their content. The second pass still takes those when the pool needs more: a tile is
+  // worthless when there is no tile left to draw the missing area with.
+  for (bool backedOnly : {true, false}) {
+    for (auto& candidate : candidates) {
+      for (auto& tile : candidate.tiles) {
+        if (tile == nullptr) {
+          continue;
+        }
+        if (backedOnly &&
+            !HasScaleBackup(*tile, candidate.scale, _tileSize, _root->renderBounds, sortedCaches)) {
+          continue;
+        }
+        candidate.cache->removeTile(tile->tileX, tile->tileY);
+        tiles.push_back(std::move(tile));
+        if (tiles.size() >= tileCount) {
+          break;
+        }
+      }
       if (tiles.size() >= tileCount) {
         break;
       }
@@ -1201,10 +1284,207 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
 }
 
+// Merges the rects that overlap or touch, so many styles sitting next to each other do not multiply
+// the per-layer cull loop. Every join restarts the scan and a scan is O(n^2), so the loop is O(n^3)
+// in the worst case: the callers size the list before calling.
+void DisplayList::mergeCullRects(std::vector<Rect>* rects) {
+  bool merged = true;
+  while (merged) {
+    merged = false;
+    for (size_t i = 0; i < rects->size() && !merged; ++i) {
+      for (size_t j = i + 1; j < rects->size(); ++j) {
+        auto& current = (*rects)[i];
+        const auto& other = (*rects)[j];
+        auto joined = current;
+        joined.join(other);
+        // Merge when the bounding rect is no larger than the two areas combined: always true for a
+        // shared edge or containment, and for overlaps that are nearly aligned, while a real gap is
+        // left alone. The bounding rect may add a little area, which only draws a little more.
+        auto joinedArea = joined.width() * joined.height();
+        if (joinedArea <= current.width() * current.height() + other.width() * other.height()) {
+          current = joined;
+          rects->erase(rects->begin() + static_cast<long>(j));
+          merged = true;
+          break;
+        }
+      }
+    }
+  }
+}
+
+// Builds the list a capture culls its draw against. Merging only pays for a small list, and when
+// too many groups stay apart, bounding them per captured rect keeps every rect inside its captured
+// rect and still drops the rects no style reaches. Only when even that exceeds the budget, or
+// covers more than the union does, the union is used, which may also span the gaps between captured
+// rects. A union that spans those gaps wider than the captured rects themselves is not worth it:
+// the capture then draws everything it would have drawn anyway, so the list is left empty and the
+// caller keeps the captured rects.
+std::vector<Rect> DisplayList::buildCullRects(const std::vector<Rect>& footprints,
+                                              const std::vector<Rect>& captureRects) {
+  auto narrowed = narrowCullRects(footprints, captureRects);
+  if (narrowed.empty()) {
+    return {};
+  }
+  if (narrowed.size() <= 4 * MAX_CULL_RECTS) {
+    mergeCullRects(&narrowed);
+    if (narrowed.size() <= MAX_CULL_RECTS) {
+      return narrowed;
+    }
+  }
+  auto unionRect = Rect::MakeEmpty();
+  for (const auto& rect : narrowed) {
+    unionRect.join(rect);
+  }
+  auto captureArea = 0.0f;
+  for (const auto& rect : captureRects) {
+    captureArea += rect.width() * rect.height();
+  }
+  auto unionArea = unionRect.width() * unionRect.height();
+  auto perCapture = std::vector<Rect>{};
+  perCapture.reserve(captureRects.size());
+  for (const auto& captureRect : captureRects) {
+    auto bounds = Rect::MakeEmpty();
+    // Captured rects overlap once they are widened by the blur reach, so a piece narrowed to a
+    // neighbour may reach into this one. Clipping it first keeps the bounds inside this rect, and
+    // the neighbour still covers the piece in full.
+    for (const auto& rect : narrowed) {
+      auto clipped = rect;
+      if (clipped.intersect(captureRect)) {
+        bounds.join(clipped);
+      }
+    }
+    if (!bounds.isEmpty()) {
+      perCapture.push_back(bounds);
+    }
+  }
+  // A frame that repaints more captured rects than the per-layer loop can afford has no list to
+  // give: bounding them per rect would already exceed the budget, so it falls back to the union.
+  if (perCapture.size() > MAX_CULL_RECTS) {
+    return unionArea > captureArea ? std::vector<Rect>{} : std::vector<Rect>{unionRect};
+  }
+  auto perCaptureArea = 0.0f;
+  for (const auto& rect : perCapture) {
+    perCaptureArea += rect.width() * rect.height();
+  }
+  if (perCaptureArea <= unionArea) {
+    return perCapture;
+  }
+  return unionArea > captureArea ? std::vector<Rect>{} : std::vector<Rect>{unionRect};
+}
+
+// A style reads the captured background under the recording it resolves, and only where it shows:
+// within the blur reach of its visible region, which is what the footprint covers. The recording
+// measures the same geometry the layer bounds do, but it is rounded out to the layer's own pixels,
+// which are no larger than the captured ones since both follow the capture canvas scale, and the
+// copy is then rounded out to the captured pixels. Widening a footprint by one captured pixel and
+// rounding it out to that grid covers both roundings. A rotated layer reads no farther: the style
+// resamples the copy on its own grid inside its content bounds.
+static Rect RoundOutToCapturedPixels(const Rect& footprint, const Matrix& worldToPixel,
+                                     const Matrix& pixelToWorld) {
+  auto pixelRect = worldToPixel.mapRect(footprint);
+  pixelRect.outset(1.0f, 1.0f);
+  pixelRect.roundOut();
+  return pixelToWorld.mapRect(pixelRect);
+}
+
+// Returns the world rects the capture may cull its draw to, or an empty list when the whole
+// captured area has to be drawn. `worldRects` are the captured rects, already widened by the blur
+// reach, and `pixelToWorld` maps a pixel of the captured background to the world.
+std::vector<Rect> DisplayList::computeCaptureCullRects(const std::vector<Rect>& worldRects,
+                                                       const Matrix& pixelToWorld) const {
+  if (!captureCullingEnabledForTests) {
+    return {};
+  }
+  Matrix worldToPixel = Matrix::I();
+  if (!pixelToWorld.invert(&worldToPixel)) {
+    return {};
+  }
+  auto captureBounds = Rect::MakeEmpty();
+  for (const auto& rect : worldRects) {
+    captureBounds.join(rect);
+  }
+  // An empty list means no style samples inside this capture, so there is nothing to narrow the
+  // draw to, but the capture still runs: keeping the whole area only costs the culling for this
+  // frame.
+  auto footprints = collectBackgroundFootprints(captureBounds);
+  if (footprints.empty()) {
+    return {};
+  }
+  for (auto& footprint : footprints) {
+    footprint = RoundOutToCapturedPixels(footprint, worldToPixel, pixelToWorld);
+  }
+  return buildCullRects(footprints, worldRects);
+}
+
+// Intersects each footprint with each captured rect instead of with their union, so the narrowed
+// cull never covers more than the capture would have drawn without the footprints. Footprints that
+// overlap no captured rect are dropped.
+std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprints,
+                                               const std::vector<Rect>& captureRects) {
+  std::vector<Rect> narrowed = {};
+  narrowed.reserve(footprints.size());
+  for (const auto& footprint : footprints) {
+    for (const auto& captureRect : captureRects) {
+      auto clipped = footprint;
+      if (clipped.intersect(captureRect)) {
+        narrowed.push_back(clipped);
+      }
+    }
+  }
+  return narrowed;
+}
+
+// Walks only the subtrees that hold a background style. A style blurs the backdrop of its whole
+// content, which its render bounds cover, so the footprint of a layer nothing cuts also covers
+// every style below it until a scrollRect or a mask cuts that subtree again. A cut layer still
+// blurs the backdrop of its whole content, so a pixel next to the cut reads up to the blur reach
+// beyond it, and widening the footprint by that reach covers every style below it for good.
+// `clipped` tells whether this layer or an ancestor is cut, and `covered` whether a footprint above
+// already covers this layer.
+//
+// The culling is right only while a style reads no backdrop outside its footprint: the recording it
+// resolves has to stay inside the layer bounds up to its pixel rounding, and a cut layer may read
+// the reach beyond those bounds, which is why it is widened here. A shape measured wider than it
+// draws would break that, so the stroke measurement of rects, round rects and ovals stopped adding
+// a miter those shapes cannot reach.
+void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds, bool clipped,
+                                              bool covered, std::vector<Rect>* footprints,
+                                              float alpha) {
+  if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
+      !Rect::Intersects(bounds, layer->renderBounds)) {
+    return;
+  }
+  if (layer->_scrollRect != nullptr || layer->hasValidMask()) {
+    clipped = true;
+    covered = false;
+  }
+  if (!covered && layer->hasOwnBackgroundStyle(alpha)) {
+    auto footprint = layer->renderBounds;
+    if (clipped) {
+      footprint.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
+    }
+    footprints->push_back(footprint);
+    if (clipped) {
+      return;
+    }
+    covered = true;
+  }
+  for (const auto& child : layer->_children) {
+    collectBackgroundFootprints(child.get(), bounds, clipped, covered, footprints,
+                                alpha * child->_alpha);
+  }
+}
+
+std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds) const {
+  std::vector<Rect> footprints = {};
+  collectBackgroundFootprints(_root.get(), worldBounds, false, false, &footprints, 1.0f);
+  return footprints;
+}
+
 std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     Surface* surface, const std::vector<Rect>& renderRects) const {
   DEBUG_ASSERT(surface != nullptr);
-  if (!_root->hasBackgroundStyle()) {
+  if (!_root->hasBackgroundStyle(1.0f)) {
     return nullptr;
   }
   if (renderRects.empty()) {
@@ -1249,6 +1529,14 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   if (bgSource == nullptr) {
     return nullptr;
   }
+  // The layers to draw can be narrowed to the area the background styles sample, while the surface
+  // still covers every render rect: keeping the captured area unchanged keeps the multi-pass
+  // structure (and the style output sharing that depends on it) intact.
+  auto culledRects = computeCaptureCullRects(worldRects, bgSource->backgroundMatrix());
+  auto cullWorldRects = worldRects;
+  if (!culledRects.empty()) {
+    cullWorldRects = std::move(culledRects);
+  }
   auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
   snapshotMap->multiPass = renderRects.size() > 1;
   snapshotMap->visibleRects = std::move(visibleRects);
@@ -1274,7 +1562,8 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   if (_backgroundColor != Color::Transparent()) {
     bgSource->getCanvas()->drawColor(_backgroundColor, BlendMode::SrcOver);
   }
-  BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get(), worldRects);
+  BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get(), cullWorldRects,
+                          worldRects, 1.0f);
   return snapshotMap;
 }
 

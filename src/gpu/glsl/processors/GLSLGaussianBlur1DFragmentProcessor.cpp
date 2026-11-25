@@ -190,7 +190,8 @@ void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("if (i > radius) { break; }");
   // abs(i) never exceeds kernelRadius, which computeKernel() derives as ceil(2 * sigma) and thus
   // stays within 2 * maxSigma as long as the sigma <= maxSigma contract holds, upheld by the call
-  // site as described in computeKernel(). The loop bound above rests on the same contract.
+  // site as described in computeKernel(). The loop bound above rests on the same contract, so the
+  // library lookup only reaches the slots that range can hit.
   auto weightEntry = fragBuilder->appendFunction("tgfxBlurWeight");
   if (weightEntry.empty()) {
     return;

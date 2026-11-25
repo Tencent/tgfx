@@ -26,6 +26,7 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SamplingOptions.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ImageOrigin.h"
 #include "tgfx/platform/HardwareBuffer.h"
@@ -39,6 +40,7 @@ class TPArgs;
 class SamplingArgs;
 class Context;
 class ImageFilter;
+class ImageProvider;
 class FragmentProcessor;
 class TextureProxy;
 class Paint;
@@ -77,6 +79,15 @@ class Image {
    * nullptr. The image generator may wrap codec data or custom data.
    */
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator);
+
+  /**
+   * Creates an Image from the image provider. The returned Image keeps a reference to the provider
+   * and asks it for the variant matching the scale it is finally drawn at. Its width and height are
+   * the logical size reported by the provider, so the layout size stays the same while the pixel
+   * density of the displayed variant changes. Returns nullptr if the provider is nullptr or
+   * reports a size less than or equal to 0.
+   */
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageProvider> provider);
 
   /**
    * Creates an Image using the provided ImageInfo and pixel data from an immutable Data object. The
@@ -327,6 +338,7 @@ class Image {
     Generator,
     Orient,
     Picture,
+    Provider,
     Rasterized,
     RGBAAA,
     Texture,
@@ -359,6 +371,13 @@ class Image {
   virtual float getRasterizedScale(float drawScale) const;
 
   /**
+   * Returns the content size of the texture created by lockTextureProxy() at the given rasterized
+   * scale. The texture may be larger than its content. Returns an empty size if the content size is
+   * unknown. The default implementation returns the image's width and height.
+   */
+  virtual ISize getRasterizedSize(float scale) const;
+
+  /**
    * Returns a texture proxy for the entire Image. Note that the returned texture size may differ
    * from the scaling factor in TPArgs, as subclasses can choose whether to apply exact scaling.
    * @param args The TPArgs used to create the texture proxy.
@@ -379,6 +398,7 @@ class Image {
   friend class RuntimeImageFilter;
   friend class TransformImage;
   friend class RGBAAAImage;
+  friend class ProviderImage;
   friend class RasterizedImage;
   friend class ScaledImage;
   friend class ImageShader;

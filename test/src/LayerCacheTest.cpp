@@ -918,4 +918,59 @@ TGFX_TEST_PRIVATE(LayerCacheTest, OverlappingDirtyRegions) {
                       EXPECT_EQ(9lu, emptyTilesAfter));
 }
 
+// A tile whose area another scale also holds is recycled before the tiles that are the only copy of
+// their content, so the pool keeps what no other cache can draw again.
+TGFX_TEST_PRIVATE(LayerCacheTest, FullPoolRecyclesRedundantTilesFirst) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 256, 256);
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.setTileSize(128);
+  displayList.setMaxTileCount(9);
+  displayList.setBackgroundColor(Color::White());
+  Path path = {};
+  path.addRect(Rect::MakeWH(1024.0f, 1024.0f));
+  auto shape = ShapeLayer::Make();
+  shape->setPath(path);
+  shape->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList.root()->addChild(shape);
+  // Scale 1 covers world 0..256 and scale 2 covers world 0..128 on top of it, so only the scale 1
+  // tile at the origin has every cell drawn again by another scale.
+  for (auto zoom : {1.0f, 2.0f}) {
+    displayList.setZoomScale(zoom);
+    displayList.setContentOffset(0.0f, 0.0f);
+    int frames = 0;
+    do {
+      displayList.render(surface.get());
+      ++frames;
+    } while (displayList.hasContentChanged() && frames < 20);
+  }
+  displayList.setZoomScale(4.0f);
+  TGFX_PRIVATE_ACCESS({
+    ASSERT_EQ(displayList.tileCaches.size(), 2u);
+    auto first = displayList.tileCaches.begin();
+    auto second = std::next(first);
+    auto* scaleOneCache = first->first < second->first ? first->second : second->second;
+    auto* scaleTwoCache = first->first < second->first ? second->second : first->second;
+    ASSERT_EQ(scaleOneCache->tileMap.size(), 4u);
+    ASSERT_EQ(scaleTwoCache->tileMap.size(), 4u);
+    ASSERT_EQ(displayList.emptyTiles.size(), 1u);
+    // The free tile comes first, then the redundant one instead of a tile no other scale holds.
+    auto tiles = displayList.getFreeTiles(surface.get(), 2, displayList.getSortedTileCaches());
+    EXPECT_EQ(tiles.size(), 2u);
+    EXPECT_EQ(scaleOneCache->tileMap.size(), 3u);
+    EXPECT_TRUE(scaleOneCache->getTile(0, 0) == nullptr);
+    EXPECT_TRUE(scaleOneCache->getTile(1, 1) != nullptr);
+    EXPECT_EQ(scaleTwoCache->tileMap.size(), 4u);
+    // The remaining tiles are the only copy of their content, so they are taken only once the
+    // redundant ones run out.
+    tiles = displayList.getFreeTiles(surface.get(), 4, displayList.getSortedTileCaches());
+    EXPECT_EQ(tiles.size(), 4u);
+    EXPECT_TRUE(scaleOneCache->empty());
+    EXPECT_EQ(scaleTwoCache->tileMap.size(), 3u);
+  });
+}
+
 }  // namespace tgfx

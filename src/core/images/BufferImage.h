@@ -52,6 +52,8 @@ class BufferImage : public PixelImage {
 
   float getRasterizedScale(float drawScale) const override;
 
+  ISize getRasterizedSize(float scale) const override;
+
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;

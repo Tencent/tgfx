@@ -103,6 +103,16 @@ bool DrawContent::contourEqualsOpaqueContent(bool includeUnpaintedGeometry) cons
   return true;
 }
 
+bool DrawContent::isFullyOpaque() const {
+  if (!color.has_value() || color->alpha <= 0) {
+    return true;
+  }
+  if (color->alpha < 1.0f || blendMode != BlendMode::SrcOver) {
+    return false;
+  }
+  return shader == nullptr || shader->isOpaque();
+}
+
 bool DrawContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
   if (!color.has_value() || color->alpha <= 0) {
     return false;

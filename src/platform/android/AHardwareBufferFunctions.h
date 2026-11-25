@@ -20,6 +20,7 @@
 
 #include <android/hardware_buffer.h>
 #include <jni.h>
+#include <cstdint>
 
 namespace tgfx {
 using Allocate = int(const AHardwareBuffer_Desc* desc, AHardwareBuffer** outBuffer);

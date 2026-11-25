@@ -116,7 +116,7 @@ if (EXISTS ${CACHE_DIR}/md5.json AND EXISTS ${CACHE_DIR}/version.json)
     )
 else ()
     message(WARNING "Baseline cache not found at ${CACHE_DIR}/. "
-        "Screenshot tests will pass without actual comparison. "
+        "Screenshot tests will fail because there is no reference to compare against. "
         "Run './update_baseline.sh USE_WEBGL' (or USE_WEBGPU) from project root first.")
 endif ()
 

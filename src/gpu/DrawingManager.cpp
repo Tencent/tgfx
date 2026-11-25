@@ -118,11 +118,15 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   auto allocator = drawingAllocator();
   auto drawOps = allocator->makeArray<DrawOp>(&drawOp, 1);
   auto textureProxy = renderTarget->asTextureProxy();
-  // fillRTWithFP produces a new offscreen image, never a draw over prior target contents. Its
-  // generated rectangle only covers the logical size, while the scratch backing may be larger.
-  // Initialize the whole backing so downstream linear/decal sampling never sees stale texels.
+  std::optional<PMColor> clearColor = std::nullopt;
+  if (textureProxy != nullptr && textureProxy->hasMipmaps() &&
+      (textureProxy->backingStoreWidth() != textureProxy->width() ||
+       textureProxy->backingStoreHeight() != textureProxy->height())) {
+    // Mipmap generation samples the whole backing store, including unwritten padding.
+    clearColor = PMColor::Transparent();
+  }
   auto task = allocator->make<OpsRenderTask>(allocator, std::move(renderTarget), std::move(drawOps),
-                                             PMColor::Transparent());
+                                             clearColor);
   addRenderTask(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
   return true;

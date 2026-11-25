@@ -32,6 +32,18 @@ GlassRefractionFragmentProcessor::GlassRefractionFragmentProcessor(
   geometryIndex = registerChildProcessor(std::move(geometry));
 }
 
+void GlassRefractionFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  uint32_t flags = 0;
+  if (params.dispersion >= 0.01f) {
+    flags |= 1;
+  }
+  if (params.lightIntensity > 0.0f) {
+    flags |= 2;
+  }
+  bytesKey->write(flags);
+  bytesKey->write(static_cast<uint32_t>(params.shapeType));
+}
+
 size_t GlassRefractionFragmentProcessor::onCountTextureSamplers() const {
   return 1;
 }
@@ -43,19 +55,6 @@ std::shared_ptr<Texture> GlassRefractionFragmentProcessor::onTextureAt(size_t) c
 
 SamplerState GlassRefractionFragmentProcessor::onSamplerStateAt(size_t) const {
   return SamplerState(TileMode::Clamp, TileMode::Clamp);
-}
-
-
-
-void GlassRefractionFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  uint32_t flags = 0;
-  if (params.dispersion >= 0.01f) {
-    flags |= 1;
-  }
-  if (params.lightIntensity > 0.0f) {
-    flags |= 2;
-  }
-  bytesKey->write(flags);
 }
 
 }  // namespace tgfx

@@ -17,7 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MergeShape.h"
+#include "core/PathRef.h"
 #include "core/shapes/AppendShape.h"
+#include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_ptr<Shape> second,
@@ -37,19 +40,52 @@ std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_pt
   return std::make_shared<MergeShape>(std::move(first), std::move(second), pathOp);
 }
 
+bool MergeShape::unionConcatenates(const Path& firstPath, const Path& secondPath) const {
+  if (pathOp != PathOp::Union) {
+    return false;
+  }
+  // A text run reports its em box, which overlaps neighbours whose outlines do not, so the fast
+  // path is decided from the reported bounds. A Shape can also report a rule that differs from its
+  // outline, and an outline grown by a non-unit resolution scale can reach a neighbour that the
+  // scale=1 outline misses, so the two outlines actually being combined must confirm the rules
+  // and disjointness before concatenation.
+  auto firstType = first->fillType();
+  auto secondType = second->fillType();
+  if (!PathRef::UnionsByConcatenation(firstType, first->getBounds(), secondType,
+                                      second->getBounds())) {
+    return false;
+  }
+  return firstPath.getFillType() == firstType && secondPath.getFillType() == secondType &&
+         PathRef::UnionsByConcatenation(firstPath.getFillType(), firstPath.getBounds(),
+                                        secondPath.getFillType(), secondPath.getBounds());
+}
+
+// fillType() and the base isInverseFillType() both describe the rule of the outline handed out, so
+// the inverse flag needs no separate override here.
 PathFillType MergeShape::fillType() const {
-  bool firstInverse = first->isInverseFillType();
-  bool secondInverse = second->isInverseFillType();
+  if (pathOp == PathOp::Append || pathOp == PathOp::Extend) {
+    return getPath().getFillType();
+  }
+  auto firstPath = first->getPath();
+  auto secondPath = second->getPath();
+  if (unionConcatenates(firstPath, secondPath)) {
+    // Concatenation keeps the first operand's outline unchanged, including its rule.
+    return firstPath.getFillType();
+  }
+  // A boolean operation resolves both operands under the rules of the outlines it receives and
+  // writes an even-odd result, inverse only when the area outside that result stays filled.
+  auto firstInverse = firstPath.isInverseFillType();
+  auto secondInverse = secondPath.isInverseFillType();
   bool inverse = false;
   switch (pathOp) {
-    case PathOp::Difference:
-      inverse = firstInverse && !secondInverse;
+    case PathOp::Union:
+      inverse = firstInverse || secondInverse;
       break;
     case PathOp::Intersect:
       inverse = firstInverse && secondInverse;
       break;
-    case PathOp::Union:
-      inverse = firstInverse || secondInverse;
+    case PathOp::Difference:
+      inverse = firstInverse && !secondInverse;
       break;
     case PathOp::XOR:
       inverse = firstInverse != secondInverse;
@@ -57,23 +93,25 @@ PathFillType MergeShape::fillType() const {
     default:
       break;
   }
-  // PathOp always produces EvenOdd fill type regardless of input fill types.
   return inverse ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd;
 }
 
 Rect MergeShape::onGetBounds() const {
   auto firstBounds = first->onGetBounds();
   auto secondBounds = second->onGetBounds();
-  bool firstInverse = first->isInverseFillType();
-  bool secondInverse = second->isInverseFillType();
   switch (pathOp) {
     case PathOp::Difference:
-      return secondInverse ? secondBounds : firstBounds;
-    case PathOp::Intersect:
+      return second->isInverseFillType() ? secondBounds : firstBounds;
+    case PathOp::Intersect: {
+      // Only these two operations need the inverse flags; asking for them on a union chain would
+      // build every operand path just to discard the answer.
+      auto firstInverse = first->isInverseFillType();
+      auto secondInverse = second->isInverseFillType();
       if (firstInverse == secondInverse) {
         return firstBounds.intersect(secondBounds) ? firstBounds : Rect::MakeEmpty();
       }
       return firstInverse ? secondBounds : firstBounds;
+    }
     default:
       firstBounds.join(secondBounds);
       return firstBounds;
@@ -81,9 +119,21 @@ Rect MergeShape::onGetBounds() const {
 }
 
 Path MergeShape::onGetPath(float resolutionScale) const {
-  auto path = first->onGetPath(resolutionScale);
-  auto secondPath = second->onGetPath(resolutionScale);
-  path.addPath(secondPath, pathOp);
+  // Reusing the cached scale=1 paths keeps a chain of merges linear: each operand is built once
+  // instead of once per ancestor. Export paths with another scale build their own outlines, and
+  // those exact outlines are used for the concatenation check below.
+  bool unitScale = FloatNearlyEqual(resolutionScale, 1.0f);
+  auto path = unitScale ? first->getPath() : first->onGetPath(resolutionScale);
+  auto secondPath = unitScale ? second->getPath() : second->onGetPath(resolutionScale);
+  if (!PathRef::AddPath(path, secondPath, pathOp, unionConcatenates(path, secondPath))) {
+    // A failed operation leaves the first operand behind, which is not the merge that was asked
+    // for: reading it as the result would draw one side of the operation as if it were both. An
+    // empty path is the only answer that is wrong in a visible way rather than a silent one, and
+    // it still carries the rule fillType() reports, so nothing downstream reads a mixed result.
+    LOGE("MergeShape::onGetPath() Failed to merge the two shapes; reporting an empty result.");
+    path = {};
+    path.setFillType(fillType());
+  }
   return path;
 }
 

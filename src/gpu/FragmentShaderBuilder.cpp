@@ -288,7 +288,7 @@ std::string FragmentShaderBuilder::emitPerspTextCoord(const CoordValue& coordVar
     return coordVar.name();
   }
   if (coordVar.type() == SLType::Float3) {
-    const std::string perspCoordName = "perspCoord2D";
+    const std::string perspCoordName = "persp_" + coordVar.name();
     if (sourceRecorder != nullptr) {
       FragmentSourceRecord record = {};
       record.kind = FragmentSourceRecord::Kind::Project;

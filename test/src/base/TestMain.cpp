@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TestEnvironment.h"
+#include "utils/Baseline.h"
 #include "utils/ShaderAOTTestReporter.h"
 
 int main(int argc, char** argv) {
@@ -26,5 +27,7 @@ int main(int argc, char** argv) {
 #ifndef UPDATE_BASELINE
   tgfx::InstallShaderAOTTestReporter();
 #endif
-  return RUN_ALL_TESTS();
+  auto result = RUN_ALL_TESTS();
+  tgfx::Baseline::ReportMissingCache();
+  return result;
 }
