@@ -442,11 +442,11 @@ class PrecompiledShaderCache {
   void resetStats();
 
   /// Returns the cache of compiled shader modules. It lives here because this object exists for
-  /// every Context and backend, including those with no bundle; it serves the precompiled
-  /// creator's module and pipeline creation.
+  /// every Context and backend; the benchmark harness reads it.
   ShaderCache* shaderCache() {
     return &_shaderCache;
   }
+
 
   /// Whether the AOT route may specialize a precompiled variant with the draw's structural
   /// uniform values before creating its program. On by default, and the resolver's format gate
@@ -500,11 +500,11 @@ class PrecompiledShaderCache {
 
   Context* _context = nullptr;
   Backend _backend = Backend::Unknown;
-  ShaderCache _shaderCache;
   std::atomic<uint64_t> _generation{0};
   /// The specialization capture's per-(vertex, fragment)-stage scratch, keyed by the two stage
   /// hashes and dropped whenever a bundle load replaces the stage blobs (the reflected uniforms
   /// the scratch was built from may no longer be the same).
+  ShaderCache _shaderCache;
   bool _specializationEnabled = false;
   mutable std::mutex _specStatsMutex;
   SpecStats _specStats = {};

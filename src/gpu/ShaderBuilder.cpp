@@ -19,7 +19,6 @@
 #include "ShaderBuilder.h"
 #include "ProgramBuilder.h"
 #include "Swizzle.h"
-#include "gpu/shaders/ShaderFunctionCatalog.h"
 #include "gpu/shaders/ShaderLibraryBundle.h"
 #include "stdarg.h"
 
