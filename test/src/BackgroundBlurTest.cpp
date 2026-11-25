@@ -3216,4 +3216,47 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, PartialAlphaDrawKeepsTheBlur) {
   });
 }
 
+// A layer whose effects reach into the captured area while its content lies outside it still has
+// its background style dispatched by the capture, which records an empty entry for it instead of
+// holding on to the capture surface.
+TGFX_TEST_PRIVATE(BackgroundBlurTest, CaptureSkipsStyleOutsideItsSurface) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto surface = Surface::Make(context, 240, 200);
+    DisplayList displayList;
+    displayList.setBackgroundColor(Color::White());
+    auto backdrop = ShapeLayer::Make();
+    Path backdropPath = {};
+    backdropPath.addRect(Rect::MakeXYWH(0, 0, 240, 100));
+    backdrop->setPath(backdropPath);
+    backdrop->setFillStyle(ShapeStyle::Make(Color::Black()));
+    displayList.root()->addChild(backdrop);
+    auto card = SolidLayer::Make();
+    card->setColor(Color::FromRGBA(30, 120, 220, 128));
+    card->setWidth(64);
+    card->setHeight(64);
+    card->setMatrix(Matrix::MakeTrans(600, 40));
+    auto blur = BackgroundBlurStyle::Make(4, 4);
+    card->setLayerStyles(
+        {blur, DropShadowStyle::Make(-560, 0, 0, 0, Color::FromRGBA(0, 0, 0, 255))});
+    displayList.root()->addChild(card);
+    displayList.render(surface.get());
+
+    auto map = displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)});
+    ASSERT_TRUE(map != nullptr);
+    auto entries = map->snapshots.find(BackgroundSnapshotKey{card.get(), blur.get()});
+    ASSERT_TRUE(entries != map->snapshots.end());
+    ASSERT_EQ(entries->second.size(), 1u);
+    EXPECT_TRUE(entries->second[0].image == nullptr);
+    // The drop shadow lands inside the surface while the blurred card stays out of it.
+    auto shadow = surface->getColor(60, 60);
+    EXPECT_NEAR(shadow.red, 0.0f, 2.0f / 255.0f);
+    auto outside = surface->getColor(60, 150);
+    EXPECT_NEAR(outside.red, 1.0f, 2.0f / 255.0f);
+    context->flushAndSubmit();
+  });
+}
+
 }  // namespace tgfx
