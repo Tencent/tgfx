@@ -822,13 +822,12 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   return dirtyRects;
 }
 
-std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureLevelBackgrounds(
+std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureTaskBackgrounds(
     Surface* surface, const std::vector<DrawTask>& tileTasks,
     const std::vector<size_t>& taskIndices, int level, float zoomScale,
     std::vector<bool>* taskSnapshotCover) const {
-  // Each capture serves all tiles of one raster scale, so a tile is captured with the density it
-  // is drawn with. That is what lets tree tiles take part: their scale is 2^-level, not the
-  // current zoom.
+  // A capture serves tiles of one raster scale, so a tile is captured with the density it is drawn
+  // with. That is what lets tree tiles take part: their scale is 2^-level, not the current zoom.
   auto rasterScale = level == EXACT_LEVEL ? zoomScale : GetTileRasterScale(level);
   if (FloatNearlyZero(rasterScale)) {
     return nullptr;
@@ -923,42 +922,49 @@ std::vector<Rect> DisplayList::drawTileTasks(const std::vector<DrawTask>& tileTa
            std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >=
                budgetSeconds;
   };
-  // Group by level, keeping the order in which levels first appear: one capture transform cannot
-  // serve two raster scales.
-  std::vector<std::pair<int, std::vector<size_t>>> levels = {};
+  // One capture transform cannot serve two raster scales, so a group holds the tasks of one level.
+  // Within a level, a group of neighboring tiles shares a capture while the budget can still stop
+  // between groups. Groups keep the order in which their first task appears.
+  struct TaskGroup {
+    int level = 0;
+    int blockX = 0;
+    int blockY = 0;
+    std::vector<size_t> taskIndices = {};
+  };
+  std::vector<TaskGroup> groups = {};
   for (size_t i = 0; i < tileTasks.size(); ++i) {
+    const auto& tile = *tileTasks[i].getTiles().front();
     auto level = tileTasks[i].treeLevel();
-    auto it = std::find_if(
-        levels.begin(), levels.end(),
-        [level](const std::pair<int, std::vector<size_t>>& entry) { return entry.first == level; });
-    if (it == levels.end()) {
-      levels.push_back({level, {i}});
+    auto blockX = FloatFloorToInt(static_cast<float>(tile.tileX) / 2.0f);
+    auto blockY = FloatFloorToInt(static_cast<float>(tile.tileY) / 2.0f);
+    auto it = std::find_if(groups.begin(), groups.end(), [&](const TaskGroup& group) {
+      return group.level == level && group.blockX == blockX && group.blockY == blockY;
+    });
+    if (it == groups.end()) {
+      groups.push_back({level, blockX, blockY, {i}});
     } else {
-      it->second.push_back(i);
+      it->taskIndices.push_back(i);
     }
   }
   const bool hasBackgroundStyle = _root->hasBackgroundStyle(1.0f);
   std::vector<bool> taskSnapshotCover(tileTasks.size(), false);
   std::vector<Rect> dirtyRects = {};
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
-  for (const auto& [level, taskIndices] : levels) {
+  for (const auto& group : groups) {
     if (timeExpired()) {
       break;
     }
     std::unique_ptr<BackgroundSnapshotMap> snapshots = nullptr;
     if (hasBackgroundStyle) {
       const auto captureStart = std::chrono::steady_clock::now();
-      snapshots = captureLevelBackgrounds(surface, tileTasks, taskIndices, level, zoomScale,
-                                          &taskSnapshotCover);
+      snapshots = captureTaskBackgrounds(surface, tileTasks, group.taskIndices, group.level,
+                                         zoomScale, &taskSnapshotCover);
       ++gCaptureProbe.levelCaptures;
       gCaptureProbe.captureMs +=
           std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - captureStart)
               .count();
     }
-    for (auto taskIndex : taskIndices) {
-      if (timeExpired()) {
-        break;
-      }
+    for (auto taskIndex : group.taskIndices) {
       const auto& task = tileTasks[taskIndex];
       auto isTreeTask = task.treeLevel() != EXACT_LEVEL;
       int missingBackdrops = 0;

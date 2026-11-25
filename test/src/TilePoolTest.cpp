@@ -396,7 +396,7 @@ TGFX_TEST_PRIVATE(TilePoolTest, TimeBudgetDefersPatchesToLaterFrames) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
-  auto surface = Surface::Make(context, 512, 512);
+  auto surface = Surface::Make(context, 1024, 1024);
   ASSERT_NE(surface, nullptr);
   auto displayList = std::make_unique<DisplayList>();
   displayList->setRenderMode(RenderMode::Tiled);
@@ -405,18 +405,19 @@ TGFX_TEST_PRIVATE(TilePoolTest, TimeBudgetDefersPatchesToLaterFrames) {
   first->setMatrix(Matrix::MakeTrans(20, 20));
   displayList->root()->addChild(first);
   auto second = MakeSolid(50, 50, Color::Red());
-  second->setMatrix(Matrix::MakeTrans(400, 400));
+  // Tiles (0, 0) and (3, 3) fall in different 2x2 blocks, so they are drawn in separate groups.
+  second->setMatrix(Matrix::MakeTrans(800, 800));
   displayList->root()->addChild(second);
   displayList->render(surface.get());
   EXPECT_FALSE(displayList->hasContentChanged());
 
-  // The smallest budget runs out after the first task, so each frame patches a single tile.
+  // The smallest budget runs out after the first group, so each frame patches a single block.
   displayList->setTileTimeBudget(1e-9f);
   first->setColor(Color::Blue());
   second->setColor(Color::Blue());
   displayList->render(surface.get());
   auto firstPixel = ReadPixel(surface, 40, 40);
-  auto secondPixel = ReadPixel(surface, 420, 420);
+  auto secondPixel = ReadPixel(surface, 820, 820);
   EXPECT_TRUE((firstPixel == OPAQUE_BLUE) != (secondPixel == OPAQUE_BLUE));
   EXPECT_TRUE(firstPixel == OPAQUE_RED || secondPixel == OPAQUE_RED);
   TGFX_PRIVATE_ACCESS(EXPECT_FALSE(displayList->deferredPatches.empty()));
@@ -424,7 +425,7 @@ TGFX_TEST_PRIVATE(TilePoolTest, TimeBudgetDefersPatchesToLaterFrames) {
 
   displayList->render(surface.get());
   EXPECT_EQ(ReadPixel(surface, 40, 40), OPAQUE_BLUE);
-  EXPECT_EQ(ReadPixel(surface, 420, 420), OPAQUE_BLUE);
+  EXPECT_EQ(ReadPixel(surface, 820, 820), OPAQUE_BLUE);
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->deferredPatches.empty()));
 }
 
@@ -444,7 +445,7 @@ TGFX_TEST_PRIVATE(TilePoolTest, TimeBudgetDefersNewTilesToFallbacks) {
   // fallback levels to rasterize.
   displayList->setContentOffset(-256, 0);
   displayList->render(surface.get());
-  // The smallest budget runs out after the first task, so each frame adds at most one tile.
+  // The smallest budget runs out after the first group, so each frame adds at most one 2x2 block.
   displayList->setTileTimeBudget(1e-9f);
   auto tileCount = [&]() {
     size_t count = 0;
@@ -461,7 +462,7 @@ TGFX_TEST_PRIVATE(TilePoolTest, TimeBudgetDefersNewTilesToFallbacks) {
     EXPECT_EQ(ReadPixel(surface, 10, 10), OPAQUE_RED);
     EXPECT_EQ(ReadPixel(surface, 500, 500), OPAQUE_RED);
     auto count = tileCount();
-    EXPECT_LE(count, lastCount + 1);
+    EXPECT_LE(count, lastCount + 4);
     lastCount = count;
   }
   EXPECT_GT(frames, 1);

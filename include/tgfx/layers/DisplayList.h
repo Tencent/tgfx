@@ -266,9 +266,10 @@ class DisplayList {
    * Sets the per-frame time budget, in seconds, for rasterizing tiles in tiled rendering mode. Once
    * a frame has spent the budget, its remaining tiles are left to later frames: a new tile shows
    * the finest cached fallback of another scale in the meantime, or the background color when
-   * there is none, and a tile whose content changed keeps showing its outdated content. The first
-   * tile of a frame is always rasterized, so every frame makes progress. Zero or a negative value
-   * removes the limit.
+   * there is none, and a tile whose content changed keeps showing its outdated content. Neighboring
+   * tiles share a background capture and are rasterized together, at most a 2x2 block of one scale,
+   * and the first such block of a frame is always rasterized, so every frame makes progress. Zero or
+   * a negative value removes the limit.
    */
   void setTileTimeBudget(float seconds) {
     _tileTimeBudget = seconds > 0.0f ? seconds : 0.0f;
@@ -447,10 +448,11 @@ class DisplayList {
                     int* missingBackdrops = nullptr) const;
 
   /**
-   * Captures the backgrounds for the tasks of one tree level, listed by taskIndices. Marks in
-   * taskSnapshotCover the tasks the capture covers. Returns nullptr when the level needs no map.
+   * Captures the backgrounds for the tasks listed by taskIndices, which all rasterize the given
+   * tree level. Marks in taskSnapshotCover the tasks the capture covers. Returns nullptr when the
+   * tasks need no map.
    */
-  std::unique_ptr<BackgroundSnapshotMap> captureLevelBackgrounds(
+  std::unique_ptr<BackgroundSnapshotMap> captureTaskBackgrounds(
       Surface* surface, const std::vector<DrawTask>& tileTasks,
       const std::vector<size_t>& taskIndices, int level, float zoomScale,
       std::vector<bool>* taskSnapshotCover) const;
@@ -481,9 +483,10 @@ class DisplayList {
   void updateForceCapture(const DrawTask& task, bool skippedStyles);
 
   /**
-   * Captures the backgrounds and draws the tasks one tree level at a time. Stops once
-   * budgetSeconds has passed, if it is positive, leaving the rest undrawn; the first task is always
-   * drawn. drawn receives which tasks were drawn. Returns the dirty rects on the surface.
+   * Captures the backgrounds and draws the tasks one group at a time, a group being the tasks of
+   * one tree level within a 2x2 block of tiles. Stops before a group once budgetSeconds has passed,
+   * if it is positive, leaving the rest undrawn; the first group is always drawn. drawn receives
+   * which tasks were drawn. Returns the dirty rects on the surface.
    */
   std::vector<Rect> drawTileTasks(const std::vector<DrawTask>& tileTasks, Surface* surface,
                                   float zoomScale, double budgetSeconds, std::vector<bool>* drawn);
