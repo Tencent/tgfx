@@ -74,10 +74,10 @@ ShaderCaps::ShaderCaps(GPU* gpu) {
   maxUBOSize = limits->maxUniformBufferBindingSize;
   uboOffsetAlignment = limits->minUniformBufferOffsetAlignment;
   if (info->backend == Backend::Metal) {
-    // Metal natively supports framebuffer fetch via [[color(0)]] in MSL. The GLSL->SPIRV->MSL
-    // pipeline uses Vulkan subpassInput to represent this, and SPIRV-Cross converts it to
-    // the [[color(0)]] attribute when use_framebuffer_fetch_subpasses is enabled.
-    frameBufferFetchSupport = true;
+    // The assembled MSL route reads the destination through a destination texture copy: the
+    // printer emits no [[color(0)]] input, so a fetch that has no color name would leave the
+    // destination operand empty.
+    frameBufferFetchSupport = false;
   } else if (info->backend == Backend::WebGPU) {
     frameBufferFetchSupport = false;
     requiresUniformControlFlow = true;

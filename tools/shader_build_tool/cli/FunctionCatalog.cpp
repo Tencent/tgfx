@@ -856,7 +856,8 @@ bool CollectMslBlocks(const std::string& msl, std::vector<std::string>* blocks,
       break;
     }
     if (semi != std::string::npos && (open == std::string::npos || semi < open)) {
-      blocks->push_back(body.substr(start, semi - start + 1));
+      // A top-level declaration without a body is a module-local constant the dummy main used;
+      // its names are per-module, so it must not travel into the shared support text.
       index = semi + 1;
       continue;
     }
@@ -872,6 +873,22 @@ bool CollectMslBlocks(const std::string& msl, std::vector<std::string>* blocks,
           break;
         }
       }
+    }
+    const std::string header = body.substr(start, open - start);
+    const bool initializer =
+        header.find('=') != std::string::npos && header.find("struct ") == std::string::npos;
+    if (initializer ||
+        (header.find("struct ") == std::string::npos && header.find('(') == std::string::npos)) {
+      // A module-local initializer list is not a definition: it is dropped with its declaration.
+      while (end < body.size() && body[end] != ';') {
+        ++end;
+      }
+      index = end < body.size() ? end + 1 : end;
+      continue;
+    }
+    const bool isStruct = header.find("struct ") != std::string::npos;
+    if (isStruct && end < body.size() && body[end] == ';') {
+      ++end;
     }
     blocks->push_back(body.substr(start, end - start));
     index = end;
@@ -1003,6 +1020,36 @@ bool BuildCatalogMsl(const std::vector<CatalogEntry>& entries, StageCompiler* co
       return false;
     }
   }
+  // The translator splits a sampler parameter into the texture and the sampler state, so a
+  // function that reads a texture would need two arguments at every call site while the GLSL call
+  // shape passes one. Each such function is renamed <name>Impl and a macro rejoins the pair.
+  std::set<std::string> samplerFunctions = {};
+  for (const auto& pair : *mslByName) {
+    if (pair.second.find("texture2d<float>") != std::string::npos) {
+      samplerFunctions.insert(pair.first);
+    }
+  }
+  for (const auto& name : samplerFunctions) {
+    const std::string from = name + "(";
+    const std::string to = name + "Impl(";
+    for (auto& pair : *mslByName) {
+      size_t offset = 0;
+      while ((offset = pair.second.find(from, offset)) != std::string::npos) {
+        pair.second.replace(offset, from.size(), to);
+        offset += to.size();
+      }
+    }
+  }
+  // The runtime needs the list to spell the call sites: a sampler function's name gains the Impl
+  // suffix, and each sampler argument splits into the texture/sampler pair at the call.
+  std::string samplerList = {};
+  for (const auto& name : samplerFunctions) {
+    if (!samplerList.empty()) {
+      samplerList += ",";
+    }
+    samplerList += name;
+  }
+  mslByName->insert({"__msl_samplers__", samplerList});
   return true;
 }
 
@@ -1081,6 +1128,20 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
     }
     // The support types the translator emitted travel once, under a name no catalog function can
     // claim; the assembling shader appends them ahead of the functions.
+    const auto samplerEntry = mslByName.find("__msl_samplers__");
+    if (samplerEntry != mslByName.end() && !samplerEntry->second.empty()) {
+      FunctionOffset samplerOffset = {};
+      samplerOffset.name = static_cast<uint32_t>(mslPool.size());
+      mslPool += "__msl_samplers__";
+      mslPool.push_back('\0');
+      samplerOffset.source = static_cast<uint32_t>(mslPool.size());
+      samplerOffset.sourceSize = static_cast<uint32_t>(samplerEntry->second.size());
+      mslPool += samplerEntry->second;
+      mslPool.push_back('\0');
+      samplerOffset.requires = static_cast<uint32_t>(mslPool.size());
+      mslPool.push_back('\0');
+      mslOffsets.push_back(samplerOffset);
+    }
     FunctionOffset supportOffset = {};
     supportOffset.name = static_cast<uint32_t>(mslPool.size());
     mslPool += "__msl_support__";

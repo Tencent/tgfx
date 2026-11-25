@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <set>
 #include <string>
 #include <vector>
 #include "gpu/ir/ProgramDescription.h"
@@ -33,14 +34,25 @@ class ShaderBuilder;
  * arrives already translated (the library bundle's MSL section). The result is the complete MSL
  * text the Metal runtime compiles, entry point main0.
  */
+/// The call-site spelling rules the printer needs: the declared sampler names (a sampler argument
+/// splits into the texture/sampler pair) and the catalog functions the translator split that way
+/// (their call site names the Impl form).
+struct MslCallSite {
+  std::set<std::string> samplerNames = {};
+  std::set<std::string> samplerFunctions = {};
+};
+
 class MSLPrinter {
  public:
-  static std::string PrintVertexProgram(const std::vector<VertexCall>& calls);
+  static std::string PrintVertexProgram(const std::vector<VertexCall>& calls,
+                                        const MslCallSite& callSite);
 
-  static std::string PrintFragmentProgram(const FragmentProgram& program);
+  static std::string PrintFragmentProgram(const FragmentProgram& program,
+                                          const MslCallSite& callSite);
 
   static std::string PrintStage(const ProgramBuilder& programBuilder, ShaderStage stage,
-                                const InterfaceDesc& interface, const ShaderBuilder& builder);
+                                const InterfaceDesc& interface, const ShaderBuilder& builder,
+                                const MslCallSite& callSite);
 };
 
 }  // namespace tgfx

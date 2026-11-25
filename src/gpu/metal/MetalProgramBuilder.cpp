@@ -24,6 +24,7 @@
 #include "gpu/ProgramWriter.h"
 #include "gpu/ir/ProgramValidation.h"
 #include "gpu/metal/MSLPrinter.h"
+#include "gpu/shaders/ShaderLibraryBundle.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -109,12 +110,33 @@ std::shared_ptr<Program> MetalProgramBuilder::finalize() {
     LOGE("MetalProgramBuilder: %s", validationError.c_str());
     return nullptr;
   }
-  _vertexBuilder.setCodeText(MSLPrinter::PrintVertexProgram(description.vertexCalls));
-  _fragBuilder.setCodeText(MSLPrinter::PrintFragmentProgram(description.fragment));
-  const auto vertexText =
-      MSLPrinter::PrintStage(*this, ShaderStage::Vertex, description.interface, _vertexBuilder);
-  const auto fragmentText =
-      MSLPrinter::PrintStage(*this, ShaderStage::Fragment, description.interface, _fragBuilder);
+  MslCallSite callSite = {};
+  for (const auto& sampler : description.interface.samplers) {
+    callSite.samplerNames.insert(sampler.name);
+  }
+  std::set<std::string> listEmitted = {};
+  std::string samplerList = {};
+  ShaderLibraryBundle::Get().appendFunction(ShaderLibraryLanguage::MSL, "__msl_samplers__",
+                                            &listEmitted, &samplerList);
+  size_t listStart = 0;
+  while (listStart <= samplerList.size()) {
+    const size_t comma = samplerList.find(',', listStart);
+    const std::string name = samplerList.substr(
+        listStart, comma == std::string::npos ? std::string::npos : comma - listStart);
+    if (!name.empty()) {
+      callSite.samplerFunctions.insert(name);
+    }
+    if (comma == std::string::npos) {
+      break;
+    }
+    listStart = comma + 1;
+  }
+  _vertexBuilder.setCodeText(MSLPrinter::PrintVertexProgram(description.vertexCalls, callSite));
+  _fragBuilder.setCodeText(MSLPrinter::PrintFragmentProgram(description.fragment, callSite));
+  const auto vertexText = MSLPrinter::PrintStage(*this, ShaderStage::Vertex, description.interface,
+                                                 _vertexBuilder, callSite);
+  const auto fragmentText = MSLPrinter::PrintStage(*this, ShaderStage::Fragment,
+                                                   description.interface, _fragBuilder, callSite);
   if (const char* dumpDir = std::getenv("TGFX_DUMP_PROGRAM")) {
     static std::atomic<int> dumpIndex{0};
     const int index = dumpIndex.fetch_add(1);

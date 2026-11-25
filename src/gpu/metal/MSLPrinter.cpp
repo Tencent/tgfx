@@ -19,11 +19,14 @@
 #include "MSLPrinter.h"
 #include <cctype>
 #include <cstring>
+#include <set>
+#include "gpu/FragmentShaderBuilder.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/SLType.h"
 #include "gpu/ShaderBuilder.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/VertexShaderBuilder.h"
+#include "gpu/shaders/ShaderLibraryBundle.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
@@ -93,6 +96,22 @@ void ReplaceWord(std::string* text, const char* from, const char* to) {
   }
 }
 
+// A call site names the function directly before its parenthesis; the parenthesis is the only
+// right boundary the name has, so the word check applies to the left side alone.
+void ReplaceCallName(std::string* text, const std::string& name) {
+  const std::string from = name + "(";
+  const std::string to = name + "Impl(";
+  size_t offset = 0;
+  while ((offset = text->find(from, offset)) != std::string::npos) {
+    if (offset == 0 || !IsWordChar((*text)[offset - 1])) {
+      text->replace(offset, from.size(), to);
+      offset += to.size();
+    } else {
+      offset += from.size();
+    }
+  }
+}
+
 void DropWordWithSpace(std::string* text, const char* word) {
   const std::string needle(word);
   size_t offset = 0;
@@ -151,7 +170,7 @@ void RewriteTextureCalls(std::string* text) {
 }
 
 // The GLSL statement text the processors emitted, spelled as MSL.
-std::string RewriteBody(const std::string& text) {
+std::string RewriteBody(const std::string& text, const MslCallSite& callSite) {
   std::string out = text;
   DropWordWithSpace(&out, "highp");
   DropWordWithSpace(&out, "mediump");
@@ -168,9 +187,16 @@ std::string RewriteBody(const std::string& text) {
   ReplaceWord(&out, "mat3", "float3x3");
   ReplaceWord(&out, "mat4", "float4x4");
   ReplaceWord(&out, "gl_FragCoord", "in.position");
-  ReplaceWord(&out, "mod(", "fmod(");
   ReplaceWord(&out, "discard;", "discard_fragment();");
+  for (const auto& name : callSite.samplerFunctions) {
+    ReplaceCallName(&out, name);
+  }
   RewriteTextureCalls(&out);
+  // After the read rewrite: a bare sampler name is a call argument, and the MSL function takes the
+  // texture and the sampler state as two parameters. The derived names (X_t/X_s) no longer match.
+  for (const auto& name : callSite.samplerNames) {
+    ReplaceWord(&out, name.c_str(), (name + "_t, " + name + "_s").c_str());
+  }
   return out;
 }
 
@@ -197,18 +223,8 @@ std::string PrefixOf(const FragmentInstruction& instruction) {
   return instruction.text.substr(0, first);
 }
 
-std::string ArgumentsOf(const std::vector<std::string>& args) {
-  std::string out = {};
-  for (size_t index = 0; index < args.size(); ++index) {
-    if (index > 0) {
-      out += ", ";
-    }
-    out += args[index];
-  }
-  return out;
-}
-
-void AppendCall(std::string* out, const FragmentInstruction& instruction) {
+void AppendCall(std::string* out, const FragmentInstruction& instruction,
+                const MslCallSite& callSite) {
   *out += PrefixOf(instruction);
   if (instruction.declaresResult) {
     *out += instruction.resultType + " ";
@@ -217,7 +233,23 @@ void AppendCall(std::string* out, const FragmentInstruction& instruction) {
   if (!instruction.wrapType.empty()) {
     *out += instruction.wrapType + "(";
   }
-  *out += instruction.function + "(" + ArgumentsOf(instruction.args) + ")";
+  std::string function = instruction.function;
+  if (callSite.samplerFunctions.count(function) != 0) {
+    function += "Impl";
+  }
+  *out += function + "(";
+  for (size_t index = 0; index < instruction.args.size(); ++index) {
+    if (index > 0) {
+      *out += ", ";
+    }
+    const std::string& argument = instruction.args[index];
+    if (callSite.samplerNames.count(argument) != 0) {
+      *out += argument + "_t, " + argument + "_s";
+    } else {
+      *out += argument;
+    }
+  }
+  *out += ")";
   if (!instruction.wrapType.empty()) {
     *out += ")";
   }
@@ -234,7 +266,8 @@ void AppendSection(std::string* out, const std::string& section) {
 
 }  // namespace
 
-std::string MSLPrinter::PrintVertexProgram(const std::vector<VertexCall>& calls) {
+std::string MSLPrinter::PrintVertexProgram(const std::vector<VertexCall>& calls,
+                                           const MslCallSite& /*callSite*/) {
   std::string out = {};
   for (const auto& call : calls) {
     switch (call.kind) {
@@ -293,7 +326,8 @@ std::string MSLPrinter::PrintVertexProgram(const std::vector<VertexCall>& calls)
   return out;
 }
 
-std::string MSLPrinter::PrintFragmentProgram(const FragmentProgram& program) {
+std::string MSLPrinter::PrintFragmentProgram(const FragmentProgram& program,
+                                             const MslCallSite& callSite) {
   std::string out = {};
   for (const auto& instruction : program.instructions) {
     switch (instruction.kind) {
@@ -301,7 +335,7 @@ std::string MSLPrinter::PrintFragmentProgram(const FragmentProgram& program) {
         out += instruction.text;
         break;
       case FragmentInstructionKind::Call:
-        AppendCall(&out, instruction);
+        AppendCall(&out, instruction, callSite);
         break;
       case FragmentInstructionKind::Alias:
         out += PrefixOf(instruction);
@@ -343,7 +377,8 @@ std::string MSLPrinter::PrintFragmentProgram(const FragmentProgram& program) {
 }
 
 std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderStage stage,
-                                   const InterfaceDesc& interface, const ShaderBuilder& builder) {
+                                   const InterfaceDesc& interface, const ShaderBuilder& builder,
+                                   const MslCallSite& callSite) {
   (void)programBuilder;
   std::vector<UniformDesc> uniforms = {};
   for (const auto& uniform : interface.uniforms) {
@@ -356,18 +391,28 @@ std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderS
 
   std::string out = {};
   out += "#include <metal_stdlib>\n#include <simd/simd.h>\n\nusing namespace metal;\n\n";
+  // The translator leaves a few GLSL builtins untouched (mod is the common one) and emits the
+  // array wrapper type beside the functions; the support entry carries that type for every
+  // assembled shader, ahead of the structs that use it.
+  std::set<std::string> supportEmitted = {};
+  std::string supportText = {};
+  ShaderLibraryBundle::Get().appendFunction(ShaderLibraryLanguage::MSL, "__msl_support__",
+                                            &supportEmitted, &supportText);
+  AppendSection(&out, supportText);
   if (!uniforms.empty()) {
     out += "struct ";
     out += blockName;
     out += " {\n";
     for (const auto& uniform : uniforms) {
       out += Indent;
-      out += MslTypeName(uniform.type);
+      if (uniform.count > 1) {
+        out += std::string("spvUnsafeArray<") + MslTypeName(uniform.type) + ", " +
+               std::to_string(uniform.count) + ">";
+      } else {
+        out += MslTypeName(uniform.type);
+      }
       out += " ";
       out += uniform.name;
-      if (uniform.count > 1) {
-        out += "[" + std::to_string(uniform.count) + "]";
-      }
       out += ";\n";
     }
     out += "};\n\n";
@@ -405,9 +450,9 @@ std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderS
     out += "};\n\n";
   }
 
-  AppendSection(&out, builder.functions());
+  AppendSection(&out, RewriteBody(builder.functions(), callSite));
 
-  std::string body = RewriteBody(builder.code());
+  std::string body = RewriteBody(builder.code(), callSite);
   if (isVertex) {
     out += "vertex VertexOut main0(";
     if (!interface.attributes.empty()) {
@@ -424,8 +469,14 @@ std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderS
              attribute.name + ";\n";
     }
     for (const auto& uniform : uniforms) {
-      out += Indent + std::string(MslTypeName(uniform.type)) + " " + uniform.name + " = vb." +
-             uniform.name + ";\n";
+      out += Indent;
+      if (uniform.count > 1) {
+        out += std::string("spvUnsafeArray<") + MslTypeName(uniform.type) + ", " +
+               std::to_string(uniform.count) + ">";
+      } else {
+        out += MslTypeName(uniform.type);
+      }
+      out += " " + uniform.name + " = vb." + uniform.name + ";\n";
     }
     for (const auto& varying : interface.varyings) {
       out += Indent + std::string(MslTypeName(varying.type)) + " " + varying.name + " = {};\n";
@@ -460,17 +511,27 @@ std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderS
            ")]], sampler " + sampler.name + "_s [[sampler(" + std::to_string(index) + ")]]";
   }
   out += ") {\n";
-  out += std::string(Indent) + "float4 fragColor = float4(0.0);\n";
+  out += std::string(Indent) + "float4 ";
+  out += CUSTOM_COLOR_OUTPUT_NAME;
+  out += " = float4(0.0);\n";
   for (const auto& varying : interface.varyings) {
     out += Indent + std::string(MslTypeName(varying.type)) + " " + varying.name + " = in." +
            varying.name + ";\n";
   }
   for (const auto& uniform : uniforms) {
-    out += Indent + std::string(MslTypeName(uniform.type)) + " " + uniform.name + " = fb." +
-           uniform.name + ";\n";
+    out += Indent;
+    if (uniform.count > 1) {
+      out += std::string("spvUnsafeArray<") + MslTypeName(uniform.type) + ", " +
+             std::to_string(uniform.count) + ">";
+    } else {
+      out += MslTypeName(uniform.type);
+    }
+    out += " " + uniform.name + " = fb." + uniform.name + ";\n";
   }
   out += body;
-  out += std::string(Indent) + "return fragColor;\n}\n";
+  out += std::string(Indent) + "return ";
+  out += CUSTOM_COLOR_OUTPUT_NAME;
+  out += ";\n}\n";
   return out;
 }
 
