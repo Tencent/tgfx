@@ -969,5 +969,39 @@ TGFX_TEST(TilePoolTest, PassThroughSeedMatchesDirectRendering) {
   Layer::SetDefaultAllowsGroupOpacity(oldGroupOpacity);
   EXPECT_EQ(MaxDifference(tiled, direct), 0);
 }
+TGFX_TEST_PRIVATE(TilePoolTest, TimeBudgetKeepsRequestingFramesForDeferredTiles) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 1600, 1000);
+  ASSERT_NE(surface, nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileUpdateMode(TileUpdateMode::Smooth);
+  displayList->setMaxTilesRefinedPerFrame(2);
+  displayList->setMinFallbackScale(1.0f / 32.0f);
+  displayList->setBackgroundColor(Color::White());
+  displayList->root()->addChild(MakeSolid(200000, 200000, Color::Red()));
+  // The second zoom scale fills the atlas around the first one's tiles, so the next one cannot draw
+  // its grid as one continuous task and splits it into tile tasks the budget can defer.
+  for (float zoomScale : {0.012f, 0.0125f}) {
+    displayList->setZoomScale(zoomScale);
+    displayList->render(surface.get());
+  }
+  // Below the minimum fallback scale the missing tiles have no fallback, so the ones the budget
+  // leaves show the background until a later frame draws them.
+  displayList->setTileTimeBudget(1e-9f);
+  displayList->setZoomScale(0.014f);
+  int frames = 0;
+  do {
+    displayList->render(surface.get());
+  } while (displayList->hasContentChanged() && ++frames < 200);
+  EXPECT_LT(frames, 200);
+  for (int y = 8; y < 1000; y += 64) {
+    for (int x = 8; x < 1600; x += 64) {
+      EXPECT_EQ(ReadPixel(surface, x, y), OPAQUE_RED);
+    }
+  }
+}
 
 }  // namespace tgfx

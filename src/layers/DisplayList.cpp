@@ -751,7 +751,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     skippedRects.clear();
     screenTasks = collectDisplayTasks(surface, &skippedRects);
   }
-  if (!deferredPatches.empty()) {
+  if (drawnCount < tileTasks.size() || !deferredPatches.empty()) {
     hasZoomBlurTiles = true;
   }
   if (!tileTasks.empty()) {
