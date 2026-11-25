@@ -22,8 +22,6 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/Program.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/aot/chain/AOTChainBuilder.h"
-#include "gpu/aot/chain/AOTShapeRules.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/select/PrecompiledDiagnostics.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"

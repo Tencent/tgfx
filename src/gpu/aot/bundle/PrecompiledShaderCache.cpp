@@ -28,7 +28,6 @@
 #include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ShaderCaps.h"
-#include "gpu/aot/AOTDiagnostics.h"
 #include "gpu/aot/bundle/BundleReader.h"
 #include "gpu/aot/select/ShaderProfileResolver.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"

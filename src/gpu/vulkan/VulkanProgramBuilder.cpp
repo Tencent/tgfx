@@ -21,14 +21,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
-#include "VulkanEntryEmit.h"
 #include "core/utils/Log.h"
 #include "gpu/ContextInternal.h"
 #include "gpu/Program.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/aot/chain/ChainProgramPlan.h"
 #include "gpu/aot/chain/ChainSPIRVBody.h"
 #include "gpu/shaders/contract/ChainISA.h"
 #include "gpu/shaders/contract/FragmentLibrary.h"

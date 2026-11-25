@@ -19,27 +19,12 @@
 #pragma once
 
 #include <cstdint>
+#include <set>
 #include <string>
 #include <vector>
-#include "gpu/aot/chain/ChainProgramPlan.h"
 #include "gpu/shaders/Layout.h"
 
 namespace tgfx {
-
-/**
- * Emits the Vulkan linking route's body module: the runtime half the precompiled frame calls.
- * The body imports the plan's operators, declares the plan's own fragment uniform block (the
- * only block declaration in the whole program), threads the registers through the call
- * sequence, writes the epilogue and returns the final color. No entry point: the frame's
- * entry calls the exported chainBody. The module targets SPIR-V 1.0, the version the bundle's
- * op modules carry (the linker rejects a mismatch).
- * @param plan    The planned program (calls, uniform table, epilogue registers).
- * @param layout  The variant's derived layout (the chainBody parameter list follows it).
- * @param out     Receives the module words.
- * @param error   Receives the failure reason.
- */
-bool EmitChainBodySPIRV(const ChainProgramPlan& plan, const Layout& layout,
-                        std::vector<uint32_t>* out, std::string* error);
 
 /**
  * Links the frame, the body and the op modules into one module in the Vulkan 1.0 environment

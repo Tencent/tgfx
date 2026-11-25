@@ -26,7 +26,7 @@
 #include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/aot/ir/Program.h"
 #include "gpu/aot/ir/XferFacts.h"
-#include "gpu/aot/plan/DrawPlan.h"
+#include "gpu/aot/select/FamilyMatchResult.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
@@ -130,24 +130,11 @@ class ProgramInfo {
   std::shared_ptr<Program> getProgram();
 
   /**
-   * Records the draw's resolved plan on this info. The selection layer is the only caller: it runs
-   * once per draw, right before the program is created from the selected variant.
-   */
-  void setPlan(const DrawPlan& value) {
-    plan = value;
-  }
-
-  /// The draw's resolved plan, or null when no selection ran (a draw that did not match).
-  const DrawPlan* getPlan() const {
-    return plan.has_value() ? &*plan : nullptr;
-  }
-
-  /**
-   * The plan's data sources (the texture/gradient/kernel leaves the declared families' writers
-   * read), or null when no selection ran.
+   * The plan's data sources. The selection layer that recorded them is gone, so nothing carries
+   * them any more; the accessor stays for the writers' null check.
    */
   const FamilyMatchResult* getSources() const {
-    return plan.has_value() ? &plan->sources : nullptr;
+    return nullptr;
   }
 
   /**
@@ -352,7 +339,6 @@ class ProgramInfo {
 
   // The draw's single selection result (see getPlan), filled by getProgram()'s first call. An
   // input to the upload, never recomputed; null when no selection ran.
-  std::optional<DrawPlan> plan = std::nullopt;
 
   friend class ProgramWriter;
   friend class ChainProgramWriter;

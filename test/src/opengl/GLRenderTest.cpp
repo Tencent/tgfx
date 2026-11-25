@@ -32,7 +32,6 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/aot/bundle/EmbeddedShaderBundles.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/aot/select/ProgramSelection.h"
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
@@ -336,101 +335,6 @@ TGFX_TEST(GLRenderTest, TextureImportBenchmark) {
 }
 #endif  // !defined(TGFX_USE_SWIFTSHADER)
 
-TGFX_TEST(GLRenderTest, AOTWhitelist) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_NE(context, nullptr);
-  ASSERT_EQ(context->backend(), Backend::OpenGL);
-  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
-  ASSERT_NE(renderTargetProxy, nullptr);
-  auto renderTarget = renderTargetProxy->getRenderTarget();
-  ASSERT_NE(renderTarget, nullptr);
-
-  {
-    BlockAllocator allocator;
-    auto gp = QuadGeometryLayoutOf(8, 8, AAType::None, PMColor::White(), Matrix::I(), false);
-    auto textureProxy =
-        context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
-    auto texture = TextureEffect::Make(&allocator, std::move(textureProxy));
-    std::array<float, 20> matrixValues = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-                                          0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
-    auto matrix = ColorMatrixFragmentProcessor::Make(&allocator, matrixValues);
-    auto fp = FragmentProcessor::Compose(&allocator, std::move(texture), std::move(matrix));
-    ASSERT_NE(fp, nullptr);
-    // The chain serves a draw from its record-time IR; a ProgramInfo without one is not served.
-    auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
-    ASSERT_TRUE(ir.has_value());
-    ProgramInfo programInfo(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, false);
-    programInfo.setCarriedIR(&*ir);
-    EXPECT_TRUE(programInfo.glProfileMatchesCache());
-    EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo).has_value());
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp = QuadGeometryLayoutOf(8, 8, AAType::None, PMColor::White(), Matrix::I(), false);
-    auto textureProxy =
-        context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
-    auto fp = TextureEffect::Make(&allocator, std::move(textureProxy));
-    ASSERT_NE(fp, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, false);
-    // QuadPerEdgeAA + TextureEffect is served by QuadTextureFillShader. The matcher reads the
-    // carried IR, so this info needs the same record-time lowering a draw gets.
-    auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
-    ASSERT_TRUE(ir.has_value());
-    programInfo.setCarriedIR(&*ir);
-    EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo).has_value());
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp = DefaultGeometryLayout(PMColor::White(), AAType::None, Matrix::I(), Matrix::I());
-    // Adopting an external texture caches its view under a scratch key derived from size/format.
-    // An unusual size keeps the adopted rectangle view from being recycled by the plain 2x2
-    // proxies other blocks (and other tests on the shared device) create, which would make their
-    // matched texture kind depend on test order.
-    auto glInfo = CreateRectangleTexture(context, 7, 5);
-    ASSERT_NE(glInfo.id, 0u);
-    // wrapExternalTexture copies a rectangle texture into a 2D one, so wrap the view directly to
-    // reach the matcher with a rectangle sampler.
-    auto textureProxy = context->proxyProvider()->wrapTextureView(
-        TextureView::MakeFrom(context, BackendTexture(glInfo, 7, 5), ImageOrigin::TopLeft, true));
-    ASSERT_NE(textureProxy, nullptr);
-    auto fp = TextureEffect::Make(&allocator, std::move(textureProxy));
-    ASSERT_NE(fp, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp, std::nullopt, BlendMode::SrcOver, false);
-    // The sampler list is read off the carried IR, so the draw needs the same lowering a real op
-    // gets before the gate can see its rectangle sampler.
-    auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
-    ASSERT_TRUE(ir.has_value());
-    programInfo.setCarriedIR(&*ir);
-    EXPECT_FALSE(programInfo.samplersAre2D());
-    // A rectangle sampler has no precompiled variant and is rejected by the matcher gate (it
-    // would otherwise bind to a plain sampler2D).
-    EXPECT_FALSE(SelectProgram(programInfo.getContext(), programInfo).has_value());
-  }
-
-  {
-    BlockAllocator allocator;
-    auto gp = QuadGeometryLayoutOf(8, 8, AAType::None, PMColor::White(), Matrix::I(), false);
-    auto textureProxy =
-        context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
-    auto texture = TextureEffect::Make(&allocator, std::move(textureProxy));
-    std::array<float, 20> matrixValues = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-                                          0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
-    auto matrix = ColorMatrixFragmentProcessor::Make(&allocator, matrixValues);
-    auto fp = FragmentProcessor::Compose(&allocator, std::move(texture), std::move(matrix));
-    // A present value with an empty proxy: the framebuffer-fetch state.
-    std::optional<DstTextureInfo> dst = DstTextureInfo{};
-    ASSERT_NE(fp, nullptr);
-    auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
-    ASSERT_TRUE(ir.has_value());
-    ProgramInfo programInfo(renderTarget.get(), gp, dst, BlendMode::SrcOver, false);
-    programInfo.setCarriedIR(&*ir);
-    // SrcOver needs no dst readback, so the chain kernel serves this draw.
-    EXPECT_TRUE(SelectProgram(programInfo.getContext(), programInfo).has_value());
-  }
-}
 
 TGFX_TEST(GLRenderTest, InvalidShaderReturnsNull) {
   ContextScope scope;
