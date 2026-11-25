@@ -111,7 +111,8 @@ class ProgramBuilder {
   void emitAndInstallFragProcessors(std::string* color, std::string* coverage);
 
   std::string emitAndInstallFragProc(const FragmentProcessor* processor,
-                                     size_t transformedCoordVarsIdx, const std::string& input);
+                                     size_t transformedCoordVarsIdx, const std::string& input,
+                                     bool isCoverage);
 
   void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn);
 

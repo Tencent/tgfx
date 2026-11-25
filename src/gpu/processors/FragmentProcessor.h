@@ -241,7 +241,7 @@ class FragmentProcessor : public Processor {
              std::function<std::string(std::string_view)> coordFunc = {},
              ProgramIRBuilder* irBuilder = nullptr, ValueID inputValue = INVALID_VALUE_ID,
              ValueID outputValue = INVALID_VALUE_ID,
-             const std::vector<ValueID>* samplerValues = nullptr)
+             const std::vector<ValueID>* samplerValues = nullptr, bool isCoverage = false)
         : fragBuilder(fragBuilder), uniformHandler(uniformHandler),
           outputColor(std::move(outputColor)), inputColor(std::move(inputColor)),
           transformedCoords(transformedCoords), textureSamplers(textureSamplers),
@@ -249,7 +249,7 @@ class FragmentProcessor : public Processor {
           inputColorValue(this->inputColor, SLType::Float4, ValueOrigin::Local),
           outputColorValue(this->outputColor, SLType::Float4, ValueOrigin::Local),
           irBuilder(irBuilder), inputValue(inputValue), outputValue(outputValue),
-          samplerValues(samplerValues) {
+          samplerValues(samplerValues), isCoverage(isCoverage) {
     }
 
     /**
@@ -283,6 +283,7 @@ class FragmentProcessor : public Processor {
     ValueID inputValue = INVALID_VALUE_ID;
     ValueID outputValue = INVALID_VALUE_ID;
     const std::vector<ValueID>* samplerValues = nullptr;
+    bool isCoverage = false;
 
     ValueID samplerValue(SamplerHandle handle) const {
       if (samplerValues == nullptr || handle.toIndex() >= samplerValues->size()) {

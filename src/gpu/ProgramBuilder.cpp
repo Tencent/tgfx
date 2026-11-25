@@ -101,7 +101,8 @@ void ProgramBuilder::emitAndInstallFragProcessors(std::string* color, std::strin
       inOut = &coverage;
     }
     const auto fp = programInfo->getFragmentProcessor(i);
-    auto output = emitAndInstallFragProc(fp, transformedCoordVarsIdx, **inOut);
+    auto output = emitAndInstallFragProc(fp, transformedCoordVarsIdx, **inOut,
+                                         i >= programInfo->numColorFragmentProcessors());
     FragmentProcessor::Iter iter(fp);
     while (const FragmentProcessor* tempFP = iter.next()) {
       transformedCoordVarsIdx += tempFP->numCoordTransforms();
@@ -120,7 +121,7 @@ static const T* GetPointer(const std::vector<T>& vector, size_t atIndex) {
 
 std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* processor,
                                                    size_t transformedCoordVarsIdx,
-                                                   const std::string& input) {
+                                                   const std::string& input, bool isCoverage) {
   ProcessorGuard processorGuard(this, processor);
   std::string output;
   nameExpression(&output, "output");
@@ -150,7 +151,7 @@ std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* proc
       programIR.InternValue(output, SLType::Float4, Precision::High, IRValueKind::Local);
   FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output, input,
                                    subsetVarName, &coords, &textureSamplers, {}, &programIR,
-                                   inputValue, outputValue, &samplerValues);
+                                   inputValue, outputValue, &samplerValues, isCoverage);
 
   processor->emitCode(args);
   fragmentShaderBuilder()->codeAppend("}");

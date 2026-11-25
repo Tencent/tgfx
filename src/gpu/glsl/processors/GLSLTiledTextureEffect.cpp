@@ -466,7 +466,9 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
     const auto op = textureProxy->isAlphaOnly() ? OperatorID::AlphaModulate : OperatorID::MulAlpha;
     const auto result = args.irBuilder->CreateCall(
         op, SLType::Float4, {textureValue, args.inputValue}, args.outputColor);
-    args.irBuilder->StoreOutput(args.outputValue, result);
+    const auto value =
+        args.isCoverage ? args.irBuilder->CreateSwizzle(result, SLType::Float4, "aaaa") : result;
+    args.irBuilder->StoreOutput(args.outputValue, value);
   }
 }
 

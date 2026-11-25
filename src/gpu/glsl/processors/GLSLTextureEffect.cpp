@@ -150,7 +150,10 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
     fragBuilder->storeColor(args.outputColor, read.name);
     if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID &&
         read.value != INVALID_VALUE_ID) {
-      args.irBuilder->StoreOutput(args.outputValue, read.value);
+      const auto value = args.isCoverage
+                             ? args.irBuilder->CreateSwizzle(read.value, SLType::Float4, "aaaa")
+                             : read.value;
+      args.irBuilder->StoreOutput(args.outputValue, value);
     }
     return;
   }
