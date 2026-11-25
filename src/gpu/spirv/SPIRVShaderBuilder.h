@@ -21,9 +21,9 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "gpu/aot/chain/SPIRVWriter.h"
 #include "gpu/ir/OperatorBundle.h"
 #include "gpu/ir/ProgramIR.h"
+#include "gpu/spirv/SPIRVWriter.h"
 
 namespace tgfx {
 

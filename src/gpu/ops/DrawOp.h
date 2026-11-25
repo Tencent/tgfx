@@ -20,7 +20,7 @@
 
 #include <optional>
 #include "gpu/AAType.h"
-#include "gpu/aot/ir/XferFacts.h"
+#include "gpu/ir/XferFacts.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XferProcessor.h"
 #include "gpu/resources/RenderTarget.h"

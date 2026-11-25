@@ -22,7 +22,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
-#include "gpu/aot/bundle/BundleData.h"
+#include "gpu/precompiled/BundleData.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {

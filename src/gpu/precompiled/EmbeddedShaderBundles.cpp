@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/aot/bundle/EmbeddedShaderBundles.h"
+#include "gpu/precompiled/EmbeddedShaderBundles.h"
 #include <mutex>
 
 namespace tgfx {

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/aot/chain/ChainSPIRVBody.h"
+#include "gpu/spirv/SPIRVLinker.h"
 // The linking route exists only where Vulkan does: the SPIRV-Tools sources the runtime links
 // against are built for the Vulkan configuration alone. Other backends get the declining stubs
 // below, so the creator's Vulkan branch collapses to its fallback.
@@ -28,10 +28,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <unordered_map>
-#include "gpu/aot/chain/SPIRVWriter.h"
 #include "gpu/shaders/contract/ChainISA.h"
 #include "gpu/shaders/contract/OpTable.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
+#include "gpu/spirv/SPIRVWriter.h"
 #include "spirv-tools/libspirv.hpp"
 #include "spirv-tools/linker.hpp"
 
@@ -89,7 +89,6 @@ bool LinkChainSPIRV(const std::vector<std::vector<uint32_t>>& modules, std::vect
 
 namespace tgfx {
 
-
 bool LinkChainSPIRV(const std::vector<std::vector<uint32_t>>&, std::vector<uint32_t>*,
                     std::string* error) {
   if (error != nullptr) {
@@ -104,7 +103,6 @@ bool ValidateSPIRVModule(const std::vector<uint32_t>&, std::string* error) {
   }
   return false;
 }
-
 
 }  // namespace tgfx
 

@@ -23,7 +23,7 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/QuadsVertexProvider.h"
-#include "gpu/aot/ir/GeometryLayout.h"
+#include "gpu/ir/GeometryLayout.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/aot/bundle/BundleReader.h"
+#include "gpu/precompiled/BundleReader.h"
 #include "core/utils/Log.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 

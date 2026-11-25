@@ -28,11 +28,10 @@ PerlinNoiseFragmentProcessor::PerlinNoiseFragmentProcessor(
     PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
     std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
     std::shared_ptr<TextureView> permutationsView, std::shared_ptr<TextureView> noiseView,
-    const Matrix* uvMatrix, bool hasOriginalLookupData)
-    : FragmentProcessor(ClassID()), hasOriginalLookupData(hasOriginalLookupData),
-      noiseType(noiseType), numOctaves(numOctaves), stitchTiles(stitchTiles),
-      paintingData(std::move(paintingData)), permutationsView(std::move(permutationsView)),
-      noiseView(std::move(noiseView)) {
+    const Matrix* uvMatrix)
+    : FragmentProcessor(ClassID()), noiseType(noiseType), numOctaves(numOctaves),
+      stitchTiles(stitchTiles), paintingData(std::move(paintingData)),
+      permutationsView(std::move(permutationsView)), noiseView(std::move(noiseView)) {
   if (uvMatrix) {
     coordTransform = CoordTransform(*uvMatrix);
   }
@@ -49,23 +48,6 @@ std::shared_ptr<Texture> PerlinNoiseFragmentProcessor::onTextureAt(size_t index)
 SamplerState PerlinNoiseFragmentProcessor::onSamplerStateAt(size_t) const {
   return SamplerState(SamplingOptions(FilterMode::Nearest));
 }
-
-PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::MakeFromAOTParameters(
-    BlockAllocator* allocator, const AOTPerlinNoiseParameters& parameters) {
-  auto paintingData = std::make_unique<PerlinNoiseShader::PaintingData>(
-      parameters.baseFrequencyX, parameters.baseFrequencyY, parameters.stitchWidth,
-      parameters.stitchHeight);
-  auto processor =
-      MakeFromViews(allocator, static_cast<PerlinNoiseType>(parameters.noiseType),
-                    parameters.numOctaves, parameters.stitchTiles, std::move(paintingData),
-                    parameters.permutationsView, parameters.noiseView, &parameters.uvMatrix);
-  if (processor != nullptr) {
-    processor->lookupData = parameters.lookupData;
-  }
-  return processor;
-}
-
-
 
 void PerlinNoiseFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t key = static_cast<uint32_t>(numOctaves);

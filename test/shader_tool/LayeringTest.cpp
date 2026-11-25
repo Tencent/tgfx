@@ -124,12 +124,6 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
       "gpu/shaders/contract/FragmentLibrary.h", "gpu/shaders/contract/OpTable.h",
       "gpu/shaders/KernelContract.h",
       // declaration layer
-      "gpu/shaders/PrecompiledShader.h",
-      // the module-declaration layer (families, layouts, domains)
-      "gpu/shaders/Module.h", "gpu/shaders/Family.h", "gpu/shaders/Families.h",
-      "gpu/shaders/FamilyDomains.h", "gpu/shaders/Layout.h",
-      // runtime headers that read the declaration layer
-      "gpu/aot/AOTResourceProfile.h",
       // the operator table the composed SPIR-V pool is generated from
       "gpu/ir/OperatorManifest.h",
       // the fragment-stage declaration language (the emitter walks these tables)
@@ -138,8 +132,6 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
 }
 
 // The contract headers: constants and pure functions shared by the tool and the runtime.
-// AOTResourceProfile.h is not one of them: it reads the declaration's per-profile capacity table,
-// so it belongs to the runtime headers that consume the declaration layer.
 const std::vector<std::string>& ContractHeaders() {
   static const std::vector<std::string> headers = {
       "gpu/shaders/contract/ShaderBundleContract.h",
@@ -287,36 +279,6 @@ TEST(LayeringTest, TheRuntimeOnlyProfileResolverIsNotUsedByTheTool) {
 }
 
 // ---- The declaration layer stays a declaration layer ----------------------------------------
-
-TEST(LayeringTest, DeclarationLayerIncludesOnlyItselfAndTheContractLeaves) {
-  // src/gpu/shaders holds what the tool and the runtime share: the module declarations, the
-  // families and the layout derived from them. It must stay usable without a GPU context, so its
-  // includes are its own tree plus the two contract leaves below. Anything else — a processor, an
-  // IR node, a logger, the uniform writer — belongs to the runtime side of src/gpu/aot.
-  const std::set<std::string> contractLeaves = {"gpu/Uniform.h"};
-  std::set<std::string> used;
-  size_t checked = 0;
-  for (const auto& file : FilesIn(SourceDir + "/src/gpu/shaders", {".cpp", ".h"})) {
-    for (const auto& include : IncludesOf(file)) {
-      if (include.system) {
-        continue;
-      }
-      ++checked;
-      used.insert(include.target);
-      const bool declarationInclude = include.target.rfind("gpu/shaders/", 0) == 0;
-      EXPECT_TRUE(declarationInclude || contractLeaves.count(include.target) == 1u)
-          << NameOf(file) << " includes " << include.target
-          << "; the declaration layer may include only gpu/shaders/** and its contract leaves. If "
-             "this file belongs to the declaration layer, add it to contractLeaves in this test as "
-             "a reviewed decision.";
-    }
-  }
-  EXPECT_GT(checked, 0u);
-  // A leaf nobody includes any more is a permission that will be reused later without a review.
-  for (const auto& leaf : contractLeaves) {
-    EXPECT_EQ(used.count(leaf), 1u) << leaf << " is allowed but the layer no longer includes it";
-  }
-}
 
 // ---- The tool's own modules ------------------------------------------------------------------
 

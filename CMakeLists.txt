@@ -209,18 +209,10 @@ file(GLOB_RECURSE SRC_FILES
         src/core/shaders/*.*
         src/core/shapes/*.*
         src/core/utils/*.*
-        src/gpu/aot/*.*
         src/gpu/glsl/*.*
         src/gpu/ir/*.*
+        src/gpu/precompiled/*.*
         src/gpu/spirv/*.*
-        src/gpu/aot/bind/*.*
-        src/gpu/aot/bundle/*.*
-        src/gpu/aot/chain/*.*
-        src/gpu/aot/ir/*.*
-        src/gpu/aot/plan/*.*
-        src/gpu/aot/select/*.*
-        src/gpu/aot/spec/*.*
-        src/gpu/aot/write/*.*
         src/gpu/ops/*.*
         src/gpu/processors/*.*
         src/gpu/proxies/*.*
@@ -1183,7 +1175,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     endforeach ()
     file(GENERATE OUTPUT "${TRAMPOLINE_CPP}" CONTENT
 "// Auto-generated — do not edit.
-#include \"gpu/aot/bundle/EmbeddedShaderBundles.h\"
+#include \"gpu/precompiled/EmbeddedShaderBundles.h\"
 
 namespace tgfx {
 namespace embedded {

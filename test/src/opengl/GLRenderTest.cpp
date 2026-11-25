@@ -30,13 +30,13 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/aot/bundle/EmbeddedShaderBundles.h"
-#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLTexture.h"
 #include "gpu/opengl/GLUtil.h"
+#include "gpu/precompiled/EmbeddedShaderBundles.h"
+#include "gpu/precompiled/PrecompiledShaderCache.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -334,7 +334,6 @@ TGFX_TEST(GLRenderTest, TextureImportBenchmark) {
   }
 }
 #endif  // !defined(TGFX_USE_SWIFTSHADER)
-
 
 TGFX_TEST(GLRenderTest, InvalidShaderReturnsNull) {
   ContextScope scope;

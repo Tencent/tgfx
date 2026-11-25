@@ -24,7 +24,6 @@
 #include "core/DiagnosticCodes.h"
 #include "core/Diagnostics.h"
 #include "gpu/Uniform.h"
-#include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/contract/SpecContract.h"
 

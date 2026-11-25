@@ -20,7 +20,7 @@
 #include <algorithm>
 #include "SPIRVInterfaceLayout.h"
 #if defined(TGFX_USE_VULKAN)
-#include "gpu/aot/chain/ChainSPIRVBody.h"
+#include "gpu/spirv/SPIRVLinker.h"
 #endif
 
 namespace tgfx {

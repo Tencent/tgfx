@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <utility>
-#include "gpu/aot/bundle/EmbeddedShaderBundles.h"
+#include "gpu/precompiled/EmbeddedShaderBundles.h"
 #include "gtest/gtest.h"
 
 namespace tgfx {

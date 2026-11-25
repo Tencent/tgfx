@@ -27,7 +27,7 @@
 #include <cstdio>
 #include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/precompiled/PrecompiledShaderCache.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"

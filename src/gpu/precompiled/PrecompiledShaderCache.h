@@ -35,8 +35,8 @@
 #include "gpu/ShaderCache.h"
 #include "gpu/Uniform.h"
 #include "gpu/UniformData.h"
-#include "gpu/aot/AOTFailure.h"
-#include "gpu/aot/bundle/BundleData.h"
+#include "gpu/precompiled/AOTFailure.h"
+#include "gpu/precompiled/BundleData.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Backend.h"
 

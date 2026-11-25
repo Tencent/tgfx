@@ -25,8 +25,7 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/ShaderCaps.h"
-#include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/aot/select/ShaderProfileResolver.h"
+#include "gpu/precompiled/PrecompiledShaderCache.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
 #include "gpu/processors/XferProcessor.h"
@@ -416,16 +415,6 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
 
 Backend ProgramInfo::backend() const {
   return renderTarget->getContext()->backend();
-}
-
-std::string ProgramInfo::glProfileTag() const {
-  auto shaderCaps = renderTarget->getContext()->shaderCaps();
-  return ProfileTag(ResolveGLShaderProfile(shaderCaps->usesPrecisionModifiers));
-}
-
-bool ProgramInfo::glProfileMatchesCache() const {
-  auto cache = ContextCacheAccess::Cache(renderTarget->getContext());
-  return cache->profileTag() == glProfileTag();
 }
 
 bool ProgramInfo::samplersAre2D() const {

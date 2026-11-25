@@ -20,7 +20,7 @@
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
 #include "gpu/ContextInternal.h"
-#include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/precompiled/PrecompiledShaderCache.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"

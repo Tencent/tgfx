@@ -23,8 +23,8 @@
 #include <unordered_map>
 #include "gpu/Program.h"
 #include "gpu/Swizzle.h"
-#include "gpu/aot/ir/GeometryLayout.h"
-#include "gpu/aot/ir/XferFacts.h"
+#include "gpu/ir/GeometryLayout.h"
+#include "gpu/ir/XferFacts.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
@@ -249,14 +249,12 @@ class ProgramInfo {
    * Returns the GLSL profile tag ("opengl" for desktop GL, "opengles" for the GLES-family
    * contexts: GLES, WebGL, SwiftShader) the precompiled bundle must serve this context from.
    */
-  std::string glProfileTag() const;
 
   /**
    * Returns true when the loaded precompiled bundle was built for this context's GLSL profile;
    * a bundle for the other GL profile hashes its entries under a different tag and can never
    * serve this context.
    */
-  bool glProfileMatchesCache() const;
 
   /**
    * Returns true when every texture sampled by this program uses the 2D texture type.

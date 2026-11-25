@@ -22,8 +22,8 @@
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/UniformData.h"
 #include "gpu/UniformHandler.h"
-#include "gpu/aot/ir/XferFacts.h"
 #include "gpu/ir/ProgramIR.h"
+#include "gpu/ir/XferFacts.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/proxies/TextureProxy.h"
 

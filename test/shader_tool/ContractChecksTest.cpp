@@ -29,9 +29,7 @@
 #include "FailureAssertions.h"
 #include "ScratchDir.h"
 #include "gpu/Uniform.h"
-#include "gpu/shaders/Families.h"
 #include "gpu/shaders/KernelContract.h"
-#include "gpu/shaders/PrecompiledShader.h"
 #include "gtest/gtest.h"
 #include "verify/ContractChecks.h"
 

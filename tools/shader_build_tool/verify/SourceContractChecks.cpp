@@ -27,7 +27,6 @@
 #include <variant>
 #include <vector>
 #include "core/DiagnosticCodes.h"
-#include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/contract/SpecContract.h"
 #include "verify/ContractCheckSupport.h"

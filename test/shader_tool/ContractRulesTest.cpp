@@ -23,8 +23,6 @@
 
 #include <string>
 #include <vector>
-#include "gpu/shaders/Families.h"
-#include "gpu/shaders/PrecompiledShader.h"
 #include "gtest/gtest.h"
 #include "verify/ContractRules.h"
 
@@ -48,7 +46,8 @@ TEST(ContractRulesTest, TheSourceRegistryHoldsTheOneSourceRule) {
 }
 
 TEST(ContractRulesTest, TheArtifactRegistryHoldsTheTwoArtifactRules) {
-  EXPECT_EQ(MakeArtifactRules().size(), 2u);
+  // The binding-layout rule retired with the variant path; one artifact rule remains.
+  EXPECT_EQ(MakeArtifactRules().size(), 1u);
 }
 
 TEST(ContractRulesTest, EverySourceRuleIsCleanOnTheRealSources) {

@@ -31,9 +31,8 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceCache.h"
 #include "gpu/ShaderCaps.h"
-#include "gpu/aot/bundle/EmbeddedShaderBundles.h"
-#include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/aot/select/ShaderProfileResolver.h"
+#include "gpu/precompiled/EmbeddedShaderBundles.h"
+#include "gpu/precompiled/PrecompiledShaderCache.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -73,7 +72,7 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
       _precompiledShaderCache->setEmbeddedBundleState(EmbeddedBundleState::NoBundleForBackend);
       static std::atomic_flag absentReported = ATOMIC_FLAG_INIT;
       if (!absentReported.test_and_set()) {
-        if (!ExpectedShaderProfile(backend)) {
+        if (backend == Backend::Unknown) {
           LOGI("Context: this backend has no precompiled shader support; every draw is dropped.");
         } else {
           LOGI(

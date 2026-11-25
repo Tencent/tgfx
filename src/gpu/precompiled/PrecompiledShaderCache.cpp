@@ -28,13 +28,38 @@
 #include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ShaderCaps.h"
-#include "gpu/aot/bundle/BundleReader.h"
-#include "gpu/aot/select/ShaderProfileResolver.h"
+#include "gpu/precompiled/BundleReader.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/Context.h"
 #include "zstd.h"
 
 namespace tgfx {
+
+namespace {
+
+std::optional<ShaderProfile> ExpectedShaderProfile(Backend backend) {
+  switch (backend) {
+    case Backend::OpenGL:
+      return ShaderProfile::OpenGL;
+    case Backend::Metal:
+      return ShaderProfile::Metal;
+    case Backend::Vulkan:
+      return ShaderProfile::Vulkan;
+    case Backend::WebGPU:
+      return ShaderProfile::WebGPU;
+    case Backend::D3D12:
+      return ShaderProfile::D3D12;
+    case Backend::Unknown:
+      return std::nullopt;
+  }
+  return std::nullopt;
+}
+
+ShaderProfile ResolveGLShaderProfile(bool usesPrecisionModifiers) {
+  return usesPrecisionModifiers ? ShaderProfile::OpenGLES : ShaderProfile::OpenGL;
+}
+
+}  // namespace
 
 PrecompiledShaderCache::PrecompiledShaderCache(Context* context, Backend backend)
     : _context(context), _backend(backend), _shaderCache(context), _specializationEnabled(true) {
@@ -207,7 +232,6 @@ AOTDrawStats PrecompiledShaderCache::drawStats() const {
   std::lock_guard<std::mutex> autoLock(drawStatsMutex);
   return _drawStats;
 }
-
 
 PrecompiledShaderCache::SpecStats PrecompiledShaderCache::specStats() const {
   std::lock_guard<std::mutex> autoLock(_specStatsMutex);

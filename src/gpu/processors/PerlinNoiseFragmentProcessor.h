@@ -20,7 +20,6 @@
 
 #include <memory>
 #include "core/shaders/PerlinNoiseShader.h"
-#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
@@ -54,11 +53,6 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
       std::shared_ptr<TextureView> permutationsView, std::shared_ptr<TextureView> noiseView,
       const Matrix* uvMatrix);
 
-  // Rebuilds the processor from a lowered AOTPerlinNoiseParameters (the lookup-identity path the
-  // lowering tests exercise; the plan executor's perlin reconstruction went with the kernel).
-  static PlacementPtr<PerlinNoiseFragmentProcessor> MakeFromAOTParameters(
-      BlockAllocator* allocator, const AOTPerlinNoiseParameters& parameters);
-
   std::string name() const override {
     return "PerlinNoiseFragmentProcessor";
   }
@@ -87,16 +81,12 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
 
   SamplerState onSamplerStateAt(size_t index) const override;
 
-
  protected:
   PerlinNoiseFragmentProcessor(PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
                                std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
                                std::shared_ptr<TextureView> permutationsView,
-                               std::shared_ptr<TextureView> noiseView, const Matrix* uvMatrix,
-                               bool hasOriginalLookupData = false);
+                               std::shared_ptr<TextureView> noiseView, const Matrix* uvMatrix);
 
-  bool hasOriginalLookupData = false;
-  mutable std::shared_ptr<const AOTPerlinNoiseLookupData> lookupData = nullptr;
   PerlinNoiseType noiseType;
   int numOctaves;
   bool stitchTiles;
