@@ -1163,7 +1163,10 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (FloatNearlyZero(contentScale)) {
     return true;
   }
-  if (args.renderRects != nullptr && !args.renderRects->empty() && !renderBounds.isEmpty()) {
+  if (args.renderRects != nullptr && !args.renderRects->empty()) {
+    if (renderBounds.isEmpty()) {
+      return true;
+    }
     bool anyHit = false;
     for (const auto& rect : *args.renderRects) {
       if (Rect::Intersects(rect, renderBounds)) {
@@ -1237,6 +1240,11 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   DrawArgs maskArgs = args;
   maskArgs.excludeEffects |= isContourMode;
   maskArgs.backgroundHandler = BackgroundHandler::NoOp();
+  // A mask under a hidden ancestor still applies, but updateRenderBounds() skips hidden subtrees,
+  // so its render bounds are empty and would cull the whole mask. Draw such a mask uncut.
+  if (_mask->renderBounds.isEmpty()) {
+    maskArgs.renderRects = nullptr;
+  }
   auto maskCanPreserve3D = _mask->canPreserve3D();
   // When mask enables 3D context, the full 3D relative matrix is handled by the 3D context.
   // Otherwise, use the 2D projection of the relative matrix on canvas.

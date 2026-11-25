@@ -1118,4 +1118,37 @@ TGFX_TEST(LayerMaskTest, InvertedMaskKeepsBounds) {
   });
 }
 
+// A layer's render bounds are empty when it draws nothing, so it is culled. A mask under a hidden
+// ancestor is the exception: it still applies, while updateRenderBounds() leaves it uncomputed.
+TGFX_TEST(LayerMaskTest, MaskUnderHiddenAncestor) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  DisplayList list;
+  list.setRenderMode(RenderMode::Partial);
+  Path contentPath;
+  contentPath.addRect(Rect::MakeWH(100, 100));
+  auto content = ShapeLayer::Make();
+  content->setPath(contentPath);
+  content->setFillStyle(ShapeStyle::Make(Color::Red()));
+  auto hidden = Layer::Make();
+  hidden->setVisible(false);
+  auto mask = ShapeLayer::Make();
+  Path maskPath;
+  maskPath.addRect(Rect::MakeWH(50, 100));
+  mask->setPath(maskPath);
+  mask->setFillStyle(ShapeStyle::Make(Color::Black()));
+  hidden->addChild(mask);
+  content->setMask(mask);
+  list.root()->addChild(content);
+  list.root()->addChild(hidden);
+  list.render(surface.get());
+  auto inside = surface->getColor(25, 50);
+  EXPECT_NEAR(inside.red, 1.0f, 2.0f / 255.0f);
+  EXPECT_NEAR(inside.alpha, 1.0f, 2.0f / 255.0f);
+  auto outside = surface->getColor(75, 50);
+  EXPECT_NEAR(outside.alpha, 0.0f, 2.0f / 255.0f);
+}
+
 }  // namespace tgfx
