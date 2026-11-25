@@ -20,6 +20,8 @@
 
 #include <memory>
 #include <optional>
+#include <set>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 #include "layers/BackgroundSnapshotMap.h"
@@ -90,6 +92,36 @@ struct CaptureProbe {
   }
 };
 extern CaptureProbe gCaptureProbe;
+
+// TEMP probe: non-background layer style draws per tiled frame.
+struct StyleProbe {
+  // Where a style is drawn: 0 live into a tile, 1 into a background capture, 2 into a subtree
+  // cache image being built.
+  static constexpr int Places = 3;
+  // Indexed by LayerStyleType.
+  static constexpr int Types = 8;
+  int subtreeBuildDepth = 0;
+  int calls[Places][Types] = {};
+  int analytic[Places][Types] = {};
+  // Draws whose content image is not texture backed, so drawing it rasterizes it again.
+  int lazyContent[Places][Types] = {};
+  double contentMpx[Places][Types] = {};
+  // Distinct (layer, style, contentScale) keys drawn live this frame, and how many live draws hit
+  // a key also drawn live in the previous frame.
+  std::set<std::tuple<const void*, const void*, float>> liveKeys = {};
+  std::set<std::tuple<const void*, const void*, float>> previousLiveKeys = {};
+  int liveRepeatsFromPrevious = 0;
+  int lastType = -1;
+
+  void beginFrame() {
+    auto previous = std::move(liveKeys);
+    auto depth = subtreeBuildDepth;
+    *this = {};
+    previousLiveKeys = std::move(previous);
+    subtreeBuildDepth = depth;
+  }
+};
+extern StyleProbe gStyleProbe;
 
 /**
  * Strategy for rendering Background-sourced LayerStyles.

@@ -40,6 +40,7 @@
 namespace tgfx {
 
 CaptureProbe gCaptureProbe = {};
+StyleProbe gStyleProbe = {};
 
 static double ProbeMsSince(std::chrono::steady_clock::time_point start) {
   return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)

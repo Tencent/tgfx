@@ -22,6 +22,7 @@
 #include <cmath>
 #include <cstdio>
 #include <functional>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include "core/utils/DecomposeRects.h"
@@ -748,6 +749,28 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
           p.subtreeFailFilter, p.subtreeFailTexture, p.subtreeFailEmptyBounds, p.subtreeFailLeaf,
           static_cast<double>(p.subtreeFailMaxEdge));
     }
+  }
+  if (!tileTasks.empty()) {
+    auto& sp = gStyleProbe;
+    static const char* const PlaceNames[] = {"live", "capture", "subtree"};
+    std::string line = {};
+    char buffer[200];
+    for (int place = 0; place < StyleProbe::Places; ++place) {
+      for (int type = 0; type < StyleProbe::Types; ++type) {
+        if (sp.calls[place][type] == 0 || type == 1) {
+          continue;
+        }
+        std::snprintf(buffer, sizeof(buffer), " %s.t%d=%d/%d/%d/%.3f", PlaceNames[place], type,
+                      sp.calls[place][type], sp.analytic[place][type], sp.lazyContent[place][type],
+                      sp.contentMpx[place][type]);
+        line += buffer;
+      }
+    }
+    if (!line.empty()) {
+      std::printf("[STYLE] tasks=%zu uniqueLive=%zu repeatLive=%d%s\n", tileTasks.size(),
+                  sp.liveKeys.size(), sp.liveRepeatsFromPrevious, line.c_str());
+    }
+    sp.beginFrame();
   }
   if (hasBackgroundStyle && !tileTasks.empty()) {
     const double drawMs =

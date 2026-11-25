@@ -19,6 +19,7 @@
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "layers/BackgroundHandler.h"
 #include "layers/SpreadUtils.h"
 #include "layers/layerstyles/AnalyticShadowUtils.h"
 #include "layers/shaders/RRectInnerShadowShader.h"
@@ -150,6 +151,10 @@ void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& inp
   // spread case can therefore be evaluated in closed form.
   // TODO: let contentShape describe the whole subtree, then lift this restriction.
   if (tryDrawAnalytic(canvas, input, alpha, blendMode)) {
+    if (gStyleProbe.lastType >= 0) {
+      const int place = gCaptureProbe.inCapture ? 1 : (gStyleProbe.subtreeBuildDepth > 0 ? 2 : 0);
+      ++gStyleProbe.analytic[place][gStyleProbe.lastType];
+    }
     return;
   }
   auto shapeResult = SpreadUtils::MakeSpreadShapeImage(input, 0);

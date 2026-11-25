@@ -1557,6 +1557,14 @@ SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
               .count();
     }
   } buildTimer{buildStart};
+  struct BuildDepth {
+    BuildDepth() {
+      ++gStyleProbe.subtreeBuildDepth;
+    }
+    ~BuildDepth() {
+      --gStyleProbe.subtreeBuildDepth;
+    }
+  } buildDepth;
   auto maxBoundsSize = std::max(layerBounds.width(), layerBounds.height());
   if (FloatNearlyZero(maxBoundsSize)) {
     return nullptr;
@@ -2179,6 +2187,29 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   LayerStyleInput styleInput = {};
   styleInput.content = std::move(contentSource);
   styleInput.contentScale = source->contentScale;
+  static const char* const ProbeTags[] = {"style:Other",      "style:BgBlur",    "style:Drop",
+                                          "style:Inner",      "style:MonoNoise", "style:DuoNoise",
+                                          "style:MultiNoise", "style:Glass"};
+  const int probeType = std::clamp(static_cast<int>(layerStyle->Type()), 0, StyleProbe::Types - 1);
+  const int probePlace = gCaptureProbe.inCapture ? 1 : (gStyleProbe.subtreeBuildDepth > 0 ? 2 : 0);
+  GpuProbeTag styleProbeTag(ProbeTags[probeType]);
+  ++gStyleProbe.calls[probePlace][probeType];
+  if (auto contentImage = styleInput.content->image()) {
+    if (!contentImage->isTextureBacked()) {
+      ++gStyleProbe.lazyContent[probePlace][probeType];
+    }
+    gStyleProbe.contentMpx[probePlace][probeType] +=
+        static_cast<double>(contentImage->width()) * contentImage->height() / 1e6;
+  }
+  if (probePlace == 0) {
+    auto key = std::make_tuple(static_cast<const void*>(this), static_cast<const void*>(layerStyle),
+                               source->contentScale);
+    gStyleProbe.liveKeys.insert(key);
+    if (gStyleProbe.previousLiveKeys.count(key) > 0) {
+      ++gStyleProbe.liveRepeatsFromPrevious;
+    }
+  }
+  gStyleProbe.lastType = probeType;
   auto sourceFlags = layerStyle->extraSourceType();
   if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
     // The Contour extra source is the shared contour; its contentShape is the legacy spread outline
@@ -2191,6 +2222,7 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
         std::move(contourImage), contourOffset, source->contentShape));
   }
   layerStyle->draw(canvas, styleInput, alpha);
+  gStyleProbe.lastType = -1;
 }
 
 bool Layer::getLayersUnderPointInternal(float x, float y,
