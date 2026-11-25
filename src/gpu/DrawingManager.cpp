@@ -20,9 +20,7 @@
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
 #include "gpu/ContextInternal.h"
-#include "gpu/aot/AOTRouter.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
@@ -60,21 +58,6 @@ void DrawingManager::collectFrameUsage(std::shared_ptr<RenderTargetProxy> render
     }
   }
   drawingBuffer->windowUsages.push_back(std::move(renderTarget));
-}
-
-PlacementPtr<DrawOp> DrawingManager::makePassFillDrawOp(
-    std::shared_ptr<RenderTargetProxy> renderTarget, PlacementPtr<DrawIR> passIR,
-    uint32_t renderFlags, const Point& coordOffset, float inputAlpha) {
-  if (passIR == nullptr) {
-    return nullptr;
-  }
-  auto drawOp = makeFillDrawOp(renderTarget, PlacementPtr<FragmentProcessor>(), renderFlags,
-                               coordOffset, inputAlpha);
-  if (drawOp == nullptr) {
-    return nullptr;
-  }
-  drawOp->adoptLoweredIR(std::move(passIR));
-  return drawOp;
 }
 
 PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTargetProxy> renderTarget,
@@ -122,7 +105,6 @@ PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTarget
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                                   PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
                                   const Point& coordOffset) {
-  const FragmentProcessor* fillProcessor = processor.get();
   auto drawOp = makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset);
   if (drawOp == nullptr) {
     return false;
@@ -133,24 +115,6 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   // target, so the task clears its full backing first and a shader-side sample cannot observe
   // pixels left by an earlier scratch allocation. A single-pass chain-capable plan needs no task:
   // the fill's RectDrawOp is a StandardDrawOp, so the plain lookup serves it at prepare time.
-  AOTRouteRequest request = {};
-  request.kind = AOTRouteRequest::Kind::Fill;
-  request.target = renderTarget;
-  request.coordOffset = coordOffset;
-  request.renderFlags = renderFlags;
-  request.clearDestination = true;
-  request.processor = fillProcessor;
-  // The FP-tree route serves the fill's RectDrawOp at prepare time, so the record-time plan task
-  // stays off it (see OpsCompositor::addDrawOp for the same gate).
-  const bool fpTreeRoute = FPRecordingEnabled(context);
-  AOTRouter router(context);
-  if (!fpTreeRoute) {
-    if (auto task = router.route(&drawOp, request)) {
-      addRenderTask(std::move(task));
-      addGenerateMipmapsTask(renderTarget->asTextureProxy());
-      return true;
-    }
-  }
   auto allocator = drawingAllocator();
   auto drawOps = allocator->makeArray<DrawOp>(&drawOp, 1);
   auto textureProxy = renderTarget->asTextureProxy();
@@ -180,11 +144,6 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
-  // Ops submitted as a batch (a clip's mask layer, a layer's own render) never pass through
-  // OpsCompositor::addDrawOp, so this is their record-time lowering (see AOTRouter::lowerOps):
-  // the IR exists before the task prepares them, exactly like a compositor-recorded draw.
-  AOTRouter router(context);
-  router.lowerOps(drawOps);
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();

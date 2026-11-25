@@ -36,7 +36,6 @@ class ComposeFragmentProcessor : public FragmentProcessor {
     return "ComposeFragmentProcessor";
   }
 
-  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
   /**
    * Moves all child processors out of this ComposeFragmentProcessor. After calling this method,

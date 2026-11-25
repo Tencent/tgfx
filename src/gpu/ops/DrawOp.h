@@ -20,7 +20,6 @@
 
 #include <optional>
 #include "gpu/AAType.h"
-#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/XferFacts.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XferProcessor.h"
@@ -96,42 +95,6 @@ class DrawOp {
   }
 
   /**
-   * The draw's whole expression lowered once at record time: the color graph plus the classified
-   * coverage terms, with the xfer processor and blend mode riding along. Null when the expression
-   * did not lower — the plain FP path serves the draw unchanged. Nothing consumes the IR until
-   * the prepare-time AOT branch reads it.
-   */
-  const DrawIR* loweredIR() const {
-    return ir.get();
-  }
-
-  /**
-   * Appends the coverage processors added after the record-time lowering — a rasterized shape
-   * attaches its mask coverage only once the shape proxy exists — as new IR terms, so the carried
-   * IR stays the draw's complete expression. Returns true when the IR now covers the live list;
-   * false when the grown expression does not lower, which leaves the IR unusable for this draw.
-   */
-  bool appendGrownCoverage();
-
-  /**
-   * The record-time source of the AtlasText glyph leaf: the op's atlas proxy and sampling, which
-   * the prepare-time geometry processor merely re-derives. Nullopt for every other op. Both atlas
-   * flavors lower: the glyph leaf's parameters carry the atlas's alpha-only fact, the chain
-   * refuses a color glyph, and the dedicated atlas kernel carries it.
-   */
-  virtual std::optional<AOTAtlasGlyphSource> recordTimeAtlasSource() const {
-    return std::nullopt;
-  }
-
-  /**
-   * Adopts a plan pass's IR: the op's expression is that pass (a cut segment built by the plan
-   * executor), so the fill draw carries IR instead of a processor and the prepare-time serving
-   * rebuilds the processor once. The override replaces any record-time IR and the op's own
-   * processors are ignored while it is set.
-   */
-  void adoptLoweredIR(PlacementPtr<DrawIR> passIR);
-
-  /**
    * Whether the draw produces fractional coverage from any source: its coverage processors, or its
    * geometry processor (analytic AA edges, glyph masks, per-vertex coverage). Decides whether the
    * blend needs a dst texture.
@@ -169,7 +132,6 @@ class DrawOp {
   /// xfer stage); see setDstTexture.
   std::optional<DstTextureInfo> dstTexture = std::nullopt;
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
-  PlacementPtr<DrawIR> ir = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;
 
@@ -189,13 +151,5 @@ class DrawOp {
   // The record-time route's private levers (AOTRouter): the lowering and the in-place pass
   // annotation belong to that route alone, so nothing else drives them out of order.
   friend class AOTRouter;
-
-  /**
-   * Lowers the op's colors, coverages, xfer processor and blend mode into a DrawIR placed on the
-   * drawing allocator. Call once at record time, after those members are set and only while the
-   * precompiled route is active. A lowering failure leaves the IR null, and no match rule accepts
-   * a draw that carries processors without one, so such a draw is dropped and recorded as a miss.
-   */
-  void tryLowerIR();
 };
 }  // namespace tgfx

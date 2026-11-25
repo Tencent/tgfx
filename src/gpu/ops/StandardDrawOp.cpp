@@ -22,7 +22,6 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/Program.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/select/PrecompiledDiagnostics.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/Processor.h"
@@ -49,65 +48,7 @@ static bool IsDirectAOTShader(const std::string& shaderName) {
 }
 
 #if DEBUG
-namespace {
-// The texture-batch safety net: for the single-leaf color shape the texture rows read, the IR
-// leaf's record-time facts must agree with the tree's one texture processor. A disagreement is
-// a record-versus-prepare drift (a pending upload's instantiation, a proxy/texture disagreement)
-// that would make the executor-table rows read different facts than the processor walk did.
-// Multi-leaf shapes (blend DAGs, a mask-modulated shader) have no unambiguous correspondence
-// here and are skipped — the rows' shapes are single-leaf.
-void AssertSingleLeafFacts(const DrawIR& ir,
-                           const std::vector<PlacementPtr<FragmentProcessor>>& colors) {
-  const AOTTextureParameters* leaf = nullptr;
-  size_t leafCount = 0;
-  for (uint32_t index = 0; index < ir.color.nodeCount(); ++index) {
-    auto* node = ir.color.nodeAt(AOTNodeID(index));
-    if (node != nullptr && node->kind == AOTEffectKind::TextureSource) {
-      leaf = std::get_if<AOTTextureParameters>(&node->parameters);
-      leafCount++;
-    }
-  }
-  if (leafCount != 1 || leaf == nullptr) {
-    return;
-  }
-  const FragmentProcessor* texture = nullptr;
-  size_t textureCount = 0;
-  for (const auto& color : colors) {
-    FragmentProcessor::Iter iter(color.get());
-    while (auto* fp = iter.next()) {
-      if (IsProcessor<TiledTextureEffect>(fp) || IsProcessor<DeviceSpaceTextureEffect>(fp) ||
-          IsProcessor<TextureEffect>(fp)) {
-        texture = fp;
-        textureCount++;
-      }
-    }
-  }
-  if (textureCount != 1 || texture == nullptr) {
-    return;
-  }
-  auto classOf = [](const FragmentProcessor* fp) {
-    if (IsProcessor<TiledTextureEffect>(fp)) {
-      return AOTTextureSamplingKind::Tiled;
-    }
-    if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
-      return AOTTextureSamplingKind::Device;
-    }
-    return AOTTextureSamplingKind::Plain;
-  };
-  // A failure here means the leaf's record-time facts drifted from the tree's processor.
-  DEBUG_ASSERT(classOf(texture) == leaf->samplingKind);
-  if (leaf->samplingKind == AOTTextureSamplingKind::Plain) {
-    auto* te = static_cast<const TextureEffect*>(texture);
-    DEBUG_ASSERT(te->isYUV() == leaf->isYUV && te->isAlphaOnly() == leaf->isAlphaOnly &&
-                 te->hasRGBAAA() == leaf->hasRGBAAA &&
-                 te->hasPerspective() == leaf->hasPerspective);
-  } else if (leaf->samplingKind == AOTTextureSamplingKind::Tiled) {
-    auto* tiled = static_cast<const TiledTextureEffect*>(texture);
-    DEBUG_ASSERT(tiled->isAlphaOnly() == leaf->isAlphaOnly &&
-                 tiled->hasPerspective() == leaf->hasPerspective);
-  }
-}
-}  // namespace
+namespace {}  // namespace
 #endif
 
 void StandardDrawOp::configureProgramInfo(ProgramInfo* info, PixelFormat depthStencilFormat) {
@@ -138,7 +79,7 @@ bool StandardDrawOp::failLookup(RenderTarget* renderTarget, bool isFinalLookup,
 }
 
 bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStencilFormat,
-                             bool isFinalLookup, const DrawIR* passIR) {
+                             bool isFinalLookup) {
   // The FP-tree route: an op that spells its vertex stage through a GeometryProcessor serves the
   // whole draw from the processor tree — the geometry processor, the color/coverage fragment
   // processors and the xfer processor assembled here — with the runtime GLSL emission. The route
@@ -146,8 +87,7 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
   // precompiled route below. A plan-task pass is the precompiled route's own product and always
   // stays on it.
   const bool fpTreeRoute = FPRecordingEnabled(renderTarget->getContext());
-  auto geometryProcessor =
-      (passIR != nullptr || !fpTreeRoute) ? nullptr : onMakeGeometryProcessor(renderTarget);
+  auto geometryProcessor = !fpTreeRoute ? nullptr : onMakeGeometryProcessor(renderTarget);
   if (geometryProcessor != nullptr) {
     preparedProgram = nullptr;
     preparedProgramInfo = nullptr;
@@ -183,90 +123,18 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
   if (!geometryLayout.has_value()) {
     return false;
   }
-#if DEBUG
-  // The leaf twin runs while the carried IR is the one being served: the color list must be the
-  // record-time one (a grown coverage list is appended to the IR, not compared here).
-  const bool irServes = loweredIR() != nullptr && loweredIR()->colorFPCount == colors.size();
-  if (irServes) {
-    AssertSingleLeafFacts(*ir, colors);
-  }
-#endif
-
-  preparedProgram = nullptr;
-  preparedProgramInfo = nullptr;
-  preparedRenderTarget = nullptr;
-
-  // One path for both kinds of expression: a plan pass hands its IR in (its program was compiled
-  // when the plan was built, so the interpreter is its only family), and a draw carries its own
-  // record-time IR. Everything after this point — the info, the plan, the key, the program — is
-  // the same work either way.
-  const bool isPass = passIR != nullptr;
-  const DrawIR* carried = passIR;
-  if (isPass) {
-    auto context = renderTarget->getContext();
-    if (context == nullptr || context->drawingManager() == nullptr) {
-      return false;
-    }
-    // A plan pass carries its program from the pass build; a missing one means the admission
-    // promise was broken, so the draw is dropped instead of compiled on the spot.
-    if (carried->carriedChainProgram() == nullptr) {
-      return failLookup(renderTarget, isFinalLookup, "the pass carries no compiled program");
-    }
-  } else {
-    // The draw's record-time IR is the whole expression every later stage reads. A coverage
-    // processor attached only at prepare (a rasterized shape's mask, added by onMakeGeometry) is
-    // appended to the IR's terms instead of dropping the IR — the color graph cannot change after
-    // record time, so a color-count mismatch is the only case the IR does not describe. A draw
-    // that never lowered has no expression any rule accepts, so it is dropped here.
-    carried = loweredIR();
-    if (carried == nullptr || carried->colorFPCount != colors.size() || !appendGrownCoverage()) {
-      return failLookup(renderTarget, isFinalLookup, "the draw carries no expression");
-    }
-  }
-  // The pass info carries no processors: its program is the whole expression, and the blend
-  // formula's coverage bit is false (the kernel folds coverage itself).
-  preparedProgramInfo = std::make_unique<ProgramInfo>(renderTarget, *geometryLayout, dstTexture,
-                                                      blendMode, !isPass && !coverages.empty());
-  configureProgramInfo(preparedProgramInfo.get(), depthStencilFormat);
-  preparedProgramInfo->setCarriedIR(carried);
-  if (!isPass) {
-    // Diagnostics only: the effect signature stays processor-based until the processors
-    // themselves go away, and it is built only when the cache records diagnostics, so a
-    // production draw pays nothing. Nothing that selects, keys or writes reads it.
-    auto* cache = ContextCacheAccess::Cache(renderTarget->getContext());
-    if (cache != nullptr && cache->diagnosticRecordingEnabled()) {
-      std::vector<const FragmentProcessor*> colorList = {};
-      std::vector<const FragmentProcessor*> coverageList = {};
-      colorList.reserve(colors.size());
-      coverageList.reserve(coverages.size());
-      for (const auto& color : colors) {
-        colorList.push_back(color.get());
-      }
-      for (const auto& coverage : coverages) {
-        coverageList.push_back(coverage.get());
-      }
-      preparedProgramInfo->setEffectSignature(BuildEffectSignature(
-          *geometryLayout, colorList, coverageList, preparedProgramInfo->getXferFacts()));
-    }
-  }
-  preparedProgram = preparedProgramInfo->getProgram();
-  if (preparedProgram == nullptr) {
-    return failLookup(
-        renderTarget, isFinalLookup,
-        isPass ? "the pass program has no serving variant" : "No program for the draw");
-  }
-  preparedRenderTarget = renderTarget;
-  return true;
+  // The precompiled variant and plan-pass routes that carried a DrawIR are retired: only the
+  // FP-tree branch above serves a draw, so a draw without a geometry processor has no program.
+  return failLookup(renderTarget, isFinalLookup, "the draw carries no expression");
 }
 
-bool StandardDrawOp::prepareForTask(RenderTarget* renderTarget, bool isFinalLookup,
-                                    const DrawIR* passIR) {
+bool StandardDrawOp::prepareForTask(RenderTarget* renderTarget, bool isFinalLookup) {
   // Mirror execute()'s ordering: onPrepare() may veto the op (empty asynchronous buffers);
   // skipping it here would leave those ops drawing from null resources ().
   if (!onPrepare()) {
     return false;
   }
-  return prepare(renderTarget, PixelFormat::Unknown, isFinalLookup, passIR);
+  return prepare(renderTarget, PixelFormat::Unknown, isFinalLookup);
 }
 
 bool StandardDrawOp::executePrepared(RenderPass* renderPass, RenderTarget* renderTarget,

@@ -37,7 +37,6 @@
 #include "gpu/UniformData.h"
 #include "gpu/aot/AOTFailure.h"
 #include "gpu/aot/bundle/BundleData.h"
-#include "gpu/aot/spec/SpecValues.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Backend.h"
 
@@ -471,7 +470,6 @@ class PrecompiledShaderCache {
   };
 
   /// Records one resolved specialization. An empty value set is the generic form and is ignored.
-  void recordSpecCapture(const SpecValues& values);
 
   /// Returns a snapshot of the specialization accounting since the last resetStats().
   SpecStats specStats() const;

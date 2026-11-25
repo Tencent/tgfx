@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
-#include "gpu/aot/ir/EffectGraph.h"
 
 namespace tgfx {
 
@@ -43,14 +42,6 @@ bool ColorMatrixFragmentProcessor::isChannelPermutation() const {
          matrix[19] == 0.0f;
 }
 
-bool ColorMatrixFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
-                                              AOTNodeID* output) const {
-  if (builder == nullptr || output == nullptr) {
-    return false;
-  }
-  AOTColorMatrixParameters parameters = {};
-  parameters.matrix = matrix;
-  return builder->addColorMatrix(input, parameters, output);
-}
+
 
 }  // namespace tgfx

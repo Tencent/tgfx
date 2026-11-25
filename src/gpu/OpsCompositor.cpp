@@ -1152,29 +1152,6 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
   // The record-time AOT route's one entry: a null return leaves the op on the plain route (or
   // annotated in place for the prepare-time serving), a task return hands the plan's ownership
   // over for submission.
-  AOTRouteRequest request = {};
-  request.kind = AOTRouteRequest::Kind::Draw;
-  request.target = renderTarget;
-  request.deviceBounds = deviceBounds;
-  request.blend = brush.blendMode;
-  request.renderFlags = renderFlags;
-  // The FP-tree route serves its draws at prepare time (StandardDrawOp::prepare), so the
-  // record-time lowering and the plan task stay off it: no IR is recorded and the fill's multi-pass
-  // work stays with the ImageFilter's own successive fills.
-  const bool fpTreeRoute = FPRecordingEnabled(context);
-  AOTRouter router(context);
-  if (!fpTreeRoute) {
-    if (auto task = router.route(&op, request)) {
-      submitDrawOps();
-      context->drawingManager()->addRenderTask(std::move(task));
-      // The plan task writes level 0 directly, so a mipmapped target must regenerate its lower
-      // levels afterwards — every other path that renders into a mipmapped render target schedules
-      // this (see addOpsRenderTask), and skipping it leaves downscaled consumers sampling stale
-      // transparent levels.
-      context->drawingManager()->addGenerateMipmapsTask(renderTarget->asTextureProxy());
-      return;
-    }
-  }
   drawOps.emplace_back(std::move(op));
 }
 

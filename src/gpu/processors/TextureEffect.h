@@ -86,7 +86,6 @@ class TextureEffect : public FragmentProcessor {
     return textureProxy;
   }
 
-  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
   TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerState& samplerState,

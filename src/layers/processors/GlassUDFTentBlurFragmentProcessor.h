@@ -72,7 +72,6 @@ class GlassUDFTentBlurFragmentProcessor : public FragmentProcessor {
                                     float coarseRadius, GlassUDFBlurDirection direction,
                                     int maxRadius, bool inputIsPacked, GlassUDFField field);
 
-  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
   float fineRadius = 0.0f;
   float coarseRadius = 0.0f;

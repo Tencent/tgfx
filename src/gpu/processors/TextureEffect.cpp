@@ -22,8 +22,6 @@
 #include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/YUVColorConversion.h"
-#include "gpu/aot/ir/DrawIR.h"
-#include "gpu/aot/ir/EffectGraph.h"
 
 namespace tgfx {
 
@@ -51,83 +49,7 @@ TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerS
   addCoordTransform(&coordTransform);
 }
 
-bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const {
-  if (builder == nullptr || output == nullptr) {
-    return false;
-  }
-  auto textureView = getTextureView();
-  AOTTextureParameters parameters = {};
-  parameters.textureProxy = textureProxy;
-  parameters.samplingKind = AOTTextureSamplingKind::Plain;
-  parameters.samplerState = samplerState;
-  parameters.constraint = constraint;
-  parameters.uvMatrix = coordTransform.matrix;
-  parameters.subset = subset;
-  parameters.alphaStart = alphaStart;
-  parameters.isAlphaOnly = textureProxy->isAlphaOnly();
-  parameters.hasRGBAAA = alphaStart != Point::Zero();
-  parameters.hasPerspective = coordTransform.matrix.hasPerspective();
-  if (textureView == nullptr) {
-    // A pending multi-plane upload: the YUV-ness is exact at proxy creation (only the
-    // ImageBuffer-backed path reports it), while the plane layout exists only once the view
-    // does. Lower the leaf with what is known — the chain refuses it as any YUV leaf, and the
-    // YUV family's matching reads the layout off the tree's TextureEffect at prepare (an
-    // instance-time fact of a pending source, like the upload values that stay on the
-    // processor until the node contract lands).
-    if (textureProxy->mayUploadYUV()) {
-      parameters.isYUV = true;
-      parameters.yuvFormat = -1;
-      return builder->addTextureSource(input, parameters, output);
-    }
-    // The view is not instantiated yet. A proxy with a pending upload gets its view before this
-    // draw executes (resource tasks run ahead of the draw ops in the same flush), so the chain
-    // route can serve it — otherwise the first frame of every lazily uploaded image takes the
-    // plain direct-match route and a second program gets created once the view exists. The
-    // pending leaf is required to be single-plane: an ImageBuffer-backed YUV source reports its
-    // YUV-ness at proxy creation and is refused here; a generator-backed source is trusted to
-    // decode single-plane (every built-in codec does), with the chain matcher's multi-sampler
-    // rejection as the backstop. A view-less proxy with no
-    // pending upload never materializes (e.g. a generated mask whose rasterization failed); the
-    // chain route must refuse it so the runtime route's zero-stub behavior stays authoritative.
-    if (!hasPendingSinglePlaneUpload()) {
-      return false;
-    }
-    // The format gate below reads the instantiated view's texture; a pending upload's eventual
-    // format is the proxy's descriptor format (the upload task creates the view from it), so gate
-    // on that here too — a lowering run before the upload completes now refuses exactly the
-    // leaves a post-upload lowering would, and the record-time and prepare-time lowerings of the
-    // same draw cannot disagree on a gray or RG source.
-    if (textureProxy->format() == PixelFormat::GRAY_8 ||
-        textureProxy->format() == PixelFormat::RG_88) {
-      return false;
-    }
-    parameters.isYUV = false;
-  } else {
-    // Format gate (): the runtime applies Swizzle::ForRead to every texture lookup
-    // (GRAY_8 -> .rrra, RG_88 -> .rgrg), which the chain's plain leaf does not carry — a gray
-    // source would read (g, 0, 0, 1) instead of (g, g, g, 1). These formats exist as
-    // user-reachable standalone textures through external hardware buffers, so the chain must
-    // fail closed on them; the runtime route stays authoritative.
-    if (!textureView->isYUV()) {
-      auto format = textureView->getTexture()->format();
-      if (format == PixelFormat::GRAY_8 || format == PixelFormat::RG_88) {
-        return false;
-      }
-    }
-    parameters.isYUV = textureView->isYUV();
-    if (parameters.isYUV) {
-      // The multi-plane leaf's variant dimension rides on the node: the family's matching reads
-      // it off the IR (only I420 and NV12 are enumerated; anything else stays -1 and falls back).
-      auto* yuvTexture = getYUVTexture();
-      parameters.yuvFormat = yuvTexture == nullptr
-                                 ? -1
-                                 : (yuvTexture->yuvFormat() == YUVFormat::I420
-                                        ? 0
-                                        : (yuvTexture->yuvFormat() == YUVFormat::NV12 ? 1 : -1));
-    }
-  }
-  return builder->addTextureSource(input, parameters, output);
-}
+
 
 size_t TextureEffect::onCountTextureSamplers() const {
   auto textureView = getTextureView();

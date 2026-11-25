@@ -17,17 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AlphaThresholdFragmentProcessor.h"
-#include "gpu/aot/ir/EffectGraph.h"
 
 namespace tgfx {
 
-bool AlphaThresholdFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
-                                                 AOTNodeID* output) const {
-  if (builder == nullptr || output == nullptr) {
-    return false;
-  }
-  ChainISA::AlphaThresholdData parameters = {threshold};
-  return builder->addAlphaThreshold(input, parameters, output);
-}
+
 
 }  // namespace tgfx

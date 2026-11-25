@@ -73,15 +73,7 @@ PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarge
   return AtlasTextGeometryProcessor::Make(allocator, textureProxy, aaType, commonColor, sampling);
 }
 
-std::optional<AOTAtlasGlyphSource> AtlasTextOp::recordTimeAtlasSource() const {
-  if (textureProxy == nullptr) {
-    return std::nullopt;
-  }
-  // Both atlas flavors lower: the glyph term's leaf carries the atlas's own alpha-only fact, and
-  // the chain refuses a color glyph (it only modulates alpha) while the dedicated atlas kernel
-  // carries the color-glyph semantics, so a color atlas draw is served with its coverage.
-  return AOTAtlasGlyphSource{textureProxy, sampling};
-}
+
 
 void AtlasTextOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   std::shared_ptr<BufferResource> indexBuffer = nullptr;

@@ -62,7 +62,6 @@ class GlassRefractionFragmentProcessor : public FragmentProcessor {
     return params.dispersion >= 0.01f;
   }
 
-  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
   size_t onCountTextureSamplers() const override;
 

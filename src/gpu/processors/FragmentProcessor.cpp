@@ -20,7 +20,6 @@
 #include "ComposeFragmentProcessor.h"
 #include "core/utils/Log.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Shader.h"
@@ -98,12 +97,7 @@ void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey
   }
 }
 
-bool FragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID, AOTNodeID*) const {
-  if (builder != nullptr) {
-    builder->recordMissingLowering(this);
-  }
-  return false;
-}
+
 
 size_t FragmentProcessor::registerChildProcessor(PlacementPtr<FragmentProcessor> child) {
   auto index = childProcessors.size();

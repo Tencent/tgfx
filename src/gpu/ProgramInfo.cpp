@@ -24,11 +24,8 @@
 #include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
-#include "gpu/ProgramWriter.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/aot/ir/DrawIR.h"
-#include "gpu/aot/select/ProgramKey.h"
 #include "gpu/aot/select/ShaderProfileResolver.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
@@ -38,6 +35,41 @@
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
+
+// The render-target adjust vector (2/width, -1, ±2/height, ±1): the vertex stage's uniform.
+static std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
+  std::array<float, 4> result = {};
+  result[0] = 2.f / static_cast<float>(renderTarget->width());
+  result[2] = 2.f / static_cast<float>(renderTarget->height());
+  result[1] = -1.f;
+  result[3] = -1.f;
+  if (renderTarget->origin() == ImageOrigin::BottomLeft) {
+    result[2] = -result[2];
+    result[3] = -result[3];
+  }
+  // WebGPU's viewport maps NDC y=+1 to the framebuffer top; a top-left target needs the negate.
+  if (renderTarget->getContext()->backend() == Backend::WebGPU &&
+      renderTarget->origin() == ImageOrigin::TopLeft) {
+    result[2] = -result[2];
+    result[3] = -result[3];
+  }
+  return result;
+}
+
+// The sampler address mode a tile mode maps onto.
+static AddressMode ToAddressMode(TileMode tileMode) {
+  switch (tileMode) {
+    case TileMode::Clamp:
+      return AddressMode::ClampToEdge;
+    case TileMode::Repeat:
+      return AddressMode::Repeat;
+    case TileMode::Mirror:
+      return AddressMode::MirrorRepeat;
+    case TileMode::Decal:
+      return AddressMode::ClampToBorder;
+  }
+  return AddressMode::ClampToEdge;
+}
 
 static void EncodeStencilFace(BytesKey& key, const StencilDescriptor& face) {
   key.write(static_cast<uint32_t>(face.compare));
@@ -197,50 +229,6 @@ std::string ProgramInfo::FormatDiagnosticKey(const BytesKey& key) {
     stream << std::setw(8) << key.data()[index];
   }
   return stream.str();
-}
-
-BytesKey ProgramInfo::programKey() const {
-  return buildProgramKey();
-}
-
-BytesKey ProgramInfo::buildProgramKey() const {
-  BytesKey key = {};
-  // The geometry's key contribution (see the precompiled-side key): kind, perspective and the
-  // live attribute formats.
-  key.write(static_cast<uint32_t>(geometryLayout.parameters.kind));
-  key.write(static_cast<uint32_t>(geometryLayout.parameters.hasUVPerspective ? 1u : 0u));
-  for (const auto& attribute : geometryLayout.vertexAttributes) {
-    if (!attribute.empty()) {
-      key.write(static_cast<uint32_t>(attribute.format()));
-    }
-  }
-  for (const auto& attribute : geometryLayout.instanceAttributes) {
-    if (!attribute.empty()) {
-      key.write(static_cast<uint32_t>(attribute.format()));
-    }
-  }
-  // The expression's identity: the lowered IR carries every matching-relevant fact now that the
-  // processor list is gone — node kinds, parameters, texture identities, and the color/coverage
-  // boundary, which stays semantic (the same sequence on the other side of the boundary
-  // composites differently, so it must ride the key or a negative hit can poison the wrong role).
-  if (carriedIR != nullptr) {
-    HashDrawIR(*carriedIR, &key);
-  } else {
-    key.write(static_cast<uint32_t>(0));
-  }
-  // The output formula's contribution, the same encoding the precompiled-side key writes: the
-  // shader-stage flag and the sampled destination's identity (a null proxy is the framebuffer
-  // fetch; blendMode rides the pipeline state key below).
-  key.write(static_cast<uint32_t>(xferFacts.shaderBlend() ? 1u : 0u));
-  if (xferFacts.shaderBlend()) {
-    const auto& dstProxy = xferFacts.dstTexture->textureProxy;
-    auto dstView = dstProxy != nullptr ? dstProxy->getTextureView() : nullptr;
-    if (dstView != nullptr) {
-      TextureView::ComputeTextureKey(dstView->getTexture(), &key);
-    }
-  }
-  writePipelineStateKey(&key);
-  return key;
 }
 
 void ProgramInfo::writePipelineStateKey(BytesKey* key) const {
@@ -420,7 +408,10 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
     }
     return true;
   }
-  return program->writer()->write(*this, renderPass, program);
+  // The precompiled variant route that carried a writer is retired; a draw without a geometry
+  // processor has no program source any more.
+  LOGE("ProgramInfo::setUniformsAndSamplers() the info carries no geometry processor");
+  return false;
 }
 
 Backend ProgramInfo::backend() const {
@@ -450,27 +441,6 @@ bool ProgramInfo::samplersAre2D() const {
     auto atlasView = geometryLayout.parameters.atlasProxy->getTextureView();
     if (atlasView != nullptr && !isTwoD(atlasView->getTexture())) {
       return false;
-    }
-  }
-  if (carriedIR != nullptr) {
-    for (const auto& proxy : carriedIR->textures) {
-      auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
-      if (view == nullptr) {
-        // An upload that has not landed binds the dummy, which is a 2D texture.
-        continue;
-      }
-      if (view->isYUV()) {
-        auto* yuvView = static_cast<const YUVTextureView*>(view.get());
-        for (size_t index = 0; index < yuvView->textureCount(); ++index) {
-          if (!isTwoD(yuvView->getTextureAt(index))) {
-            return false;
-          }
-        }
-        continue;
-      }
-      if (!isTwoD(view->getTexture())) {
-        return false;
-      }
     }
   }
   if (xferFacts.shaderBlend() && xferFacts.dstProxy() != nullptr) {

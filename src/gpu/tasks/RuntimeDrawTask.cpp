@@ -23,7 +23,6 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/QuadsVertexProvider.h"
-#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/GeometryLayout.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
@@ -138,14 +137,6 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   }
   auto geometryLayout = QuadGeometryLayoutOf(renderTarget->width(), renderTarget->height(),
                                              AAType::None, PMColor::White(), Matrix::I(), false);
-  // This flatten draw never passes through the record-time router, so it lowers its own
-  // expression here: the program is resolved from the IR alone, and a draw that fails to lower
-  // has nothing to serve. The handle outlives the resolution below.
-  auto lowered = LowerDraw({colorProcessor.get()}, {}, BlendMode::Src, allocator);
-  if (!lowered.has_value()) {
-    LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to lower the flatten draw!");
-    return nullptr;
-  }
   // The FP-tree route assembles the same flatten draw from the processor tree (the geometry
   // processor, the color processor, no xfer) and lets the runtime emission build the program;
   // the precompiled route keeps the IR-based flow below.
@@ -172,11 +163,8 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
                                       std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);
     program = programInfo->getProgram();
   } else {
-    PlacementPtr<DrawIR> carriedIR = allocator->make<DrawIR>(std::move(*lowered));
-    programInfo = std::make_unique<ProgramInfo>(renderTarget.get(), geometryLayout, std::nullopt,
-                                                BlendMode::Src, false);
-    programInfo->setCarriedIR(carriedIR.get());
-    program = programInfo->getProgram();
+    LOGE("RuntimeDrawTask::GetFlatTextureView() the IR route is retired");
+    return nullptr;
   }
   if (program == nullptr) {
     LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to get the program!");

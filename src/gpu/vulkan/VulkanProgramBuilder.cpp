@@ -24,7 +24,6 @@
 #include "core/utils/Log.h"
 #include "gpu/ContextInternal.h"
 #include "gpu/Program.h"
-#include "gpu/ProgramWriter.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/chain/ChainSPIRVBody.h"
@@ -191,7 +190,7 @@ std::shared_ptr<Program> VulkanProgramBuilder::buildIRProgram() {
   LOGI("VulkanProgramBuilder: built an IR program (%zu bindings)",
        modules.layout.bindings().size());
   return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
-                                   std::move(fragmentUniformData), nullptr);
+                                   std::move(fragmentUniformData));
 }
 
 std::shared_ptr<Program> VulkanProgramBuilder::finalize() {

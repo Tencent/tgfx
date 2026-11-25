@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
-#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {

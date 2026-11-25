@@ -33,7 +33,6 @@ class ColorMatrixFragmentProcessor : public FragmentProcessor {
     return "ColorMatrixFragmentProcessor";
   }
 
-  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
   bool isChannelPermutation() const;
 

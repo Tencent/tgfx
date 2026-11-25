@@ -18,16 +18,8 @@
 
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "core/utils/ColorSpaceHelper.h"
-#include "gpu/aot/ir/EffectGraph.h"
 namespace tgfx {
-bool LumaFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
-                                       AOTNodeID* output) const {
-  if (builder == nullptr || output == nullptr) {
-    return false;
-  }
-  ChainISA::LumaData parameters = {_lumaFactor.kr, _lumaFactor.kg, _lumaFactor.kb};
-  return builder->addLuma(input, parameters, output);
-}
+
 
 LumaFragmentProcessor::LumaFragmentProcessor(std::shared_ptr<ColorSpace> colorSpace)
     : FragmentProcessor(ClassID()), _colorSpace(std::move(colorSpace)) {

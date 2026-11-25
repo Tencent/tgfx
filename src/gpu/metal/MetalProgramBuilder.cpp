@@ -21,7 +21,6 @@
 #include <cstdlib>
 #include <string>
 #include "core/utils/Log.h"
-#include "gpu/ProgramWriter.h"
 #include "gpu/ir/ProgramValidation.h"
 #include "gpu/metal/MSLPrinter.h"
 #include "gpu/shaders/ShaderLibraryBundle.h"
@@ -208,7 +207,7 @@ std::shared_ptr<Program> MetalProgramBuilder::finalize() {
     return nullptr;
   }
   return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
-                                   std::move(fragmentUniformData), nullptr);
+                                   std::move(fragmentUniformData));
 }
 
 }  // namespace tgfx

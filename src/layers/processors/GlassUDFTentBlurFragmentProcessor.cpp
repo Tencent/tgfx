@@ -18,7 +18,6 @@
 
 #include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
 #include "core/utils/Log.h"
-#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -156,29 +155,7 @@ void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData* /*vertexUniformDa
   fragmentUniformData->setData("Step", step);
 }
 
-bool GlassUDFTentBlurFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
-                                                   AOTNodeID* output) const {
-  // Same contract as the gaussian blur's opaque node: the active source child lowers into the
-  // graph (a texture leaf — the horizontal pass reads a plain TextureEffect, the vertical a
-  // TiledTextureEffect), everything else stays inside the family's kernel. The matcher reads
-  // the child's servable shape and the radius cap off the node.
-  if (builder == nullptr || output == nullptr || numChildProcessors() != 1) {
-    return false;
-  }
-  AOTNodeID childNode = AOTNodeID::Invalid();
-  if (!childProcessor(0)->lowerToAOT(builder, input, &childNode)) {
-    return false;
-  }
-  AOTOpaqueKernelParameters parameters = {};
-  parameters.kernel = AOTOpaqueKernel::GlassUDFTentBlur;
-  parameters.maxRadius = maxRadius;
-  parameters.tentFineRadius = fineRadius;
-  parameters.tentCoarseRadius = coarseRadius;
-  parameters.tentField = static_cast<int>(field);
-  parameters.tentInputIsPacked = inputIsPacked ? 1 : 0;
-  parameters.tentVertical = direction == GlassUDFBlurDirection::Vertical;
-  return builder->addOpaqueKernel(childNode, parameters, output);
-}
+
 
 void GlassUDFTentBlurFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
   key->write(maxRadius);

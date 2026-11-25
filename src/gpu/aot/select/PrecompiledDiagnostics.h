@@ -43,15 +43,8 @@ std::string BuildEffectSignature(const GeometryLayout& geometry,
 
 /// The record one program lookup leaves behind. Both return an empty record when the cache's
 /// diagnostic recording is off, so the production path pays one flag read and no string work.
-PrecompiledFallbackRecord MakeFallbackRecord(const PrecompiledShaderCache* cache,
-                                             const ProgramInfo* programInfo,
-                                             const Variant* variant = nullptr);
-PrecompiledHitRecord MakeHitRecord(const PrecompiledShaderCache* cache,
-                                   const ProgramInfo* programInfo, const Variant& variant);
 
 /// Dumps every pipeline-state field the descriptor carries, so a failing creation can be diffed
 /// against a succeeding one; the backend logs the underlying error separately.
-void LogPipelineCreationFailure(const RenderPipelineDescriptor& descriptor, const char* shaderName,
-                                uint32_t variantId);
 
 }  // namespace tgfx

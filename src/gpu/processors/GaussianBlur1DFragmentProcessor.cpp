@@ -22,7 +22,6 @@
 #include <limits>
 #include <string>
 #include <string_view>
-#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
@@ -63,33 +62,7 @@ void GaussianBlur1DFragmentProcessor::computeKernel(float sigma) {
   }
 }
 
-bool GaussianBlur1DFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
-                                                 AOTNodeID* output) const {
-  // The blur's math cannot ride the pointwise chain, so it lowers as an opaque-kernel barrier:
-  // the dedicated family's kernel runs it (the planner refuses the graph, keeping the draw on
-  // the plain route), and the family's IR-based matching reads the node. The child
-  // lowers normally — its texture leaf is the natural cut point for a future split (a color
-  // grade under the blur materializes as its own pass).
-  if (builder == nullptr || output == nullptr || numChildProcessors() != 1) {
-    return false;
-  }
-  AOTNodeID childNode = AOTNodeID::Invalid();
-  if (!childProcessor(0)->lowerToAOT(builder, input, &childNode)) {
-    return false;
-  }
-  AOTOpaqueKernelParameters parameters = {};
-  parameters.kernel = AOTOpaqueKernel::GaussianBlur1D;
-  // The fixed kernel caps sigma at 10; the matcher reads the acceptance range off the node.
-  parameters.sigma = maxSigma;
-  // The upload values the blur bind reads off the node (see AOTOpaqueKernelParameters). The
-  // step's matrix is NOT stashed here: its normalization needs the child's instantiated view,
-  // so the bind maps it through the child leaf's recorded matrix at bind time.
-  parameters.kernelRadius = getKernelRadius();
-  parameters.stepLength = getStepLength();
-  parameters.vertical = getDirection() == GaussianBlurDirection::Vertical;
-  parameters.packedKernel = packedKernel();
-  return builder->addOpaqueKernel(childNode, parameters, output);
-}
+
 
 void GaussianBlur1DFragmentProcessor::onComputeProcessorKey(BytesKey* key) const {
   key->write(maxSigma);

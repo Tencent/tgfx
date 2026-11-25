@@ -65,7 +65,6 @@ class RectEffect : public FragmentProcessor {
     return _deviceToLocal;
   }
 
-  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
   RectEffect(const Rect& localRect, const Matrix& deviceToLocal, bool antiAlias)

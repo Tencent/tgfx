@@ -208,16 +208,6 @@ AOTDrawStats PrecompiledShaderCache::drawStats() const {
   return _drawStats;
 }
 
-void PrecompiledShaderCache::recordSpecCapture(const SpecValues& values) {
-  if (values.empty()) {
-    return;
-  }
-  std::lock_guard<std::mutex> autoLock(_specStatsMutex);
-  _specStats.captures++;
-  if (_specStructures.insert(values.values).second) {
-    _specStats.distinctStructures++;
-  }
-}
 
 PrecompiledShaderCache::SpecStats PrecompiledShaderCache::specStats() const {
   std::lock_guard<std::mutex> autoLock(_specStatsMutex);

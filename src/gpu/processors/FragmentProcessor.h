@@ -130,7 +130,7 @@ class FragmentProcessor : public Processor {
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
 
-  virtual bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const;
+
 
   size_t numChildProcessors() const {
     return childProcessors.size();

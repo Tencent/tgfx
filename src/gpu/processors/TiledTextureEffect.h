@@ -76,7 +76,6 @@ class TiledTextureEffect : public FragmentProcessor {
   /// The texture view the sampling references; null while the texture is not instantiated yet.
   const TextureView* getTextureView() const;
 
-  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
   struct Sampling {

@@ -25,24 +25,17 @@
 
 namespace tgfx {
 
-class ProgramWriter;
 
 class Program {
  public:
   Program(std::shared_ptr<RenderPipeline> pipeline, std::unique_ptr<UniformData> vertexUniformData,
-          std::unique_ptr<UniformData> fragmentUniformData, std::unique_ptr<ProgramWriter> writer);
+          std::unique_ptr<UniformData> fragmentUniformData);
   ~Program();
 
   std::shared_ptr<RenderPipeline> getPipeline() const {
     return pipeline;
   }
 
-  /**
-   * The route-specific writer that uploads this program's per-draw uniforms and samplers.
-   */
-  const ProgramWriter* writer() const {
-    return writerValue.get();
-  }
 
   /**
    * The precompiled family the program was built from: lets a cache hit tell which kernel
@@ -99,7 +92,6 @@ class Program {
   std::shared_ptr<RenderPipeline> pipeline = nullptr;
   std::unique_ptr<UniformData> vertexUniformData = nullptr;
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
-  std::unique_ptr<ProgramWriter> writerValue = nullptr;
   std::string shaderNameValue = {};
   uint32_t expectedTextureCountValue = 0;
   std::vector<unsigned> textureSlotBindings = {};

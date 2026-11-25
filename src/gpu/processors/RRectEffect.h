@@ -52,7 +52,6 @@ class RRectEffect : public FragmentProcessor {
     return "RRectEffect";
   }
 
-  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
   /** The rounded rect in local space, with the axis scales baked in by Make. */
   const Rect& getLocalRect() const {

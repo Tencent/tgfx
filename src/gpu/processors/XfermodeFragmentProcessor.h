@@ -53,7 +53,6 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
 
   std::string name() const override;
 
-  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
   DEFINE_PROCESSOR_CLASS_ID

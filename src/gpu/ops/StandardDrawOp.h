@@ -23,7 +23,6 @@
 #include "gpu/processors/GeometryProcessor.h"
 
 namespace tgfx {
-struct DrawIR;
 
 /**
  * StandardDrawOp is the base class for ops that follow the "framework binds one pipeline,
@@ -49,7 +48,7 @@ class StandardDrawOp : public DrawOp {
    * versus a plan-task pass probe, whose failure falls back to the original draw.
    */
   bool prepare(RenderTarget* renderTarget, PixelFormat depthStencilFormat = PixelFormat::Unknown,
-               bool isFinalLookup = true, const DrawIR* passIR = nullptr);
+               bool isFinalLookup = true);
 
   /**
    * Executes a successfully prepared draw and uploads its uniforms and texture samplers. Set
@@ -71,8 +70,7 @@ class StandardDrawOp : public DrawOp {
    * plan-task pass probe (false) falls back to the original draw on failure, while the task's
    * fallback re-run of the original draw (true) drops it.
    */
-  bool prepareForTask(RenderTarget* renderTarget, bool isFinalLookup = true,
-                      const DrawIR* passIR = nullptr);
+  bool prepareForTask(RenderTarget* renderTarget, bool isFinalLookup = true);
 
   /**
    * The geometry color every fragment of this op receives as its input color, or nullopt when

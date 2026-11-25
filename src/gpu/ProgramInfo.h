@@ -24,9 +24,7 @@
 #include "gpu/Program.h"
 #include "gpu/Swizzle.h"
 #include "gpu/aot/ir/GeometryLayout.h"
-#include "gpu/aot/ir/Program.h"
 #include "gpu/aot/ir/XferFacts.h"
-#include "gpu/aot/select/FamilyMatchResult.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
@@ -130,14 +128,6 @@ class ProgramInfo {
   std::shared_ptr<Program> getProgram();
 
   /**
-   * The plan's data sources. The selection layer that recorded them is gone, so nothing carries
-   * them any more; the accessor stays for the writers' null check.
-   */
-  const FamilyMatchResult* getSources() const {
-    return nullptr;
-  }
-
-  /**
    * Writes the pipeline-state fields the program keys carry — everything past the processor keys
    * (blend mode, output swizzle, cull, target format and samples, colour write mask, depth and
    * stencil). The plain route's key and the AOT route's key share this tail, so the two routes
@@ -221,13 +211,6 @@ class ProgramInfo {
   }
 
   /**
-   * The attempt key: what the draw is before any match ran, derived on each call from the current
-   * pipeline state. The program cache is keyed by MakeProgramKey instead (a program's key carries
-   * its matched variant), so this key only addresses the diagnostic records.
-   */
-  BytesKey programKey() const;
-
-  /**
    * Returns the index of the processor in the ProgramInfo. Returns -1 if the processor is not in
    * the ProgramInfo.
    */
@@ -242,22 +225,6 @@ class ProgramInfo {
    * Returns the GPU backend used by this program's render target.
    */
   Backend backend() const;
-
-  /**
-   * The draw's record-time lowered expression, attached by StandardDrawOp::prepare from the op
-   * when the draw carries one and its processor list is the unmodified record-time list (no
-   * color override). This is an input, not a cache: set once at construction of the info, read by
-   * the re-expressing families to skip their second lowering. Null for draws that did not lower,
-   * atlas-text draws (whose glyph leaf needs the geometry processor), and every info built with
-   * replaced colors.
-   */
-  void setCarriedIR(const DrawIR* ir) {
-    carriedIR = ir;
-  }
-
-  const DrawIR* getCarriedIR() const {
-    return carriedIR;
-  }
 
   /**
    * The diagnostics-only effect signature, built by the op from its processor lists (empty when
@@ -327,12 +294,6 @@ class ProgramInfo {
 
   void updateUniformDataSuffix(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                                const Processor* processor) const;
-
-  BytesKey buildProgramKey() const;
-
-  // The draw's record-time DrawIR, attached through setCarriedIR() before getProgram(); an input,
-  // never recomputed, and null unless explicitly attached.
-  const DrawIR* carriedIR = nullptr;
 
   // The diagnostics-only signature (see setEffectSignature).
   std::string effectSignature = {};

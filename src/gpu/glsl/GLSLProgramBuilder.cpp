@@ -23,7 +23,6 @@
 #include <string>
 #include "GLSLPrinter.h"
 #include "core/utils/Log.h"
-#include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
 #include "gpu/ir/ProgramIRValidation.h"
 #include "gpu/ir/ProgramValidation.h"
@@ -372,7 +371,7 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     return nullptr;
   }
   return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
-                                   std::move(fragmentUniformData), nullptr);
+                                   std::move(fragmentUniformData));
 }
 
 bool GLSLProgramBuilder::checkSamplerCounts() {

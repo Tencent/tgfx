@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <cstring>
 #include "core/shaders/PerlinNoiseShader.h"
-#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {
@@ -66,34 +65,7 @@ PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::MakeFro
   return processor;
 }
 
-bool PerlinNoiseFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
-                                              AOTNodeID* output) const {
-  if (builder == nullptr || output == nullptr) {
-    return false;
-  }
-  AOTPerlinNoiseParameters parameters = {};
-  parameters.noiseType = static_cast<int>(noiseType);
-  parameters.numOctaves = numOctaves;
-  parameters.stitchTiles = stitchTiles;
-  parameters.permutationsView = permutationsView;
-  parameters.noiseView = noiseView;
-  parameters.baseFrequencyX = paintingData->baseFrequencyX;
-  parameters.baseFrequencyY = paintingData->baseFrequencyY;
-  parameters.stitchWidth = paintingData->stitchWidth;
-  parameters.stitchHeight = paintingData->stitchHeight;
-  parameters.uvMatrix = coordTransform.matrix;
-  if (lookupData == nullptr && hasOriginalLookupData) {
-    auto data = std::make_shared<AOTPerlinNoiseLookupData>();
-    static_assert(sizeof(paintingData->latticeSelector) == sizeof(data->permutations));
-    static_assert(sizeof(paintingData->noise) == sizeof(data->noise));
-    std::memcpy(data->permutations.data(), paintingData->latticeSelector,
-                data->permutations.size());
-    std::memcpy(data->noise.data(), paintingData->noise, data->noise.size());
-    lookupData = std::move(data);
-  }
-  parameters.lookupData = lookupData;
-  return builder->addPerlinNoiseSource(input, parameters, output);
-}
+
 
 void PerlinNoiseFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t key = static_cast<uint32_t>(numOctaves);

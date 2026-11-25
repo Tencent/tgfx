@@ -17,18 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Program.h"
-#include "ProgramWriter.h"
 
 namespace tgfx {
 Program::Program(std::shared_ptr<RenderPipeline> pipeline,
                  std::unique_ptr<UniformData> vertexUniformData,
-                 std::unique_ptr<UniformData> fragmentUniformData,
-                 std::unique_ptr<ProgramWriter> writer)
+                 std::unique_ptr<UniformData> fragmentUniformData)
     : pipeline(std::move(pipeline)), vertexUniformData(std::move(vertexUniformData)),
-      fragmentUniformData(std::move(fragmentUniformData)), writerValue(std::move(writer)) {
+      fragmentUniformData(std::move(fragmentUniformData))  {
 }
 
-// Defined here so the header can hold a unique_ptr to the forward-declared ProgramWriter.
 Program::~Program() = default;
 
 UniformData* Program::getUniformData(ShaderStage stage) const {

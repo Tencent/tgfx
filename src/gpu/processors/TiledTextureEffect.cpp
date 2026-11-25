@@ -25,8 +25,6 @@
 #include "gpu/SamplerState.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/Swizzle.h"
-#include "gpu/aot/ir/DrawIR.h"
-#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
@@ -278,40 +276,7 @@ bool TiledTextureEffect::isAlphaOnly() const {
   return textureProxy->isAlphaOnly();
 }
 
-bool TiledTextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
-                                    AOTNodeID* output) const {
-  if (builder == nullptr || output == nullptr) {
-    return false;
-  }
-  // A pending single-plane upload resolves its sampling from the proxy: the upload task creates
-  // the view before this draw executes, from the same size, origin and mip request, so the
-  // snapshot equals the one the view yields. Refusing it instead would send every tiled draw of a
-  // freshly decoded image through a materialization retry (an RGBA8 round trip) on its first
-  // frame.
-  SamplingSource source = {};
-  bool fromPendingUpload = false;
-  if (!getSamplingSource(&source, &fromPendingUpload)) {
-    return false;
-  }
-  // Rectangle textures cannot be served: the context no longer produces them (the CGL pixel
-  // buffer import copies into a plain 2D texture), and rectangle samplers adopted from external
-  // adopters have no precompiled variant.
-  if (source.type != TextureType::TwoD) {
-    return false;
-  }
-  auto resolved = fromPendingUpload ? makeResolvedSampling(source) : *resolveSampling();
-  AOTTextureParameters parameters = {};
-  parameters.textureProxy = textureProxy;
-  parameters.samplingKind = AOTTextureSamplingKind::Tiled;
-  parameters.samplerState = resolved.hardwareSampler;
-  parameters.constraint = constraint;
-  parameters.uvMatrix = resolved.coordMatrix;
-  parameters.subset = subset;
-  parameters.tiledRecipe = resolved;
-  parameters.isAlphaOnly = resolved.alphaOnly;
-  parameters.hasPerspective = resolved.hasPerspective;
-  return builder->addTextureSource(input, parameters, output);
-}
+
 
 size_t TiledTextureEffect::onCountTextureSamplers() const {
   auto textureView = getTextureView();

@@ -20,82 +20,12 @@
 #include <algorithm>
 #include "core/utils/MathExtra.h"
 #include "gpu/OriginFlip.h"
-#include "gpu/aot/ir/DrawIR.h"
 
 namespace tgfx {
 DrawOp::DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
 }
 
 DrawOp::~DrawOp() = default;
-
-void DrawOp::adoptLoweredIR(PlacementPtr<DrawIR> passIR) {
-  ir = std::move(passIR);
-}
-
-void DrawOp::tryLowerIR() {
-  if (ir != nullptr) {
-    return;
-  }
-  std::vector<const FragmentProcessor*> colorList = {};
-  colorList.reserve(colors.size());
-  for (const auto& processor : colors) {
-    colorList.push_back(processor.get());
-  }
-  std::vector<const FragmentProcessor*> coverageList = {};
-  coverageList.reserve(coverages.size());
-  for (const auto& processor : coverages) {
-    coverageList.push_back(processor.get());
-  }
-  std::optional<DrawIR> lowered = std::nullopt;
-  if (type() == Type::AtlasTextOp) {
-    // The glyph leaf's atlas facts come from the op itself — the prepare-time geometry processor
-    // only re-derives them. When the op carries no atlas source the IR stays null, and the draw
-    // is left to the routes that accept an IR-less draw (no match rule accepts one otherwise).
-    auto atlas = recordTimeAtlasSource();
-    if (atlas.has_value()) {
-      lowered = LowerDrawWithAtlas(colorList, coverageList, *atlas, blendMode, allocator);
-    }
-  } else {
-    // No geometry processor exists at record time, so the IR carries no glyph leaf — matching the
-    // null-GP contract of LowerDraw. A lowering failure leaves the IR null: no match rule accepts
-    // a draw that carries processors without an IR, so the draw is dropped and accounted as a
-    // miss instead of drawing with an expression the program cannot name.
-    lowered = LowerDraw(colorList, coverageList, blendMode, allocator);
-  }
-  if (!lowered.has_value()) {
-    return;
-  }
-  ir = allocator->make<DrawIR>(std::move(*lowered));
-}
-
-bool DrawOp::appendGrownCoverage() {
-  if (ir == nullptr) {
-    return false;
-  }
-  if (ir->coverageFPCount == coverages.size()) {
-    return true;
-  }
-  if (ir->coverageFPCount > coverages.size()) {
-    return false;
-  }
-  std::vector<const FragmentProcessor*> grown = {};
-  grown.reserve(coverages.size() - ir->coverageFPCount);
-  for (size_t index = ir->coverageFPCount; index < coverages.size(); ++index) {
-    grown.push_back(coverages[index].get());
-  }
-  auto terms = LowerCoverageTerms(grown, nullptr, allocator);
-  if (!terms.has_value()) {
-    return false;
-  }
-  for (auto& term : *terms) {
-    ir->coverage.emplace_back(std::move(term));
-  }
-  ir->coverageFPCount = coverages.size();
-  // The grown mask is now one of the IR's terms, so the draw's texture list is recomputed from the
-  // IR: the same walk that produced it at record time, over the grown coverage.
-  CollectDrawTextures(ir.get());
-  return true;
-}
 
 void DrawOp::applyScissor(RenderPass* renderPass, RenderTarget* renderTarget) const {
   if (scissorRect.isEmpty()) {

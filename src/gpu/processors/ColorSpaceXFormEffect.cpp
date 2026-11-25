@@ -18,7 +18,6 @@
 
 #include "ColorSpaceXFormEffect.h"
 #include "gpu/ColorSpaceXformHelper.h"
-#include "gpu/aot/ir/EffectGraph.h"
 
 namespace tgfx {
 
@@ -33,14 +32,7 @@ PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(
   return allocator->make<ColorSpaceXformEffect>(std::move(colorXform));
 }
 
-bool ColorSpaceXformEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
-                                       AOTNodeID* output) const {
-  if (builder == nullptr || output == nullptr) {
-    return false;
-  }
-  AOTColorSpaceXformParameters parameters = {colorSpaceXformSteps};
-  return builder->addColorSpaceXform(input, parameters, output);
-}
+
 
 void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
   auto uniformHandler = args.uniformHandler;

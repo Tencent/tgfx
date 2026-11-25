@@ -49,7 +49,6 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
     return uvMatrix;
   }
 
-  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
   DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix);
