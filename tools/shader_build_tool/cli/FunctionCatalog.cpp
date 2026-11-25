@@ -1076,8 +1076,8 @@ bool BuildCatalogMsl(const std::vector<CatalogEntry>& entries, StageCompiler* co
   return true;
 }
 
-bool DeriveOperatorParams(const CatalogEntry& entry, std::vector<OperatorParamInfo>* params,
-                          std::string* error) {
+bool DeriveOperatorParams(const CatalogEntry& entry, std::string* returnType,
+                          std::vector<OperatorParamInfo>* params, std::string* error) {
   // The signature is parsed here rather than through SignatureParams: that helper's contract
   // (the marker folded into the type tail, the name stripped) serves the dummy-main call
   // builder, and its last-space split mis-splits the real files' trailing-marker spelling
@@ -1089,6 +1089,16 @@ bool DeriveOperatorParams(const CatalogEntry& entry, std::vector<OperatorParamIn
   const auto close = entry.source.find(')', open);
   if (nameAt == std::string::npos || open == std::string::npos || close == std::string::npos) {
     *error = entry.name + ": the signature is unreadable";
+    return false;
+  }
+  // The return type: the last token before the function name.
+  const auto typeEnd = entry.source.find_last_not_of(" \t\n", nameAt - 1);
+  if (typeEnd != std::string::npos) {
+    const auto typeBegin = entry.source.find_last_of(" \t\n", typeEnd);
+    *returnType = entry.source.substr(typeBegin + 1, typeEnd - typeBegin);
+  }
+  if (returnType->empty()) {
+    *error = entry.name + ": the return type is unreadable";
     return false;
   }
   const std::string list = entry.source.substr(open + 1, close - open - 1);
@@ -1165,7 +1175,9 @@ bool DeriveOperatorParams(const CatalogEntry& entry, std::vector<OperatorParamIn
       }
       param.role = OperatorParamRole::UniformArray;
     } else {
-      if (FragmentTypeOf(type) == nullptr) {
+      // mat4 joins the registry table's set here: the color-matrix operator carries one, and
+      // the registry itself never sees it (the entry carries no op prefix).
+      if (FragmentTypeOf(type) == nullptr && type != "mat4") {
         *error = entry.name + ": the parameter '" + name + "' has an unknown type '" + type + "'";
         return false;
       }
@@ -1198,7 +1210,7 @@ bool CollectOperatorSignatures(const std::string& shaderDir,
     signature.opName = entry.opName;
     signature.functionName = entry.name;
     signature.stage = entry.opStage;
-    if (!DeriveOperatorParams(entry, &signature.params, error)) {
+    if (!DeriveOperatorParams(entry, &signature.returnType, &signature.params, error)) {
       return false;
     }
     signatures->push_back(std::move(signature));

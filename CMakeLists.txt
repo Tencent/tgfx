@@ -1109,6 +1109,12 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     set_source_files_properties(${TGFX_SHADER_LIBRARY_DATA} PROPERTIES GENERATED TRUE)
     target_compile_definitions(tgfx PRIVATE TGFX_EMBED_SHADER_LIBRARY=1)
 
+    # The typed operator glue the migrated processors call (Emit / upload). Generated beside the
+    # bundle by the same tool run; the include path above already covers the bundle directory.
+    set(TGFX_GENERATED_OPERATORS "${TGFX_SHADER_BUNDLE_DIR}/GeneratedOperators.cpp")
+    target_sources(tgfx PRIVATE ${TGFX_GENERATED_OPERATORS})
+    set_source_files_properties(${TGFX_GENERATED_OPERATORS} PROPERTIES GENERATED TRUE)
+
     add_custom_target(tgfx_shader_bundles
             COMMAND ${TGFX_SHADER_TOOL_COMMAND} --verify ${TGFX_SHADER_BUNDLE_STAMP}
             DEPENDS ${TGFX_SHADER_BUNDLE_STAMP} ${TGFX_SHADER_TOOL_DEPENDS})

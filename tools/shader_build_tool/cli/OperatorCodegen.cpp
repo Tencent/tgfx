@@ -34,6 +34,9 @@ const char* const HeaderPrelude =
     "#include <cstdint>\n"
     "#include <string>\n"
     "#include \"gpu/UniformData.h\"\n"
+    "#include \"gpu/UniformHandler.h\"\n"
+    "#include \"gpu/ir/OperatorManifest.h\"\n"
+    "#include \"gpu/ir/ProgramIRBuilder.h\"\n"
     "#include \"tgfx/core/Matrix.h\"\n"
     "\n"
     "namespace tgfx {\n"
@@ -74,15 +77,42 @@ bool IsPascalIdentifier(const std::string& text) {
   return true;
 }
 
-/// The C++ field type of one uniform-side parameter, or nullptr when the derivation is not
-/// representable (the collector already rejects the ambiguous forms; this guards the mapping).
-const char* UniformFieldType(const OperatorParamInfo& param) {
-  if (param.role == OperatorParamRole::UniformArray) {
-    if (param.type == "vec4" || param.type == "ivec4") {
-      return "array";
-    }
-    return nullptr;
+/// The SLType spelling of one GLSL type, or nullptr outside the supported set.
+const char* SLTypeNameOf(const std::string& glslType) {
+  if (glslType == "float") {
+    return "Float";
   }
+  if (glslType == "int") {
+    return "Int";
+  }
+  if (glslType == "vec2") {
+    return "Float2";
+  }
+  if (glslType == "vec3") {
+    return "Float3";
+  }
+  if (glslType == "vec4") {
+    return "Float4";
+  }
+  if (glslType == "ivec4") {
+    return "Int4";
+  }
+  if (glslType == "mat3") {
+    return "Float3x3";
+  }
+  if (glslType == "mat4") {
+    return "Float4x4";
+  }
+  return nullptr;
+}
+
+/// The UniformFormat spelling of one GLSL type, or nullptr outside the supported set.
+const char* UniformFormatNameOf(const std::string& glslType) {
+  return SLTypeNameOf(glslType);
+}
+
+/// The C++ field type of one uniform-side parameter, or nullptr when the mapping fails.
+std::string UniformFieldCppType(const OperatorParamInfo& param) {
   if (param.type == "float") {
     return "float";
   }
@@ -104,14 +134,16 @@ const char* UniformFieldType(const OperatorParamInfo& param) {
   if (param.type == "mat3") {
     return "Matrix";
   }
-  return nullptr;
+  if (param.type == "mat4") {
+    return "std::array<float, 16>";
+  }
+  return {};
 }
 
-/// The element type of one uniform array field: std140 keeps every element on a 16-byte stride,
-/// so the flattened array length counts 16-byte elements.
-std::string UniformArrayFieldType(const OperatorParamInfo& param) {
-  const uint32_t elementSize = param.type == "ivec4" ? 4u : 4u;
-  const uint32_t length = param.arrayCount * elementSize;
+/// The flattened element length of one uniform array field: std140 keeps every element on a
+/// 16-byte stride, so both vec4 and ivec4 count 4 scalars per element.
+std::string UniformArrayFieldCppType(const OperatorParamInfo& param) {
+  const uint32_t length = param.arrayCount * 4;
   return param.type == "ivec4" ? "std::array<int32_t, " + std::to_string(length) + ">"
                                : "std::array<float, " + std::to_string(length) + ">";
 }
@@ -128,6 +160,24 @@ const char* RoleName(OperatorParamRole role) {
       return "Sampler";
   }
   return "Uniform";
+}
+
+bool HasIntLiterals(const OperatorSignature& signature) {
+  for (const auto& param : signature.params) {
+    if (param.intLiteral) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool HasUniformMembers(const OperatorSignature& signature) {
+  for (const auto& param : signature.params) {
+    if (param.role == OperatorParamRole::Uniform) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /// Writes text only when it differs from the file's current content, so an unchanged input leaves
@@ -170,7 +220,7 @@ void AppendHeaderTypes(std::string* text) {
   *text += "};\n";
   *text += "\n";
   *text += "struct GeneratedOperatorDesc {\n";
-  *text += "  GeneratedOperatorID id = GeneratedOperatorID::OpCount;\n";
+  *text += "  OperatorID id = INVALID_OPERATOR_ID;\n";
   *text += "  const char* opName = \"\";\n";
   *text += "  const char* functionName = \"\";\n";
   *text += "  bool vertexStage = false;\n";
@@ -186,15 +236,35 @@ void AppendHeaderTypes(std::string* text) {
   *text += "\n";
 }
 
-void AppendUniformsStruct(const OperatorSignature& signature, std::string* text) {
-  bool hasMembers = false;
+/// The Emit signature's parameter list: one ValueID per In / Sampler argument, one int32_t per
+/// int literal, in declaration order.
+void AppendEmitSignatureParams(const OperatorSignature& signature, std::string* text) {
+  bool first = true;
   for (const auto& param : signature.params) {
-    if (param.role == OperatorParamRole::Uniform || param.role == OperatorParamRole::UniformArray) {
-      hasMembers = true;
-      break;
+    if (param.role == OperatorParamRole::In) {
+      if (!first) {
+        *text += ", ";
+      }
+      if (param.intLiteral) {
+        *text += "int32_t ";
+      } else {
+        *text += "ValueID ";
+      }
+      *text += param.name;
+      first = false;
+    } else if (param.role == OperatorParamRole::Sampler) {
+      if (!first) {
+        *text += ", ";
+      }
+      *text += "ValueID ";
+      *text += param.name;
+      first = false;
     }
   }
-  if (!hasMembers) {
+}
+
+void AppendUniformsStruct(const OperatorSignature& signature, std::string* text) {
+  if (!HasUniformMembers(signature)) {
     return;
   }
   *text += "/// The uniform side of the ";
@@ -206,13 +276,13 @@ void AppendUniformsStruct(const OperatorSignature& signature, std::string* text)
   for (const auto& param : signature.params) {
     if (param.role == OperatorParamRole::Uniform) {
       *text += "  ";
-      *text += UniformFieldType(param);
+      *text += UniformFieldCppType(param);
       *text += " ";
       *text += param.name;
       *text += " = {};\n";
     } else if (param.role == OperatorParamRole::UniformArray) {
       *text += "  ";
-      *text += UniformArrayFieldType(param);
+      *text += UniformArrayFieldCppType(param);
       *text += " ";
       *text += param.name;
       *text += " = {};\n";
@@ -226,12 +296,48 @@ void AppendUniformsStruct(const OperatorSignature& signature, std::string* text)
   *text += "\n";
 }
 
-void AppendIdEnumValue(const OperatorSignature& signature, uint32_t index, std::string* text) {
-  *text += "  ";
+void AppendEmitClass(const OperatorSignature& signature, std::string* text) {
+  *text += "/// The call-side glue of the ";
   *text += signature.opName;
-  *text += " = ";
-  *text += std::to_string(index + 1);
-  *text += ",\n";
+  *text += " operator.\n";
+  *text += "struct ";
+  *text += signature.opName;
+  *text += "Op {\n";
+  *text += "  /// The mangled uniform names Emit declared, for the text route's call arguments.\n";
+  *text += "  struct UniformNames {\n";
+  for (const auto& param : signature.params) {
+    if (param.role == OperatorParamRole::Uniform || param.role == OperatorParamRole::UniformArray) {
+      *text += "    std::string ";
+      *text += param.name;
+      *text += ";\n";
+    }
+  }
+  *text += "  };\n";
+  *text += "\n";
+  *text += "  /// Declares the operator's uniforms (on the text-side uniform handler; the IR\n";
+  *text += "  /// interface picks them up from there) and emits the operator call. textNames may be\n";
+  *text += "  /// null when the caller does not assemble the text route. Returns the result value\n";
+  *text += "  /// id, or the invalid id when the builder rejects the call.\n";
+  if (HasIntLiterals(signature)) {
+    *text += "  /// key must encode: every int literal argument below (";
+    bool first = true;
+    for (const auto& param : signature.params) {
+      if (param.intLiteral) {
+        if (!first) {
+          *text += ", ";
+        }
+        *text += param.name;
+        first = false;
+      }
+    }
+    *text += ").\n";
+  }
+  *text += "  static ValueID Emit(ProgramIRBuilder* ir, UniformHandler* uniformHandler,\n";
+  *text += "                      UniformNames* textNames, ";
+  AppendEmitSignatureParams(signature, text);
+  *text += ");\n";
+  *text += "};\n";
+  *text += "\n";
 }
 
 void AppendParamTables(const std::vector<const OperatorSignature*>& sorted, std::string* text) {
@@ -260,7 +366,7 @@ void AppendParamTables(const std::vector<const OperatorSignature*>& sorted, std:
 void AppendDescTable(const std::vector<const OperatorSignature*>& sorted, std::string* text) {
   *text += "const GeneratedOperatorDesc kGeneratedOperators[] = {\n";
   for (const OperatorSignature* signature : sorted) {
-    *text += "    {GeneratedOperatorID::";
+    *text += "    {OperatorID::";
     *text += signature->opName;
     *text += ", \"";
     *text += signature->opName;
@@ -294,15 +400,96 @@ void AppendDescTable(const std::vector<const OperatorSignature*>& sorted, std::s
   *text += "}\n";
 }
 
-void AppendUploadImpl(const OperatorSignature& signature, std::string* text) {
-  bool hasMembers = false;
+void AppendEmitImpl(const OperatorSignature& signature, std::string* text) {
+  const std::string stage = signature.stage == "vertex" ? "ShaderStage::Vertex"
+                                                        : "ShaderStage::Fragment";
+  *text += "ValueID ";
+  *text += signature.opName;
+  *text += "Op::Emit(ProgramIRBuilder* ir, UniformHandler* uniformHandler,\n";
+  *text += "                     ";
+  *text += signature.opName;
+  *text += "Op::UniformNames* textNames, ";
+  AppendEmitSignatureParams(signature, text);
+  *text += ") {\n";
   for (const auto& param : signature.params) {
-    if (param.role == OperatorParamRole::Uniform || param.role == OperatorParamRole::UniformArray) {
-      hasMembers = true;
-      break;
+    if (param.role != OperatorParamRole::Uniform && param.role != OperatorParamRole::UniformArray) {
+      continue;
+    }
+    *text += "  const std::string ";
+    *text += param.name;
+    *text += " =\n      uniformHandler->addUniform(\"";
+    *text += param.name;
+    *text += "\", UniformFormat::";
+    *text += UniformFormatNameOf(param.type);
+    *text += ", ";
+    *text += stage;
+    *text += ");\n";
+  }
+  if (HasUniformMembers(signature)) {
+    *text += "  if (textNames != nullptr) {\n";
+    for (const auto& param : signature.params) {
+      if (param.role == OperatorParamRole::Uniform ||
+          param.role == OperatorParamRole::UniformArray) {
+        *text += "    textNames->";
+        *text += param.name;
+        *text += " = ";
+        *text += param.name;
+        *text += ";\n";
+      }
+    }
+    *text += "  }\n";
+  }
+  for (const auto& param : signature.params) {
+    if (param.role == OperatorParamRole::In && param.intLiteral) {
+      *text += "  const auto ";
+      *text += param.name;
+      *text += "Value = ir->CreateIntConstant(";
+      *text += param.name;
+      *text += ");\n";
     }
   }
-  if (!hasMembers) {
+  for (const auto& param : signature.params) {
+    if (param.role != OperatorParamRole::Uniform) {
+      continue;
+    }
+    *text += "  const auto ";
+    *text += param.name;
+    *text += "Value = ir->InternValue(";
+    *text += param.name;
+    *text += ", SLType::";
+    *text += SLTypeNameOf(param.type);
+    *text += ", Precision::High, IRValueKind::Uniform);\n";
+  }
+  *text += "  return ir->CreateCall(OperatorID::";
+  *text += signature.opName;
+  *text += ", SLType::";
+  *text += SLTypeNameOf(signature.returnType);
+  *text += ", {";
+  bool first = true;
+  for (const auto& param : signature.params) {
+    if (!first) {
+      *text += ", ";
+    }
+    if (param.role == OperatorParamRole::In || param.role == OperatorParamRole::Sampler) {
+      if (param.intLiteral) {
+        *text += param.name;
+        *text += "Value";
+      } else {
+        *text += param.name;
+      }
+    } else {
+      *text += param.name;
+      *text += "Value";
+    }
+    first = false;
+  }
+  *text += "});\n";
+  *text += "}\n";
+  *text += "\n";
+}
+
+void AppendUploadImpl(const OperatorSignature& signature, std::string* text) {
+  if (!HasUniformMembers(signature)) {
     return;
   }
   *text += "void ";
@@ -334,10 +521,28 @@ bool WriteGeneratedOperators(const std::vector<OperatorSignature>& signatures,
       *error = "the operator name must be a Pascal-case identifier: " + signature.opName;
       return false;
     }
+    if (SLTypeNameOf(signature.returnType) == nullptr) {
+      *error = signature.opName + ": the return type '" + signature.returnType +
+               "' has no SLType mapping";
+      return false;
+    }
     for (const auto& param : signature.params) {
-      if (param.role == OperatorParamRole::Uniform && UniformFieldType(param) == nullptr) {
-        *error = signature.opName + ": the parameter '" + param.name + "' has no C++ mapping";
+      if (param.role == OperatorParamRole::Uniform) {
+        if (UniformFieldCppType(param).empty()) {
+          *error = signature.opName + ": the parameter '" + param.name +
+                   "' has no C++ mapping";
+          return false;
+        }
+      } else if (param.role == OperatorParamRole::UniformArray) {
+        *error = signature.opName + ": the array parameter '" + param.name +
+                 "' waits for the blur batch (Emit for arrays lands with it)";
         return false;
+      } else if (param.role == OperatorParamRole::In && !param.intLiteral) {
+        if (SLTypeNameOf(param.type) == nullptr) {
+          *error = signature.opName + ": the parameter '" + param.name + "' has type '" +
+                   param.type + "' with no SLType mapping";
+          return false;
+        }
       }
     }
     sorted.push_back(&signature);
@@ -351,22 +556,12 @@ bool WriteGeneratedOperators(const std::vector<OperatorSignature>& signatures,
   }
 
   std::string header = HeaderPrelude;
-  header += "// Sorted by operator name at generation time; the generated library and the\n";
-  header += "// embedded shader bundle come from the same build, so the ids never cross a version\n";
-  header += "// boundary.\n";
-  header += "enum class GeneratedOperatorID : uint32_t {\n";
-  if (sorted.empty()) {
-    header += "  OpCount = 0,\n";
-  } else {
-    for (size_t index = 0; index < sorted.size(); ++index) {
-      AppendIdEnumValue(*sorted[index], static_cast<uint32_t>(index), &header);
-    }
-    header += "  OpCount,\n";
-  }
-  header += "};\n\n";
   AppendHeaderTypes(&header);
   for (const OperatorSignature* signature : sorted) {
     AppendUniformsStruct(*signature, &header);
+  }
+  for (const OperatorSignature* signature : sorted) {
+    AppendEmitClass(*signature, &header);
   }
   header += HeaderEpilogue;
 
@@ -375,6 +570,7 @@ bool WriteGeneratedOperators(const std::vector<OperatorSignature>& signatures,
   AppendDescTable(sorted, &source);
   for (const OperatorSignature* signature : sorted) {
     AppendUploadImpl(*signature, &source);
+    AppendEmitImpl(*signature, &source);
   }
   source += SourceEpilogue;
 

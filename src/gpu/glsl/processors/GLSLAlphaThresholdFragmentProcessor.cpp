@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLAlphaThresholdFragmentProcessor.h"
+#include "GeneratedOperators.h"
 #include "gpu/glsl/GLSLOperatorEmitter.h"
 
 namespace tgfx {
@@ -26,10 +27,6 @@ PlacementPtr<AlphaThresholdFragmentProcessor> AlphaThresholdFragmentProcessor::M
 }
 
 void GLSLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto uniformHandler = args.uniformHandler;
-  auto thresholdUniformName =
-      uniformHandler->addUniform("Threshold", UniformFormat::Float, ShaderStage::Fragment);
-
   auto fragBuilder = args.fragBuilder;
   auto entry = fragBuilder->appendFunction("pmApplyAlphaThreshold");
   if (entry.empty()) {
@@ -39,10 +36,9 @@ void GLSLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
       args.outputValue == INVALID_VALUE_ID) {
     return;
   }
-  const auto thresholdValue = args.irBuilder->InternValue(thresholdUniformName, SLType::Float,
-                                                          Precision::High, IRValueKind::Uniform);
-  const auto result = args.irBuilder->CreateCall(OperatorID::AlphaThreshold, SLType::Float4,
-                                                 {args.inputValue, thresholdValue});
+  AlphaThresholdOp::UniformNames names = {};
+  const auto result =
+      AlphaThresholdOp::Emit(args.irBuilder, args.uniformHandler, &names, args.inputValue);
   args.irBuilder->StoreOutput(args.outputValue, result);
   std::string expression = {};
   std::string error = {};
@@ -54,13 +50,15 @@ void GLSLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
   }
   fragBuilder->appendCall(
       args.outputColor, entry,
-      {args.inputColorValue, ValueRef(thresholdUniformName, SLType::Float, ValueOrigin::Uniform)},
+      {args.inputColorValue, ValueRef(names.threshold, SLType::Float, ValueOrigin::Uniform)},
       "", expression);
 }
 
 void GLSLAlphaThresholdFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
                                                     UniformData* fragmentUniformData) const {
-  fragmentUniformData->setData("Threshold", threshold);
+  AlphaThresholdUniforms uniforms = {};
+  uniforms.threshold = threshold;
+  uniforms.upload(fragmentUniformData);
 }
 
 }  // namespace tgfx

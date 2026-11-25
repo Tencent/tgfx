@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLLumaFragmentProcessor.h"
+#include "GeneratedOperators.h"
 #include "gpu/glsl/GLSLOperatorEmitter.h"
 
 namespace tgfx {
@@ -26,12 +27,8 @@ PlacementPtr<FragmentProcessor> LumaFragmentProcessor::Make(
 }
 
 void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto uniformHandler = args.uniformHandler;
-  auto kr = uniformHandler->addUniform("Kr", UniformFormat::Float, ShaderStage::Fragment);
-  auto kg = uniformHandler->addUniform("Kg", UniformFormat::Float, ShaderStage::Fragment);
-  auto kb = uniformHandler->addUniform("Kb", UniformFormat::Float, ShaderStage::Fragment);
-
-  auto entry = args.fragBuilder->appendFunction("pmApplyLuma");
+  auto fragBuilder = args.fragBuilder;
+  auto entry = fragBuilder->appendFunction("pmApplyLuma");
   if (entry.empty()) {
     return;
   }
@@ -39,14 +36,8 @@ void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
       args.outputValue == INVALID_VALUE_ID) {
     return;
   }
-  const auto krValue =
-      args.irBuilder->InternValue(kr, SLType::Float, Precision::High, IRValueKind::Uniform);
-  const auto kgValue =
-      args.irBuilder->InternValue(kg, SLType::Float, Precision::High, IRValueKind::Uniform);
-  const auto kbValue =
-      args.irBuilder->InternValue(kb, SLType::Float, Precision::High, IRValueKind::Uniform);
-  const auto result = args.irBuilder->CreateCall(OperatorID::Luma, SLType::Float4,
-                                                 {args.inputValue, krValue, kgValue, kbValue});
+  LumaOp::UniformNames names = {};
+  const auto result = LumaOp::Emit(args.irBuilder, args.uniformHandler, &names, args.inputValue);
   args.irBuilder->StoreOutput(args.outputValue, result);
   std::string expression = {};
   std::string error = {};
@@ -55,19 +46,21 @@ void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
     args.irBuilder->MarkFailed(error.empty() ? "the luma operator could not be emitted" : error);
     return;
   }
-  args.fragBuilder->appendCall(
+  fragBuilder->appendCall(
       args.outputColor, entry,
-      {args.inputColorValue, ValueRef(kr, SLType::Float, ValueOrigin::Uniform),
-       ValueRef(kg, SLType::Float, ValueOrigin::Uniform),
-       ValueRef(kb, SLType::Float, ValueOrigin::Uniform)},
+      {args.inputColorValue, ValueRef(names.kr, SLType::Float, ValueOrigin::Uniform),
+       ValueRef(names.kg, SLType::Float, ValueOrigin::Uniform),
+       ValueRef(names.kb, SLType::Float, ValueOrigin::Uniform)},
       "", expression);
 }
 
 void GLSLLumaFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
                                           UniformData* fragmentUniformData) const {
-  fragmentUniformData->setData("Kr", _lumaFactor.kr);
-  fragmentUniformData->setData("Kg", _lumaFactor.kg);
-  fragmentUniformData->setData("Kb", _lumaFactor.kb);
+  LumaUniforms uniforms = {};
+  uniforms.kr = _lumaFactor.kr;
+  uniforms.kg = _lumaFactor.kg;
+  uniforms.kb = _lumaFactor.kb;
+  uniforms.upload(fragmentUniformData);
 }
 
 }  // namespace tgfx

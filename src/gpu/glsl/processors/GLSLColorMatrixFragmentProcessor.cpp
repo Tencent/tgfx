@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLColorMatrixFragmentProcessor.h"
+#include "GeneratedOperators.h"
 #include "gpu/glsl/GLSLOperatorEmitter.h"
 
 namespace tgfx {
@@ -31,12 +32,6 @@ GLSLColorMatrixFragmentProcessor::GLSLColorMatrixFragmentProcessor(
 }
 
 void GLSLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto uniformHandler = args.uniformHandler;
-  auto matrixUniformName =
-      uniformHandler->addUniform("Matrix", UniformFormat::Float4x4, ShaderStage::Fragment);
-  auto vectorUniformName =
-      uniformHandler->addUniform("Vector", UniformFormat::Float4, ShaderStage::Fragment);
-
   auto fragBuilder = args.fragBuilder;
   auto entry = fragBuilder->appendFunction("pmApplyColorMatrix");
   if (entry.empty()) {
@@ -46,12 +41,9 @@ void GLSLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
       args.outputValue == INVALID_VALUE_ID) {
     return;
   }
-  const auto matrixValue = args.irBuilder->InternValue(matrixUniformName, SLType::Float4x4,
-                                                       Precision::High, IRValueKind::Uniform);
-  const auto vectorValue = args.irBuilder->InternValue(vectorUniformName, SLType::Float4,
-                                                       Precision::High, IRValueKind::Uniform);
-  const auto result = args.irBuilder->CreateCall(OperatorID::ColorMatrix, SLType::Float4,
-                                                 {args.inputValue, matrixValue, vectorValue});
+  ColorMatrixOp::UniformNames names = {};
+  const auto result =
+      ColorMatrixOp::Emit(args.irBuilder, args.uniformHandler, &names, args.inputValue);
   args.irBuilder->StoreOutput(args.outputValue, result);
   std::string expression = {};
   std::string error = {};
@@ -63,24 +55,24 @@ void GLSLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
   }
   fragBuilder->appendCall(
       args.outputColor, entry,
-      {args.inputColorValue, ValueRef(matrixUniformName, SLType::Float4x4, ValueOrigin::Uniform),
-       ValueRef(vectorUniformName, SLType::Float4, ValueOrigin::Uniform)},
+      {args.inputColorValue, ValueRef(names.matrix, SLType::Float4x4, ValueOrigin::Uniform),
+       ValueRef(names.vector, SLType::Float4, ValueOrigin::Uniform)},
       "", expression);
 }
 
 void GLSLColorMatrixFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
                                                  UniformData* fragmentUniformData) const {
-  float m[] = {
+  ColorMatrixUniforms uniforms = {};
+  uniforms.matrix = {
       matrix[0], matrix[5], matrix[10], matrix[15], matrix[1], matrix[6], matrix[11], matrix[16],
       matrix[2], matrix[7], matrix[12], matrix[17], matrix[3], matrix[8], matrix[13], matrix[18],
   };
-  float vec[] = {
+  uniforms.vector = {
       matrix[4],
       matrix[9],
       matrix[14],
       matrix[19],
   };
-  fragmentUniformData->setData("Matrix", m);
-  fragmentUniformData->setData("Vector", vec);
+  uniforms.upload(fragmentUniformData);
 }
 }  // namespace tgfx

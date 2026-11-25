@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLConstColorProcessor.h"
+#include "GeneratedOperators.h"
 #include "gpu/glsl/GLSLOperatorEmitter.h"
 
 namespace tgfx {
@@ -31,8 +32,6 @@ GLSLConstColorProcessor::GLSLConstColorProcessor(PMColor color, InputMode mode)
 
 void GLSLConstColorProcessor::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
-  auto colorName =
-      args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   auto entry = fragBuilder->appendFunction("pmApplyConstColor");
   if (entry.empty()) {
     return;
@@ -41,11 +40,9 @@ void GLSLConstColorProcessor::emitCode(EmitArgs& args) const {
       args.outputValue == INVALID_VALUE_ID) {
     return;
   }
-  const auto colorValue =
-      args.irBuilder->InternValue(colorName, SLType::Float4, Precision::High, IRValueKind::Uniform);
-  const auto modeValue = args.irBuilder->CreateIntConstant(static_cast<int32_t>(inputMode));
-  const auto result = args.irBuilder->CreateCall(OperatorID::ConstColor, SLType::Float4,
-                                                 {colorValue, args.inputValue, modeValue});
+  ConstColorOp::UniformNames names = {};
+  const auto result = ConstColorOp::Emit(args.irBuilder, args.uniformHandler, &names,
+                                         args.inputValue, static_cast<int32_t>(inputMode));
   args.irBuilder->StoreOutput(args.outputValue, result);
   std::string expression = {};
   std::string error = {};
@@ -57,13 +54,15 @@ void GLSLConstColorProcessor::emitCode(EmitArgs& args) const {
   }
   fragBuilder->appendCall(
       args.outputColor, entry,
-      {ValueRef(colorName, SLType::Float4, ValueOrigin::Uniform), args.inputColorValue,
+      {ValueRef(names.constColor, SLType::Float4, ValueOrigin::Uniform), args.inputColorValue,
        ValueRef(std::to_string(static_cast<int>(inputMode)), SLType::Int, ValueOrigin::Literal)},
       "", expression);
 }
 
 void GLSLConstColorProcessor::onSetData(UniformData* /*vertexUniformData*/,
                                         UniformData* fragmentUniformData) const {
-  fragmentUniformData->setData("Color", color);
+  ConstColorUniforms uniforms = {};
+  uniforms.constColor = {color.red, color.green, color.blue, color.alpha};
+  uniforms.upload(fragmentUniformData);
 }
 }  // namespace tgfx

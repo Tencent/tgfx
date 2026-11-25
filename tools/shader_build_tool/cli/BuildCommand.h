@@ -102,6 +102,8 @@ struct OperatorSignature {
   std::string functionName;
   /// "vertex" or "fragment".
   std::string stage;
+  /// The GLSL return type of the function ("vec4"), mapped to SLType at generation.
+  std::string returnType;
   std::vector<OperatorParamInfo> params;
 };
 

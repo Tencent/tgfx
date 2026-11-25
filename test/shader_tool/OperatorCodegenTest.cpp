@@ -136,10 +136,11 @@ TEST_F(OperatorCodegenTest, GeneratesEnumTableAndUniforms) {
            "//@op Luma fragment\n"
            "vec4 pmApplyLuma(/*@in*/ vec4 color, float kr, float kg, float kb) "
            "{ return color; }\n");
-  WriteInc("op_kernel.inc",
-           "//@function pmKernel\n"
-           "//@op Kernel fragment\n"
-           "vec4 pmKernel(vec4 slots[17], /*@in*/ int radius) { return slots[0]; }\n");
+  WriteInc("op_const_color.inc",
+           "//@function pmApplyConstColor\n"
+           "//@op ConstColor fragment\n"
+           "vec4 pmApplyConstColor(vec4 constColor, /*@in*/ vec4 inputColor, "
+           "/*@in*/ int inputMode) { return constColor; }\n");
   std::vector<OperatorSignature> signatures = {};
   std::string error;
   ASSERT_TRUE(CollectOperatorSignatures(root.string(), &signatures, &error)) << error;
@@ -154,26 +155,50 @@ TEST_F(OperatorCodegenTest, GeneratesEnumTableAndUniforms) {
   std::ifstream headerFile(headerPath);
   std::string header((std::istreambuf_iterator<char>(headerFile)),
                      std::istreambuf_iterator<char>());
-  EXPECT_NE(header.find("enum class GeneratedOperatorID : uint32_t {"), std::string::npos);
-  EXPECT_NE(header.find("  Kernel = 1,"), std::string::npos);
-  EXPECT_NE(header.find("  Luma = 2,"), std::string::npos);
-  EXPECT_NE(header.find("  OpCount,"), std::string::npos);
+  EXPECT_NE(header.find("struct ConstColorUniforms {"), std::string::npos);
+  EXPECT_NE(header.find("std::array<float, 4> constColor = {};"), std::string::npos);
   EXPECT_NE(header.find("struct LumaUniforms {"), std::string::npos);
   EXPECT_NE(header.find("float kr = {};"), std::string::npos);
-  EXPECT_NE(header.find("struct KernelUniforms {"), std::string::npos);
-  EXPECT_NE(header.find("std::array<float, 68> slots = {};"), std::string::npos);
   EXPECT_NE(header.find("void upload(UniformData* uniformData) const;"), std::string::npos);
+  EXPECT_NE(header.find("struct ConstColorOp {"), std::string::npos);
+  EXPECT_NE(header.find("struct UniformNames {"), std::string::npos);
+  EXPECT_NE(header.find("std::string constColor;"), std::string::npos);
+  EXPECT_NE(header.find("static ValueID Emit(ProgramIRBuilder* ir, "
+                        "UniformHandler* uniformHandler,"),
+            std::string::npos);
+  EXPECT_NE(header.find("UniformNames* textNames, ValueID inputColor, int32_t inputMode);"),
+            std::string::npos);
+  EXPECT_NE(header.find("key must encode: every int literal argument below (inputMode)."),
+            std::string::npos);
+  EXPECT_NE(header.find("UniformNames* textNames, ValueID color);"), std::string::npos);
 
   std::ifstream sourceFile(sourcePath);
   std::string source((std::istreambuf_iterator<char>(sourceFile)),
                      std::istreambuf_iterator<char>());
   EXPECT_NE(source.find("kGeneratedOperators[]"), std::string::npos);
+  EXPECT_NE(source.find("OperatorID::ConstColor,"), std::string::npos);
+  EXPECT_NE(source.find("OperatorID::Luma,"), std::string::npos);
   EXPECT_NE(source.find("\"pmApplyLuma\""), std::string::npos);
-  EXPECT_NE(source.find("\"pmKernel\""), std::string::npos);
+  EXPECT_NE(source.find("\"pmApplyConstColor\""), std::string::npos);
   EXPECT_NE(source.find("kLumaParams[]"), std::string::npos);
   EXPECT_NE(source.find("uniformData->setData(\"kr\", kr);"), std::string::npos);
-  EXPECT_NE(source.find("uniformData->setData(\"slots\", slots);"), std::string::npos);
+  EXPECT_NE(source.find("uniformData->setData(\"constColor\", constColor);"), std::string::npos);
   EXPECT_NE(source.find("const uint32_t kGeneratedOperatorCount = 2;"), std::string::npos);
+  EXPECT_NE(source.find("uniformHandler->addUniform(\"kr\", UniformFormat::Float, "
+                        "ShaderStage::Fragment);"),
+            std::string::npos);
+  EXPECT_NE(source.find("const auto inputModeValue = ir->CreateIntConstant(inputMode);"),
+            std::string::npos);
+  EXPECT_NE(source.find("const auto krValue = ir->InternValue(kr, SLType::Float, "
+                        "Precision::High, IRValueKind::Uniform);"),
+            std::string::npos);
+  EXPECT_NE(source.find("return ir->CreateCall(OperatorID::Luma, SLType::Float4, "
+                        "{color, krValue, kgValue, kbValue});"),
+            std::string::npos);
+  EXPECT_NE(source.find("return ir->CreateCall(OperatorID::ConstColor, SLType::Float4, "
+                        "{constColorValue, inputColor, inputModeValue});"),
+            std::string::npos);
+  EXPECT_NE(source.find("textNames->kr = kr;"), std::string::npos);
 }
 
 TEST_F(OperatorCodegenTest, GeneratesAnEmptyTableWithoutAnnotations) {
