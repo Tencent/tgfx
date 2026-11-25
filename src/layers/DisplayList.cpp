@@ -23,6 +23,7 @@
 #include <cstdio>
 #include <functional>
 #include <limits>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -389,6 +390,7 @@ static void AppendFallbackScreenTasks(TreeLevelCoverage* coverage, const Rect& z
     if (coverage->isBlank(tileX, tileY)) {
       drawRect.scale(displayScale, displayScale);
       backgroundRects->push_back(drawRect);
+      ++gCaptureProbe.blankTreeCells;
     } else {
       tasks->emplace_back(coverage->tileAt(tileX, tileY), tileSize, drawRect, displayScale);
     }
@@ -698,6 +700,7 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
 std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
                                            const std::vector<Rect>& dirtyRegions) {
   const auto frameStart = std::chrono::steady_clock::now();
+  gCaptureProbe.reset();
   if (!surfaceCaches.empty() && (surfaceCaches.front()->getContext() != surface->getContext() ||
                                  !ColorSpace::Equals(surfaceCaches.front()->colorSpace().get(),
                                                      surface->colorSpace().get()))) {
@@ -734,7 +737,6 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   }
   auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   // TEMP probe: how much of a tiled frame the per-level background captures take.
-  gCaptureProbe.reset();
   const auto drawStart = std::chrono::steady_clock::now();
   const auto captureProbe = gCaptureProbe;
   double budgetSeconds = 0.0;
@@ -754,6 +756,31 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   }
   if (drawnCount < tileTasks.size() || !deferredPatches.empty()) {
     hasZoomBlurTiles = true;
+  }
+  {
+    const auto& p = gCaptureProbe;
+    int skippedCount = 0;
+    for (auto value : p.skipped) {
+      skippedCount += value;
+    }
+    if (skippedCount > 0 || p.blankTreeCells > 0) {
+      std::map<int, int> treeLevels = {};
+      for (const auto& key : tilePool->keysOf(TileType::Tree)) {
+        ++treeLevels[key.level];
+      }
+      std::string levels = {};
+      for (const auto& [level, count] : treeLevels) {
+        levels += " L" + std::to_string(level) + "=" + std::to_string(count);
+      }
+      std::printf(
+          "[TILE-SKIP] zoom=%.4f base=%d maxLevel=%d skipped=%d/%d/%d/%d/%d blankTree=%d "
+          "evicted=%d/%d grid=%zu/%zu tree=%zu/%zu empty=%zu tasks=%zu drawn=%zu pool:%s\n",
+          static_cast<double>(zoomScale), GetTileLevel(zoomScale), maxTreeLevel(), p.skipped[0],
+          p.skipped[1], p.skipped[2], p.skipped[3], p.skipped[4], p.blankTreeCells, p.evicted[0],
+          p.evicted[1], tilePool->size(TileType::Grid), tilePool->quota(TileType::Grid),
+          tilePool->size(TileType::Tree), tilePool->quota(TileType::Tree), emptyTiles.size(),
+          tileTasks.size(), drawnCount, levels.c_str());
+    }
   }
   if (!tileTasks.empty()) {
     std::printf(
@@ -1313,6 +1340,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       screenTasks.emplace_back(tile, _tileSize, tileRect);
     } else if (blankTiles->contains(key)) {
       skippedRects->push_back(getGridRect(grid));
+      ++gCaptureProbe.skipped[0];
     } else {
       missingGrids.push_back(grid);
     }
@@ -1427,6 +1455,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
           AppendFallbackScreenTasks(coverage, gridRect, _tileSize, &screenTasks, skippedRects);
         } else {
           skippedRects->push_back(gridRect);
+          ++gCaptureProbe.skipped[1];
         }
       }
     }
@@ -1497,6 +1526,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
           AppendFallbackScreenTasks(coverage, gridRect, _tileSize, &screenTasks, skippedRects);
         } else {
           skippedRects->push_back(gridRect);
+          ++gCaptureProbe.skipped[2];
         }
       }
       dirtyGrids.resize(freeTiles.size());
@@ -1583,10 +1613,12 @@ std::vector<DrawTask> DisplayList::collectDisplayTasks(const Surface* surface,
         screenTasks.emplace_back(tile, _tileSize, tile->getTileRect(_tileSize, &renderRect));
       } else if (blankTiles->contains(key)) {
         skippedRects->push_back(gridRect);
+        ++gCaptureProbe.skipped[3];
       } else if (auto coverage = FindFinestCoverage(&coverages, gridRect, _tileSize)) {
         AppendFallbackScreenTasks(coverage, gridRect, _tileSize, &screenTasks, skippedRects);
       } else {
         skippedRects->push_back(gridRect);
+        ++gCaptureProbe.skipped[4];
       }
     }
   }
@@ -1663,6 +1695,7 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(const Surface* rend
   emptyTiles.resize(emptyTiles.size() - emptyCount);
   auto evictInto = [&](TileType evictType, size_t count) {
     auto evicted = tilePool->evict(evictType, std::min(count, tileCount - tiles.size()));
+    gCaptureProbe.evicted[evictType == TileType::Grid ? 0 : 1] += static_cast<int>(evicted.size());
     tiles.insert(tiles.end(), evicted.begin(), evicted.end());
   };
   const auto otherType = type == TileType::Grid ? TileType::Tree : TileType::Grid;

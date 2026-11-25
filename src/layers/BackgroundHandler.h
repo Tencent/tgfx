@@ -67,6 +67,13 @@ struct CaptureProbe {
   int subtreeRebuilds = 0;
   int subtreeRefused = 0;
   int subtreeBorrows = 0;
+  // Cells shown as background, by where the decision was made: 0 blank grid tile, 1 no fallback in
+  // collectScreenTasks, 2 no free tile, 3 blank grid tile and 4 no fallback after deferring.
+  int skipped[5] = {};
+  // Blank tree cells shown by AppendFallbackScreenTasks.
+  int blankTreeCells = 0;
+  // Tiles evicted from the pool this frame, by type: 0 grid, 1 tree.
+  int evicted[2] = {};
   double subtreeBuildMs = 0.0;
   // Builds per long edge, indexed by log2(longEdge) (5 = 32 px ... 11 = 2048 px).
   int subtreeBuildsByEdge[16] = {};
