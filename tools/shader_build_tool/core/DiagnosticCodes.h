@@ -66,9 +66,6 @@ inline constexpr const char* SpecReader = "spec.reader-undeclared";
 /// stubbable function, or an expression the variant's spec table cannot evaluate.
 inline constexpr const char* SpecGateUnmatched = "spec.gate-unmatched";
 
-/// A profile emitter could not produce its storage form for a variant.
-inline constexpr const char* EmitFailed = "emit.failed";
-
 /// The stored text of a dialect variant still carries a form it must not (a surviving set or
 /// binding qualifier, a conditional directive, Vulkan-only syntax).
 inline constexpr const char* EmitFormLeak = "emit.form-leak";
@@ -103,18 +100,9 @@ inline constexpr const char* OutputDuplicateKey = "output.duplicate-key";
 /// must be referenced by at least one site (an unreferenced one is dead, or a site that still
 /// reports through something else).
 inline constexpr const char* AllCodes[] = {
-    SourcesUnreadable,
-    CompileCacheDisabled,
-    ReflectUnknownType,
-    EmitFailed,
-    EmitFormLeak,
-    SpecReader,
-    SpecGateUnmatched,
-    VerifyReflection,
-    VerifyBindingLayout,
-    VerifyNotApplicable,
-    OutputWrite,
-    OutputDuplicateKey,
+    SourcesUnreadable,   CompileCacheDisabled, ReflectUnknownType, EmitFormLeak,
+    SpecReader,          SpecGateUnmatched,    VerifyReflection,   VerifyBindingLayout,
+    VerifyNotApplicable, OutputWrite,          OutputDuplicateKey,
 };
 
 }  // namespace DiagnosticCode

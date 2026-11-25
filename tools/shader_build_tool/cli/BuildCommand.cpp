@@ -38,14 +38,10 @@
 #include "compile/SpecCodegen.h"
 #include "compile/StageCache.h"
 #include "compile/StageCompiler.h"
-#include "core/CapacityDefines.h"
 #include "core/DiagnosticCodes.h"
 #include "core/Diagnostics.h"
 #include "core/ShaderSources.h"
-#include "emit/Assembler.h"
 #include "emit/ChainOpsGLSL.h"
-#include "emit/ComposedShapes.h"
-#include "emit/ProfileEmitter.h"
 #include "gpu/ir/OperatorManifest.h"
 #include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/KernelContract.h"
@@ -440,20 +436,16 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*comp
     std::string expandError;
     return stripComments(ExpandStageIncludes(raw, options.shaderDir, &expandError));
   };
-  std::vector<std::pair<ShaderProfile, std::unique_ptr<ProfileEmitter>>> emitters;
-  for (auto profile : options.backends) {
-    emitters.emplace_back(profile, MakeProfileEmitter(profile));
-  }
+  const std::vector<ShaderProfile>& emitters = options.backends;
   // The fragment source pack: every fragment with a source file is read verbatim and stored in the
   // bundle's fragment pool under its fragment id (0x40000000 | op), so the runtime assembler joins
   // the compiled-in manifest with the text without ever reading files. A missing or unreadable
   // source fails the build — the pack and the manifest cannot drift apart silently.
-  for (const auto& emitterEntry : emitters) {
-    if (emitterEntry.first != ShaderProfile::OpenGL &&
-        emitterEntry.first != ShaderProfile::OpenGLES) {
+  for (auto emitterProfile : emitters) {
+    if (emitterProfile != ShaderProfile::OpenGL && emitterProfile != ShaderProfile::OpenGLES) {
       continue;
     }
-    const std::string profileTag = ProfileTag(emitterEntry.first);
+    const std::string profileTag = ProfileTag(emitterProfile);
     [[maybe_unused]] auto resolveBranch = [](const std::string& text, const std::string& directive,
                                              bool keep) {
       const auto begin = text.find(directive);
@@ -684,117 +676,13 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*comp
   // The Vulkan linking route's op library: one patched SPIR-V module per pure operator, compiled
   // from the same sources the text pack ships (a dummy entry forces glslang to emit the function;
   // the surgery then strips the entry and exports the operator for linking).
-  for (const auto& emitterEntry : emitters) {
-    if (emitterEntry.first != ShaderProfile::Vulkan && emitterEntry.first != ShaderProfile::Metal) {
+  for (auto emitterProfile : emitters) {
+    if (emitterProfile != ShaderProfile::Vulkan && emitterProfile != ShaderProfile::Metal) {
       // The composed payloads are SPIR-V: Vulkan links them, Metal links and translates them to
       // MSL at draw time, so both profiles carry the same pool.
       continue;
     }
-    const std::string profileTag = ProfileTag(emitterEntry.first);
-    // The linking route's frames: one precompiled module per rect-geometry Chain variant. The
-    // frame carries the entry the pipeline runs, the variant's varyings at their own locations,
-    // and an imported chainBody whose signature is the canonical parameter order the runtime
-    // body derives from the same layout (fragCoord first, then the declared varyings).
-    for (size_t familyIndex = 0; familyIndex < FamilyCount(); ++familyIndex) {
-      const Family& family = Families()[familyIndex];
-      if (strcmp(family.name, "Chain") != 0) {
-        continue;
-      }
-      const auto frameVariants = EnumerateVariants(family, static_cast<uint16_t>(familyIndex));
-      for (const auto& frameVariant : frameVariants) {
-        if (frameVariant.geometry != 0) {
-          continue;  // the plan declines the declared geometries
-        }
-        std::vector<uint8_t> _frame_locations;
-        const Layout frameLayout = DeriveLayout(family, frameVariant);
-        // The varying declarations, in the layout's order: the type decides whether the frame
-        // can carry the contract at all (the runtime body declines the same way).
-        std::vector<std::pair<std::string, std::string>> frameVaryings;
-        bool frameTypesOk = true;
-        for (const auto& varying : frameLayout.varyings) {
-          const char* typeName = nullptr;
-          switch (varying.type) {
-            case ShaderType::Float:
-              typeName = "float";
-              break;
-            case ShaderType::Float2:
-              typeName = "vec2";
-              break;
-            case ShaderType::Float3:
-              typeName = "vec3";
-              break;
-            case ShaderType::Float4:
-              typeName = "vec4";
-              break;
-            case ShaderType::Int:
-              typeName = "int";
-              break;
-            case ShaderType::Int4:
-              typeName = "ivec4";
-              break;
-            default:
-              break;
-          }
-          if (typeName == nullptr) {
-            frameTypesOk = false;
-            break;
-          }
-          frameVaryings.emplace_back(typeName, varying.name);
-          _frame_locations.push_back(varying.location);
-        }
-        if (!frameTypesOk) {
-          continue;
-        }
-        const Layout::Texture* frameMask = nullptr;
-        for (const auto& texture : frameLayout.textures) {
-          if (texture.name == "MaskTextureSampler") {
-            frameMask = &texture;
-          }
-        }
-        std::string frame = "#version 450\n";
-        if (frameMask != nullptr) {
-          frame += "layout(set = " + std::to_string(TEXTURE_DESCRIPTOR_SET) +
-                   ", binding = " + std::to_string(frameMask->binding) +
-                   ") uniform sampler2D MaskTextureSampler;\n";
-        }
-        for (size_t varyingIndex = 0; varyingIndex < frameVaryings.size(); ++varyingIndex) {
-          frame += "layout(location = " + std::to_string(_frame_locations[varyingIndex]) + ") in ";
-          frame +=
-              frameVaryings[varyingIndex].first + " " + frameVaryings[varyingIndex].second + ";\n";
-        }
-        frame += "layout(location = 0) out vec4 fragColor;\n";
-        frame += "vec4 chainBody(vec2 pFragCoord";
-        for (const auto& varying : frameVaryings) {
-          frame += ", " + varying.first + " p" + varying.second;
-        }
-        frame += ") { return vec4(0.0); }\n";
-        frame += "void main() { fragColor = chainBody(gl_FragCoord.xy";
-        for (const auto& varying : frameVaryings) {
-          frame += ", " + varying.second;
-        }
-        frame += "); }\n";
-        std::string frameError;
-        const auto frameCompiled =
-            CompileGLSL(frame, ShaderStageType::Fragment, "chainFrame", 0, false, &frameError);
-        std::string importError;
-        auto framePatched = frameCompiled.empty()
-                                ? std::vector<uint32_t>()
-                                : ImportSPIRVFunction(frameCompiled, "chainBody", &importError);
-        if (framePatched.empty()) {
-          RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
-                           "chainFrame", profileTag, -1, -1,
-                           std::string("the SPIR-V frame did not build: ") +
-                               (frameCompiled.empty() ? frameError : importError));
-          continue;
-        }
-        ComposedPayload framePayload;
-        framePayload.name = "ChainFrame_" + std::to_string(frameVariant.id());
-        framePayload.id = FragmentPackSPIRVFrameBase | frameVariant.id();
-        const auto* frameBytes = reinterpret_cast<const uint8_t*>(framePatched.data());
-        framePayload.blob.assign(frameBytes, frameBytes + framePatched.size() * sizeof(uint32_t));
-        report->composedByTag[profileTag].push_back(std::move(framePayload));
-      }
-    }
+    const std::string profileTag = ProfileTag(emitterProfile);
     // One linkable SPIR-V module per new IR operator. The manifest owns the id, symbol, return
     // type, parameters and include recipe; nothing here reads the old chain table.
     for (size_t operatorIndex = 0; operatorIndex < OperatorCount(); ++operatorIndex) {
@@ -995,8 +883,7 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*comp
       report->composedByTag[profileTag].push_back(std::move(payload));
     }
   }
-
-  }
+}
 
 int RunBuildCommand(const BuildOptions& options) {
   BuildReport report;

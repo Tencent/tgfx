@@ -121,6 +121,7 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
       "gpu/shaders/contract/ShaderBundleContract.h", "gpu/shaders/contract/ChainISA.h",
       "gpu/shaders/contract/ChainOps.h", "gpu/shaders/contract/SpecContract.h",
       "gpu/shaders/contract/ShaderLibraryBundleFormat.h", "gpu/Uniform.h",
+      "gpu/shaders/contract/FragmentLibrary.h", "gpu/shaders/contract/OpTable.h",
       "gpu/shaders/KernelContract.h",
       // declaration layer
       "gpu/shaders/PrecompiledShader.h",
@@ -465,23 +466,6 @@ TEST(LayeringTest, TheStageCompilerDependsOnlyOnTheCompilePrimitives) {
   for (const auto& dependency : graph["StageCompiler"]) {
     EXPECT_EQ(allowed.count(dependency), 1u)
         << "StageCompiler depends on " << dependency << ", which is not part of the compile layer";
-  }
-}
-
-TEST(LayeringTest, TheProfileEmittersDependOnlyOnTheirDialectAndTheCompiler) {
-  // An emitter consumes a compiled variant and produces storage: its dependencies stop at the
-  // compile layer and the two dialect helpers of the emit layer — anything else and a backend's
-  // translation has grown a dependency of its own.
-  auto graph = ToolModuleGraph();
-  ASSERT_EQ(graph.count("ProfileEmitter"), 1u);
-  // "Types" is the core data-type header (the spec table and gate records an emitter consumes);
-  // it carries no behaviour, so depending on it is not depending on a layer.
-  const std::set<std::string> allowed = {"DiagnosticCodes", "Diagnostics", "ShaderCompiler",
-                                         "StageCompiler",   "GLSLDialect", "Types"};
-  for (const auto& dependency : graph["ProfileEmitter"]) {
-    EXPECT_EQ(allowed.count(dependency), 1u)
-        << "ProfileEmitter depends on " << dependency
-        << ", which is not the compile layer or a dialect helper";
   }
 }
 

@@ -36,7 +36,7 @@ Diagnostic MakeDiagnostic(Severity severity, const char* profile, const char* me
   Diagnostic diagnostic;
   diagnostic.severity = severity;
   diagnostic.layer = Layer::Verify;
-  diagnostic.code = DiagnosticCode::EmitFailed;
+  diagnostic.code = DiagnosticCode::ReflectUnknownType;
   diagnostic.profile = profile;
   diagnostic.shader = "TestShader";
   diagnostic.message = message;
