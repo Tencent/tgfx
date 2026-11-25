@@ -24,40 +24,57 @@
 
 namespace tgfx {
 
-/// Stable operator identifiers. The manifest is the single source of truth; do not assign these
-/// values by hand in call sites.
+/// Stable operator identifiers. The values come from this list alone; do not assign them by hand
+/// in call sites. The X-macro also derives the name lookup the build tool uses to resolve an
+/// operator name (from the .inc annotation) to its id.
+#define TGFX_OPERATOR_LIST(X)                                                                       \
+  X(Luma, 1)                                                                                         \
+  X(ConstColor, 2)                                                                                   \
+  X(ColorMatrix, 3)                                                                                  \
+  X(AlphaThreshold, 4)                                                                               \
+  X(YUVToRGB, 5)                                                                                     \
+  X(Clamp, 6)                                                                                        \
+  X(DeviceCoord, 7)                                                                                  \
+  X(MulAlpha, 8)                                                                                     \
+  X(AlphaModulate, 9)                                                                                \
+  X(GaussianBlur1D, 10)                                                                              \
+  X(TiledSample1, 11)                                                                                \
+  X(TiledSample2, 12)                                                                                \
+  X(TiledSample4, 13)                                                                                \
+  X(TiledSample1Rect, 14)                                                                            \
+  X(TiledSample2Rect, 15)                                                                            \
+  X(TiledSample4Rect, 16)                                                                            \
+  X(TiledRepeatBlend, 17)                                                                            \
+  X(TiledRepeatBlendRect, 18)                                                                        \
+  X(TiledBorderLinear, 19)                                                                           \
+  X(TiledBorderNearest, 20)                                                                          \
+  X(NonAARRectCoverage, 21)                                                                          \
+  X(ComplexRRectCoverage, 22)                                                                        \
+  X(EllipseCoverage, 23)                                                                             \
+  X(ComplexEllipseCoverage, 24)                                                                      \
+  X(RRectCoverage, 25)                                                                               \
+  X(RectCoverage, 26)                                                                                 \
+  X(SingleGradientColor, 27)                                                                         \
+  X(DualGradientColor, 28)
+
 enum class OperatorID : uint32_t {
-  Luma = 1,
-  ConstColor = 2,
-  ColorMatrix = 3,
-  AlphaThreshold = 4,
-  YUVToRGB = 5,
-  Clamp = 6,
-  DeviceCoord = 7,
-  MulAlpha = 8,
-  AlphaModulate = 9,
-  GaussianBlur1D = 10,
-  TiledSample1 = 11,
-  TiledSample2 = 12,
-  TiledSample4 = 13,
-  TiledSample1Rect = 14,
-  TiledSample2Rect = 15,
-  TiledSample4Rect = 16,
-  TiledRepeatBlend = 17,
-  TiledRepeatBlendRect = 18,
-  TiledBorderLinear = 19,
-  TiledBorderNearest = 20,
-  NonAARRectCoverage = 21,
-  ComplexRRectCoverage = 22,
-  EllipseCoverage = 23,
-  ComplexEllipseCoverage = 24,
-  RRectCoverage = 25,
-  RectCoverage = 26,
-  SingleGradientColor = 27,
-  DualGradientColor = 28,
+#define TGFX_OPERATOR_ENUM(name, value) name = value,
+  TGFX_OPERATOR_LIST(TGFX_OPERATOR_ENUM)
+#undef TGFX_OPERATOR_ENUM
 };
 
 constexpr OperatorID INVALID_OPERATOR_ID = static_cast<OperatorID>(-1);
+
+/// Resolves an operator name (the .inc annotation's spelling) to its id, or INVALID_OPERATOR_ID.
+inline OperatorID OperatorIDFromName(const std::string& opName) {
+#define TGFX_OPERATOR_CASE(name, value)                                                             \
+  if (opName == #name) {                                                                            \
+    return OperatorID::name;                                                                        \
+  }
+  TGFX_OPERATOR_LIST(TGFX_OPERATOR_CASE)
+#undef TGFX_OPERATOR_CASE
+  return INVALID_OPERATOR_ID;
+}
 
 struct OperatorParam {
   SLType type = SLType::Void;
@@ -80,9 +97,7 @@ struct OperatorDesc {
   const char* glslSymbol = nullptr;
   SLType returnType = SLType::Void;
   std::vector<OperatorParam> params = {};
-  const char* prelude = nullptr;
   std::vector<const char*> includes = {};
-  bool leafSamplers = false;
 };
 
 /// Returns the manifest entry for an operator, or null when the id is unknown.

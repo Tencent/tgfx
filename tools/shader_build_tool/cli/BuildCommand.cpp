@@ -53,6 +53,23 @@
 namespace tgfx {
 
 namespace {
+/// The SLType of one GLSL type spelling, or Void outside the supported set.
+SLType SLTypeFromName(const std::string& glslType) {
+  if (glslType == "float") return SLType::Float;
+  if (glslType == "int") return SLType::Int;
+  if (glslType == "vec2") return SLType::Float2;
+  if (glslType == "vec3") return SLType::Float3;
+  if (glslType == "vec4") return SLType::Float4;
+  if (glslType == "ivec4") return SLType::Int4;
+  if (glslType == "mat3") return SLType::Float3x3;
+  if (glslType == "mat4") return SLType::Float4x4;
+  if (glslType == "sampler2D") return SLType::Texture2DSampler;
+  if (glslType == "sampler2DRect") return SLType::Texture2DRectSampler;
+  return SLType::Void;
+}
+}  // namespace
+
+namespace {
 
 /// The SpecId decorations the compiled fragment module carries (OpDecorate with the SpecId
 /// decoration). The declared families generate their constants from DeriveSpecFields; this reads
@@ -672,6 +689,55 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*comp
   // The Vulkan linking route's op library: one patched SPIR-V module per pure operator, compiled
   // from the same sources the text pack ships (a dummy entry forces glslang to emit the function;
   // the surgery then strips the entry and exports the operator for linking).
+  // The descriptors come from the .inc signatures directly — the same single source the generated
+  // manifest uses — because the tool must not link the runtime's OperatorManifest.cpp: that
+  // translation unit now includes a header the tool itself produces, so linking it here would make
+  // building the tool depend on running it.
+  std::vector<OperatorSignature> signatures = {};
+  {
+    std::string signatureError = {};
+    if (!CollectOperatorSignatures(options.shaderDir, &signatures, &signatureError)) {
+      RecordBuildError(&report->diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
+                       "signatures", "", -1, -1, signatureError);
+      return;
+    }
+  }
+  std::vector<OperatorDesc> operatorDescs = {};
+  for (const auto& signature : signatures) {
+    OperatorDesc desc = {};
+    desc.id = OperatorIDFromName(signature.opName);
+    if (desc.id == INVALID_OPERATOR_ID) {
+      RecordBuildError(&report->diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
+                       signature.functionName, "", -1, -1,
+                       "the operator '" + signature.opName + "' has no OperatorID enumerator");
+      return;
+    }
+    desc.debugName = signature.opName.c_str();
+    desc.glslSymbol = signature.functionName.c_str();
+    desc.returnType = SLTypeFromName(signature.returnType);
+    if (desc.returnType == SLType::Void) {
+      RecordBuildError(&report->diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
+                       signature.functionName, "", -1, -1,
+                       "the operator '" + signature.opName + "' returns '" + signature.returnType +
+                           "', which has no SLType");
+      return;
+    }
+    for (const auto& param : signature.params) {
+      const auto type = SLTypeFromName(param.type);
+      if (type == SLType::Void) {
+        RecordBuildError(&report->diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
+                         signature.functionName, "", -1, -1,
+                         "the operator '" + signature.opName + "' has the parameter '" + param.name +
+                             "' of type '" + param.type + "', which has no SLType");
+        return;
+      }
+      desc.params.emplace_back(type, param.arrayCount > 0, param.arrayCount);
+    }
+    for (const auto& include : signature.includes) {
+      desc.includes.push_back(include.c_str());
+    }
+    operatorDescs.push_back(std::move(desc));
+  }
   for (auto emitterProfile : emitters) {
     if (emitterProfile != ShaderProfile::Vulkan && emitterProfile != ShaderProfile::Metal) {
       // The composed payloads are SPIR-V: Vulkan links them, Metal links and translates them to
@@ -679,15 +745,14 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*comp
       continue;
     }
     const std::string profileTag = ProfileTag(emitterProfile);
-    // One linkable SPIR-V module per new IR operator. The manifest owns the id, symbol, return
-    // type, parameters and include recipe; nothing here reads the old chain table.
-    for (size_t operatorIndex = 0; operatorIndex < OperatorCount(); ++operatorIndex) {
-      const auto* desc = OperatorAt(operatorIndex);
-      if (desc == nullptr || desc->glslSymbol == nullptr || desc->includes.empty()) {
+    // One linkable SPIR-V module per new IR operator. The id, symbol, return type, parameters and
+    // include recipe all come from the .inc signatures; nothing here reads the old chain table.
+    for (const auto& desc : operatorDescs) {
+      if (desc.glslSymbol == nullptr || desc.includes.empty()) {
         continue;
       }
       bool unsupported = false;
-      for (const auto& param : desc->params) {
+      for (const auto& param : desc.params) {
         if (param.isArray) {
           unsupported = true;
           break;
@@ -697,12 +762,9 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*comp
         continue;
       }
       std::string text = "#version 450\n";
-      if (desc->prelude != nullptr) {
-        text += desc->prelude;
-      }
       bool needsDummySampler = false;
       bool needsRectSampler = false;
-      for (const auto& param : desc->params) {
+      for (const auto& param : desc.params) {
         if (param.type == SLType::Texture2DSampler) {
           needsDummySampler = true;
         } else if (param.type == SLType::Texture2DRectSampler) {
@@ -719,20 +781,13 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*comp
                 std::to_string(DUMMY_RECT_SAMPLER_BINDING) + ") uniform sampler2DRect " +
                 DUMMY_RECT_SAMPLER_NAME + ";\n";
       }
-      if (desc->leafSamplers) {
-        for (int sampler = 0; sampler < 4; ++sampler) {
-          text += "layout(set = " + std::to_string(TEXTURE_DESCRIPTOR_SET) + ", binding = " +
-                  std::to_string(sampler) + ") uniform sampler2D " +
-                  SamplerContract::TextureSamplerPrefix + std::to_string(sampler) + ";\n";
-        }
-      }
-      for (const auto* include : desc->includes) {
+      for (const auto* include : desc.includes) {
         text += readExpanded(include);
       }
       text += "\nlayout(location = 0) out vec4 dummyOut;\nvoid main() {\n  dummyOut = ";
       std::string widenPrefix;
       std::string widenSuffix;
-      switch (desc->returnType) {
+      switch (desc.returnType) {
         case SLType::Float:
           widenPrefix = "vec4(";
           widenSuffix = ")";
@@ -749,13 +804,13 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*comp
           break;
       }
       text += widenPrefix;
-      text += desc->glslSymbol;
+      text += desc.glslSymbol;
       text += "(";
-      for (size_t argument = 0; argument < desc->params.size(); ++argument) {
+      for (size_t argument = 0; argument < desc.params.size(); ++argument) {
         if (argument > 0) {
           text += ", ";
         }
-        const auto& param = desc->params[argument];
+        const auto& param = desc.params[argument];
         if (param.isArray) {
           text += "vec4[" + std::to_string(param.arrayCount) + "](";
           for (uint32_t element = 0; element < param.arrayCount; ++element) {
@@ -807,27 +862,27 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*comp
       text += ";\n}\n";
       std::string buildError;
       auto patched =
-          CompileSPIRVLibraryModule(text, desc->glslSymbol, desc->glslSymbol, &buildError);
+          CompileSPIRVLibraryModule(text, desc.glslSymbol, desc.glslSymbol, &buildError);
       if (patched.empty()) {
         RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
-                         desc->glslSymbol, profileTag, -1, -1,
+                         desc.glslSymbol, profileTag, -1, -1,
                          std::string("the SPIR-V operator module did not build: ") + buildError);
         continue;
       }
       std::string reflectError;
-      const auto reflected = ReflectFunctionSignature(patched, desc->glslSymbol, &reflectError);
-      if (reflected.size() != desc->params.size()) {
+      const auto reflected = ReflectFunctionSignature(patched, desc.glslSymbol, &reflectError);
+      if (reflected.size() != desc.params.size()) {
         RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
-                         desc->glslSymbol, profileTag, -1, -1,
-                         "the operator declares " + std::to_string(desc->params.size()) +
+                         desc.glslSymbol, profileTag, -1, -1,
+                         "the operator declares " + std::to_string(desc.params.size()) +
                              " parameters but the module compiled " +
                              std::to_string(reflected.size()) +
                              (reflectError.empty() ? std::string() : ": " + reflectError));
         continue;
       }
       bool signatureMatches = true;
-      for (size_t argument = 0; argument < desc->params.size(); ++argument) {
-        const auto& param = desc->params[argument];
+      for (size_t argument = 0; argument < desc.params.size(); ++argument) {
+        const auto& param = desc.params[argument];
         OpTable::Param expected = OpTable::Param::Vec4;
         if (param.isArray) {
           expected = OpTable::Param::Vec4Array8;
@@ -868,8 +923,8 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*comp
         if (reflected[argument] != expected) {
           signatureMatches = false;
           RecordBuildError(&report->diagnostics, Layer::Output, DiagnosticCode::OutputWrite,
-                           desc->glslSymbol, profileTag, -1, -1,
-                           "parameter " + std::to_string(argument) + " of " + desc->glslSymbol +
+                           desc.glslSymbol, profileTag, -1, -1,
+                           "parameter " + std::to_string(argument) + " of " + desc.glslSymbol +
                                " drifted from the manifest");
         }
       }
@@ -877,8 +932,8 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*comp
         continue;
       }
       ComposedPayload payload;
-      payload.name = desc->glslSymbol;
-      payload.id = FragmentPackSPIRVOpBase | static_cast<uint32_t>(desc->id);
+      payload.name = desc.glslSymbol;
+      payload.id = FragmentPackSPIRVOpBase | static_cast<uint32_t>(desc.id);
       const auto* bytes = reinterpret_cast<const uint8_t*>(patched.data());
       payload.blob.assign(bytes, bytes + patched.size() * sizeof(uint32_t));
       report->composedByTag[profileTag].push_back(std::move(payload));

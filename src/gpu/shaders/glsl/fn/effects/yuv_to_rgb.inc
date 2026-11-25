@@ -2,8 +2,9 @@
 // range normalization. The raw alpha arrives as a parameter so the call site keeps only the
 // sampling orchestration on its side.
 //@function tgfxYUVToRGB
-vec4 tgfxYUVToRGB(highp vec3 yuv, highp mat3 colorXform, int limitedRange, int hasAlpha,
-                  highp float rawAlpha) {
+//@op YUVToRGB
+//@frag
+vec4 tgfxYUVToRGB(highp vec3 yuv /*@in*/, highp mat3 colorXform /*@in*/, int limitedRange /*@in*/, int hasAlpha /*@in*/, highp float rawAlpha /*@in*/) {
   if (limitedRange != 0) {
     yuv.x -= (16.0 / 255.0);
   }

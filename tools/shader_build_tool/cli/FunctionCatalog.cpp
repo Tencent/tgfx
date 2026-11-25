@@ -38,6 +38,8 @@ namespace {
 
 struct CatalogEntry {
   std::string name = {};
+  /// The file's path relative to the shader directory — the manifest's module source.
+  std::string path = {};
   std::string source = {};
   std::vector<std::string>
   requires = {};
@@ -467,6 +469,7 @@ bool CollectCatalogEntries(const std::string& shaderDir, std::vector<CatalogEntr
     std::ostringstream buffer;
     buffer << file.rdbuf();
     CatalogEntry entry = {};
+    entry.path = fs::relative(it->path(), shaderDir).generic_string();
     std::string parseError;
     if (!ParseAnnotatedFunction(buffer.str(), &entry, &parseError)) {
       *error = it->path().string() + ": " + parseError;
@@ -494,6 +497,7 @@ bool CollectCatalogEntries(const std::string& shaderDir, std::vector<CatalogEntr
       std::ostringstream buffer;
       buffer << file.rdbuf();
       CatalogEntry entry = {};
+      entry.path = fs::relative(it->path(), shaderDir).generic_string();
       std::string parseError;
       if (!ParseAnnotatedFunction(buffer.str(), &entry, &parseError)) {
         *error = it->path().string() + ": " + parseError;
@@ -1313,6 +1317,18 @@ bool CollectOperatorSignatures(const std::string& shaderDir,
     signature.stage = entry.opStage;
     if (!DeriveOperatorParams(entry, &signature.returnType, &signature.params, error)) {
       return false;
+    }
+    // The module sources: the dependency closure in compile order (callees before callers), the
+    // same order the MSL module builder uses, so the manifest's includes always compile.
+    std::set<std::string> closureDone = {};
+    std::vector<const CatalogEntry*> closureOrdered = {};
+    if (!CollectMslOrder(entries, entry, &closureDone, &closureOrdered, error)) {
+      return false;
+    }
+    for (const auto* dependency : closureOrdered) {
+      if (!dependency->path.empty()) {
+        signature.includes.push_back(dependency->path);
+      }
     }
     signatures->push_back(std::move(signature));
   }

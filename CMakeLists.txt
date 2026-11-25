@@ -880,7 +880,6 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     list(REMOVE_ITEM SHADER_TOOL_FILES
             ${CMAKE_CURRENT_SOURCE_DIR}/tools/shader_build_tool/main.cpp)
     add_library(shader_build_tool_core STATIC ${SHADER_TOOL_FILES})
-    target_sources(shader_build_tool_core PRIVATE src/gpu/ir/OperatorManifest.cpp)
     target_link_libraries(shader_build_tool_core PUBLIC tgfx_shader_declarations)
     target_include_directories(shader_build_tool_core PUBLIC tools/shader_build_tool)
     target_include_directories(shader_build_tool_core SYSTEM PUBLIC

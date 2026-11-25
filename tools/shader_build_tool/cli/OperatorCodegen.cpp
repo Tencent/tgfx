@@ -103,6 +103,12 @@ const char* SLTypeNameOf(const std::string& glslType) {
   if (glslType == "mat4") {
     return "Float4x4";
   }
+  if (glslType == "sampler2D") {
+    return "Texture2DSampler";
+  }
+  if (glslType == "sampler2DRect") {
+    return "Texture2DRectSampler";
+  }
   return nullptr;
 }
 
@@ -372,6 +378,64 @@ void AppendParamTables(const std::vector<const OperatorSignature*>& sorted, std:
   }
 }
 
+/// The runtime manifest table, serialized from the same signatures as the glue: the id
+/// enumerators stay hand-written in OperatorManifest.h (stable values); a missing enumerator or a
+/// signature drift fails the compile instead of surfacing at runtime.
+void AppendManifestTable(const std::vector<const OperatorSignature*>& sorted, std::string* text) {
+  *text += "const OperatorDesc kGeneratedOperatorDescs[] = {\n";
+  for (const OperatorSignature* signature : sorted) {
+    *text += "    {OperatorID::";
+    *text += signature->opName;
+    *text += ", \"";
+    *text += signature->opName;
+    *text += "\", \"";
+    *text += signature->functionName;
+    *text += "\", SLType::";
+    *text += SLTypeNameOf(signature->returnType);
+    *text += ",\n     {";
+    bool first = true;
+    for (const auto& param : signature->params) {
+      if (!first) {
+        *text += ", ";
+      }
+      first = false;
+      if (param.arrayCount > 0) {
+        *text += "OperatorParam(SLType::";
+        *text += SLTypeNameOf(param.type);
+        *text += ", true, ";
+        *text += std::to_string(param.arrayCount);
+        *text += ")";
+      } else {
+        *text += "OperatorParam(SLType::";
+        *text += SLTypeNameOf(param.type);
+        *text += ")";
+      }
+    }
+    *text += "}, {";
+    first = true;
+    for (const auto& include : signature->includes) {
+      if (!first) {
+        *text += ", ";
+      }
+      first = false;
+      *text += "\"";
+      *text += include;
+      *text += "\"";
+    }
+    *text += "}},\n";
+  }
+  if (sorted.empty()) {
+    *text += "    // No //@op annotations yet; the manifest table stays empty until the migration\n";
+    *text += "    // marks its first operator.\n";
+  }
+  *text += "};\n";
+  *text += "\n";
+  *text += "const uint32_t kGeneratedOperatorDescCount = ";
+  *text += std::to_string(sorted.size());
+  *text += ";\n";
+  *text += "\n";
+}
+
 void AppendDescTable(const std::vector<const OperatorSignature*>& sorted, std::string* text) {
   *text += "const GeneratedOperatorDesc kGeneratedOperators[] = {\n";
   for (const OperatorSignature* signature : sorted) {
@@ -596,11 +660,18 @@ bool WriteGeneratedOperators(const std::vector<OperatorSignature>& signatures,
   for (const OperatorSignature* signature : sorted) {
     AppendEmitClass(*signature, &header);
   }
+  header += "/// The runtime manifest table, generated from the same signatures as the glue above:\n";
+  header += "/// the id enumerators stay hand-written in OperatorManifest.h (stable values); a missing\n";
+  header += "/// enumerator or a signature drift fails the compile instead of surfacing at runtime.\n";
+  header += "extern const OperatorDesc kGeneratedOperatorDescs[];\n";
+  header += "extern const uint32_t kGeneratedOperatorDescCount;\n";
+  header += "\n";
   header += HeaderEpilogue;
 
   std::string source = SourcePrelude;
   AppendParamTables(sorted, &source);
   AppendDescTable(sorted, &source);
+  AppendManifestTable(sorted, &source);
   for (const OperatorSignature* signature : sorted) {
     AppendEnsureUniformsImpl(*signature, &source);
     AppendUploadImpl(*signature, &source);

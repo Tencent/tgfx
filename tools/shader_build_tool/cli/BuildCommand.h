@@ -104,6 +104,9 @@ struct OperatorSignature {
   std::string stage;
   /// The GLSL return type of the function ("vec4"), mapped to SLType at generation.
   std::string returnType;
+  /// The module sources in compile order (the dependency closure, callees before callers), paths
+  /// relative to the shader directory — the runtime manifest's includes.
+  std::vector<std::string> includes;
   std::vector<OperatorParamInfo> params;
 };
 
