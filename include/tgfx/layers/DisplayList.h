@@ -370,6 +370,10 @@ class DisplayList {
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;
   int64_t lastZoomScaleInt = 1000;
+  // The last zoom scale whose grid tiles were drawn before the zoom changed, or 0. They stay in the
+  // pool and fill cells no tree level covers, until a frame no longer shows any of them.
+  int64_t staleGridScaleInt = 0;
+  bool staleGridShown = false;
   Point lastContentOffset = {};
   Point mousePosition = {};
   int totalTileCount = 0;
@@ -417,7 +421,21 @@ class DisplayList {
 
   void recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks);
 
-  void recycleGridTiles();
+  /**
+   * Returns the grid tiles of every zoom scale but keepScaleInt to the free list. Zero keeps none.
+   */
+  void recycleGridTiles(int64_t keepScaleInt = 0);
+
+  /**
+   * Returns the grid tiles of the stale zoom scale that the dirty regions touch to the free list, so
+   * no outdated content is shown as a fallback.
+   */
+  void invalidateStaleGridTiles(const std::vector<Rect>& dirtyRegions);
+
+  /**
+   * Returns every grid tile of the stale zoom scale to the free list.
+   */
+  void dropStaleGridTiles();
 
   void recycleBlankTiles(const DrawTask& task);
 

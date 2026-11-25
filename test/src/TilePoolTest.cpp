@@ -192,6 +192,8 @@ TGFX_TEST_PRIVATE(TilePoolTest, FastModeLeavesUncoveredCellsToTheBackground) {
   displayList->render(surface.get());
 
   displayList->setZoomScale(0.7f);
+  // Away from the area the first frame drew, the grid tiles of its zoom scale cover nothing either.
+  displayList->setContentOffset(-1500, -1500);
   displayList->render(surface.get());
   // The zero budget leaves every cell without a tile, and Fast mode does not rasterize a fallback
   // for them within the frame, so they show the background instead. The Smooth mode counterpart is
@@ -561,6 +563,37 @@ TGFX_TEST_PRIVATE(TilePoolTest, ExpiredBudgetBorrowsSubtreeCacheOfAnotherSize) {
   EXPECT_EQ(ReadPixel(surface, 100, 100), OPAQUE_RED);
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->root()->subtreeCache->hasCache(context, 128));
                       EXPECT_TRUE(displayList->deferredPatches.empty()));
+}
+
+TGFX_TEST_PRIVATE(TilePoolTest, ZoomShowsGridTilesOfThePreviousScale) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 512, 512);
+  ASSERT_NE(surface, nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileUpdateMode(TileUpdateMode::Fast);
+  displayList->setMaxTilesRefinedPerFrame(0);
+  displayList->setBackgroundColor(Color::White());
+  auto layer = MakeSolid(4096, 4096, Color::Red());
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+
+  // Fast mode with no budget rasterizes nothing for the new zoom scale, so the grid tiles of the
+  // previous one fill the cells they still cover, scaled to the new zoom.
+  displayList->setZoomScale(1.5f);
+  displayList->render(surface.get());
+  EXPECT_EQ(ReadPixel(surface, 10, 10), OPAQUE_RED);
+  EXPECT_EQ(ReadPixel(surface, 500, 500), OPAQUE_RED);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->staleGridScaleInt, 1000));
+
+  // Content that changed under them leaves the stale tiles, which would show it outdated.
+  layer->setColor(Color::Blue());
+  displayList->render(surface.get());
+  EXPECT_EQ(ReadPixel(surface, 10, 10), OPAQUE_WHITE);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(displayList->staleGridScaleInt, 0);
+                      EXPECT_EQ(displayList->tilePool->size(TileType::Grid), 0u));
 }
 
 TGFX_TEST_PRIVATE(TilePoolTest, DirtyRegionDropsTilesOutsideFallbackLevels) {
