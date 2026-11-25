@@ -18,15 +18,17 @@
 
 #include "SPIRVInterfaceLayout.h"
 #include <unordered_set>
+#include "gpu/ShaderBindingLayout.h"
 
 namespace tgfx {
 
 uint32_t SPIRVInterfaceLayout::UniformSet(ShaderStage stage) {
-  return stage == ShaderStage::Vertex ? 0 : 1;
+  return stage == ShaderStage::Vertex ? static_cast<uint32_t>(VERTEX_UBO_DESCRIPTOR_SET)
+                                      : static_cast<uint32_t>(FRAGMENT_UBO_DESCRIPTOR_SET);
 }
 
 uint32_t SPIRVInterfaceLayout::SamplerSet() {
-  return 2;
+  return static_cast<uint32_t>(TEXTURE_DESCRIPTOR_SET);
 }
 
 bool SPIRVInterfaceLayout::Build(const InterfaceIR& interface, std::string* error) {

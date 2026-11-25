@@ -710,15 +710,20 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*comp
         }
       }
       if (needsDummySampler) {
-        text += "layout(set = 2, binding = 15) uniform sampler2D dummyLeafTex;\n";
+        text += "layout(set = " + std::to_string(TEXTURE_DESCRIPTOR_SET) + ", binding = " +
+                std::to_string(DUMMY_LEAF_SAMPLER_BINDING) + ") uniform sampler2D " +
+                DUMMY_LEAF_SAMPLER_NAME + ";\n";
       }
       if (needsRectSampler) {
-        text += "layout(set = 2, binding = 14) uniform sampler2DRect dummyRectTex;\n";
+        text += "layout(set = " + std::to_string(TEXTURE_DESCRIPTOR_SET) + ", binding = " +
+                std::to_string(DUMMY_RECT_SAMPLER_BINDING) + ") uniform sampler2DRect " +
+                DUMMY_RECT_SAMPLER_NAME + ";\n";
       }
       if (desc->leafSamplers) {
         for (int sampler = 0; sampler < 4; ++sampler) {
-          text += "layout(set = 2, binding = " + std::to_string(sampler) +
-                  ") uniform sampler2D TextureSampler_" + std::to_string(sampler) + ";\n";
+          text += "layout(set = " + std::to_string(TEXTURE_DESCRIPTOR_SET) + ", binding = " +
+                  std::to_string(sampler) + ") uniform sampler2D " +
+                  SamplerContract::TextureSamplerPrefix + std::to_string(sampler) + ";\n";
         }
       }
       for (const auto* include : desc->includes) {
@@ -788,10 +793,10 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*comp
             text += "ivec4(0)";
             break;
           case SLType::Texture2DSampler:
-            text += "dummyLeafTex";
+            text += DUMMY_LEAF_SAMPLER_NAME;
             break;
           case SLType::Texture2DRectSampler:
-            text += "dummyRectTex";
+            text += DUMMY_RECT_SAMPLER_NAME;
             break;
           default:
             break;

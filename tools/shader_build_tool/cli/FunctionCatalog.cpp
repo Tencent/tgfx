@@ -42,6 +42,10 @@ struct CatalogEntry {
   std::vector<std::string>
   requires = {};
   std::string opPrefix = {};
+  /// The operator name of a `//@op <Name> [vertex|fragment]` annotation; empty for helpers.
+  std::string opName = {};
+  /// The stage the annotation declares ("vertex" or "fragment").
+  std::string opStage = {};
   std::vector<std::pair<std::string, std::string>> members = {};     // param -> member
   std::vector<std::pair<std::string, std::string>> sources = {};     // param -> enum override
   std::vector<std::pair<std::string, std::string>> conditions = {};  // param -> guard
@@ -196,6 +200,7 @@ bool ParseAnnotatedFunction(const std::string& text, CatalogEntry* entry, std::s
       line.pop_back();
     }
     const std::string functionTag = "//@function ";
+    const std::string opTag = "//@op ";
 
     const std::string requiresTag = "//@requires ";
     if (line.rfind(functionTag, 0) == 0) {
@@ -210,6 +215,24 @@ bool ParseAnnotatedFunction(const std::string& text, CatalogEntry* entry, std::s
         entry->opPrefix = rest.substr(space + 1);
       } else {
         entry->name = rest;
+      }
+    } else if (line.rfind(opTag, 0) == 0) {
+      if (!entry->opName.empty()) {
+        *error = "a file declares more than one //@op";
+        return false;
+      }
+      const std::string rest = line.substr(opTag.size());
+      const auto space = rest.find(' ');
+      if (space != std::string::npos) {
+        entry->opName = rest.substr(0, space);
+        entry->opStage = rest.substr(space + 1);
+      } else {
+        entry->opName = rest;
+        entry->opStage = "fragment";
+      }
+      if (entry->opStage != "vertex" && entry->opStage != "fragment") {
+        *error = "the //@op stage must be vertex or fragment: " + line;
+        return false;
       }
     } else if (line.rfind("//@members ", 0) == 0 || line.rfind("//@member ", 0) == 0 ||
                line.rfind("//@source ", 0) == 0 || line.rfind("//@when ", 0) == 0 ||
@@ -1053,7 +1076,135 @@ bool BuildCatalogMsl(const std::vector<CatalogEntry>& entries, StageCompiler* co
   return true;
 }
 
+bool DeriveOperatorParams(const CatalogEntry& entry, std::vector<OperatorParamInfo>* params,
+                          std::string* error) {
+  // The signature is parsed here rather than through SignatureParams: that helper's contract
+  // (the marker folded into the type tail, the name stripped) serves the dummy-main call
+  // builder, and its last-space split mis-splits the real files' trailing-marker spelling
+  // ("sampler2D tex /*@in*/" becomes an empty name). The operator pipeline reads the raw
+  // parameter list itself: split on commas, strip every marker wherever it sits, split type
+  // and name on the first space.
+  const auto nameAt = entry.source.find(entry.name + "(");
+  const auto open = entry.source.find('(', nameAt);
+  const auto close = entry.source.find(')', open);
+  if (nameAt == std::string::npos || open == std::string::npos || close == std::string::npos) {
+    *error = entry.name + ": the signature is unreadable";
+    return false;
+  }
+  const std::string list = entry.source.substr(open + 1, close - open - 1);
+  size_t start = 0;
+  while (start <= list.size()) {
+    size_t end = list.find(',', start);
+    if (end == std::string::npos) {
+      end = list.size();
+    }
+    std::string item = list.substr(start, end - start);
+    start = end + 1;
+    bool isIn = false;
+    size_t markerAt = item.find("/*@in*/");
+    while (markerAt != std::string::npos) {
+      isIn = true;
+      item.erase(markerAt, 7);
+      markerAt = item.find("/*@in*/");
+    }
+    const auto first = item.find_first_not_of(" \t\n");
+    const auto last = item.find_last_not_of(" \t\n");
+    if (first == std::string::npos) {
+      continue;
+    }
+    item = item.substr(first, last - first + 1);
+    uint32_t arrayCount = 0;
+    if (!item.empty() && item.back() == ']') {
+      const auto bracket = item.rfind('[');
+      if (bracket == std::string::npos) {
+        *error = entry.name + ": the parameter '" + item + "' has an unreadable array length";
+        return false;
+      }
+      arrayCount = static_cast<uint32_t>(std::atoi(item.c_str() + bracket + 1));
+      if (arrayCount == 0) {
+        *error = entry.name + ": the parameter '" + item + "' has an invalid array length";
+        return false;
+      }
+      item = item.substr(0, bracket);
+      const auto trim = item.find_last_not_of(" \t");
+      item = trim == std::string::npos ? "" : item.substr(0, trim + 1);
+    }
+    const auto space = item.find(' ');
+    if (space == std::string::npos || space == 0 || space + 1 >= item.size()) {
+      *error = entry.name + ": the parameter '" + item + "' needs a type and a name";
+      return false;
+    }
+    const std::string type = item.substr(0, space);
+    const std::string name = item.substr(space + 1);
+    if (name.find(' ') != std::string::npos) {
+      *error = entry.name + ": the parameter name '" + name + "' must be one token";
+      return false;
+    }
+    OperatorParamInfo param = {};
+    param.type = type;
+    param.name = name;
+    param.arrayCount = arrayCount;
+    if (type == "sampler2D" || type == "sampler2DRect") {
+      // A sampler is always a call-side argument: the caller registers the texture and passes
+      // its value id. Existing entry functions mark the samplers /*@in*/ (yuv.inc) and the
+      // reader functions leave them unmarked; both spell the same role.
+      param.role = OperatorParamRole::Sampler;
+    } else if (isIn) {
+      if (arrayCount > 0) {
+        *error = entry.name + ": the array '" + name + "' cannot be marked /*@in*/";
+        return false;
+      }
+      param.role = OperatorParamRole::In;
+      param.intLiteral = type == "int";
+    } else if (arrayCount > 0) {
+      // std140 keeps every array element on a 16-byte stride, so only the 16-byte element types
+      // are representable as a uniform array.
+      if (type != "vec4" && type != "ivec4") {
+        *error = entry.name + ": the array '" + name + "' must have a vec4 or ivec4 element type";
+        return false;
+      }
+      param.role = OperatorParamRole::UniformArray;
+    } else {
+      if (FragmentTypeOf(type) == nullptr) {
+        *error = entry.name + ": the parameter '" + name + "' has an unknown type '" + type + "'";
+        return false;
+      }
+      param.role = OperatorParamRole::Uniform;
+    }
+    params->push_back(std::move(param));
+    if (end == list.size()) {
+      break;
+    }
+  }
+  return true;
+}
+
 }  // namespace
+
+bool CollectOperatorSignatures(const std::string& shaderDir,
+                               std::vector<OperatorSignature>* signatures, std::string* error) {
+  if (signatures == nullptr || error == nullptr) {
+    return false;
+  }
+  std::vector<CatalogEntry> entries = {};
+  if (!CollectCatalogEntries(shaderDir, &entries, error)) {
+    return false;
+  }
+  for (const auto& entry : entries) {
+    if (entry.opName.empty()) {
+      continue;
+    }
+    OperatorSignature signature = {};
+    signature.opName = entry.opName;
+    signature.functionName = entry.name;
+    signature.stage = entry.opStage;
+    if (!DeriveOperatorParams(entry, &signature.params, error)) {
+      return false;
+    }
+    signatures->push_back(std::move(signature));
+  }
+  return true;
+}
 
 bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& outPath,
                               StageCompiler* compiler, std::string* error) {
@@ -1218,7 +1369,17 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
   }
   const std::filesystem::path outputPath(outPath);
   const std::filesystem::path registryPath = outputPath.parent_path() / "ChainOpRegistry.inc";
-  return WriteChainOpRegistry(entries, registryPath.string(), error);
+  if (!WriteChainOpRegistry(entries, registryPath.string(), error)) {
+    return false;
+  }
+  std::vector<OperatorSignature> signatures = {};
+  if (!CollectOperatorSignatures(shaderDir, &signatures, error)) {
+    return false;
+  }
+  const std::filesystem::path operatorHeader = outputPath.parent_path() / "GeneratedOperators.h";
+  const std::filesystem::path operatorSource = outputPath.parent_path() / "GeneratedOperators.cpp";
+  return WriteGeneratedOperators(signatures, operatorHeader.string(), operatorSource.string(),
+                                 error);
 }
 
 }  // namespace tgfx

@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include "gpu/ShaderBindingLayout.h"
 #include "gpu/shaders/contract/ChainISA.h"
 #include "gpu/shaders/contract/ChainOps.h"
 
@@ -122,29 +123,7 @@ inline std::vector<std::string> Defines() {
 
 }  // namespace Op
 
-namespace SamplerContract {
-
-// The prefix of every ordinary texture sampler: TextureSampler_<N>, with N dense from zero in
-// declaration order. shader_build_tool checks the reflected samplers against this pattern.
-constexpr const char* TextureSamplerPrefix = "TextureSampler_";
-
-// Every semantic sampler name a precompiled kernel may declare. Ordinary texture bindings use the
-// generic TextureSampler_<N> pattern (N dense from zero, checked by shader_build_tool); the names
-// below carry dedicated meaning and appear verbatim in the kernels, the runtime emitters, and the
-// uniform writers. A new semantic sampler must be registered here or the bundle build fails —
-// the point is that adding a binding interface is a deliberate contract change, not a typo.
-constexpr const char* DstTexture = "DstTextureSampler";
-constexpr const char* MaskTexture = "MaskTextureSampler";
-constexpr const char* Mask = "MaskSampler";
-constexpr const char* LocalMask = "LocalMaskSampler";
-constexpr const char* EdgeMask = "EdgeMaskSampler";
-constexpr const char* GradientTexture = "GradientTexture";
-
-inline bool IsSemanticSamplerName(const std::string& name) {
-  return name == DstTexture || name == MaskTexture || name == Mask || name == LocalMask ||
-         name == EdgeMask || name == GradientTexture;
-}
-
-}  // namespace SamplerContract
+// The sampler naming contract (the TextureSampler_ prefix and the semantic sampler names) moved
+// to gpu/ShaderBindingLayout.h; this header re-exports it through the include above.
 
 }  // namespace tgfx

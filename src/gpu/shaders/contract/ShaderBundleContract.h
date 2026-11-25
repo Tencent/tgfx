@@ -26,6 +26,7 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+#include "gpu/ShaderBindingLayout.h"
 
 namespace tgfx {
 
@@ -256,33 +257,9 @@ inline ShaderKeyHash ComputeFragmentKeyHash(const std::string& shaderName,
 // Changing a value changes the resource layout every precompiled shader was built against, so it
 // is also a bundle format change: bump ExpectedToolchainABI.
 
-/// The name of the uniform block every vertex stage declares.
-inline constexpr char VertexUniformBlockName[] = "VertexUniformBlock";
-
-/// The name of the uniform block every fragment stage declares.
-inline constexpr char FragmentUniformBlockName[] = "FragmentUniformBlock";
-
-// Descriptor set indices for SPIR-V based backends. The runtime pipelines build exactly three
-// descriptor sets / bind groups — one per uniform block and one for the textures — and the
-// precompiled shaders must declare their resources in the same three sets: vertex UBO in set 0,
-// fragment UBO in set 1, textures in set 2. (The GLSL templates get these values injected as the
-// TGFX_* contract macros below, so the numbers exist only in this file.)
-inline constexpr int VERTEX_UBO_DESCRIPTOR_SET = 0;
-inline constexpr int FRAGMENT_UBO_DESCRIPTOR_SET = 1;
-inline constexpr int TEXTURE_DESCRIPTOR_SET = 2;
-
-// The framebuffer-fetch subpass input of the FBF variants (HAS_XP == 2). Those variants only
-// enter the Metal and GLES bundles — Metal's translation turns the subpass input into a
-// [[color(N)]] read and the ES emitter deletes the declaration, so no stored form carries the
-// set. Vulkan is excluded from the FBF variants today (ProfileSupportsFramebufferFetch); if it
-// ever gains them, this must move off the texture set's bindings.
-inline constexpr int FBF_INPUT_ATTACHMENT_SET = 3;
-
-/// The binding of the vertex uniform block inside its descriptor set.
-inline constexpr int VERTEX_UBO_BINDING_POINT = 0;
-
-/// The binding of the fragment uniform block inside its descriptor set.
-inline constexpr int FRAGMENT_UBO_BINDING_POINT = 1;
+// The uniform block names and the descriptor set / binding layout constants moved to
+// gpu/ShaderBindingLayout.h, the single source shared by the tool and the runtime; this header
+// re-exports them through the include above.
 
 // Where the WebGPU rewrite packs the separated texture/sampler pairs of the texture set: pair i
 // lives on bindings START + 2i (texture) and START + 2i + 1 (sampler). The runtime JIT rewrite

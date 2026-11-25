@@ -141,6 +141,9 @@ const std::vector<std::string>& ContractHeaders() {
       "gpu/shaders/contract/ShaderLibraryBundleFormat.h",
       "gpu/Uniform.h",
       "gpu/shaders/KernelContract.h",
+      // The binding and naming constants the tool and the runtime share; it lives at the src/gpu
+      // top level because it survives the contract directory's retirement.
+      "gpu/ShaderBindingLayout.h",
   };
   return headers;
 }

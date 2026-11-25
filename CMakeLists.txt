@@ -1081,6 +1081,8 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     add_custom_command(
             OUTPUT ${TGFX_SHADER_LIBRARY_BUNDLE}
             BYPRODUCTS ${TGFX_SHADER_LIBRARY_REGISTRY}
+                       ${TGFX_SHADER_BUNDLE_DIR}/GeneratedOperators.h
+                       ${TGFX_SHADER_BUNDLE_DIR}/GeneratedOperators.cpp
             COMMAND ${TGFX_SHADER_TOOL_COMMAND}
                     --shader-dir ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/glsl
                     --library-bundle ${TGFX_SHADER_LIBRARY_BUNDLE}
