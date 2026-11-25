@@ -255,6 +255,26 @@ class DisplayList {
   }
 
   /**
+   * Returns the smallest scale fallback tiles are rasterized at in tiled rendering mode. Zero means
+   * no limit. The default value is 0.
+   */
+  float minFallbackScale() const {
+    return _minFallbackScale;
+  }
+
+  /**
+   * Sets the smallest scale fallback tiles are rasterized at in tiled rendering mode. Fallback tiles
+   * are rasterized at power-of-two scales up to eight times smaller than the zoom scale, and this
+   * drops the ones smaller than the given scale: a coarse tile covers a large area of the layer
+   * tree, so rasterizing it costs nearly as much as the whole tree. Below this scale, missing tiles
+   * are rasterized at the zoom scale without any fallback, as in TileUpdateMode::Immediate. Zero or
+   * a negative value removes the limit.
+   */
+  void setMinFallbackScale(float scale) {
+    _minFallbackScale = scale > 0.0f ? scale : 0.0f;
+  }
+
+  /**
    * Returns the per-frame time budget, in seconds, for rasterizing tiles in tiled rendering mode,
    * including the background captures they need. Zero means no limit. The default value is 0.
    */
@@ -343,6 +363,7 @@ class DisplayList {
   TileUpdateMode _tileUpdateMode = TileUpdateMode::Immediate;
   int _maxTilesRefinedPerFrame = 5;
   float _tileTimeBudget = 0.0f;
+  float _minFallbackScale = 0.0f;
   int _subtreeCacheMaxSize = 0;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
@@ -405,6 +426,11 @@ class DisplayList {
    * rect when nothing is visible.
    */
   Rect getVisibleRenderRect(const Surface* surface) const;
+
+  /**
+   * Returns the coarsest tree level fallback tiles may use, following minFallbackScale().
+   */
+  int maxTreeLevel() const;
 
   /**
    * Returns the screen tasks that display the tiles currently cached for the viewport: the exact

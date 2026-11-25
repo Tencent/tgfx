@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <limits>
 #include "layers/BackgroundHandler.h"
 #include "layers/TilePool.h"
 #include "tgfx/layers/DisplayList.h"
@@ -468,6 +469,55 @@ TGFX_TEST_PRIVATE(TilePoolTest, TimeBudgetDefersNewTilesToFallbacks) {
   EXPECT_GT(frames, 1);
   EXPECT_LT(frames, 64);
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->deferredPatches.empty()));
+}
+
+TGFX_TEST_PRIVATE(TilePoolTest, MinFallbackScaleCapsTreeLevels) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 512, 512);
+  ASSERT_NE(surface, nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileUpdateMode(TileUpdateMode::Smooth);
+  displayList->setMaxTilesRefinedPerFrame(64);
+  // Level 2 is the coarsest one allowed, since its raster scale is 1/4.
+  displayList->setMinFallbackScale(0.25f);
+  displayList->root()->addChild(MakeSolid(8192, 8192, Color::Red()));
+  auto maxLevelInPool = [&]() {
+    int maxLevel = std::numeric_limits<int>::min();
+    TGFX_PRIVATE_ACCESS(for (auto& key
+                             : displayList->tilePool->keysOf(TileType::Tree)) {
+      maxLevel = std::max(maxLevel, key.level);
+    });
+    return maxLevel;
+  };
+  auto renderUntilSettled = [&]() {
+    int frames = 0;
+    do {
+      displayList->render(surface.get());
+    } while (displayList->hasContentChanged() && ++frames < 64);
+    EXPECT_LT(frames, 64);
+  };
+  // At 0.6 the viewport level is 0, so the fallback levels 0 to 3 are capped at 2.
+  displayList->setZoomScale(0.6f);
+  renderUntilSettled();
+  EXPECT_LE(maxLevelInPool(), 2);
+  // Panning to an area no level covers fills it from the coarsest level left, 2 instead of 3.
+  displayList->setContentOffset(-3000, -3000);
+  displayList->render(surface.get());
+  EXPECT_EQ(ReadPixel(surface, 10, 10), OPAQUE_RED);
+  EXPECT_EQ(maxLevelInPool(), 2);
+  renderUntilSettled();
+  EXPECT_LE(maxLevelInPool(), 2);
+
+  // At 0.1 the viewport level is 3, past the cap, so the grid is drawn at once without fallbacks.
+  displayList->setContentOffset(0, 0);
+  displayList->setZoomScale(0.1f);
+  displayList->render(surface.get());
+  EXPECT_EQ(ReadPixel(surface, 10, 10), OPAQUE_RED);
+  EXPECT_EQ(ReadPixel(surface, 500, 500), OPAQUE_RED);
+  EXPECT_LE(maxLevelInPool(), 2);
 }
 
 TGFX_TEST_PRIVATE(TilePoolTest, DirtyRegionDropsTilesOutsideFallbackLevels) {

@@ -22,6 +22,7 @@
 #include <cmath>
 #include <cstdio>
 #include <functional>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -286,17 +287,18 @@ static void ForEachTileUnderRect(const Rect& rect, int tileSize,
   }
 }
 
-// Looks up every tile of the levels L to L+3 inside the viewport. Hits are touched regardless of
-// whether the frame displays them, which is what keeps the coarse levels from being evicted.
+// Looks up every tile of the levels L to L+3, capped at maxLevel, inside the viewport. Hits are
+// touched regardless of whether the frame displays them, which is what keeps the coarse levels from
+// being evicted.
 static std::vector<TreeLevelCoverage> CollectTreeCoverages(TilePool* tilePool,
                                                            const BlankTileSet* blankTiles,
                                                            float zoomScale, const Rect& renderRect,
-                                                           int tileSize) {
+                                                           int tileSize, int maxLevel) {
   std::vector<TreeLevelCoverage> coverages = {};
   coverages.reserve(TREE_LEVEL_COUNT);
   auto baseLevel = GetTileLevel(zoomScale);
   auto tileSizeFloat = static_cast<float>(tileSize);
-  for (int i = 0; i < TREE_LEVEL_COUNT; ++i) {
+  for (int i = 0; i < TREE_LEVEL_COUNT && baseLevel + i <= maxLevel; ++i) {
     TreeLevelCoverage coverage = {};
     coverage.level = baseLevel + i;
     coverage.zoomToRaster = GetTileRasterScale(coverage.level) / zoomScale;
@@ -1125,7 +1127,7 @@ void DisplayList::invalidateTreeTiles(const std::vector<Rect>& dirtyRegions,
     // Only the coarsest level is patched, because the finer fallbacks are not drawn while the
     // grid covers every cell: patching them would replay the whole scene for pixels nobody sees.
     // They are dropped here instead and rebuilt by the chain top-up once the grid is settled.
-    const auto coarsestLevel = baseLevel + TREE_LEVEL_COUNT - 1;
+    const auto coarsestLevel = std::min(baseLevel + TREE_LEVEL_COUNT - 1, maxTreeLevel());
     if (key.level != coarsestLevel || !Rect::Intersects(tileRect, rects.viewportRect)) {
       dirtyKeys.push_back(key);
       continue;
@@ -1221,7 +1223,10 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks,
                                                       std::vector<Rect>* skippedRects) {
   auto refineBudget = std::max(_maxTilesRefinedPerFrame, 0);
-  const auto useFallback = _tileUpdateMode != TileUpdateMode::Immediate;
+  // Below minFallbackScale() no fallback level is left, so missing tiles are rasterized at once.
+  const auto useFallback =
+      _tileUpdateMode != TileUpdateMode::Immediate &&
+      GetTileLevel(ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision)) <= maxTreeLevel();
   // Grid tiles drawn while the viewport moves are often stale by the next frame, so a moving
   // viewport spends the budget on tree tiles, which stay valid across zoom scales.
   const auto viewportChanged =
@@ -1252,8 +1257,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   screenTasks.reserve(tileCount);
   std::vector<TreeLevelCoverage> coverages = {};
   if (useFallback) {
-    coverages =
-        CollectTreeCoverages(tilePool.get(), blankTiles.get(), zoomScale, renderRect, _tileSize);
+    coverages = CollectTreeCoverages(tilePool.get(), blankTiles.get(), zoomScale, renderRect,
+                                     _tileSize, maxTreeLevel());
   }
   auto getGridRect = [&](const std::pair<int, int>& grid) {
     auto rect =
@@ -1397,12 +1402,13 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     if (useFallback && !coverages.empty()) {
       const bool mayRefine = tileTasks->empty();
       const bool gridComplete = missingGrids.empty();
-      // Once the grid is complete, the budget tops up L+2, L+1 and then L itself. L+3 is left to
-      // pass 1.
+      // Once the grid is complete, the budget tops up the levels finer than the coarsest one, coarse
+      // first, down to L itself. The coarsest level is left to pass 1.
       auto chainBudget = gridComplete ? std::max(_maxTilesRefinedPerFrame, 0) : 0;
+      // coverages[0] is L and coverages.back() is the coarsest level.
+      const auto finerLevelCount = static_cast<int>(coverages.size()) - 1;
       if (mayRefine) {
-        // coverages[0] is L and coverages[3] is L+3.
-        for (int index = TREE_LEVEL_COUNT - 2; index >= 0 && chainBudget > 0; --index) {
+        for (int index = finerLevelCount - 1; index >= 0 && chainBudget > 0; --index) {
           auto& coverage = coverages[static_cast<size_t>(index)];
           auto cells = CollectMissingTreeTiles(coverage, {renderRect}, _tileSize);
           if (cells.empty()) {
@@ -1420,7 +1426,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       // loop alive, so only a complete one needs the scan.
       bool chainPending = false;
       if (gridComplete) {
-        for (int index = TREE_LEVEL_COUNT - 2; index >= 0; --index) {
+        for (int index = finerLevelCount - 1; index >= 0; --index) {
           auto& coverage = coverages[static_cast<size_t>(index)];
           if (!CollectMissingTreeTiles(coverage, {renderRect}, _tileSize).empty()) {
             chainPending = true;
@@ -1490,6 +1496,14 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   return screenTasks;
 }
 
+int DisplayList::maxTreeLevel() const {
+  if (_minFallbackScale <= 0.0f) {
+    return std::numeric_limits<int>::max();
+  }
+  // The coarsest level whose raster scale 2^-level is not below minFallbackScale().
+  return std::ilogb(1.0f / _minFallbackScale);
+}
+
 Rect DisplayList::getVisibleRenderRect(const Surface* surface) const {
   auto renderRect = GetViewportRect(surface, _contentOffset);
   auto renderBounds = _root->renderBounds;
@@ -1514,8 +1528,8 @@ std::vector<DrawTask> DisplayList::collectDisplayTasks(const Surface* surface,
   const auto endX = FloatCeilToInt(renderRect.right / tileSizeFloat);
   const auto endY = FloatCeilToInt(renderRect.bottom / tileSizeFloat);
   auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  auto coverages =
-      CollectTreeCoverages(tilePool.get(), blankTiles.get(), zoomScale, renderRect, _tileSize);
+  auto coverages = CollectTreeCoverages(tilePool.get(), blankTiles.get(), zoomScale, renderRect,
+                                        _tileSize, maxTreeLevel());
   std::vector<DrawTask> screenTasks = {};
   for (auto tileY = startY; tileY < endY; ++tileY) {
     for (auto tileX = startX; tileX < endX; ++tileX) {
