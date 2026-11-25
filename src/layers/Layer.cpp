@@ -765,7 +765,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
         continue;
       }
     }
-    if (child->hasValidMask()) {
+    if (child->isClippedToMaskBounds()) {
       auto maskRelativeMatrix = child->_mask->getRelativeMatrix3D(child.get());
       maskRelativeMatrix.postConcat(childMatrix);
       auto maskBounds = child->_mask->getBoundsInternal(maskRelativeMatrix, computeTightBounds);
@@ -1161,7 +1161,10 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (FloatNearlyZero(contentScale)) {
     return true;
   }
-  if (args.renderRects != nullptr && !args.renderRects->empty() && !renderBounds.isEmpty()) {
+  if (args.renderRects != nullptr && !args.renderRects->empty()) {
+    if (renderBounds.isEmpty()) {
+      return true;
+    }
     bool anyHit = false;
     for (const auto& rect : *args.renderRects) {
       if (Rect::Intersects(rect, renderBounds)) {
@@ -1235,6 +1238,11 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   DrawArgs maskArgs = args;
   maskArgs.excludeEffects |= isContourMode;
   maskArgs.backgroundHandler = BackgroundHandler::NoOp();
+  // A mask under a hidden ancestor still applies, but updateRenderBounds() skips hidden subtrees,
+  // so its render bounds are empty and would cull the whole mask. Draw such a mask uncut.
+  if (_mask->renderBounds.isEmpty()) {
+    maskArgs.renderRects = nullptr;
+  }
   auto maskCanPreserve3D = _mask->canPreserve3D();
   // When mask enables 3D context, the full 3D relative matrix is handled by the 3D context.
   // Otherwise, use the 2D projection of the relative matrix on canvas.
@@ -1431,13 +1439,16 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, float 
   if (!bitFields.staticSubtree) {
     return false;
   }
+  // A subtree that draws nothing has no cache to build: its bounds are empty whether it holds no
+  // content or only geometry no paint captured, and every lookup would fall back to drawing it.
+  if (getBounds().isEmpty()) {
+    return false;
+  }
   // Skip caching for leaf nodes with basic shapes (Rect, RRect) that have no filters or layer
   // styles, as they can be efficiently merged during rendering.
   if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
     auto content = getContent();
-    // Content that draws nothing stays out of the cache: either it has none, or everything it
-    // holds is geometry no paint captured, whose painted-caliber bounds are empty.
-    if (content == nullptr || getBounds().isEmpty()) {
+    if (content == nullptr) {
       return false;
     }
     auto contentType = Types::Get(content);
@@ -2142,6 +2153,15 @@ bool Layer::hasValidMask() const {
   return _mask && _mask->root() == root() && _mask->bitFields.visible;
 }
 
+bool Layer::isClippedToMaskBounds() const {
+  if (!hasValidMask()) {
+    return false;
+  }
+  auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
+  return maskType != LayerMaskType::AlphaInverted && maskType != LayerMaskType::LuminanceInverted &&
+         maskType != LayerMaskType::ContourInverted;
+}
+
 void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty,
                                float alpha) {
   const auto accumulatedAlpha = alpha * _alpha;
@@ -2233,7 +2253,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     if (child->_scrollRect) {
       clipRect = *child->_scrollRect;
     }
-    if (child->hasValidMask()) {
+    if (child->isClippedToMaskBounds()) {
       auto maskBounds = child->_mask->getBounds(child.get());
       if (clipRect.has_value()) {
         if (!clipRect->intersect(maskBounds)) {
