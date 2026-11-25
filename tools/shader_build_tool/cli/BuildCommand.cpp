@@ -879,13 +879,19 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
         text += desc->prelude;
       }
       bool needsDummySampler = false;
+      bool needsRectSampler = false;
       for (const auto& param : desc->params) {
         if (param.type == SLType::Texture2DSampler) {
           needsDummySampler = true;
+        } else if (param.type == SLType::Texture2DRectSampler) {
+          needsRectSampler = true;
         }
       }
       if (needsDummySampler) {
         text += "layout(set = 2, binding = 15) uniform sampler2D dummyLeafTex;\n";
+      }
+      if (needsRectSampler) {
+        text += "layout(set = 2, binding = 14) uniform sampler2DRect dummyRectTex;\n";
       }
       if (desc->leafSamplers) {
         for (int sampler = 0; sampler < 4; ++sampler) {
@@ -962,6 +968,9 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
           case SLType::Texture2DSampler:
             text += "dummyLeafTex";
             break;
+          case SLType::Texture2DRectSampler:
+            text += "dummyRectTex";
+            break;
           default:
             break;
         }
@@ -1022,6 +1031,7 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* compil
               expected = OpTable::Param::IVec4;
               break;
             case SLType::Texture2DSampler:
+            case SLType::Texture2DRectSampler:
               expected = OpTable::Param::SampledImage;
               break;
             default:

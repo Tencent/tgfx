@@ -438,62 +438,20 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
                              fragBuilder->getSamplerSwizzleSuffix(sampler).c_str());
     if (args.irBuilder != nullptr && args.samplerValue(sampler) != INVALID_VALUE_ID) {
       const auto zero = args.irBuilder->CreateConstant(0.0f);
-      const auto one = args.irBuilder->CreateConstant(1.0f);
-      const auto zero4 = args.irBuilder->CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
-      const auto one2 = args.irBuilder->CreateConstruct(SLType::Float2, {one, one});
       const auto coordValue = makeCoordValue(texCoordName);
-      const auto subsetValue =
-          names.subsetName.empty()
-              ? zero4
-              : args.irBuilder->InternValue(names.subsetName, SLType::Float4, Precision::High,
-                                            IRValueKind::Uniform);
-      const auto clampValue = names.clampName.empty() ? zero4
-                                                      : args.irBuilder->InternValue(
-                                                            names.clampName, SLType::Float4,
-                                                            Precision::High, IRValueKind::Uniform);
-      const auto dimensionsValue =
-          names.dimensionsName.empty()
-              ? one2
-              : args.irBuilder->InternValue(names.dimensionsName, SLType::Float2, Precision::High,
-                                            IRValueKind::Uniform);
-      const auto strictSubsetValue =
-          constraint == SrcRectConstraint::Strict && !args.inputSubset.empty()
-              ? args.irBuilder->InternValue(args.inputSubset, SLType::Float4, Precision::High,
-                                            IRValueKind::Uniform)
-              : zero4;
-      const auto modeXValue = args.irBuilder->CreateIntConstant(modeX);
-      const auto modeYValue = args.irBuilder->CreateIntConstant(modeY);
-      uint32_t flags = 0;
-      if (constraint == SrcRectConstraint::Strict) {
-        flags |= TiledFlags(TiledReadFlag::StrictSubset);
+      std::vector<ValueID> sampleArgs = {args.samplerValue(sampler), coordValue};
+      OperatorID sampleOp = OperatorID::TiledSample1;
+      if (mipmapX && mipmapY) {
+        sampleArgs.insert(sampleArgs.end(), {coordValue, coordValue, coordValue, zero, zero});
+        sampleOp = typeSuffix == "Rect" ? OperatorID::TiledSample4Rect : OperatorID::TiledSample4;
+      } else if (mipmapX || mipmapY) {
+        sampleArgs.insert(sampleArgs.end(), {coordValue, zero});
+        sampleOp = typeSuffix == "Rect" ? OperatorID::TiledSample2Rect : OperatorID::TiledSample2;
+      } else {
+        sampleOp = typeSuffix == "Rect" ? OperatorID::TiledSample1Rect : OperatorID::TiledSample1;
       }
-      if (repeatX) {
-        flags |= TiledFlags(TiledReadFlag::RepeatX);
-      }
-      if (repeatY) {
-        flags |= TiledFlags(TiledReadFlag::RepeatY);
-      }
-      if (borderLinearX) {
-        flags |= TiledFlags(TiledReadFlag::BorderLinearX);
-      }
-      if (borderLinearY) {
-        flags |= TiledFlags(TiledReadFlag::BorderLinearY);
-      }
-      if (borderNearestX) {
-        flags |= TiledFlags(TiledReadFlag::BorderNearestX);
-      }
-      if (borderNearestY) {
-        flags |= TiledFlags(TiledReadFlag::BorderNearestY);
-      }
-      const auto flagsValue = args.irBuilder->CreateIntConstant(static_cast<int32_t>(flags));
-      const auto op = samplerVar.type() == SLType::Texture2DRectSampler
-                          ? OperatorID::TiledSampleRect
-                          : OperatorID::TiledSample;
-      textureValue = args.irBuilder->CreateCall(
-          op, SLType::Float4,
-          {args.samplerValue(sampler), coordValue, subsetValue, clampValue, dimensionsValue,
-           modeXValue, modeYValue, flagsValue, strictSubsetValue},
-          args.outputColor);
+      textureValue =
+          args.irBuilder->CreateCall(sampleOp, SLType::Float4, sampleArgs, args.outputColor);
     }
   }
   if (textureProxy->isAlphaOnly()) {
