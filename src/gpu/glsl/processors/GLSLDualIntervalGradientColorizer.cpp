@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLDualIntervalGradientColorizer.h"
+#include "GeneratedOperators.h"
+#include "gpu/glsl/GLSLOperatorEmitter.h"
 
 namespace tgfx {
 PlacementPtr<DualIntervalGradientColorizer> DualIntervalGradientColorizer::Make(
@@ -51,24 +53,35 @@ GLSLDualIntervalGradientColorizer::GLSLDualIntervalGradientColorizer(Color scale
 
 void GLSLDualIntervalGradientColorizer::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
-  auto scale01Name =
-      args.uniformHandler->addUniform("scale01", UniformFormat::Float4, ShaderStage::Fragment);
-  auto bias01Name =
-      args.uniformHandler->addUniform("bias01", UniformFormat::Float4, ShaderStage::Fragment);
-  auto scale23Name =
-      args.uniformHandler->addUniform("scale23", UniformFormat::Float4, ShaderStage::Fragment);
-  auto bias23Name =
-      args.uniformHandler->addUniform("bias23", UniformFormat::Float4, ShaderStage::Fragment);
-  auto thresholdName =
-      args.uniformHandler->addUniform("threshold", UniformFormat::Float, ShaderStage::Fragment);
   auto entry = fragBuilder->appendFunction("tgfxDualGradientColor");
   if (entry.empty()) {
     return;
   }
-  fragBuilder->codeAppendf("%s = %s(%s.x, %s, %s, %s, %s, %s);", args.outputColor.c_str(),
-                           entry.c_str(), args.inputColor.c_str(), scale01Name.c_str(),
-                           bias01Name.c_str(), scale23Name.c_str(), bias23Name.c_str(),
-                           thresholdName.c_str());
+  if (args.irBuilder == nullptr || args.inputValue == INVALID_VALUE_ID ||
+      args.outputValue == INVALID_VALUE_ID) {
+    return;
+  }
+  DualGradientColorOp::UniformNames names = {};
+  const auto t = args.irBuilder->CreateSwizzle(args.inputValue, SLType::Float, "x");
+  const auto result = DualGradientColorOp::Emit(args.irBuilder, args.uniformHandler, &names, t);
+  args.irBuilder->StoreOutput(args.outputValue, result);
+  std::string expression = {};
+  std::string error = {};
+  if (result == INVALID_VALUE_ID ||
+      !GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error)) {
+    args.irBuilder->MarkFailed(error.empty() ? "the dual-interval colorizer could not be emitted"
+                                             : error);
+    return;
+  }
+  fragBuilder->appendCall(
+      args.outputColor, entry,
+      {ValueRef(args.inputColor + ".x", SLType::Float, ValueOrigin::Local),
+       ValueRef(names.scale01, SLType::Float4, ValueOrigin::Uniform),
+       ValueRef(names.bias01, SLType::Float4, ValueOrigin::Uniform),
+       ValueRef(names.scale23, SLType::Float4, ValueOrigin::Uniform),
+       ValueRef(names.bias23, SLType::Float4, ValueOrigin::Uniform),
+       ValueRef(names.threshold, SLType::Float, ValueOrigin::Uniform)},
+      "", expression);
 }
 
 void GLSLDualIntervalGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,

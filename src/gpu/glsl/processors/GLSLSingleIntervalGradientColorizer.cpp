@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLSingleIntervalGradientColorizer.h"
+#include "GeneratedOperators.h"
+#include "gpu/glsl/GLSLOperatorEmitter.h"
 
 namespace tgfx {
 PlacementPtr<SingleIntervalGradientColorizer> SingleIntervalGradientColorizer::Make(
@@ -30,16 +32,33 @@ GLSLSingleIntervalGradientColorizer::GLSLSingleIntervalGradientColorizer(Color s
 
 void GLSLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
-  auto startName =
-      args.uniformHandler->addUniform("start", UniformFormat::Float4, ShaderStage::Fragment);
-  auto endName =
-      args.uniformHandler->addUniform("end", UniformFormat::Float4, ShaderStage::Fragment);
   auto entry = fragBuilder->appendFunction("tgfxSingleGradientColor");
   if (entry.empty()) {
     return;
   }
-  fragBuilder->codeAppendf("%s = %s(%s.x, %s, %s);", args.outputColor.c_str(), entry.c_str(),
-                           args.inputColor.c_str(), startName.c_str(), endName.c_str());
+  if (args.irBuilder == nullptr || args.inputValue == INVALID_VALUE_ID ||
+      args.outputValue == INVALID_VALUE_ID) {
+    return;
+  }
+  SingleGradientColorOp::UniformNames names = {};
+  const auto t = args.irBuilder->CreateSwizzle(args.inputValue, SLType::Float, "x");
+  const auto result =
+      SingleGradientColorOp::Emit(args.irBuilder, args.uniformHandler, &names, t);
+  args.irBuilder->StoreOutput(args.outputValue, result);
+  std::string expression = {};
+  std::string error = {};
+  if (result == INVALID_VALUE_ID ||
+      !GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error)) {
+    args.irBuilder->MarkFailed(error.empty() ? "the single-interval colorizer could not be emitted"
+                                             : error);
+    return;
+  }
+  fragBuilder->appendCall(
+      args.outputColor, entry,
+      {ValueRef(args.inputColor + ".x", SLType::Float, ValueOrigin::Local),
+       ValueRef(names.start, SLType::Float4, ValueOrigin::Uniform),
+       ValueRef(names.end, SLType::Float4, ValueOrigin::Uniform)},
+      "", expression);
 }
 
 void GLSLSingleIntervalGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,

@@ -213,6 +213,21 @@ const std::vector<OperatorDesc>& Operators() {
        {SLType::Float4, SLType::Float2, SLType::Float4, SLType::Float, SLType::Float3x3},
        nullptr,
        {"fn/ops/rect_effect.inc"}},
+      {OperatorID::SingleGradientColor,
+       "SingleGradientColor",
+       "tgfxSingleGradientColor",
+       SLType::Float4,
+       {SLType::Float, SLType::Float4, SLType::Float4},
+       nullptr,
+       {"fn/source/tgfx_single_gradient_color.inc"}},
+      {OperatorID::DualGradientColor,
+       "DualGradientColor",
+       "tgfxDualGradientColor",
+       SLType::Float4,
+       {SLType::Float, SLType::Float4, SLType::Float4, SLType::Float4, SLType::Float4,
+        SLType::Float},
+       nullptr,
+       {"fn/source/tgfx_dual_gradient_color.inc"}},
   };
   return operators;
 }
