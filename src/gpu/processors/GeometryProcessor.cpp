@@ -117,4 +117,41 @@ void GeometryProcessor::emitTransforms(EmitArgs& args, VertexShaderBuilder* vert
   }
 }
 
+void GeometryProcessor::emitPositionIR(EmitArgs& args, const ShaderVar& position) const {
+  auto ir = args.irBuilder;
+  if (ir == nullptr) {
+    return;
+  }
+  auto positionValue = ir->InternValue(position.name(), position.type(), Precision::High,
+                                       IRValueKind::Attribute);
+  if (position.type() != SLType::Float2) {
+    positionValue = ir->CreateSwizzle(positionValue, SLType::Float2, "xy");
+  }
+  const auto rtAdjust =
+      ir->InternValue(RTAdjustName, SLType::Float4, Precision::High, IRValueKind::Uniform);
+  const auto adjustXZ = ir->CreateSwizzle(rtAdjust, SLType::Float2, "xz");
+  const auto adjustYW = ir->CreateSwizzle(rtAdjust, SLType::Float2, "yw");
+  const auto scaled = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float2, positionValue, adjustXZ);
+  const auto shifted = ir->CreateBinary(IRBinaryOp::Add, SLType::Float2, scaled, adjustYW);
+  const auto zero = ir->CreateConstant(0.0f);
+  const auto one = ir->CreateConstant(1.0f);
+  const auto position4 = ir->CreateConstruct(SLType::Float4, {shifted, zero, one});
+  const auto output =
+      ir->CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "gl_Position");
+  ir->StoreOutput(output, position4);
+}
+
+void GeometryProcessor::emitVaryingIR(EmitArgs& args, const Varying& varying,
+                                      const ShaderVar& source) const {
+  auto ir = args.irBuilder;
+  if (ir == nullptr) {
+    return;
+  }
+  const auto varyingValue = ir->AddVarying(
+      {varying.name(), varying.type(), Precision::High, 0, varying.isFlat()});
+  const auto sourceValue =
+      ir->InternValue(source.name(), source.type(), Precision::High, IRValueKind::Attribute);
+  ir->StoreVarying({varyingValue, ""}, sourceValue);
+}
+
 }  // namespace tgfx

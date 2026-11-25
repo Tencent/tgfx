@@ -47,6 +47,10 @@ enum class OperatorID : uint32_t {
   TiledRepeatBlendRect = 18,
   TiledBorderLinear = 19,
   TiledBorderNearest = 20,
+  NonAARRectCoverage = 21,
+  ComplexRRectCoverage = 22,
+  EllipseCoverage = 23,
+  ComplexEllipseCoverage = 24,
 };
 
 constexpr OperatorID INVALID_OPERATOR_ID = static_cast<OperatorID>(-1);

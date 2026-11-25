@@ -6,9 +6,11 @@
 #define TGSL_RRECT_COVERAGE_INCLUDED
 
 //@function nonAARRectCoverage
+//@op NonAARRectCoverage
+//@frag
 
-float nonAARRectCoverage(vec2 localCoord, vec4 rectBounds, vec2 radii, vec2 strokeWidth,
-                         int strokeEnabled) {
+float nonAARRectCoverage(vec2 localCoord /*@in*/, vec4 rectBounds /*@in*/, vec2 radii /*@in*/,
+                         vec2 strokeWidth /*@in*/, int strokeEnabled /*@in*/) {
   highp vec2 center = (rectBounds.xy + rectBounds.zw) * 0.5;
   highp vec2 halfSize = (rectBounds.zw - rectBounds.xy) * 0.5;
   highp vec2 q = abs(localCoord - center) - halfSize + radii;

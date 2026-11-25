@@ -8,9 +8,12 @@
 #define TGSL_COMPLEX_RRECT_COVERAGE_INCLUDED
 
 //@function complexRRectCoverage
+//@op ComplexRRectCoverage
+//@frag
 
-float complexRRectCoverage(vec2 localCoord, vec4 rectBounds, vec4 xRadii, vec4 yRadii,
-                           vec2 strokeWidth, int strokeEnabled) {
+float complexRRectCoverage(vec2 localCoord /*@in*/, vec4 rectBounds /*@in*/, vec4 xRadii /*@in*/,
+                           vec4 yRadii /*@in*/, vec2 strokeWidth /*@in*/,
+                           int strokeEnabled /*@in*/) {
   // Per-corner radii: xR/yR order is [TL, TR, BR, BL]
   highp vec4 cornersX = vec4(rectBounds.x, rectBounds.z, rectBounds.z, rectBounds.x);
   highp vec4 cornersY = vec4(rectBounds.y, rectBounds.y, rectBounds.w, rectBounds.w);

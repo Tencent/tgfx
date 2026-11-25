@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLComplexNonAARRectGeometryProcessor.h"
+#include "GeneratedOperators.h"
 
 namespace tgfx {
 PlacementPtr<ComplexNonAARRectGeometryProcessor> ComplexNonAARRectGeometryProcessor::Make(
@@ -40,14 +41,16 @@ void GLSLComplexNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   // Emit attributes
 
   // Setup color output
+  std::string colorUniformName = {};
+  Varying colorVarying = {};
   if (commonColor.has_value()) {
-    auto colorName =
+    colorUniformName =
         uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->storeColor(args.outputColor, colorName);
+    fragBuilder->storeColor(args.outputColor, colorUniformName);
   } else {
-    auto color = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->storeVarying(color.vsOut(), inColor.name());
-    fragBuilder->storeColor(args.outputColor, color.fsIn());
+    colorVarying = varyingHandler->addVarying("Color", SLType::Float4);
+    vertBuilder->storeVarying(colorVarying.vsOut(), inColor.name());
+    fragBuilder->storeColor(args.outputColor, colorVarying.fsIn());
   }
 
   // Output position using RTAdjust uniform
@@ -77,6 +80,61 @@ void GLSLComplexNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   // Emit transforms using position as UV coordinates.
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
                  ShaderVar(inPosition.name(), SLType::Float2));
+
+  // The IR route: the same varyings and the coverage call as SSA values, so the SPIR-V path
+  // serves this geometry without the text emission.
+  if (args.irBuilder != nullptr) {
+    auto ir = args.irBuilder;
+    if (!commonColor.has_value()) {
+      emitVaryingIR(args, colorVarying, ShaderVar(inColor));
+    }
+    emitPositionIR(args, ShaderVar(inPosition));
+    emitVaryingIR(args, localCoordVarying, ShaderVar(inLocalCoord));
+    emitVaryingIR(args, xRadiiVarying, ShaderVar(inXRadii));
+    emitVaryingIR(args, yRadiiVarying, ShaderVar(inYRadii));
+    emitVaryingIR(args, boundsVarying, ShaderVar(inRectBounds));
+    if (stroke) {
+      emitVaryingIR(args, strokeWidthVarying, ShaderVar(inStrokeWidth));
+    }
+    ir->SetStage(ShaderStage::Fragment);
+    if (commonColor.has_value()) {
+      const auto colorValue = ir->InternValue(colorUniformName, SLType::Float4, Precision::High,
+                                              IRValueKind::Uniform);
+      const auto colorOutput = ir->InternValue(args.outputColor, SLType::Float4, Precision::High,
+                                               IRValueKind::Local);
+      ir->StoreOutput(colorOutput, colorValue);
+    } else {
+      const auto colorValue = ir->InternValue(colorVarying.fsIn(), SLType::Float4,
+                                              Precision::High, IRValueKind::Varying);
+      const auto colorOutput = ir->InternValue(args.outputColor, SLType::Float4, Precision::High,
+                                               IRValueKind::Local);
+      ir->StoreOutput(colorOutput, colorValue);
+    }
+    const auto localCoordIn = ir->InternValue(localCoordVarying.fsIn(), SLType::Float2,
+                                              Precision::High, IRValueKind::Varying);
+    const auto boundsIn = ir->InternValue(boundsVarying.fsIn(), SLType::Float4, Precision::High,
+                                          IRValueKind::Varying);
+    const auto xRadiiIn = ir->InternValue(xRadiiVarying.fsIn(), SLType::Float4, Precision::High,
+                                          IRValueKind::Varying);
+    const auto yRadiiIn = ir->InternValue(yRadiiVarying.fsIn(), SLType::Float4, Precision::High,
+                                          IRValueKind::Varying);
+    ValueID strokeWidthIn = INVALID_VALUE_ID;
+    if (stroke) {
+      strokeWidthIn = ir->InternValue(strokeWidthVarying.fsIn(), SLType::Float2, Precision::High,
+                                      IRValueKind::Varying);
+    } else {
+      const auto zero = ir->CreateConstant(0.0f);
+      strokeWidthIn = ir->CreateConstruct(SLType::Float2, {zero, zero});
+    }
+    const auto coverageValue =
+        ComplexRRectCoverageOp::Emit(ir, uniformHandler, nullptr, localCoordIn, boundsIn, xRadiiIn,
+                                      yRadiiIn, strokeWidthIn, stroke ? 1 : 0);
+    const auto coverage4 = ir->CreateConstruct(
+        SLType::Float4, {coverageValue, coverageValue, coverageValue, coverageValue});
+    const auto coverageOutput = ir->InternValue(args.outputCoverage, SLType::Float4,
+                                                Precision::High, IRValueKind::Local);
+    ir->StoreOutput(coverageOutput, coverage4);
+  }
 
   // Fragment shader - evaluate the per-corner round rect through the shared SDF. The stroke form
   // rides the function's runtime flag as a literal, so the driver folds the arm this draw does

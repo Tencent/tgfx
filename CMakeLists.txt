@@ -1059,6 +1059,8 @@ if (TGFX_EMBED_SHADER_BUNDLES)
                         --compress
                         --stamp ${TGFX_SHADER_BUNDLE_STAMP}
                 DEPENDS ${TGFX_SHADER_TOOL_DEPENDS} ${TGFX_SHADER_SOURCES}
+                        src/gpu/ir/OperatorManifest.cpp
+                        src/gpu/ir/OperatorManifest.h
                 COMMENT "Compiling precompiled shader bundles (${TGFX_SHADER_BACKENDS})")
 
     # Depend on the stamp only: the bundle files are BYPRODUCTS of the rule that writes the stamp,

@@ -142,6 +142,23 @@ class GeometryProcessor : public Processor {
                       VaryingHandler* varyingHandler, UniformHandler* uniformHandler,
                       const ShaderVar& uvCoordsVar) const;
 
+  /**
+   * The IR side of storePosition(): gl_Position = vec4(position.xy * rtAdjust.xz + rtAdjust.yw,
+   * 0, 1). The caller must run in the vertex stage; the RTAdjust uniform is declared by the
+   * program builder before the processors.
+   * @param position The position attribute the vertex stage stores.
+   */
+  void emitPositionIR(EmitArgs& args, const ShaderVar& position) const;
+
+  /**
+   * The IR side of storeVarying(): registers the varying on the IR interface (the name is
+   * deduplicated, so a later registration from the varying handler is a no-op) and stores the
+   * source attribute's value into it. The caller must run in the vertex stage.
+   * @param varying The varying the text route declared through the varying handler.
+   * @param source The vertex attribute feeding the varying.
+   */
+  void emitVaryingIR(EmitArgs& args, const Varying& varying, const ShaderVar& source) const;
+
  private:
   virtual void onComputeProcessorKey(BytesKey*) const {
   }

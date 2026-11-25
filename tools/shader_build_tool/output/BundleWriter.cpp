@@ -84,17 +84,31 @@ struct PoolEntry {
 // the runtime loader. The header is written field by field in that order, and WriteBundle checks
 // the written size against BundleFormat::HeaderSize.
 
+// A composed-only bundle (the whole-program variants retired) carries what its profile's composed
+// modules are: compiled bytes for Vulkan/Metal/D3D12, source text for the GL and WGSL profiles.
+// The variant path reads the kind off the compiled variants; this keeps the composed-only form
+// on the same profile rule the loader enforces (ProfileAllowsPayload).
+uint16_t ComposedProfilePayloadKind(const std::string& profileTag) {
+  if (profileTag == "opengl" || profileTag == "webgl" || profileTag == "webgpu") {
+    return BundleFormat::Payload::Text;
+  }
+  return BundleFormat::Payload::Binary;
+}
+
 bool WriteBundle(const std::string& outPath, const std::string& profileTag,
                  const std::vector<VariantData>& variants,
                  const std::vector<ComposedPayload>& composed, bool compress,
                  Diagnostics* diagnostics) {
-  if (variants.empty()) {
+  if (variants.empty() && composed.empty()) {
     return true;
   }
 
   // The payload kind is a header field, so every variant of a bundle must agree on it: a bundle
   // that mixed text and binary blobs would have no single answer for what the data pool holds.
-  const uint16_t payloadKind = variants.front().payloadKind;
+  // A composed-only bundle derives the kind from its profile instead (see
+  // ComposedProfilePayloadKind).
+  const uint16_t payloadKind =
+      variants.empty() ? ComposedProfilePayloadKind(profileTag) : variants.front().payloadKind;
   for (const auto& v : variants) {
     if (v.payloadKind != payloadKind) {
       ReportWriteFailure(diagnostics, DiagnosticCode::OutputWrite, "", profileTag, -1, -1,

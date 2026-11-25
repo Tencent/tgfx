@@ -411,6 +411,10 @@ void AppendEmitImpl(const OperatorSignature& signature, std::string* text) {
   *text += "Op::UniformNames* textNames, ";
   AppendEmitSignatureParams(signature, text);
   *text += ") {\n";
+  if (!HasUniformMembers(signature)) {
+    *text += "  (void)uniformHandler;\n";
+    *text += "  (void)textNames;\n";
+  }
   for (const auto& param : signature.params) {
     if (param.role != OperatorParamRole::Uniform && param.role != OperatorParamRole::UniformArray) {
       continue;

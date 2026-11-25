@@ -8,9 +8,12 @@
 #define TGSL_COMPLEX_ELLIPSE_COVERAGE_INCLUDED
 
 //@function complexEllipseEdgeCoverage
+//@op ComplexEllipseCoverage
+//@frag
 
-float complexEllipseEdgeCoverage(vec2 ellipseOffsets, vec4 ellipseRadii, vec2 edgeDist,
-                                 vec2 strokeWidth, int strokeEnabled) {
+float complexEllipseEdgeCoverage(vec2 ellipseOffsets /*@in*/, vec4 ellipseRadii /*@in*/,
+                                 vec2 edgeDist /*@in*/, vec2 strokeWidth /*@in*/,
+                                 int strokeEnabled /*@in*/) {
   highp vec2 offset = ellipseOffsets;
   highp vec2 eDist = edgeDist;
 

@@ -6,8 +6,11 @@
 #define TGSL_ELLIPSE_COVERAGE_INCLUDED
 
 //@function ellipseEdgeCoverage
+//@op EllipseCoverage
+//@frag
 
-float ellipseEdgeCoverage(vec2 ellipseOffsets, vec4 ellipseRadii, int strokeEnabled) {
+float ellipseEdgeCoverage(vec2 ellipseOffsets /*@in*/, vec4 ellipseRadii /*@in*/,
+                          int strokeEnabled /*@in*/) {
   highp vec2 offset = ellipseOffsets;
   if (strokeEnabled != 0) {
     offset *= ellipseRadii.xy;
