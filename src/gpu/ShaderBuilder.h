@@ -26,6 +26,7 @@
 #include "gpu/ShaderVar.h"
 #include "gpu/Swizzle.h"
 #include "gpu/ir/ProgramDescription.h"
+#include "gpu/shaders/contract/ShaderLibraryBundleFormat.h"
 #include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
@@ -95,6 +96,14 @@ class ShaderBuilder {
    * site, or the shader would reference an undefined function.
    */
   std::string appendFunction(const char* name);
+
+  /**
+   * Selects the library section appendFunction reads: the printed language of the shader the
+   * builder is emitting. Defaults to GLSL.
+   */
+  void setLibraryLanguage(ShaderLibraryLanguage language) {
+    libraryLanguage = language;
+  }
 
   /**
    * The sink a bytecode builder installs to collect the structured calls; nullptr keeps the
@@ -241,6 +250,7 @@ class ShaderBuilder {
 
   std::vector<std::string> shaderStrings;
   std::set<std::string> emittedFunctions = {};
+  ShaderLibraryLanguage libraryLanguage = ShaderLibraryLanguage::GLSL;
   std::vector<CallRecord>* callRecorder = nullptr;
   FragmentProgram* fragmentProgramRecorder = nullptr;
   ValueTable* valueTable = nullptr;

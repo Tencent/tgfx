@@ -20,6 +20,7 @@
 #include "ProgramBuilder.h"
 #include "Swizzle.h"
 #include "gpu/shaders/ShaderFunctionCatalog.h"
+#include "gpu/shaders/ShaderLibraryBundle.h"
 #include "stdarg.h"
 
 namespace tgfx {
@@ -101,7 +102,7 @@ void ShaderBuilder::addFunction(const std::string& str) {
 
 std::string ShaderBuilder::appendFunction(const char* name) {
   std::string text;
-  if (!AppendShaderFunction(name, &emittedFunctions, &text)) {
+  if (!ShaderLibraryBundle::Get().appendFunction(libraryLanguage, name, &emittedFunctions, &text)) {
     return "";
   }
   if (!text.empty()) {

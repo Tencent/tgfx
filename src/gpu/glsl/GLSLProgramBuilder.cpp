@@ -32,6 +32,9 @@
 #if defined(TGFX_USE_VULKAN)
 #include "gpu/vulkan/VulkanProgramBuilder.h"
 #endif
+#if defined(TGFX_USE_METAL)
+#include "gpu/metal/MetalProgramBuilder.h"
+#endif
 
 namespace tgfx {
 static std::string TypeModifierString(ShaderVar::TypeModifier t, ShaderStage stage) {
@@ -121,6 +124,11 @@ std::shared_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
 #if defined(TGFX_USE_VULKAN)
   if (context != nullptr && context->backend() == Backend::Vulkan) {
     return VulkanProgramBuilder::Create(context, programInfo);
+  }
+#endif
+#if defined(TGFX_USE_METAL)
+  if (context != nullptr && context->backend() == Backend::Metal) {
+    return MetalProgramBuilder::Create(context, programInfo);
   }
 #endif
   GLSLProgramBuilder builder(context, programInfo);
