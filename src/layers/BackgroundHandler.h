@@ -66,6 +66,7 @@ struct CaptureProbe {
   int subtreeNewBuilds = 0;
   int subtreeRebuilds = 0;
   int subtreeRefused = 0;
+  int subtreeBorrows = 0;
   double subtreeBuildMs = 0.0;
   // Builds per long edge, indexed by log2(longEdge) (5 = 32 px ... 11 = 2048 px).
   int subtreeBuildsByEdge[16] = {};

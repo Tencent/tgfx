@@ -32,6 +32,7 @@ class DrawTask;
 class StyleOutputCache;
 enum class TileType;
 struct BackgroundSnapshotMap;
+struct TileBudget;
 struct TreeLevelCoverage;
 
 /**
@@ -390,6 +391,8 @@ class DisplayList {
   // Redraws of cached tiles whose content changed, left over by the time budget of an earlier
   // frame. Their tiles keep the outdated content until these are drawn.
   std::vector<DrawTask> deferredPatches = {};
+  // The time budget of the tiles being rasterized, set while drawTileTasks() runs.
+  mutable TileBudget* tileBudget = nullptr;
 
   std::vector<Rect> renderDirect(Surface* surface, bool autoClear) const;
 

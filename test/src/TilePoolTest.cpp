@@ -18,6 +18,7 @@
 
 #include <limits>
 #include "layers/BackgroundHandler.h"
+#include "layers/SubtreeCache.h"
 #include "layers/TilePool.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -518,6 +519,48 @@ TGFX_TEST_PRIVATE(TilePoolTest, MinFallbackScaleCapsTreeLevels) {
   EXPECT_EQ(ReadPixel(surface, 10, 10), OPAQUE_RED);
   EXPECT_EQ(ReadPixel(surface, 500, 500), OPAQUE_RED);
   EXPECT_LE(maxLevelInPool(), 2);
+}
+
+TGFX_TEST_PRIVATE(TilePoolTest, ExpiredBudgetBorrowsSubtreeCacheOfAnotherSize) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 512, 512);
+  ASSERT_NE(surface, nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setSubtreeCacheMaxSize(2048);
+  displayList->root()->setPassThroughBackground(false);
+  auto group = Layer::Make();
+  group->setMatrix(Matrix::MakeTrans(20, 20));
+  group->addChild(MakeSolid(200, 200, Color::Red()));
+  auto inner = Layer::Make();
+  inner->addChild(MakeSolid(100, 100, Color::Blue()));
+  group->addChild(inner);
+  displayList->root()->addChild(group);
+  // The second frame marks the subtree static, the third builds its cache at 256.
+  for (int i = 0; i < 3; ++i) {
+    displayList->setZoomScale(i == 0 ? 1.0f : 1.0f + 0.001f * static_cast<float>(i));
+    displayList->render(surface.get());
+  }
+  TGFX_PRIVATE_ACCESS(ASSERT_TRUE(displayList->root()->subtreeCache != nullptr);
+                      ASSERT_TRUE(displayList->root()->subtreeCache->hasCache(context, 256)));
+
+  // At 0.5 the cache needs 128. With the budget gone, the 256 one is drawn instead and the tiles
+  // are rasterized again in the next frame, which builds the 128 one.
+  displayList->setTileTimeBudget(1e-9f);
+  displayList->setZoomScale(0.5f);
+  displayList->render(surface.get());
+  EXPECT_EQ(ReadPixel(surface, 15, 15), OPAQUE_BLUE);
+  EXPECT_EQ(ReadPixel(surface, 100, 100), OPAQUE_RED);
+  TGFX_PRIVATE_ACCESS(EXPECT_FALSE(displayList->root()->subtreeCache->hasCache(context, 128)));
+  EXPECT_TRUE(displayList->hasContentChanged());
+
+  displayList->render(surface.get());
+  EXPECT_EQ(ReadPixel(surface, 15, 15), OPAQUE_BLUE);
+  EXPECT_EQ(ReadPixel(surface, 100, 100), OPAQUE_RED);
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(displayList->root()->subtreeCache->hasCache(context, 128));
+                      EXPECT_TRUE(displayList->deferredPatches.empty()));
 }
 
 TGFX_TEST_PRIVATE(TilePoolTest, DirtyRegionDropsTilesOutsideFallbackLevels) {

@@ -39,7 +39,7 @@ void SubtreeCache::addCache(Context* context, int longEdge,
   auto proxyProvider = context->proxyProvider();
   proxyProvider->assignProxyUniqueKey(textureProxy, sizeUniqueKey);
   textureProxy->assignUniqueKey(sizeUniqueKey);
-  cacheEntries[sizeUniqueKey] = CacheEntry{imageMatrix, colorSpace};
+  cacheEntries[sizeUniqueKey] = CacheEntry{longEdge, imageMatrix, colorSpace};
 }
 
 bool SubtreeCache::hasCache(Context* context, int longEdge) const {
@@ -53,6 +53,24 @@ bool SubtreeCache::hasCache(Context* context, int longEdge) const {
   }
   auto proxyProvider = context->proxyProvider();
   return proxyProvider->findOrWrapTextureProxy(sizeUniqueKey) != nullptr;
+}
+
+int SubtreeCache::findNearest(Context* context, int longEdge) const {
+  if (context == nullptr) {
+    return 0;
+  }
+  auto proxyProvider = context->proxyProvider();
+  int nearest = 0;
+  for (const auto& item : cacheEntries) {
+    auto edge = item.second.longEdge;
+    // A larger size draws sharper, so it wins over any smaller one.
+    bool closer = nearest == 0 || (edge >= longEdge && (nearest < longEdge || edge < nearest)) ||
+                  (edge < longEdge && nearest < longEdge && edge > nearest);
+    if (closer && proxyProvider->findOrWrapTextureProxy(makeSizeKey(edge)) != nullptr) {
+      nearest = edge;
+    }
+  }
+  return nearest;
 }
 
 void SubtreeCache::draw(Context* context, int longEdge, Canvas* canvas, const Paint& paint) const {

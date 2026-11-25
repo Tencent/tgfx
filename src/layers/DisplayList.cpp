@@ -139,6 +139,18 @@ class DrawTask {
     _coversTiles = coversTiles;
   }
 
+  /**
+   * Returns true if the task redraws tiles whose layers drew subtree caches of other sizes, so it
+   * must build the caches it needs whatever the time budget.
+   */
+  bool requiresExactCaches() const {
+    return _requiresExactCaches;
+  }
+
+  void setRequiresExactCaches(bool requiresExactCaches) {
+    _requiresExactCaches = requiresExactCaches;
+  }
+
  private:
   // Hold strong references to tiles to ensure the pool doesn't evict them.
   std::vector<std::shared_ptr<Tile>> tiles = {};
@@ -147,6 +159,7 @@ class DrawTask {
   Rect _strictRect = {};
   bool _identityScale = true;
   bool _coversTiles = false;
+  bool _requiresExactCaches = false;
   int _treeLevel = EXACT_LEVEL;
 
   void calculateRects(int tileSize, const Rect& drawRect, float scale) {
@@ -737,12 +750,14 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     deferTileTasks(tileTasks, drawn);
     skippedRects.clear();
     screenTasks = collectDisplayTasks(surface, &skippedRects);
+  }
+  if (!deferredPatches.empty()) {
     hasZoomBlurTiles = true;
   }
   if (!tileTasks.empty()) {
     std::printf(
-        "[TILE-BUDGET] tasks=%zu drawn=%zu deferredPatches=%zu ms=%.1f\n", tileTasks.size(),
-        drawnCount, deferredPatches.size(),
+        "[TILE-BUDGET] tasks=%zu drawn=%zu deferredPatches=%zu borrows=%d ms=%.1f\n",
+        tileTasks.size(), drawnCount, deferredPatches.size(), gCaptureProbe.subtreeBorrows,
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameStart)
             .count());
   }
@@ -917,13 +932,12 @@ std::vector<Rect> DisplayList::drawTileTasks(const std::vector<DrawTask>& tileTa
                                              Surface* surface, float zoomScale,
                                              double budgetSeconds, std::vector<bool>* drawn) {
   drawn->assign(tileTasks.size(), false);
-  const auto start = std::chrono::steady_clock::now();
   size_t drawnCount = 0;
-  auto timeExpired = [&]() {
-    return budgetSeconds > 0.0 && drawnCount > 0 &&
-           std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >=
-               budgetSeconds;
-  };
+  TileBudget budget = {};
+  budget.deadline = std::chrono::steady_clock::now() +
+                    std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                        std::chrono::duration<double>(budgetSeconds));
+  auto timeExpired = [&]() { return budgetSeconds > 0.0 && drawnCount > 0 && budget.expired(); };
   // One capture transform cannot serve two raster scales, so a group holds the tasks of one level.
   // Within a level, a group of neighboring tiles shares a capture while the budget can still stop
   // between groups. Groups keep the order in which their first task appears.
@@ -956,6 +970,11 @@ std::vector<Rect> DisplayList::drawTileTasks(const std::vector<DrawTask>& tileTa
     if (timeExpired()) {
       break;
     }
+    const bool mayBorrow =
+        budgetSeconds > 0.0 &&
+        std::none_of(group.taskIndices.begin(), group.taskIndices.end(),
+                     [&](size_t index) { return tileTasks[index].requiresExactCaches(); });
+    tileBudget = mayBorrow ? &budget : nullptr;
     std::unique_ptr<BackgroundSnapshotMap> snapshots = nullptr;
     if (hasBackgroundStyle) {
       const auto captureStart = std::chrono::steady_clock::now();
@@ -1009,7 +1028,22 @@ std::vector<Rect> DisplayList::drawTileTasks(const std::vector<DrawTask>& tileTa
       (*drawn)[taskIndex] = true;
       ++drawnCount;
     }
+    if (budget.borrowedCache) {
+      // Layers of this group drew subtree caches of other sizes, so its tiles are shown as they are
+      // and rasterized again in a later frame.
+      budget.borrowedCache = false;
+      for (auto taskIndex : group.taskIndices) {
+        const auto& task = tileTasks[taskIndex];
+        for (const auto& tile : task.getTiles()) {
+          DrawTask redraw(tile, _tileSize);
+          redraw.setTreeLevel(task.treeLevel());
+          redraw.setRequiresExactCaches(true);
+          deferredPatches.push_back(std::move(redraw));
+        }
+      }
+    }
   }
+  tileBudget = nullptr;
   return dirtyRects;
 }
 
@@ -2005,6 +2039,7 @@ bool DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   args.renderRects = &renderRectsVec;
   args.dstColorSpace = surface->colorSpace();
   args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
+  args.tileBudget = tileBudget;
   // Draw background color before the layer tree. This ensures backgroundColor is only rendered
   // through the DisplayList::render() path, not when calling Layer::draw() directly.
   canvas->drawColor(_backgroundColor, BlendMode::SrcOver);
@@ -2354,6 +2389,7 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   DrawArgs args(context);
   args.dstColorSpace = surface->colorSpace();
   args.subtreeCacheMaxSize = _subtreeCacheMaxSize;
+  args.tileBudget = tileBudget;
   auto bgSource =
       _root->createBackgroundSource(context, surfaceUnion, viewMatrix, false, args.dstColorSpace);
   if (bgSource == nullptr) {

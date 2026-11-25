@@ -753,7 +753,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode, float alpha);
 
-  SubtreeCache* getValidSubtreeCache(const DrawArgs& args, int longEdge, const Rect& layerBounds);
+  SubtreeCache* getValidSubtreeCache(const DrawArgs& args, int* longEdge, const Rect& layerBounds);
 
   std::shared_ptr<Image> createSubtreeCacheImage(const DrawArgs& args, float contentScale,
                                                  const Rect& scaledBounds, Matrix* drawingMatrix);

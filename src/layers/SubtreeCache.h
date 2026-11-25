@@ -46,6 +46,12 @@ class SubtreeCache {
 
   bool hasCache(Context* context, int longEdge) const;
 
+  /**
+   * Returns the long edge of the cached size closest to longEdge, preferring larger sizes, or 0 if
+   * no size is cached.
+   */
+  int findNearest(Context* context, int longEdge) const;
+
   // TEMP probe: whether an entry for longEdge was ever added, regardless of its texture.
   bool hasEntry(int longEdge) const {
     return cacheEntries.find(makeSizeKey(longEdge)) != cacheEntries.end();
@@ -55,6 +61,7 @@ class SubtreeCache {
 
  private:
   struct CacheEntry {
+    int longEdge = 0;
     Matrix imageMatrix = {};
     std::shared_ptr<ColorSpace> colorSpace = nullptr;
   };

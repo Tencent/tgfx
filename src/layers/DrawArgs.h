@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <vector>
 #include "layers/compositing3d/Layer3DContext.h"
@@ -27,6 +28,20 @@
 namespace tgfx {
 class BackgroundHandler;
 class OpaqueContext;
+
+/**
+ * The time budget of the tiles being rasterized together in tiled rendering.
+ */
+struct TileBudget {
+  std::chrono::steady_clock::time_point deadline = {};
+  // Set once a layer drew a subtree cache of another size because the deadline had passed, which
+  // leaves the tiles to be rasterized again.
+  bool borrowedCache = false;
+
+  bool expired() const {
+    return std::chrono::steady_clock::now() >= deadline;
+  }
+};
 
 /**
  * DrawArgs represents the arguments passed to the draw method of a Layer.
@@ -72,5 +87,10 @@ class DrawArgs {
   // BackgroundHandler::NoOp() on intermediate-artifact paths (mask prep, contour, subtree cache,
   // layer style source, 3D entry). nullptr falls back to NoOp in DispatchOrSkip.
   BackgroundHandler* backgroundHandler = nullptr;
+
+  // The time budget of the tiles being rasterized. Once it has expired, a layer without a subtree
+  // cache of the size it needs draws one of another size instead of building it. nullptr means no
+  // budget.
+  TileBudget* tileBudget = nullptr;
 };
 }  // namespace tgfx

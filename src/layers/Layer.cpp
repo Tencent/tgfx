@@ -1528,8 +1528,9 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
   return textureImage;
 }
 
-SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
+SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int* longEdgePtr,
                                           const Rect& layerBounds) {
+  auto longEdge = *longEdgePtr;
   if (subtreeCache->hasCache(args.context, longEdge)) {
     ++gCaptureProbe.subtreeHits;
     return subtreeCache.get();
@@ -1537,6 +1538,16 @@ SubtreeCache* Layer::getValidSubtreeCache(const DrawArgs& args, int longEdge,
   if (args.renderFlags & RenderFlags::DisableCache || longEdge > args.subtreeCacheMaxSize) {
     ++gCaptureProbe.subtreeRefused;
     return nullptr;
+  }
+  if (args.tileBudget != nullptr && args.tileBudget->expired()) {
+    // Building a cache would overrun the budget further; another size draws the subtree blurrier
+    // or sharper for now, and the tile is rasterized again in a later frame.
+    if (auto nearest = subtreeCache->findNearest(args.context, longEdge)) {
+      ++gCaptureProbe.subtreeBorrows;
+      args.tileBudget->borrowedCache = true;
+      *longEdgePtr = nearest;
+      return subtreeCache.get();
+    }
   }
   if (subtreeCache->hasEntry(longEdge)) {
     ++gCaptureProbe.subtreeRebuilds;
@@ -1596,7 +1607,7 @@ bool Layer::drawWithSubtreeCache(const DrawArgs& args, Canvas* canvas, float alp
   auto layerBounds = getBounds();
   auto contentScale = canvas->getMatrix().getMaxScale();
   auto longEdge = GetMipmapCacheLongEdge(args.subtreeCacheMaxSize, contentScale, layerBounds);
-  auto cache = getValidSubtreeCache(args, longEdge, layerBounds);
+  auto cache = getValidSubtreeCache(args, &longEdge, layerBounds);
   if (cache == nullptr) {
     return false;
   }
