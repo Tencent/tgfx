@@ -1,6 +1,6 @@
 // Pure pointwise fragment: the alpha step function. See ops/ColorMatrix.glsl for the rules.
-//@function pmApplyAlphaThreshold
-//@op AlphaThreshold fragment
+//@op AlphaThreshold
+//@frag
 vec4 pmApplyAlphaThreshold(vec4 color /*@in*/, float threshold) {
   vec4 result = vec4(0.0);
   if (color.a > 0.0) {

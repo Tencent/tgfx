@@ -56,8 +56,8 @@ class OperatorCodegenTest : public testing::Test {
 
 TEST_F(OperatorCodegenTest, DerivesTheRolesOfEveryParameterKind) {
   WriteInc("op_all.inc",
-           "//@function pmAllKinds\n"
-           "//@op AllKinds fragment\n"
+           "//@op AllKinds\n"
+           "//@frag\n"
            "vec4 pmAllKinds(/*@in*/ vec4 color, /*@in*/ int radius, float scale, "
            "vec4 kernel[4], sampler2D tex /*@in*/) { return color; }\n");
   std::vector<OperatorSignature> signatures = {};
@@ -80,26 +80,56 @@ TEST_F(OperatorCodegenTest, DerivesTheRolesOfEveryParameterKind) {
   EXPECT_EQ(signature.params[4].role, OperatorParamRole::Sampler);
 }
 
-TEST_F(OperatorCodegenTest, DefaultsTheStageAndSkipsUnannotatedFunctions) {
-  WriteInc("op_default.inc",
-           "//@function pmDefaultStage\n"
-           "//@op DefaultStage\n"
-           "float pmDefaultStage(float value) { return value; }\n");
+TEST_F(OperatorCodegenTest, ReadsTheStageLineAndSkipsUnannotatedFunctions) {
+  WriteInc("op_vert.inc",
+           "//@op VertOp\n"
+           "//@vert\n"
+           "float pmVertOp(float value) { return value; }\n");
   WriteInc("helper.inc", "//@function pmHelper\nfloat pmHelper(float v) { return v; }\n");
   std::vector<OperatorSignature> signatures = {};
   std::string error;
   ASSERT_TRUE(CollectOperatorSignatures(root.string(), &signatures, &error)) << error;
   ASSERT_EQ(signatures.size(), 1u);
-  EXPECT_EQ(signatures[0].stage, "fragment");
+  EXPECT_EQ(signatures[0].stage, "vertex");
+  EXPECT_EQ(signatures[0].functionName, "pmVertOp");
+}
+
+TEST_F(OperatorCodegenTest, TheOptionalFunctionAnnotationCrossChecksTheSignature) {
+  // A matching //@function name passes and keeps feeding the legacy prefix form.
+  WriteInc("op_checked.inc",
+           "//@function pmChecked Chain\n"
+           "//@op Checked\n"
+           "//@frag\n"
+           "vec4 pmChecked(float v) { return vec4(v); }\n");
+  std::vector<OperatorSignature> signatures = {};
+  std::string error;
+  ASSERT_TRUE(CollectOperatorSignatures(root.string(), &signatures, &error)) << error;
+  ASSERT_EQ(signatures.size(), 1u);
+  EXPECT_EQ(signatures[0].functionName, "pmChecked");
+
+  // A mismatching one fails closed.
+  std::filesystem::remove_all(root / "fn");
+  std::filesystem::create_directories(root / "fn");
+  WriteInc("op_mismatch.inc",
+           "//@function pmWrong\n"
+           "//@op Mismatch\n"
+           "//@frag\n"
+           "vec4 pmMismatch(float v) { return vec4(v); }\n");
+  EXPECT_FALSE(CollectOperatorSignatures(root.string(), &signatures, &error));
+  EXPECT_NE(error.find("does not match the signature"), std::string::npos) << error;
 }
 
 TEST_F(OperatorCodegenTest, RejectsTheAmbiguousForms) {
   const std::string cases[] = {
-      "//@function pmA\n//@op A\nvec4 pmA(/*@in*/ float k[4]) { return vec4(0.0); }\n",
-      "//@function pmA\n//@op A\nvec4 pmA(Foo bar) { return vec4(0.0); }\n",
-      "//@function pmA\n//@op A\nvec4 pmA(float m[3]) { return vec4(0.0); }\n",
-      "//@function pmA\n//@op A\nvec4 pmA(float v) { return vec4(v); }\n"
-      "//@function pmB\n//@op A\nvec4 pmB(float v) { return vec4(v); }\n",
+      "//@op A\n//@frag\nvec4 pmA(/*@in*/ float k[4]) { return vec4(0.0); }\n",
+      "//@op A\n//@frag\nvec4 pmA(Foo bar) { return vec4(0.0); }\n",
+      "//@op A\n//@frag\nvec4 pmA(float m[3]) { return vec4(0.0); }\n",
+      "//@op A\n//@frag\nvec4 pmA(float v) { return vec4(v); }\n"
+      "//@op A\n//@frag\nvec4 pmB(float v) { return vec4(v); }\n",
+      "//@op A\nfloat pmA(float v) { return v; }\n",
+      "//@op A fragment\n//@frag\nfloat pmA(float v) { return v; }\n",
+      "//@frag\nfloat pmA(float v) { return v; }\n",
+      "//@op A\n//@frag\n//@vert\nfloat pmA(float v) { return v; }\n",
   };
   for (const auto& text : cases) {
     std::filesystem::remove_all(root / "fn");
@@ -113,32 +143,24 @@ TEST_F(OperatorCodegenTest, RejectsTheAmbiguousForms) {
   }
 }
 
-TEST_F(OperatorCodegenTest, RejectsABadStageAndADuplicateAnnotation) {
-  WriteInc("op_stage.inc",
-           "//@function pmStage\n//@op Stage geometry\nfloat pmStage(float v) { return v; }\n");
+TEST_F(OperatorCodegenTest, RejectsADuplicateOpAnnotation) {
+  WriteInc("op_twice.inc",
+           "//@op Twice\n//@op Twice\n//@frag\nfloat pmTwice(float v) { return v; }\n");
   std::vector<OperatorSignature> signatures = {};
   std::string error;
   EXPECT_FALSE(CollectOperatorSignatures(root.string(), &signatures, &error));
-  EXPECT_NE(error.find("vertex or fragment"), std::string::npos) << error;
-
-  std::filesystem::remove_all(root / "fn");
-  std::filesystem::create_directories(root / "fn");
-  WriteInc("op_twice.inc",
-           "//@function pmTwice\n//@op Twice\n//@op Twice\nfloat pmTwice(float v) { return v; }\n");
-  // The duplicate surfaces as a parse error through the catalog collector, not the operator
-  // collector, so the call only has to fail closed.
-  EXPECT_FALSE(CollectOperatorSignatures(root.string(), &signatures, &error));
+  EXPECT_FALSE(error.empty());
 }
 
 TEST_F(OperatorCodegenTest, GeneratesEnumTableAndUniforms) {
   WriteInc("op_luma.inc",
-           "//@function pmApplyLuma\n"
-           "//@op Luma fragment\n"
+           "//@op Luma\n"
+           "//@frag\n"
            "vec4 pmApplyLuma(/*@in*/ vec4 color, float kr, float kg, float kb) "
            "{ return color; }\n");
   WriteInc("op_const_color.inc",
-           "//@function pmApplyConstColor\n"
-           "//@op ConstColor fragment\n"
+           "//@op ConstColor\n"
+           "//@frag\n"
            "vec4 pmApplyConstColor(vec4 constColor, /*@in*/ vec4 inputColor, "
            "/*@in*/ int inputMode) { return constColor; }\n");
   std::vector<OperatorSignature> signatures = {};

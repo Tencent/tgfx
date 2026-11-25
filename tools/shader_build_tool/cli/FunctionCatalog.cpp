@@ -187,8 +187,70 @@ std::string CompactFunctionSource(const std::string& text) {
   return compact;
 }
 
+bool IsIdentifierText(const std::string& text) {
+  if (text.empty() || (!std::isalpha(static_cast<unsigned char>(text[0])) && text[0] != '_')) {
+    return false;
+  }
+  for (const char c : text) {
+    if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_') {
+      return false;
+    }
+  }
+  return true;
+}
+
+/// The name of the file's main function, read from its signature: the first top-level line that
+/// looks like a definition ("returnType name("), with the annotations, pragmas, comments and
+/// preprocessor lines skipped. A struct declaration has no parameter list, so it cannot match.
+/// The optional //@function name is only a cross-check against this parse.
+std::string ExtractFunctionName(const std::string& source, std::string* error) {
+  size_t lineStart = 0;
+  while (lineStart <= source.size()) {
+    size_t lineEnd = source.find('\n', lineStart);
+    if (lineEnd == std::string::npos) {
+      lineEnd = source.size();
+    }
+    std::string line = source.substr(lineStart, lineEnd - lineStart);
+    if (!line.empty() && line.back() == '\r') {
+      line.pop_back();
+    }
+    lineStart = lineEnd + 1;
+    const auto first = line.find_first_not_of(" \t");
+    if (first == std::string::npos) {
+      continue;
+    }
+    line = line.substr(first);
+    if (line[0] == '#' || (line.size() > 1 && line[0] == '/' && line[1] == '/')) {
+      continue;
+    }
+    const auto open = line.find('(');
+    if (open == std::string::npos) {
+      continue;
+    }
+    const auto headEnd = line.find_last_not_of(" \t", open > 0 ? open - 1 : 0);
+    if (headEnd == std::string::npos) {
+      continue;
+    }
+    const std::string head = line.substr(0, headEnd + 1);
+    const auto space = head.find_last_of(" \t");
+    if (space == std::string::npos || space == 0) {
+      *error = "the function definition line has no return type: " + line;
+      return {};
+    }
+    const std::string name = head.substr(space + 1);
+    if (!IsIdentifierText(name)) {
+      *error = "the function name is not an identifier: " + name;
+      return {};
+    }
+    return name;
+  }
+  *error = "no function definition found";
+  return {};
+}
+
 bool ParseAnnotatedFunction(const std::string& text, CatalogEntry* entry, std::string* error) {
   std::string source = {};
+  std::string declaredName = {};
   size_t lineStart = 0;
   while (lineStart <= text.size()) {
     size_t lineEnd = text.find('\n', lineStart);
@@ -204,17 +266,17 @@ bool ParseAnnotatedFunction(const std::string& text, CatalogEntry* entry, std::s
 
     const std::string requiresTag = "//@requires ";
     if (line.rfind(functionTag, 0) == 0) {
-      if (!entry->name.empty()) {
+      if (!declaredName.empty()) {
         *error = "a file declares more than one //@function";
         return false;
       }
       const std::string rest = line.substr(functionTag.size());
       const auto space = rest.find(' ');
       if (space != std::string::npos) {
-        entry->name = rest.substr(0, space);
+        declaredName = rest.substr(0, space);
         entry->opPrefix = rest.substr(space + 1);
       } else {
-        entry->name = rest;
+        declaredName = rest;
       }
     } else if (line.rfind(opTag, 0) == 0) {
       if (!entry->opName.empty()) {
@@ -222,18 +284,19 @@ bool ParseAnnotatedFunction(const std::string& text, CatalogEntry* entry, std::s
         return false;
       }
       const std::string rest = line.substr(opTag.size());
-      const auto space = rest.find(' ');
-      if (space != std::string::npos) {
-        entry->opName = rest.substr(0, space);
-        entry->opStage = rest.substr(space + 1);
-      } else {
-        entry->opName = rest;
-        entry->opStage = "fragment";
-      }
-      if (entry->opStage != "vertex" && entry->opStage != "fragment") {
-        *error = "the //@op stage must be vertex or fragment: " + line;
+      if (rest.empty() || rest.find(' ') != std::string::npos) {
+        *error = "the //@op line carries the operator name alone; the stage is its own //@frag or "
+                 "//@vert line: " +
+                 line;
         return false;
       }
+      entry->opName = rest;
+    } else if (line == "//@frag" || line == "//@vert") {
+      if (!entry->opStage.empty()) {
+        *error = "a file declares the stage twice";
+        return false;
+      }
+      entry->opStage = line == "//@vert" ? "vertex" : "fragment";
     } else if (line.rfind("//@members ", 0) == 0 || line.rfind("//@member ", 0) == 0 ||
                line.rfind("//@source ", 0) == 0 || line.rfind("//@when ", 0) == 0 ||
                line.rfind("//@member-start ", 0) == 0 || line.rfind("//@requires ", 0) == 0) {
@@ -251,13 +314,30 @@ bool ParseAnnotatedFunction(const std::string& text, CatalogEntry* entry, std::s
     }
     lineStart = lineEnd + 1;
   }
-  if (entry->name.empty()) {
-    *error = "no //@function annotation";
-    return false;
-  }
   entry->source = CompactFunctionSource(StripIncludeGuard(source));
   if (entry->source.empty()) {
     *error = "the function body is empty";
+    return false;
+  }
+  const std::string parsedName = ExtractFunctionName(entry->source, error);
+  if (parsedName.empty()) {
+    if (error->empty()) {
+      *error = "no function definition found";
+    }
+    return false;
+  }
+  if (!declaredName.empty() && declaredName != parsedName) {
+    *error = "the //@function name '" + declaredName +
+             "' does not match the signature '" + parsedName + "'";
+    return false;
+  }
+  entry->name = parsedName;
+  if (!entry->opName.empty() && entry->opStage.empty()) {
+    *error = "the operator '" + entry->opName + "' needs a //@frag or //@vert line";
+    return false;
+  }
+  if (entry->opName.empty() && !entry->opStage.empty()) {
+    *error = "a //@frag or //@vert line belongs to a //@op operator";
     return false;
   }
   return true;

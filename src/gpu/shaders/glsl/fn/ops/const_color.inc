@@ -1,5 +1,5 @@
-//@function pmApplyConstColor
-//@op ConstColor fragment
+//@op ConstColor
+//@frag
 vec4 pmApplyConstColor(vec4 constColor, vec4 inputColor /*@in*/, int inputMode /*@in*/) {
   if (inputMode == 1) {
     return constColor * inputColor;
