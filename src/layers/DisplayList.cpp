@@ -300,18 +300,19 @@ static void ForEachTileUnderRect(const Rect& rect, int tileSize,
   }
 }
 
-// Looks up every tile of the levels L to L+3, capped at maxLevel, inside the viewport. Hits are
-// touched regardless of whether the frame displays them, which is what keeps the coarse levels from
-// being evicted.
+// Looks up every tile of the levels L to L+levelCount-1, capped at maxLevel, inside the viewport.
+// Hits are touched regardless of whether the frame displays them, which is what keeps the coarse
+// levels from being evicted.
 static std::vector<TreeLevelCoverage> CollectTreeCoverages(TilePool* tilePool,
                                                            const BlankTileSet* blankTiles,
                                                            float zoomScale, const Rect& renderRect,
-                                                           int tileSize, int maxLevel) {
+                                                           int tileSize, int maxLevel,
+                                                           int levelCount = TREE_LEVEL_COUNT) {
   std::vector<TreeLevelCoverage> coverages = {};
-  coverages.reserve(TREE_LEVEL_COUNT);
+  coverages.reserve(static_cast<size_t>(std::max(levelCount, 0)));
   auto baseLevel = GetTileLevel(zoomScale);
   auto tileSizeFloat = static_cast<float>(tileSize);
-  for (int i = 0; i < TREE_LEVEL_COUNT && baseLevel + i <= maxLevel; ++i) {
+  for (int i = 0; i < levelCount && baseLevel + i <= maxLevel; ++i) {
     TreeLevelCoverage coverage = {};
     coverage.level = baseLevel + i;
     coverage.zoomToRaster = GetTileRasterScale(coverage.level) / zoomScale;
@@ -1562,8 +1563,16 @@ std::vector<DrawTask> DisplayList::collectDisplayTasks(const Surface* surface,
   const auto endX = FloatCeilToInt(renderRect.right / tileSizeFloat);
   const auto endY = FloatCeilToInt(renderRect.bottom / tileSizeFloat);
   auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  // Cells whose tiles were left to a later frame show any coarser level still cached, even past
+  // the fallback levels a frame rasterizes, since they are only on screen until those tiles exist.
+  int coarsestLevel = std::numeric_limits<int>::min();
+  for (const auto& key : tilePool->keysOf(TileType::Tree)) {
+    coarsestLevel = std::max(coarsestLevel, key.level);
+  }
+  auto baseLevel = GetTileLevel(zoomScale);
+  auto levelCount = std::max(coarsestLevel - baseLevel + 1, TREE_LEVEL_COUNT);
   auto coverages = CollectTreeCoverages(tilePool.get(), blankTiles.get(), zoomScale, renderRect,
-                                        _tileSize, maxTreeLevel());
+                                        _tileSize, maxTreeLevel(), levelCount);
   std::vector<DrawTask> screenTasks = {};
   for (auto tileY = startY; tileY < endY; ++tileY) {
     for (auto tileX = startX; tileX < endX; ++tileX) {

@@ -1004,4 +1004,34 @@ TGFX_TEST_PRIVATE(TilePoolTest, TimeBudgetKeepsRequestingFramesForDeferredTiles)
   }
 }
 
+TGFX_TEST_PRIVATE(TilePoolTest, TimeBudgetShowsCoarserLevelsForDeferredTiles) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 1600, 1000);
+  ASSERT_NE(surface, nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileSize(64);
+  displayList->setTileUpdateMode(TileUpdateMode::Smooth);
+  displayList->setMaxTilesRefinedPerFrame(2);
+  displayList->setBackgroundColor(Color::White());
+  displayList->root()->addChild(MakeSolid(200000, 200000, Color::Red()));
+  displayList->setZoomScale(0.05f);
+  int frames = 0;
+  do {
+    displayList->render(surface.get());
+  } while (displayList->hasContentChanged() && ++frames < 300);
+  // Zooming in by more than the fallback levels a frame rasterizes leaves the new coarsest level to
+  // later frames, while the levels cached at the old zoom scale still cover every cell.
+  displayList->setTileTimeBudget(1e-9f);
+  displayList->setZoomScale(0.9f);
+  displayList->render(surface.get());
+  for (int y = 8; y < 1000; y += 32) {
+    for (int x = 8; x < 1600; x += 32) {
+      ASSERT_EQ(ReadPixel(surface, x, y), OPAQUE_RED) << "x=" << x << " y=" << y;
+    }
+  }
+}
+
 }  // namespace tgfx
