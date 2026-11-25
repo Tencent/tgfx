@@ -20,6 +20,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "gpu/ir/OperatorBundle.h"
 #include "gpu/ir/ProgramIR.h"
@@ -86,7 +87,10 @@ class SPIRVShaderBuilder {
   uint32_t EmitValueAsValue(const ProgramIR& program, ValueID value, std::string* error);
   void AddEntryPointInterface(uint32_t id);
   uint32_t LoadSampler(const ProgramIR& program, ValueID sampler, std::string* error);
-  bool EnsureUniformBlock(const ProgramIR& program, std::string* error);
+  /// Declares the sampler's descriptor variable (UniformConstant storage) and returns its id —
+  /// the form a linked operator call passes as its sampler parameter. LoadSampler loads this.
+  uint32_t EnsureSamplerVariable(const ProgramIR& program, const IRValue& value,
+                                 std::string* error);  bool EnsureUniformBlock(const ProgramIR& program, std::string* error);
   uint32_t EmitUniformValue(const ProgramIR& program, const IRValue& value, std::string* error);
   uint32_t EmitUniformArrayValue(const ProgramIR& program, const IRValue& value,
                                  std::string* error);
@@ -124,6 +128,11 @@ class SPIRVShaderBuilder {
   bool uniformBlockDeclared = false;
   bool linkageCapabilityAdded = false;
   std::unordered_map<uint32_t, uint32_t> samplerValues = {};
+  std::unordered_map<std::string, uint32_t> samplerVariables = {};
+  /// The SPIR-V ids passed as linked-call arguments that are already pointers (the sampler
+  /// descriptor variables): EmitFunctionCall forwards them instead of staging them into a
+  /// Function-storage local.
+  std::unordered_set<uint32_t> samplerPointerArgs = {};
   std::unordered_map<uint32_t, uint32_t> varyingVariables = {};
   std::unordered_map<std::string, uint32_t> uniformMemberIndices = {};
   std::unordered_map<std::string, uint32_t> uniformArrayTypeIds = {};

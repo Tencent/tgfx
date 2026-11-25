@@ -369,6 +369,43 @@ uint32_t SPIRVShaderBuilder::EmitValueAsValue(const ProgramIR& program, ValueID 
   return id;
 }
 
+uint32_t SPIRVShaderBuilder::EnsureSamplerVariable(const ProgramIR& program, const IRValue& value,
+                                                   std::string* error) {
+  const auto found = samplerVariables.find(value.debugName);
+  if (found != samplerVariables.end()) {
+    return found->second;
+  }
+  uint32_t binding = 0;
+  bool hasBinding = false;
+  for (const auto& info : program.interface.samplers) {
+    if (info.name == value.debugName) {
+      binding = info.binding;
+      hasBinding = true;
+      break;
+    }
+  }
+  if (!hasBinding) {
+    Fail(error, "the sampler has no interface binding");
+    return 0;
+  }
+  const auto pointer =
+      PointerTypeId(SLType::Texture2DSampler, spirv::kStorageUniformConstant, error);
+  if (pointer == 0) {
+    return 0;
+  }
+  auto* saved = writer.sink;
+  writer.Sink(&writer.decl);
+  const auto variableId = writer.NewId();
+  writer.Inst(spirv::kOpVariable, {pointer, variableId, spirv::kStorageUniformConstant});
+  writer.Sink(&writer.ann);
+  writer.Inst(spirv::kOpDecorate,
+              {variableId, spirv::kDecorationDescriptorSet, SPIRVInterfaceLayout::SamplerSet()});
+  writer.Inst(spirv::kOpDecorate, {variableId, spirv::kDecorationBinding, binding});
+  writer.Sink(saved);
+  samplerVariables.emplace(value.debugName, variableId);
+  return variableId;
+}
+
 uint32_t SPIRVShaderBuilder::LoadSampler(const ProgramIR& program, ValueID sampler,
                                          std::string* error) {
   const auto found = samplerValues.find(sampler);
@@ -384,38 +421,17 @@ uint32_t SPIRVShaderBuilder::LoadSampler(const ProgramIR& program, ValueID sampl
     Fail(error, "the SPIR-V builder only supports sampler2D");
     return 0;
   }
-  uint32_t binding = 0;
-  bool hasBinding = false;
-  for (const auto& info : program.interface.samplers) {
-    if (info.name == samplerValue.debugName) {
-      binding = info.binding;
-      hasBinding = true;
-      break;
-    }
-  }
-  if (!hasBinding) {
-    Fail(error, "the sampler has no interface binding");
+  const auto variableId = EnsureSamplerVariable(program, samplerValue, error);
+  if (variableId == 0) {
     return 0;
   }
   const auto sampledType = TypeId(SLType::Texture2DSampler, error);
-  const auto pointer =
-      PointerTypeId(SLType::Texture2DSampler, spirv::kStorageUniformConstant, error);
-  if (sampledType == 0 || pointer == 0) {
+  if (sampledType == 0) {
     return 0;
   }
-
-  auto* saved = writer.sink;
-  writer.Sink(&writer.decl);
-  const auto variableId = writer.NewId();
-  writer.Inst(spirv::kOpVariable, {pointer, variableId, spirv::kStorageUniformConstant});
-  writer.Sink(&writer.ann);
-  writer.Inst(spirv::kOpDecorate,
-              {variableId, spirv::kDecorationDescriptorSet, SPIRVInterfaceLayout::SamplerSet()});
-  writer.Inst(spirv::kOpDecorate, {variableId, spirv::kDecorationBinding, binding});
   writer.Sink(&writer.func);
   const auto loadId = writer.NewId();
   writer.Inst(spirv::kOpLoad, {sampledType, loadId, variableId});
-  writer.Sink(saved);
   samplerValues[sampler] = loadId;
   return loadId;
 }
@@ -448,6 +464,13 @@ uint32_t SPIRVShaderBuilder::ArrayTypeId(SLType elementType, uint32_t count, uin
 }
 
 uint32_t SPIRVShaderBuilder::FunctionParamTypeId(const OperatorParam& param, std::string* error) {
+  // The imported module is the tool's compilation of the GLSL function, whose parameters are
+  // storage pointers: a UniformConstant pointer for a sampler (the descriptor slot), a Function
+  // pointer for every plain value. The declared types must match the module's exports word for
+  // word or the linker reports a type mismatch on the symbol.
+  if (param.type == SLType::Texture2DSampler || param.type == SLType::Texture2DRectSampler) {
+    return PointerTypeId(param.type, spirv::kStorageUniformConstant, error);
+  }
   const auto valueType = param.isArray ? ArrayTypeId(param.type, param.arrayCount, 0, false, error)
                                        : TypeId(param.type, error);
   if (valueType == 0) {
@@ -1422,14 +1445,16 @@ bool SPIRVShaderBuilder::EmitValue(const ProgramIR& program, ValueID value, uint
     return true;
   }
   if (irValue.kind == IRValueKind::Sampler) {
-    // A linked operator call takes the sampler itself as an argument: load the bound descriptor
-    // the same way the texture-sample path does (the cache shares the loaded id).
-    const auto id = LoadSampler(program, value, error);
-    if (id == 0) {
+    // A linked operator call takes the sampler's descriptor slot itself (the UniformConstant
+    // variable), not the loaded value: the imported module's parameter is a UniformConstant
+    // pointer, and the texture-sample path keeps using its own loaded id.
+    const auto variable = EnsureSamplerVariable(program, irValue, error);
+    if (variable == 0) {
       return false;
     }
-    valueIds.emplace(value, id);
-    *resultId = id;
+    samplerPointerArgs.insert(variable);
+    valueIds.emplace(value, variable);
+    *resultId = variable;
     return true;
   }
   if (irValue.definingExpr == INVALID_EXPR_ID || irValue.definingExpr >= program.exprs.size()) {
@@ -1567,6 +1592,15 @@ uint32_t SPIRVShaderBuilder::EmitFunctionCall(ValueID result, SLType returnType,
   };
   std::vector<uint32_t> callArgs = {};
   for (size_t index = 0; index < args.size(); ++index) {
+    if (samplerPointerArgs.count(args[index]) != 0) {
+      // The sampler argument is the descriptor variable itself (a UniformConstant pointer) and
+      // the imported parameter is exactly that type: it passes straight through, because staging
+      // it through a Function-storage local would clash with the storage class.
+      callArgs.push_back(args[index]);
+      continue;
+    }
+    // Every other parameter is a Function-storage pointer while the argument is the plain value:
+    // stage the value into a matching local and pass the local.
     const auto variableId = writer.NewId();
     declareFunctionVariable(imported->paramTypeIds[index], variableId);
     writer.Inst(spirv::kOpStore, {variableId, args[index]});
