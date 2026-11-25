@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -28,6 +28,39 @@
 
 namespace tgfx {
 namespace {
+class UnimplementedImageStream : public ImageStream {
+ public:
+  UnimplementedImageStream() : ImageStream(1, 1) {
+  }
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return space;
+  }
+
+ private:
+  std::shared_ptr<ColorSpace> space = nullptr;
+};
+
+class CreationOnlyImageStream : public ImageStream {
+ public:
+  CreationOnlyImageStream() : ImageStream(1, 1) {
+  }
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return space;
+  }
+  int creates = 0;
+
+ protected:
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override {
+    creates++;
+    uint8_t pixels[] = {9, 0, 0, 255};
+    return TextureView::MakeFormat(context, 1, 1, pixels, sizeof(pixels), PixelFormat::RGBA_8888,
+                                   mipmapped);
+  }
+
+ private:
+  std::shared_ptr<ColorSpace> space = nullptr;
+};
+
 class LegacyImageStream : public ImageStream {
  public:
   LegacyImageStream() : ImageStream(1, 1) {
@@ -73,12 +106,6 @@ class ThreeStateStream : public ImageStream {
   bool changeWhenEmpty = false;
 
  protected:
-  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override {
-    return onReadTexture(context, mipmapped, nullptr).texture;
-  }
-  bool onUpdateTexture(std::shared_ptr<TextureView>) override {
-    return false;
-  }
   TextureReadResult onReadTexture(Context* context, bool mipmapped,
                                   std::shared_ptr<TextureView> texture) override {
     reads++;
@@ -116,6 +143,45 @@ static void ExpectIdentity(Context* context, const std::shared_ptr<TextureView>&
   EXPECT_EQ(pixels[3], 255);
 }
 }  // namespace
+
+TGFX_TEST_PRIVATE(ImageReaderTest, MissingLegacyCreationFailsWithoutRecursiveDispatch) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<UnimplementedImageStream>();
+      auto result = stream->onReadTexture(context, false, nullptr);
+      EXPECT_EQ(result.texture, nullptr); EXPECT_FALSE(result.advanced); EXPECT_TRUE(result.failed);
+      EXPECT_EQ(result.timestamp, -1); auto reader = ImageReader::MakeFrom(stream);
+      auto first = reader->acquireBuffer();
+      EXPECT_EQ(TextureView::MakeFrom(context, first), nullptr);
+      EXPECT_EQ(first->state(), ImageBufferState::Expired); EXPECT_EQ(first->timestamp(), -1);
+      auto retry = reader->acquireBuffer();
+      EXPECT_EQ(TextureView::MakeFrom(context, retry), nullptr);
+      EXPECT_EQ(retry->state(), ImageBufferState::Expired);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, MissingLegacyUpdateFailsWithoutRecursiveDispatch) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<CreationOnlyImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); auto first = reader->acquireBuffer();
+      ExpectIdentity(context, TextureView::MakeFrom(context, first), 9);
+      EXPECT_EQ(first->state(), ImageBufferState::Ready); EXPECT_EQ(stream->creates, 1);
+      auto next = reader->acquireBuffer(); EXPECT_EQ(TextureView::MakeFrom(context, next), nullptr);
+      EXPECT_EQ(next->state(), ImageBufferState::Expired); EXPECT_EQ(next->timestamp(), -1);
+      EXPECT_EQ(stream->creates, 1); EXPECT_TRUE(first->expired());)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, MetadataReadClassifiesEmptyQueueWithoutLegacyHooks) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<ThreeStateStream>();
+      auto empty = stream->onReadTexture(context, false, nullptr);
+      EXPECT_EQ(empty.texture, nullptr); EXPECT_FALSE(empty.advanced); EXPECT_FALSE(empty.failed);
+      EXPECT_FALSE(empty.contentChanged); EXPECT_EQ(empty.timestamp, -1); stream->push(2, 2000);
+      auto result = stream->onReadTexture(context, false, nullptr);
+      ExpectIdentity(context, result.texture, 2); EXPECT_TRUE(result.advanced);
+      EXPECT_FALSE(result.failed); EXPECT_EQ(result.timestamp, 2000);)
+}
 
 TGFX_TEST_PRIVATE(ImageReaderTest, ConcurrentQueriesObserveRenderingThreadDelivery) {
   TGFX_PRIVATE_ACCESS(

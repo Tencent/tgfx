@@ -62,10 +62,6 @@ class SurfaceTexture : public ImageStream {
   }
 
  protected:
-  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override;
-
-  bool onUpdateTexture(std::shared_ptr<TextureView> textureView) override;
-
   TextureReadResult onReadTexture(Context* context, bool mipmapped,
                                   std::shared_ptr<TextureView> texture) override;
 

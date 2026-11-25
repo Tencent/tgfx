@@ -44,12 +44,18 @@ class ImageStream {
  protected:
   ImageStream(int width, int height) : _width(width), _height(height) {
   }
-  /** Creates a native texture. The mipmapped flag requests mip map levels when supported by
-   * the source. A null result means no texture was created. */
-  virtual std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) = 0;
+  /** Legacy creation hook used by the default onReadTexture() adapter. The mipmapped flag requests
+   * mip map levels when supported by the source. Defaults to nullptr for sources that override
+   * onReadTexture() instead; it does not forward to that method. */
+  virtual std::shared_ptr<TextureView> onMakeTexture(Context*, bool) {
+    return nullptr;
+  }
 
-  /** Updates the native texture and reports success, not whether another queued image exists. */
-  virtual bool onUpdateTexture(std::shared_ptr<TextureView> texture) = 0;
+  /** Legacy update hook used by the default onReadTexture() adapter. Returns success, not whether
+   * another queued image exists. Defaults to false and does not forward to onReadTexture(). */
+  virtual bool onUpdateTexture(std::shared_ptr<TextureView>) {
+    return false;
+  }
 
   struct TextureReadResult {
     /** Native texture, possibly retained after an empty or failed read. Its presence alone does
@@ -67,9 +73,11 @@ class ImageStream {
     bool failed = true;
   };
 
-  /** Performs one create/update operation for a credential. Sources can override this to return
-   * actual delivery metadata, but must not drain queued frames or wait for producer notifications.
-   * Scheduling another attempt belongs to the caller. */
+  /** Calls one legacy creation or update hook and reports its success as delivery, with no PTS.
+   * A missing hook or false/null result reports failure conservatively, since this adapter cannot
+   * distinguish an empty queue from an error. Sources with that distinction override this method
+   * without implementing legacy hooks. Overrides must perform one read without draining queued
+   * frames or waiting for producer notifications. Scheduling another attempt belongs to the caller. */
   virtual TextureReadResult onReadTexture(Context* context, bool mipmapped,
                                           std::shared_ptr<TextureView> texture) {
     bool advanced;

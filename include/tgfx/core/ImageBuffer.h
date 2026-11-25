@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include "ColorSpace.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageInfo.h"

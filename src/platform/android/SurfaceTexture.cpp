@@ -239,14 +239,6 @@ static ISize ComputeTextureSize(const float matrix[16], int width, int height) {
   return result;
 }
 
-std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, bool mipmapped) {
-  return onReadTexture(context, mipmapped, nullptr).texture;
-}
-
-bool SurfaceTexture::onUpdateTexture(std::shared_ptr<TextureView>) {
-  return updateTexImage().advanced;
-}
-
 ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
     Context* context, bool, std::shared_ptr<TextureView> textureView) {
   unsigned textureID = 0;
