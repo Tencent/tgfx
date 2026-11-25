@@ -1788,6 +1788,55 @@ TGFX_TEST(LayerTest, LayerVisible) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerVisible"));
 }
 
+TGFX_TEST(LayerTest, DirectDrawIgnoresLayerState) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 100, 100);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  auto path = Path();
+  path.addRect(Rect::MakeWH(100, 100));
+  DisplayList displayList;
+  auto layer = ShapeLayer::Make();
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  displayList.root()->addChild(layer);
+  displayList.render(surface.get());
+
+  // Layer::draw() must ignore the layer's own visible flag.
+  layer->setVisible(false);
+  canvas->clear();
+  layer->draw(canvas);
+  auto color = surface->getColor(50, 50);
+  EXPECT_NEAR(color.red, 1.0f, 2.0f / 255.0f);
+  EXPECT_NEAR(color.alpha, 1.0f, 2.0f / 255.0f);
+
+  // Layer::draw() must ignore the layer's own alpha.
+  layer->setVisible(true);
+  layer->setAlpha(0.0f);
+  canvas->clear();
+  layer->draw(canvas);
+  color = surface->getColor(50, 50);
+  EXPECT_NEAR(color.red, 1.0f, 2.0f / 255.0f);
+  EXPECT_NEAR(color.alpha, 1.0f, 2.0f / 255.0f);
+
+  // A subtree the tree never updates bounds for, because its parent is hidden, must still draw.
+  layer->setAlpha(1.0f);
+  auto hiddenGroup = Layer::Make();
+  hiddenGroup->setVisible(false);
+  auto child = ShapeLayer::Make();
+  child->setPath(path);
+  child->setFillStyle(ShapeStyle::Make(Color::Red()));
+  hiddenGroup->addChild(child);
+  displayList.root()->addChild(hiddenGroup);
+  canvas->clear();
+  hiddenGroup->draw(canvas);
+  color = surface->getColor(50, 50);
+  EXPECT_NEAR(color.red, 1.0f, 2.0f / 255.0f);
+  EXPECT_NEAR(color.alpha, 1.0f, 2.0f / 255.0f);
+}
+
 TGFX_TEST(LayerTest, PartialDrawLayer) {
   ContextScope scope;
   auto context = scope.getContext();

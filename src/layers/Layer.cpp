@@ -913,14 +913,13 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   bool canInvert = localToGlobalMatrix.invert(&globalToLocalMatrix);
 
   Rect renderRect = {};
-  std::vector<Rect> renderRectsVec = {};
   if (_root && canInvert) {
     // The bounds the background styles need depend on the alpha that reaches them, so pass the
     // draw alpha down instead of assuming an opaque draw.
     _root->updateRenderBounds(nullptr, false, alpha);
+    // No renderRects here: a direct draw paints the layer and its children even when the tree
+    // skipped them for being hidden or fully transparent, so their bounds cannot cull them.
     renderRect = localToGlobalMatrix.mapRect(clippedBounds);
-    renderRectsVec = {renderRect};
-    args.renderRects = &renderRectsVec;
   }
 
   if (surface) {
@@ -1161,21 +1160,6 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (FloatNearlyZero(contentScale)) {
     return true;
   }
-  if (args.renderRects != nullptr && !args.renderRects->empty()) {
-    if (renderBounds.isEmpty()) {
-      return true;
-    }
-    bool anyHit = false;
-    for (const auto& rect : *args.renderRects) {
-      if (Rect::Intersects(rect, renderBounds)) {
-        anyHit = true;
-        break;
-      }
-    }
-    if (!anyHit) {
-      return true;
-    }
-  }
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
   if (!prepareMask(args, canvas, &maskFilter)) {
     return true;
@@ -1239,7 +1223,8 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   maskArgs.excludeEffects |= isContourMode;
   maskArgs.backgroundHandler = BackgroundHandler::NoOp();
   // A mask under a hidden ancestor still applies, but updateRenderBounds() skips hidden subtrees,
-  // so its render bounds are empty and would cull the whole mask. Draw such a mask uncut.
+  // so the mask and its descendants have no render bounds and the replay would cull all of them.
+  // Draw such a mask uncut.
   if (_mask->renderBounds.isEmpty()) {
     maskArgs.renderRects = nullptr;
   }
@@ -1754,6 +1739,24 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
   return allMatch;
 }
 
+// Culling is a parent-side decision: renderBounds is the parent's view of a child, so a layer that
+// is drawn on its own is never culled by its own bounds. In a culled replay an empty renderBounds
+// means the child draws nothing, and a child whose bounds miss every cull rect is invisible.
+static bool IsCulledByRenderRects(const Rect& renderBounds, const std::vector<Rect>* renderRects) {
+  if (renderRects == nullptr || renderRects->empty()) {
+    return false;
+  }
+  if (renderBounds.isEmpty()) {
+    return true;
+  }
+  for (const auto& rect : *renderRects) {
+    if (Rect::Intersects(rect, renderBounds)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
                          const Layer* stopChild) {
   // 3D middle node: descendants are independently registered with the active Layer3DContext and
@@ -1778,7 +1781,8 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
       // Background-walk truncation: the caller only wants prior siblings of stopChild.
       break;
     }
-    if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
+    if (child->maskOwner || !child->visible() || child->_alpha <= 0 ||
+        IsCulledByRenderRects(child->renderBounds, args.renderRects)) {
       continue;
     }
     if (args.backgroundHandler != nullptr && i < maxIndex) {
