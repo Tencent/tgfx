@@ -48,9 +48,10 @@ class NoOpImpl : public BackgroundHandler {
 // references the copy rather than bgImage. bgImage IS bgSource->surface's cachedImage; holding a
 // reference to it during capture would trigger Surface::aboutToDraw's copy-on-write path on every
 // subsequent write to bgCanvas — a full RT reallocation plus blit that dominates GPU submit time.
-// Returns nullptr when no detached copy can be made: layerBounds does not intersect bgImage, the
-// background transform is not invertible, or the copy cannot be built. The style draws nothing in
-// every such case, so the caller records an empty snapshot instead of holding bgImage.
+// Returns nullptr when no detached copy can be made: the background transform is not invertible,
+// layerBounds does not intersect bgImage, or the private surface cannot be created. The first two
+// leave the style nothing to draw. On a surface creation failure the caller skips the style as
+// well rather than falling back to bgImage, which would bring back the copy-on-write cost above.
 std::shared_ptr<Image> MakeDetachedBgCopy(Context* context, const std::shared_ptr<Image>& bgImage,
                                           const Matrix& bgPixelToLocal, const Rect& layerBounds,
                                           std::shared_ptr<ColorSpace> colorSpace, Point* offset) {
@@ -487,7 +488,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     }
     auto& entry = it->second[cursor++];
     if (entry.image == nullptr) {
-      // The capture found the style outside its surface, so it draws nothing here.
+      // The capture could not make a detached copy for this style, so it draws nothing here.
       return;
     }
     bgImage = entry.image;
