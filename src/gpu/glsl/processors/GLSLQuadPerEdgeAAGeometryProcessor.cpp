@@ -78,16 +78,19 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
     emitPositionIR(args, ShaderVar(position));
     ir->SetStage(ShaderStage::Fragment);
     if (aa == AAType::Coverage) {
-      const auto coverageValue = ir->InternValue(coverageVar.fsIn(), SLType::Float, Precision::High,
-                                                 IRValueKind::Varying);
-      const auto coverageOutput = ir->InternValue(args.outputCoverage, SLType::Float,
+      const auto coverageIn = ir->InternValue(coverageVar.fsIn(), SLType::Float, Precision::High,
+                                              IRValueKind::Varying);
+      const auto coverage4 = ir->CreateConstruct(
+          SLType::Float4, {coverageIn, coverageIn, coverageIn, coverageIn});
+      const auto coverageOutput = ir->InternValue(args.outputCoverage, SLType::Float4,
                                                    Precision::High, IRValueKind::Local);
-      ir->StoreOutput(coverageOutput, coverageValue);
+      ir->StoreOutput(coverageOutput, coverage4);
     } else {
       const auto one = ir->CreateConstant(1.0f);
-      const auto coverageOutput = ir->InternValue(args.outputCoverage, SLType::Float,
+      const auto coverage4 = ir->CreateConstruct(SLType::Float4, {one, one, one, one});
+      const auto coverageOutput = ir->InternValue(args.outputCoverage, SLType::Float4,
                                                    Precision::High, IRValueKind::Local);
-      ir->StoreOutput(coverageOutput, one);
+      ir->StoreOutput(coverageOutput, coverage4);
     }
     if (commonColor.has_value()) {
       const auto colorValue = ir->InternValue(colorUniformName, SLType::Float4, Precision::High,

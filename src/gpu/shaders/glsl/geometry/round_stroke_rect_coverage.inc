@@ -7,8 +7,10 @@
 #define TGSL_ROUND_STROKE_RECT_COVERAGE_INCLUDED
 
 //@function roundStrokeRectCoverage
+//@op RoundStrokeRectCoverage
+//@frag
 
-float roundStrokeRectCoverage(vec2 offsets, vec2 ellipseRadii, float vertexCoverage, int aa) {
+float roundStrokeRectCoverage(vec2 offsets /*@in*/, vec2 ellipseRadii /*@in*/, float vertexCoverage /*@in*/, int aa /*@in*/) {
   highp vec2 offset = offsets;
   if (aa == 0) {
     highp float test = dot(offset, offset);

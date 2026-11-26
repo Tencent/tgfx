@@ -1090,7 +1090,13 @@ if (TGFX_EMBED_SHADER_BUNDLES)
                     --library-languages ${TGFX_SHADER_LIBRARY_LANGUAGES}
             DEPENDS ${TGFX_SHADER_TOOL_DEPENDS} ${TGFX_SHADER_SOURCES}
             COMMENT "Generating the shader library bundle")
-    add_custom_target(shader_library_bundle DEPENDS ${TGFX_SHADER_LIBRARY_BUNDLE})
+    add_custom_target(shader_library_bundle
+            # The bundle file is removed after every build on purpose: the generator rule keys off
+            # its OUTPUT, so a missing file forces a fresh tool run on the next build. The tool
+            # rewrites it (content-addressed, so an unchanged rewrite keeps the embed step cheap),
+            # which ends the recurring stale-bundle class of failures.
+            COMMAND ${CMAKE_COMMAND} -E rm -f ${TGFX_SHADER_LIBRARY_BUNDLE}
+            DEPENDS ${TGFX_SHADER_LIBRARY_BUNDLE})
     add_dependencies(tgfx shader_library_bundle)
     target_include_directories(tgfx PRIVATE ${TGFX_SHADER_BUNDLE_DIR})
 
@@ -1116,8 +1122,15 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     target_sources(tgfx PRIVATE ${TGFX_GENERATED_OPERATORS})
     set_source_files_properties(${TGFX_GENERATED_OPERATORS} PROPERTIES GENERATED TRUE)
 
+    # The stamp is removed after every build on purpose: the bundle generator keys off its
+    # OUTPUT (the stamp), so a missing stamp forces a fresh tool run on the next build. The tool
+    # re-verifies what it just wrote, then the removal restarts the cycle. This trades a full
+    # bundle regeneration per build (a few seconds; the embedded-source steps stay content-based)
+    # for the recurring class of stale-bundle failures where an input changed but the rule's
+    # dependency scan judged everything up to date.
     add_custom_target(tgfx_shader_bundles
             COMMAND ${TGFX_SHADER_TOOL_COMMAND} --verify ${TGFX_SHADER_BUNDLE_STAMP}
+            COMMAND ${CMAKE_COMMAND} -E rm -f ${TGFX_SHADER_BUNDLE_STAMP}
             DEPENDS ${TGFX_SHADER_BUNDLE_STAMP} ${TGFX_SHADER_TOOL_DEPENDS})
 
     set(TGFX_EMBEDDED_BUNDLE_DIR "${CMAKE_BINARY_DIR}/generated/embedded")

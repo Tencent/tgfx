@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLRoundStrokeRectGeometryProcessor.h"
+#include "GeneratedOperators.h"
 
 namespace tgfx {
 PlacementPtr<RoundStrokeRectGeometryProcessor> RoundStrokeRectGeometryProcessor::Make(
@@ -51,12 +52,14 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
   vertBuilder->storeVarying(ellipseOffsets.vsOut(), inEllipseOffset.name());
 
+  std::string colorUniformName = {};
+  Varying colorVar = {};
   if (commonColor.has_value()) {
-    auto colorName =
+    colorUniformName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->storeColor(args.outputColor, colorName);
+    fragBuilder->storeColor(args.outputColor, colorUniformName);
   } else {
-    auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
+    colorVar = varyingHandler->addVarying("Color", SLType::Float4);
     vertBuilder->storeVarying(colorVar.vsOut(), inColor.name());
     fragBuilder->storeColor(args.outputColor, colorVar.fsIn());
   }
@@ -79,6 +82,59 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
   args.vertBuilder->storePosition(inPosition.name());
+
+  // The IR route: the same varyings and the coverage call as SSA values, so the SPIR-V path
+  // serves this geometry without the text emission.
+  if (args.irBuilder != nullptr) {
+    auto ir = args.irBuilder;
+    if (aaType == AAType::Coverage) {
+      emitVaryingIR(args, coverageVar, ShaderVar(inCoverage));
+      emitVaryingIR(args, ellipseRadii, ShaderVar(inEllipseRadii));
+    }
+    emitVaryingIR(args, ellipseOffsets, ShaderVar(inEllipseOffset));
+    if (!commonColor.has_value()) {
+      emitVaryingIR(args, colorVar, ShaderVar(inColor));
+    }
+    emitPositionIR(args, ShaderVar(inPosition));
+    ir->SetStage(ShaderStage::Fragment);
+    if (commonColor.has_value()) {
+      const auto colorValue = ir->InternValue(colorUniformName, SLType::Float4, Precision::High,
+                                              IRValueKind::Uniform);
+      const auto colorOutput = ir->InternValue(args.outputColor, SLType::Float4, Precision::High,
+                                               IRValueKind::Local);
+      ir->StoreOutput(colorOutput, colorValue);
+    } else {
+      const auto colorValue = ir->InternValue(colorVar.fsIn(), SLType::Float4, Precision::High,
+                                              IRValueKind::Varying);
+      const auto colorOutput = ir->InternValue(args.outputColor, SLType::Float4, Precision::High,
+                                               IRValueKind::Local);
+      ir->StoreOutput(colorOutput, colorValue);
+    }
+    const auto offsetsValue = ir->InternValue(ellipseOffsets.fsIn(), SLType::Float2, Precision::High,
+                                              IRValueKind::Varying);
+    ValueID radiiValue = INVALID_VALUE_ID;
+    ValueID coverageValue = INVALID_VALUE_ID;
+    int32_t aaFlag = 0;
+    if (aaType == AAType::Coverage) {
+      radiiValue = ir->InternValue(ellipseRadii.fsIn(), SLType::Float2, Precision::High,
+                                   IRValueKind::Varying);
+      coverageValue = ir->InternValue(coverageVar.fsIn(), SLType::Float, Precision::High,
+                                      IRValueKind::Varying);
+      aaFlag = 1;
+    } else {
+      const auto zero = ir->CreateConstant(0.0f);
+      radiiValue = ir->CreateConstruct(SLType::Float2, {zero, zero});
+      coverageValue = ir->CreateConstant(1.0f);
+    }
+    const auto coverageResult = RoundStrokeRectCoverageOp::Emit(ir, uniformHandler, nullptr,
+                                                                offsetsValue, radiiValue,
+                                                                coverageValue, aaFlag);
+    const auto coverage4 = ir->CreateConstruct(
+        SLType::Float4, {coverageResult, coverageResult, coverageResult, coverageResult});
+    const auto coverageOutput = ir->InternValue(args.outputCoverage, SLType::Float4,
+                                                Precision::High, IRValueKind::Local);
+    ir->StoreOutput(coverageOutput, coverage4);
+  }
 }
 
 void GLSLRoundStrokeRectGeometryProcessor::setData(UniformData* vertexUniformData,
