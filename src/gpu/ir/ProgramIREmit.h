@@ -150,7 +150,8 @@ inline ValueID emitWeightedTapLoop(
   // weight: kernelWeight(i) splatted to vec4.
   KernelWeightOp::UniformNames kernelNames = {};
   KernelWeightOp::EnsureUniforms(ir, uniformHandler, &kernelNames);
-  const auto weight = KernelWeightOp::Emit(ir, uniformHandler, &kernelNames, indexValue);
+  // The operator's offset parameter is a float: the loop counter converts first.
+  const auto weight = KernelWeightOp::Emit(ir, uniformHandler, &kernelNames, indexFloat);
   const auto weight4 = ir->CreateConstruct(SLType::Float4, {weight, weight, weight, weight});
   const auto weighted = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, childValue, weight4);
   const auto newSum = ir->CreateBinary(IRBinaryOp::Add, SLType::Float4, sumVar, weighted);
