@@ -1,5 +1,7 @@
 //@function xpBlend_ColorBurn
-vec4 xpBlend_ColorBurn(vec4 S, vec4 D, vec4 dstSrcAlpha, vec4 srcDstAlpha) {
+//@op XpBlendColorBurn
+//@frag
+vec4 xpBlend_ColorBurn(vec4 S /*@in*/, vec4 D /*@in*/, vec4 dstSrcAlpha /*@in*/, vec4 srcDstAlpha /*@in*/) {
   vec4 result;
   result.a = S.a + (1.0 - S.a) * D.a;
   vec3 sSafe = mix(vec3(1.0), S.rgb, notEqual(S.rgb, vec3(0.0)));

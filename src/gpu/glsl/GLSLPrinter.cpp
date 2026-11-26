@@ -490,17 +490,17 @@ std::string GLSLPrinter::PrintFragmentBodyFromIR(const ProgramIR& program) {
           if (std::getenv("TGFX_IR_DIAG") != nullptr) {
             for (const auto& value : program.values) {
               if (!value.debugName.empty()) {
-                LOGE("IRDIAG value '%s' kind=%d type=%d defining=%d", value.debugName.c_str(),
-                     static_cast<int>(value.kind), static_cast<int>(value.type),
-                     static_cast<int>(value.definingExpr));
+                LOGE("IRDIAG value '%s' id=%u kind=%d type=%d defining=%d",
+                     value.debugName.c_str(), value.id, static_cast<int>(value.kind),
+                     static_cast<int>(value.type), static_cast<int>(value.definingExpr));
               }
             }
             for (const auto& statement : program.statements) {
               const auto dstName = statement.dst.base < program.values.size()
                                        ? program.values[statement.dst.base].debugName
                                        : std::string();
-              LOGE("IRDIAG stmt kind=%d dst='%s'", static_cast<int>(statement.kind),
-                   dstName.c_str());
+              LOGE("IRDIAG stmt kind=%d dst='%s' dstId=%u", static_cast<int>(statement.kind),
+                   dstName.c_str(), statement.dst.base);
             }
           }
           return {};

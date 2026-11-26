@@ -1,5 +1,7 @@
 //@function xpBlend_HardLight
-vec4 xpBlend_HardLight(vec4 S, vec4 D, vec4 dstSrcAlpha, vec4 srcDstAlpha) {
+//@op XpBlendHardLight
+//@frag
+vec4 xpBlend_HardLight(vec4 S /*@in*/, vec4 D /*@in*/, vec4 dstSrcAlpha /*@in*/, vec4 srcDstAlpha /*@in*/) {
   vec4 result;
   // Overlay and HardLight share one branch: Overlay == HardLight with operands swapped.
   // Two structurally-related branches in the if-chain miscompile under Chrome WebGPU (dawn

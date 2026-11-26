@@ -202,8 +202,16 @@ void FragmentProcessor::internalEmitChild(
   }
   ValueID irChildOutputValue = INVALID_VALUE_ID;
   if (args.irBuilder != nullptr) {
-    irChildOutputValue = args.irBuilder->CreateValue(SLType::Float4, Precision::High,
-                                                     IRValueKind::Local, outputColor);
+    // The interned lookup dedupes by name: when the parent already registered this name (the
+    // chain's output value), the child's store lands on that exact value instead of minting a
+    // same-named twin the registry never sees.
+    irChildOutputValue = args.irBuilder->InternValue(outputColor, SLType::Float4,
+                                                     Precision::High, IRValueKind::Local);
+    if (std::getenv("TGFX_IR_DIAG") != nullptr) {
+      fprintf(stderr, "CHILDPROBE child='%s' outName='%s' interned=%u\n",
+               childProcessor(childIndex)->name().c_str(), outputColor.c_str(),
+               irChildOutputValue);
+    }
   }
   EmitArgs childArgs(fragBuilder, args.uniformHandler, outputColor,
                      inputName.empty() ? "vec4(1.0)" : inputName, args.inputSubset, &coordVars,

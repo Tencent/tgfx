@@ -237,6 +237,10 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
     const auto one = programIRBuilder().CreateConstant(1.0f);
     return programIRBuilder().CreateConstruct(SLType::Float4, {one, one, one, one});
   };
+  if (std::getenv("TGFX_IR_DIAG") != nullptr) {
+    fprintf(stderr, "IDPROBE xfer color=%u coverage=%u geoColor=%u geoCoverage=%u\n",
+            colorChainValue, coverageChainValue, geoColorValue, geoCoverageValue);
+  }
   const auto inputColorValue = chainValue(colorChainValue, geoColorValue);
   const auto inputCoverageValue =
       chainValue(coverageChainValue, geoCoverageValue != INVALID_VALUE_ID ? geoCoverageValue

@@ -1,5 +1,7 @@
 //@function xpBlend_SoftLight
-vec4 xpBlend_SoftLight(vec4 S, vec4 D, vec4 dstSrcAlpha, vec4 srcDstAlpha) {
+//@op XpBlendSoftLight
+//@frag
+vec4 xpBlend_SoftLight(vec4 S /*@in*/, vec4 D /*@in*/, vec4 dstSrcAlpha /*@in*/, vec4 srcDstAlpha /*@in*/) {
   vec4 result;
   result.a = S.a + (1.0 - S.a) * D.a;
   if (D.a == 0.0) {

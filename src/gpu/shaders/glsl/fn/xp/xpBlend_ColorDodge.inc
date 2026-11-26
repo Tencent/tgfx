@@ -1,5 +1,7 @@
 //@function xpBlend_ColorDodge
-vec4 xpBlend_ColorDodge(vec4 S, vec4 D, vec4 dstSrcAlpha, vec4 srcDstAlpha) {
+//@op XpBlendColorDodge
+//@frag
+vec4 xpBlend_ColorDodge(vec4 S /*@in*/, vec4 D /*@in*/, vec4 dstSrcAlpha /*@in*/, vec4 srcDstAlpha /*@in*/) {
   vec4 result;
   result.a = S.a + (1.0 - S.a) * D.a;
   vec3 d = vec3(S.a) - S.rgb;

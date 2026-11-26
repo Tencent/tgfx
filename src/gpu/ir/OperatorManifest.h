@@ -68,7 +68,37 @@ namespace tgfx {
   X(TextColorUnpremul, 37)                                                                          \
   X(ClampSubset, 38)                                                                               \
   X(KernelWeight, 39)                                                                               \
-  X(KernelWeight2, 40)
+  X(KernelWeight2, 40)  \
+  X(XpBlendClear, 41)  \
+  X(XpBlendColor, 42)  \
+  X(XpBlendColorBurn, 43)  \
+  X(XpBlendColorDodge, 44)  \
+  X(XpBlendDarken, 45)  \
+  X(XpBlendDifference, 46)  \
+  X(XpBlendDst, 47)  \
+  X(XpBlendDstATop, 48)  \
+  X(XpBlendDstIn, 49)  \
+  X(XpBlendDstOut, 50)  \
+  X(XpBlendDstOver, 51)  \
+  X(XpBlendExclusion, 52)  \
+  X(XpBlendHardLight, 53)  \
+  X(XpBlendHue, 54)  \
+  X(XpBlendLighten, 55)  \
+  X(XpBlendLuminosity, 56)  \
+  X(XpBlendModulate, 57)  \
+  X(XpBlendMultiply, 58)  \
+  X(XpBlendOverlay, 59)  \
+  X(XpBlendPlusDarker, 60)  \
+  X(XpBlendPlusLighter, 61)  \
+  X(XpBlendSaturation, 62)  \
+  X(XpBlendScreen, 63)  \
+  X(XpBlendSoftLight, 64)  \
+  X(XpBlendSrc, 65)  \
+  X(XpBlendSrcATop, 66)  \
+  X(XpBlendSrcIn, 67)  \
+  X(XpBlendSrcOut, 68)  \
+  X(XpBlendSrcOver, 69)  \
+  X(XpBlendXor, 70)  \
 
 enum class OperatorID : uint32_t {
 #define TGFX_OPERATOR_ENUM(name, value) name = value,
