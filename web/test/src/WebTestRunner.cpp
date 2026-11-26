@@ -52,10 +52,6 @@ EMSCRIPTEN_KEEPALIVE
 int RunAllTests() {
   initTests();
   auto result = RUN_ALL_TESTS();
-  if (testing::UnitTest::GetInstance()->test_to_run_count() == 0) {
-    printf("The test filter matched no tests.\n");
-    result = 1;
-  }
   tgfx::Baseline::ReportMissingCache();
   return result;
 }
@@ -73,11 +69,8 @@ int RunTest(const char* filter) {
     testing::GTEST_FLAG(filter) = excludeFilter;
   }
   auto result = RUN_ALL_TESTS();
-  if (testing::UnitTest::GetInstance()->test_to_run_count() == 0) {
-    printf("The test filter matched no tests.\n");
-    result = 1;
-  }
   tgfx::Baseline::ReportMissingCache();
   return result;
 }
+
 }

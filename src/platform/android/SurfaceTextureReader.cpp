@@ -37,6 +37,7 @@ void SurfaceTextureReader::notifyFrameAvailable() {
 }  // namespace tgfx
 
 #else
+#include <chrono>
 #include "platform/android/SurfaceTexture.h"
 
 namespace tgfx {

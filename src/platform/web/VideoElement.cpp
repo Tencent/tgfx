@@ -42,16 +42,21 @@ VideoElement::VideoElement(emscripten::val video, int width, int height)
     : ImageStream(width, height), source(video) {
 }
 
-ImageStream::TextureReadResult VideoElement::onReadTexture(Context* context, bool mipmapped,
-                                                           std::shared_ptr<TextureView> texture) {
-  if (texture == nullptr) {
-    texture = makeTexture(context, mipmapped);
+ImageStream::ReadResult VideoElement::onReadTexture(Context* context, bool mipmapped,
+                                                    std::shared_ptr<TextureView> textureView,
+                                                    int64_t) {
+  if (textureView == nullptr) {
+    textureView = makeTexture(context, mipmapped);
+    if (textureView == nullptr) {
+      return {};
+    }
   }
-  if (texture == nullptr) {
-    return {};
-  }
-  uploadTexture(texture);
-  return {std::move(texture), ReadOutcome::Delivered, -1};
+  // The upload calls drop frames silently on failure (video not ready, device lost), in which case
+  // the texture keeps its previous content. Report success either way: the first upload targets a
+  // zero-initialized texture, and during playback keeping the previous frame is preferable to
+  // flickering transparent.
+  uploadTexture(textureView);
+  return {std::move(textureView), ImageBufferStatus::Ready, true};
 }
 
 std::shared_ptr<TextureView> VideoElement::makeTexture(Context* context, bool mipmapped) {
@@ -60,7 +65,7 @@ std::shared_ptr<TextureView> VideoElement::makeTexture(Context* context, bool mi
   auto textureWidth = width();
   auto textureHeight = height();
   if (isAndroidMiniprogram) {
-    // https://stackoverflow.com/q/28291204
+    // https://stackoverflow.com/questions/28291204/something-about-stagefright-codec-input-format-in-android
     // Video decoder will align to multiples of 16 on the Android WeChat mini-program.
     if (textureWidth % ANDROID_MINIPROGRAM_ALIGNMENT != 0) {
       textureWidth +=
@@ -93,8 +98,5 @@ void VideoElement::uploadTexture(const std::shared_ptr<TextureView>& textureView
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
                                           source, glTexture->textureID(), 0, 0, false);
 #endif
-  // The JS helpers do not return an upload result. Preserve their existing delivery behavior,
-  // including retaining prior pixels on a silently dropped upload. This source reports no PTS,
-  // and does not claim that a successful native call proves a new video image was uploaded.
 }
 }  // namespace tgfx

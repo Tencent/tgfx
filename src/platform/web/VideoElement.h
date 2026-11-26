@@ -31,7 +31,7 @@ class VideoElement : public ImageStream {
  public:
   /**
    * Creates a new VideoElement from the specified HTMLVideoElement object and the video size.
-   * Returns nullptr if the video is null or either dimension is non-positive.
+   * Returns nullptr if the video is null or the buffer size is zero.
    */
   static std::shared_ptr<VideoElement> MakeFrom(emscripten::val video, int width, int height);
 
@@ -40,8 +40,8 @@ class VideoElement : public ImageStream {
   }
 
  protected:
-  TextureReadResult onReadTexture(Context* context, bool mipmapped,
-                                  std::shared_ptr<TextureView> texture) override;
+  ReadResult onReadTexture(Context* context, bool mipmapped,
+                           std::shared_ptr<TextureView> textureView, int64_t timestamp) override;
 
  private:
   emscripten::val source = emscripten::val::null();

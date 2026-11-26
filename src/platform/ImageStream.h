@@ -18,26 +18,37 @@
 
 #pragma once
 
-#include <cstdint>
 #include <memory>
+#include <mutex>
+#include <vector>
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/ImageBuffer.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
+class ImageReader;
 class TextureView;
 class Context;
-class ImageReader;
 
-/** A source of updated pixels consumed through ImageReader's deferred buffers. onReadTexture()
- * calls are serialized within one reader. Shared sources synchronize their own mutable state.
+/**
+ * ImageStream represents a writable pixel buffer that can continuously generate ImageBuffer
+ * objects, which can be directly accessed by The ImageReader class. ImageStream is an abstract
+ * class. Use its subclasses instead.
  */
 class ImageStream {
  public:
   virtual ~ImageStream() = default;
 
+  /**
+   * Returns the width of the ImageStream.
+   */
   int width() const {
     return _width;
   }
 
+  /**
+   * Returns the height of the ImageStream.
+   */
   int height() const {
     return _height;
   }
@@ -48,34 +59,36 @@ class ImageStream {
   ImageStream(int width, int height) : _width(width), _height(height) {
   }
 
-  enum class ReadOutcome {
-    /** No new image was delivered and the supplied texture and its pixels remain unchanged. */
-    Unchanged,
-    /** Valid source pixels were delivered. This does not establish a business target match. */
-    Delivered,
-    /** No valid image was delivered; the previous content may have changed or become unusable. */
-    Invalidated
+  struct ReadResult {
+    /**
+     * The texture view holding the most recently read frame, or nullptr if no frame has been read.
+     */
+    std::shared_ptr<TextureView> textureView = nullptr;
+    /**
+     * Ready if the requested frame was read, Timeout if it did not arrive in time, or Failed if
+     * reading failed.
+     */
+    ImageBufferStatus status = ImageBufferStatus::Failed;
+    /**
+     * True if the pixels of the passed-in texture view may have changed during the read.
+     */
+    bool contentChanged = false;
   };
 
-  struct TextureReadResult {
-    /** Current native texture; retaining it does not itself imply valid delivered content. */
-    std::shared_ptr<TextureView> texture = nullptr;
-    ReadOutcome outcome = ReadOutcome::Invalidated;
-    /** Actual delivered source timestamp in nanoseconds, or -1 when unavailable. */
-    int64_t timestamp = -1;
-  };
-
-  /** Performs one non-waiting source read without draining queued images or choosing a target.
-   * Unchanged preserves the supplied texture and its pixels; the reader may then reuse previously
-   * delivered content. Native latches with unknown effects report Invalidated, including failures.
-   * Scheduling another acquisition and deciding whether its pixels match a target are caller work.
+  /**
+   * Reads the frame with the specified presentation timestamp into the texture view, creating the
+   * texture view first if it is nullptr. Older frames are skipped, and a frame that has not arrived
+   * yet is waited for a bounded time. If the timestamp is -1 or the source provides no timestamps,
+   * reads the next available frame. The mipmapped parameter specifies whether a created texture
+   * view must allocate mip map levels.
    */
-  virtual TextureReadResult onReadTexture(Context* context, bool mipmapped,
-                                          std::shared_ptr<TextureView> texture) = 0;
+  virtual ReadResult onReadTexture(Context* context, bool mipmapped,
+                                   std::shared_ptr<TextureView> textureView, int64_t timestamp) = 0;
 
  private:
   int _width = 0;
   int _height = 0;
+
   friend class ImageReader;
 };
 }  // namespace tgfx

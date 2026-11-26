@@ -18,9 +18,7 @@
 
 #pragma once
 
-#include <mutex>
 #include "platform/ImageStream.h"
-#include "tgfx/core/Size.h"
 #include "tgfx/platform/android/Global.h"
 
 namespace tgfx {
@@ -33,29 +31,27 @@ class Texture;
 class SurfaceTexture : public ImageStream {
  public:
   /**
-   * Creates a source with the specified fixed image size and listener. Returns nullptr if either
-   * dimension is non-positive, the listener is null, or JNI source/listener initialization fails.
-   * @param width The positive width of source images in pixels.
-   * @param height The positive height of source images in pixels.
-   * @param listener A Java SurfaceTexture.OnFrameAvailableListener. Its callback must forward
-   * notifications to notifyFrameAvailable() on the returned source, normally through
-   * the owning SurfaceTextureReader.
+   * Creates a new SurfaceTexture with the specified image size and listener. Returns nullptr
+   * if the image size is zero or the listener is null.
+   * @param width The width of generated ImageBuffers.
+   * @param height The height of generated ImageBuffers.
+   * @param listener A java object that implements the SurfaceTexture.OnFrameAvailableListener
+   * interface. The implementation should make a native call to the notifyFrameAvailable() of the
+   * returned SurfaceImageReader.
    */
   static std::shared_ptr<SurfaceTexture> Make(int width, int height, jobject listener);
 
   ~SurfaceTexture() override;
 
   /**
-   * Creates a Java Surface connected to this source, or returns nullptr if creation fails. The
-   * returned JNI local reference belongs to the caller's local frame. Call Surface.release() when
-   * done with the Surface object.
+   * Creates a new Java Surface object connected to this SurfaceTexture. Each call returns a fresh
+   * Surface. The caller owns the returned object and must call Surface.release() when done.
    */
   jobject createInputSurface() const;
 
   /**
-   * Marks source content as available for a subsequent texture read without performing a read or
-   * identifying a particular ImageBuffer. Texture generation does not wait for this notification,
-   * and a later notification cannot revive an Expired buffer. Called by the creation listener.
+   * Notifies that a new frame has been queued into the SurfaceTexture. The method should only be
+   * called by the listener passed in when creating the reader.
    */
   void notifyFrameAvailable();
 
@@ -64,21 +60,18 @@ class SurfaceTexture : public ImageStream {
   }
 
  protected:
-  TextureReadResult onReadTexture(Context* context, bool mipmapped,
-                                  std::shared_ptr<TextureView> texture) override;
+  ReadResult onReadTexture(Context* context, bool mipmapped,
+                           std::shared_ptr<TextureView> textureView, int64_t timestamp) override;
 
  private:
   std::mutex locker = {};
+  std::condition_variable condition = {};
   Global<jobject> surfaceTexture;
   bool frameAvailable = false;
   bool textureSizeResolved = false;
-  int64_t lastLatchedTimestamp = -1;
+  int64_t latchedTimestamp = -1;
   ISize textureSize = {};
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
-
-  bool latchTexture(JNIEnv* env);
-
-  int64_t currentTimestamp(JNIEnv* env);
 
   static void JNIInit(JNIEnv* env);
 
@@ -88,15 +81,14 @@ class SurfaceTexture : public ImageStream {
 
   void releaseExternalOESTexture(Context* context, unsigned textureID);
 
-  struct FrameUpdateResult {
-    ReadOutcome outcome = ReadOutcome::Invalidated;
-    int64_t timestamp = -1;
-    ISize textureSize = {};
+  struct FrameResult {
+    ImageBufferStatus status = ImageBufferStatus::Failed;
+    bool latched = false;
   };
 
-  FrameUpdateResult updateTexImage();
+  FrameResult updateTexImage(int64_t timestamp);
 
-  void resolveTextureSize(JNIEnv* env);
+  bool latchTexImage(JNIEnv* env);
 
   friend class JNIInit;
 };

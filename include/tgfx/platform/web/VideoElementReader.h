@@ -30,10 +30,7 @@ class VideoElementReader : public ImageReader {
  public:
   /**
    * Creates a new VideoElementReader from the specified HTMLVideoElement object and the video size.
-   * Returns nullptr if the video is null or either dimension is non-positive.
-   * @param video The source HTMLVideoElement object.
-   * @param width The positive width of the source images in pixels.
-   * @param height The positive height of the source images in pixels.
+   * Returns nullptr if the video is null or the buffer size is zero.
    */
   static std::shared_ptr<VideoElementReader> MakeFrom(emscripten::val video, int width, int height);
 

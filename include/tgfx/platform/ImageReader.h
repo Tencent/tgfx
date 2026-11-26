@@ -21,95 +21,86 @@
 #include <cstdint>
 #include <mutex>
 #include "tgfx/core/ImageBuffer.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 class TextureView;
 class ImageStream;
 
 /**
- * Defers sequential image delivery until texture generation. All acquired buffers share a native
- * texture bound to one Context and must be rendered with that Context. The first texture-generation
- * attempt for a valid new credential performs one source read, without draining queued frames,
- * waiting for producer notifications, or selecting a target timestamp. The platform can still
- * return its latest image and skip intermediate frames.
- * GPU, driver, and lock operations have no bounded completion time.
- * Delivery is written while generating a texture on the rendering thread; other threads may query
- * buffer state and timestamp for reconciliation. Reads and these queries share the reader's mutex.
- * Queries are thread-safe, not lock-free, and may wait for an in-flight source read. They track
- * delivery and version-based expiration, not the lifetime of the owning Context or GPU resources.
- * Observe Ready after texture generation finishes, then read the timestamp; this does not reserve
- * the texture against a subsequent read or acquisition.
- * Delivered pixels remain valid only until their buffer expires. Preserve an independent rendered
- * output to retain pixels across later source reads. This release changes ImageReader's layout;
- * rebuild callers and subclasses together with the library rather than mixing compiled versions.
+ * The ImageReader class allows direct access to ImageBuffers generated from a video source of the
+ * native platform. The video source could be a Surface on the android platform or an
+ * HTMLVideoElement on the web platform. You should call ImageReader::acquireNextBuffer() to read a
+ * new ImageBuffer each time when the video source is changed. All ImageBuffers generated from one
+ * ImageReader share the same internal texture, which allows you to continuously read the latest
+ * content from the video source with minimal memory copying. However, there are two limits:
+ *
+ *    1) The generated ImageBuffers are bound to the associated GPU Context when first being drawn
+ *       and cannot be drawn to another Context anymore.
+ *    2) The generated ImageBuffers may have a limited lifetime and cannot create textures after
+ *       expiration. Usually, the previously acquired ImageBuffer will expire after the newly
+ *       created ImageBuffer is drawn. So there are only two ImageBuffers that can be accessed
+ *       simultaneously.
  */
 class ImageReader {
  public:
   virtual ~ImageReader() = default;
 
   /**
-   * Returns the width of the source images in pixels.
+   * Returns the width of generated image buffers.
    */
   int width() const;
 
   /**
-   * Returns the height of the source images in pixels.
+   * Returns the height of generated image buffers.
    */
   int height() const;
 
   /**
-   * Returns the ColorSpace of the source images, or nullptr if unspecified. This forwards the
-   * source's reference without locking; sources with changing metadata require callers to serialize
-   * this query and use of the returned reference with texture reads.
+   * Returns the ColorSpace of generated image buffers.
    */
   const std::shared_ptr<ColorSpace>& colorSpace() const;
 
   /**
-   * Acquires a Pending buffer without dequeuing source contents. Its first texture-generation read
-   * makes valid pixels Ready or reaches terminal Expired if no valid content is available. If no
-   * new image arrives but previously delivered content is known unchanged, it reuses that content
-   * and its actual timestamp. It does not wait for a producer notification. An Expired buffer
-   * cannot retry; acquire a new buffer instead. Acquisitions share the reader mutex and may wait
-   * for an in-flight source read.
-   * Each acquisition expires older undelivered Pending buffers. A previously Ready buffer remains
-   * available for redraw while the shared native contents are known unchanged, but expires after a
-   * later native mutation or a failed read whose effect on those contents is unknown.
-   * Ready means successful delivery, not a match for a caller's target frame. Use timestamp() for
-   * the actual delivered presentation timestamp after texture generation completes.
+   * Acquires the next ImageBuffer from the ImageReader after a new image frame has been rendered
+   * into the associated video source. The frame is read when the ImageBuffer is first drawn. If the
+   * timestamp of the frame is specified, the drawing waits for a bounded time until the frame with
+   * that timestamp arrives, skipping any older frames still queued in the video source. If the
+   * frame does not arrive in time, or reading it fails, the drawing shows the most recently read
+   * frame instead, and the status() of the ImageBuffer reports Timeout or Failed after the drawing
+   * is flushed. Drawing a newly created Image of that ImageBuffer retries. Note that the previously
+   * returned image buffers will immediately expire after the newly created ImageBuffer is drawn.
+   * @param timestamp The presentation timestamp in nanoseconds that the producer attached to the
+   * rendered frame. For example, a MediaCodec output buffer released with render set to true is
+   * attached its presentationTimeUs multiplied by 1000. Pass -1 if unknown, in which case the
+   * drawing reads the next available frame without verifying it. Video sources that provide no
+   * timestamps, such as an HTMLVideoElement, ignore this parameter.
    */
-  std::shared_ptr<ImageBuffer> acquireBuffer();
-
-  /**
-   * Forwards to acquireBuffer() with identical deferred-delivery and lifetime semantics.
-   * Retained without deprecation for existing zero-argument source calls. It does not restore the
-   * former notification wait or guarantee compatibility with previously compiled binaries.
-   */
-  std::shared_ptr<ImageBuffer> acquireNextBuffer();
+  std::shared_ptr<ImageBuffer> acquireNextBuffer(int64_t timestamp = -1);
 
  protected:
   std::mutex locker = {};
   std::weak_ptr<ImageReader> weakThis;
   std::shared_ptr<ImageStream> stream = nullptr;
+
   explicit ImageReader(std::shared_ptr<ImageStream> stream);
 
  private:
   std::shared_ptr<TextureView> textureView = nullptr;
   uint64_t bufferVersion = 0;
-  uint64_t contentVersion = 0;
-  bool contentValid = false;
-  int64_t textureTimestamp = -1;
-  struct Credential {
-    uint64_t version = 0;
-    uint64_t contentVersion = 0;
-    ImageBufferState delivery = ImageBufferState::Pending;
-    int64_t timestamp = -1;
-  };
-  static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<ImageStream> stream);
+  uint64_t textureVersion = 0;
+  uint64_t failedVersion = 0;
+  ImageBufferStatus failedStatus = ImageBufferStatus::Pending;
 
-  bool checkExpired(const Credential& credential) const;
-  // Writes credential receipts with locker held; the credential must not be expired.
-  std::shared_ptr<TextureView> readTexture(Credential& credential, Context* context,
-                                           bool mipmapped);
+  static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<ImageStream> imageStream);
+
+  bool checkExpired(uint64_t contentVersion);
+
+  ImageBufferStatus getStatus(uint64_t contentVersion);
+
+  std::shared_ptr<TextureView> readTexture(uint64_t contentVersion, int64_t timestamp,
+                                           Context* context, bool mipmapped);
+
   friend class ImageReaderBuffer;
   friend class ImageStream;
 };

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <cstdint>
 #include "ColorSpace.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageInfo.h"
@@ -33,34 +32,39 @@ class TextureView;
 class BufferImage;
 
 /**
- * Describes pixel delivery and availability, not pixel mutability or a caller's target frame.
+ * Describes whether an ImageBuffer has delivered its own pixels.
  */
-enum class ImageBufferState {
+enum class ImageBufferStatus {
   /**
-   * Deferred delivery has not completed, so pixels are not yet available.
-   */
-  Pending,
-  /**
-   * Valid pixels are available and remain unchanged until the buffer expires. A streaming buffer
-   * may retain previous pixels; Ready does not imply that a new source image was consumed.
+   * The pixels of the ImageBuffer are available. ImageBuffers with fixed pixels are always Ready.
    */
   Ready,
   /**
-   * The buffer is no longer usable for texture generation or redraw. This state is terminal.
+   * The pixels are delivered when the ImageBuffer is first drawn, which has not happened yet.
+   */
+  Pending,
+  /**
+   * The pixels did not arrive in time when the ImageBuffer was drawn, so previously delivered
+   * pixels were drawn instead. Drawing a newly created Image of the ImageBuffer retries.
+   */
+  Timeout,
+  /**
+   * Reading the pixels failed when the ImageBuffer was drawn, so previously delivered pixels, if
+   * any, were drawn instead. Drawing a newly created Image of the ImageBuffer retries.
+   */
+  Failed,
+  /**
+   * The ImageBuffer can no longer create textures. See expired().
    */
   Expired
 };
 
 /**
  * ImageBuffer describes a two-dimensional array of pixels and is optimized for creating textures.
- * Delivery state and timestamp can be queried across threads; pixel access and other properties
- * must follow the creator's synchronization and Context requirements. Delivered pixels remain
- * unchanged while the buffer is Ready, but deferred buffers may begin Pending and some buffers have
- * a limited lifetime. ImageReader buffers share a native texture and must not be redrawn after
- * expiration. Observing Ready does not reserve those pixels against later source reads.
- * Other ImageBuffers normally start Ready and only expire if explicitly stated by the creator.
- * The added virtual delivery queries change this class's ABI. Rebuild callers and subclasses with
- * the library; retaining source-compatible calls does not make existing binaries compatible.
+ * ImageBuffer is immutable and safe across threads. The content of an ImageBuffer never changes,
+ * but some ImageBuffers may have a limited lifetime and cannot create textures after they expire.
+ * For example, the ImageBuffers generated from an ImageReader. In other cases, ImageBuffers usually
+ * only expire if explicitly stated by the creator.
  */
 class ImageBuffer {
  public:
@@ -119,36 +123,24 @@ class ImageBuffer {
   virtual bool isAlphaOnly() const = 0;
 
   /**
-   * Returns true if the buffer can no longer create textures or be used for redraw. Expiration does
-   * not prevent metadata queries, which retain their original synchronization requirements.
-   * The default implementation returns false.
+   * Returns true if the ImageBuffer is expired, indicating that it cannot create any new textures.
+   * However, you can still safely access all of its properties across threads.
    */
   virtual bool expired() const {
     return false;
   }
 
   /**
-   * Returns the current delivery state, safely across threads. By default, returns Ready unless
-   * expired(). Ready does not guarantee a target-frame match or prevent subsequent expiration.
+   * Returns the delivery status of the ImageBuffer. For ImageBuffers whose pixels are delivered when
+   * first drawn, query it after the drawing is flushed. The default implementation returns Expired
+   * if expired() returns true, and Ready otherwise.
    */
-  virtual ImageBufferState state() const {
-    return expired() ? ImageBufferState::Expired : ImageBufferState::Ready;
+  virtual ImageBufferStatus status() const {
+    return expired() ? ImageBufferStatus::Expired : ImageBufferStatus::Ready;
   }
 
   /**
-   * Returns the delivered source presentation timestamp in nanoseconds, or -1 when absent. Zero
-   * is valid; the default implementation returns -1. For deferred buffers, read after texture
-   * generation completes and Ready is observed. An expired buffer may retain its historical
-   * timestamp, which does not permit redraw or establish a match for a caller's target frame.
-   */
-  virtual int64_t timestamp() const {
-    return -1;
-  }
-
-  /**
-   * Returns the ColorSpace of this ImageBuffer, or nullptr if unspecified. For an ImageReader
-   * buffer whose source updates its color space, serialize this query and use of the returned
-   * reference with source texture reads.
+   * Return the ColorSpace of this ImageBuffer
    */
   virtual const std::shared_ptr<ColorSpace>& colorSpace() const = 0;
 
