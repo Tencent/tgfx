@@ -115,9 +115,13 @@ struct VectorColorSnapshot {
   Kind kind = Kind::Solid;
   /** Solid RGBA color, including an overlay's override weight when applicable. */
   Color color = Color::Transparent();
+  /** Authored color space of `color`; the snapshot keeps it because RGBA alone cannot say it. */
+  VectorColorSpace colorSpace = VectorColorSpace::SRGB;
   /** Owned gradient stops and their authored positions; empty positions mean evenly spaced. */
   std::vector<Color> colors = {};
   std::vector<float> positions = {};
+  /** Authored space of each stop; empty means every stop uses `colorSpace`. */
+  std::vector<VectorColorSpace> colorSpaces = {};
   /** Linear endpoints in color-source local space. */
   Point start = Point::Zero();
   Point end = Point::Zero();

@@ -118,6 +118,20 @@ class Gradient : public ColorSource {
   void setColors(std::vector<Color> colors);
 
   /**
+   * Returns the authored color space of each entry in colors(). An empty vector means every stop
+   * uses the source-level colorSpace().
+   */
+  const std::vector<VectorColorSpace>& colorSpaces() const {
+    return _colorSpaces;
+  }
+
+  /**
+   * Sets the authored color space of each stop. Pass an empty vector when all stops share the
+   * source-level color space.
+   */
+  void setColorSpaces(std::vector<VectorColorSpace> colorSpaces);
+
+  /**
    * Returns the relative position of each corresponding color in the color array. If this is empty,
    * the colors are distributed evenly between the start and end point. If this is not empty, the
    * values must begin with 0, end with 1.0, and intermediate values must be strictly increasing.
@@ -175,6 +189,7 @@ class Gradient : public ColorSource {
 
   std::vector<Color> _colors = {};
   std::vector<float> _positions = {};
+  std::vector<VectorColorSpace> _colorSpaces = {};
 
   Gradient(const std::vector<Color>& colors, const std::vector<float>& positions)
       : _colors(colors), _positions(positions) {

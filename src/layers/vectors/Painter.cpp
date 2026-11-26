@@ -29,6 +29,7 @@ VectorColorSnapshot VectorColorSnapshot::Capture(const ColorSource* source) {
   DEBUG_ASSERT(source != nullptr);
   VectorColorSnapshot snapshot = {};
   snapshot.fitsToGeometry = source->fitsToGeometry();
+  snapshot.colorSpace = source->colorSpace();
   switch (Types::Get(source)) {
     case Types::ColorSourceType::SolidColor:
       snapshot.color = static_cast<const SolidColor*>(source)->color();
@@ -48,6 +49,7 @@ VectorColorSnapshot VectorColorSnapshot::Capture(const ColorSource* source) {
       const auto* gradient = static_cast<const Gradient*>(source);
       snapshot.colors = gradient->colors();
       snapshot.positions = gradient->positions();
+      snapshot.colorSpaces = gradient->colorSpaces();
       snapshot.matrix = gradient->matrix();
       switch (gradient->type()) {
         case GradientType::None:

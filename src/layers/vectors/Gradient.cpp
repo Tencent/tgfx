@@ -57,6 +57,14 @@ void Gradient::setColors(std::vector<Color> colors) {
   invalidateContent();
 }
 
+void Gradient::setColorSpaces(std::vector<VectorColorSpace> colorSpaces) {
+  if (_colorSpaces == colorSpaces) {
+    return;
+  }
+  _colorSpaces = std::move(colorSpaces);
+  invalidateContent();
+}
+
 void Gradient::setPositions(std::vector<float> positions) {
   if (_positions.size() == positions.size() &&
       std::equal(_positions.begin(), _positions.end(), positions.begin())) {
