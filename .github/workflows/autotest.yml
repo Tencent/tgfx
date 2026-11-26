@@ -284,9 +284,10 @@ jobs:
           key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-web-
 
-      # The reference archive is validated against the origin/main commit, not against the worktree
-      # version.json, so keying by that commit avoids regenerating an identical reference whenever
-      # a pull request accepts new baselines.
+      # The reference is built from the pinned main source and its own web/test driver, so its
+      # content only depends on the dependency declarations, the pinned version.json and the browser
+      # version. Keying by those keeps the entry valid across main commits, and restore-keys
+      # promotes an older entry that update_web_baseline.sh revalidates before reuse.
       - name: Get Reference Commit
         id: reference-commit
         run: echo "sha=$(git rev-parse origin/main)" >> "$GITHUB_OUTPUT"
@@ -297,7 +298,8 @@ jobs:
         with:
           path: |
             test/baseline/.cache/webgl
-          key: autotest-web-webgl-ref-${{ steps.reference-commit.outputs.sha }}
+          key: autotest-web-webgl-ref-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}-${{ hashFiles('web/test/package.json') }}
+          restore-keys: autotest-web-webgl-ref-
 
       - name: Get Browser Cache
         id: browser-cache
@@ -410,7 +412,7 @@ jobs:
         with:
           path: |
             test/baseline/.cache/webgl
-          key: autotest-web-webgl-ref-${{ steps.reference-commit.outputs.sha }}
+          key: autotest-web-webgl-ref-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}-${{ hashFiles('web/test/package.json') }}
 
       # A sha-based key keeps every push saving a fresh snapshot, while pull requests restore the
       # most recent one through the prefix fallback. Entries are small (about 60 MB per backend).
@@ -465,6 +467,9 @@ jobs:
           key: tgfx-environment-web-linux-20260608
           restore-keys: tgfx-environment-web-linux-
 
+      # The cache holds the whole third_party tree, including the vendored libraries compiled into
+      # third_party/out. WebGPU additionally builds shaderc, glslang and SPIRV-Cross for wasm, so a
+      # separate key keeps the lanes from restoring each other's partial build output.
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
@@ -484,7 +489,8 @@ jobs:
         with:
           path: |
             test/baseline/.cache/webgpu
-          key: autotest-web-webgpu-ref-${{ steps.reference-commit.outputs.sha }}
+          key: autotest-web-webgpu-ref-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}-${{ hashFiles('web/test/package.json') }}
+          restore-keys: autotest-web-webgpu-ref-
 
       - name: Get Browser Cache
         id: browser-cache
@@ -592,7 +598,7 @@ jobs:
         with:
           path: |
             test/baseline/.cache/webgpu
-          key: autotest-web-webgpu-ref-${{ steps.reference-commit.outputs.sha }}
+          key: autotest-web-webgpu-ref-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}-${{ hashFiles('web/test/package.json') }}
 
       # See the web-webgl job for the key rotation rationale behind this cache.
       - name: Save Ccache Cache

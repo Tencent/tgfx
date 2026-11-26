@@ -19,7 +19,7 @@ function CreateFixture(backend) {
   const directories = new Set();
   const writes = [];
   let sequence = 0;
-  const fixture = { directory, files, directories, writes, fault: '', commit: COMMIT };
+  const fixture = { directory, files, directories, writes, fault: '', commit: COMMIT, version: VERSION };
   fixture.entries = [
     { entryName: 'md5.json', data: MD5 },
     { entryName: 'version.json', data: VERSION },
@@ -92,7 +92,7 @@ function CreateFixture(backend) {
           return Buffer.alloc(0);
         }
         assert.equal(args[0], 'show');
-        return VERSION;
+        return fixture.version;
       },
     },
     'adm-zip': FakeZip,
@@ -132,13 +132,20 @@ for (const backend of ['webgl', 'webgpu']) {
     });
   }
 
-  test(`${backend} tampered MD5 and changed main commit invalidate the cache`, function() {
+  test(`${backend} a later main commit with the same version reuses the cache`, function() {
+    const fixture = CreateFixture(backend);
+    const { api } = fixture;
+    api.PublishReference('reference.zip', backend, COMMIT, 5);
+    fixture.commit = 'c'.repeat(40);
+    assert.equal(api.IsReferenceCurrent(backend, fixture.commit), true);
+    fixture.version = Buffer.from(JSON.stringify({ Suite: { Image: 'v2' } }));
+    assert.equal(api.IsReferenceCurrent(backend, fixture.commit), false);
+  });
+
+  test(`${backend} tampered MD5 invalidates the cache`, function() {
     const fixture = CreateFixture(backend);
     const { api, files, directory } = fixture;
     api.PublishReference('reference.zip', backend, COMMIT, 5);
-    fixture.commit = 'c'.repeat(40);
-    assert.equal(api.IsReferenceCurrent(backend, fixture.commit), false);
-    fixture.commit = COMMIT;
     files.set(path.join(directory, 'md5.json'), Buffer.from(JSON.stringify({ Suite: { Image: 'c'.repeat(32) } })));
     assert.equal(api.IsReferenceCurrent(backend, COMMIT), false);
   });
