@@ -83,7 +83,7 @@ else
     # The reference must be built from the pinned dependency declarations rather than the
     # worktree's, so install them inside the isolated source tree.
     if ! command -v depsync > /dev/null; then
-        echo "Error: depsync is required to install the pinned dependencies. Run ./install_tools.sh first."
+        echo "Error: depsync is required to install the pinned dependencies. Run npm install depsync -g first."
         exit 1
     fi
     echo "Dependency declarations differ from origin/main; installing the pinned set in $SOURCE_DIR"

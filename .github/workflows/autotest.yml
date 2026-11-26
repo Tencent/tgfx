@@ -537,6 +537,11 @@ jobs:
           cd web/test
           npm install
 
+      - name: Run Web Test Runner Unit Tests
+        run: |
+          cd web/test
+          npm run test:runner
+
       # See the web-webgl job for the reference cache regeneration rule and the restore ordering.
       - name: Update Reference Cache
         if: ${{ steps.reference-cache.outputs.cache-hit != 'true' }}
