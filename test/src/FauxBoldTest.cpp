@@ -18,7 +18,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <filesystem>
 #include "core/PathRasterizer.h"
 #include "core/utils/FauxBoldScale.h"
 #include "tgfx/core/Bitmap.h"
@@ -381,8 +380,15 @@ TGFX_TEST(FauxBoldTest, CustomPathRegularKeepsGammaCoverage) {
   int maxDifference = 0;
   long correctedSum = 0;
   long rawSum = 0;
+  // Regular custom-path text keeps whatever coverage policy the build was compiled with, so the
+  // expectation follows the same switch as the production code instead of assuming gamma is on.
+#ifdef TGFX_USE_TEXT_GAMMA_CORRECTION
+  const uint8_t* expectedPixels = correctedPixels;
+#else
+  const uint8_t* expectedPixels = rawPixels;
+#endif
   for (size_t i = 0; i < actual.info().byteSize(); ++i) {
-    maxDifference = std::max(maxDifference, std::abs(static_cast<int>(correctedPixels[i]) -
+    maxDifference = std::max(maxDifference, std::abs(static_cast<int>(expectedPixels[i]) -
                                                      static_cast<int>(producedPixels[i])));
     correctedSum += correctedPixels[i];
     rawSum += rawPixels[i];
@@ -390,7 +396,8 @@ TGFX_TEST(FauxBoldTest, CustomPathRegularKeepsGammaCoverage) {
   corrected.unlockPixels();
   raw.unlockPixels();
   actual.unlockPixels();
-  // Regular custom-path text keeps the text gamma correction it had before this change.
+  // The fixture has partial coverage, so the two policies must actually differ; otherwise matching
+  // either one would prove nothing about the switch.
   EXPECT_GT(correctedSum, rawSum);
   EXPECT_LE(maxDifference, 1);
 }
@@ -418,20 +425,9 @@ TGFX_TEST(FauxBoldTest, FauxBoldCoverageBaseline) {
   bold.setFauxBold(true);
   const std::vector<Point> boldPositions = {Point::Make(25, 255), Point::Make(140, 255)};
   canvas->drawGlyphs(glyphs.data(), boldPositions.data(), glyphs.size(), bold, paint);
-  constexpr const char* BASELINE_KEY = "FauxBoldTest/FauxBoldCoverage";
-  bool matched = Baseline::Compare(surface, BASELINE_KEY);
-  if (!matched) {
-    // A backend that has not recorded this case yet (or a fresh checkout without the md5 cache)
-    // reports a missing reference rather than a pixel mismatch. CI records the first image through
-    // the regular update_baseline flow and later runs compare against it.
-    auto referencePath =
-        ProjectPath::Absolute(std::string("test/baseline/") + BASELINE_KEY + ".webp");
-    if (!std::filesystem::exists(referencePath)) {
-      GTEST_SKIP() << "No recorded reference for " << BASELINE_KEY
-                   << " on this backend yet; run update_baseline to create it.";
-    }
-  }
-  EXPECT_TRUE(matched);
+  // Always assert: a missing reference is a real failure here, the same way it is for every other
+  // screenshot case. Skip this test with --gtest_filter instead of swallowing the result.
+  EXPECT_TRUE(Baseline::Compare(surface, "FauxBoldTest/FauxBoldCoverage"));
 }
 
 }  // namespace tgfx

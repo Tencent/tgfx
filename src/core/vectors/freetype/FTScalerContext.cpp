@@ -613,7 +613,7 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
 }
 
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
-  if (fauxBold && !hasColor()) {
+  if (fauxBold && !hasColor() && hasOutlines()) {
     Path path;
     if (!generatePath(glyphID, true, fauxItalic, &path)) {
       return {};
@@ -801,7 +801,9 @@ Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
 
 Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
                                         Matrix* matrix) const {
-  if (!hasColor() && (stroke != nullptr || fauxBold)) {
+  // Only outline fonts can be re-rendered from the stroked path; bitmap-only faces keep the
+  // bitmap metrics and image path they had before.
+  if (!hasColor() && (stroke != nullptr || (fauxBold && hasOutlines()))) {
     return {};
   }
   if (!hasColor()) {
