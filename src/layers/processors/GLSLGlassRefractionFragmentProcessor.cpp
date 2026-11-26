@@ -18,6 +18,7 @@
 
 #include "GLSLGlassRefractionFragmentProcessor.h"
 #include <cmath>
+#include "GeneratedOperators.h"
 
 namespace tgfx {
 
@@ -41,78 +42,47 @@ GLSLGlassRefractionFragmentProcessor::GLSLGlassRefractionFragmentProcessor(
 }
 
 void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
-  auto common = args.uniformHandler->addUniform("GlassOpticsP0", UniformFormat::Float4,
-                                                ShaderStage::Fragment);
-  auto lighting = args.uniformHandler->addUniform("GlassOpticsP1", UniformFormat::Float4,
-                                                  ShaderStage::Fragment);
-  auto offsets = args.uniformHandler->addUniform("GlassOpticsP2", UniformFormat::Float4,
-                                                 ShaderStage::Fragment);
-  auto geometryMapping = args.uniformHandler->addUniform("GlassOpticsP3", UniformFormat::Float4,
-                                                         ShaderStage::Fragment);
-  auto& sourceSampler = (*args.textureSamplers)[0];
-  auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
-
-  fragBuilder->codeAppendf("vec2 sourceUV = %s * %s.xy;", texCoordName.c_str(), common.c_str());
-  fragBuilder->codeAppendf("vec2 glassUV = %s * %s.xy + %s.xy;", texCoordName.c_str(),
-                           offsets.c_str(), geometryMapping.c_str());
-  std::string geometryOutput = "glassGeometry";
-  emitChild(geometryIndex, "vec4(glassUV, 0.0, 0.0)", &geometryOutput, args);
-  fragBuilder->codeAppendf("vec2 refractDir = %s.xy;", geometryOutput.c_str());
-  fragBuilder->codeAppendf("float edgeWeight = %s.w;", geometryOutput.c_str());
-  if (params.shapeType == GlassShapeType::AlphaMask) {
-    // The UDF distance can exceed the physical bound because of its proximity term. Constrain the
-    // scalar distance so a diagonal displacement cannot exceed the vector-length bound.
-    fragBuilder->codeAppendf("float offsetDist = clamp(%s.z, 0.0, %s.w);", geometryOutput.c_str(),
-                             common.c_str());
-    fragBuilder->codeAppend("vec2 displacement = refractDir * offsetDist;");
-  } else {
-    // Keep the original component-wise clamp for the SDF path. Its offset is already below the
-    // physical bound, but this exact expression preserves existing SDF pixel output.
-    fragBuilder->codeAppendf("float offsetDist = %s.z;", geometryOutput.c_str());
-    fragBuilder->codeAppend("vec2 displacement = refractDir * offsetDist;");
-    fragBuilder->codeAppendf("displacement = clamp(displacement, vec2(-%s.w), vec2(%s.w));",
-                             common.c_str(), common.c_str());
+  // The IR route is the only route: the displacement math, the source reads, the edge light and
+  // the final assembly live in the shared function, and the compile-time shape/effect flags ride
+  // the call as int constants.
+  if (args.irBuilder == nullptr || args.outputValue == INVALID_VALUE_ID) {
+    return;
   }
-  fragBuilder->codeAppendf("vec2 uvOffset = vec2(displacement.x * %s.x, -displacement.y * %s.y);",
-                           lighting.c_str(), lighting.c_str());
-
-  fragBuilder->codeAppend("vec3 finalColor;");
-  fragBuilder->codeAppend("float srcAlpha;");
-  if (params.dispersion >= 0.01f) {
-    fragBuilder->codeAppendf("vec2 uvR = sourceUV + uvOffset * (1.0 + %s.z);", common.c_str());
-    fragBuilder->codeAppend("vec2 uvG = sourceUV + uvOffset;");
-    fragBuilder->codeAppendf("vec2 uvB = sourceUV + uvOffset * (1.0 - %s.z);", common.c_str());
-    fragBuilder->codeAppend("vec4 srcG = ");
-    fragBuilder->appendTextureLookup(sourceSampler, "uvG");
-    fragBuilder->codeAppend(";");
-    fragBuilder->codeAppend("finalColor.r = ");
-    fragBuilder->appendTextureLookup(sourceSampler, "uvR");
-    fragBuilder->codeAppend(".r;");
-    fragBuilder->codeAppend("finalColor.g = srcG.g;");
-    fragBuilder->codeAppend("finalColor.b = ");
-    fragBuilder->appendTextureLookup(sourceSampler, "uvB");
-    fragBuilder->codeAppend(".b;");
-    fragBuilder->codeAppend("srcAlpha = srcG.a;");
-  } else {
-    fragBuilder->codeAppend("vec4 srcColor = ");
-    fragBuilder->appendTextureLookup(sourceSampler, "sourceUV + uvOffset");
-    fragBuilder->codeAppend(";");
-    fragBuilder->codeAppend("finalColor = srcColor.rgb;");
-    fragBuilder->codeAppend("srcAlpha = srcColor.a;");
+  auto ir = args.irBuilder;
+  const auto sampler = args.samplerValue((*args.textureSamplers)[0]);
+  const auto texCoordName = args.fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
+  if (sampler == INVALID_VALUE_ID || texCoordName.empty()) {
+    ir->MarkFailed("the glass refraction inputs have no IR values");
+    return;
   }
-
-  if (params.lightIntensity > 0.0f) {
-    fragBuilder->codeAppend("if (edgeWeight > 0.0) {");
-    fragBuilder->codeAppendf("  float NdotL = dot(-refractDir, %s.zw);", lighting.c_str());
-    fragBuilder->codeAppendf("  float diffuse = smoothstep(0.35, 1.0, NdotL) * edgeWeight * %s.z;",
-                             offsets.c_str());
-    fragBuilder->codeAppendf(
-        "  float rim = smoothstep(0.35, 1.0, -NdotL) * edgeWeight * %s.z * 0.6;", offsets.c_str());
-    fragBuilder->codeAppend("  finalColor += vec3(diffuse + rim);");
-    fragBuilder->codeAppend("}");
+  GlassRefractionOp::UniformNames names = {};
+  GlassRefractionOp::EnsureUniforms(ir, args.uniformHandler, &names);
+  const auto texCoord =
+      ir->InternValue(texCoordName, SLType::Float2, Precision::High, IRValueKind::Varying);
+  const auto offsets =
+      ir->InternValue(names.GlassOpticsP2, SLType::Float4, Precision::High, IRValueKind::Uniform);
+  const auto mapping =
+      ir->InternValue(names.GlassOpticsP3, SLType::Float4, Precision::High, IRValueKind::Uniform);
+  const auto scaled = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float2, texCoord,
+                                       ir->CreateSwizzle(offsets, SLType::Float2, "xy"));
+  const auto glassUV =
+      ir->CreateBinary(IRBinaryOp::Add, SLType::Float2, scaled,
+                       ir->CreateSwizzle(mapping, SLType::Float2, "xy"));
+  const auto zero = ir->CreateConstant(0.0f);
+  const auto geometryInput = ir->CreateConstruct(SLType::Float4, {glassUV, zero, zero});
+  std::string geometryName = "glassGeometry";
+  const auto geometry =
+      emitChildIR(geometryIndex, "glassGeometryInput", &geometryName, args, geometryInput);
+  if (geometry == INVALID_VALUE_ID) {
+    ir->MarkFailed("the glass geometry child has no IR output");
+    return;
   }
-  fragBuilder->codeAppendf("%s = vec4(finalColor, srcAlpha);", args.outputColor.c_str());
+  const int32_t udfShape = params.shapeType == GlassShapeType::AlphaMask ? 1 : 0;
+  const int32_t dispersionOn = params.dispersion >= 0.01f ? 1 : 0;
+  const int32_t lightingOn = params.lightIntensity > 0.0f ? 1 : 0;
+  ir->StoreOutput(args.outputValue,
+                  GlassRefractionOp::Emit(ir, args.uniformHandler, &names, sampler, texCoord,
+                                          geometry, udfShape, dispersionOn, lightingOn));
 }
 
 void GLSLGlassRefractionFragmentProcessor::onSetData(UniformData*,

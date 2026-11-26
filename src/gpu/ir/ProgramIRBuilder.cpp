@@ -271,14 +271,6 @@ ValueID ProgramIRBuilder::AddExpr(IRExpr expr, const std::string& debugName) {
   return result;
 }
 
-ValueID ProgramIRBuilder::CreateConstantInt(int32_t value) {
-  IRExpr expr = {};
-  expr.kind = IRExprKind::ConstantInt;
-  expr.type = SLType::Int;
-  expr.constantBits = static_cast<uint32_t>(value);
-  return AddExpr(std::move(expr), {});
-}
-
 ValueID ProgramIRBuilder::CreateConstant(float value, Precision precision) {
   IRExpr expr = {};
   expr.kind = IRExprKind::ConstantFloat;

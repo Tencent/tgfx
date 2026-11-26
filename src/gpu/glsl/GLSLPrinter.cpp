@@ -435,6 +435,8 @@ std::string GLSLPrinter::PrintFragmentBodyFromIR(const ProgramIR& program) {
       std::string bound = {};
       if (!GLSLOperatorEmitter::EmitValue(program, statement.loopInit, &init, &error) ||
           !GLSLOperatorEmitter::EmitValue(program, statement.loopBound, &bound, &error)) {
+        LOGE("IRPrinter: the loop '%s' bounds cannot be printed: %s", statement.loopVarName.c_str(),
+             error.c_str());
         return {};
       }
       // The counter is a loop-local declared by the header itself.

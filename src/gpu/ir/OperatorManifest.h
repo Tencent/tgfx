@@ -89,16 +89,19 @@ namespace tgfx {
   X(XpBlendMultiply, 58)  \
   X(XpBlendOverlay, 59)  \
   X(XpBlendPlusDarker, 60)  \
-  X(XpBlendPlusLighter, 61)  \
+  X(XpBlendPlusLighter, 61) \
   X(XpBlendSaturation, 62)  \
-  X(XpBlendScreen, 63)  \
-  X(XpBlendSoftLight, 64)  \
-  X(XpBlendSrc, 65)  \
-  X(XpBlendSrcATop, 66)  \
-  X(XpBlendSrcIn, 67)  \
-  X(XpBlendSrcOut, 68)  \
-  X(XpBlendSrcOver, 69)  \
-  X(XpBlendXor, 70)  \
+  X(XpBlendScreen, 63)      \
+  X(XpBlendSoftLight, 64)   \
+  X(XpBlendSrc, 65)         \
+  X(XpBlendSrcATop, 66)     \
+  X(XpBlendSrcIn, 67)       \
+  X(XpBlendSrcOut, 68)      \
+  X(XpBlendSrcOver, 69)     \
+  X(XpBlendXor, 70)         \
+  X(GlassSDFRounded, 71)    \
+  X(GlassSFDEllipse, 72)    \
+  X(GlassRefraction, 73)    \
 
 enum class OperatorID : uint32_t {
 #define TGFX_OPERATOR_ENUM(name, value) name = value,

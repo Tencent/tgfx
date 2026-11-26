@@ -75,7 +75,14 @@ PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTarget
   PlacementPtr<RectsVertexProvider> provider = nullptr;
   if (coordOffset.x == 0.0f && coordOffset.y == 0.0f && inputAlpha == 1.0f) {
     auto bounds = Rect::MakeWH(width, height);
-    provider = RectsVertexProvider::MakeFrom(allocator, bounds, AAType::None);
+    // The single-rect MakeFrom leaves the vertex color at Color()'s transparent default. The IR
+    // route modulates a texture read through the input color, so an opaque white is required to
+    // keep the fill equivalent to the text route, which never modulates here.
+    auto record = allocator->make<RectRecord>(bounds, Matrix::I(), Color(1, 1, 1, 1));
+    auto rects = std::vector<PlacementPtr<RectRecord>>();
+    rects.push_back(std::move(record));
+    provider = RectsVertexProvider::MakeFrom(allocator, std::move(rects), {}, {}, AAType::None,
+                                             false, UVSubsetMode::None, {});
   } else {
     auto rect = Rect::MakeXYWH(coordOffset.x, coordOffset.y, width, height);
     auto viewMatrix = Matrix::MakeTrans(-coordOffset.x, -coordOffset.y);

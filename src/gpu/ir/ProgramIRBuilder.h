@@ -55,8 +55,6 @@ class ProgramIRBuilder {
   ValueID CreateConstant(float value, Precision precision = Precision::High);
 
   /// Creates an int constant (the loop counters and index math need them).
-  ValueID CreateConstantInt(int32_t value);
-
   ValueID CreateIntConstant(int32_t value);
 
   ValueID CreateLoad(ValueID source, SLType type, Precision precision = Precision::Default);

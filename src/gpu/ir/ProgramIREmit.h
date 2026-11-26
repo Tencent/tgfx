@@ -130,7 +130,7 @@ inline ValueID emitWeightedTapLoop(
   ir->Assign({sumVar, ""}, zero4);
   // i runs from -radius to +radius; the bound (radius uniform) is a float, the counter is int.
   const auto radiusInt = ir->CreateConvert(radiusValue, SLType::Int);
-  const auto intZero = ir->CreateConstantInt(0);
+  const auto intZero = ir->CreateIntConstant(0);
   const auto initValue = ir->CreateBinary(IRBinaryOp::Sub, SLType::Int, intZero, radiusInt);
   ir->BeginForLoop("blurTapIndex", initValue, radiusInt, intZero);
   const auto indexValue = ir->InternValue("blurTapIndex", SLType::Int, Precision::High,
@@ -179,7 +179,7 @@ inline ValueID emitWeightedTapLoop2D(
   const auto zero = ir->CreateConstant(0.0f);
   const auto zero4 = ir->CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
   ir->Assign({sumVar, ""}, zero4);
-  const auto intZero = ir->CreateConstantInt(0);
+  const auto intZero = ir->CreateIntConstant(0);
   // The radii are int uniforms already; the counters run i in [-radius, radius] (the text loop's
   // j form plus early break folds to the same taps: out-of-range weights read as zero).
   const auto initY = ir->CreateBinary(IRBinaryOp::Sub, SLType::Int, intZero, radiusYValue);

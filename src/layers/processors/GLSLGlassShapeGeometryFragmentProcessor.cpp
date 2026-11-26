@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "GeneratedOperators.h"
 #include "GLSLGlassShapeGeometryFragmentProcessor.h"
 #include <cmath>
 
@@ -49,97 +50,25 @@ GLSLGlassSDFGeometryFragmentProcessor::GLSLGlassSDFGeometryFragmentProcessor(
 }
 
 void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
-  auto shape =
-      args.uniformHandler->addUniform("GlassShapeP0", UniformFormat::Float4, ShaderStage::Fragment);
-  auto effect =
-      args.uniformHandler->addUniform("GlassShapeP1", UniformFormat::Float4, ShaderStage::Fragment);
-
-  std::string sdfFunction = fragBuilder->getMangledFunctionName("glassShapeSDF");
+  // The IR route is the only route: the whole shape computation (SDF, edge band, offset
+  // distance, corner compensation, direction blend) lives in the two shared functions, and the
+  // compile-time shape choice picks the one this draw uses.
+  if (args.irBuilder == nullptr) {
+    return;
+  }
+  if (args.inputValue == INVALID_VALUE_ID || args.outputValue == INVALID_VALUE_ID) {
+    return;
+  }
+  auto ir = args.irBuilder;
   if (shapeType == GlassShapeType::RoundedRect) {
-    fragBuilder->addFunction("float " + sdfFunction +
-                             "(float px, float py, float hw, float hh, float r) {\n"
-                             "  float dx = abs(px) - hw + r;\n"
-                             "  float dy = abs(py) - hh + r;\n"
-                             "  float outside = length(max(vec2(dx, dy), vec2(0.0)));\n"
-                             "  return outside + min(max(dx, dy), 0.0) - r;\n"
-                             "}\n");
+    GlassSDFRoundedOp::UniformNames names = {};
+    ir->StoreOutput(args.outputValue,
+                    GlassSDFRoundedOp::Emit(ir, args.uniformHandler, &names, args.inputValue));
   } else {
-    fragBuilder->addFunction(
-        "float " + sdfFunction +
-        "(float px, float py, float hw, float hh) {\n"
-        "  float normalizedDist = length(vec2(px / hw, py / hh));\n"
-        "  float gradientLength = length(vec2(px / (hw * hw), py / (hh * hh)));\n"
-        "  if (gradientLength < 0.000001) return -min(hw, hh);\n"
-        "  return normalizedDist * (normalizedDist - 1.0) / gradientLength;\n"
-        "}\n");
+    GlassSFDEllipseOp::UniformNames names = {};
+    ir->StoreOutput(args.outputValue,
+                    GlassSFDEllipseOp::Emit(ir, args.uniformHandler, &names, args.inputValue));
   }
-
-  EmitGeometryCoordinates(fragBuilder, args.inputColor, shape);
-  fragBuilder->codeAppendf("float cornerRadius = %s.z;", shape.c_str());
-  if (shapeType == GlassShapeType::RoundedRect) {
-    fragBuilder->codeAppendf("float outerSDF = %s(px, py, halfW, halfH, cornerRadius);",
-                             sdfFunction.c_str());
-  } else {
-    fragBuilder->codeAppendf("float outerSDF = %s(px, py, halfW, halfH);", sdfFunction.c_str());
-  }
-  fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
-  fragBuilder->codeAppend("if (outerSDF < 0.0) {");
-  fragBuilder->codeAppend("  float edgeDist = -outerSDF;");
-  fragBuilder->codeAppendf("  float edgeBand = max(1.0, %s.w);", effect.c_str());
-  fragBuilder->codeAppend("  float edgeWeight = 1.0 - smoothstep(0.0, edgeBand, edgeDist);");
-  // Figma profile with rd = glassThickness, bs = 0 (no bevel):
-  // offset = I * rd * pow(clamp((rd - d) / rd, 0, 1), 3.5), capped at 0.999 * rd.
-  fragBuilder->codeAppendf("  float rd = max(%s.w, 0.0001);", shape.c_str());
-  fragBuilder->codeAppend("  float heightT = clamp((rd - edgeDist) / rd, 0.0, 1.0);");
-  fragBuilder->codeAppendf("  float offsetDist = min(%s.x * rd * pow(heightT, 3.5), 0.999 * rd);",
-                           effect.c_str());
-  fragBuilder->codeAppendf("  float effectiveSplay = %s.y;", effect.c_str());
-  if (shapeType == GlassShapeType::Ellipse) {
-    fragBuilder->codeAppend(
-        "  vec2 sdfGradient = vec2(px / (halfW * halfW), py / (halfH * halfH));");
-    fragBuilder->codeAppend("  float gradientLength = length(sdfGradient);");
-    fragBuilder->codeAppend("  if (gradientLength > 0.000001) {");
-    fragBuilder->codeAppend("    vec2 gradientDir = -sdfGradient / gradientLength;");
-  } else {
-    // Figma-style corner radius amplification: effective corner radius grows with
-    // refractionDistance (glassThickness), so larger refraction produces larger corner
-    // regions and more radial direction blending at corners.
-    fragBuilder->codeAppend("  vec2 absP = abs(vec2(px, py));");
-    fragBuilder->codeAppendf("  float refractionDistance = %s.w;", shape.c_str());
-    fragBuilder->codeAppend(
-        "  float r_effective = min(min(halfW, halfH), max(cornerRadius, refractionDistance));");
-    fragBuilder->codeAppend(
-        "  vec2 cornerCenter = vec2(halfW - r_effective, halfH - r_effective);");
-    fragBuilder->codeAppend("  vec2 relToCorner = absP - cornerCenter;");
-    fragBuilder->codeAppend("  float compensation = max(-min(relToCorner.x, relToCorner.y), 0.0);");
-    fragBuilder->codeAppend("  vec2 grad = relToCorner + vec2(compensation);");
-    fragBuilder->codeAppend("  float qx = absP.x - cornerCenter.x;");
-    fragBuilder->codeAppend("  float qy = absP.y - cornerCenter.y;");
-    fragBuilder->codeAppend("  float straightHalfW = max(cornerCenter.x, 0.0001);");
-    fragBuilder->codeAppend("  float straightHalfH = max(cornerCenter.y, 0.0001);");
-    fragBuilder->codeAppend("  float cornerWeightX = smoothstep(0.0, straightHalfW, absP.x);");
-    fragBuilder->codeAppend("  float cornerWeightY = smoothstep(0.0, straightHalfH, absP.y);");
-    fragBuilder->codeAppend("  float cornerWeight = (qx > 0.0 && qy > 0.0) ? 1.0 :");
-    fragBuilder->codeAppend("        ((qx > qy) ? cornerWeightY : cornerWeightX);");
-    fragBuilder->codeAppendf("    effectiveSplay = min(cornerWeight + %s.y, 1.0);", effect.c_str());
-    fragBuilder->codeAppend("  float gradientLength = length(grad);");
-    fragBuilder->codeAppend("  if (gradientLength > 0.000001) {");
-    fragBuilder->codeAppend(
-        "    vec2 gradientDir = -vec2(sign(px) * grad.x, sign(py) * grad.y) / gradientLength;");
-  }
-  fragBuilder->codeAppend("    float centerDistance = length(vec2(px, py));");
-  fragBuilder->codeAppend(
-      "    vec2 centerDir = centerDistance > 0.001 ? -vec2(px, py) / centerDistance : "
-      "gradientDir;");
-  fragBuilder->codeAppend("    vec2 refractDir = mix(gradientDir, centerDir, effectiveSplay);");
-  fragBuilder->codeAppend("    float refractLength = length(refractDir);");
-  fragBuilder->codeAppend(
-      "    refractDir = refractLength < 0.000001 ? gradientDir : refractDir / refractLength;");
-  fragBuilder->codeAppendf("    %s = vec4(refractDir, offsetDist, edgeWeight);",
-                           args.outputColor.c_str());
-  fragBuilder->codeAppend("  }");
-  fragBuilder->codeAppend("}");
 }
 
 void GLSLGlassSDFGeometryFragmentProcessor::onSetData(UniformData*,
