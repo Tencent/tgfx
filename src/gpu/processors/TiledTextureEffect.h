@@ -102,7 +102,7 @@ class TiledTextureEffect : public FragmentProcessor {
 
   // The sampling source for the texture view, or for a pending single-plane upload when the view
   // does not exist yet. Returns false when neither is available.
-  bool getSamplingSource(SamplingSource* source, bool* fromPendingUpload) const;
+  bool getSamplingSource(SamplingSource* source) const;
 
   ResolvedSampling makeResolvedSampling(const SamplingSource& source) const;
 

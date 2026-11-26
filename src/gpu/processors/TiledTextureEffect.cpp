@@ -193,34 +193,17 @@ static Rect ResolveShaderRect(const TiledTextureEffect::SamplingSource& source, 
   return rect;
 }
 
-bool TiledTextureEffect::getSamplingSource(SamplingSource* source, bool* fromPendingUpload) const {
-  *fromPendingUpload = false;
-  if (auto textureView = getTextureView()) {
-    source->width = textureView->width();
-    source->height = textureView->height();
-    source->type = textureView->getTexture()->type();
-    source->hasMipmaps = textureView->hasMipmaps();
-    source->origin = textureView->origin();
-    source->features = textureView->getContext()->gpu()->features();
-    return true;
-  }
-  // A pending single-plane upload: TextureUploadTask creates the view from the decoded buffer as a
-  // top-left 2D texture of the proxy's size, with a full mip chain when mipmaps were requested.
-  if (textureProxy->getTextureView() != nullptr || !textureProxy->hasPendingUpload() ||
-      textureProxy->mayUploadYUV()) {
+bool TiledTextureEffect::getSamplingSource(SamplingSource* source) const {
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
     return false;
   }
-  auto context = textureProxy->getContext();
-  if (context == nullptr) {
-    return false;
-  }
-  source->width = textureProxy->width();
-  source->height = textureProxy->height();
-  source->type = TextureType::TwoD;
-  source->hasMipmaps = textureProxy->hasMipmaps() && std::max(source->width, source->height) > 1;
-  source->origin = textureProxy->origin();
-  source->features = context->gpu()->features();
-  *fromPendingUpload = true;
+  source->width = textureView->width();
+  source->height = textureView->height();
+  source->type = textureView->getTexture()->type();
+  source->hasMipmaps = textureView->hasMipmaps();
+  source->origin = textureView->origin();
+  source->features = textureView->getContext()->gpu()->features();
   return true;
 }
 
@@ -261,11 +244,8 @@ const TiledTextureEffect::ResolvedSampling* TiledTextureEffect::resolveSampling(
   if (resolvedSampling.has_value()) {
     return &*resolvedSampling;
   }
-  // Only a view-derived snapshot is cached: the runtime shader setup reads it once the view
-  // exists, and lowering a pending upload computes its own snapshot (see lowerToAOT).
   SamplingSource source = {};
-  bool fromPendingUpload = false;
-  if (!getSamplingSource(&source, &fromPendingUpload) || fromPendingUpload) {
+  if (!getSamplingSource(&source)) {
     return nullptr;
   }
   resolvedSampling = makeResolvedSampling(source);
@@ -292,8 +272,17 @@ std::shared_ptr<Texture> TiledTextureEffect::onTextureAt(size_t) const {
 }
 
 SamplerState TiledTextureEffect::onSamplerStateAt(size_t) const {
-  auto sampling = resolveSampling();
-  return sampling != nullptr ? sampling->hardwareSampler : SamplerState();
+  // Main-form linkage: compute from the live view on every call, no caching — the cached
+  // resolveSampling() deferred sampler decisions to first-view timing, which main never does.
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
+    return {};
+  }
+  SamplingSource source = {};
+  if (!getSamplingSource(&source)) {
+    return {};
+  }
+  return makeResolvedSampling(source).hardwareSampler;
 }
 
 const TextureView* TiledTextureEffect::getTextureView() const {

@@ -280,7 +280,6 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
 
   DEBUG_ASSERT(!descriptor.vertex.bufferLayouts.empty());
   bufferLayouts.reserve(descriptor.vertex.bufferLayouts.size());
-  size_t globalAttributeIndex = 0;
   for (const auto& layout : descriptor.vertex.bufferLayouts) {
     DEBUG_ASSERT(layout.stride > 0);
     GLBufferLayout glLayout = {};
@@ -289,20 +288,8 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
     size_t attributeOffset = 0;
     glLayout.attributes.reserve(layout.attributes.size());
     int divisor = (layout.stepMode == VertexStepMode::Instance) ? 1 : 0;
-    size_t attributeIndex = 0;
     for (const auto& attribute : layout.attributes) {
-      int location = -1;
-      if (!layout.shaderLocations.empty()) {
-        // The program creator resolved each attribute's input location against the artifact's
-        // reflection: the physical slot (with holes where a variant compiles an attribute out) or
-        // a spare slot for an unread one. The dense index below only agrees with templates that
-        // number their inputs compactly, so a physical-slot template would misrender here.
-        location = static_cast<int>(layout.shaderLocations[attributeIndex]);
-      } else if (descriptor.vertex.bindAttributesByLocation) {
-        location = static_cast<int>(globalAttributeIndex);
-      } else {
-        location = gl->getAttribLocation(programID, attribute.name().c_str());
-      }
+      auto location = gl->getAttribLocation(programID, attribute.name().c_str());
       if (location != -1) {
         glLayout.attributes.push_back(
             MakeGLAttribute(attribute.format(), location, attributeOffset));
@@ -310,8 +297,6 @@ bool GLRenderPipeline::setPipelineDescriptor(GLGPU* gpu,
         gl->vertexAttribDivisor(static_cast<unsigned>(location), divisor);
       }
       attributeOffset += attribute.size();
-      attributeIndex++;
-      globalAttributeIndex++;
     }
     bufferLayouts.push_back(std::move(glLayout));
   }

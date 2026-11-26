@@ -103,7 +103,6 @@ void GLCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcTexture,
 void GLCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTexture, const Rect& srcRect,
                                            std::shared_ptr<GPUBuffer> dstBuffer, size_t dstOffset,
                                            size_t dstRowBytes) {
-  fprintf(stderr, "DSTDBG readback source=%p\n", static_cast<void*>(srcTexture.get()));
   if (srcTexture == nullptr || srcRect.isEmpty()) {
     LOGE("GLCommandEncoder::copyTextureToBuffer() source texture or rectangle is invalid!");
     return;

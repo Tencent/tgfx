@@ -17,10 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLGPU.h"
-#include <atomic>
-#include <cstdio>
-#include <cstdlib>
-#include <string>
 #include "gpu/opengl/GLBuffer.h"
 #if defined(__EMSCRIPTEN__)
 #include "gpu/opengl/webgl/WebGLBuffer.h"
@@ -219,12 +215,6 @@ std::shared_ptr<Sampler> GLGPU::createSampler(const SamplerDescriptor& descripto
 }
 
 std::shared_ptr<ShaderModule> GLGPU::createShaderModule(const ShaderModuleDescriptor& descriptor) {
-  if (descriptor.format != ShaderCodeFormat::GLSL) {
-    LOGE(
-        "GLGPU::createShaderModule() unsupported shader format; the OpenGL backend only accepts "
-        "GLSL text.");
-    return nullptr;
-  }
   if (descriptor.code.empty()) {
     LOGE("GLGPU::createShaderModule() shader code is empty!");
     return nullptr;
@@ -252,7 +242,7 @@ std::shared_ptr<ShaderModule> GLGPU::createShaderModule(const ShaderModuleDescri
     gl->getShaderInfoLog(shader, 512, nullptr, infoLog);
     LOGE("Could not compile shader:\n%s\ntype:%d info%s", code.c_str(), shaderType, infoLog);
     gl->deleteShader(shader);
-    return nullptr;
+    shader = 0;
   }
 #endif
   return makeResource<GLShaderModule>(shader);
@@ -262,7 +252,7 @@ std::shared_ptr<RenderPipeline> GLGPU::createRenderPipeline(
     const RenderPipelineDescriptor& descriptor) {
   auto vertexModule = static_cast<GLShaderModule*>(descriptor.vertex.module.get());
   auto fragmentModule = static_cast<GLShaderModule*>(descriptor.fragment.module.get());
-  if (vertexModule == nullptr || vertexModule->shader() == 0 || fragmentModule == nullptr ||
+  if (vertexModule == nullptr || vertexModule->shader() == 0 || vertexModule == nullptr ||
       fragmentModule->shader() == 0) {
     LOGE("GLGPU::createRenderPipeline() invalid shader module!");
     return nullptr;
@@ -297,8 +287,8 @@ std::shared_ptr<RenderPipeline> GLGPU::createRenderPipeline(
     char infoLog[512];
     gl->getProgramInfoLog(programID, 512, nullptr, infoLog);
     gl->deleteProgram(programID);
+    programID = 0;
     LOGE("GLGPU::createRenderPipeline() Could not link program: %s", infoLog);
-    return nullptr;
   }
 #endif
   auto pipeline = makeResource<GLRenderPipeline>(programID);

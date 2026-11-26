@@ -9,10 +9,10 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the License for the specific language governing permissions
-//  and limitations under the License.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,75 +20,29 @@
 
 #include "DrawOp.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/ir/GeometryLayout.h"
 #include "gpu/processors/GeometryProcessor.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-
 /**
  * StandardDrawOp is the base class for ops that follow the "framework binds one pipeline,
  * subclass issues one draw call" pattern. execute() is final: it first gives the subclass a
  * chance to veto the whole execution via onPrepare() when runtime inputs turn out to be
  * unusable, then builds the op's ProgramInfo from the geometry processor supplied by
- * onMakeGeometry() and the color/coverage fragment processors accumulated on DrawOp,
- * gives subclasses a chance to tweak the resulting ProgramInfo via onConfigureProgramInfo(), then
- * binds the pipeline (together with uniforms, samplers and
- * scissor) before delegating the actual draw call to onDraw().
+ * onMakeGeometryProcessor() and the color/coverage fragment processors accumulated on DrawOp,
+ * gives subclasses a chance to tweak the resulting ProgramInfo via onConfigureProgramInfo(),
+ * then binds the pipeline (together with uniforms, samplers and scissor) before delegating
+ * the actual draw call to onDraw().
  *
- * Ops that need to run multiple pipelines within a single render pass must not derive from
- * this class — they should inherit from DrawOp directly and take full responsibility for
+ * Ops that need to run multiple pipelines within a single render pass (for example
+ * StencilCoverPathDrawOp, which runs a stencil pass followed by a cover pass) must not derive
+ * from this class — they should inherit from DrawOp directly and take full responsibility for
  * pipeline binding inside their own execute() implementation.
  */
 class StandardDrawOp : public DrawOp {
  public:
   void execute(RenderPass* renderPass, RenderTarget* renderTarget) final;
-
-  /**
-   * Prepares the geometry processor and program for a draw. isFinalLookup marks this as the
-   * draw's own last program lookup — its failure drops the draw and is recorded as such —
-   * versus a plan-task pass probe, whose failure falls back to the original draw.
-   */
-  bool prepare(RenderTarget* renderTarget, PixelFormat depthStencilFormat = PixelFormat::Unknown,
-               bool isFinalLookup = true);
-
-  /**
-   * Executes a successfully prepared draw and uploads its uniforms and texture samplers. Set
-   * recordDrawStats to false when a caller aggregates multiple prepared passes into one logical
-   * Draw-level record. Returns false when nothing was submitted (the draw is not prepared, or its
-   * uniforms have no backing store), so such callers do not count the pass as executed.
-   */
-  bool executePrepared(RenderPass* renderPass, RenderTarget* renderTarget,
-                       bool recordDrawStats = true);
-
-  /**
-   * The task-driven equivalent of execute()'s prepare half: runs onPrepare() FIRST and then
-   * prepare(). Callers that drive prepare()/executePrepared() directly (the AOT plan task,
-   * whose passes render through its own render-pass sequence) must use this entry point
-   * instead of prepare(): prepare() alone skips the onPrepare() lifecycle hook, and ops that
-   * validate asynchronously produced buffers there (hairline ops with possibly-empty vertex
-   * segments) would reach onDraw() with null buffers — execute() runs the hook, so a
-   * task-driven op must not silently lose it. isFinalLookup carries prepare()'s contract: a
-   * plan-task pass probe (false) falls back to the original draw on failure, while the task's
-   * fallback re-run of the original draw (true) drops it.
-   */
-  bool prepareForTask(RenderTarget* renderTarget, bool isFinalLookup = true);
-
-  /**
-   * The geometry color every fragment of this op receives as its input color, or nullopt when
-   * the color varies per vertex or the op does not report it. The AOT route uses it to decide
-   * whether intermediate fills, which run with an opaque white input, see the same input.
-   */
-  virtual std::optional<PMColor> uniformGeometryColor() const {
-    return std::nullopt;
-  }
-
-  /**
-   * The matrix mapping this op's top-left device positions onto the local coordinates its
-   * fragment processors evaluate at, when that mapping is one affine matrix for the whole op, or
-   * nullopt otherwise (per-vertex UV coordinates, or an op that does not report it).
-   */
-  virtual std::optional<Matrix> deviceToLocalMatrix() const {
-    return std::nullopt;
-  }
 
  protected:
   StandardDrawOp(BlockAllocator* allocator, AAType aaType) : DrawOp(allocator, aaType) {
@@ -113,19 +67,21 @@ class StandardDrawOp : public DrawOp {
   }
 
   /**
-   * Builds the geometry layout that drives this op's pipeline: the attribute slots and the
-   * uniform values. Called once per execute(); a null return drops the draw (the old null
-   * geometry processor).
+   * Builds the geometry processor that drives this op's pipeline. Called once per execute().
    */
-  virtual std::optional<GeometryLayout> onMakeGeometry(RenderTarget* renderTarget) = 0;
+  virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
+  // Compatibility shim: feature subclasses override this AOT-expression hook. The main body
+  // never calls it, so a default nullopt keeps them compiling while the retired route stays dead.
+  virtual std::optional<GeometryLayout> onMakeGeometry(RenderTarget* /*renderTarget*/) {
+    return std::nullopt;
+  }
 
-  /**
-   * Builds the geometry processor that drives this op's pipeline on the FP-tree (JIT) route.
-   * The default returns nullptr, which keeps the draw on the precompiled route; an op that
-   * spells its vertex stage through a GeometryProcessor overrides this.
-   */
-  virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* /*renderTarget*/) {
-    return nullptr;
+  virtual std::optional<PMColor> uniformGeometryColor() const {
+    return std::nullopt;
+  }
+
+  virtual std::optional<Matrix> deviceToLocalMatrix() const {
+    return std::nullopt;
   }
 
   /**
@@ -144,21 +100,11 @@ class StandardDrawOp : public DrawOp {
   virtual void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
 
  private:
-  /// The configuration every prepared info shares: cull mode, the pass's inherited depth-stencil
-  /// format, and the op's own processor-info hook.
-  void configureProgramInfo(ProgramInfo* info, PixelFormat depthStencilFormat);
-
-  /// The final-lookup failure account: a probe (isFinalLookup false) falls back to the original
-  /// draw, so only the draw's own last lookup logs and counts the drop.
-  static bool failLookup(RenderTarget* renderTarget, bool isFinalLookup, const char* reason);
-
-  std::optional<GeometryLayout> geometryLayout = std::nullopt;
-  bool geometryInitialized = false;
-  std::unique_ptr<ProgramInfo> preparedProgramInfo = nullptr;
-  std::shared_ptr<Program> preparedProgram = nullptr;
-  RenderTarget* preparedRenderTarget = nullptr;
-  /// The FP-tree route's geometry processor: it must outlive prepare(), because executePrepared()
-  /// walks it for the uniform upload after prepare() has returned.
-  PlacementPtr<GeometryProcessor> preparedGeometryProcessor = nullptr;
+  /**
+   * Assembles the op's ProgramInfo, materialises the pipeline, and binds it to the render
+   * pass together with uniforms, samplers and the scissor rectangle. Returns false if program
+   * creation fails, in which case execute() aborts before calling onDraw().
+   */
+  bool bindStandardPipeline(RenderPass* renderPass, RenderTarget* renderTarget);
 };
 }  // namespace tgfx

@@ -48,12 +48,6 @@ class TextureEffect : public FragmentProcessor {
 
   bool isYUV() const;
 
-  // A pending single-plane upload has no TextureView yet, so numTextureSamplers() reports zero.
-  // Its view will exist before draw execution; matchers may treat it as a single texture leaf.
-  bool hasPendingSinglePlaneUpload() const {
-    return textureProxy->hasPendingUpload() && !textureProxy->mayUploadYUV();
-  }
-
   bool isAlphaOnly() const;
 
   bool hasRGBAAA() const {

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <atomic>
 #include "ResourceProxy.h"
 #include "gpu/resources/TextureView.h"
 
@@ -42,26 +41,6 @@ class TextureProxy : public ResourceProxy {
    */
   virtual int height() const {
     return _height;
-  }
-
-  /**
-   * Returns true while a TextureUploadTask is still queued for this proxy. The texture view is
-   * not yet instantiated but will be when the task runs during the next flush (and stays null
-   * forever if the upload fails). Consumers that must not serve an un-instantiated view can use
-   * this to distinguish "upload pending" from "never instantiated".
-   */
-  bool hasPendingUpload() const {
-    return _hasPendingUpload;
-  }
-
-  /**
-   * Returns true if the pending upload may produce a multi-plane YUV texture view. Only
-   * meaningful while hasPendingUpload() is true: the YUV-ness of the future view is known at
-   * proxy creation for ImageBuffer-backed sources and unknown (reported as may-YUV) for
-   * generator-backed ones. AOT planning that assumes a single-plane leaf must refuse those.
-   */
-  bool mayUploadYUV() const {
-    return _mayUploadYUV;
   }
 
   /**
@@ -142,8 +121,6 @@ class TextureProxy : public ResourceProxy {
   PixelFormat _format = PixelFormat::RGBA_8888;
   bool _mipmapped = false;
   ImageOrigin _origin = ImageOrigin::TopLeft;
-  std::atomic_bool _hasPendingUpload = {false};
-  bool _mayUploadYUV = false;
 
   TextureProxy(int width, int height, PixelFormat pixelFormat, bool mipmapped = false,
                ImageOrigin origin = ImageOrigin::TopLeft)
@@ -152,6 +129,5 @@ class TextureProxy : public ResourceProxy {
   }
 
   friend class ProxyProvider;
-  friend class TextureUploadTask;
 };
 }  // namespace tgfx

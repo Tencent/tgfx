@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureUploadTask.h"
-#include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {
@@ -28,16 +27,7 @@ TextureUploadTask::TextureUploadTask(std::shared_ptr<ResourceProxy> proxy,
 }
 
 bool TextureUploadTask::execute(Context* context) {
-  auto success = ResourceTask::execute(context);
-  // The upload intent ends here either way: on success the view is instantiated and the
-  // pending flag no longer matters; on failure the view stays null forever and the flag must
-  // be cleared so later draws go back to refusing the un-instantiated view. This uses the
-  // base-class reference rather than a second member copy, which would inflate use_count()
-  // and defeat ResourceTask::execute()'s no-consumer skip.
-  if (proxy != nullptr) {
-    static_cast<TextureProxy*>(proxy.get())->_hasPendingUpload = false;
-  }
-  return success;
+  return ResourceTask::execute(context);
 }
 
 std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
