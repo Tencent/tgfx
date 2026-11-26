@@ -64,7 +64,12 @@ function IsReferenceCurrent(backend, commit) {
     const version = fs.readFileSync(path.join(directory, 'version.json'));
     const receipt = JSON.parse(fs.readFileSync(path.join(directory, 'reference.json'), 'utf8'));
     const entries = ValidateReference(md5, version, GetSourceVersion(commit));
-    return receipt.backend === backend && receipt.commit === commit &&
+    // The cache is bound to the pinned version.json rather than to the commit that produced it:
+    // every main commit sharing the same version renders the same references, so a new main push
+    // reuses the entry instead of rebuilding it. A rendering change without a version bump then
+    // fails the comparison on main itself, which is the contract the native platforms use.
+    return receipt.backend === backend && typeof receipt.commit === 'string' &&
+      /^[0-9a-f]{40}$/.test(receipt.commit) &&
       receipt.md5Hash === Hash(md5) && receipt.versionHash === Hash(version) &&
       receipt.entries === entries && Number.isSafeInteger(receipt.tests) && receipt.tests > 0;
   } catch (error) {

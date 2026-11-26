@@ -33,7 +33,7 @@ if [ ! -d "$SCRIPT_DIR/node_modules/puppeteer" ] || [ ! -d "$SCRIPT_DIR/node_mod
 fi
 REFERENCE_COMMIT=$(git rev-parse --verify 'origin/main^{commit}')
 if node "$SCRIPT_DIR/reference_cache.js" --check "$BACKEND" "$REFERENCE_COMMIT"; then
-    echo "Complete $BACKEND reference cache already matches origin/main."
+    echo "Complete $BACKEND reference cache matches the pinned main version."
     exit 0
 fi
 
@@ -76,6 +76,19 @@ export CCACHE_NOHASHDIR=true
 echo "Generating $BACKEND reference from origin/main ${REFERENCE_COMMIT:0:9} in $SESSION"
 git archive "$REFERENCE_COMMIT" | tar -x -C "$SOURCE_DIR"
 node "$SCRIPT_DIR/reference_source.js" "$SOURCE_DIR"
+# The reference must also be driven by the pinned main's own web/test, otherwise a change to this
+# tree's CMake entry, page or adapter could move the reference it is compared against. The driver is
+# staged inside the session because the build rejects a driver tree that doubles as the reference
+# source.
+TOOLING_DIR="$SESSION/tooling"
+mkdir -p "$TOOLING_DIR/web"
+cp -R "$SOURCE_DIR/web/test" "$TOOLING_DIR/web/test"
+cp -R "$SOURCE_DIR/web/cmake" "$TOOLING_DIR/web/cmake"
+REFERENCE_TEST_DIR="$TOOLING_DIR/web/test"
+if ! grep -q "reference-cache.zip" "$REFERENCE_TEST_DIR/index.html"; then
+    echo "Error: the pinned main does not ship the web reference contract. Update origin/main and retry."
+    exit 1
+fi
 if [ "$REUSE_DEPS" = "ON" ]; then
     ln -s "$PROJECT_ROOT/third_party" "$SOURCE_DIR/third_party"
     ln -s "$PROJECT_ROOT/web/node_modules" "$SOURCE_DIR/web/node_modules"
@@ -99,7 +112,7 @@ USE_WEBGPU=OFF
 if [ "$BACKEND" = "webgpu" ]; then
     USE_WEBGPU=ON
 fi
-emcmake cmake -S "$SCRIPT_DIR" -B "$BUILD_DIR" \
+emcmake cmake -S "$REFERENCE_TEST_DIR" -B "$BUILD_DIR" \
     -DCMAKE_BUILD_TYPE=Release \
     -DTGFX_SOURCE_DIR="$SOURCE_DIR" \
     -DTGFX_REFERENCE_COMMIT="$REFERENCE_COMMIT" \
@@ -108,7 +121,7 @@ emcmake cmake -S "$SCRIPT_DIR" -B "$BUILD_DIR" \
     -DTGFX_SKIP_GENERATE_BASELINE_IMAGES="$SKIP_IMAGES"
 cmake --build "$BUILD_DIR" --parallel 8
 cp "$BUILD_DIR/tgfx-test.js" "$BUILD_DIR/tgfx-test.wasm" "$BUILD_DIR/tgfx-test.data" "$RUNTIME_DIR/"
-cp "$SCRIPT_DIR/index.html" "$RUNTIME_DIR/"
+cp "$REFERENCE_TEST_DIR/index.html" "$RUNTIME_DIR/"
 cp "$SOURCE_DIR/web/lib/tgfx.esm.js" "$RUNTIME_DIR/"
 
 node "$SCRIPT_DIR/run_test.js" --backend="$BACKEND" --mode=reference \

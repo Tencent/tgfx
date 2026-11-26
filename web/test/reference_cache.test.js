@@ -19,7 +19,7 @@ function CreateFixture(backend) {
   const directories = new Set();
   const writes = [];
   let sequence = 0;
-  const fixture = { directory, files, directories, writes, fault: '', commit: COMMIT };
+  const fixture = { directory, files, directories, writes, fault: '', commit: COMMIT, version: VERSION };
   fixture.entries = [
     { entryName: 'md5.json', data: MD5 },
     { entryName: 'version.json', data: VERSION },
@@ -92,7 +92,7 @@ function CreateFixture(backend) {
           return Buffer.alloc(0);
         }
         assert.equal(args[0], 'show');
-        return VERSION;
+        return fixture.version;
       },
     },
     'adm-zip': FakeZip,
@@ -132,13 +132,20 @@ for (const backend of ['webgl', 'webgpu']) {
     });
   }
 
-  test(`${backend} tampered MD5 and changed main commit invalidate the cache`, function() {
+  test(`${backend} a later main commit with the same version reuses the cache`, function() {
+    const fixture = CreateFixture(backend);
+    const { api } = fixture;
+    api.PublishReference('reference.zip', backend, COMMIT, 5);
+    fixture.commit = 'c'.repeat(40);
+    assert.equal(api.IsReferenceCurrent(backend, fixture.commit), true);
+    fixture.version = Buffer.from(JSON.stringify({ Suite: { Image: 'v2' } }));
+    assert.equal(api.IsReferenceCurrent(backend, fixture.commit), false);
+  });
+
+  test(`${backend} tampered MD5 invalidates the cache`, function() {
     const fixture = CreateFixture(backend);
     const { api, files, directory } = fixture;
     api.PublishReference('reference.zip', backend, COMMIT, 5);
-    fixture.commit = 'c'.repeat(40);
-    assert.equal(api.IsReferenceCurrent(backend, fixture.commit), false);
-    fixture.commit = COMMIT;
     files.set(path.join(directory, 'md5.json'), Buffer.from(JSON.stringify({ Suite: { Image: 'c'.repeat(32) } })));
     assert.equal(api.IsReferenceCurrent(backend, COMMIT), false);
   });
@@ -191,6 +198,24 @@ for (const [name, entries] of INVALID_ARCHIVES) {
     assert.equal(fixture.writes.length, 0);
   });
 }
+
+test('web reference caches never restore an entry built from other inputs', function() {
+  const workflow = fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/autotest.yml'), 'utf8');
+  for (const backend of ['webgl', 'webgpu']) {
+    const key = 'key: autotest-web-' + backend + '-ref-${{ hashFiles(\'DEPS\') }}' +
+      '-${{ hashFiles(\'vendor.json\') }}-${{ hashFiles(\'test/baseline/version.json\') }}' +
+      '-${{ hashFiles(\'web/test/package.json\') }}';
+    assert.equal(workflow.split(key).length - 1, 2, `${backend} reference key must be restored and saved`);
+    assert.equal(workflow.includes(`restore-keys: autotest-web-${backend}-ref-`), false,
+      `${backend} reference cache must not promote an older entry into a new key`);
+  }
+});
+
+test('the puppeteer version that drives the browser is pinned', function() {
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+  const version = manifest.devDependencies.puppeteer;
+  assert.match(version, /^\d+\.\d+\.\d+$/, `Expected an exact puppeteer version, got ${version}`);
+});
 
 test('a non main commit cannot publish reference data', function() {
   const fixture = CreateFixture('webgpu');

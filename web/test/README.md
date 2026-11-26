@@ -106,7 +106,7 @@ Web 普通测试默认开启 `GENERATE_BASELINE_IMAGES`，只控制诊断图片�
 该命令固定本地 `origin/main` 引用对应的提交（不会自动 fetch），然后：
 1. 检查缓存的 MD5、版本、来源记录及内容摘要；缺任何一项都重新准备。
 2. 将固定提交解包到 `web/test/build-reference-{backend}/run.*/source`，还原并校验 LFS 资源；不切分支、不 stash。依赖声明（`DEPS`、`vendor.json`、`web/package.json`）与固定提交一致时，直接复用当前已安装的 `third_party` 和 `web/node_modules`；不一致时（例如依赖升级与 baseline 接受在同一个 PR 中）会在隔离源码树内通过 `depsync` 和 `npm install` 安装固定提交声明的依赖，因此这类运行明显更慢。lockfile 未被 git 跟踪，因此这里不校验实际安装版本。JS 绑定从该快照重新构建。
-3. 用当前测试驱动构建该主干的库、测试及资源；参考构建和普通构建目录独立，普通运行产物不被覆盖。
+3. 用固定提交自带的 `web/test` 驱动构建该主干的库、测试及资源（编排与发布仍使用当前分支的脚本），参考构建和普通构建目录独立，普通运行产物不被覆盖。
 4. 全量测试成功且没有 GPU 错误、跳过或下载失败后，校验专用 `reference-cache.zip`，将完整缓存事务发布到 `.cache/{backend}/`。`reference.json` 记录来源提交、执行数量及摘要；失败保留旧缓存，不合并部分结果。
 5. 构建和诊断产物保留在该独立目录，仅保留最近 3 个历史会话，更早的会在下次生成前自动清理；`--skip-images` 仅跳过参考图片生成。
 
@@ -141,10 +141,10 @@ Web 普通测试默认开启 `GENERATE_BASELINE_IMAGES`，只控制诊断图片�
 - `ReadPixelsTest.JpegCodec` — Emscripten 环境下无 JPEG codec
 - `PDFExportTest` — PDF 模块未在 Web 平台启用
 
-### 参考缓存的 driver 来源（已知限制）
+### 参考缓存的 driver 与有效期
 
-参考产物 = 固定 main 提交的 tgfx 源码 + **当前检出**的 `web/test` driver（`CMakeLists.txt`、`index.html`、`src/*.cpp` 与浏览器启动参数）。原生平台的参考是在 main 检出上构建的，因此两边在这一点上尚未对齐。
+参考产物由固定 main 提交里的 `web/test`（`CMakeLists.txt`、`index.html`、`src/*.cpp`）构建，当前分支的 driver 只参与验证。因此改动 `index.html` 或编译选项不会改变参考，冷热缓存下的门禁结论一致。参考构建会把 main 的 `web/test` 与 `web/cmake` 复制到会话目录后再编译，因为构建要求 driver 树与参考源码树相互独立。
 
-后果：参考缓存未命中时（冷启动），driver 改动同时作用于参考与验证两侧，即使改变了像素也不会被门禁捕获；命中时参考来自 main driver，同样的改动会失败。同一个 PR 的结果取决于缓存状态。
+有效期由 `version.json` 决定：`reference_cache.js` 要求缓存的 `version.json` 与固定 main 提交逐字节一致，`reference.json` 记录的来源提交仅用于溯源。CI 的缓存 key 由 `DEPS`、`vendor.json`、`test/baseline/version.json` 和 `web/test/package.json`（puppeteer 固定版本，决定 Chromium 版本）组成；任一输入变化即未命中并重建参考，不做前缀恢复——否则旧参考会在恢复后按新 key 保存，成为新输入的 oracle。
 
-后续会改为参考构建直接使用 main 快照里的 `web/test`，并把缓存 key 从 main sha 换成 `DEPS` + `vendor.json` + `test/baseline/version.json`（可加 `web/test/package.json`）并启用 `restore-keys`，与原生平台对齐。在此之前，修改 web driver 的 PR 需要人工确认截图差异。
+由此带来的约定：main 上的源码渲染变化必须 bump `test/baseline/version.json`，否则基于新 main 的 PR 会与旧参考不一致而失败，这与原生平台的契约相同；依赖声明（`DEPS`、`vendor.json`、`web/test/package.json`）变化则通过 key 未命中自动重建，不需要 bump。另外，若某个 PR 同时修改 `index.html` 的协议与 `run_test.js` 的读取逻辑，参考页面仍来自 main 的旧协议，该 PR 自己的 CI 会失败，需要拆成两步合入。
