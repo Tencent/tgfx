@@ -38,6 +38,10 @@ static std::shared_ptr<Typeface> MakeFauxBoldTestTypeface() {
   return Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
 }
 
+// The reference scaler context is inspected through TGFX_TEST_ACCESS_PRIVATE: the test needs the
+// scaler's own glyph flags to build an unhinted expectation. MSVC builds do not enable
+// -fno-access-control, so the whole test has to be excluded there instead of just unregistered.
+#ifdef TGFX_TEST_ACCESS_PRIVATE
 TGFX_TEST_PRIVATE(FauxBoldTest, OutlineMatchesUnhintedStroke) {
   auto typeface = MakeFauxBoldTestTypeface();
   ASSERT_NE(typeface, nullptr);
@@ -69,6 +73,7 @@ TGFX_TEST_PRIVATE(FauxBoldTest, OutlineMatchesUnhintedStroke) {
     }
   }
 }
+#endif
 
 TGFX_TEST(FauxBoldTest, BoundsAndImageUseTheSameOutline) {
   auto typeface = MakeFauxBoldTestTypeface();
