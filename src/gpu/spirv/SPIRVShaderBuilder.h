@@ -42,6 +42,13 @@ class SPIRVShaderBuilder {
 
   bool Begin(std::string* error = nullptr);
 
+  /// Emits a runtime for loop at the current position: opens the header block (merge + guard
+  /// + conditional), the body block starts here; the body's statements append as usual.
+  bool BeginForLoop(const ProgramIR& program, const IRStatement& statement, std::string* error);
+
+  /// Emits the back edge, the exit block, and continues the linear flow.
+  bool EndForLoop(std::string* error);
+
   /// Declares function-local variables for values that are assigned in the IR. Must be called
   /// after Begin and before any other value is emitted so the variables stay in the entry block.
   bool DeclareLocals(const ProgramIR& program, std::string* error = nullptr);
@@ -141,6 +148,15 @@ class SPIRVShaderBuilder {
   std::vector<std::vector<uint32_t>> importedModules = {};
   const OperatorBundle* operatorBundle = nullptr;
   bool begun = false;
+
+  /// The open loops (innermost last): the header block to branch back to, the exit block to
+  /// continue from, and the counter's function variable.
+  struct LoopInfo {
+    uint32_t headerLabel = 0;
+    uint32_t exitLabel = 0;
+    uint32_t counterVariable = 0;
+  };
+  std::vector<LoopInfo> loopStack = {};
   bool finished = false;
 };
 

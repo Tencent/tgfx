@@ -95,6 +95,7 @@ enum class IRExprKind : uint8_t {
   Call,
   TextureSample,
   Builtin,
+  Convert,
 };
 
 /// One typed expression. Values are always referenced by ValueID; the constant payload is kept as
@@ -130,13 +131,21 @@ enum class IRStatementKind : uint8_t {
   StoreOutput,
   StoreVarying,
   Return,
+  ForLoopBegin,
+  ForLoopEnd,
 };
 
 struct IRStatement {
   IRStatementKind kind = IRStatementKind::Assign;
   LValue dst = {};
-  ValueID src = INVALID_VALUE_ID;
+  ValueID src = INVALID_EXPR_ID;
   ExprID expr = INVALID_EXPR_ID;
+  /// ForLoopBegin: the loop counter's name, init, bound (i <= bound) and step. The counter
+  /// registers as an IR value so the body's expressions reference it by name.
+  std::string loopVarName;
+  ValueID loopInit = INVALID_VALUE_ID;
+  ValueID loopBound = INVALID_VALUE_ID;
+  ValueID loopStep = INVALID_VALUE_ID;
 };
 
 enum class BindingKind : uint8_t {

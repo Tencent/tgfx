@@ -462,10 +462,17 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
                                   args.outputColor.c_str(), args.inputColor.c_str());
   }
   if (textureValue != INVALID_VALUE_ID && args.irBuilder != nullptr &&
-      args.inputValue != INVALID_VALUE_ID && args.outputValue != INVALID_VALUE_ID) {
+      args.outputValue != INVALID_VALUE_ID) {
+    // A top-level emission has no input value: the text route multiplies by the literal
+    // vec4(1.0), so the IR falls back to the same constant instead of skipping the output.
+    ValueID inputValue = args.inputValue;
+    if (inputValue == INVALID_VALUE_ID) {
+      const auto one = args.irBuilder->CreateConstant(1.0f);
+      inputValue = args.irBuilder->CreateConstruct(SLType::Float4, {one, one, one, one});
+    }
     const auto op = textureProxy->isAlphaOnly() ? OperatorID::AlphaModulate : OperatorID::MulAlpha;
-    const auto result = args.irBuilder->CreateCall(
-        op, SLType::Float4, {textureValue, args.inputValue}, args.outputColor);
+    const auto result = args.irBuilder->CreateCall(op, SLType::Float4, {textureValue, inputValue},
+                                                   args.outputColor);
     const auto value =
         args.isCoverage ? args.irBuilder->CreateSwizzle(result, SLType::Float4, "aaaa") : result;
     args.irBuilder->StoreOutput(args.outputValue, value);

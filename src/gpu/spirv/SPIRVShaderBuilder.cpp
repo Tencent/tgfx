@@ -664,6 +664,95 @@ uint32_t SPIRVShaderBuilder::EmitUniformArrayValue(const ProgramIR& program, con
   return loadId;
 }
 
+bool SPIRVShaderBuilder::BeginForLoop(const ProgramIR& program, const IRStatement& statement,
+                                      std::string* error) {
+  if (!begun) {
+    return Fail(error, "the SPIR-V shader builder has not begun");
+  }
+  // The counter's IR value (registered when the loop began on the builder side) resolves to a
+  // function variable the way DeclareLocals creates them.
+  ValueID counterValueId = INVALID_VALUE_ID;
+  for (const auto& value : program.values) {
+    if (value.debugName == statement.loopVarName) {
+      counterValueId = value.id;
+      break;
+    }
+  }
+  if (counterValueId == INVALID_VALUE_ID || counterValueId >= program.values.size()) {
+    return Fail(error, "the for loop counter has no IR value");
+  }
+  uint32_t counterVariable = 0;
+  const auto known = valueIds.find(counterValueId);
+  if (known != valueIds.end()) {
+    counterVariable = known->second;
+  } else {
+    const auto pointer = PointerTypeId(SLType::Int, spirv::kStorageFunction, error);
+    if (pointer == 0) {
+      return false;
+    }
+    writer.Sink(&writer.func);
+    counterVariable = writer.NewId();
+    writer.Inst(spirv::kOpVariable, {pointer, counterVariable, spirv::kStorageFunction});
+    valueIds[counterValueId] = counterVariable;
+  }
+  uint32_t initId = 0;
+  uint32_t boundId = 0;
+  if (!EmitValue(program, statement.loopInit, &initId, error) ||
+      !EmitValue(program, statement.loopBound, &boundId, error)) {
+    return false;
+  }
+  const auto intType = TypeId(SLType::Int, error);
+  const auto boolType = BoolTypeId(error);
+  if (intType == 0 || boolType == 0) {
+    return false;
+  }
+  writer.Sink(&writer.func);
+  writer.Inst(spirv::kOpStore, {counterVariable, initId});
+  const auto headerLabel = writer.NewId();
+  const auto bodyLabel = writer.NewId();
+  const auto exitLabel = writer.NewId();
+  writer.Inst(spirv::kOpBranch, {headerLabel});
+  writer.Inst(spirv::kOpLabel, {headerLabel});
+  const auto counter = writer.NewId();
+  writer.Inst(spirv::kOpLoad, {intType, counter, counterVariable});
+  const auto guard = writer.NewId();
+  writer.Inst(spirv::kOpSLessThanEqual, {boolType, guard, counter, boundId});
+  writer.Inst(spirv::kOpLoopMerge, {exitLabel, headerLabel, 0});
+  writer.Inst(spirv::kOpBranchConditional, {guard, bodyLabel, exitLabel});
+  writer.Inst(spirv::kOpLabel, {bodyLabel});
+  loopStack.push_back({headerLabel, exitLabel, counterVariable});
+  return true;
+}
+
+bool SPIRVShaderBuilder::EndForLoop(std::string* error) {
+  if (loopStack.empty()) {
+    return Fail(error, "a for loop end has no matching begin");
+  }
+  const auto loop = loopStack.back();
+  const auto intType = TypeId(SLType::Int, error);
+  if (intType == 0) {
+    return false;
+  }
+  writer.Sink(&writer.func);
+  IRExpr one = {};
+  one.kind = IRExprKind::ConstantInt;
+  one.type = SLType::Int;
+  one.constantBits = 1;
+  const auto oneId = ConstantId(one, error);
+  if (oneId == 0) {
+    return false;
+  }
+  const auto counter = writer.NewId();
+  writer.Inst(spirv::kOpLoad, {intType, counter, loop.counterVariable});
+  const auto next = writer.NewId();
+  writer.Inst(spirv::kOpIAdd, {intType, next, counter, oneId});
+  writer.Inst(spirv::kOpStore, {loop.counterVariable, next});
+  writer.Inst(spirv::kOpBranch, {loop.headerLabel});
+  writer.Inst(spirv::kOpLabel, {loop.exitLabel});
+  loopStack.pop_back();
+  return true;
+}
+
 bool SPIRVShaderBuilder::Begin(std::string* error) {
   if (begun) {
     return Fail(error, "the SPIR-V shader builder has already begun");
@@ -799,6 +888,25 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
     case IRExprKind::ConstantFloat:
     case IRExprKind::ConstantInt:
       return ConstantId(expr, error);
+    case IRExprKind::Convert: {
+      if (expr.args.size() != 1) {
+        Fail(error, "a conversion needs one source");
+        return 0;
+      }
+      uint32_t source = 0;
+      if (!EmitValue(program, expr.args[0], &source, error)) {
+        return 0;
+      }
+      const auto targetType = TypeId(expr.type, error);
+      if (targetType == 0) {
+        return 0;
+      }
+      const auto opcode = expr.type == SLType::Float ? spirv::kOpConvertSToF : spirv::kOpConvertFToS;
+      writer.Sink(&writer.func);
+      const auto id = writer.NewId();
+      writer.Inst(opcode, {targetType, id, source});
+      return id;
+    }
     case IRExprKind::Load: {
       if (expr.args.size() != 1) {
         Fail(error, "a load needs one source");

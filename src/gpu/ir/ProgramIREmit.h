@@ -20,6 +20,9 @@
 
 #include <string>
 
+#include <functional>
+
+#include "GeneratedOperators.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/VertexShaderBuilder.h"
 #include "gpu/ir/ProgramIRBuilder.h"
@@ -105,6 +108,55 @@ inline void emitOutputCoverageIR(ProgramIRBuilder* ir, ValueID value, bool value
   const auto output =
       ir->InternValue(outputCoverageName, SLType::Float4, Precision::High, IRValueKind::Local);
   ir->StoreOutput(output, coverage4);
+}
+
+// The weighted tap loop: the gaussian blur family's slow path, expressed as a runtime loop over
+// one child evaluation. The loop body holds a single child emission (the child evaluator
+// callback fires once at build time inside the loop), so the IR stays as compact as the text
+// route's for loop.
+inline ValueID emitWeightedTapLoop(
+    ProgramIRBuilder* ir, UniformHandler* uniformHandler, ValueID baseCoord, ValueID tapStep,
+    ValueID radiusValue, const std::string& baseCoordName,
+    const std::function<ValueID(ValueID tapCoordValue, const std::string& tapCoordName)>&
+        childEvaluator) {
+  if (ir == nullptr) {
+    return INVALID_VALUE_ID;
+  }
+  // sum: the accumulator (a local, Load/Store semantics on both backends).
+  const auto sumVar = ir->CreateValue(SLType::Float4, Precision::High, IRValueKind::Local,
+                                      "blurTapSum");
+  const auto zero = ir->CreateConstant(0.0f);
+  const auto zero4 = ir->CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
+  ir->Assign({sumVar, ""}, zero4);
+  // i runs from -radius to +radius; the bound (radius uniform) is a float, the counter is int.
+  const auto radiusInt = ir->CreateConvert(radiusValue, SLType::Int);
+  const auto intZero = ir->CreateConstantInt(0);
+  const auto initValue = ir->CreateBinary(IRBinaryOp::Sub, SLType::Int, intZero, radiusInt);
+  ir->BeginForLoop("blurTapIndex", initValue, radiusInt, intZero);
+  const auto indexValue = ir->InternValue("blurTapIndex", SLType::Int, Precision::High,
+                                          IRValueKind::Local);
+  // tapCoord = baseCoord + tapStep * float(i) — updated inside the loop body each iteration.
+  const auto indexFloat = ir->CreateConvert(indexValue, SLType::Float);
+  const auto scaled = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float2, tapStep, indexFloat);
+  const auto tapCoordValue =
+      ir->CreateBinary(IRBinaryOp::Add, SLType::Float2, baseCoord, scaled);
+  const std::string tapCoordName = baseCoordName + "Tap";
+  const auto tapCoordVar = ir->CreateValue(SLType::Float2, Precision::High, IRValueKind::Local,
+                                           tapCoordName);
+  ir->Assign({tapCoordVar, ""}, tapCoordValue);
+  // The child evaluates once, at the tap coordinate (the name bridges into the child's
+  // coordinate lookup).
+  const auto childValue = childEvaluator(tapCoordValue, tapCoordName);
+  // weight: kernelWeight(i) splatted to vec4.
+  KernelWeightOp::UniformNames kernelNames = {};
+  KernelWeightOp::EnsureUniforms(ir, uniformHandler, &kernelNames);
+  const auto weight = KernelWeightOp::Emit(ir, uniformHandler, &kernelNames, indexValue);
+  const auto weight4 = ir->CreateConstruct(SLType::Float4, {weight, weight, weight, weight});
+  const auto weighted = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, childValue, weight4);
+  const auto newSum = ir->CreateBinary(IRBinaryOp::Add, SLType::Float4, sumVar, weighted);
+  ir->Assign({sumVar, ""}, newSum);
+  ir->EndForLoop();
+  return sumVar;
 }
 
 }  // namespace tgfx

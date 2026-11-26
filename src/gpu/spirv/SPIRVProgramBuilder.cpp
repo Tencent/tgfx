@@ -48,6 +48,16 @@ bool BuildStage(const ProgramIR& program, const std::vector<IRStatement>& statem
           return false;
         }
         break;
+      case IRStatementKind::ForLoopBegin:
+        if (!builder->BeginForLoop(program, statement, error)) {
+          return false;
+        }
+        break;
+      case IRStatementKind::ForLoopEnd:
+        if (!builder->EndForLoop(error)) {
+          return false;
+        }
+        break;
       case IRStatementKind::StoreOutput:
         if (!builder->StoreOutput(program, statement.dst.base, statement.src, error)) {
           return false;

@@ -4,14 +4,17 @@
 // zeros, which drops the blur. Both blur paths (the linked call and the inline loop) read their
 // weights through this one function, so the two forms cannot drift apart.
 //@function tgfxKernelWeight
+//@op KernelWeight
+//@frag
 float tgfxKernelWeight(vec4 kernelSlot0, vec4 kernelSlot1, vec4 kernelSlot2, vec4 kernelSlot3,
                        vec4 kernelSlot4, vec4 kernelSlot5, vec4 kernelSlot6, vec4 kernelSlot7,
                        vec4 kernelSlot8, vec4 kernelSlot9, vec4 kernelSlot10, vec4 kernelSlot11,
                        vec4 kernelSlot12, vec4 kernelSlot13, vec4 kernelSlot14, vec4 kernelSlot15,
-                       vec4 kernelSlot16, int offset) {
+                       vec4 kernelSlot16, float offset /*@in*/) {
   // The table is symmetric, so the offset is folded first: the inline loop passes the signed tap
-  // index (j - radius), the linked call already passes abs(tap).
-  int kernelOffset = abs(offset);
+  // index (j - radius), the linked call already passes abs(tap). The parameter is a float so a
+  // runtime value (the IR loop counter) can flow through it; the int fold happens here.
+  int kernelOffset = abs(int(offset));
   int kernelSlot = kernelOffset / 4;
   vec4 kernelValues = kernelSlot0;
   if (kernelSlot == 0) { kernelValues = kernelSlot0; }

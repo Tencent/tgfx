@@ -165,6 +165,17 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
       *expression = std::move(out);
       return true;
     }
+    case IRExprKind::Convert: {
+      if (expr.args.size() != 1) {
+        return Fail(error, "a conversion needs one source");
+      }
+      std::string source = {};
+      if (!GLSLOperatorEmitter::EmitValue(program, expr.args[0], &source, error)) {
+        return false;
+      }
+      *expression = (expr.type == SLType::Float ? "float(" : "int(") + source + ")";
+      return true;
+    }
     case IRExprKind::Binary: {
       std::string left = {};
       std::string right = {};

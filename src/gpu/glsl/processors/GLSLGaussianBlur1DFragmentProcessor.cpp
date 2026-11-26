@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "gpu/ir/ProgramIREmit.h"
 #include "GLSLGaussianBlur1DFragmentProcessor.h"
 #include <algorithm>
 #include <cmath>
@@ -28,10 +29,6 @@ namespace tgfx {
 
 // Returns the shader expression for sampling the child at a coord offset by the gaussian kernel.
 // "offset" is a shader variable declared in the emitted code and "i" is the loop index.
-static std::string GaussianOffsetCoordFunc(std::string_view coord) {
-  return "(" + std::string(coord) + " + offset * float(i))";
-}
-
 // Emits the code that reads the half-kernel weight for the current loop offset into a "weight"
 // variable. The slot and the lane inside it are picked with chains of compile-time indices rather
 // than indexing the uniform array with abs(i) directly: SwiftShader miscompiles a dynamic index
@@ -194,38 +191,38 @@ void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
     }
   }
 
-  fragBuilder->codeAppendf("vec2 offset = %s;", names.tapStep.c_str());
-  fragBuilder->codeAppendf("int radius = %s;", names.tapRadius.c_str());
-  fragBuilder->codeAppend("vec4 sum = vec4(0.0);");
-
-  // The kernel is symmetric, so abs(i) indexes the half-kernel table. The weights are already
-  // normalized on the CPU, so neither exp() nor the trailing normalization division is needed.
-  fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", kernelLoopUpperBound());
-  fragBuilder->codeAppend("int i = j - radius;");
-  fragBuilder->codeAppend("if (i > radius) { break; }");
-  // abs(i) never exceeds kernelRadius, which computeKernel() derives as ceil(2 * sigma) and thus
-  // stays within 2 * maxSigma as long as the sigma <= maxSigma contract holds, upheld by the call
-  // site as described in computeKernel(). The loop bound above rests on the same contract, so the
-  // library lookup only reaches the slots that range can hit.
-  auto weightEntry = fragBuilder->appendFunction("tgfxKernelWeight");
-  if (weightEntry.empty()) {
+  // The slow path (any child that is not a single tiled read): a runtime loop over one child
+  // evaluation, the same shape the text loop had. The child fires once inside the loop body;
+  // its coordinate resolves through the tap coordinate local the loop updates each iteration.
+  if (args.irBuilder != nullptr) {
+    if (args.transformedCoords != nullptr) {
+      auto childCoords = args.transformedCoords->childInputs(0);
+      if (childCoords.count() >= 1 && childCoords[0].type() == SLType::Float2) {
+        auto ir = args.irBuilder;
+        const auto stepValue =
+            ir->InternValue(names.tapStep, SLType::Float2, Precision::High, IRValueKind::Uniform);
+        const auto radiusValue =
+            ir->InternValue(names.tapRadius, SLType::Float, Precision::High, IRValueKind::Uniform);
+        const auto baseCoord = ir->InternValue(childCoords[0].name(), SLType::Float2,
+                                               Precision::High, IRValueKind::Varying);
+        const std::string baseCoordName = childCoords[0].name();
+        const auto sumValue = emitWeightedTapLoop(
+            ir, args.uniformHandler, baseCoord, stepValue, radiusValue, baseCoordName,
+            [&](ValueID /*tapCoordValue*/, const std::string& tapCoordName) -> ValueID {
+              std::string childName = "blurTapChild";
+              return emitChildIR(
+                  0, "", &childName, args, INVALID_VALUE_ID,
+                  [&tapCoordName](std::string_view) -> std::string { return tapCoordName; });
+            });
+        if (sumValue != INVALID_VALUE_ID && args.outputValue != INVALID_VALUE_ID) {
+          ir->StoreOutput(args.outputValue, sumValue);
+          return;
+        }
+      }
+    }
+    args.irBuilder->MarkFailed("the gaussian blur slow path cannot express this child");
     return;
   }
-  fragBuilder->codeAppendf(
-      "float weight = %s(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, i);",
-      weightEntry.c_str(), names.kernelSlot0.c_str(), names.kernelSlot1.c_str(),
-      names.kernelSlot2.c_str(), names.kernelSlot3.c_str(), names.kernelSlot4.c_str(),
-      names.kernelSlot5.c_str(), names.kernelSlot6.c_str(), names.kernelSlot7.c_str(),
-      names.kernelSlot8.c_str(), names.kernelSlot9.c_str(), names.kernelSlot10.c_str(),
-      names.kernelSlot11.c_str(), names.kernelSlot12.c_str(), names.kernelSlot13.c_str(),
-      names.kernelSlot14.c_str(), names.kernelSlot15.c_str(), names.kernelSlot16.c_str());
-
-  std::string tempColor = "tempColor";
-  emitChild(0, &tempColor, args, GaussianOffsetCoordFunc);
-
-  fragBuilder->codeAppendf("sum += %s * weight;", tempColor.c_str());
-  fragBuilder->codeAppend("}");
-  fragBuilder->codeAppendf("%s = sum;", args.outputColor.c_str());
 }
 
 void GLSLGaussianBlur1DFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

@@ -99,6 +99,12 @@ bool ValidateExpr(const ProgramIR& program, const IRExpr& expr, std::string* err
     *error = "a texture sample needs a sampler and a coordinate";
     return false;
   }
+  if (expr.kind == IRExprKind::Convert) {
+    if (expr.args.size() != 1 || !HasValue(program, expr.args[0])) {
+      *error = "a conversion needs a source value";
+      return false;
+    }
+  }
   if (expr.kind == IRExprKind::Builtin && expr.builtin.empty()) {
     *error = "a builtin read needs a name";
     return false;
@@ -119,6 +125,15 @@ bool ValidateStatement(const ProgramIR& program, const IRStatement& statement, s
         *error = "a call statement references an unknown expression";
         return false;
       }
+      break;
+    case IRStatementKind::ForLoopBegin:
+      if (statement.loopInit == INVALID_VALUE_ID || !HasValue(program, statement.loopInit) ||
+          statement.loopBound == INVALID_VALUE_ID || !HasValue(program, statement.loopBound)) {
+        *error = "a for loop header references an unknown value";
+        return false;
+      }
+      break;
+    case IRStatementKind::ForLoopEnd:
       break;
     case IRStatementKind::StoreOutput:
       if (!HasValue(program, statement.dst.base) || !HasValue(program, statement.src)) {

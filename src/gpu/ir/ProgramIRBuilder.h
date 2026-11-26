@@ -54,6 +54,9 @@ class ProgramIRBuilder {
 
   ValueID CreateConstant(float value, Precision precision = Precision::High);
 
+  /// Creates an int constant (the loop counters and index math need them).
+  ValueID CreateConstantInt(int32_t value);
+
   ValueID CreateIntConstant(int32_t value);
 
   ValueID CreateLoad(ValueID source, SLType type, Precision precision = Precision::Default);
@@ -79,6 +82,18 @@ class ProgramIRBuilder {
   void SetStage(ShaderStage stage);
 
   void Assign(LValue dst, ValueID src);
+
+  /// Begins a runtime for loop: the statements pushed until the matching EndForLoop form the
+  /// loop body. The counter registers as an int IR value under varName (the body references it
+  /// by that name); the loop runs while counter <= bound, stepping by step.
+  void BeginForLoop(const std::string& varName, ValueID init, ValueID bound, ValueID step);
+
+  /// Closes the innermost open BeginForLoop.
+  void EndForLoop();
+
+  /// Converts between int and float (the IR is strongly typed). The target picks the
+  /// direction; a source already of the target type returns unchanged.
+  ValueID CreateConvert(ValueID source, SLType target);
 
   void StoreOutput(ValueID dst, ValueID src);
 

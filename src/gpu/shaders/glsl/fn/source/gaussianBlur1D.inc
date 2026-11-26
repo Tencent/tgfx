@@ -26,7 +26,7 @@ vec4 gaussianBlur1D(sampler2D sourceSampler, highp vec2 baseCoord /*@in*/, highp
                                     kernelSlot4, kernelSlot5, kernelSlot6, kernelSlot7,
                                     kernelSlot8, kernelSlot9, kernelSlot10, kernelSlot11,
                                     kernelSlot12, kernelSlot13, kernelSlot14, kernelSlot15,
-                                    kernelSlot16, kernelOffset);
+                                    kernelSlot16, float(kernelOffset));
 
     vec2 sampleCoord = baseCoord + tapStep * float(tap);
     vec4 tapColor = vec4(0.0);

@@ -271,6 +271,14 @@ ValueID ProgramIRBuilder::AddExpr(IRExpr expr, const std::string& debugName) {
   return result;
 }
 
+ValueID ProgramIRBuilder::CreateConstantInt(int32_t value) {
+  IRExpr expr = {};
+  expr.kind = IRExprKind::ConstantInt;
+  expr.type = SLType::Int;
+  expr.constantBits = static_cast<uint32_t>(value);
+  return AddExpr(std::move(expr), {});
+}
+
 ValueID ProgramIRBuilder::CreateConstant(float value, Precision precision) {
   IRExpr expr = {};
   expr.kind = IRExprKind::ConstantFloat;
@@ -374,6 +382,41 @@ ValueID ProgramIRBuilder::CreateTextureSample(ValueID sampler, ValueID coordinat
 
 void ProgramIRBuilder::SetStage(ShaderStage stage) {
   currentStage = stage;
+}
+
+void ProgramIRBuilder::BeginForLoop(const std::string& varName, ValueID init, ValueID bound,
+                                    ValueID step) {
+  IRStatement statement = {};
+  statement.kind = IRStatementKind::ForLoopBegin;
+  statement.loopVarName = varName;
+  statement.loopInit = init;
+  statement.loopBound = bound;
+  statement.loopStep = step;
+  (currentStage == ShaderStage::Vertex ? ir.vertexStatements : ir.statements)
+      .push_back(std::move(statement));
+  // The counter is an IR value the body references by name.
+  CreateValue(SLType::Int, Precision::High, IRValueKind::Local, varName);
+}
+
+void ProgramIRBuilder::EndForLoop() {
+  IRStatement statement = {};
+  statement.kind = IRStatementKind::ForLoopEnd;
+  (currentStage == ShaderStage::Vertex ? ir.vertexStatements : ir.statements)
+      .push_back(std::move(statement));
+}
+
+ValueID ProgramIRBuilder::CreateConvert(ValueID source, SLType target) {
+  if (source == INVALID_VALUE_ID || source >= ir.values.size()) {
+    return INVALID_VALUE_ID;
+  }
+  if (ir.values[source].type == target) {
+    return source;
+  }
+  IRExpr expr = {};
+  expr.kind = IRExprKind::Convert;
+  expr.type = target;
+  expr.args = {source};
+  return AddExpr(std::move(expr), {});
 }
 
 void ProgramIRBuilder::Assign(LValue dst, ValueID src) {

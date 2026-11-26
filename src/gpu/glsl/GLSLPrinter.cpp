@@ -354,11 +354,29 @@ bool ResolvesIdentifier(const std::string& name, const ProgramIR& program,
 
 std::string GLSLPrinter::PrintFragmentBodyFromIR(const ProgramIR& program) {
   std::string out = {};
+  std::string error = {};
   std::set<std::string> declared = {};
   // The fragment epilogue writes through the stage output; it is declared by the header, and the
   // position output is a builtin.
   declared.insert("gl_Position");
   for (const auto& statement : program.statements) {
+    if (statement.kind == IRStatementKind::ForLoopBegin) {
+      std::string init = {};
+      std::string bound = {};
+      if (!GLSLOperatorEmitter::EmitValue(program, statement.loopInit, &init, &error) ||
+          !GLSLOperatorEmitter::EmitValue(program, statement.loopBound, &bound, &error)) {
+        return {};
+      }
+      // The counter is a loop-local declared by the header itself.
+      declared.insert(statement.loopVarName);
+      out += "  for (int " + statement.loopVarName + " = " + init + "; " + statement.loopVarName +
+             " <= " + bound + "; ++" + statement.loopVarName + ") {\n";
+      continue;
+    }
+    if (statement.kind == IRStatementKind::ForLoopEnd) {
+      out += "  }\n";
+      continue;
+    }
     if (statement.kind != IRStatementKind::Assign && statement.kind != IRStatementKind::StoreOutput) {
       return {};
     }
