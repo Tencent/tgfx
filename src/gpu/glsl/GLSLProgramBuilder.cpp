@@ -20,6 +20,7 @@
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
+#include <set>
 #include <string>
 #include "GLSLPrinter.h"
 #include "core/utils/Log.h"
@@ -293,6 +294,76 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   }
   _vertexBuilder.setCodeText(GLSLPrinter::PrintVertexProgram(description.vertexCalls));
   _fragBuilder.setCodeText(GLSLPrinter::PrintFragmentProgram(description.fragment));
+  // The IR printer route (stage 3 step 1): the main bodies come straight from the ProgramIR
+  // statements instead of the recorded text. Gated by an environment switch so the text route
+  // stays the default while the printer's coverage grows; an empty print (an uncovered statement
+  // form) falls back to the recorded text. The swizzle epilogue is appended outside, the same way
+  // the text route does it.
+  if (std::getenv("TGFX_IR_PRINTER") != nullptr) {
+    bool irRouteUsable = true;
+    // The printed body calls the operator functions by name, but nothing on the IR route pulled
+    // their sources (the text route's processors call appendFunction themselves). Walk the calls
+    // and pull each referenced function; the library pull is deduplicated and carries each
+    // function's own dependencies.
+    for (const auto& expr : programIRBuilder().IR().exprs) {
+      if (expr.kind == IRExprKind::TextureSample) {
+        // The printed texture read goes through the shared reader function; the rect samplers
+        // have their own.
+        _fragBuilder.appendFunction(
+            expr.samplerType == SLType::Texture2DRectSampler ? "tgfxTextureSampleRect"
+                                                             : "tgfxTextureSample");
+        continue;
+      }
+      if (expr.kind != IRExprKind::Call) {
+        continue;
+      }
+      const auto* desc = FindOperator(expr.op);
+      if (desc == nullptr || desc->glslSymbol == nullptr) {
+        continue;
+      }
+      _fragBuilder.appendFunction(desc->glslSymbol);
+    }
+    auto fragmentBody = GLSLPrinter::PrintFragmentBodyFromIR(programIRBuilder().IR());
+    if (!fragmentBody.empty()) {
+      // A varying the fragment body reads must be written by the printed vertex body: some
+      // vertex-side math (for example the tex-subset transform) is still text-only, and a program
+      // whose vertex side skips it fails to link. Fall back to the text route for those.
+      std::set<std::string> writtenVaryings = {};
+      for (const auto& statement : programIRBuilder().IR().vertexStatements) {
+        if (statement.kind == IRStatementKind::StoreVarying &&
+            statement.dst.base < programIRBuilder().IR().values.size()) {
+          writtenVaryings.insert(programIRBuilder().IR().values[statement.dst.base].debugName);
+        }
+      }
+      for (const auto& varying : programIRBuilder().IR().interface.varyings) {
+        if (fragmentBody.find(varying.name) == std::string::npos) {
+          continue;
+        }
+        if (writtenVaryings.count(varying.name) == 0) {
+          // The vertex side cannot produce this varying on the IR route: both bodies fall back
+          // together (a text fragment against an IR vertex fails the same link).
+          fragmentBody.clear();
+          irRouteUsable = false;
+          break;
+        }
+      }
+    }
+    if (!fragmentBody.empty()) {
+      const auto swizzle = programInfo->getOutputSwizzle();
+      if (swizzle != Swizzle::RGBA()) {
+        // The epilogue belongs inside main: swizzle the output before the closing brace.
+        fragmentBody += std::string(CUSTOM_COLOR_OUTPUT_NAME) + " = " +
+                                CUSTOM_COLOR_OUTPUT_NAME + "." + swizzle.c_str() + ";\n";
+      }
+      fragmentBody += "}\n";
+      _fragBuilder.setCodeText(fragmentBody);
+    }
+    auto vertexBody = GLSLPrinter::PrintVertexBodyFromIR(programIRBuilder().IR());
+    if (irRouteUsable && !vertexBody.empty()) {
+      vertexBody += "}\n";
+      _vertexBuilder.setCodeText(vertexBody);
+    }
+  }
   const auto vertexText =
       GLSLPrinter::PrintStage(*this, ShaderStage::Vertex, description.interface, _vertexBuilder);
   const auto fragmentText =

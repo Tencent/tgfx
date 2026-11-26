@@ -19,6 +19,7 @@
 #pragma once
 
 #include <string>
+#include "gpu/ir/ProgramIR.h"
 #include <vector>
 #include "gpu/ir/ProgramDescription.h"
 #include "tgfx/gpu/ShaderStage.h"
@@ -35,6 +36,15 @@ class GLSLPrinter {
   static std::string PrintVertexProgram(const std::vector<VertexCall>& calls);
 
   static std::string PrintFragmentProgram(const FragmentProgram& program);
+
+  /// Prints the fragment main body straight from the ProgramIR statements (the IR printer
+  /// route): one declaration or assignment per statement, expressions through the operator
+  /// emitter. Returns an empty string when a statement cannot be printed yet, so the caller can
+  /// fall back to the recorded text route. outputName seeds the swizzle epilogue's target.
+  static std::string PrintFragmentBodyFromIR(const ProgramIR& program);
+
+  /// Prints the vertex main body from the ProgramIR vertex statements under the same rules.
+  static std::string PrintVertexBodyFromIR(const ProgramIR& program);
 
   static std::string PrintStage(const ProgramBuilder& programBuilder, ShaderStage stage,
                                 const InterfaceDesc& interface, const ShaderBuilder& builder);

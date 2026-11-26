@@ -187,7 +187,7 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
           op = "/";
           break;
       }
-      *expression = left + " " + op + " " + right;
+      *expression = "(" + left + " " + op + " " + right + ")";
       return true;
     }
     case IRExprKind::Call:
@@ -202,11 +202,30 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
           !ValueName(program, expr.args[1], &coord, error)) {
         return false;
       }
-      if (expr.samplerSwizzleCode < 0) {
-        return Fail(error, "a texture sample has no reader swizzle");
+      if (expr.samplerType == SLType::Texture2DRectSampler) {
+        // The rect reader takes the sampler and coordinate alone (no subset clamp, no swizzle).
+        *expression = "tgfxTextureSampleRect(" + sampler + ", " + coord + ")";
+        return true;
       }
-      *expression = "tgfxTextureSample(" + sampler + ", " + coord + ", vec4(0.0), 0, " +
-                    std::to_string(expr.samplerSwizzleCode) + ")";
+      // A plain sample (no swizzle code recorded) reads the sampler's own channels, which the
+      // shared reader expresses with the identity swizzle code. A clamped sample carries the
+      // subset uniform (the stricter of the strict/draw pair rides the call) with clamp on.
+      const int32_t swizzleCode = expr.samplerSwizzleCode < 0 ? 0 : expr.samplerSwizzleCode;
+      std::string subset = "vec4(0.0)";
+      std::string clampOn = "0";
+      if (expr.subsetClamped) {
+        const ValueID subsetValue = expr.strictSubset != INVALID_VALUE_ID ? expr.strictSubset
+                                                                          : expr.drawSubset;
+        if (subsetValue != INVALID_VALUE_ID && subsetValue < program.values.size()) {
+          std::string subsetName = {};
+          if (ValueName(program, subsetValue, &subsetName, error)) {
+            subset = subsetName;
+            clampOn = "1";
+          }
+        }
+      }
+      *expression = "tgfxTextureSample(" + sampler + ", " + coord + ", " + subset + ", " +
+                    clampOn + ", " + std::to_string(swizzleCode) + ")";
       return true;
     }
     case IRExprKind::Builtin:
@@ -251,7 +270,10 @@ bool GLSLOperatorEmitter::EmitCall(const ProgramIR& program, ValueID result,
   out += "(";
   for (size_t index = 0; index < call.args.size(); ++index) {
     std::string argument = {};
-    if (!ValueName(program, call.args[index], &argument, error)) {
+    // An argument with a defining expression prints the expression inline: the IR printer route
+    // has no named staging local for it, and a bare debug name would be undeclared there. Resource
+    // and named values keep their names, which the text route declares.
+    if (!EmitValue(program, call.args[index], &argument, error)) {
       return false;
     }
     if (index != 0) {

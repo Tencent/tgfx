@@ -150,7 +150,19 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
     fragBuilder->storeColor(args.outputColor, read.name);
     if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID &&
         read.value != INVALID_VALUE_ID) {
-      args.irBuilder->StoreOutput(args.outputValue, read.value);
+      // The text route's epilogue modulates the read through tgfxMulAlpha/tgfxAlphaModulate; the
+      // IR must record the same call or the printed body skips the modulation entirely.
+      ValueID result = read.value;
+      if (args.inputValue != INVALID_VALUE_ID) {
+        if (textureProxy->isAlphaOnly()) {
+          result = args.irBuilder->CreateCall(OperatorID::AlphaModulate, SLType::Float4,
+                                               {read.value, args.inputValue}, read.name);
+        } else {
+          result = args.irBuilder->CreateCall(OperatorID::MulAlpha, SLType::Float4,
+                                               {read.value, args.inputValue}, read.name);
+        }
+      }
+      args.irBuilder->StoreOutput(args.outputValue, result);
     }
     return;
   }
