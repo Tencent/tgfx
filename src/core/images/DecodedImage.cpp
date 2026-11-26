@@ -47,6 +47,17 @@ DecodedImage::DecodedImage(int width, int height, bool alphaOnly,
       source(std::move(source)), _colorSpace(std::move(colorSpace)) {
 }
 
+Image::DecodeStatus DecodedImage::decodeStatus() const {
+  if (source == nullptr) {
+    return DecodeStatus::Failed;
+  }
+  if (source->isReady()) {
+    return source->tryGetData() != nullptr ? DecodeStatus::Completed : DecodeStatus::Failed;
+  }
+  // A build without worker support keeps an on-demand source. Do not execute it from a query.
+  return source->isAsynchronous() ? DecodeStatus::Decoding : DecodeStatus::NotStarted;
+}
+
 std::shared_ptr<TextureProxy> DecodedImage::lockTextureProxy(const TPArgs& args) const {
   return args.context->proxyProvider()->createTextureProxy(source, _width, _height, _alphaOnly,
                                                            args.mipmapped);

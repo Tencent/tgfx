@@ -126,7 +126,15 @@ std::shared_ptr<Image> RasterizedImage::onMakeDecoded(Context* context, bool try
   if (newSource == nullptr) {
     return nullptr;
   }
-  return newSource->makeRasterized();
+  // Keep the documented cache identity of makeDecoded(). The original Image can reuse the
+  // uploaded texture after the caller releases the decoded pixels. Do not mutate its source.
+  // Some wrappers can change logical dimensions during decoding; keep their existing behavior.
+  if (newSource->width() != width() || newSource->height() != height()) {
+    return newSource->makeRasterized();
+  }
+  auto image = std::make_shared<RasterizedImage>(uniqueKey, std::move(newSource));
+  image->weakThis = image;
+  return image;
 }
 
 std::shared_ptr<Image> RasterizedImage::onMakeMipmapped(bool enabled) const {

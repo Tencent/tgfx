@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/codecs/jpeg/JpegCodec.h"
+#include <algorithm>
 #include <csetjmp>
+#include "core/codecs/ScanlineEncoder.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -26,6 +28,7 @@
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/WriteStream.h"
 
 extern "C" {
 #include "jerror.h"
@@ -381,64 +384,144 @@ std::shared_ptr<Data> JpegCodec::getEncodedData() const {
 }
 
 #ifdef TGFX_USE_JPEG_ENCODE
-std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality) {
-  auto srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixmap.pixels()));
-  int srcRowBytes = static_cast<int>(pixmap.rowBytes());
-  jpeg_compress_struct cinfo = {};
-  jpeg_error_mgr jerr = {};
-  JSAMPROW row_pointer[1];
-  cinfo.err = jpeg_std_error(&jerr);
-  jpeg_create_compress(&cinfo);
-  uint8_t* dstBuffer = nullptr;
-  unsigned long dstBufferSize = 0;  // NOLINT
-  jpeg_mem_dest(&cinfo, &dstBuffer, &dstBufferSize);
-  cinfo.image_width = static_cast<JDIMENSION>(pixmap.width());
-  cinfo.image_height = static_cast<JDIMENSION>(pixmap.height());
-  Buffer buffer = {};
-  switch (pixmap.colorType()) {
-    case ColorType::RGBA_8888:
-      cinfo.in_color_space = JCS_EXT_RGBA;
-      cinfo.input_components = 4;
-      break;
-    case ColorType::BGRA_8888:
-      cinfo.in_color_space = JCS_EXT_BGRA;
-      cinfo.input_components = 4;
-      break;
-    case ColorType::Gray_8:
-      cinfo.in_color_space = JCS_GRAYSCALE;
-      cinfo.input_components = 1;
-      break;
-    default:
-      auto info = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888,
-                                  AlphaType::Premultiplied, 0, pixmap.colorSpace());
-      buffer.alloc(info.byteSize());
-      if (buffer.isEmpty()) {
-        return nullptr;
-      }
-      srcPixels = buffer.bytes();
-      srcRowBytes = static_cast<int>(info.rowBytes());
-      Pixmap(info, srcPixels).writePixels(pixmap.info(), pixmap.pixels());
-      cinfo.in_color_space = JCS_EXT_RGBA;
-      cinfo.input_components = 4;
-      break;
-  }
-  jpeg_set_defaults(&cinfo);
-  cinfo.optimize_coding = TRUE;
-  jpeg_set_quality(&cinfo, quality, TRUE);
-  jpeg_start_compress(&cinfo, TRUE);
-  if (pixmap.colorSpace()) {
-    auto iccData = pixmap.colorSpace()->toICCProfile();
-    jpeg_write_icc_profile(&cinfo, iccData->bytes(), static_cast<uint32_t>(iccData->size()));
-  }
-  while (cinfo.next_scanline < cinfo.image_height) {
-    row_pointer[0] = &(srcPixels)[cinfo.next_scanline * static_cast<JDIMENSION>(srcRowBytes)];
-    (void)jpeg_write_scanlines(&cinfo, row_pointer, 1);
+namespace {
+class JpegScanlineEncoder final : public ScanlineEncoder {
+ public:
+  explicit JpegScanlineEncoder(WriteStream* destination) : stream(destination) {
   }
 
-  /* similar to read file, clean up after we're done compressing */
-  jpeg_finish_compress(&cinfo);
-  jpeg_destroy_compress(&cinfo);
-  return Data::MakeAdopted(dstBuffer, dstBufferSize, Data::FreeProc);
+  ~JpegScanlineEncoder() override {
+    if (jpeg.mem) {
+      jpeg_destroy_compress(&jpeg);
+    }
+  }
+
+  bool initialize(const ImageInfo& info, int quality, bool optimizeCoding) {
+    if (info.width() > JPEG_MAX_DIMENSION || info.height() > JPEG_MAX_DIMENSION) {
+      return false;
+    }
+    auto inputColorSpace = JCS_EXT_RGBA;
+    auto inputComponents = 4;
+    switch (info.colorType()) {
+      case ColorType::RGBA_8888:
+        break;
+      case ColorType::BGRA_8888:
+        inputColorSpace = JCS_EXT_BGRA;
+        break;
+      case ColorType::Gray_8:
+        inputColorSpace = JCS_GRAYSCALE;
+        inputComponents = 1;
+        break;
+      default:
+        rowInfo = ImageInfo::Make(info.width(), 1, ColorType::RGBA_8888, AlphaType::Premultiplied,
+                                  0, info.colorSpace());
+        if (!scratch.alloc(rowInfo.byteSize())) {
+          return false;
+        }
+        break;
+    }
+
+    auto profile = info.colorSpace() ? info.colorSpace()->toICCProfile() : nullptr;
+    jpeg.err = jpeg_std_error(&error);
+    jpeg.err->error_exit = Fail;
+    jpeg.client_data = this;
+    if (setjmp(jump)) {
+      return false;
+    }
+    jpeg_create_compress(&jpeg);
+    jpeg.dest = &destination;
+    destination.init_destination = InitDestination;
+    destination.empty_output_buffer = WriteBuffer;
+    destination.term_destination = FinishDestination;
+    jpeg.image_width = static_cast<JDIMENSION>(info.width());
+    jpeg.image_height = static_cast<JDIMENSION>(info.height());
+    jpeg.input_components = inputComponents;
+    jpeg.in_color_space = inputColorSpace;
+    jpeg_set_defaults(&jpeg);
+    jpeg.optimize_coding = optimizeCoding ? TRUE : FALSE;
+    jpeg_set_quality(&jpeg, std::clamp(quality, 0, 100), TRUE);
+    jpeg_start_compress(&jpeg, TRUE);
+    if (profile && profile->size()) {
+      jpeg_write_icc_profile(&jpeg, profile->bytes(), static_cast<unsigned int>(profile->size()));
+    }
+    return true;
+  }
+
+  bool appendRows(const Pixmap& band) override {
+    if (setjmp(jump)) {
+      return false;
+    }
+    auto pixels = static_cast<const uint8_t*>(band.pixels());
+    for (int row = 0; row < band.height(); ++row) {
+      auto* source = pixels + static_cast<size_t>(row) * band.rowBytes();
+      if (!scratch.isEmpty()) {
+        if (!band.readPixels(rowInfo, scratch.data(), 0, row)) {
+          return false;
+        }
+        source = scratch.bytes();
+      }
+      auto* scanline = const_cast<JSAMPLE*>(source);
+      if (jpeg_write_scanlines(&jpeg, &scanline, 1) != 1) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool finish() override {
+    if (setjmp(jump)) {
+      return false;
+    }
+    jpeg_finish_compress(&jpeg);
+    return true;
+  }
+
+ private:
+  static void Fail(j_common_ptr encoder) {
+    longjmp(static_cast<JpegScanlineEncoder*>(encoder->client_data)->jump, 1);
+  }
+
+  static void InitDestination(j_compress_ptr encoder) {
+    auto* self = static_cast<JpegScanlineEncoder*>(encoder->client_data);
+    encoder->dest->next_output_byte = self->outputBuffer;
+    encoder->dest->free_in_buffer = sizeof(self->outputBuffer);
+  }
+
+  static boolean WriteBuffer(j_compress_ptr encoder) {
+    auto* self = static_cast<JpegScanlineEncoder*>(encoder->client_data);
+    if (!self->stream->write(self->outputBuffer, sizeof(self->outputBuffer))) {
+      ERREXIT(encoder, JERR_FILE_WRITE);
+    }
+    InitDestination(encoder);
+    return TRUE;
+  }
+
+  static void FinishDestination(j_compress_ptr encoder) {
+    auto* self = static_cast<JpegScanlineEncoder*>(encoder->client_data);
+    auto size = sizeof(self->outputBuffer) - encoder->dest->free_in_buffer;
+    if (size != 0 && !self->stream->write(self->outputBuffer, size)) {
+      ERREXIT(encoder, JERR_FILE_WRITE);
+    }
+  }
+
+  WriteStream* stream = nullptr;
+  jpeg_compress_struct jpeg = {};
+  jpeg_error_mgr error = {};
+  jpeg_destination_mgr destination = {};
+  jmp_buf jump = {};
+  JOCTET outputBuffer[16 * 1024] = {};
+  ImageInfo rowInfo = {};
+  Buffer scratch;
+};
+}  // namespace
+
+std::unique_ptr<ScanlineEncoder> JpegCodec::MakeEncoder(WriteStream* stream, const ImageInfo& info,
+                                                        int quality, bool optimizeCoding) {
+  auto encoder = std::make_unique<JpegScanlineEncoder>(stream);
+  if (!encoder->initialize(info, quality, optimizeCoding)) {
+    return nullptr;
+  }
+  return encoder;
 }
 #endif
 

@@ -37,6 +37,10 @@ class TransformImage : public Image {
     return source->isFullyDecoded();
   }
 
+  DecodeStatus decodeStatus() const override {
+    return source->decodeStatus();
+  }
+
   bool isAlphaOnly() const override {
     return source->isAlphaOnly();
   }

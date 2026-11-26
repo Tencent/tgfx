@@ -46,6 +46,8 @@ class DecodedImage : public PixelImage {
     return _colorSpace;
   }
 
+  DecodeStatus decodeStatus() const override;
+
  protected:
   Type type() const override {
     return Type::Decoded;

@@ -46,6 +46,10 @@ class RasterizedImage : public Image {
     return source->isFullyDecoded();
   }
 
+  DecodeStatus decodeStatus() const override {
+    return source->decodeStatus();
+  }
+
   bool hasMipmaps() const override {
     return source->hasMipmaps();
   }

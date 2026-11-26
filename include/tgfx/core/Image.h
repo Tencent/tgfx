@@ -235,6 +235,16 @@ class Image {
   }
 
   /**
+   * Progress of CPU decoding. Query the Image returned by makeDecoded(); querying the original
+   * Image does not start decoding. This method never waits for a decoding task.
+   */
+  enum class DecodeStatus { NotStarted, Decoding, Completed, Failed };
+
+  virtual DecodeStatus decodeStatus() const {
+    return isFullyDecoded() ? DecodeStatus::Completed : DecodeStatus::NotStarted;
+  }
+
+  /**
    * Returns an Image backed by a GPU texture associated with the given context. If a corresponding
    * texture cache exists in the context, it returns an Image that wraps that texture. Otherwise, it
    * creates one immediately. If the Image is already texture-backed and the context is compatible
