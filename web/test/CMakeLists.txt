@@ -140,7 +140,7 @@ if (NOT TGFX_UPDATE_BASELINE AND EXISTS ${CACHE_DIR}/md5.json AND EXISTS ${CACHE
 elseif (NOT TGFX_UPDATE_BASELINE)
     message(WARNING "Baseline reference cache is incomplete at ${CACHE_DIR}/. "
         "Screenshot comparisons with missing references will fail. "
-        "Provide an approved reference cache before running screenshot tests.")
+        "Run './update_baseline.sh USE_WEBGL' (or USE_WEBGPU) from the project root first.")
 endif ()
 set_property(TARGET tgfx-test APPEND PROPERTY LINK_DEPENDS
     ${TGFX_SOURCE_DIR}/test/baseline/version.json)

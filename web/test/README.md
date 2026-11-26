@@ -61,7 +61,7 @@ Web 端的 baseline 机制与原生主干一致，核心流程相同，但因 WA
 1. **`TGFXFullTest`**（无特殊宏）：运行所有测试，输出 `test/out/version.json` 记录当前各 key 的版本
 2. **`UpdateBaseline`**（带 `UPDATE_BASELINE` + `GENERATE_BASELINE_IMAGES` 宏）：运行所有测试，无条件记录每个 key 的 MD5 到 cache，生成 baseline 图片，TearDown 时写入 `test/baseline/.cache/{backend}/md5.json`
 
-Web 端 accept baseline 后，`accept_baseline.sh` 会自动同步 `version.json` 到 `test/baseline/.cache/webgl/` 和 `.cache/webgpu/`（如目录存在）。
+Web 端参考缓存由 `./update_baseline.sh` 基于固定 main 提交生成，其 `version.json` 必须与 main 保持一致，因此 `accept_baseline.sh` 不再同步分支的 `version.json` 到 `test/baseline/.cache/webgl/` 和 `.cache/webgpu/`。本地已接受的 key 因两边版本号不同而自然跳过比较。
 
 ### Web 端流程
 
