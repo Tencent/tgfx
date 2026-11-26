@@ -1090,13 +1090,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
                     --library-languages ${TGFX_SHADER_LIBRARY_LANGUAGES}
             DEPENDS ${TGFX_SHADER_TOOL_DEPENDS} ${TGFX_SHADER_SOURCES}
             COMMENT "Generating the shader library bundle")
-    add_custom_target(shader_library_bundle
-            # The bundle file is removed after every build on purpose: the generator rule keys off
-            # its OUTPUT, so a missing file forces a fresh tool run on the next build. The tool
-            # rewrites it (content-addressed, so an unchanged rewrite keeps the embed step cheap),
-            # which ends the recurring stale-bundle class of failures.
-            COMMAND ${CMAKE_COMMAND} -E rm -f ${TGFX_SHADER_LIBRARY_BUNDLE}
-            DEPENDS ${TGFX_SHADER_LIBRARY_BUNDLE})
+    add_custom_target(shader_library_bundle DEPENDS ${TGFX_SHADER_LIBRARY_BUNDLE})
     add_dependencies(tgfx shader_library_bundle)
     target_include_directories(tgfx PRIVATE ${TGFX_SHADER_BUNDLE_DIR})
 
