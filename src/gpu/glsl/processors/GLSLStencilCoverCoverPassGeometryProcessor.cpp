@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLStencilCoverCoverPassGeometryProcessor.h"
+#include "gpu/VertexShaderBuilder.h"
 
 namespace tgfx {
 PlacementPtr<StencilCoverCoverPassGeometryProcessor> StencilCoverCoverPassGeometryProcessor::Make(
@@ -56,6 +57,42 @@ void GLSLStencilCoverCoverPassGeometryProcessor::emitCode(EmitArgs& args) const 
   fragBuilder->storeColor(args.outputColor, colorName);
 
   vertBuilder->storePosition(positionName);
+
+  // The IR route: the transformed position, the constant coverage and the brush colour as SSA
+  // values, so the SPIR-V path serves this geometry without the text emission.
+  if (args.irBuilder != nullptr) {
+    auto ir = args.irBuilder;
+    const auto matrixValue =
+        ir->InternValue(matrixName, SLType::Float3x3, Precision::High, IRValueKind::Uniform);
+    const auto positionValue = ir->InternValue(position.name(), SLType::Float2, Precision::High,
+                                               IRValueKind::Attribute);
+    const auto one = ir->CreateConstant(1.0f);
+    const auto zero = ir->CreateConstant(0.0f);
+    const auto position3 = ir->CreateConstruct(SLType::Float3, {positionValue, one});
+    const auto transformed =
+        ir->CreateBinary(IRBinaryOp::Mul, SLType::Float3, matrixValue, position3);
+    const auto transformedXY = ir->CreateSwizzle(transformed, SLType::Float2, "xy");
+    const auto rtAdjust =
+        ir->InternValue(RTAdjustName, SLType::Float4, Precision::High, IRValueKind::Uniform);
+    const auto adjustXZ = ir->CreateSwizzle(rtAdjust, SLType::Float2, "xz");
+    const auto adjustYW = ir->CreateSwizzle(rtAdjust, SLType::Float2, "yw");
+    const auto scaled = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float2, transformedXY, adjustXZ);
+    const auto shifted = ir->CreateBinary(IRBinaryOp::Add, SLType::Float2, scaled, adjustYW);
+    const auto position4 = ir->CreateConstruct(SLType::Float4, {shifted, zero, one});
+    const auto positionOutput =
+        ir->CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "gl_Position");
+    ir->StoreOutput(positionOutput, position4);
+    ir->SetStage(ShaderStage::Fragment);
+    const auto colorValue =
+        ir->InternValue(colorName, SLType::Float4, Precision::High, IRValueKind::Uniform);
+    const auto colorOutput = ir->InternValue(args.outputColor, SLType::Float4, Precision::High,
+                                             IRValueKind::Local);
+    ir->StoreOutput(colorOutput, colorValue);
+    const auto coverage4 = ir->CreateConstruct(SLType::Float4, {one, one, one, one});
+    const auto coverageOutput = ir->InternValue(args.outputCoverage, SLType::Float4,
+                                                Precision::High, IRValueKind::Local);
+    ir->StoreOutput(coverageOutput, coverage4);
+  }
 }
 
 void GLSLStencilCoverCoverPassGeometryProcessor::setData(
