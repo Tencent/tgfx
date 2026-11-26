@@ -34,10 +34,11 @@ class ImageStream;
  * return its latest image and skip intermediate frames.
  * GPU, driver, and lock operations have no bounded completion time.
  * Delivery is written while generating a texture on the rendering thread; other threads may query
- * buffer state and timestamp for reconciliation. Reads and these queries share the reader's mutex,
- * including the native texture lifetime check. Queries are thread-safe, not lock-free, and may wait
- * for an in-flight source read. Observe Ready after texture generation finishes, then read the
- * timestamp; this does not reserve the texture against a subsequent read or acquisition.
+ * buffer state and timestamp for reconciliation. Reads and these queries share the reader's mutex.
+ * Queries are thread-safe, not lock-free, and may wait for an in-flight source read. They track
+ * delivery and version-based expiration, not the lifetime of the owning Context or GPU resources.
+ * Observe Ready after texture generation finishes, then read the timestamp; this does not reserve
+ * the texture against a subsequent read or acquisition.
  * Delivered pixels remain valid only until their buffer expires. Preserve an independent rendered
  * output to retain pixels across later source reads.
  */
