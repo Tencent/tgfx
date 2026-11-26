@@ -285,9 +285,10 @@ jobs:
           restore-keys: third-party-web-
 
       # The reference is built from the pinned main source and its own web/test driver, so its
-      # content only depends on the dependency declarations, the pinned version.json and the browser
-      # version. Keying by those keeps the entry valid across main commits, and restore-keys
-      # promotes an older entry that update_web_baseline.sh revalidates before reuse.
+      # content only depends on the dependency declarations, the pinned version.json and the exact
+      # puppeteer version. Every input is part of the key and there is deliberately no restore-keys
+      # fallback: a stale entry would pass the version check, and the save step would then keep that
+      # old rendering as the oracle for the new inputs.
       - name: Get Reference Commit
         id: reference-commit
         run: echo "sha=$(git rev-parse origin/main)" >> "$GITHUB_OUTPUT"
@@ -299,7 +300,6 @@ jobs:
           path: |
             test/baseline/.cache/webgl
           key: autotest-web-webgl-ref-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}-${{ hashFiles('web/test/package.json') }}
-          restore-keys: autotest-web-webgl-ref-
 
       - name: Get Browser Cache
         id: browser-cache
@@ -490,7 +490,6 @@ jobs:
           path: |
             test/baseline/.cache/webgpu
           key: autotest-web-webgpu-ref-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}-${{ hashFiles('web/test/package.json') }}
-          restore-keys: autotest-web-webgpu-ref-
 
       - name: Get Browser Cache
         id: browser-cache

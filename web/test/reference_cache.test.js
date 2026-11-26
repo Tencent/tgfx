@@ -199,6 +199,24 @@ for (const [name, entries] of INVALID_ARCHIVES) {
   });
 }
 
+test('web reference caches never restore an entry built from other inputs', function() {
+  const workflow = fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/autotest.yml'), 'utf8');
+  for (const backend of ['webgl', 'webgpu']) {
+    const key = 'key: autotest-web-' + backend + '-ref-${{ hashFiles(\'DEPS\') }}' +
+      '-${{ hashFiles(\'vendor.json\') }}-${{ hashFiles(\'test/baseline/version.json\') }}' +
+      '-${{ hashFiles(\'web/test/package.json\') }}';
+    assert.equal(workflow.split(key).length - 1, 2, `${backend} reference key must be restored and saved`);
+    assert.equal(workflow.includes(`restore-keys: autotest-web-${backend}-ref-`), false,
+      `${backend} reference cache must not promote an older entry into a new key`);
+  }
+});
+
+test('the puppeteer version that drives the browser is pinned', function() {
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+  const version = manifest.devDependencies.puppeteer;
+  assert.match(version, /^\d+\.\d+\.\d+$/, `Expected an exact puppeteer version, got ${version}`);
+});
+
 test('a non main commit cannot publish reference data', function() {
   const fixture = CreateFixture('webgpu');
   assert.throws(function() { fixture.api.PublishReference('reference.zip', 'webgpu', 'b'.repeat(40), 5); });

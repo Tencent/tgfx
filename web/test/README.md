@@ -145,6 +145,6 @@ Web 普通测试默认开启 `GENERATE_BASELINE_IMAGES`，只控制诊断图片�
 
 参考产物由固定 main 提交里的 `web/test`（`CMakeLists.txt`、`index.html`、`src/*.cpp`）构建，当前分支的 driver 只参与验证。因此改动 `index.html` 或编译选项不会改变参考，冷热缓存下的门禁结论一致。参考构建会把 main 的 `web/test` 与 `web/cmake` 复制到会话目录后再编译，因为构建要求 driver 树与参考源码树相互独立。
 
-有效期由 `version.json` 决定：`reference_cache.js` 要求缓存的 `version.json` 与固定 main 提交逐字节一致，`reference.json` 记录的来源提交仅用于溯源。CI 的缓存 key 为 `DEPS` + `vendor.json` + `test/baseline/version.json` + `web/test/package.json`（浏览器版本会影响像素），并启用 `restore-keys` 复用更早的条目；恢复后由脚本重新校验，不匹配才重建。
+有效期由 `version.json` 决定：`reference_cache.js` 要求缓存的 `version.json` 与固定 main 提交逐字节一致，`reference.json` 记录的来源提交仅用于溯源。CI 的缓存 key 由 `DEPS`、`vendor.json`、`test/baseline/version.json` 和 `web/test/package.json`（puppeteer 固定版本，决定 Chromium 版本）组成；任一输入变化即未命中并重建参考，不做前缀恢复——否则旧参考会在恢复后按新 key 保存，成为新输入的 oracle。
 
-由此带来的约定：main 上的渲染变化必须 bump `test/baseline/version.json`，否则基于新 main 的 PR 会与旧参考不一致而失败，这与原生平台的契约相同。另外，若某个 PR 同时修改 `index.html` 的协议与 `run_test.js` 的读取逻辑，参考页面仍来自 main 的旧协议，该 PR 自己的 CI 会失败，需要拆成两步合入。
+由此带来的约定：main 上的源码渲染变化必须 bump `test/baseline/version.json`，否则基于新 main 的 PR 会与旧参考不一致而失败，这与原生平台的契约相同；依赖声明（`DEPS`、`vendor.json`、`web/test/package.json`）变化则通过 key 未命中自动重建，不需要 bump。另外，若某个 PR 同时修改 `index.html` 的协议与 `run_test.js` 的读取逻辑，参考页面仍来自 main 的旧协议，该 PR 自己的 CI 会失败，需要拆成两步合入。

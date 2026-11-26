@@ -23,7 +23,7 @@
   "devDependencies": {
     "adm-zip": "^0.5.16",
     "http-server": "^14.1.1",
-    "puppeteer": "^24.38.0"
+    "puppeteer": "24.38.0"
   },
   "keywords": [
     "tgfx",
