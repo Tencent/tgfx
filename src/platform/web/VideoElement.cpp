@@ -42,7 +42,19 @@ VideoElement::VideoElement(emscripten::val video, int width, int height)
     : ImageStream(width, height), source(video) {
 }
 
-std::shared_ptr<TextureView> VideoElement::onMakeTexture(Context* context, bool mipmapped) {
+ImageStream::TextureReadResult VideoElement::onReadTexture(Context* context, bool mipmapped,
+                                                           std::shared_ptr<TextureView> texture) {
+  if (texture == nullptr) {
+    texture = makeTexture(context, mipmapped);
+  }
+  if (texture == nullptr) {
+    return {};
+  }
+  uploadTexture(texture);
+  return {std::move(texture), ReadOutcome::Delivered, -1};
+}
+
+std::shared_ptr<TextureView> VideoElement::makeTexture(Context* context, bool mipmapped) {
   static auto isAndroidMiniprogram =
       val::module_property("tgfx").call<bool>("isAndroidMiniprogram");
   auto textureWidth = width();
@@ -63,15 +75,11 @@ std::shared_ptr<TextureView> VideoElement::onMakeTexture(Context* context, bool 
   _deviceHandle = reinterpret_cast<uintptr_t>(
       static_cast<WGPUDevice>(static_cast<WebGPUDevice*>(context->device())->webgpuDevice()));
 #endif
-  auto textureView = TextureView::MakeFormat(context, textureWidth, textureHeight,
-                                             PixelFormat::RGBA_8888, mipmapped);
-  if (textureView != nullptr) {
-    onUpdateTexture(textureView);
-  }
-  return textureView;
+  return TextureView::MakeFormat(context, textureWidth, textureHeight, PixelFormat::RGBA_8888,
+                                 mipmapped);
 }
 
-bool VideoElement::onUpdateTexture(std::shared_ptr<TextureView> textureView) {
+void VideoElement::uploadTexture(const std::shared_ptr<TextureView>& textureView) {
 #ifdef TGFX_USE_WEBGPU
   auto webgpuTexture = std::static_pointer_cast<WebGPUTexture>(textureView->getTexture());
   auto wgpuTexture = webgpuTexture->webgpuTexture();
@@ -85,10 +93,8 @@ bool VideoElement::onUpdateTexture(std::shared_ptr<TextureView> textureView) {
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
                                           source, glTexture->textureID(), 0, 0, false);
 #endif
-  // The upload calls above drop frames silently on failure (video not ready, device lost), in
-  // which case the texture keeps its previous content. Report success either way: the first
-  // upload targets a zero-initialized texture, and during playback keeping the previous frame is
-  // preferable to flickering transparent.
-  return true;
+  // The JS helpers do not return an upload result. Preserve their existing delivery behavior,
+  // including retaining prior pixels on a silently dropped upload. This source reports no PTS,
+  // and does not claim that a successful native call proves a new video image was uploaded.
 }
 }  // namespace tgfx

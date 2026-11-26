@@ -27,71 +27,51 @@ class TextureView;
 class Context;
 class ImageReader;
 
-/** Abstract source of continuously updated pixels, consumed through ImageReader's deferred buffers.
- * Use a platform subclass to create and update native textures. Reader callbacks are serialized
- * within one reader. Sources shared by different readers must synchronize their own mutable state.
+/** A source of updated pixels consumed through ImageReader's deferred buffers. Reader callbacks
+ * are serialized within one reader. Sources shared by readers synchronize their own mutable state.
  */
 class ImageStream {
  public:
   virtual ~ImageStream() = default;
+
   int width() const {
     return _width;
   }
+
   int height() const {
     return _height;
   }
+
   virtual const std::shared_ptr<ColorSpace>& colorSpace() const = 0;
 
  protected:
   ImageStream(int width, int height) : _width(width), _height(height) {
   }
-  /** Legacy creation hook used by the default onReadTexture() adapter. The mipmapped flag requests
-   * mip map levels when supported by the source. Defaults to nullptr for sources that override
-   * onReadTexture() instead; it does not forward to that method. */
-  virtual std::shared_ptr<TextureView> onMakeTexture(Context*, bool) {
-    return nullptr;
-  }
 
-  /** Legacy update hook used by the default onReadTexture() adapter. Returns success, not whether
-   * another queued image exists. Defaults to false and does not forward to onReadTexture(). */
-  virtual bool onUpdateTexture(std::shared_ptr<TextureView>) {
-    return false;
-  }
-
-  struct TextureReadResult {
-    /** Native texture, possibly retained after an empty or failed read. Its presence alone does
-     * not make this read successful. */
-    std::shared_ptr<TextureView> texture = nullptr;
-    /** This read supplied valid content for a new credential, not a business target match.
-     */
-    bool advanced = false;
-    /** Timestamp of the bound content in nanoseconds, or -1 when unavailable. */
-    int64_t timestamp = -1;
-    /** False only if the previous texture and pixels stayed unchanged throughout this callback.
-     * Native latches and unknown mutations must report true, including when they fail. */
-    bool contentChanged = true;
-    /** A failure prevents delivery even if a texture is retained or content changed.
-     * An empty queue instead reports advanced=false and failed=false. */
-    bool failed = true;
+  enum class ReadOutcome {
+    /** No new image was delivered and the supplied texture and its pixels remain unchanged. */
+    Unchanged,
+    /** Valid source pixels were delivered. This does not establish a business target match. */
+    Delivered,
+    /** No valid image was delivered; the previous content may have changed or become unusable. */
+    Invalidated
   };
 
-  /** Calls one legacy creation or update hook and reports its success as delivery, with no PTS.
-   * A missing hook or false/null result reports failure conservatively, since this adapter cannot
-   * distinguish an empty queue from an error. Sources with that distinction override this method
-   * without implementing legacy hooks. Overrides must perform one read without draining queued
-   * frames or waiting for producer notifications. Scheduling another attempt belongs to the caller.
+  struct TextureReadResult {
+    /** Current native texture; retaining it does not itself imply valid delivered content. */
+    std::shared_ptr<TextureView> texture = nullptr;
+    ReadOutcome outcome = ReadOutcome::Invalidated;
+    /** Actual delivered source timestamp in nanoseconds, or -1 when unavailable. */
+    int64_t timestamp = -1;
+  };
+
+  /** Performs one non-waiting source read without draining queued images or choosing a target.
+   * Unchanged preserves the supplied texture and its pixels; the reader may then reuse previously
+   * delivered content. Native latches with unknown effects report Invalidated, including failures.
+   * Scheduling another acquisition and deciding whether its pixels match a target are caller work.
    */
   virtual TextureReadResult onReadTexture(Context* context, bool mipmapped,
-                                          std::shared_ptr<TextureView> texture) {
-    bool advanced;
-    if (texture == nullptr) {
-      texture = onMakeTexture(context, mipmapped);
-      advanced = texture != nullptr;
-    } else {
-      advanced = onUpdateTexture(texture);
-    }
-    return {std::move(texture), advanced, -1, true, !advanced};
-  }
+                                          std::shared_ptr<TextureView> texture) = 0;
 
  private:
   int _width = 0;

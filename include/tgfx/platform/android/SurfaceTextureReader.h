@@ -52,8 +52,9 @@ class SurfaceTextureReader : public ImageReader {
   /**
    * Marks source content as available for a subsequent texture read. This method should be invoked
    * by the listener provided when creating the reader; it does not perform a read or identify a
-   * particular frame. Texture generation does not wait for this notification. If a read delivers
-   * no content, its buffer becomes terminal Expired and cannot be revived by a later notification.
+   * particular frame. Texture generation does not wait for this notification. Without new content,
+   * a read can retain known-valid previous pixels. If neither new nor valid retained content is
+   * available, the buffer becomes terminal Expired and cannot be revived by a later notification.
    * Acquire a new buffer for another attempt, normally after receiving the notification.
    */
   void notifyFrameAvailable();

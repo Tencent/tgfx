@@ -89,11 +89,9 @@ class SurfaceTexture : public ImageStream {
   void releaseExternalOESTexture(Context* context, unsigned textureID);
 
   struct FrameUpdateResult {
-    bool advanced = false;
+    ReadOutcome outcome = ReadOutcome::Invalidated;
     int64_t timestamp = -1;
     ISize textureSize = {};
-    bool contentChanged = false;
-    bool failed = true;
   };
 
   FrameUpdateResult updateTexImage();

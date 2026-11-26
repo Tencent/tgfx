@@ -24,6 +24,7 @@
 #include "platform/ImageStream.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/RenderFlags.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/platform/ImageReader.h"
@@ -31,69 +32,6 @@
 
 namespace tgfx {
 namespace {
-class UnimplementedImageStream : public ImageStream {
- public:
-  UnimplementedImageStream() : ImageStream(1, 1) {
-  }
-  const std::shared_ptr<ColorSpace>& colorSpace() const override {
-    return space;
-  }
-
- private:
-  std::shared_ptr<ColorSpace> space = nullptr;
-};
-
-class CreationOnlyImageStream : public ImageStream {
- public:
-  CreationOnlyImageStream() : ImageStream(1, 1) {
-  }
-  const std::shared_ptr<ColorSpace>& colorSpace() const override {
-    return space;
-  }
-  int creates = 0;
-
- protected:
-  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override {
-    creates++;
-    uint8_t pixels[] = {9, 0, 0, 255};
-    return TextureView::MakeFormat(context, 1, 1, pixels, sizeof(pixels), PixelFormat::RGBA_8888,
-                                   mipmapped);
-  }
-
- private:
-  std::shared_ptr<ColorSpace> space = nullptr;
-};
-
-class LegacyImageStream : public ImageStream {
- public:
-  LegacyImageStream() : ImageStream(1, 1) {
-  }
-  const std::shared_ptr<ColorSpace>& colorSpace() const override {
-    return space;
-  }
-  int creates = 0;
-  int updates = 0;
-  bool fails = false;
-
- protected:
-  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override {
-    creates++;
-    if (fails) {
-      return nullptr;
-    }
-    uint8_t pixels[] = {7, 0, 0, 255};
-    return TextureView::MakeFormat(context, 1, 1, pixels, sizeof(pixels), PixelFormat::RGBA_8888,
-                                   mipmapped);
-  }
-  bool onUpdateTexture(std::shared_ptr<TextureView>) override {
-    updates++;
-    return !fails;
-  }
-
- private:
-  std::shared_ptr<ColorSpace> space = nullptr;
-};
-
 class ThreeStateStream : public ImageStream {
  public:
   ThreeStateStream() : ImageStream(1, 1) {
@@ -105,8 +43,8 @@ class ThreeStateStream : public ImageStream {
     frames.push_back({identity, timestamp});
   }
   int reads = 0;
-  bool failWhenEmpty = false;
-  bool changeWhenEmpty = false;
+  bool invalidateWhenEmpty = false;
+  bool replaceWhenEmpty = false;
   bool replaceTexture = true;
 
  protected:
@@ -114,7 +52,13 @@ class ThreeStateStream : public ImageStream {
                                   std::shared_ptr<TextureView> texture) override {
     reads++;
     if (frames.empty()) {
-      return {std::move(texture), false, boundTimestamp, changeWhenEmpty, failWhenEmpty};
+      if (replaceWhenEmpty) {
+        uint8_t pixels[] = {99, 0, 0, 255};
+        texture = TextureView::MakeFormat(context, 1, 1, pixels, sizeof(pixels),
+                                          PixelFormat::RGBA_8888, mipmapped);
+      }
+      auto outcome = invalidateWhenEmpty ? ReadOutcome::Invalidated : ReadOutcome::Unchanged;
+      return {std::move(texture), outcome, boundTimestamp};
     }
     auto frame = frames.front();
     frames.pop_front();
@@ -127,7 +71,7 @@ class ThreeStateStream : public ImageStream {
                                             sizeof(pixels));
     }
     boundTimestamp = frame.timestamp;
-    return {std::move(texture), true, boundTimestamp, true, false};
+    return {std::move(texture), ReadOutcome::Delivered, boundTimestamp};
   }
 
  private:
@@ -168,10 +112,38 @@ static void ObserveDelivery(const std::shared_ptr<ImageBuffer>& buffer, std::ato
   }
 }
 
+static void ObserveInvalidation(const std::shared_ptr<ImageBuffer>& buffer,
+                                std::atomic<bool>* started, std::atomic<bool>* stop,
+                                std::atomic<bool>* invalid, std::atomic<bool>* observedExpired) {
+  EXPECT_EQ(buffer->state(), ImageBufferState::Ready);
+  EXPECT_EQ(buffer->timestamp(), 3000);
+  started->store(true);
+  while (!stop->load()) {
+    auto state = buffer->state();
+    if (state != ImageBufferState::Ready && state != ImageBufferState::Expired) {
+      invalid->store(true);
+    }
+    if (buffer->timestamp() != 3000) {
+      invalid->store(true);
+    }
+    if (state == ImageBufferState::Expired) {
+      if (!buffer->expired()) {
+        invalid->store(true);
+      }
+      observedExpired->store(true);
+    }
+    std::this_thread::yield();
+  }
+  if (buffer->state() == ImageBufferState::Expired && buffer->timestamp() == 3000 &&
+      buffer->expired()) {
+    observedExpired->store(true);
+  }
+}
+
 static void ExpectImagePixels(Context* context, const std::shared_ptr<Image>& image,
-                              uint8_t identity, uint8_t alpha) {
+                              uint8_t identity, uint8_t alpha, uint32_t renderFlags) {
   ASSERT_NE(image, nullptr);
-  auto surface = Surface::Make(context, 1, 1);
+  auto surface = Surface::Make(context, 1, 1, false, 1, false, renderFlags);
   ASSERT_NE(surface, nullptr);
   surface->getCanvas()->drawImage(image);
   uint8_t pixels[4] = {};
@@ -184,43 +156,24 @@ static void ExpectImagePixels(Context* context, const std::shared_ptr<Image>& im
 }
 }  // namespace
 
-TGFX_TEST_PRIVATE(ImageReaderTest, MissingLegacyCreationFailsWithoutRecursiveDispatch) {
-  TGFX_PRIVATE_ACCESS(
-      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
-      auto stream = std::make_shared<UnimplementedImageStream>();
-      auto result = stream->onReadTexture(context, false, nullptr);
-      EXPECT_EQ(result.texture, nullptr); EXPECT_FALSE(result.advanced); EXPECT_TRUE(result.failed);
-      EXPECT_EQ(result.timestamp, -1); auto reader = ImageReader::MakeFrom(stream);
-      auto first = reader->acquireBuffer();
-      EXPECT_EQ(TextureView::MakeFrom(context, first), nullptr);
-      EXPECT_EQ(first->state(), ImageBufferState::Expired); EXPECT_EQ(first->timestamp(), -1);
-      auto retry = reader->acquireBuffer();
-      EXPECT_EQ(TextureView::MakeFrom(context, retry), nullptr);
-      EXPECT_EQ(retry->state(), ImageBufferState::Expired);)
-}
-
-TGFX_TEST_PRIVATE(ImageReaderTest, MissingLegacyUpdateFailsWithoutRecursiveDispatch) {
-  TGFX_PRIVATE_ACCESS(
-      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
-      auto stream = std::make_shared<CreationOnlyImageStream>();
-      auto reader = ImageReader::MakeFrom(stream); auto first = reader->acquireBuffer();
-      ExpectIdentity(context, TextureView::MakeFrom(context, first), 9);
-      EXPECT_EQ(first->state(), ImageBufferState::Ready); EXPECT_EQ(stream->creates, 1);
-      auto next = reader->acquireBuffer(); EXPECT_EQ(TextureView::MakeFrom(context, next), nullptr);
-      EXPECT_EQ(next->state(), ImageBufferState::Expired); EXPECT_EQ(next->timestamp(), -1);
-      EXPECT_EQ(stream->creates, 1); EXPECT_TRUE(first->expired());)
-}
-
-TGFX_TEST_PRIVATE(ImageReaderTest, MetadataReadClassifiesEmptyQueueWithoutLegacyHooks) {
+TGFX_TEST_PRIVATE(ImageReaderTest, ReadOutcomeClassifiesEmptyAndDeliveredContent) {
   TGFX_PRIVATE_ACCESS(
       ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
       auto stream = std::make_shared<ThreeStateStream>();
       auto empty = stream->onReadTexture(context, false, nullptr);
-      EXPECT_EQ(empty.texture, nullptr); EXPECT_FALSE(empty.advanced); EXPECT_FALSE(empty.failed);
-      EXPECT_FALSE(empty.contentChanged); EXPECT_EQ(empty.timestamp, -1); stream->push(2, 2000);
-      auto result = stream->onReadTexture(context, false, nullptr);
-      ExpectIdentity(context, result.texture, 2); EXPECT_TRUE(result.advanced);
-      EXPECT_FALSE(result.failed); EXPECT_EQ(result.timestamp, 2000);)
+      EXPECT_EQ(empty.texture, nullptr);
+      EXPECT_EQ(empty.outcome, ImageStream::ReadOutcome::Unchanged); EXPECT_EQ(empty.timestamp, -1);
+      stream->push(2, 2000); auto result = stream->onReadTexture(context, false, nullptr);
+      ExpectIdentity(context, result.texture, 2);
+      EXPECT_EQ(result.outcome, ImageStream::ReadOutcome::Delivered);
+      EXPECT_EQ(result.timestamp, 2000);
+      auto unchanged = stream->onReadTexture(context, false, result.texture);
+      EXPECT_EQ(unchanged.texture, result.texture);
+      EXPECT_EQ(unchanged.outcome, ImageStream::ReadOutcome::Unchanged);
+      stream->invalidateWhenEmpty = true;
+      auto invalidated = stream->onReadTexture(context, false, result.texture);
+      EXPECT_EQ(invalidated.texture, result.texture);
+      EXPECT_EQ(invalidated.outcome, ImageStream::ReadOutcome::Invalidated);)
 }
 
 TGFX_TEST_PRIVATE(ImageReaderTest, ConcurrentQueriesObserveRenderingThreadDelivery) {
@@ -241,6 +194,28 @@ TGFX_TEST_PRIVATE(ImageReaderTest, ConcurrentQueriesObserveRenderingThreadDelive
       EXPECT_GT(readyObservations.load(), 0);)
 }
 
+TGFX_TEST_PRIVATE(ImageReaderTest, ConcurrentQueriesObserveInvalidationWithHistoricalTimestamp) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<ThreeStateStream>();
+      auto reader = ImageReader::MakeFrom(stream); stream->push(3, 3000);
+      auto first = reader->acquireBuffer();
+      ExpectIdentity(context, TextureView::MakeFrom(context, first), 3);
+      ASSERT_FALSE(HasFatalFailure()); auto retained = reader->acquireBuffer();
+      ExpectIdentity(context, TextureView::MakeFrom(context, retained), 3);
+      ASSERT_FALSE(HasFatalFailure()); std::atomic<bool> started = false;
+      std::atomic<bool> stop = false; std::atomic<bool> invalid = false;
+      std::atomic<bool> observedExpired = false; std::thread observer(
+          ObserveInvalidation, retained, &started, &stop, &invalid, &observedExpired);
+      while (!started.load()) { std::this_thread::yield(); } stream->invalidateWhenEmpty = true;
+      auto failed = reader->acquireBuffer(); auto texture = TextureView::MakeFrom(context, failed);
+      stop.store(true); observer.join(); EXPECT_EQ(texture, nullptr); EXPECT_FALSE(invalid.load());
+      EXPECT_TRUE(observedExpired.load()); EXPECT_EQ(first->state(), ImageBufferState::Expired);
+      EXPECT_EQ(first->timestamp(), 3000); EXPECT_EQ(retained->state(), ImageBufferState::Expired);
+      EXPECT_EQ(retained->timestamp(), 3000); EXPECT_EQ(failed->state(), ImageBufferState::Expired);
+      EXPECT_EQ(failed->timestamp(), -1); EXPECT_EQ(stream->reads, 3);)
+}
+
 TGFX_TEST_PRIVATE(ImageReaderTest, FailedCredentialCannotBeRevivedByReaderResult) {
   TGFX_PRIVATE_ACCESS(
       ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
@@ -255,76 +230,40 @@ TGFX_TEST_PRIVATE(ImageReaderTest, FailedCredentialCannotBeRevivedByReaderResult
       EXPECT_EQ(next->timestamp(), 1000); EXPECT_EQ(failed->timestamp(), -1);)
 }
 
-TGFX_TEST_PRIVATE(ImageReaderTest, LegacyAdapterPerformsOneOperationPerAcquisition) {
-  TGFX_PRIVATE_ACCESS(
-      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
-      auto stream = std::make_shared<LegacyImageStream>();
-      auto reader = ImageReader::MakeFrom(stream); auto first = reader->acquireBuffer();
-      ExpectIdentity(context, TextureView::MakeFrom(context, first), 7);
-      EXPECT_EQ(stream->creates, 1); EXPECT_EQ(stream->updates, 0);
-      EXPECT_EQ(first->state(), ImageBufferState::Ready); EXPECT_EQ(first->timestamp(), -1);
-      auto second = reader->acquireBuffer(); auto texture = TextureView::MakeFrom(context, second);
-      ExpectIdentity(context, texture, 7); EXPECT_EQ(stream->creates, 1);
-      EXPECT_EQ(stream->updates, 1); EXPECT_EQ(TextureView::MakeFrom(context, second), texture);
-      EXPECT_EQ(stream->updates, 1);)
-}
-
-TGFX_TEST_PRIVATE(ImageReaderTest, LegacyAdapterFailureCanRecoverWithNewCredential) {
-  TGFX_PRIVATE_ACCESS(
-      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
-      auto stream = std::make_shared<LegacyImageStream>();
-      auto reader = ImageReader::MakeFrom(stream); stream->fails = true;
-      auto first = reader->acquireBuffer();
-      EXPECT_EQ(TextureView::MakeFrom(context, first), nullptr);
-      EXPECT_EQ(first->state(), ImageBufferState::Expired); EXPECT_EQ(stream->creates, 1);
-      stream->fails = false; auto next = reader->acquireBuffer();
-      ExpectIdentity(context, TextureView::MakeFrom(context, next), 7);
-      EXPECT_EQ(stream->creates, 2); stream->fails = true; auto failed = reader->acquireBuffer();
-      EXPECT_EQ(TextureView::MakeFrom(context, failed), nullptr); EXPECT_EQ(stream->updates, 1);
-      EXPECT_EQ(failed->state(), ImageBufferState::Expired); stream->fails = false;
-      auto recovered = reader->acquireBuffer();
-      ExpectIdentity(context, TextureView::MakeFrom(context, recovered), 7);
-      EXPECT_EQ(stream->updates, 2); EXPECT_EQ(recovered->state(), ImageBufferState::Ready);)
-}
-
-TGFX_TEST_PRIVATE(ImageReaderTest, LegacyAdapterInitializesNewReaderWithUnchangedPixels) {
-  TGFX_PRIVATE_ACCESS(
-      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
-      auto stream = std::make_shared<LegacyImageStream>();
-      auto reader = ImageReader::MakeFrom(stream); auto first = reader->acquireBuffer();
-      ExpectIdentity(context, TextureView::MakeFrom(context, first), 7);
-      auto replacementStream = std::make_shared<LegacyImageStream>();
-      auto replacementReader = ImageReader::MakeFrom(replacementStream);
-      auto next = replacementReader->acquireBuffer();
-      ExpectIdentity(context, TextureView::MakeFrom(context, next), 7);
-      EXPECT_EQ(replacementStream->creates, 1); EXPECT_EQ(replacementStream->updates, 0);)
-}
-
-TGFX_TEST_PRIVATE(ImageReaderTest, EmptyReadPreservesPreviouslyDeliveredContent) {
+TGFX_TEST_PRIVATE(ImageReaderTest, ConsecutiveEmptyReadsReusePreviouslyDeliveredContent) {
   TGFX_PRIVATE_ACCESS(
       ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
       auto stream = std::make_shared<ThreeStateStream>();
-      auto reader = ImageReader::MakeFrom(stream); stream->push(1, 0);
+      auto reader = ImageReader::MakeFrom(stream); stream->push(1, 1000);
       auto first = reader->acquireBuffer(); auto texture = TextureView::MakeFrom(context, first);
-      ExpectIdentity(context, texture, 1); auto second = reader->acquireBuffer();
-      EXPECT_EQ(TextureView::MakeFrom(context, second), nullptr);
-      EXPECT_EQ(second->state(), ImageBufferState::Expired); EXPECT_FALSE(first->expired());
-      EXPECT_EQ(TextureView::MakeFrom(context, first), texture);)
+      ExpectIdentity(context, texture, 1); for (int count = 0; count < 3; count++) {
+        auto next = reader->acquireBuffer();
+        EXPECT_EQ(next->state(), ImageBufferState::Pending);
+        EXPECT_EQ(next->timestamp(), -1);
+        EXPECT_EQ(TextureView::MakeFrom(context, next), texture);
+        EXPECT_EQ(next->state(), ImageBufferState::Ready);
+        EXPECT_EQ(next->timestamp(), 1000);
+        EXPECT_EQ(first->state(), ImageBufferState::Ready);
+        EXPECT_EQ(first->timestamp(), 1000);
+        EXPECT_EQ(TextureView::MakeFrom(context, first), texture);
+        EXPECT_EQ(TextureView::MakeFrom(context, next), texture);
+        EXPECT_EQ(stream->reads, count + 2);
+      })
 }
 
 TGFX_TEST_PRIVATE(ImageReaderTest, SuccessfulReadDoesNotProbeFutureFailure) {
   TGFX_PRIVATE_ACCESS(
       ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
       auto stream = std::make_shared<ThreeStateStream>();
-      auto reader = ImageReader::MakeFrom(stream); stream->push(1, 0); stream->failWhenEmpty = true;
-      stream->changeWhenEmpty = true; auto first = reader->acquireBuffer();
+      auto reader = ImageReader::MakeFrom(stream); stream->push(1, 0);
+      stream->invalidateWhenEmpty = true; auto first = reader->acquireBuffer();
       ExpectIdentity(context, TextureView::MakeFrom(context, first), 1);
       EXPECT_EQ(first->state(), ImageBufferState::Ready); EXPECT_EQ(first->timestamp(), 0);
       EXPECT_EQ(stream->reads, 1); auto failed = reader->acquireBuffer();
       EXPECT_EQ(TextureView::MakeFrom(context, failed), nullptr);
       EXPECT_EQ(failed->state(), ImageBufferState::Expired); EXPECT_EQ(failed->timestamp(), -1);
       EXPECT_TRUE(first->expired()); EXPECT_EQ(first->timestamp(), 0); EXPECT_EQ(stream->reads, 2);
-      stream->failWhenEmpty = false; stream->changeWhenEmpty = false; stream->push(2, 1000);
+      stream->invalidateWhenEmpty = false; stream->push(2, 1000);
       auto recovered = reader->acquireBuffer();
       ExpectIdentity(context, TextureView::MakeFrom(context, recovered), 2);
       EXPECT_EQ(recovered->timestamp(), 1000); EXPECT_EQ(stream->reads, 3);)
@@ -337,23 +276,35 @@ TGFX_TEST_PRIVATE(ImageReaderTest, UnknownMutationExpiresPreviouslyDeliveredBuff
       auto reader = ImageReader::MakeFrom(stream); stream->push(1, 0);
       auto first = reader->acquireBuffer();
       ExpectIdentity(context, TextureView::MakeFrom(context, first), 1);
-      stream->failWhenEmpty = true; stream->changeWhenEmpty = true;
-      auto next = reader->acquireBuffer(); EXPECT_EQ(TextureView::MakeFrom(context, next), nullptr);
-      EXPECT_TRUE(first->expired()); EXPECT_EQ(first->timestamp(), 0);
-      EXPECT_EQ(TextureView::MakeFrom(context, first), nullptr);)
+      stream->invalidateWhenEmpty = true; auto next = reader->acquireBuffer();
+      EXPECT_EQ(TextureView::MakeFrom(context, next), nullptr); EXPECT_TRUE(first->expired());
+      EXPECT_EQ(first->timestamp(), 0); EXPECT_EQ(TextureView::MakeFrom(context, first), nullptr);)
 }
 
 TGFX_TEST_PRIVATE(ImageReaderTest, EmptyReadIsTerminalButNextAcquisitionCanSucceed) {
-  TGFX_PRIVATE_ACCESS(
-      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
-      auto stream = std::make_shared<ThreeStateStream>();
-      auto reader = ImageReader::MakeFrom(stream); auto first = reader->acquireBuffer();
-      EXPECT_EQ(first->state(), ImageBufferState::Pending);
-      EXPECT_EQ(TextureView::MakeFrom(context, first), nullptr);
-      EXPECT_EQ(first->state(), ImageBufferState::Expired); stream->push(7, 0);
-      auto second = reader->acquireBuffer();
-      ExpectIdentity(context, TextureView::MakeFrom(context, second), 7);
-      EXPECT_EQ(second->state(), ImageBufferState::Ready); EXPECT_EQ(stream->reads, 2);)
+  TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
+                      ASSERT_NE(context, nullptr); for (bool invalidateWhenEmpty
+                                                        : {false, true}) {
+                        auto stream = std::make_shared<ThreeStateStream>();
+                        stream->invalidateWhenEmpty = invalidateWhenEmpty;
+                        auto reader = ImageReader::MakeFrom(stream);
+                        auto first = reader->acquireBuffer();
+                        EXPECT_EQ(first->state(), ImageBufferState::Pending);
+                        EXPECT_EQ(first->timestamp(), -1);
+                        EXPECT_EQ(TextureView::MakeFrom(context, first), nullptr);
+                        EXPECT_EQ(first->state(), ImageBufferState::Expired);
+                        EXPECT_EQ(first->timestamp(), -1);
+                        stream->push(7, 0);
+                        EXPECT_EQ(TextureView::MakeFrom(context, first), nullptr);
+                        EXPECT_EQ(stream->reads, 1);
+                        auto second = reader->acquireBuffer();
+                        ExpectIdentity(context, TextureView::MakeFrom(context, second), 7);
+                        EXPECT_EQ(second->state(), ImageBufferState::Ready);
+                        EXPECT_EQ(second->timestamp(), 0);
+                        EXPECT_EQ(first->state(), ImageBufferState::Expired);
+                        EXPECT_EQ(first->timestamp(), -1);
+                        EXPECT_EQ(stream->reads, 2);
+                      })
 }
 
 TGFX_TEST_PRIVATE(ImageReaderTest, ExpiredAcquisitionsDoNotRequireUnavailableFrames) {
@@ -362,7 +313,9 @@ TGFX_TEST_PRIVATE(ImageReaderTest, ExpiredAcquisitionsDoNotRequireUnavailableFra
       auto stream = std::make_shared<ThreeStateStream>();
       auto reader = ImageReader::MakeFrom(stream); auto skipped = reader->acquireBuffer();
       reader->acquireBuffer(); auto latest = reader->acquireBuffer();
-      EXPECT_TRUE(skipped->expired()); stream->push(3, 2000);
+      EXPECT_TRUE(skipped->expired()); EXPECT_EQ(skipped->state(), ImageBufferState::Expired);
+      EXPECT_EQ(skipped->timestamp(), -1); stream->push(3, 2000);
+      EXPECT_EQ(TextureView::MakeFrom(context, skipped), nullptr); EXPECT_EQ(stream->reads, 0);
       ExpectIdentity(context, TextureView::MakeFrom(context, latest), 3);
       EXPECT_EQ(latest->state(), ImageBufferState::Ready); EXPECT_EQ(stream->reads, 1);)
 }
@@ -397,8 +350,9 @@ TGFX_TEST_PRIVATE(ImageReaderTest, SkippedCredentialsDoNotDrainQueuedFrames) {
         EXPECT_EQ(next->timestamp(), i * 1000);
         EXPECT_EQ(stream->reads, i + 1);
       } auto empty = reader->acquireBuffer();
-      EXPECT_EQ(TextureView::MakeFrom(context, empty), nullptr);
-      EXPECT_EQ(empty->state(), ImageBufferState::Expired); EXPECT_EQ(stream->reads, 9);)
+      ExpectIdentity(context, TextureView::MakeFrom(context, empty), 8);
+      EXPECT_EQ(empty->state(), ImageBufferState::Ready); EXPECT_EQ(empty->timestamp(), 7000);
+      EXPECT_EQ(stream->reads, 9);)
 }
 
 TGFX_TEST_PRIVATE(ImageReaderTest, RepositionedProducerCanDeliverZeroTimestamp) {
@@ -415,14 +369,27 @@ TGFX_TEST_PRIVATE(ImageReaderTest, RepositionedProducerCanDeliverZeroTimestamp) 
 
 TGFX_TEST_PRIVATE(ImageReaderTest, EqualTimestampNewContentIsAcceptedAsProgress) {
   TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
-                      ASSERT_NE(context, nullptr);
-                      auto stream = std::make_shared<ThreeStateStream>();
-                      auto reader = ImageReader::MakeFrom(stream); stream->push(1, 0);
-                      auto first = reader->acquireBuffer();
-                      ExpectIdentity(context, TextureView::MakeFrom(context, first), 1);
-                      stream->push(2, 0); auto second = reader->acquireBuffer();
-                      ExpectIdentity(context, TextureView::MakeFrom(context, second), 2);
-                      EXPECT_EQ(second->state(), ImageBufferState::Ready);)
+                      ASSERT_NE(context, nullptr); for (bool replaceTexture
+                                                        : {false, true}) {
+                        auto stream = std::make_shared<ThreeStateStream>();
+                        stream->replaceTexture = replaceTexture;
+                        auto reader = ImageReader::MakeFrom(stream);
+                        stream->push(1, 0);
+                        auto first = reader->acquireBuffer();
+                        auto firstTexture = TextureView::MakeFrom(context, first);
+                        ExpectIdentity(context, firstTexture, 1);
+                        stream->push(2, 0);
+                        auto second = reader->acquireBuffer();
+                        auto secondTexture = TextureView::MakeFrom(context, second);
+                        ExpectIdentity(context, secondTexture, 2);
+                        EXPECT_EQ(firstTexture == secondTexture, !replaceTexture);
+                        EXPECT_EQ(second->state(), ImageBufferState::Ready);
+                        EXPECT_EQ(second->timestamp(), 0);
+                        EXPECT_EQ(first->state(), ImageBufferState::Expired);
+                        EXPECT_EQ(first->timestamp(), 0);
+                        EXPECT_EQ(TextureView::MakeFrom(context, first), nullptr);
+                        EXPECT_EQ(stream->reads, 2);
+                      })
 }
 
 TGFX_TEST_PRIVATE(ImageReaderTest, DeliveredBufferRedrawDoesNotConsumeAnotherFrame) {
@@ -472,31 +439,67 @@ TGFX_TEST_PRIVATE(ImageReaderTest, LaterReadExpiresOldBufferWithoutChangingItsTi
       EXPECT_EQ(TextureView::MakeFrom(context, second), texture); EXPECT_EQ(stream->reads, 2);)
 }
 
-TGFX_TEST_PRIVATE(ImageReaderTest, UnchangedReadPreservesCachedImage) {
+TGFX_TEST_PRIVATE(ImageReaderTest, UnchangedReadPreservesOldAndNewImagesWithOrWithoutCache) {
   TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
-                      ASSERT_NE(context, nullptr); for (bool failed
+                      ASSERT_NE(context, nullptr); for (bool disableCache
                                                         : {false, true}) {
+                        auto renderFlags = disableCache ? RenderFlags::DisableCache : 0;
                         auto stream = std::make_shared<ThreeStateStream>();
                         auto reader = ImageReader::MakeFrom(stream);
                         stream->push(17, 1000);
                         auto first = reader->acquireBuffer();
-                        auto image = Image::MakeFrom(first);
-                        ExpectImagePixels(context, image, 17, 255);
+                        auto firstImage = Image::MakeFrom(first);
+                        ExpectImagePixels(context, firstImage, 17, 255, renderFlags);
                         ASSERT_FALSE(HasFatalFailure());
-                        auto key =
-                            std::static_pointer_cast<RasterizedImage>(image)->getTextureKey();
-                        auto texture = Resource::Find<TextureView>(context, key);
+                        auto firstKey =
+                            std::static_pointer_cast<RasterizedImage>(firstImage)->getTextureKey();
+                        auto texture = TextureView::MakeFrom(context, first);
                         ASSERT_NE(texture, nullptr);
-                        stream->failWhenEmpty = failed;
+                        if (!disableCache) {
+                          EXPECT_EQ(Resource::Find<TextureView>(context, firstKey), texture);
+                        }
                         auto next = reader->acquireBuffer();
-                        EXPECT_EQ(TextureView::MakeFrom(context, next), nullptr);
-                        EXPECT_EQ(next->state(), ImageBufferState::Expired);
+                        auto nextImage = Image::MakeFrom(next);
+                        ExpectImagePixels(context, nextImage, 17, 255, renderFlags);
+                        ASSERT_FALSE(HasFatalFailure());
+                        auto nextKey =
+                            std::static_pointer_cast<RasterizedImage>(nextImage)->getTextureKey();
+                        EXPECT_EQ(next->state(), ImageBufferState::Ready);
+                        EXPECT_EQ(next->timestamp(), 1000);
                         EXPECT_EQ(first->state(), ImageBufferState::Ready);
                         EXPECT_EQ(first->timestamp(), 1000);
-                        EXPECT_EQ(Resource::Find<TextureView>(context, key), texture);
-                        ExpectImagePixels(context, image, 17, 255);
-                        ASSERT_FALSE(HasFatalFailure());
+                        EXPECT_EQ(TextureView::MakeFrom(context, next), texture);
                         EXPECT_EQ(stream->reads, 2);
+                        if (!disableCache) {
+                          EXPECT_EQ(Resource::Find<TextureView>(context, nextKey), texture);
+                        }
+                        stream->push(29, 2000);
+                        for (int count = 0; count < 3; count++) {
+                          ExpectImagePixels(context, firstImage, 17, 255, renderFlags);
+                          ASSERT_FALSE(HasFatalFailure());
+                          if (!disableCache) {
+                            EXPECT_EQ(Resource::Find<TextureView>(context, firstKey), texture);
+                          }
+                          ExpectImagePixels(context, nextImage, 17, 255, renderFlags);
+                          ASSERT_FALSE(HasFatalFailure());
+                          if (!disableCache) {
+                            EXPECT_EQ(Resource::Find<TextureView>(context, nextKey), texture);
+                          }
+                          EXPECT_EQ(stream->reads, 2);
+                        }
+                        auto delivered = reader->acquireBuffer();
+                        ExpectIdentity(context, TextureView::MakeFrom(context, delivered), 29);
+                        EXPECT_EQ(delivered->timestamp(), 2000);
+                        EXPECT_EQ(stream->reads, 3);
+                        EXPECT_EQ(first->state(), ImageBufferState::Expired);
+                        EXPECT_EQ(next->state(), ImageBufferState::Expired);
+                        EXPECT_EQ(first->timestamp(), 1000);
+                        EXPECT_EQ(next->timestamp(), 1000);
+                        ExpectImagePixels(context, firstImage, 0, 0, renderFlags);
+                        ASSERT_FALSE(HasFatalFailure());
+                        ExpectImagePixels(context, nextImage, 0, 0, renderFlags);
+                        ASSERT_FALSE(HasFatalFailure());
+                        EXPECT_EQ(stream->reads, 3);
                       })
 }
 
@@ -510,7 +513,7 @@ TGFX_TEST_PRIVATE(ImageReaderTest, ChangedReadInvalidatesCachedImage) {
                         stream->push(17, 1000);
                         auto first = reader->acquireBuffer();
                         auto firstImage = Image::MakeFrom(first);
-                        ExpectImagePixels(context, firstImage, 17, 255);
+                        ExpectImagePixels(context, firstImage, 17, 255, 0);
                         ASSERT_FALSE(HasFatalFailure());
                         auto firstKey =
                             std::static_pointer_cast<RasterizedImage>(firstImage)->getTextureKey();
@@ -519,7 +522,7 @@ TGFX_TEST_PRIVATE(ImageReaderTest, ChangedReadInvalidatesCachedImage) {
                         stream->push(29, 2000);
                         auto next = reader->acquireBuffer();
                         auto nextImage = Image::MakeFrom(next);
-                        ExpectImagePixels(context, nextImage, 29, 255);
+                        ExpectImagePixels(context, nextImage, 29, 255, 0);
                         ASSERT_FALSE(HasFatalFailure());
                         auto nextKey =
                             std::static_pointer_cast<RasterizedImage>(nextImage)->getTextureKey();
@@ -531,41 +534,100 @@ TGFX_TEST_PRIVATE(ImageReaderTest, ChangedReadInvalidatesCachedImage) {
                         EXPECT_EQ(first->timestamp(), 1000);
                         EXPECT_EQ(next->state(), ImageBufferState::Ready);
                         EXPECT_EQ(next->timestamp(), 2000);
-                        ExpectImagePixels(context, firstImage, 0, 0);
+                        ExpectImagePixels(context, firstImage, 0, 0, 0);
                         ASSERT_FALSE(HasFatalFailure());
-                        ExpectImagePixels(context, nextImage, 29, 255);
+                        ExpectImagePixels(context, nextImage, 29, 255, 0);
                         ASSERT_FALSE(HasFatalFailure());
                         EXPECT_EQ(stream->reads, 2);
                       })
 }
 
-TGFX_TEST_PRIVATE(ImageReaderTest, UnknownMutationInvalidatesCachedImage) {
-  TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
-                      ASSERT_NE(context, nullptr); for (bool failed
-                                                        : {false, true}) {
-                        auto stream = std::make_shared<ThreeStateStream>();
-                        auto reader = ImageReader::MakeFrom(stream);
-                        stream->push(17, 1000);
-                        auto first = reader->acquireBuffer();
-                        auto image = Image::MakeFrom(first);
-                        ExpectImagePixels(context, image, 17, 255);
-                        ASSERT_FALSE(HasFatalFailure());
-                        auto key =
-                            std::static_pointer_cast<RasterizedImage>(image)->getTextureKey();
-                        auto texture = Resource::Find<TextureView>(context, key);
-                        ASSERT_NE(texture, nullptr);
-                        stream->failWhenEmpty = failed;
-                        stream->changeWhenEmpty = true;
-                        auto next = reader->acquireBuffer();
-                        EXPECT_EQ(TextureView::MakeFrom(context, next), nullptr);
-                        EXPECT_EQ(next->state(), ImageBufferState::Expired);
-                        EXPECT_EQ(first->state(), ImageBufferState::Expired);
-                        EXPECT_EQ(first->timestamp(), 1000);
-                        EXPECT_EQ(Resource::Find<TextureView>(context, key), nullptr);
-                        ExpectImagePixels(context, image, 0, 0);
-                        ASSERT_FALSE(HasFatalFailure());
-                        EXPECT_EQ(stream->reads, 2);
-                      })
+TGFX_TEST_PRIVATE(ImageReaderTest, InvalidatedReadCannotFallbackToRetainedImage) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      for (bool replaceWhenEmpty
+           : {false, true}) {
+        auto stream = std::make_shared<ThreeStateStream>();
+        auto reader = ImageReader::MakeFrom(stream);
+        stream->push(17, 1000);
+        auto first = reader->acquireBuffer();
+        auto firstImage = Image::MakeFrom(first);
+        ExpectImagePixels(context, firstImage, 17, 255, 0);
+        ASSERT_FALSE(HasFatalFailure());
+        auto firstKey = std::static_pointer_cast<RasterizedImage>(firstImage)->getTextureKey();
+        ASSERT_NE(Resource::Find<TextureView>(context, firstKey), nullptr);
+        auto retained = reader->acquireBuffer();
+        auto retainedImage = Image::MakeFrom(retained);
+        ExpectImagePixels(context, retainedImage, 17, 255, 0);
+        ASSERT_FALSE(HasFatalFailure());
+        auto retainedKey =
+            std::static_pointer_cast<RasterizedImage>(retainedImage)->getTextureKey();
+        ASSERT_NE(Resource::Find<TextureView>(context, retainedKey), nullptr);
+        EXPECT_EQ(retained->state(), ImageBufferState::Ready);
+        EXPECT_EQ(retained->timestamp(), 1000);
+        stream->invalidateWhenEmpty = true;
+        stream->replaceWhenEmpty = replaceWhenEmpty;
+        auto failed = reader->acquireBuffer();
+        EXPECT_EQ(TextureView::MakeFrom(context, failed), nullptr);
+        EXPECT_EQ(failed->state(), ImageBufferState::Expired);
+        EXPECT_EQ(failed->timestamp(), -1);
+        EXPECT_EQ(first->state(), ImageBufferState::Expired);
+        EXPECT_EQ(first->timestamp(), 1000);
+        EXPECT_EQ(retained->state(), ImageBufferState::Expired);
+        EXPECT_EQ(retained->timestamp(), 1000);
+        EXPECT_EQ(Resource::Find<TextureView>(context, firstKey), nullptr);
+        EXPECT_EQ(Resource::Find<TextureView>(context, retainedKey), nullptr);
+        ExpectImagePixels(context, firstImage, 0, 0, 0);
+        ASSERT_FALSE(HasFatalFailure());
+        ExpectImagePixels(context, retainedImage, 0, 0, 0);
+        ASSERT_FALSE(HasFatalFailure());
+        EXPECT_EQ(TextureView::MakeFrom(context, failed), nullptr);
+        EXPECT_EQ(stream->reads, 3);
+        stream->invalidateWhenEmpty = false;
+        stream->replaceWhenEmpty = false;
+        auto empty = reader->acquireBuffer();
+        EXPECT_EQ(TextureView::MakeFrom(context, empty), nullptr);
+        EXPECT_EQ(empty->state(), ImageBufferState::Expired);
+        EXPECT_EQ(empty->timestamp(), -1);
+        EXPECT_EQ(stream->reads, 4);
+        stream->push(29, 2000);
+        EXPECT_EQ(TextureView::MakeFrom(context, empty), nullptr);
+        EXPECT_EQ(stream->reads, 4);
+        auto recovered = reader->acquireBuffer();
+        ExpectIdentity(context, TextureView::MakeFrom(context, recovered), 29);
+        EXPECT_EQ(recovered->state(), ImageBufferState::Ready);
+        EXPECT_EQ(recovered->timestamp(), 2000);
+        EXPECT_EQ(stream->reads, 5);
+      })
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, UnchangedReplacementDoesNotInheritPixelsOrTimestamp) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<ThreeStateStream>();
+      auto reader = ImageReader::MakeFrom(stream); stream->push(17, 1000);
+      auto first = reader->acquireBuffer(); auto firstImage = Image::MakeFrom(first);
+      ExpectImagePixels(context, firstImage, 17, 255, 0); ASSERT_FALSE(HasFatalFailure());
+      auto firstKey = std::static_pointer_cast<RasterizedImage>(firstImage)->getTextureKey();
+      ASSERT_NE(Resource::Find<TextureView>(context, firstKey), nullptr);
+      stream->replaceWhenEmpty = true; auto replacement = reader->acquireBuffer();
+      EXPECT_EQ(TextureView::MakeFrom(context, replacement), nullptr);
+      EXPECT_EQ(replacement->state(), ImageBufferState::Expired);
+      EXPECT_EQ(replacement->timestamp(), -1); EXPECT_EQ(first->state(), ImageBufferState::Expired);
+      EXPECT_EQ(first->timestamp(), 1000);
+      EXPECT_EQ(Resource::Find<TextureView>(context, firstKey), nullptr);
+      auto replacementImage = Image::MakeFrom(replacement);
+      ExpectImagePixels(context, replacementImage, 0, 0, 0); ASSERT_FALSE(HasFatalFailure());
+      ExpectImagePixels(context, firstImage, 0, 0, 0); ASSERT_FALSE(HasFatalFailure());
+      EXPECT_EQ(stream->reads, 2); stream->replaceWhenEmpty = false;
+      auto unchanged = reader->acquireBuffer();
+      EXPECT_EQ(TextureView::MakeFrom(context, unchanged), nullptr);
+      EXPECT_EQ(unchanged->state(), ImageBufferState::Expired);
+      EXPECT_EQ(unchanged->timestamp(), -1); EXPECT_EQ(stream->reads, 3); stream->push(29, 2000);
+      auto delivered = reader->acquireBuffer();
+      ExpectIdentity(context, TextureView::MakeFrom(context, delivered), 29);
+      EXPECT_EQ(delivered->state(), ImageBufferState::Ready);
+      EXPECT_EQ(delivered->timestamp(), 2000); EXPECT_EQ(stream->reads, 4);)
 }
 
 TGFX_TEST(ImageReaderTest, StablePixelBufferDefaultsToReadyWithoutTimestamp) {

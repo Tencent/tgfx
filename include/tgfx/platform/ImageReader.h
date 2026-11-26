@@ -65,8 +65,10 @@ class ImageReader {
 
   /**
    * Acquires a Pending buffer without dequeuing source contents. Its first texture-generation read
-   * delivers Ready pixels or reaches terminal Expired if no content is delivered, without waiting
-   * for a producer notification. An Expired buffer cannot retry; acquire a new buffer instead.
+   * makes valid pixels Ready or reaches terminal Expired if no valid content is available. If no
+   * new image arrives but previously delivered content is known unchanged, it reuses that content
+   * and its actual timestamp. It does not wait for a producer notification. An Expired buffer cannot
+   * retry; acquire a new buffer instead.
    * Each acquisition expires older undelivered Pending buffers. A previously Ready buffer remains
    * available for redraw while the shared native contents are known unchanged, but expires after a
    * later native mutation or a failed read whose effect on those contents is unknown.
@@ -91,18 +93,21 @@ class ImageReader {
  private:
   std::shared_ptr<TextureView> textureView = nullptr;
   uint64_t bufferVersion = 0;
-  uint64_t textureVersion = 0;
-  static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<ImageStream> stream);
-  struct ReadResult {
-    std::shared_ptr<TextureView> texture = nullptr;
-    bool delivered = false;
+  uint64_t contentVersion = 0;
+  bool contentValid = false;
+  int64_t textureTimestamp = -1;
+  struct Credential {
+    uint64_t version = 0;
+    uint64_t contentVersion = 0;
+    ImageBufferState delivery = ImageBufferState::Pending;
     int64_t timestamp = -1;
   };
-  int64_t textureTimestamp = -1;
+  static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<ImageStream> stream);
 
-  // Called with locker held; readTexture() additionally requires a nonexpired credential.
-  bool checkExpired(uint64_t version);
-  ReadResult readTexture(uint64_t version, Context* context, bool mipmapped);
+  // Credential receipts are written only by readTexture() while locker is held.
+  bool checkExpired(const Credential& credential) const;
+  std::shared_ptr<TextureView> readTexture(Credential& credential, Context* context,
+                                           bool mipmapped);
   friend class ImageReaderBuffer;
   friend class ImageStream;
 };

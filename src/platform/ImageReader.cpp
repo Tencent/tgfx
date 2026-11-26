@@ -24,30 +24,38 @@
 namespace tgfx {
 class ImageReaderBuffer : public ImageBuffer {
  public:
-  ImageReaderBuffer(std::shared_ptr<ImageReader> reader, uint64_t version)
-      : reader(std::move(reader)), version(version) {
+  ImageReaderBuffer(std::shared_ptr<ImageReader> reader,
+                    std::shared_ptr<ImageReader::Credential> credential)
+      : reader(std::move(reader)), credential(std::move(credential)) {
   }
+
   int width() const override {
     return reader->width();
   }
+
   int height() const override {
     return reader->height();
   }
+
   bool isAlphaOnly() const override {
     return false;
   }
+
   bool expired() const override {
     std::lock_guard<std::mutex> lock(reader->locker);
-    return isExpired();
+    return reader->checkExpired(*credential);
   }
+
   ImageBufferState state() const override {
     std::lock_guard<std::mutex> lock(reader->locker);
-    return isExpired() ? ImageBufferState::Expired : delivery;
+    return reader->checkExpired(*credential) ? ImageBufferState::Expired : credential->delivery;
   }
+
   int64_t timestamp() const override {
     std::lock_guard<std::mutex> lock(reader->locker);
-    return deliveredTimestamp;
+    return credential->timestamp;
   }
+
   const std::shared_ptr<ColorSpace>& colorSpace() const override {
     return reader->colorSpace();
   }
@@ -55,28 +63,15 @@ class ImageReaderBuffer : public ImageBuffer {
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override {
     std::lock_guard<std::mutex> lock(reader->locker);
-    if (isExpired()) {
+    if (reader->checkExpired(*credential)) {
       return nullptr;
     }
-    auto result = reader->readTexture(version, context, mipmapped);
-    if (!result.delivered) {
-      delivery = ImageBufferState::Expired;
-      return nullptr;
-    }
-    deliveredTimestamp = result.timestamp;
-    delivery = ImageBufferState::Ready;
-    return result.texture;
+    return reader->readTexture(*credential, context, mipmapped);
   }
 
  private:
-  // Requires reader->locker. Do not call the locking public expired() while holding this mutex.
-  bool isExpired() const {
-    return delivery == ImageBufferState::Expired || reader->checkExpired(version);
-  }
-  std::shared_ptr<ImageReader> reader;
-  uint64_t version;
-  mutable ImageBufferState delivery = ImageBufferState::Pending;
-  mutable int64_t deliveredTimestamp = -1;
+  const std::shared_ptr<ImageReader> reader;
+  const std::shared_ptr<ImageReader::Credential> credential;
 };
 
 std::shared_ptr<ImageReader> ImageReader::MakeFrom(std::shared_ptr<ImageStream> stream) {
@@ -107,38 +102,57 @@ std::shared_ptr<ImageBuffer> ImageReader::acquireBuffer() {
   std::lock_guard<std::mutex> lock(locker);
   auto reader = weakThis.lock();
   DEBUG_ASSERT(reader != nullptr);
-  return std::make_shared<ImageReaderBuffer>(std::move(reader), ++bufferVersion);
+  auto credential = std::make_shared<Credential>();
+  credential->version = ++bufferVersion;
+  return std::make_shared<ImageReaderBuffer>(std::move(reader), std::move(credential));
 }
 
 std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {
   return acquireBuffer();
 }
 
-bool ImageReader::checkExpired(uint64_t version) {
-  return version != textureVersion && version < bufferVersion;
+bool ImageReader::checkExpired(const Credential& credential) const {
+  if (credential.delivery == ImageBufferState::Expired) {
+    return true;
+  }
+  if (credential.delivery == ImageBufferState::Ready) {
+    return !contentValid || credential.contentVersion != contentVersion;
+  }
+  return credential.version < bufferVersion;
 }
 
-ImageReader::ReadResult ImageReader::readTexture(uint64_t version, Context* context,
-                                                 bool mipmapped) {
-  if (version == textureVersion) {
-    return {textureView, true, textureTimestamp};
+std::shared_ptr<TextureView> ImageReader::readTexture(Credential& credential, Context* context,
+                                                      bool mipmapped) {
+  DEBUG_ASSERT(!checkExpired(credential));
+  if (credential.delivery == ImageBufferState::Ready) {
+    return textureView;
   }
   auto result = stream->onReadTexture(context, mipmapped, textureView);
-  if (result.advanced || result.contentChanged || result.texture != textureView) {
-    textureVersion = 0;
-    if (textureView) {
+  auto changed =
+      result.outcome != ImageStream::ReadOutcome::Unchanged || result.texture != textureView;
+  if (changed) {
+    ++contentVersion;
+    contentValid = false;
+    textureTimestamp = -1;
+    if (textureView != nullptr) {
       textureView->removeUniqueKey();
     }
-    if (result.texture && result.texture != textureView) {
+    if (result.texture != nullptr && result.texture != textureView) {
       result.texture->removeUniqueKey();
     }
   }
   textureView = std::move(result.texture);
-  if (textureView == nullptr || result.failed || !result.advanced) {
-    return {};
+  if (result.outcome == ImageStream::ReadOutcome::Delivered && textureView != nullptr) {
+    contentValid = true;
+    textureTimestamp = result.timestamp;
   }
-  textureVersion = version;
-  textureTimestamp = result.timestamp;
-  return {textureView, true, result.timestamp};
+  if (!contentValid || textureView == nullptr) {
+    credential.delivery = ImageBufferState::Expired;
+    return nullptr;
+  }
+  credential.delivery = ImageBufferState::Ready;
+  credential.contentVersion = contentVersion;
+  credential.timestamp = textureTimestamp;
+  return textureView;
 }
 }  // namespace tgfx

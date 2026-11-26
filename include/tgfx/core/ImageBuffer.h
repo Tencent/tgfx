@@ -41,7 +41,8 @@ enum class ImageBufferState {
    */
   Pending,
   /**
-   * Pixels have been delivered and remain unchanged until the buffer expires.
+   * Valid pixels are available and remain unchanged until the buffer expires. A streaming buffer
+   * may retain previous pixels; Ready does not imply that a new source image was consumed.
    */
   Ready,
   /**

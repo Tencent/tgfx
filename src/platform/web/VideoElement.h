@@ -40,9 +40,8 @@ class VideoElement : public ImageStream {
   }
 
  protected:
-  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override;
-
-  bool onUpdateTexture(std::shared_ptr<TextureView> textureView) override;
+  TextureReadResult onReadTexture(Context* context, bool mipmapped,
+                                  std::shared_ptr<TextureView> texture) override;
 
  private:
   emscripten::val source = emscripten::val::null();
@@ -53,5 +52,9 @@ class VideoElement : public ImageStream {
 #endif
 
   VideoElement(emscripten::val video, int width, int height);
+
+  std::shared_ptr<TextureView> makeTexture(Context* context, bool mipmapped);
+
+  void uploadTexture(const std::shared_ptr<TextureView>& textureView);
 };
 }  // namespace tgfx

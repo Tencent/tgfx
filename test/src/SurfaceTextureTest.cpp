@@ -209,10 +209,23 @@ TEST_F(SurfaceTextureTest, NewCredentialRetriesFailedLatchWithoutAnotherNotifica
   expectColor(retry, 0, 255);
   ASSERT_FALSE(HasFatalFailure());
 
-  auto empty = reader->acquireBuffer();
-  EXPECT_EQ(TextureView::MakeFrom(context, empty), nullptr);
-  EXPECT_EQ(empty->state(), ImageBufferState::Expired);
-  EXPECT_FALSE(retry->expired());
+  auto retryTexture = TextureView::MakeFrom(context, retry);
+  auto retryTimestamp = retry->timestamp();
+  for (int count = 0; count < 3; count++) {
+    auto empty = reader->acquireBuffer();
+    EXPECT_EQ(empty->state(), ImageBufferState::Pending);
+    EXPECT_EQ(TextureView::MakeFrom(context, empty), retryTexture);
+    EXPECT_EQ(empty->state(), ImageBufferState::Ready);
+    EXPECT_EQ(empty->timestamp(), retryTimestamp);
+    EXPECT_EQ(retry->state(), ImageBufferState::Ready);
+    EXPECT_EQ(retry->timestamp(), retryTimestamp);
+    expectColor(empty, 0, 255);
+    ASSERT_FALSE(HasFatalFailure());
+    expectColor(retry, 0, 255);
+    ASSERT_FALSE(HasFatalFailure());
+    EXPECT_EQ(env->GetIntField(source, latchCalls), 4);
+    EXPECT_FALSE(stream->frameAvailable);
+  }
 }
 
 TEST_F(SurfaceTextureTest, TimestampFailureDoesNotRestoreConsumedNotification) {
@@ -234,12 +247,17 @@ TEST_F(SurfaceTextureTest, TimestampFailureDoesNotRestoreConsumedNotification) {
   EXPECT_FALSE(stream->frameAvailable);
   EXPECT_EQ(stream->lastLatchedTimestamp, firstTimestamp);
   EXPECT_TRUE(first->expired());
+  EXPECT_EQ(first->timestamp(), firstTimestamp);
   EXPECT_EQ(env->GetIntField(source, latchCalls), 2);
   EXPECT_FALSE(env->ExceptionCheck());
 
   auto empty = reader->acquireBuffer();
   EXPECT_EQ(TextureView::MakeFrom(context, empty), nullptr);
   EXPECT_EQ(empty->state(), ImageBufferState::Expired);
+  EXPECT_EQ(empty->timestamp(), -1);
+  EXPECT_EQ(TextureView::MakeFrom(context, first), nullptr);
+  EXPECT_EQ(TextureView::MakeFrom(context, empty), nullptr);
+  EXPECT_EQ(first->timestamp(), firstTimestamp);
   EXPECT_EQ(env->GetIntField(source, latchCalls), 2);
 
   postColor(static_cast<jint>(0xFFFFFF00u));

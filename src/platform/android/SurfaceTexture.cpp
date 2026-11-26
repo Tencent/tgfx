@@ -245,7 +245,7 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
     {
       std::lock_guard<std::mutex> lock(locker);
       if (!frameAvailable) {
-        return {nullptr, false, lastLatchedTimestamp, false, false};
+        return {nullptr, ReadOutcome::Unchanged, -1};
       }
     }
     textureID = makeExternalOESTexture(context);
@@ -255,12 +255,11 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
   }
   auto result = updateTexImage();
   if (textureView != nullptr) {
-    return {std::move(textureView), result.advanced, result.timestamp, result.contentChanged,
-            result.failed};
+    return {std::move(textureView), result.outcome, result.timestamp};
   }
-  if (!result.advanced) {
+  if (result.outcome != ReadOutcome::Delivered) {
     releaseExternalOESTexture(context, textureID);
-    return {nullptr, false, -1, result.contentChanged, result.failed};
+    return {nullptr, result.outcome, -1};
   }
   // The descriptor must match the real size of the OES texture, otherwise getTextureCoord()
   // converts pixel coordinates with a wrong base: hardware decoders pad the output buffer to an
@@ -283,8 +282,7 @@ ImageStream::TextureReadResult SurfaceTexture::onReadTexture(
   auto texture = gpu->makeResource<GLTexture>(
       descriptor, static_cast<unsigned>(GL_TEXTURE_EXTERNAL_OES), textureID);
   textureView = Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
-  return {std::move(textureView), result.advanced, result.timestamp, result.contentChanged,
-          result.failed};
+  return {std::move(textureView), result.outcome, result.timestamp};
 }
 
 bool SurfaceTexture::latchTexture(JNIEnv* env) {
@@ -355,12 +353,12 @@ SurfaceTexture::FrameUpdateResult SurfaceTexture::updateTexImage() {
   // No notification is not proof of an empty native queue, but no JNI call is proof this read
   // leaves its content unchanged. A late notification is handled by a later acquisition.
   if (!frameAvailable) {
-    return {false, lastLatchedTimestamp, textureSize, false, false};
+    return {ReadOutcome::Unchanged, lastLatchedTimestamp, textureSize};
   }
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
-    return {false, lastLatchedTimestamp, textureSize, false};
+    return {ReadOutcome::Unchanged, lastLatchedTimestamp, textureSize};
   }
   frameAvailable = false;
   auto previous = lastLatchedTimestamp;
@@ -368,17 +366,17 @@ SurfaceTexture::FrameUpdateResult SurfaceTexture::updateTexImage() {
     // A failed latch may leave an image pending; another notification is not guaranteed.
     // Preserve retry eligibility, not a guarantee that the queue or previous pixels are unchanged.
     frameAvailable = true;
-    return {false, previous, textureSize, true};
+    return {ReadOutcome::Invalidated, previous, textureSize};
   }
   auto timestamp = currentTimestamp(env);
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
-    return {false, previous, textureSize, true, true};
+    return {ReadOutcome::Invalidated, previous, textureSize};
   }
   lastLatchedTimestamp = timestamp;
   resolveTextureSize(env);
   // Every actual latch can replace pixels, even when its timestamp equals the previous one.
-  return {true, timestamp, textureSize, true, false};
+  return {ReadOutcome::Delivered, timestamp, textureSize};
 }
 
 void SurfaceTexture::resolveTextureSize(JNIEnv* env) {
