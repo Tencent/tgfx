@@ -89,6 +89,7 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
         {ShaderVar(attribute).name(), ShaderVar(attribute).type(), Precision::High, 0});
   }
   GeometryProcessor::FPCoordTransformHandler transformHandler(programInfo, &transformedCoordVars);
+
   GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(),
                                    uniformHandler(), getContext()->shaderCaps(), *outputColor,
                                    *outputCoverage, &transformHandler, &subsetVarName,
@@ -96,6 +97,16 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
   programIRBuilder().SetStage(ShaderStage::Vertex);
   geometryProcessor->emitCode(args);
   programIRBuilder().SetStage(ShaderStage::Fragment);
+  // The id registry reads back the values the geometry's own emission created (its output
+  // statements' destinations): minting fresh ones here would break the link the moment the
+  // printer's name pass makes same-name-different-id pairs print differently.
+  for (const auto& value : programIRBuilder().IR().values) {
+    if (value.debugName == *outputColor) {
+      geoColorValue = value.id;
+    } else if (value.debugName == *outputCoverage) {
+      geoCoverageValue = value.id;
+    }
+  }
   fragmentShaderBuilder()->codeAppend("}");
 }
 
@@ -113,7 +124,17 @@ void ProgramBuilder::emitAndInstallFragProcessors(std::string* color, std::strin
     while (const FragmentProcessor* tempFP = iter.next()) {
       transformedCoordVarsIdx += tempFP->numCoordTransforms();
     }
-    **inOut = output;
+    **inOut = output.first;
+    // The id protocol: record the tail of each chain leg for the xfer to read. The coverage leg
+    // only exists when the chain extends past the color processors; without one the xfer reads
+    // the literal constant.
+    if (i + 1 == programInfo->numColorFragmentProcessors()) {
+      colorChainValue = output.second;
+    }
+    if (i + 1 == programInfo->numFragmentProcessors() &&
+        programInfo->numFragmentProcessors() > programInfo->numColorFragmentProcessors()) {
+      coverageChainValue = output.second;
+    }
   }
 }
 
@@ -125,9 +146,9 @@ static const T* GetPointer(const std::vector<T>& vector, size_t atIndex) {
   return &vector[atIndex];
 }
 
-std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* processor,
-                                                   size_t transformedCoordVarsIdx,
-                                                   const std::string& input, bool isCoverage) {
+std::pair<std::string, ValueID> ProgramBuilder::emitAndInstallFragProc(
+    const FragmentProcessor* processor, size_t transformedCoordVarsIdx,
+    const std::string& input, bool isCoverage) {
   ProcessorGuard processorGuard(this, processor);
   std::string output;
   nameExpression(&output, "output");
@@ -161,7 +182,7 @@ std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* proc
 
   processor->emitCode(args);
   fragmentShaderBuilder()->codeAppend("}");
-  return output;
+  return {output, outputValue};
 }
 
 void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
@@ -203,8 +224,26 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
     return programIRBuilder().InternValue(name, SLType::Float4, Precision::High,
                                           IRValueKind::Local);
   };
-  const auto inputColorValue = resolveInput(inputColor);
-  const auto inputCoverageValue = resolveInput(inputCoverage);
+  // The id protocol: the chain tails come from the registry, not from a name search. A chain
+  // that never emitted (a GP-only program) reads the literal constants, matching the text
+  // route's defaults.
+  auto chainValue = [&](ValueID chainTail, ValueID fallback) -> ValueID {
+    if (chainTail != INVALID_VALUE_ID) {
+      return chainTail;
+    }
+    if (fallback != INVALID_VALUE_ID) {
+      return fallback;
+    }
+    const auto one = programIRBuilder().CreateConstant(1.0f);
+    return programIRBuilder().CreateConstruct(SLType::Float4, {one, one, one, one});
+  };
+  const auto inputColorValue = chainValue(colorChainValue, geoColorValue);
+  const auto inputCoverageValue =
+      chainValue(coverageChainValue, geoCoverageValue != INVALID_VALUE_ID ? geoCoverageValue
+                                                                          : INVALID_VALUE_ID);
+  (void)resolveInput;
+  (void)chainValue;
+  (void)resolveInput;
   const auto outputValue = programIRBuilder().CreateValue(SLType::Float4, Precision::High,
                                                           IRValueKind::Local, "fragmentOutput");
   XferProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), inputColor, inputCoverage,

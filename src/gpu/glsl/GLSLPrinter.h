@@ -41,6 +41,12 @@ class GLSLPrinter {
   /// route): one declaration or assignment per statement, expressions through the operator
   /// emitter. Returns an empty string when a statement cannot be printed yet, so the caller can
   /// fall back to the recorded text route. outputName seeds the swizzle epilogue's target.
+  /// Uniquifies the printable value names in place: values two emitters named the same (or left
+  /// nameless) get stable generated names, so a printed reference and a printed definition can
+  /// only match when they are the same value. Values the interface owns (uniforms, varyings,
+  /// samplers, attributes) and the builtin outputs keep their names.
+  static void UniquifyValueNames(ProgramIR& program);
+
   static std::string PrintFragmentBodyFromIR(const ProgramIR& program);
 
   /// Prints the vertex main body from the ProgramIR vertex statements under the same rules.

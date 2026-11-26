@@ -88,6 +88,15 @@ class ProgramBuilder {
     return programIR;
   }
 
+  /// The fragment chain's tail outputs (the id protocol): the xfer reads these directly
+  /// instead of searching values by name. A chain that never emitted stays invalid.
+  ValueID colorChainValue = INVALID_VALUE_ID;
+  ValueID coverageChainValue = INVALID_VALUE_ID;
+  /// The geometry processor's color and coverage outputs (the id protocol): the xfer's inputs
+  /// fall back to them when no FP extends the chain (a GP-only fill).
+  ValueID geoColorValue = INVALID_VALUE_ID;
+  ValueID geoCoverageValue = INVALID_VALUE_ID;
+
   bool emitAndInstallProcessors();
 
   void finalizeShaders();
@@ -110,7 +119,7 @@ class ProgramBuilder {
 
   void emitAndInstallFragProcessors(std::string* color, std::string* coverage);
 
-  std::string emitAndInstallFragProc(const FragmentProcessor* processor,
+  std::pair<std::string, ValueID> emitAndInstallFragProc(const FragmentProcessor* processor,
                                      size_t transformedCoordVarsIdx, const std::string& input,
                                      bool isCoverage);
 

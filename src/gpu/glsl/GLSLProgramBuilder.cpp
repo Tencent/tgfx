@@ -304,6 +304,10 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     _vertexBuilder.setCodeText(GLSLPrinter::PrintVertexProgram(description.vertexCalls));
     _fragBuilder.setCodeText(GLSLPrinter::PrintFragmentProgram(description.fragment));
   } else {
+    // Names become print-only here: one pass rewrites every renameable value name so that a
+    // printed reference and a printed definition can only match when they are the same value.
+    // Emitters that minted colliding (or missing) names stop silently connecting through them.
+    GLSLPrinter::UniquifyValueNames(programIRBuilder().IR());
     // The printed body calls the operator functions by name, but nothing on the IR route pulls
     // their sources. Walk the calls and pull each referenced function; the library pull is
     // deduplicated and carries each function's own dependencies.

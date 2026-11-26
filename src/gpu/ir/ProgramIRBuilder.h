@@ -99,6 +99,10 @@ class ProgramIRBuilder {
 
   void StoreVarying(LValue dst, ValueID src);
 
+  ProgramIR& IR() {
+    return ir;
+  }
+
   const ProgramIR& IR() const {
     return ir;
   }

@@ -352,6 +352,76 @@ bool ResolvesIdentifier(const std::string& name, const ProgramIR& program,
 }
 }  // namespace
 
+namespace {
+/// Collects every value an expression tree references, expanding intermediate expr values.
+void CollectExprValueRefs(const ProgramIR& program, ExprID exprId, std::set<ValueID>* out) {
+  if (exprId == INVALID_EXPR_ID || exprId >= program.exprs.size()) {
+    return;
+  }
+  const auto& expr = program.exprs[exprId];
+  for (const auto arg : expr.args) {
+    if (arg == INVALID_VALUE_ID || arg >= program.values.size()) {
+      continue;
+    }
+    out->insert(arg);
+    const auto& value = program.values[arg];
+    if (value.definingExpr != INVALID_EXPR_ID) {
+      CollectExprValueRefs(program, value.definingExpr, out);
+    }
+  }
+}
+
+/// The names the printer must never rewrite: builtin outputs and the xfer route's logical output
+/// (the printer maps it to the color output).
+bool IsReservedName(const std::string& name) {
+  return name == "gl_Position" || name == "gl_FragCoord" || name == "fragmentOutput";
+}
+}  // namespace
+
+void GLSLPrinter::UniquifyValueNames(ProgramIR& program) {
+  std::set<ValueID> referenced = {};
+  auto collectStatements = [&](const std::vector<IRStatement>& statements) {
+    for (const auto& statement : statements) {
+      const ValueID ids[] = {statement.dst.base, statement.src, statement.loopInit,
+                             statement.loopBound, statement.loopStep};
+      for (const auto id : ids) {
+        if (id == INVALID_VALUE_ID || id >= program.values.size()) {
+          continue;
+        }
+        referenced.insert(id);
+        const auto& value = program.values[id];
+        if (value.definingExpr != INVALID_EXPR_ID) {
+          CollectExprValueRefs(program, value.definingExpr, &referenced);
+        }
+      }
+    }
+  };
+  collectStatements(program.statements);
+  collectStatements(program.vertexStatements);
+  // Count printable names: only local/expr values own renameable names.
+  std::map<std::string, size_t> counts = {};
+  for (const auto id : referenced) {
+    const auto& value = program.values[id];
+    if ((value.kind == IRValueKind::Local || value.kind == IRValueKind::Expr) &&
+        !IsReservedName(value.debugName)) {
+      ++counts[value.debugName];
+    }
+  }
+  size_t counter = 0;
+  for (const auto id : referenced) {
+    auto& value = program.values[id];
+    if (value.kind != IRValueKind::Local && value.kind != IRValueKind::Expr) {
+      continue;
+    }
+    if (IsReservedName(value.debugName)) {
+      continue;
+    }
+    if (value.debugName.empty() || counts[value.debugName] > 1) {
+      value.debugName = "v" + std::to_string(counter++);
+    }
+  }
+}
+
 std::string GLSLPrinter::PrintFragmentBodyFromIR(const ProgramIR& program) {
   std::string out = {};
   std::string error = {};
@@ -417,6 +487,22 @@ std::string GLSLPrinter::PrintFragmentBodyFromIR(const ProgramIR& program) {
           }
           LOGE("IRPrinter: an identifier is unresolved: '%s' in line: %s", identifier.c_str(),
                line.c_str());
+          if (std::getenv("TGFX_IR_DIAG") != nullptr) {
+            for (const auto& value : program.values) {
+              if (!value.debugName.empty()) {
+                LOGE("IRDIAG value '%s' kind=%d type=%d defining=%d", value.debugName.c_str(),
+                     static_cast<int>(value.kind), static_cast<int>(value.type),
+                     static_cast<int>(value.definingExpr));
+              }
+            }
+            for (const auto& statement : program.statements) {
+              const auto dstName = statement.dst.base < program.values.size()
+                                       ? program.values[statement.dst.base].debugName
+                                       : std::string();
+              LOGE("IRDIAG stmt kind=%d dst='%s'", static_cast<int>(statement.kind),
+                   dstName.c_str());
+            }
+          }
           return {};
         }
         index = end;
