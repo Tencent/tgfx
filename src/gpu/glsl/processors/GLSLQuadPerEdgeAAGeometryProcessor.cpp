@@ -41,8 +41,11 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   auto& uvCoordsVar = uvCoord.empty() ? position : uvCoord;
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
 
+  std::string colorUniformName = {};
+  Varying colorVar = {};
+  Varying coverageVar = {};
   if (aa == AAType::Coverage) {
-    auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
+    coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->storeVarying(coverageVar.vsOut(), coverage.name());
     fragBuilder->storeCoverage(args.outputCoverage, coverageVar.fsIn(), true);
   } else {
@@ -50,17 +53,56 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   }
 
   if (commonColor.has_value()) {
-    auto colorName =
+    colorUniformName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->storeColor(args.outputColor, colorName);
+    fragBuilder->storeColor(args.outputColor, colorUniformName);
   } else {
-    auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
+    colorVar = varyingHandler->addVarying("Color", SLType::Float4);
     vertBuilder->storeVarying(colorVar.vsOut(), color.name());
     fragBuilder->storeColor(args.outputColor, colorVar.fsIn());
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
   args.vertBuilder->storePosition(position.name());
+
+  // The IR route: the same varyings and outputs as SSA values, so the SPIR-V path serves this
+  // geometry without the text emission.
+  if (args.irBuilder != nullptr) {
+    auto ir = args.irBuilder;
+    if (aa == AAType::Coverage) {
+      emitVaryingIR(args, coverageVar, ShaderVar(coverage));
+    }
+    if (!commonColor.has_value()) {
+      emitVaryingIR(args, colorVar, ShaderVar(color));
+    }
+    emitPositionIR(args, ShaderVar(position));
+    ir->SetStage(ShaderStage::Fragment);
+    if (aa == AAType::Coverage) {
+      const auto coverageValue = ir->InternValue(coverageVar.fsIn(), SLType::Float, Precision::High,
+                                                 IRValueKind::Varying);
+      const auto coverageOutput = ir->InternValue(args.outputCoverage, SLType::Float,
+                                                   Precision::High, IRValueKind::Local);
+      ir->StoreOutput(coverageOutput, coverageValue);
+    } else {
+      const auto one = ir->CreateConstant(1.0f);
+      const auto coverageOutput = ir->InternValue(args.outputCoverage, SLType::Float,
+                                                   Precision::High, IRValueKind::Local);
+      ir->StoreOutput(coverageOutput, one);
+    }
+    if (commonColor.has_value()) {
+      const auto colorValue = ir->InternValue(colorUniformName, SLType::Float4, Precision::High,
+                                              IRValueKind::Uniform);
+      const auto colorOutput = ir->InternValue(args.outputColor, SLType::Float4, Precision::High,
+                                               IRValueKind::Local);
+      ir->StoreOutput(colorOutput, colorValue);
+    } else {
+      const auto colorValue = ir->InternValue(colorVar.fsIn(), SLType::Float4, Precision::High,
+                                              IRValueKind::Varying);
+      const auto colorOutput = ir->InternValue(args.outputColor, SLType::Float4, Precision::High,
+                                               IRValueKind::Local);
+      ir->StoreOutput(colorOutput, colorValue);
+    }
+  }
 }
 
 void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformData* vertexUniformData,

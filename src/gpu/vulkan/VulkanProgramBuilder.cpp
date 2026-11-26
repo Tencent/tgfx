@@ -92,6 +92,8 @@ std::shared_ptr<Program> VulkanProgramBuilder::buildIRProgram() {
   const auto& program = programIRBuilder().IR();
 
   if (program.vertexStatements.empty() || program.statements.empty()) {
+    LOGE("VulkanProgramBuilder: the IR is empty (%zu vertex statements, %zu fragment statements)",
+         program.vertexStatements.size(), program.statements.size());
     return nullptr;
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Vertex)) {
