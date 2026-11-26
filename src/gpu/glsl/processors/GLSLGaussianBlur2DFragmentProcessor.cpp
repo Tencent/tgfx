@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "gpu/ir/ProgramIREmit.h"
 #include "GLSLGaussianBlur2DFragmentProcessor.h"
 #include <array>
 #include <cmath>
@@ -26,12 +27,6 @@
 #include "gpu/glsl/GLSLGaussianKernelWeight.h"
 
 namespace tgfx {
-
-// The child coord of the current sample. The names are shader variables declared in emitCode().
-static std::string BlurSampleCoordFunc(std::string_view coord) {
-  return "(" + std::string(coord) +
-         " + blur2DOrigin + blur2DStepX * float(blur2DX) + blur2DStepY * float(blur2DY))";
-}
 
 PlacementPtr<FragmentProcessor> GaussianBlur2DFragmentProcessor::Make(
     BlockAllocator* allocator, PlacementPtr<FragmentProcessor> processor, float sigmaX,
@@ -51,7 +46,6 @@ GLSLGaussianBlur2DFragmentProcessor::GLSLGaussianBlur2DFragmentProcessor(
 }
 
 void GLSLGaussianBlur2DFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
   auto uniforms = args.uniformHandler;
   auto kernelXName = uniforms->addUniform("KernelX", UniformFormat::Float4, ShaderStage::Fragment,
                                           KERNEL_VEC4_COUNT);
@@ -63,28 +57,41 @@ void GLSLGaussianBlur2DFragmentProcessor::emitCode(EmitArgs& args) const {
   auto stepYName = uniforms->addUniform("StepY", UniformFormat::Float2, ShaderStage::Fragment);
   auto originName = uniforms->addUniform("Origin", UniformFormat::Float2, ShaderStage::Fragment);
 
-  fragBuilder->codeAppendf("vec2 blur2DStepX = %s;", stepXName.c_str());
-  fragBuilder->codeAppendf("vec2 blur2DStepY = %s;", stepYName.c_str());
-  fragBuilder->codeAppendf("vec2 blur2DOrigin = %s;", originName.c_str());
-  fragBuilder->codeAppendf("int blur2DRadiusX = %s;", radiusXName.c_str());
-  fragBuilder->codeAppendf("int blur2DRadiusY = %s;", radiusYName.c_str());
-  fragBuilder->codeAppend("vec4 blur2DSum = vec4(0.0);");
-  // Constant loop bounds keep the shader valid on GLSL ES; the radii stop the loops early.
-  fragBuilder->codeAppendf("for (int blur2DJY = 0; blur2DJY <= %d; ++blur2DJY) {", 2 * MAX_RADIUS);
-  fragBuilder->codeAppend("int blur2DY = blur2DJY - blur2DRadiusY;");
-  fragBuilder->codeAppend("if (blur2DY > blur2DRadiusY) { break; }");
-  AppendKernelWeight(fragBuilder, kernelYName, "blur2DY", "blur2DWeightY", KERNEL_VEC4_COUNT);
-  fragBuilder->codeAppendf("for (int blur2DJX = 0; blur2DJX <= %d; ++blur2DJX) {", 2 * MAX_RADIUS);
-  fragBuilder->codeAppend("int blur2DX = blur2DJX - blur2DRadiusX;");
-  fragBuilder->codeAppend("if (blur2DX > blur2DRadiusX) { break; }");
-  AppendKernelWeight(fragBuilder, kernelXName, "blur2DX", "blur2DWeightX", KERNEL_VEC4_COUNT);
-  std::string sampleColor = "blur2DSample";
-  emitChild(0, &sampleColor, args, BlurSampleCoordFunc);
-  fragBuilder->codeAppendf("blur2DSum += %s * (blur2DWeightX * blur2DWeightY);",
-                           sampleColor.c_str());
-  fragBuilder->codeAppend("}");
-  fragBuilder->codeAppend("}");
-  fragBuilder->codeAppendf("%s = blur2DSum;", args.outputColor.c_str());
+  // The IR route: two nested runtime loops over one child emission, the same shape the text
+  // loops had (the child fires once; the loops update its tap coordinate at runtime). The
+  // kernel slots are this processor's own uniforms, so the weight calls take them as arguments.
+  if (args.irBuilder != nullptr) {
+    auto ir = args.irBuilder;
+    auto intern2 = [&](const std::string& name) {
+      return ir->InternValue(name, SLType::Float2, Precision::High, IRValueKind::Uniform);
+    };
+    const auto radiusXValue = ir->InternValue(radiusXName, SLType::Int, Precision::High,
+                                              IRValueKind::Uniform);
+    const auto radiusYValue = ir->InternValue(radiusYName, SLType::Int, Precision::High,
+                                              IRValueKind::Uniform);
+    const auto stepXValue = intern2(stepXName);
+    const auto stepYValue = intern2(stepYName);
+    const auto originValue = intern2(originName);
+    auto slot = [&](const std::string& base, int index) {
+      return ir->InternValue(base + "[" + std::to_string(index) + "]", SLType::Float4,
+                             Precision::High, IRValueKind::Uniform);
+    };
+    const auto sumValue = emitWeightedTapLoop2D(
+        ir, radiusXValue, radiusYValue, stepXValue, stepYValue, originValue, slot(kernelXName, 0),
+        slot(kernelXName, 1), slot(kernelYName, 0), slot(kernelYName, 1),
+        [&](ValueID /*tapCoordValue*/, const std::string& tapCoordName) -> ValueID {
+          std::string childName = "blur2DTapChild";
+          return emitChildIR(
+              0, "", &childName, args, INVALID_VALUE_ID,
+              [&tapCoordName](std::string_view) -> std::string { return tapCoordName; });
+        });
+    if (sumValue != INVALID_VALUE_ID && args.outputValue != INVALID_VALUE_ID) {
+      ir->StoreOutput(args.outputValue, sumValue);
+      return;
+    }
+    ir->MarkFailed("the gaussian blur 2D path cannot express this child");
+    return;
+  }
 }
 
 void GLSLGaussianBlur2DFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

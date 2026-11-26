@@ -67,7 +67,8 @@ namespace tgfx {
   X(TextCoverageFromAlpha, 36)                                                                      \
   X(TextColorUnpremul, 37)                                                                          \
   X(ClampSubset, 38)                                                                               \
-  X(KernelWeight, 39)
+  X(KernelWeight, 39)                                                                               \
+  X(KernelWeight2, 40)
 
 enum class OperatorID : uint32_t {
 #define TGFX_OPERATOR_ENUM(name, value) name = value,

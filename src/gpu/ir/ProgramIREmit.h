@@ -159,4 +159,58 @@ inline ValueID emitWeightedTapLoop(
   return sumVar;
 }
 
+
+/// The gaussian blur 2D slow path: two nested runtime loops over one child evaluation. The child
+/// fires once inside the double loop body (its coordinate is the tap the loops update); the
+/// weights come from the caller's kernel axis uniforms, so the call is built directly rather than
+/// through the generated Emit (which would declare its own slot uniforms).
+inline ValueID emitWeightedTapLoop2D(
+    ProgramIRBuilder* ir, ValueID radiusXValue, ValueID radiusYValue, ValueID stepXValue,
+    ValueID stepYValue, ValueID originValue, ValueID kernelX0, ValueID kernelX1, ValueID kernelY0,
+    ValueID kernelY1,
+    const std::function<ValueID(ValueID tapCoordValue, const std::string& tapCoordName)>&
+        childEvaluator) {
+  if (ir == nullptr) {
+    return INVALID_VALUE_ID;
+  }
+  const auto sumVar =
+      ir->CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "blur2DTapSum");
+  const auto zero = ir->CreateConstant(0.0f);
+  const auto zero4 = ir->CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
+  ir->Assign({sumVar, ""}, zero4);
+  const auto intZero = ir->CreateConstantInt(0);
+  // The radii are int uniforms already; the counters run i in [-radius, radius] (the text loop's
+  // j form plus early break folds to the same taps: out-of-range weights read as zero).
+  const auto initY = ir->CreateBinary(IRBinaryOp::Sub, SLType::Int, intZero, radiusYValue);
+  ir->BeginForLoop("blur2DY", initY, radiusYValue, intZero);
+  const auto yIndex = ir->InternValue("blur2DY", SLType::Int, Precision::High, IRValueKind::Local);
+  const auto yFloat = ir->CreateConvert(yIndex, SLType::Float);
+  const auto weightY =
+      ir->CreateCall(OperatorID::KernelWeight2, SLType::Float, {kernelY0, kernelY1, yFloat});
+  const auto initX = ir->CreateBinary(IRBinaryOp::Sub, SLType::Int, intZero, radiusXValue);
+  ir->BeginForLoop("blur2DX", initX, radiusXValue, intZero);
+  const auto xIndex = ir->InternValue("blur2DX", SLType::Int, Precision::High, IRValueKind::Local);
+  const auto xFloat = ir->CreateConvert(xIndex, SLType::Float);
+  const auto weightX =
+      ir->CreateCall(OperatorID::KernelWeight2, SLType::Float, {kernelX0, kernelX1, xFloat});
+  // tapCoord = origin + stepX * float(x) + stepY * float(y) — updated each iteration.
+  const auto xStep = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float2, stepXValue, xFloat);
+  const auto yStep = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float2, stepYValue, yFloat);
+  const auto stepped = ir->CreateBinary(IRBinaryOp::Add, SLType::Float2, xStep, yStep);
+  const auto tapCoordValue = ir->CreateBinary(IRBinaryOp::Add, SLType::Float2, originValue, stepped);
+  const std::string tapCoordName = "blur2DTapCoord";
+  const auto tapCoordVar =
+      ir->CreateValue(SLType::Float2, Precision::High, IRValueKind::Local, tapCoordName);
+  ir->Assign({tapCoordVar, ""}, tapCoordValue);
+  const auto childValue = childEvaluator(tapCoordValue, tapCoordName);
+  const auto weight = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float, weightX, weightY);
+  const auto weight4 = ir->CreateConstruct(SLType::Float4, {weight, weight, weight, weight});
+  const auto weighted = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, childValue, weight4);
+  const auto newSum = ir->CreateBinary(IRBinaryOp::Add, SLType::Float4, sumVar, weighted);
+  ir->Assign({sumVar, ""}, newSum);
+  ir->EndForLoop();
+  ir->EndForLoop();
+  return sumVar;
+}
+
 }  // namespace tgfx
