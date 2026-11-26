@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLConicGradientLayout.h"
+#include "GeneratedOperators.h"
 
 namespace tgfx {
 PlacementPtr<ConicGradientLayout> ConicGradientLayout::Make(BlockAllocator* allocator,
@@ -31,21 +32,37 @@ GLSLConicGradientLayout::GLSLConicGradientLayout(Matrix matrix, float bias, floa
 
 void GLSLConicGradientLayout::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
-  auto uniformHandler = args.uniformHandler;
-  auto biasName = uniformHandler->addUniform("Bias", UniformFormat::Float, ShaderStage::Fragment);
-  auto scaleName = uniformHandler->addUniform("Scale", UniformFormat::Float, ShaderStage::Fragment);
+  // The generated glue owns the uniforms (the names match on both routes).
+  ConicGradientOp::UniformNames names = {};
+  if (args.irBuilder != nullptr) {
+    ConicGradientOp::EnsureUniforms(args.irBuilder, args.uniformHandler, &names);
+  }
   const auto coordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
   auto entry = fragBuilder->appendFunction("tgfxConicGradientT");
   if (entry.empty()) {
     return;
   }
   fragBuilder->codeAppendf("%s = vec4(%s(%s, %s, %s), 1.0, 0.0, 0.0);", args.outputColor.c_str(),
-                           entry.c_str(), coordName.c_str(), biasName.c_str(), scaleName.c_str());
+                           entry.c_str(), coordName.c_str(), names.bias.c_str(),
+                           names.scale.c_str());
+  // The IR route: the angle position through the shared function, splatted to vec4.
+  if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID) {
+    auto ir = args.irBuilder;
+    const auto coord =
+        ir->InternValue(coordName, SLType::Float2, Precision::High, IRValueKind::Varying);
+    const auto t = ConicGradientOp::Emit(ir, args.uniformHandler, &names, coord);
+    const auto one = ir->CreateConstant(1.0f);
+    const auto zero = ir->CreateConstant(0.0f);
+    const auto position = ir->CreateConstruct(SLType::Float4, {t, one, zero, zero});
+    ir->StoreOutput(args.outputValue, position);
+  }
 }
 
 void GLSLConicGradientLayout::onSetData(UniformData* /*vertexUniformData*/,
                                         UniformData* fragmentUniformData) const {
-  fragmentUniformData->setData("Bias", bias);
-  fragmentUniformData->setData("Scale", scale);
+  ConicGradientUniforms uniforms = {};
+  uniforms.bias = bias;
+  uniforms.scale = scale;
+  uniforms.upload(fragmentUniformData);
 }
 }  // namespace tgfx

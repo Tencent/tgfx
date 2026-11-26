@@ -55,7 +55,11 @@ namespace tgfx {
   X(RRectCoverage, 25)                                                                               \
   X(RectCoverage, 26)                                                                                 \
   X(SingleGradientColor, 27)                                                                         \
-  X(DualGradientColor, 28)
+  X(DualGradientColor, 28)                                                                           \
+  X(LinearGradient, 29)                                                                              \
+  X(RadialGradient, 30)                                                                              \
+  X(DiamondGradient, 31)                                                                             \
+  X(ConicGradient, 32)
 
 enum class OperatorID : uint32_t {
 #define TGFX_OPERATOR_ENUM(name, value) name = value,

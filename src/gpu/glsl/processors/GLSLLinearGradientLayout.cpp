@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLLinearGradientLayout.h"
+#include "GeneratedOperators.h"
 
 namespace tgfx {
 PlacementPtr<LinearGradientLayout> LinearGradientLayout::Make(BlockAllocator* allocator,
@@ -36,5 +37,18 @@ void GLSLLinearGradientLayout::emitCode(EmitArgs& args) const {
   }
   fragBuilder->codeAppendf("%s = vec4(%s(%s), 1.0, 0.0, 0.0);", args.outputColor.c_str(),
                            entry.c_str(), coordName.c_str());
+  // The IR route: the ramp position through the shared function, splatted to the layout's
+  // vec4 form (t, 1, 0, 0).
+  if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID) {
+    auto ir = args.irBuilder;
+    const auto coord =
+        ir->InternValue(coordName, SLType::Float2, Precision::High, IRValueKind::Varying);
+    LinearGradientOp::UniformNames names = {};
+    const auto t = LinearGradientOp::Emit(ir, args.uniformHandler, &names, coord);
+    const auto one = ir->CreateConstant(1.0f);
+    const auto zero = ir->CreateConstant(0.0f);
+    const auto position = ir->CreateConstruct(SLType::Float4, {t, one, zero, zero});
+    ir->StoreOutput(args.outputValue, position);
+  }
 }
 }  // namespace tgfx

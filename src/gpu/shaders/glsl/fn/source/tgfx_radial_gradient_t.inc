@@ -1,5 +1,7 @@
 // The radial-gradient position: the distance from the center.
 //@function tgfxRadialGradientT
-float tgfxRadialGradientT(highp vec2 coord) {
+//@op RadialGradient
+//@frag
+float tgfxRadialGradientT(highp vec2 coord /*@in*/) {
   return length(coord);
 }

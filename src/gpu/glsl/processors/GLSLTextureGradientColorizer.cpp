@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLTextureGradientColorizer.h"
+#include "GeneratedOperators.h"
 
 namespace tgfx {
 PlacementPtr<TextureGradientColorizer> TextureGradientColorizer::Make(
@@ -37,5 +38,20 @@ void GLSLTextureGradientColorizer::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
   fragBuilder->appendTextureLookup((*args.textureSamplers)[0], "coord");
   fragBuilder->codeAppend(";");
+  // The IR route: the ramp coordinate from the input's x, a fixed half, one texture read.
+  if (args.irBuilder != nullptr && args.inputValue != INVALID_VALUE_ID &&
+      args.outputValue != INVALID_VALUE_ID && args.textureSamplers != nullptr &&
+      args.textureSamplers->count() > 0) {
+    auto ir = args.irBuilder;
+    const auto samplerValue = args.samplerValue((*args.textureSamplers)[0]);
+    if (samplerValue != INVALID_VALUE_ID) {
+      const auto t = ir->CreateSwizzle(args.inputValue, SLType::Float, "x");
+      const auto half = ir->CreateConstant(0.5f);
+      const auto coord = ir->CreateConstruct(SLType::Float2, {t, half});
+      const auto result = ir->CreateTextureSample(
+          samplerValue, coord, SLType::Float4, "gradientColor", SLType::Texture2DSampler);
+      ir->StoreOutput(args.outputValue, result);
+    }
+  }
 }
 }  // namespace tgfx
