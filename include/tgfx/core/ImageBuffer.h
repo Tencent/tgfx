@@ -32,29 +32,27 @@ class TextureView;
 class BufferImage;
 
 /**
- * Describes whether an ImageBuffer has delivered its own pixels.
+ * Describes whether the pixels of an ImageBuffer have been delivered.
  */
 enum class ImageBufferStatus {
   /**
-   * The pixels of the ImageBuffer are available. ImageBuffers with fixed pixels are always Ready.
+   * The pixels are available.
    */
   Ready,
   /**
-   * The pixels are delivered when the ImageBuffer is first drawn, which has not happened yet.
+   * The ImageBuffer has not been drawn yet.
    */
   Pending,
   /**
-   * The pixels did not arrive in time when the ImageBuffer was drawn, so previously delivered
-   * pixels were drawn instead. Drawing a newly created Image of the ImageBuffer retries.
+   * The pixels did not arrive in time, and the previous pixels were drawn instead.
    */
   Timeout,
   /**
-   * Reading the pixels failed when the ImageBuffer was drawn, so previously delivered pixels, if
-   * any, were drawn instead. Drawing a newly created Image of the ImageBuffer retries.
+   * The pixels could not be read, and the previous pixels, if any, were drawn instead.
    */
   Failed,
   /**
-   * The ImageBuffer can no longer create textures. See expired().
+   * The ImageBuffer can no longer be drawn. See expired().
    */
   Expired
 };
@@ -131,9 +129,8 @@ class ImageBuffer {
   }
 
   /**
-   * Returns the delivery status of the ImageBuffer. For ImageBuffers whose pixels are delivered when
-   * first drawn, query it after the drawing is flushed. The default implementation returns Expired
-   * if expired() returns true, and Ready otherwise.
+   * Returns the delivery status of the ImageBuffer. For an ImageBuffer from an ImageReader, query it
+   * after the drawing is flushed. Other ImageBuffers return Ready unless expired.
    */
   virtual ImageBufferStatus status() const {
     return expired() ? ImageBufferStatus::Expired : ImageBufferStatus::Ready;

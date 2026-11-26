@@ -130,7 +130,6 @@ std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t contentVersion, i
   }
   auto result = stream->onReadTexture(context, mipmapped, textureView, timestamp);
   if (result.contentChanged || result.textureView != textureView) {
-    // Buffers delivered earlier no longer match the pixels in the shared texture.
     if (textureView != nullptr) {
       textureView->removeUniqueKey();
     }
@@ -144,8 +143,7 @@ std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t contentVersion, i
     failedStatus =
         result.status == ImageBufferStatus::Ready ? ImageBufferStatus::Failed : result.status;
   }
-  // Keep showing the most recently read frame instead of nothing when the frame of this buffer is
-  // unavailable. The buffer stays undelivered, so drawing a new Image of it reads again.
+  // Fall back to the previous frame rather than drawing nothing.
   return textureView;
 }
 }  // namespace tgfx

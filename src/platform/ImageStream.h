@@ -60,27 +60,14 @@ class ImageStream {
   }
 
   struct ReadResult {
-    /**
-     * The texture view holding the most recently read frame, or nullptr if no frame has been read.
-     */
     std::shared_ptr<TextureView> textureView = nullptr;
-    /**
-     * Ready if the requested frame was read, Timeout if it did not arrive in time, or Failed if
-     * reading failed.
-     */
     ImageBufferStatus status = ImageBufferStatus::Failed;
-    /**
-     * True if the pixels of the passed-in texture view may have changed during the read.
-     */
     bool contentChanged = false;
   };
 
   /**
-   * Reads the frame with the specified presentation timestamp into the texture view, creating the
-   * texture view first if it is nullptr. Older frames are skipped, and a frame that has not arrived
-   * yet is waited for a bounded time. If the timestamp is -1 or the source provides no timestamps,
-   * reads the next available frame. The mipmapped parameter specifies whether a created texture
-   * view must allocate mip map levels.
+   * Reads the frame with the given timestamp into the texture view, creating the texture view if
+   * it is nullptr. Reads the next available frame if the timestamp is -1.
    */
   virtual ReadResult onReadTexture(Context* context, bool mipmapped,
                                    std::shared_ptr<TextureView> textureView, int64_t timestamp) = 0;

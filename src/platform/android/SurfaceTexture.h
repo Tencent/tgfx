@@ -50,8 +50,7 @@ class SurfaceTexture : public ImageStream {
   jobject createInputSurface() const;
 
   /**
-   * Notifies that a new frame has been queued into the SurfaceTexture. The method should only be
-   * called by the listener passed in when creating the reader.
+   * Notifies that a new frame is available. Called by the listener passed in when creating it.
    */
   void notifyFrameAvailable();
 

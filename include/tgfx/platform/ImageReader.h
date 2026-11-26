@@ -63,18 +63,14 @@ class ImageReader {
 
   /**
    * Acquires the next ImageBuffer from the ImageReader after a new image frame has been rendered
-   * into the associated video source. The frame is read when the ImageBuffer is first drawn. If the
-   * timestamp of the frame is specified, the drawing waits for a bounded time until the frame with
-   * that timestamp arrives, skipping any older frames still queued in the video source. If the
-   * frame does not arrive in time, or reading it fails, the drawing shows the most recently read
-   * frame instead, and the status() of the ImageBuffer reports Timeout or Failed after the drawing
-   * is flushed. Drawing a newly created Image of that ImageBuffer retries. Note that the previously
+   * into the associated video source. When the returned ImageBuffer is drawn, it waits briefly for
+   * the frame with the given timestamp. If the frame does not arrive in time or cannot be read, the
+   * previous frame is drawn instead, and status() reports Timeout or Failed after the drawing is
+   * flushed. To retry, draw a new Image created from the same ImageBuffer. Note that the previously
    * returned image buffers will immediately expire after the newly created ImageBuffer is drawn.
-   * @param timestamp The presentation timestamp in nanoseconds that the producer attached to the
-   * rendered frame. For example, a MediaCodec output buffer released with render set to true is
-   * attached its presentationTimeUs multiplied by 1000. Pass -1 if unknown, in which case the
-   * drawing reads the next available frame without verifying it. Video sources that provide no
-   * timestamps, such as an HTMLVideoElement, ignore this parameter.
+   * @param timestamp The presentation timestamp of the frame in nanoseconds. For a MediaCodec output
+   * buffer released with render set to true, pass its presentationTimeUs multiplied by 1000. Pass
+   * -1 to draw the next available frame without checking it. Ignored on the web platform.
    */
   std::shared_ptr<ImageBuffer> acquireNextBuffer(int64_t timestamp = -1);
 

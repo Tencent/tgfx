@@ -308,7 +308,7 @@ void SurfaceTexture::releaseExternalOESTexture(Context* context, unsigned textur
   JNIEnvironment environment;
   auto env = environment.current();
   if (env != nullptr) {
-    // A successful detach deletes the texture, and lets a later attach to a new texture succeed.
+    // Detaching also deletes the texture, and allows attaching again later.
     env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_detachFromGLContext);
     if (!env->ExceptionCheck()) {
       return;
@@ -330,7 +330,6 @@ SurfaceTexture::FrameResult SurfaceTexture::updateTexImage(int64_t timestamp) {
   }
   FrameResult result = {};
   if (timestamp >= 0 && latchedTimestamp == timestamp) {
-    // The requested frame is already in the texture.
     result.status = ImageBufferStatus::Ready;
     return result;
   }
@@ -347,7 +346,7 @@ SurfaceTexture::FrameResult SurfaceTexture::updateTexImage(int64_t timestamp) {
     auto previousTimestamp = latchedTimestamp;
     result.latched = true;
     if (!latchTexImage(env)) {
-      // The frame is still queued, and no new notification arrives until it is latched.
+      // No new notification arrives until the queued frame is latched.
       frameAvailable = true;
       result.status = ImageBufferStatus::Failed;
       return result;
@@ -357,8 +356,7 @@ SurfaceTexture::FrameResult SurfaceTexture::updateTexImage(int64_t timestamp) {
       return result;
     }
     if (latchedTimestamp != previousTimestamp) {
-      // An older frame was latched. More frames may be queued behind it without a separate
-      // notification, so latch again before waiting.
+      // Queued frames may share one notification, so latch again before waiting.
       frameAvailable = true;
     }
   }
