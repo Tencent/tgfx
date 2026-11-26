@@ -27,8 +27,8 @@ class TextureView;
 class Context;
 class ImageReader;
 
-/** A source of updated pixels consumed through ImageReader's deferred buffers. Reader callbacks
- * are serialized within one reader. Sources shared by readers synchronize their own mutable state.
+/** A source of updated pixels consumed through ImageReader's deferred buffers. onReadTexture()
+ * calls are serialized within one reader. Shared sources synchronize their own mutable state.
  */
 class ImageStream {
  public:

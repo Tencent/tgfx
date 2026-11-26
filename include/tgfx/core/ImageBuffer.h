@@ -59,6 +59,8 @@ enum class ImageBufferState {
  * a limited lifetime. ImageReader buffers share a native texture and must not be redrawn after
  * expiration. Observing Ready does not reserve those pixels against later source reads.
  * Other ImageBuffers normally start Ready and only expire if explicitly stated by the creator.
+ * The added virtual delivery queries change this class's ABI. Rebuild callers and subclasses with
+ * the library; retaining source-compatible calls does not make existing binaries compatible.
  */
 class ImageBuffer {
  public:

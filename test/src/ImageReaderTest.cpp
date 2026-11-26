@@ -32,6 +32,33 @@
 
 namespace tgfx {
 namespace {
+class ExpiredPixelBuffer : public ImageBuffer {
+ public:
+  int width() const override {
+    return 1;
+  }
+  int height() const override {
+    return 1;
+  }
+  bool isAlphaOnly() const override {
+    return false;
+  }
+  bool expired() const override {
+    return true;
+  }
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return space;
+  }
+
+ protected:
+  std::shared_ptr<TextureView> onMakeTexture(Context*, bool) const override {
+    return nullptr;
+  }
+
+ private:
+  std::shared_ptr<ColorSpace> space = nullptr;
+};
+
 class ThreeStateStream : public ImageStream {
  public:
   ThreeStateStream() : ImageStream(1, 1) {
@@ -46,11 +73,15 @@ class ThreeStateStream : public ImageStream {
   bool invalidateWhenEmpty = false;
   bool replaceWhenEmpty = false;
   bool replaceTexture = true;
+  bool nullDelivery = false;
 
  protected:
   TextureReadResult onReadTexture(Context* context, bool mipmapped,
                                   std::shared_ptr<TextureView> texture) override {
     reads++;
+    if (nullDelivery) {
+      return {nullptr, ReadOutcome::Delivered, boundTimestamp};
+    }
     if (frames.empty()) {
       if (replaceWhenEmpty) {
         uint8_t pixels[] = {99, 0, 0, 255};
@@ -95,6 +126,7 @@ static void ExpectIdentity(Context* context, const std::shared_ptr<TextureView>&
   EXPECT_EQ(pixels[0], identity);
   EXPECT_EQ(pixels[3], 255);
 }
+#ifdef TGFX_USE_THREADS
 static void ObserveDelivery(const std::shared_ptr<ImageBuffer>& buffer, std::atomic<bool>* started,
                             std::atomic<bool>* stop, std::atomic<bool>* invalid,
                             std::atomic<int>* readyObservations) {
@@ -140,6 +172,8 @@ static void ObserveInvalidation(const std::shared_ptr<ImageBuffer>& buffer,
   }
 }
 
+#endif
+
 static void ExpectImagePixels(Context* context, const std::shared_ptr<Image>& image,
                               uint8_t identity, uint8_t alpha, uint32_t renderFlags) {
   ASSERT_NE(image, nullptr);
@@ -176,6 +210,7 @@ TGFX_TEST_PRIVATE(ImageReaderTest, ReadOutcomeClassifiesEmptyAndDeliveredContent
       EXPECT_EQ(invalidated.outcome, ImageStream::ReadOutcome::Invalidated);)
 }
 
+#ifdef TGFX_USE_THREADS
 TGFX_TEST_PRIVATE(ImageReaderTest, ConcurrentQueriesObserveRenderingThreadDelivery) {
   TGFX_PRIVATE_ACCESS(
       ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
@@ -215,6 +250,8 @@ TGFX_TEST_PRIVATE(ImageReaderTest, ConcurrentQueriesObserveInvalidationWithHisto
       EXPECT_EQ(retained->timestamp(), 3000); EXPECT_EQ(failed->state(), ImageBufferState::Expired);
       EXPECT_EQ(failed->timestamp(), -1); EXPECT_EQ(stream->reads, 3);)
 }
+
+#endif
 
 TGFX_TEST_PRIVATE(ImageReaderTest, FailedCredentialCannotBeRevivedByReaderResult) {
   TGFX_PRIVATE_ACCESS(
@@ -628,6 +665,27 @@ TGFX_TEST_PRIVATE(ImageReaderTest, UnchangedReplacementDoesNotInheritPixelsOrTim
       ExpectIdentity(context, TextureView::MakeFrom(context, delivered), 29);
       EXPECT_EQ(delivered->state(), ImageBufferState::Ready);
       EXPECT_EQ(delivered->timestamp(), 2000); EXPECT_EQ(stream->reads, 4);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, NullDeliveredTextureCannotPreserveOldContent) {
+  TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
+                      ASSERT_NE(context, nullptr);
+                      auto stream = std::make_shared<ThreeStateStream>();
+                      auto reader = ImageReader::MakeFrom(stream); stream->push(17, 1000);
+                      auto first = reader->acquireBuffer();
+                      ExpectIdentity(context, TextureView::MakeFrom(context, first), 17);
+                      stream->nullDelivery = true; auto failed = reader->acquireBuffer();
+                      EXPECT_EQ(TextureView::MakeFrom(context, failed), nullptr);
+                      EXPECT_EQ(failed->state(), ImageBufferState::Expired);
+                      EXPECT_EQ(failed->timestamp(), -1); EXPECT_TRUE(first->expired());
+                      EXPECT_EQ(first->timestamp(), 1000); EXPECT_EQ(stream->reads, 2);)
+}
+
+TGFX_TEST(ImageReaderTest, DefaultStateRespectsExplicitExpiration) {
+  auto buffer = std::make_shared<ExpiredPixelBuffer>();
+  EXPECT_TRUE(buffer->expired());
+  EXPECT_EQ(buffer->state(), ImageBufferState::Expired);
+  EXPECT_EQ(buffer->timestamp(), -1);
 }
 
 TGFX_TEST(ImageReaderTest, StablePixelBufferDefaultsToReadyWithoutTimestamp) {

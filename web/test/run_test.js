@@ -8,8 +8,12 @@ const WEB_TEST_DIR = __dirname;
 const PROJECT_ROOT = path.resolve(WEB_TEST_DIR, '../..');
 const DOWNLOADS_DIR = path.join(WEB_TEST_DIR, '.downloads');
 const PORT = 8082;
-const filterArg = process.argv.find(a => a.startsWith('--filter='));
-const TEST_FILTER = filterArg ? filterArg.slice('--filter='.length) : '';
+const filterArgs = process.argv.slice(2).filter(a => a === '--filter' || a.startsWith('--filter='));
+if (filterArgs.length > 1 || filterArgs[0] === '--filter' || filterArgs[0] === '--filter=') {
+  console.error('Provide one nonempty test filter using --filter=PATTERN.');
+  process.exit(1);
+}
+const TEST_FILTER = filterArgs.length === 1 ? filterArgs[0].slice('--filter='.length) : '';
 const TEST_URL = `http://127.0.0.1:${PORT}/index.html${TEST_FILTER ? `?filter=${encodeURIComponent(TEST_FILTER)}` : ''}`;
 const TIMEOUT_MS = 10 * 60 * 1000;
 

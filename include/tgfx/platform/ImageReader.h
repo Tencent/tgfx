@@ -40,7 +40,8 @@ class ImageStream;
  * Observe Ready after texture generation finishes, then read the timestamp; this does not reserve
  * the texture against a subsequent read or acquisition.
  * Delivered pixels remain valid only until their buffer expires. Preserve an independent rendered
- * output to retain pixels across later source reads.
+ * output to retain pixels across later source reads. This release changes ImageReader's layout;
+ * rebuild callers and subclasses together with the library rather than mixing compiled versions.
  */
 class ImageReader {
  public:
@@ -67,8 +68,9 @@ class ImageReader {
    * Acquires a Pending buffer without dequeuing source contents. Its first texture-generation read
    * makes valid pixels Ready or reaches terminal Expired if no valid content is available. If no
    * new image arrives but previously delivered content is known unchanged, it reuses that content
-   * and its actual timestamp. It does not wait for a producer notification. An Expired buffer cannot
-   * retry; acquire a new buffer instead.
+   * and its actual timestamp. It does not wait for a producer notification. An Expired buffer
+   * cannot retry; acquire a new buffer instead. Acquisitions share the reader mutex and may wait
+   * for an in-flight source read.
    * Each acquisition expires older undelivered Pending buffers. A previously Ready buffer remains
    * available for redraw while the shared native contents are known unchanged, but expires after a
    * later native mutation or a failed read whose effect on those contents is unknown.
@@ -104,8 +106,8 @@ class ImageReader {
   };
   static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<ImageStream> stream);
 
-  // Credential receipts are written only by readTexture() while locker is held.
   bool checkExpired(const Credential& credential) const;
+  // Writes credential receipts with locker held; the credential must not be expired.
   std::shared_ptr<TextureView> readTexture(Credential& credential, Context* context,
                                            bool mipmapped);
   friend class ImageReaderBuffer;
