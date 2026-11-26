@@ -48,8 +48,8 @@ class DrawArgs {
   // Whether to exclude effects during the drawing process.
   // Note: When set to true, all layer styles and filters will be skipped.
   bool excludeEffects = false;
-  // World-space cull rects for this draw pass. When non-null and non-empty, drawLayer culls each
-  // Layer whose renderBounds does not intersect any of these rects. Callers should pre-outset the
+  // World-space cull rects for this draw pass. When non-null and non-empty, drawChildren culls each
+  // child whose renderBounds is empty or does not intersect any of these rects. Callers should pre-outset the
   // rects if blur sampling range needs to be included. nullptr means no culling (full recording).
   const std::vector<Rect>* renderRects = nullptr;
 
