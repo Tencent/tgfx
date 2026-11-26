@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLAtlasTextGeometryProcessor.h"
+#include "GeneratedOperators.h"
 
 namespace tgfx {
 PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
@@ -49,20 +50,23 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   vertBuilder->multiplyVec2("atlasCoord", uvName, atlasName, /*declare=*/true);
   vertBuilder->storeVarying(samplerVarying.vsOut(), "atlasCoord");
 
+  Varying coverageVar = {};
   if (aa == AAType::Coverage) {
-    auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
+    coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->storeVarying(coverageVar.vsOut(), coverage.name());
     fragBuilder->storeCoverage(args.outputCoverage, coverageVar.fsIn(), true);
   } else {
     fragBuilder->storeCoverage(args.outputCoverage, "vec4(1.0)", false);
   }
 
+  std::string colorUniformName = {};
+  Varying colorVar = {};
   if (commonColor.has_value()) {
-    auto colorName =
+    colorUniformName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->storeColor(args.outputColor, colorName);
+    fragBuilder->storeColor(args.outputColor, colorUniformName);
   } else {
-    auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
+    colorVar = varyingHandler->addVarying("Color", SLType::Float4);
     vertBuilder->storeVarying(colorVar.vsOut(), color.name());
     fragBuilder->storeColor(args.outputColor, colorVar.fsIn());
   }
@@ -108,6 +112,66 @@ void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
   args.vertBuilder->storePosition(position.name());
+
+  // The IR route: the atlas coordinate multiply, the texture read and the two text operators as
+  // SSA values. Only the fast path has an IR form: the fallback branch is the legacy text path
+  // and keeps its text emission.
+  if (args.irBuilder != nullptr && !sampleEntry.empty() && !coverageEntry.empty() &&
+      readSwizzle >= 0 && (textureView->isAlphaOnly() || !colorEntry.empty())) {
+    auto ir = args.irBuilder;
+    // atlasCoord = maskCoord * atlasSize (the varying the texture read samples through).
+    const auto atlasValue =
+        ir->InternValue(atlasName, SLType::Float2, Precision::High, IRValueKind::Uniform);
+    const auto maskCoordValue = ir->InternValue(maskCoord.name(), SLType::Float2, Precision::High,
+                                               IRValueKind::Attribute);
+    const auto atlasCoord =
+        ir->CreateBinary(IRBinaryOp::Mul, SLType::Float2, maskCoordValue, atlasValue);
+    const auto textureCoordsVarying =
+        ir->AddVarying({samplerVarying.name(), SLType::Float2, Precision::High, 0, false});
+    ir->StoreVarying({textureCoordsVarying, ""}, atlasCoord);
+    if (aa == AAType::Coverage) {
+      emitVaryingIR(args, coverageVar, ShaderVar(coverage));
+    }
+    if (!commonColor.has_value()) {
+      emitVaryingIR(args, colorVar, ShaderVar(color));
+    }
+    emitPositionIR(args, ShaderVar(position));
+    ir->SetStage(ShaderStage::Fragment);
+    if (commonColor.has_value()) {
+      const auto colorValue = ir->InternValue(colorUniformName, SLType::Float4, Precision::High,
+                                              IRValueKind::Uniform);
+      const auto colorOutput = ir->InternValue(args.outputColor, SLType::Float4, Precision::High,
+                                               IRValueKind::Local);
+      ir->StoreOutput(colorOutput, colorValue);
+    } else {
+      const auto colorValue = ir->InternValue(colorVar.fsIn(), SLType::Float4, Precision::High,
+                                              IRValueKind::Varying);
+      const auto colorOutput = ir->InternValue(args.outputColor, SLType::Float4, Precision::High,
+                                               IRValueKind::Local);
+      ir->StoreOutput(colorOutput, colorValue);
+    }
+    const auto samplerVariableName = uniformHandler->getSamplerVariable(samplerHandle).name();
+    const auto samplerValue = ir->InternValue(samplerVariableName, SLType::Texture2DSampler,
+                                              Precision::Default, IRValueKind::Sampler);
+    if (samplerValue != INVALID_VALUE_ID) {
+      const auto textureCoordsIn = ir->InternValue(samplerVarying.fsIn(), SLType::Float2,
+                                                   Precision::High, IRValueKind::Varying);
+      const auto textTexel = ir->CreateTextureSample(samplerValue, textureCoordsIn,
+                                                     SLType::Float4, "textTexel",
+                                                     SLType::Texture2DSampler, readSwizzle);
+      const auto textCoverage = TextCoverageFromAlphaOp::Emit(ir, uniformHandler, nullptr,
+                                                              textTexel);
+      const auto coverageOutput = ir->InternValue(args.outputCoverage, SLType::Float4,
+                                                   Precision::High, IRValueKind::Local);
+      ir->StoreOutput(coverageOutput, textCoverage);
+      if (!textureView->isAlphaOnly()) {
+        const auto textColor = TextColorUnpremulOp::Emit(ir, uniformHandler, nullptr, textTexel);
+        const auto colorOutput = ir->InternValue(args.outputColor, SLType::Float4,
+                                                 Precision::High, IRValueKind::Local);
+        ir->StoreOutput(colorOutput, textColor);
+      }
+    }
+  }
 }
 
 void GLSLAtlasTextGeometryProcessor::setData(UniformData* vertexUniformData,

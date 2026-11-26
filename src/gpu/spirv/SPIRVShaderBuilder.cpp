@@ -263,7 +263,8 @@ uint32_t SPIRVShaderBuilder::EnsureAttribute(const ProgramIR& program, const IRV
     }
   }
   if (attribute == nullptr) {
-    Fail(error, "the vertex attribute is missing from the interface");
+    Fail(error, "the vertex attribute '" + value.debugName +
+                    "' is missing from the interface");
     return 0;
   }
   const auto typeId = TypeId(value.type, error);

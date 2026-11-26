@@ -82,6 +82,12 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
     programIRBuilder().AddAttribute(
         {ShaderVar(attribute).name(), ShaderVar(attribute).type(), Precision::High, 0});
   }
+  // Instanced attributes ride the same vertex interface: an instanced draw's IR reads them the
+  // way the per-vertex ones do, so both lists must reach the interface.
+  for (const auto& attribute : geometryProcessor->instanceAttributes()) {
+    programIRBuilder().AddAttribute(
+        {ShaderVar(attribute).name(), ShaderVar(attribute).type(), Precision::High, 0});
+  }
   GeometryProcessor::FPCoordTransformHandler transformHandler(programInfo, &transformedCoordVars);
   GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(),
                                    uniformHandler(), getContext()->shaderCaps(), *outputColor,
