@@ -163,8 +163,9 @@ void FragmentProcessor::emitChild(size_t childIndex, const std::string& inputCol
 }
 
 void FragmentProcessor::internalEmitChild(
-    size_t childIndex, const std::string& inputColor, const std::string& outputColor,
-    EmitArgs& args, std::function<std::string(std::string_view)> coordFunc) const {
+    size_t childIndex, const std::string& inputColor, const std::string& outputColor, EmitArgs& args,
+    std::function<std::string(std::string_view)> coordFunc, ValueID inputColorValue,
+    ValueID* childOutputValue) const {
   auto fragBuilder = args.fragBuilder;
   const auto childProc = childProcessor(childIndex);
   fragBuilder->onBeforeChildProcEmitCode(childProc);  // call first so mangleString is updated
@@ -192,20 +193,42 @@ void FragmentProcessor::internalEmitChild(
   if (!inputName.empty() && args.irBuilder != nullptr) {
     childInputValue =
         args.irBuilder->CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, inputName);
+    // The child input local must carry the parent-side value: without the assignment the IR
+    // printer sees an unresolved name (the text route's aliasValue did this job before).
+    const auto source = inputColorValue != INVALID_VALUE_ID ? inputColorValue : args.inputValue;
+    if (source != INVALID_VALUE_ID) {
+      args.irBuilder->Assign({childInputValue, ""}, source);
+    }
   }
-  ValueID childOutputValue = INVALID_VALUE_ID;
+  ValueID irChildOutputValue = INVALID_VALUE_ID;
   if (args.irBuilder != nullptr) {
-    childOutputValue = args.irBuilder->CreateValue(SLType::Float4, Precision::High,
-                                                   IRValueKind::Local, outputColor);
+    irChildOutputValue = args.irBuilder->CreateValue(SLType::Float4, Precision::High,
+                                                     IRValueKind::Local, outputColor);
   }
   EmitArgs childArgs(fragBuilder, args.uniformHandler, outputColor,
                      inputName.empty() ? "vec4(1.0)" : inputName, args.inputSubset, &coordVars,
                      &textureSamplers, std::move(coordFunc), args.irBuilder, childInputValue,
-                     childOutputValue, args.samplerValues);
+                     irChildOutputValue, args.samplerValues);
   childProcessor(childIndex)->emitCode(childArgs);
   fragBuilder->codeAppend("}\n");
 
   fragBuilder->onAfterChildProcEmitCode();
+  if (childOutputValue != nullptr) {
+    *childOutputValue = irChildOutputValue;
+  }
+}
+
+ValueID FragmentProcessor::emitChildIR(
+    size_t childIndex, const std::string& inputColor, std::string* outputColor, EmitArgs& args,
+    ValueID inputColorValue, std::function<std::string(std::string_view)> coordFunc) const {
+  auto fragBuilder = args.fragBuilder;
+  auto programInfo = fragBuilder->getProgramInfo();
+  outputColor->append(programInfo->getMangledSuffix(this));
+  fragBuilder->codeAppendf("vec4 %s;", outputColor->c_str());
+  ValueID childOutput = INVALID_VALUE_ID;
+  internalEmitChild(childIndex, inputColor, *outputColor, args, std::move(coordFunc),
+                    inputColorValue, &childOutput);
+  return childOutput;
 }
 
 template <typename T, size_t (FragmentProcessor::*COUNT)() const>

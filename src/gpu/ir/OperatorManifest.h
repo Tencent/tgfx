@@ -59,7 +59,8 @@ namespace tgfx {
   X(LinearGradient, 29)                                                                              \
   X(RadialGradient, 30)                                                                              \
   X(DiamondGradient, 31)                                                                             \
-  X(ConicGradient, 32)                                                                             \
+  X(ConicGradient, 32)                                                                               \
+  X(ClampedGradient, 33)                                                                             \
   X(RoundStrokeRectCoverage, 33)                                                                    \
   X(HairlineLineCoverage, 34)                                                                       \
   X(HairlineQuadCoverage, 35)                                                                       \

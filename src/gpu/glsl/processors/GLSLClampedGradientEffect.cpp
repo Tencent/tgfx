@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLClampedGradientEffect.h"
+#include "GeneratedOperators.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/ShaderCaps.h"
 
@@ -36,50 +37,30 @@ GLSLClampedGradientEffect::GLSLClampedGradientEffect(PlacementPtr<FragmentProces
 }
 
 void GLSLClampedGradientEffect::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  auto leftBorderColorName = args.uniformHandler->addUniform(
-      "leftBorderColor", UniformFormat::Float4, ShaderStage::Fragment);
-  auto rightBorderColorName = args.uniformHandler->addUniform(
-      "rightBorderColor", UniformFormat::Float4, ShaderStage::Fragment);
+  auto uniformHandler = args.uniformHandler;
+  auto leftBorderColorName =
+      uniformHandler->addUniform("leftBorderColor", UniformFormat::Float4, ShaderStage::Fragment);
+  auto rightBorderColorName = uniformHandler->addUniform("rightBorderColor", UniformFormat::Float4,
+                                                          ShaderStage::Fragment);
+  (void)leftBorderColorName;
+  (void)rightBorderColorName;
+  // Both children emit once (their declarations and IR blocks); the boundary selection, the
+  // premultiply and the input modulation all live in the shared function the call below records.
+  // Note: the IR route evaluates the colorizer on border fragments too (the call's arguments are
+  // values, not lazily-evaluated branches) — the colorizer's own subset clamp keeps the read in
+  // bounds. The WebGPU uniform-control-flow form is a phase-4 concern.
   std::string _child1 = "_child1";
-  emitChild(gradLayoutIndex, &_child1, args);
-  fragBuilder->codeAppendf("vec4 t = %s;", _child1.c_str());
-
-  auto shaderCaps = fragBuilder->shaderCaps();
-  if (shaderCaps->requiresUniformControlFlow) {
-    // WebGPU/WGSL requires texture sampling in uniform control flow. Emit colorizer before the
-    // conditional so textureSample is not inside a divergent branch.
-    std::string _input0 = "t";
-    std::string _child0 = "_child0";
-    emitChild(colorizerIndex, _input0, &_child0, args);
-    fragBuilder->codeAppend("if (t.y < 0.0) {");
-    fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
-    fragBuilder->codeAppend("} else if (t.x <= 0.0) {");
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), leftBorderColorName.c_str());
-    fragBuilder->codeAppend("} else if (t.x >= 1.0) {");
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), rightBorderColorName.c_str());
-    fragBuilder->codeAppend("} else {");
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), _child0.c_str());
-    fragBuilder->codeAppend("}");
-  } else {
-    // OpenGL/Metal/Vulkan: emit colorizer only inside the else branch to avoid unnecessary
-    // texture sampling for border fragments.
-    fragBuilder->codeAppend("if (t.y < 0.0) {");
-    fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
-    fragBuilder->codeAppend("} else if (t.x <= 0.0) {");
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), leftBorderColorName.c_str());
-    fragBuilder->codeAppend("} else if (t.x >= 1.0) {");
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), rightBorderColorName.c_str());
-    fragBuilder->codeAppend("} else {");
-    std::string _input0 = "t";
-    std::string _child0 = "_child0";
-    emitChild(colorizerIndex, _input0, &_child0, args);
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), _child0.c_str());
-    fragBuilder->codeAppend("}");
+  const auto tValue = emitChildIR(gradLayoutIndex, "", &_child1, args, INVALID_VALUE_ID);
+  std::string _child0 = "_child0";
+  const auto colorizedValue = emitChildIR(colorizerIndex, "t", &_child0, args, tValue);
+  if (args.irBuilder != nullptr && tValue != INVALID_VALUE_ID &&
+      colorizedValue != INVALID_VALUE_ID && args.inputValue != INVALID_VALUE_ID &&
+      args.outputValue != INVALID_VALUE_ID) {
+    ClampedGradientOp::UniformNames names = {};
+    const auto result = ClampedGradientOp::Emit(args.irBuilder, uniformHandler, &names, tValue,
+                                                colorizedValue, args.inputValue);
+    args.irBuilder->StoreOutput(args.outputValue, result);
   }
-  // make sure the output color is premultiplied
-  fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
-  fragBuilder->codeAppendf("%s *= %s.a;", args.outputColor.c_str(), args.inputColor.c_str());
 }
 
 void GLSLClampedGradientEffect::onSetData(UniformData* /*vertexUniformData*/,

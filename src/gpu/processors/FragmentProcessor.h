@@ -336,6 +336,16 @@ class FragmentProcessor : public Processor {
                  std::function<std::string(std::string_view)> coordFunc = {}) const;
 
   /**
+   * The IR-aware child emission: same child scoping and mangling as emitChild above, plus the
+   * value wiring. inputColorValue is the parent-side value the child's input resolves to (the
+   * child input local gets an IR assignment from it); INVALID_VALUE_ID uses the parent's input
+   * value. Returns the child's output value id, or INVALID_VALUE_ID when there is no IR route.
+   */
+  ValueID emitChildIR(size_t childIndex, const std::string& inputColor, std::string* outputColor,
+                      EmitArgs& parentArgs, ValueID inputColorValue,
+                      std::function<std::string(std::string_view)> coordFunc = {}) const;
+
+  /**
    * Variation that uses the parent's output color variable to hold the child's output.
    */
   void emitChild(size_t childIndex, const std::string& inputColor, EmitArgs& parentArgs) const;
@@ -393,7 +403,9 @@ class FragmentProcessor : public Processor {
   }
 
   void internalEmitChild(size_t, const std::string&, const std::string&, EmitArgs&,
-                         std::function<std::string(std::string_view)> = {}) const;
+                         std::function<std::string(std::string_view)> = {},
+                         ValueID inputColorValue = INVALID_VALUE_ID,
+                         ValueID* childOutputValue = nullptr) const;
 
   std::vector<const CoordTransform*> coordTransforms;
 };
