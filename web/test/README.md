@@ -140,3 +140,11 @@ Web 普通测试默认开启 `GENERATE_BASELINE_IMAGES`，只控制诊断图片�
 - `ReadPixelsTest.NativeCodec` — 依赖平台原生 image codec
 - `ReadPixelsTest.JpegCodec` — Emscripten 环境下无 JPEG codec
 - `PDFExportTest` — PDF 模块未在 Web 平台启用
+
+### 参考缓存的 driver 来源（已知限制）
+
+参考产物 = 固定 main 提交的 tgfx 源码 + **当前检出**的 `web/test` driver（`CMakeLists.txt`、`index.html`、`src/*.cpp` 与浏览器启动参数）。原生平台的参考是在 main 检出上构建的，因此两边在这一点上尚未对齐。
+
+后果：参考缓存未命中时（冷启动），driver 改动同时作用于参考与验证两侧，即使改变了像素也不会被门禁捕获；命中时参考来自 main driver，同样的改动会失败。同一个 PR 的结果取决于缓存状态。
+
+后续会改为参考构建直接使用 main 快照里的 `web/test`，并把缓存 key 从 main sha 换成 `DEPS` + `vendor.json` + `test/baseline/version.json`（可加 `web/test/package.json`）并启用 `restore-keys`，与原生平台对齐。在此之前，修改 web driver 的 PR 需要人工确认截图差异。
