@@ -365,6 +365,9 @@ SurfaceTexture::FrameUpdateResult SurfaceTexture::updateTexImage() {
   frameAvailable = false;
   auto previous = lastLatchedTimestamp;
   if (!latchTexture(env)) {
+    // A failed latch may leave an image pending; another notification is not guaranteed.
+    // Preserve retry eligibility, not a guarantee that the queue or previous pixels are unchanged.
+    frameAvailable = true;
     return {false, previous, textureSize, true};
   }
   auto timestamp = currentTimestamp(env);
