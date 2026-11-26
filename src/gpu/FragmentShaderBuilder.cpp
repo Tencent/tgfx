@@ -302,6 +302,23 @@ std::string FragmentShaderBuilder::emitPerspTextCoord(const CoordValue& coordVar
     codeAppendf("highp vec2 %s = %s.xy / %s.z;", perspCoordName.c_str(), coordVar.name().c_str(),
                 coordVar.name().c_str());
     setRawCaptureEnabled(true);
+    // The IR definition of the projection: without it a sampler that consumes this coordinate
+    // registers an undefined value (the class of unresolved-name failures).
+    {
+      auto& ir = programBuilder->programIRBuilder();
+      const auto sourceValue = ir.InternValue(coordVar.name(), SLType::Float3, Precision::High,
+                                              IRValueKind::Varying);
+      if (sourceValue != INVALID_VALUE_ID) {
+        const auto xy = ir.CreateSwizzle(sourceValue, SLType::Float2, "xy");
+        const auto z = ir.CreateSwizzle(sourceValue, SLType::Float, "z");
+        const auto projected = ir.CreateBinary(IRBinaryOp::Div, SLType::Float2, xy, z);
+        const auto perspValue = ir.InternValue(perspCoordName, SLType::Float2, Precision::High,
+                                               IRValueKind::Local);
+        if (perspValue != INVALID_VALUE_ID) {
+          ir.Assign({perspValue, ""}, projected);
+        }
+      }
+    }
     FragmentInstruction instruction = {};
     instruction.kind = FragmentInstructionKind::Project;
     instruction.output = perspCoordName;

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLDefaultGeometryProcessor.h"
+#include "gpu/ir/ProgramIREmit.h"
 #include "gpu/ir/ProgramIRBuilder.h"
 
 namespace tgfx {
@@ -44,19 +45,9 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
       args.uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
 
   if (args.irBuilder != nullptr) {
-    const auto matrixValue = args.irBuilder->InternValue(matrixName, SLType::Float3x3,
-                                                         Precision::High, IRValueKind::Uniform);
-    const auto positionValue = args.irBuilder->InternValue(position.name(), SLType::Float2,
-                                                           Precision::High, IRValueKind::Attribute);
-    const auto one = args.irBuilder->CreateConstant(1.0f);
-    const auto position3 = args.irBuilder->CreateConstruct(SLType::Float3, {positionValue, one});
-    const auto transformed =
-        args.irBuilder->CreateBinary(IRBinaryOp::Mul, SLType::Float3, matrixValue, position3);
-    const auto position4 = args.irBuilder->CreateConstruct(SLType::Float4, {transformed, one});
-    const auto output = args.irBuilder->CreateValue(SLType::Float4, Precision::High,
-                                                    IRValueKind::Local, "gl_Position");
-    args.irBuilder->StoreOutput(output, position4);
+    emitPositionTransformIR(args.irBuilder, position.name(), SLType::Float2, matrixName);
   }
+
 
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
 

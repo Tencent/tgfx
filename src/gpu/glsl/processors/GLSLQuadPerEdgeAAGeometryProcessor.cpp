@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "gpu/ir/ProgramIREmit.h"
 #include "GLSLQuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
@@ -69,17 +70,10 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
     if (aa == AAType::Coverage) {
       const auto coverageIn = ir->InternValue(coverageVar.fsIn(), SLType::Float, Precision::High,
                                               IRValueKind::Varying);
-      const auto coverage4 = ir->CreateConstruct(
-          SLType::Float4, {coverageIn, coverageIn, coverageIn, coverageIn});
-      const auto coverageOutput = ir->InternValue(args.outputCoverage, SLType::Float4,
-                                                   Precision::High, IRValueKind::Local);
-      ir->StoreOutput(coverageOutput, coverage4);
+    emitOutputCoverageIR(ir, coverageIn, false, args.outputCoverage);
     } else {
       const auto one = ir->CreateConstant(1.0f);
-      const auto coverage4 = ir->CreateConstruct(SLType::Float4, {one, one, one, one});
-      const auto coverageOutput = ir->InternValue(args.outputCoverage, SLType::Float4,
-                                                   Precision::High, IRValueKind::Local);
-      ir->StoreOutput(coverageOutput, coverage4);
+    emitOutputCoverageIR(ir, one, false, args.outputCoverage);
     }
     if (commonColor.has_value()) {
       const auto colorValue = ir->InternValue(colorUniformName, SLType::Float4, Precision::High,
@@ -88,11 +82,7 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
                                                IRValueKind::Local);
       ir->StoreOutput(colorOutput, colorValue);
     } else {
-      const auto colorValue = ir->InternValue(colorVar.fsIn(), SLType::Float4, Precision::High,
-                                              IRValueKind::Varying);
-      const auto colorOutput = ir->InternValue(args.outputColor, SLType::Float4, Precision::High,
-                                               IRValueKind::Local);
-      ir->StoreOutput(colorOutput, colorValue);
+    emitOutputColorIR(ir, colorVar.fsIn(), true, args.outputColor);
     }
   }
 }

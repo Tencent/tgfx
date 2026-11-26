@@ -125,7 +125,7 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
   switch (expr.kind) {
     case IRExprKind::Swizzle: {
       std::string source = {};
-      if (!ValueName(program, expr.args[0], &source, error)) {
+      if (!GLSLOperatorEmitter::EmitValue(program, expr.args[0], &source, error)) {
         return false;
       }
       *expression = source + "." + expr.swizzle;
@@ -139,7 +139,7 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
       std::vector<std::string> args(expr.args.size());
       bool sameArgument = true;
       for (size_t index = 0; index < expr.args.size(); ++index) {
-        if (!ValueName(program, expr.args[index], &args[index], error)) {
+        if (!GLSLOperatorEmitter::EmitValue(program, expr.args[index], &args[index], error)) {
           return false;
         }
         if (index != 0 && expr.args[index] != expr.args[0]) {
@@ -168,8 +168,8 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
     case IRExprKind::Binary: {
       std::string left = {};
       std::string right = {};
-      if (!ValueName(program, expr.args[0], &left, error) ||
-          !ValueName(program, expr.args[1], &right, error)) {
+      if (!GLSLOperatorEmitter::EmitValue(program, expr.args[0], &left, error) ||
+          !GLSLOperatorEmitter::EmitValue(program, expr.args[1], &right, error)) {
         return false;
       }
       const char* op = nullptr;
@@ -199,7 +199,7 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
       std::string sampler = {};
       std::string coord = {};
       if (!ValueName(program, expr.args[0], &sampler, error) ||
-          !ValueName(program, expr.args[1], &coord, error)) {
+          !GLSLOperatorEmitter::EmitValue(program, expr.args[1], &coord, error)) {
         return false;
       }
       if (expr.samplerType == SLType::Texture2DRectSampler) {

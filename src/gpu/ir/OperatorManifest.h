@@ -65,7 +65,8 @@ namespace tgfx {
   X(HairlineLineCoverage, 34)                                                                       \
   X(HairlineQuadCoverage, 35)                                                                       \
   X(TextCoverageFromAlpha, 36)                                                                      \
-  X(TextColorUnpremul, 37)
+  X(TextColorUnpremul, 37)                                                                          \
+  X(ClampSubset, 38)
 
 enum class OperatorID : uint32_t {
 #define TGFX_OPERATOR_ENUM(name, value) name = value,

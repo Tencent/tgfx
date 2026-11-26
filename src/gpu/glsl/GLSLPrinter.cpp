@@ -390,7 +390,15 @@ std::string GLSLPrinter::PrintFragmentBodyFromIR(const ProgramIR& program) {
         }
         const std::string identifier = line.substr(index, end - index);
         if (!ResolvesIdentifier(identifier, program, declared)) {
-          LOGE("IRPrinter: an identifier is unresolved: '%s'", identifier.c_str());
+          for (const auto& value : program.values) {
+            if (value.debugName == identifier) {
+              LOGE("IRPrinter: unresolved '%s': kind=%d type=%d defining=%d", identifier.c_str(),
+                   static_cast<int>(value.kind), static_cast<int>(value.type),
+                   static_cast<int>(value.definingExpr));
+            }
+          }
+          LOGE("IRPrinter: an identifier is unresolved: '%s' in line: %s", identifier.c_str(),
+               line.c_str());
           return {};
         }
         index = end;

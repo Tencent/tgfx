@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "gpu/ir/ProgramIREmit.h"
 #include "GLSLShapeInstancedGeometryProcessor.h"
 #include "gpu/VertexShaderBuilder.h"
 
@@ -66,7 +67,6 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   if (args.irBuilder != nullptr) {
     auto ir = args.irBuilder;
     const auto one = ir->CreateConstant(1.0f);
-    const auto zero = ir->CreateConstant(0.0f);
     const auto positionValue = ir->InternValue(position.name(), SLType::Float2, Precision::High,
                                                IRValueKind::Attribute);
     const auto position3 = ir->CreateConstruct(SLType::Float3, {positionValue, one});
@@ -85,33 +85,13 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
     if (hasColors) {
       emitVaryingIR(args, colorVar, ShaderVar(instanceColor));
     }
-    // device position = viewMatrix * position + offset.
-    const auto viewMatrixValue =
-        ir->InternValue(viewMatrixName, SLType::Float3x3, Precision::High, IRValueKind::Uniform);
-    const auto deviceTrans =
-        ir->CreateBinary(IRBinaryOp::Mul, SLType::Float3, viewMatrixValue, position3);
-    const auto deviceXY = ir->CreateSwizzle(deviceTrans, SLType::Float2, "xy");
-    const auto offsetValue = ir->InternValue(offset.name(), SLType::Float2, Precision::High,
-                                             IRValueKind::Attribute);
-    const auto shifted = ir->CreateBinary(IRBinaryOp::Add, SLType::Float2, deviceXY, offsetValue);
-    const auto rtAdjust =
-        ir->InternValue(RTAdjustName, SLType::Float4, Precision::High, IRValueKind::Uniform);
-    const auto adjustXZ = ir->CreateSwizzle(rtAdjust, SLType::Float2, "xz");
-    const auto adjustYW = ir->CreateSwizzle(rtAdjust, SLType::Float2, "yw");
-    const auto scaled = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float2, shifted, adjustXZ);
-    const auto shiftedAdjust =
-        ir->CreateBinary(IRBinaryOp::Add, SLType::Float2, scaled, adjustYW);
-    const auto position4 = ir->CreateConstruct(SLType::Float4, {shiftedAdjust, zero, one});
-    const auto positionOutput =
-        ir->CreateValue(SLType::Float4, Precision::High, IRValueKind::Local, "gl_Position");
-    ir->StoreOutput(positionOutput, position4);
+    // device position = viewMatrix * position + offset (the shared template).
+    const std::string offsetName = offset.name();
+    emitPositionTransformIR(args.irBuilder, position.name(), SLType::Float2, viewMatrixName,
+                            &offsetName);
     ir->SetStage(ShaderStage::Fragment);
     if (hasColors) {
-      const auto colorValue = ir->InternValue(colorVar.fsIn(), SLType::Float4, Precision::High,
-                                              IRValueKind::Varying);
-      const auto colorOutput = ir->InternValue(args.outputColor, SLType::Float4, Precision::High,
-                                               IRValueKind::Local);
-      ir->StoreOutput(colorOutput, colorValue);
+    emitOutputColorIR(ir, colorVar.fsIn(), true, args.outputColor);
     } else {
       const auto color4 = ir->CreateConstruct(SLType::Float4, {one, one, one, one});
       const auto colorOutput = ir->InternValue(args.outputColor, SLType::Float4, Precision::High,
@@ -121,16 +101,9 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
     if (aa == AAType::Coverage) {
       const auto coverageIn = ir->InternValue(coverageVar.fsIn(), SLType::Float, Precision::High,
                                               IRValueKind::Varying);
-      const auto coverage4 = ir->CreateConstruct(
-          SLType::Float4, {coverageIn, coverageIn, coverageIn, coverageIn});
-      const auto coverageOutput = ir->InternValue(args.outputCoverage, SLType::Float4,
-                                                  Precision::High, IRValueKind::Local);
-      ir->StoreOutput(coverageOutput, coverage4);
+    emitOutputCoverageIR(ir, coverageIn, false, args.outputCoverage);
     } else {
-      const auto coverage4 = ir->CreateConstruct(SLType::Float4, {one, one, one, one});
-      const auto coverageOutput = ir->InternValue(args.outputCoverage, SLType::Float4,
-                                                  Precision::High, IRValueKind::Local);
-      ir->StoreOutput(coverageOutput, coverage4);
+    emitOutputCoverageIR(ir, one, false, args.outputCoverage);
     }
   }
 }

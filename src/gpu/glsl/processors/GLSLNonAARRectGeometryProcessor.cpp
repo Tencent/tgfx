@@ -45,33 +45,25 @@ void GLSLNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   if (commonColor.has_value()) {
     colorUniformName =
         uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->storeColor(args.outputColor, colorUniformName);
   } else {
     colorVarying = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->storeVarying(colorVarying.vsOut(), inColor.name());
-    fragBuilder->storeColor(args.outputColor, colorVarying.fsIn());
   }
 
   // Output position using RTAdjust uniform
-  vertBuilder->storePosition(inPosition.name());
 
   // Pass local coordinates to fragment shader
   auto localCoordVarying = varyingHandler->addVarying("localCoord", SLType::Float2);
-  vertBuilder->storeVarying(localCoordVarying.vsOut(), inLocalCoord.name());
 
   // Pass radii to fragment shader
   auto radiiVarying = varyingHandler->addVarying("radii", SLType::Float2);
-  vertBuilder->storeVarying(radiiVarying.vsOut(), inRadii.name());
 
   // Pass rect bounds to fragment shader
   auto boundsVarying = varyingHandler->addVarying("rectBounds", SLType::Float4);
-  vertBuilder->storeVarying(boundsVarying.vsOut(), inRectBounds.name());
 
   // Pass stroke width to fragment shader (stroke mode only)
   Varying strokeWidthVarying;
   if (stroke) {
     strokeWidthVarying = varyingHandler->addVarying("strokeWidth", SLType::Float2);
-    vertBuilder->storeVarying(strokeWidthVarying.vsOut(), inStrokeWidth.name());
   }
 
   // Emit transforms using position as UV coordinates.

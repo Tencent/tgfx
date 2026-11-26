@@ -39,18 +39,14 @@ void GLSLComplexEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   // Emit attributes
 
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
-  vertBuilder->storeVarying(ellipseOffsets.vsOut(), inEllipseOffset.name());
 
   auto ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float4);
-  vertBuilder->storeVarying(ellipseRadii.vsOut(), inEllipseRadii.name());
 
   auto edgeDist = varyingHandler->addVarying("EdgeDist", SLType::Float2);
-  vertBuilder->storeVarying(edgeDist.vsOut(), inEdgeDist.name());
 
   Varying strokeWidthVarying;
   if (stroke) {
     strokeWidthVarying = varyingHandler->addVarying("StrokeWidth", SLType::Float2);
-    vertBuilder->storeVarying(strokeWidthVarying.vsOut(), inStrokeWidth.name());
   }
 
   auto fragBuilder = args.fragBuilder;
@@ -60,15 +56,11 @@ void GLSLComplexEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   if (commonColor.has_value()) {
     colorUniformName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->storeColor(args.outputColor, colorUniformName);
   } else {
     colorVarying = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->storeVarying(colorVarying.vsOut(), inColor.name());
-    fragBuilder->storeColor(args.outputColor, colorVarying.fsIn());
   }
 
   // Setup position
-  args.vertBuilder->storePosition(inPosition.name());
   // Emit transforms
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(inPosition));
 

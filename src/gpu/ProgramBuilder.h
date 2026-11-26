@@ -121,6 +121,7 @@ class ProgramBuilder {
   void emitFSOutputSwizzle();
 
   friend class FragmentShaderBuilder;
+  friend class ShaderBuilder;
   friend class ProcessorGuard;
 };
 }  // namespace tgfx

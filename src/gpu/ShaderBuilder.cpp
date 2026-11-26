@@ -128,6 +128,38 @@ std::string ShaderBuilder::clampToSubsets(const std::string& coordName,
   if (!subset.empty()) {
     codeAppendf("%s = %s(%s, %s);", out.c_str(), entry.c_str(), out.c_str(), subset.c_str());
   }
+  // The IR definition of the clamped coordinate, statement for statement with the text above:
+  // without it a sampler consuming this name resolves nothing (the unresolved-name class).
+  {
+    auto& ir = programBuilder->programIRBuilder();
+    auto coordKind = IRValueKind::Local;
+    for (const auto& varying : ir.IR().interface.varyings) {
+      if (varying.name == coordName) {
+        coordKind = IRValueKind::Varying;
+        break;
+      }
+    }
+    const auto sourceValue = ir.InternValue(coordName, SLType::Float2, Precision::High, coordKind);
+    if (sourceValue != INVALID_VALUE_ID) {
+      const auto outValue = ir.InternValue(out, SLType::Float2, Precision::High, IRValueKind::Local);
+      if (outValue != INVALID_VALUE_ID) {
+        ValueID current = sourceValue;
+        if (!extraSubset.empty()) {
+          const auto subsetValue =
+              ir.InternValue(extraSubset, SLType::Float4, Precision::High, IRValueKind::Uniform);
+          current = ir.CreateCall(OperatorID::ClampSubset, SLType::Float2,
+                                  {current, subsetValue}, out);
+        }
+        if (!subset.empty()) {
+          const auto subsetValue =
+              ir.InternValue(subset, SLType::Float4, Precision::High, IRValueKind::Uniform);
+          current = ir.CreateCall(OperatorID::ClampSubset, SLType::Float2, {current, subsetValue},
+                                  out);
+        }
+        ir.Assign({outValue, ""}, current);
+      }
+    }
+  }
   return out;
 }
 

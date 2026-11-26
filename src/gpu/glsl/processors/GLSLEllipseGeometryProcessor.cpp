@@ -39,10 +39,8 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   // emit attributes
 
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
-  vertBuilder->storeVarying(ellipseOffsets.vsOut(), inEllipseOffset.name());
 
   auto ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float4);
-  vertBuilder->storeVarying(ellipseRadii.vsOut(), inEllipseRadii.name());
 
   auto fragBuilder = args.fragBuilder;
   // setup pass through color
@@ -51,15 +49,11 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   if (commonColor.has_value()) {
     colorUniformName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->storeColor(args.outputColor, colorUniformName);
   } else {
     colorVarying = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->storeVarying(colorVarying.vsOut(), inColor.name());
-    fragBuilder->storeColor(args.outputColor, colorVarying.fsIn());
   }
 
   // Setup position
-  args.vertBuilder->storePosition(inPosition.name());
   // emit transforms
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(inPosition));
 
