@@ -37,14 +37,11 @@ GLSLDefaultGeometryProcessor::GLSLDefaultGeometryProcessor(PMColor color, int wi
 
 void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
   auto matrixName =
       args.uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  std::string positionName = "position";
-  vertBuilder->transformPoint(positionName, position.name(), matrixName, false);
 
   if (args.irBuilder != nullptr) {
     const auto matrixValue = args.irBuilder->InternValue(matrixName, SLType::Float3x3,
@@ -65,8 +62,6 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
 
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->storeVarying(coverageVar.vsOut(), coverage.name());
-    fragBuilder->storeCoverage(args.outputCoverage, coverageVar.fsIn(), true);
     if (args.irBuilder != nullptr) {
       const auto coverageVarying =
           args.irBuilder->AddVarying({coverageVar.name(), coverageVar.type(), Precision::High, 0});
@@ -83,7 +78,6 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
       args.irBuilder->Assign({coverageOutput, ""}, coverage4);
     }
   } else {
-    fragBuilder->storeCoverage(args.outputCoverage, "1.0", true);
     if (args.irBuilder != nullptr) {
       args.irBuilder->SetStage(ShaderStage::Fragment);
       const auto one = args.irBuilder->CreateConstant(1.0f);
@@ -96,7 +90,6 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
 
   auto colorName =
       args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->storeColor(args.outputColor, colorName);
   if (args.irBuilder != nullptr) {
     args.irBuilder->SetStage(ShaderStage::Fragment);
     const auto colorValue = args.irBuilder->InternValue(colorName, SLType::Float4, Precision::High,
@@ -106,8 +99,6 @@ void GLSLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
     args.irBuilder->StoreOutput(colorOutput, colorValue);
   }
 
-  // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->storePosition(positionName);
 }
 
 void GLSLDefaultGeometryProcessor::setData(UniformData* vertexUniformData,

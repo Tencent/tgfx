@@ -36,53 +36,29 @@ GLSLShapeInstancedGeometryProcessor::GLSLShapeInstancedGeometryProcessor(int wid
 
 void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
-  // Step 1: uvMatrix transforms tessellation-space position back to local space.
   auto uvMatrixName =
       uniformHandler->addUniform("UVMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  vertBuilder->transformPoint("local", position.name(), uvMatrixName, false);
-
-  // Step 2: transform tessellation-space position directly to device space, then add per-instance
-  // offset. viewMatrix = stateMatrix * uvMatrix, which maps tessellation space to device space in
-  // one step. The offset is already in device space (computed as the difference of translated
-  // positions), so it must be applied after the viewMatrix transform.
   auto viewMatrixName =
       uniformHandler->addUniform("ViewMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  std::string positionName = "position";
-  vertBuilder->transformPointAdd(positionName, position.name(), viewMatrixName, offset.name());
 
-  // Emit UV transforms using unshifted local coords. All FP coord transforms (both color shader
-  // and mask coverage) use 'local' without offset, because: (1) mask texture is rasterized at a
-  // fixed position shared by all instances, (2) shader patterns are defined in local space and
-  // are the same for all instances. The offset only affects device-space position.
+  // UV transforms use the unshifted local coords ('local'), computed in the IR block below: the
+  // mask texture and shader patterns are local-space, only the device position takes the offset.
   ShaderVar localVar("local", SLType::Float2);
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, localVar);
 
-  // Coverage varying for AA.
   Varying coverageVar = {};
   if (aa == AAType::Coverage) {
     coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->storeVarying(coverageVar.vsOut(), coverage.name());
-    fragBuilder->storeCoverage(args.outputCoverage, coverageVar.fsIn(), true);
-  } else {
-    fragBuilder->storeCoverage(args.outputCoverage, "1.0", true);
   }
 
   // Color: per-instance color or opaque white (overridden by shader FP).
   Varying colorVar = {};
   if (hasColors) {
     colorVar = varyingHandler->addVarying("InstanceColor", SLType::Float4);
-    vertBuilder->storeVarying(colorVar.vsOut(), instanceColor.name());
-    fragBuilder->storeColor(args.outputColor, colorVar.fsIn());
-  } else {
-    fragBuilder->storeColor(args.outputColor, "vec4(1.0)");
   }
-
-  // Emit the vertex position to NDC.
-  vertBuilder->storePosition(positionName);
 
   // The IR route: both matrix steps (local and the offset-shifted device position) and every
   // optional varying as SSA values. The local value feeds the coordinate transforms the same

@@ -39,45 +39,21 @@ GLSLHairlineQuadGeometryProcessor::GLSLHairlineQuadGeometryProcessor(const PMCol
 
 void GLSLHairlineQuadGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
-  // Emit vertex attributes
-
-  // Transform vertex position by view matrix
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  std::string positionName = "transformedPosition";
-  vertBuilder->transformPoint(positionName, position.name(), matrixName, false);
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
-                 ShaderVar(positionName, SLType::Float2));
-
-  // Pass quad edge UV coordinates to fragment shader for curve evaluation
+  auto colorName = uniformHandler->addUniform("Color", UniformFormat::Float4,
+                                              ShaderStage::Fragment);
   auto edgeVarying = varyingHandler->addVarying("HairQuadEdge", SLType::Float4);
-  vertBuilder->storeVarying(edgeVarying.vsOut(), hairQuadEdge.name());
-
-  // Fragment shader: the shared Loop-Blinn edge alpha. The non-coverage step rides the
-  // function's runtime flag as a literal, so the driver folds the arm this draw does not use.
-  auto coverageEntry = fragBuilder->appendFunction("hairlineQuadEdgeCoverage");
-  if (coverageEntry.empty()) {
-    return;
-  }
-  auto colorName =
-      uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->storeColor(args.outputColor, colorName);
   HairlineQuadCoverageOp::UniformNames coverageNames = {};
   if (args.irBuilder != nullptr) {
     HairlineQuadCoverageOp::EnsureUniforms(args.irBuilder, uniformHandler, &coverageNames);
   }
-  fragBuilder->appendCall(
-      args.outputCoverage, coverageEntry,
-      {edgeVarying.fsIn(), coverageNames.coverageScale,
-       std::to_string(aaType == AAType::Coverage ? 1 : 0)},
-      "vec4");
-
-  // Emit final vertex position
-  vertBuilder->storePosition(positionName);
+  const std::string positionName = "transformedPosition";
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
+                 ShaderVar(positionName, SLType::Float2));
 
   // The IR route: the transformed position, the edge varying and the coverage call as SSA values.
   if (args.irBuilder != nullptr) {

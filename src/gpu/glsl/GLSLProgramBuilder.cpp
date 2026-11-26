@@ -288,23 +288,25 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     LOGE("GLSLProgramBuilder: %s", validationError.c_str());
     return nullptr;
   }
-  if (!ValidateProgramDescription(&description, &validationError)) {
+  // The description checks guard the text route's recorded bodies; the IR route has its own
+  // ValidateProgramIR pass above, and once the processors' text blocks are gone the records are
+  // empty by design.
+  if (std::getenv("TGFX_TEXT_PRINTER") != nullptr &&
+      !ValidateProgramDescription(&description, &validationError)) {
     LOGE("GLSLProgramBuilder: %s", validationError.c_str());
     return nullptr;
   }
-  _vertexBuilder.setCodeText(GLSLPrinter::PrintVertexProgram(description.vertexCalls));
-  _fragBuilder.setCodeText(GLSLPrinter::PrintFragmentProgram(description.fragment));
-  // The IR printer route (stage 3 step 1): the main bodies come straight from the ProgramIR
-  // statements instead of the recorded text. Gated by an environment switch so the text route
-  // stays the default while the printer's coverage grows; an empty print (an uncovered statement
-  // form) falls back to the recorded text. The swizzle epilogue is appended outside, the same way
-  // the text route does it.
-  if (std::getenv("TGFX_IR_PRINTER") != nullptr) {
-    bool irRouteUsable = true;
-    // The printed body calls the operator functions by name, but nothing on the IR route pulled
-    // their sources (the text route's processors call appendFunction themselves). Walk the calls
-    // and pull each referenced function; the library pull is deduplicated and carries each
-    // function's own dependencies.
+  // The IR printer is the route: the main bodies come straight from the ProgramIR statements.
+  // A failed print fails the program build loudly (no text fallback): the uncovered processor
+  // form is the work item, not something to route around. TGFX_TEXT_PRINTER keeps the recorded
+  // text route alive as a debugging escape hatch while the migration finishes.
+  if (std::getenv("TGFX_TEXT_PRINTER") != nullptr) {
+    _vertexBuilder.setCodeText(GLSLPrinter::PrintVertexProgram(description.vertexCalls));
+    _fragBuilder.setCodeText(GLSLPrinter::PrintFragmentProgram(description.fragment));
+  } else {
+    // The printed body calls the operator functions by name, but nothing on the IR route pulls
+    // their sources. Walk the calls and pull each referenced function; the library pull is
+    // deduplicated and carries each function's own dependencies.
     for (const auto& expr : programIRBuilder().IR().exprs) {
       if (expr.kind == IRExprKind::TextureSample) {
         // The printed texture read goes through the shared reader function; the rect samplers
@@ -324,10 +326,13 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
       _fragBuilder.appendFunction(desc->glslSymbol);
     }
     auto fragmentBody = GLSLPrinter::PrintFragmentBodyFromIR(programIRBuilder().IR());
-    if (!fragmentBody.empty()) {
-      // A varying the fragment body reads must be written by the printed vertex body: some
-      // vertex-side math (for example the tex-subset transform) is still text-only, and a program
-      // whose vertex side skips it fails to link. Fall back to the text route for those.
+    if (fragmentBody.empty()) {
+      LOGE("GLSLProgramBuilder: the fragment body cannot be printed from the IR");
+      return nullptr;
+    }
+    // A varying the fragment body reads must be written by the printed vertex body, or the link
+    // stage rejects the program.
+    {
       std::set<std::string> writtenVaryings = {};
       for (const auto& statement : programIRBuilder().IR().vertexStatements) {
         if (statement.kind == IRStatementKind::StoreVarying &&
@@ -340,29 +345,28 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
           continue;
         }
         if (writtenVaryings.count(varying.name) == 0) {
-          // The vertex side cannot produce this varying on the IR route: both bodies fall back
-          // together (a text fragment against an IR vertex fails the same link).
-          fragmentBody.clear();
-          irRouteUsable = false;
-          break;
+          LOGE("GLSLProgramBuilder: the varying '%s' has no vertex-side IR writer",
+               varying.name.c_str());
+          return nullptr;
         }
       }
     }
-    if (!fragmentBody.empty()) {
-      const auto swizzle = programInfo->getOutputSwizzle();
-      if (swizzle != Swizzle::RGBA()) {
-        // The epilogue belongs inside main: swizzle the output before the closing brace.
-        fragmentBody += std::string(CUSTOM_COLOR_OUTPUT_NAME) + " = " +
-                                CUSTOM_COLOR_OUTPUT_NAME + "." + swizzle.c_str() + ";\n";
-      }
-      fragmentBody += "}\n";
-      _fragBuilder.setCodeText(fragmentBody);
+    const auto swizzle = programInfo->getOutputSwizzle();
+    if (swizzle != Swizzle::RGBA()) {
+      // The epilogue belongs inside main: swizzle the output before the closing brace.
+      fragmentBody += std::string(CUSTOM_COLOR_OUTPUT_NAME) + " = " +
+                      CUSTOM_COLOR_OUTPUT_NAME + "." + swizzle.c_str() + ";\n";
     }
+    fragmentBody += "}\n";
+    _fragBuilder.setCodeText(fragmentBody);
+
     auto vertexBody = GLSLPrinter::PrintVertexBodyFromIR(programIRBuilder().IR());
-    if (irRouteUsable && !vertexBody.empty()) {
-      vertexBody += "}\n";
-      _vertexBuilder.setCodeText(vertexBody);
+    if (vertexBody.empty()) {
+      LOGE("GLSLProgramBuilder: the vertex body cannot be printed from the IR");
+      return nullptr;
     }
+    vertexBody += "}\n";
+    _vertexBuilder.setCodeText(vertexBody);
   }
   const auto vertexText =
       GLSLPrinter::PrintStage(*this, ShaderStage::Vertex, description.interface, _vertexBuilder);

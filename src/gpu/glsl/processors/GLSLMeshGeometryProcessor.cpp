@@ -37,23 +37,19 @@ GLSLMeshGeometryProcessor::GLSLMeshGeometryProcessor(bool hasTexCoords, bool has
 
 void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
 
-  // Transform position by view matrix
-  std::string positionName = "position";
-  vertBuilder->transformPoint(positionName, position.name(), matrixName, false);
+  const std::string positionName = "position";
 
   // Handle texture coordinates for FragmentProcessor
   Varying texCoordVar = {};
   if (hasTexCoords) {
     // User provided texCoords, pass them through
     texCoordVar = varyingHandler->addVarying("TexCoord", SLType::Float2);
-    vertBuilder->storeVarying(texCoordVar.vsOut(), texCoord.name());
     emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(texCoord));
   } else {
     // No user texCoords, use position with uvMatrix (like DefaultGeometryProcessor)
@@ -64,28 +60,17 @@ void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
   Varying colorVar = {};
   if (hasColors) {
     colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->storeVarying(colorVar.vsOut(), color.name());
-
-    // Output vertex color (will be modulated by FragmentProcessor if texCoords present)
-    fragBuilder->storeColor(args.outputColor, colorVar.fsIn());
   } else {
     colorUniformName =
         uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->storeColor(args.outputColor, colorUniformName);
   }
 
   // Handle coverage for anti-aliasing
   Varying coverageVar = {};
   if (hasCoverage) {
     coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->storeVarying(coverageVar.vsOut(), coverage.name());
-    fragBuilder->storeCoverage(args.outputCoverage, coverageVar.fsIn(), true);
   } else {
-    // No coverage for mesh (no anti-aliasing)
-    fragBuilder->storeCoverage(args.outputCoverage, "1.0", true);
   }
-
-  vertBuilder->storePosition(positionName);
 
   // The IR route: the transformed position and every optional varying as SSA values.
   if (args.irBuilder != nullptr) {

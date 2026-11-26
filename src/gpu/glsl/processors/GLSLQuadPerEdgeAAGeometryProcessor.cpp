@@ -34,7 +34,6 @@ GLSLQuadPerEdgeAAGeometryProcessor::GLSLQuadPerEdgeAAGeometryProcessor(
 
 void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -46,24 +45,14 @@ void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   Varying coverageVar = {};
   if (aa == AAType::Coverage) {
     coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->storeVarying(coverageVar.vsOut(), coverage.name());
-    fragBuilder->storeCoverage(args.outputCoverage, coverageVar.fsIn(), true);
-  } else {
-    fragBuilder->storeCoverage(args.outputCoverage, "1.0", true);
   }
 
   if (commonColor.has_value()) {
     colorUniformName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->storeColor(args.outputColor, colorUniformName);
   } else {
     colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->storeVarying(colorVar.vsOut(), color.name());
-    fragBuilder->storeColor(args.outputColor, colorVar.fsIn());
   }
-
-  // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->storePosition(position.name());
 
   // The IR route: the same varyings and outputs as SSA values, so the SPIR-V path serves this
   // geometry without the text emission.

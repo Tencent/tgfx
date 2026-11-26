@@ -37,26 +37,18 @@ void GLSLStencilCoverCoverPassGeometryProcessor::emitCode(EmitArgs& args) const 
   // before this processor and composite against outputColor via the standard ProgramBuilder
   // wiring — when there are no FPs, the brush colour is the final colour.
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
   auto matrixName =
       uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  std::string positionName = "position";
-  vertBuilder->transformPoint(positionName, position.name(), matrixName, false);
 
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
 
-  // Default coverage of 1.0; the FP chain (mask filter, clip) may multiply this further.
-  fragBuilder->storeCoverage(args.outputCoverage, "1.0", true);
   // Brush colour uniform — matches GLSLDefaultGeometryProcessor. Without this uniform the
   // cover pass would emit a hard-coded colour (white) and silently ignore the brush.
   auto colorName =
       uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->storeColor(args.outputColor, colorName);
-
-  vertBuilder->storePosition(positionName);
 
   // The IR route: the transformed position, the constant coverage and the brush colour as SSA
   // values, so the SPIR-V path serves this geometry without the text emission.

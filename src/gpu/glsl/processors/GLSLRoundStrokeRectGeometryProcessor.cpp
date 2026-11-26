@@ -33,7 +33,6 @@ GLSLRoundStrokeRectGeometryProcessor::GLSLRoundStrokeRectGeometryProcessor(
 
 void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -44,44 +43,19 @@ void GLSLRoundStrokeRectGeometryProcessor::emitCode(EmitArgs& args) const {
   Varying coverageVar;
   if (aaType == AAType::Coverage) {
     coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->storeVarying(coverageVar.vsOut(), inCoverage.name());
     ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float2);
-    vertBuilder->storeVarying(ellipseRadii.vsOut(), inEllipseRadii.name());
   }
 
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", SLType::Float2);
-  vertBuilder->storeVarying(ellipseOffsets.vsOut(), inEllipseOffset.name());
 
   std::string colorUniformName = {};
   Varying colorVar = {};
   if (commonColor.has_value()) {
     colorUniformName =
         args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->storeColor(args.outputColor, colorUniformName);
   } else {
     colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->storeVarying(colorVar.vsOut(), inColor.name());
-    fragBuilder->storeColor(args.outputColor, colorVar.fsIn());
   }
-
-  fragBuilder->aliasValue("offset", ellipseOffsets.fsIn(), "highp vec2");
-  // The shared SDF scales the per-vertex coverage inside the ramp band when AA is on, and is a
-  // hard inside step otherwise. The AA form rides the function's runtime flag as a literal, so the
-  // driver folds the arm this draw does not use.
-  auto coverageEntry = fragBuilder->appendFunction("roundStrokeRectCoverage");
-  if (coverageEntry.empty()) {
-    return;
-  }
-  if (aaType == AAType::Coverage) {
-    fragBuilder->appendCall(args.outputCoverage, coverageEntry,
-                            {"offset", ellipseRadii.fsIn(), coverageVar.fsIn(), "1"}, "vec4");
-  } else {
-    fragBuilder->appendCall(args.outputCoverage, coverageEntry, {"offset", "vec2(0.0)", "1.0", "0"},
-                            "vec4");
-  }
-
-  // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->storePosition(inPosition.name());
 
   // The IR route: the same varyings and the coverage call as SSA values, so the SPIR-V path
   // serves this geometry without the text emission.
