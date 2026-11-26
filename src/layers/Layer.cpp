@@ -894,6 +894,15 @@ static Rect GetClippedBounds(const Rect& bounds, const Canvas* canvas) {
   return clippedBounds;
 }
 
+static bool IsReachedByRenderBounds(const Layer* layer, const Layer* root) {
+  for (auto current = layer; current != nullptr && current != root; current = current->parent()) {
+    if (!current->visible() || current->alpha() <= 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   if (canvas == nullptr || alpha <= 0) {
     return;
@@ -913,13 +922,18 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   bool canInvert = localToGlobalMatrix.invert(&globalToLocalMatrix);
 
   Rect renderRect = {};
+  std::vector<Rect> renderRectsVec = {};
   if (_root && canInvert) {
     // The bounds the background styles need depend on the alpha that reaches them, so pass the
     // draw alpha down instead of assuming an opaque draw.
     _root->updateRenderBounds(nullptr, false, alpha);
-    // No renderRects here: a direct draw paints the layer and its children even when the tree
-    // skipped them for being hidden or fully transparent, so their bounds cannot cull them.
     renderRect = localToGlobalMatrix.mapRect(clippedBounds);
+    // updateRenderBounds() skips hidden and fully transparent subtrees, so below such a layer the
+    // render bounds are empty or stale and cannot cull anything.
+    if (IsReachedByRenderBounds(this, _root)) {
+      renderRectsVec = {renderRect};
+      args.renderRects = &renderRectsVec;
+    }
   }
 
   if (surface) {
@@ -1223,8 +1237,8 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   maskArgs.excludeEffects |= isContourMode;
   maskArgs.backgroundHandler = BackgroundHandler::NoOp();
   // A mask under a hidden ancestor still applies, but updateRenderBounds() skips hidden subtrees,
-  // so the mask and its descendants have no render bounds and the replay would cull all of them.
-  // Draw such a mask uncut.
+  // so the bounds of the mask's descendants were never computed and culling would drop them. Draw
+  // such a mask uncut.
   if (_mask->renderBounds.isEmpty()) {
     maskArgs.renderRects = nullptr;
   }
@@ -1739,9 +1753,10 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
   return allMatch;
 }
 
-// Culling is a parent-side decision: renderBounds is the parent's view of a child, so a layer that
-// is drawn on its own is never culled by its own bounds. In a culled replay an empty renderBounds
-// means the child draws nothing, and a child whose bounds miss every cull rect is invisible.
+// Culling belongs to the parent: the layer a draw starts from is drawn on request, so its own
+// render bounds never cull it, which keeps Layer::draw() working on a hidden or fully transparent
+// layer. A child is skipped when it draws nothing (empty render bounds) or lies outside every cull
+// rect. An empty rect list means no culling at all.
 static bool IsCulledByRenderRects(const Rect& renderBounds, const std::vector<Rect>* renderRects) {
   if (renderRects == nullptr || renderRects->empty()) {
     return false;
