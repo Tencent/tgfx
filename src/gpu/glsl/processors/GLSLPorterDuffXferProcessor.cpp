@@ -143,6 +143,35 @@ void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
               ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, oneVec, srcValue), covValue);
           break;
       }
+      // The dual-source coefficient modes read a second stage output; the blend formula names its
+      // transform with the same output-type set as the primary one.
+      ValueID secondary = zeroVec;
+      switch (formula.secondaryOutputType()) {
+        case BlendFormula::OutputType::None:
+          break;
+        case BlendFormula::OutputType::Coverage:
+          secondary = covValue;
+          break;
+        case BlendFormula::OutputType::Modulate:
+          secondary = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, srcValue, covValue);
+          break;
+        case BlendFormula::OutputType::SAModulate:
+          secondary = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4,
+                                       ir->CreateSwizzle(srcValue, SLType::Float4, "aaaa"), covValue);
+          break;
+        case BlendFormula::OutputType::ISAModulate:
+          secondary = ir->CreateBinary(
+              IRBinaryOp::Mul, SLType::Float4,
+              ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, oneVec,
+                               ir->CreateSwizzle(srcValue, SLType::Float4, "aaaa")),
+              covValue);
+          break;
+        case BlendFormula::OutputType::ISCModulate:
+          secondary = ir->CreateBinary(
+              IRBinaryOp::Mul, SLType::Float4,
+              ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, oneVec, srcValue), covValue);
+          break;
+      }
       const auto applyFactor = [&](ValueID base, BlendFactor factor) -> ValueID {
         switch (factor) {
           case BlendFactor::Zero:
@@ -178,11 +207,19 @@ void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
                 ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, oneVec,
                                  ir->CreateSwizzle(dstValue, SLType::Float4, "aaaa")));
           case BlendFactor::Src1:
+            return ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, base, secondary);
           case BlendFactor::OneMinusSrc1:
+            return ir->CreateBinary(
+                IRBinaryOp::Mul, SLType::Float4, base,
+                ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, oneVec, secondary));
           case BlendFactor::Src1Alpha:
+            return ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, base,
+                                    ir->CreateSwizzle(secondary, SLType::Float4, "aaaa"));
           case BlendFactor::OneMinusSrc1Alpha:
-            ir->MarkFailed("dual-source blend factors have no single-value IR form");
-            return INVALID_VALUE_ID;
+            return ir->CreateBinary(
+                IRBinaryOp::Mul, SLType::Float4, base,
+                ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, oneVec,
+                                 ir->CreateSwizzle(secondary, SLType::Float4, "aaaa")));
         }
         return INVALID_VALUE_ID;
       };
