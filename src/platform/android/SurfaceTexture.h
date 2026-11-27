@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <condition_variable>
 #include "platform/ImageStream.h"
 #include "tgfx/platform/android/Global.h"
 
@@ -31,13 +32,9 @@ class Texture;
 class SurfaceTexture : public ImageStream {
  public:
   /**
-   * Creates a new SurfaceTexture with the specified image size and listener. Returns nullptr
-   * if the image size is zero or the listener is null.
-   * @param width The width of generated ImageBuffers.
-   * @param height The height of generated ImageBuffers.
-   * @param listener A java object that implements the SurfaceTexture.OnFrameAvailableListener
-   * interface. The implementation should make a native call to the notifyFrameAvailable() of the
-   * returned SurfaceImageReader.
+   * Creates a SurfaceTexture with positive dimensions and a Java OnFrameAvailableListener that
+   * forwards notifications to notifyFrameAvailable(). Returns nullptr for invalid arguments or
+   * initialization failure.
    */
   static std::shared_ptr<SurfaceTexture> Make(int width, int height, jobject listener);
 
@@ -45,7 +42,8 @@ class SurfaceTexture : public ImageStream {
 
   /**
    * Creates a new Java Surface object connected to this SurfaceTexture. Each call returns a fresh
-   * Surface. The caller owns the returned object and must call Surface.release() when done.
+   * Surface in the caller's JNI local-reference frame. The caller must release the Surface and
+   * delete its local reference when done. Returns nullptr if creation fails.
    */
   jobject createInputSurface() const;
 
@@ -67,6 +65,7 @@ class SurfaceTexture : public ImageStream {
   std::condition_variable condition = {};
   Global<jobject> surfaceTexture;
   bool frameAvailable = false;
+  bool latchedValid = false;
   bool textureSizeResolved = false;
   int64_t latchedTimestamp = -1;
   ISize textureSize = {};

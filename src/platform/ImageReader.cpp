@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/ImageReader.h"
-#include "core/PixelRef.h"
 #include "core/utils/Log.h"
 #include "gpu/resources/TextureView.h"
 #include "platform/ImageStream.h"
@@ -119,7 +118,7 @@ ImageBufferStatus ImageReader::getStatus(uint64_t contentVersion) {
 std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t contentVersion, int64_t timestamp,
                                                       Context* context, bool mipmapped) {
   std::lock_guard<std::mutex> autoLock(locker);
-  if (contentVersion == textureVersion) {
+  if (contentVersion == textureVersion && contentValid) {
     return textureView;
   }
   if (contentVersion < bufferVersion) {
@@ -129,21 +128,31 @@ std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t contentVersion, i
     return nullptr;
   }
   auto result = stream->onReadTexture(context, mipmapped, textureView, timestamp);
-  if (result.contentChanged || result.textureView != textureView) {
+  auto changed = result.contentChanged || result.textureView != textureView;
+  if (changed) {
     if (textureView != nullptr) {
       textureView->removeUniqueKey();
     }
+    if (result.textureView != nullptr && result.textureView != textureView) {
+      result.textureView->removeUniqueKey();
+    }
     textureVersion = 0;
+    contentValid = false;
   }
   textureView = std::move(result.textureView);
-  if (result.status == ImageBufferStatus::Ready && textureView != nullptr) {
+  if (textureView != nullptr &&
+      (result.status == ImageBufferStatus::Ready ||
+       (result.status == ImageBufferStatus::Timeout && result.contentChanged))) {
+    contentValid = true;
+  }
+  if (result.status == ImageBufferStatus::Ready && contentValid) {
     textureVersion = contentVersion;
   } else {
     failedVersion = contentVersion;
     failedStatus =
         result.status == ImageBufferStatus::Ready ? ImageBufferStatus::Failed : result.status;
   }
-  // Fall back to the previous frame rather than drawing nothing.
-  return textureView;
+  // A timeout can retain successfully latched non-target pixels. Unknown failed mutations cannot.
+  return contentValid ? textureView : nullptr;
 }
 }  // namespace tgfx

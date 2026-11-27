@@ -92,6 +92,8 @@ find_vendor_libraries(test-vendor STATIC TEST_VENDOR_LIBS)
 
 add_executable(tgfx-test ${TEST_SOURCES} ${WEB_TEST_SOURCES})
 add_dependencies(tgfx-test test-vendor)
+set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/ImageReaderTest.cpp PROPERTIES
+    COMPILE_DEFINITIONS TGFX_TEST_ACCESS_PRIVATE)
 
 # Generate HEAD file with current git commit hash for baseline versioning.
 execute_process(COMMAND git rev-parse --short HEAD

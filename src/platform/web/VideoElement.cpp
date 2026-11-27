@@ -65,7 +65,7 @@ std::shared_ptr<TextureView> VideoElement::makeTexture(Context* context, bool mi
   auto textureWidth = width();
   auto textureHeight = height();
   if (isAndroidMiniprogram) {
-    // https://stackoverflow.com/questions/28291204/something-about-stagefright-codec-input-format-in-android
+    // https://stackoverflow.com/q/28291204
     // Video decoder will align to multiples of 16 on the Android WeChat mini-program.
     if (textureWidth % ANDROID_MINIPROGRAM_ALIGNMENT != 0) {
       textureWidth +=

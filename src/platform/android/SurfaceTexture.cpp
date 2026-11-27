@@ -100,13 +100,20 @@ void SurfaceTexture::JNIInit(JNIEnv* env) {
   Surface_Constructor =
       env->GetMethodID(SurfaceClass.get(), "<init>", "(Landroid/graphics/SurfaceTexture;)V");
   DataSpaceClass = env->FindClass("android/hardware/DataSpace");
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+  }
   if (DataSpaceClass.get() != nullptr) {
     DataSpaceClass_getStandard =
         env->GetStaticMethodID(DataSpaceClass.get(), "getStandard", "(I)I");
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+    }
     DataSpaceClass_getTransfer =
         env->GetStaticMethodID(DataSpaceClass.get(), "getTransfer", "(I)I");
-  } else {
-    env->ExceptionClear();
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+    }
   }
 }
 
@@ -198,12 +205,19 @@ jobject SurfaceTexture::createInputSurface() const {
   if (env == nullptr) {
     return nullptr;
   }
-  return env->NewObject(SurfaceClass.get(), Surface_Constructor, surfaceTexture.get());
+  auto surface = env->NewObject(SurfaceClass.get(), Surface_Constructor, surfaceTexture.get());
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    if (surface != nullptr) {
+      env->DeleteLocalRef(surface);
+    }
+    return nullptr;
+  }
+  return surface;
 }
 
 void SurfaceTexture::notifyFrameAvailable() {
-  // Note: If there is a pending frame available already, SurfaceTexture will not dispatch any new
-  // frame-available event until you have called the SurfaceTexture.updateTexImage().
+  // Android may coalesce notifications until updateTexImage() consumes the queued frame.
   std::lock_guard<std::mutex> autoLock(locker);
   frameAvailable = true;
   condition.notify_all();
@@ -282,6 +296,7 @@ ImageStream::ReadResult SurfaceTexture::onReadTexture(Context* context, bool,
 
 unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
   std::lock_guard<std::mutex> autoLock(locker);
+  latchedValid = false;
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
@@ -305,6 +320,7 @@ unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
 
 void SurfaceTexture::releaseExternalOESTexture(Context* context, unsigned textureID) {
   std::lock_guard<std::mutex> autoLock(locker);
+  latchedValid = false;
   JNIEnvironment environment;
   auto env = environment.current();
   if (env != nullptr) {
@@ -329,25 +345,30 @@ SurfaceTexture::FrameResult SurfaceTexture::updateTexImage(int64_t timestamp) {
     return {};
   }
   FrameResult result = {};
-  if (timestamp >= 0 && latchedTimestamp == timestamp) {
-    result.status = ImageBufferStatus::Ready;
-    return result;
+  if (!frameAvailable && latchedValid && timestamp >= 0) {
+    if (latchedTimestamp == timestamp) {
+      result.status = ImageBufferStatus::Ready;
+      return result;
+    }
+    if (latchedTimestamp > timestamp) {
+      result.status = ImageBufferStatus::Timeout;
+      return result;
+    }
   }
   while (true) {
+    // Check even while frames keep arriving. The budget cannot interrupt an in-flight JNI call.
+    if (std::chrono::steady_clock::now() >= deadline) {
+      result.status = ImageBufferStatus::Timeout;
+      return result;
+    }
     if (!frameAvailable) {
-      if (condition.wait_until(autoLock, deadline) == std::cv_status::timeout && !frameAvailable) {
-        LOGE("SurfaceTexture::updateTexImage(): timeout when waiting for the frame available!");
-        result.status = ImageBufferStatus::Timeout;
-        return result;
-      }
+      condition.wait_until(autoLock, deadline);
       continue;
     }
     frameAvailable = false;
     auto previousTimestamp = latchedTimestamp;
     result.latched = true;
     if (!latchTexImage(env)) {
-      // No new notification arrives until the queued frame is latched.
-      frameAvailable = true;
       result.status = ImageBufferStatus::Failed;
       return result;
     }
@@ -355,53 +376,87 @@ SurfaceTexture::FrameResult SurfaceTexture::updateTexImage(int64_t timestamp) {
       result.status = ImageBufferStatus::Ready;
       return result;
     }
+    if (latchedTimestamp > timestamp) {
+      result.status = ImageBufferStatus::Timeout;
+      return result;
+    }
     if (latchedTimestamp != previousTimestamp) {
-      // Queued frames may share one notification, so latch again before waiting.
+      // Queued frames may share one notification; probe while advancing toward the target.
       frameAvailable = true;
     }
   }
 }
 
 bool SurfaceTexture::latchTexImage(JNIEnv* env) {
+  latchedValid = false;
   env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
+    // The queued frame may still need consuming, and Android may not send another notification.
+    frameAvailable = true;
     LOGE("SurfaceTexture::latchTexImage(): failed to updateTexImage!");
     return false;
   }
-  latchedTimestamp =
+  auto nextTimestamp =
       static_cast<int64_t>(env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp));
-  if (SurfaceTexture_getDataSpace) {
-    jint dataSpace = env->CallIntMethod(surfaceTexture.get(), SurfaceTexture_getDataSpace);
-    jint standard =
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    LOGE("SurfaceTexture::latchTexImage(): failed to getTimestamp!");
+    return false;
+  }
+  if (SurfaceTexture_getDataSpace != nullptr) {
+    if (DataSpaceClass.get() == nullptr || DataSpaceClass_getStandard == nullptr ||
+        DataSpaceClass_getTransfer == nullptr) {
+      return false;
+    }
+    auto dataSpace = env->CallIntMethod(surfaceTexture.get(), SurfaceTexture_getDataSpace);
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+      return false;
+    }
+    auto standard =
         env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getStandard, dataSpace);
-    jint transfer =
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+      return false;
+    }
+    auto transfer =
         env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getTransfer, dataSpace);
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+      return false;
+    }
     _colorSpace = AndroidDataSpaceToColorSpace(standard, transfer);
   }
   if (SurfaceTexture_getTransformMatrix != nullptr && !textureSizeResolved) {
     auto floatArray = env->NewFloatArray(16);
-    if (floatArray == nullptr) {
+    if (floatArray == nullptr || env->ExceptionCheck()) {
       env->ExceptionClear();
-    } else {
-      env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_getTransformMatrix, floatArray);
-      if (env->ExceptionCheck()) {
-        env->ExceptionClear();
-      } else {
-        auto matrix = env->GetFloatArrayElements(floatArray, nullptr);
-        if (matrix != nullptr) {
-          // The content size is fixed for the lifetime of a SurfaceTexture, so the buffer padding
-          // never changes after the first frame; resolve the texture size once and reuse it.
-          textureSize = ComputeTextureSize(matrix, width(), height());
-          textureSizeResolved = true;
-          env->ReleaseFloatArrayElements(floatArray, matrix, JNI_ABORT);
-        } else {
-          env->ExceptionClear();
-        }
+      if (floatArray != nullptr) {
+        env->DeleteLocalRef(floatArray);
       }
-      env->DeleteLocalRef(floatArray);
+      return false;
     }
+    env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_getTransformMatrix, floatArray);
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+      env->DeleteLocalRef(floatArray);
+      return false;
+    }
+    float matrix[16] = {};
+    env->GetFloatArrayRegion(floatArray, 0, 16, matrix);
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+      env->DeleteLocalRef(floatArray);
+      return false;
+    }
+    env->DeleteLocalRef(floatArray);
+    // Content dimensions are fixed; retain the first successfully recovered buffer padding.
+    textureSize = ComputeTextureSize(matrix, width(), height());
+    textureSizeResolved = true;
   }
+  latchedTimestamp = nextTimestamp;
+  latchedValid = true;
   return true;
 }
 

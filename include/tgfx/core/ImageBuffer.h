@@ -44,11 +44,13 @@ enum class ImageBufferStatus {
    */
   Pending,
   /**
-   * The pixels did not arrive in time, and the previous pixels were drawn instead.
+   * The requested pixels were not obtained in time. The last valid latched pixels can be drawn
+   * instead; they do not establish a match for the request.
    */
   Timeout,
   /**
-   * The pixels could not be read, and the previous pixels, if any, were drawn instead.
+   * The pixels could not be read. Only known-valid prior pixels can be retained; unknown effects
+   * prevent safely exposing the retained texture as a fallback.
    */
   Failed,
   /**
@@ -59,10 +61,12 @@ enum class ImageBufferStatus {
 
 /**
  * ImageBuffer describes a two-dimensional array of pixels and is optimized for creating textures.
- * ImageBuffer is immutable and safe across threads. The content of an ImageBuffer never changes,
- * but some ImageBuffers may have a limited lifetime and cannot create textures after they expire.
- * For example, the ImageBuffers generated from an ImageReader. In other cases, ImageBuffers usually
- * only expire if explicitly stated by the creator.
+ * Status queries are safe across threads. Pixel access, metadata and returned references follow
+ * the creator's synchronization and Context requirements. Streaming buffers can change pixels on
+ * retries until Ready; their delivered content remains valid only until expiration. ImageReader
+ * buffers share native storage, and later reads can invalidate previous buffers. Other buffers
+ * normally start Ready and only expire if explicitly stated by their creator. Virtual delivery
+ * interfaces change the ABI; rebuild callers and subclasses together with the library.
  */
 class ImageBuffer {
  public:
@@ -122,22 +126,24 @@ class ImageBuffer {
 
   /**
    * Returns true if the ImageBuffer is expired, indicating that it cannot create any new textures.
-   * However, you can still safely access all of its properties across threads.
+   * Expiration does not prevent metadata queries, which keep their original synchronization rules.
    */
   virtual bool expired() const {
     return false;
   }
 
   /**
-   * Returns the delivery status of the ImageBuffer. For an ImageBuffer from an ImageReader, query it
-   * after the drawing is flushed. Other ImageBuffers return Ready unless expired.
+   * Returns the delivery status. For an ImageReader buffer, query after drawing is flushed; Timeout
+   * and Failed can change on a subsequent retry until the buffer expires. Other ImageBuffers return
+   * Ready unless expired. A status query does not reserve pixels against another source read.
    */
   virtual ImageBufferStatus status() const {
     return expired() ? ImageBufferStatus::Expired : ImageBufferStatus::Ready;
   }
 
   /**
-   * Return the ColorSpace of this ImageBuffer
+   * Returns the color space, or nullptr if unspecified. Streaming sources can update it during
+   * texture reads; serialize this query and use of its reference with those reads.
    */
   virtual const std::shared_ptr<ColorSpace>& colorSpace() const = 0;
 

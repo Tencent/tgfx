@@ -62,6 +62,8 @@ class ImageStream {
   struct ReadResult {
     std::shared_ptr<TextureView> textureView = nullptr;
     ImageBufferStatus status = ImageBufferStatus::Failed;
+    // Failed with changed content cannot be used as a fallback. Timeout with changed content
+    // retains successfully latched non-target pixels, not a verified match for the request.
     bool contentChanged = false;
   };
 

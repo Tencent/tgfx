@@ -21,7 +21,6 @@
 #include <cstdint>
 #include <mutex>
 #include "tgfx/core/ImageBuffer.h"
-#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 class TextureView;
@@ -37,10 +36,13 @@ class ImageStream;
  *
  *    1) The generated ImageBuffers are bound to the associated GPU Context when first being drawn
  *       and cannot be drawn to another Context anymore.
- *    2) The generated ImageBuffers may have a limited lifetime and cannot create textures after
- *       expiration. Usually, the previously acquired ImageBuffer will expire after the newly
- *       created ImageBuffer is drawn. So there are only two ImageBuffers that can be accessed
- *       simultaneously.
+ *    2) A new acquisition expires older buffers except the one still bound to valid current pixels.
+ *       A native read that changes or invalidates pixels expires the previously Ready buffer.
+ *       Timeout and Failed buffers can retry until superseded by a newer acquisition.
+ *
+ * Acquisitions and status queries share the reader mutex with texture reads and may wait for an
+ * in-flight read. They do not reserve pixels or guarantee Context/GPU lifetime. Rebuild callers and
+ * subclasses with this version; changed virtual interfaces and layouts are not binary-compatible.
  */
 class ImageReader {
  public:
@@ -57,20 +59,26 @@ class ImageReader {
   int height() const;
 
   /**
-   * Returns the ColorSpace of generated image buffers.
+   * Returns the source color space, or nullptr if unspecified. The reference is forwarded without
+   * locking; serialize this query and use of its reference with source texture reads when the
+   * source can update its color space.
    */
   const std::shared_ptr<ColorSpace>& colorSpace() const;
 
   /**
-   * Acquires the next ImageBuffer from the ImageReader after a new image frame has been rendered
-   * into the associated video source. When the returned ImageBuffer is drawn, it waits briefly for
-   * the frame with the given timestamp. If the frame does not arrive in time or cannot be read, the
-   * previous frame is drawn instead, and status() reports Timeout or Failed after the drawing is
-   * flushed. To retry, draw a new Image created from the same ImageBuffer. Note that the previously
-   * returned image buffers will immediately expire after the newly created ImageBuffer is drawn.
-   * @param timestamp The presentation timestamp of the frame in nanoseconds. For a MediaCodec output
-   * buffer released with render set to true, pass its presentationTimeUs multiplied by 1000. Pass
-   * -1 to draw the next available frame without checking it. Ignored on the web platform.
+   * Acquires a Pending buffer without reading source pixels. On Android, texture generation reads
+   * until the requested timestamp is found or the one-second notification-wait budget is exhausted.
+   * GPU, JNI and lock operations can exceed that budget; it is not a hard completion deadline.
+   * Query status() after drawing is flushed. Ready means the source satisfied this request.
+   * Timeout can display the most recently valid latched image, which need not be the previously
+   * accepted image. Failed can retain known-valid prior pixels, but unknown mutations draw nothing.
+   * Neither fallback status implies a target match. Create a new Image from the same nonexpired
+   * buffer to retry; reusing an already cached Image may not perform another source read.
+   * Timestamps do not encode source restart generations. Callers that need to distinguish restarts
+   * must avoid reusing the same native timestamp range for different generations.
+   * @param timestamp The requested frame's presentation timestamp in nanoseconds. For MediaCodec
+   * output released with render set to true, pass presentationTimeUs multiplied by 1000. Pass -1
+   * to draw the next available frame without checking it. Ignored on the web platform.
    */
   std::shared_ptr<ImageBuffer> acquireNextBuffer(int64_t timestamp = -1);
 
@@ -83,6 +91,7 @@ class ImageReader {
 
  private:
   std::shared_ptr<TextureView> textureView = nullptr;
+  bool contentValid = false;
   uint64_t bufferVersion = 0;
   uint64_t textureVersion = 0;
   uint64_t failedVersion = 0;

@@ -17,10 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <deque>
+#ifdef TGFX_USE_THREADS
+#include <thread>
+#endif
 #include "gpu/resources/TextureView.h"
 #include "platform/ImageStream.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/gpu/GPU.h"
 #include "tgfx/platform/ImageReader.h"
 #include "utils/TestUtils.h"
 
@@ -39,6 +43,9 @@ class QueueImageStream : public ImageStream {
   }
 
   bool failNextRead = false;
+  bool unknownMutationNextRead = false;
+  bool readyWithoutTextureNextRead = false;
+  bool reuseTexture = false;
   int readCount = 0;
 
  protected:
@@ -47,6 +54,15 @@ class QueueImageStream : public ImageStream {
     readCount++;
     if (failNextRead) {
       failNextRead = false;
+      return {std::move(textureView), ImageBufferStatus::Failed, false};
+    }
+    if (readyWithoutTextureNextRead) {
+      readyWithoutTextureNextRead = false;
+      return {nullptr, ImageBufferStatus::Ready, false};
+    }
+    if (unknownMutationNextRead) {
+      unknownMutationNextRead = false;
+      textureView = writeFrame(context, std::move(textureView), 99);
       return {std::move(textureView), ImageBufferStatus::Failed, true};
     }
     bool latched = false;
@@ -54,9 +70,7 @@ class QueueImageStream : public ImageStream {
       auto frame = frames.front();
       frames.pop_front();
       latched = true;
-      uint8_t pixels[] = {frame.red, 0, 0, 255};
-      textureView =
-          TextureView::MakeFormat(context, 1, 1, pixels, sizeof(pixels), PixelFormat::RGBA_8888);
+      textureView = writeFrame(context, std::move(textureView), frame.red);
       if (timestamp < 0 || frame.timestamp == timestamp) {
         return {std::move(textureView), ImageBufferStatus::Ready, latched};
       }
@@ -65,6 +79,17 @@ class QueueImageStream : public ImageStream {
   }
 
  private:
+  std::shared_ptr<TextureView> writeFrame(Context* context,
+                                          std::shared_ptr<TextureView> textureView, uint8_t red) {
+    uint8_t pixels[] = {red, 0, 0, 255};
+    if (reuseTexture && textureView != nullptr) {
+      context->gpu()->queue()->writeTexture(textureView->getTexture(), Rect::MakeWH(1, 1), pixels,
+                                            sizeof(pixels));
+      return textureView;
+    }
+    return TextureView::MakeFormat(context, 1, 1, pixels, sizeof(pixels), PixelFormat::RGBA_8888);
+  }
+
   struct Frame {
     uint8_t red = 0;
     int64_t timestamp = -1;
@@ -76,6 +101,7 @@ class QueueImageStream : public ImageStream {
 static uint8_t DrawAndReadRed(Context* context, std::shared_ptr<Image> image) {
   auto surface = Surface::Make(context, 1, 1);
   if (surface == nullptr) {
+    ADD_FAILURE() << "Failed to create the readback surface.";
     return 0;
   }
   auto canvas = surface->getCanvas();
@@ -84,10 +110,98 @@ static uint8_t DrawAndReadRed(Context* context, std::shared_ptr<Image> image) {
   uint8_t pixels[4] = {};
   auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
   if (!surface->readPixels(info, pixels)) {
+    ADD_FAILURE() << "Failed to read the rendered pixels.";
     return 0;
   }
   return pixels[0];
 }
+
+static void ExpectFramesForTimestamps(Context* context, const int64_t* timestamps, size_t count) {
+  auto stream = std::make_shared<QueueImageStream>();
+  auto reader = ImageReader::MakeFrom(stream);
+  ASSERT_NE(reader, nullptr);
+  std::shared_ptr<ImageBuffer> previous = nullptr;
+  for (size_t index = 0; index < count; index++) {
+    uint8_t red = static_cast<uint8_t>(20 + index * 20);
+    stream->queueFrame(red, timestamps[index]);
+    auto buffer = reader->acquireNextBuffer(timestamps[index]);
+    ASSERT_NE(buffer, nullptr);
+    EXPECT_EQ(buffer->status(), ImageBufferStatus::Pending);
+    EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(buffer)), red);
+    EXPECT_EQ(buffer->status(), ImageBufferStatus::Ready);
+    if (previous != nullptr) {
+      EXPECT_EQ(previous->status(), ImageBufferStatus::Expired);
+    }
+    previous = std::move(buffer);
+  }
+  EXPECT_EQ(stream->readCount, static_cast<int>(count));
+}
+
+class ExpiringImageBuffer : public ImageBuffer {
+ public:
+  int width() const override {
+    return 1;
+  }
+
+  int height() const override {
+    return 1;
+  }
+
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
+  bool expired() const override {
+    return isExpired;
+  }
+
+  const std::shared_ptr<ColorSpace>& colorSpace() const override {
+    return _colorSpace;
+  }
+
+  void expire() {
+    isExpired = true;
+  }
+
+ protected:
+  std::shared_ptr<TextureView> onMakeTexture(Context*, bool) const override {
+    return nullptr;
+  }
+
+ private:
+  bool isExpired = false;
+  std::shared_ptr<ColorSpace> _colorSpace = nullptr;
+};
+
+#ifdef TGFX_USE_THREADS
+class BufferStatusQuery {
+ public:
+  BufferStatusQuery(std::shared_ptr<ImageBuffer> first, std::shared_ptr<ImageBuffer> latest)
+      : first(std::move(first)), latest(std::move(latest)) {
+  }
+
+  void run() {
+    for (int index = 0; index < 2000; index++) {
+      auto firstStatus = first->status();
+      EXPECT_TRUE(firstStatus == ImageBufferStatus::Ready ||
+                  firstStatus == ImageBufferStatus::Expired);
+      auto latestStatus = latest->status();
+      EXPECT_TRUE(latestStatus == ImageBufferStatus::Pending ||
+                  latestStatus == ImageBufferStatus::Ready);
+      EXPECT_EQ(first->width(), 1);
+      EXPECT_EQ(first->height(), 1);
+      EXPECT_FALSE(first->isAlphaOnly());
+      EXPECT_EQ(first->colorSpace(), nullptr);
+      EXPECT_FALSE(latest->expired());
+      first->expired();
+    }
+  }
+
+ private:
+  std::shared_ptr<ImageBuffer> first = nullptr;
+  std::shared_ptr<ImageBuffer> latest = nullptr;
+};
+#endif
 
 TGFX_TEST_PRIVATE(ImageReaderTest, SkipsOlderFramesToTheRequestedTimestamp) {
   TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
@@ -183,6 +297,200 @@ TGFX_TEST_PRIVATE(ImageReaderTest, SkippedBufferExpiresWithoutReading) {
                       EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(latest)), 20);
                       EXPECT_EQ(latest->status(), ImageBufferStatus::Ready);)
 }
+
+TGFX_TEST_PRIVATE(ImageReaderTest, UnknownFailedMutationDropsPreviousPixelsAndCache) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<QueueImageStream>(); stream->reuseTexture = true;
+      auto reader = ImageReader::MakeFrom(stream); ASSERT_NE(reader, nullptr);
+      stream->queueFrame(10, 1000); auto first = reader->acquireNextBuffer(1000);
+      auto firstImage = Image::MakeFrom(first); EXPECT_EQ(DrawAndReadRed(context, firstImage), 10);
+      auto oldTexture = reader->textureView; ASSERT_NE(oldTexture, nullptr);
+      auto oldKey = oldTexture->uniqueKey; ASSERT_FALSE(oldKey.empty());
+      stream->unknownMutationNextRead = true; auto second = reader->acquireNextBuffer(2000);
+      EXPECT_EQ(TextureView::MakeFrom(context, second), nullptr);
+      EXPECT_EQ(second->status(), ImageBufferStatus::Failed);
+      EXPECT_EQ(first->status(), ImageBufferStatus::Expired); EXPECT_TRUE(first->expired());
+      EXPECT_EQ(Resource::Find<TextureView>(context, oldKey), nullptr);
+      EXPECT_EQ(DrawAndReadRed(context, firstImage), 0); EXPECT_EQ(stream->readCount, 2);
+      EXPECT_EQ(TextureView::MakeFrom(context, second), nullptr);
+      EXPECT_EQ(second->status(), ImageBufferStatus::Timeout); stream->queueFrame(20, 2000);
+      EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(second)), 20);
+      EXPECT_EQ(second->status(), ImageBufferStatus::Ready);)
+}
+
+// A new Image takes ownership of the texture cache key; earlier Images can subsequently miss it.
+TGFX_TEST_PRIVATE(ImageReaderTest, TimeoutCachedImageDoesNotRetryButNewImageDoes) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<QueueImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); ASSERT_NE(reader, nullptr);
+      stream->queueFrame(10, 1000); auto first = reader->acquireNextBuffer(1000);
+      EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(first)), 10);
+      auto second = reader->acquireNextBuffer(2000); auto cachedImage = Image::MakeFrom(second);
+      EXPECT_EQ(DrawAndReadRed(context, cachedImage), 10);
+      EXPECT_EQ(second->status(), ImageBufferStatus::Timeout); EXPECT_EQ(stream->readCount, 2);
+      EXPECT_EQ(DrawAndReadRed(context, cachedImage), 10); EXPECT_EQ(stream->readCount, 2);
+      auto retryImage = Image::MakeFrom(second); EXPECT_EQ(DrawAndReadRed(context, retryImage), 10);
+      EXPECT_EQ(stream->readCount, 3); EXPECT_EQ(second->status(), ImageBufferStatus::Timeout);
+      EXPECT_EQ(first->status(), ImageBufferStatus::Ready); stream->queueFrame(20, 2000);
+      EXPECT_EQ(DrawAndReadRed(context, retryImage), 10); EXPECT_EQ(stream->readCount, 3);
+      EXPECT_EQ(second->status(), ImageBufferStatus::Timeout);
+      EXPECT_EQ(DrawAndReadRed(context, cachedImage), 20); EXPECT_EQ(stream->readCount, 4);
+      EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(second)), 20);
+      EXPECT_EQ(stream->readCount, 4); EXPECT_EQ(second->status(), ImageBufferStatus::Ready);
+      EXPECT_EQ(first->status(), ImageBufferStatus::Expired);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, FailedCachedImageDoesNotRetryButNewImageDoes) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<QueueImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); ASSERT_NE(reader, nullptr);
+      stream->queueFrame(10, 1000); auto first = reader->acquireNextBuffer(1000);
+      EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(first)), 10); stream->queueFrame(20, 2000);
+      stream->failNextRead = true; auto second = reader->acquireNextBuffer(2000);
+      auto cachedImage = Image::MakeFrom(second);
+      EXPECT_EQ(DrawAndReadRed(context, cachedImage), 10);
+      EXPECT_EQ(second->status(), ImageBufferStatus::Failed);
+      EXPECT_EQ(first->status(), ImageBufferStatus::Ready); EXPECT_EQ(stream->readCount, 2);
+      EXPECT_EQ(DrawAndReadRed(context, cachedImage), 10); EXPECT_EQ(stream->readCount, 2);
+      EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(second)), 20);
+      EXPECT_EQ(stream->readCount, 3); EXPECT_EQ(second->status(), ImageBufferStatus::Ready);
+      EXPECT_EQ(first->status(), ImageBufferStatus::Expired);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, InPlaceMutationRemovesOldImageCacheKey) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<QueueImageStream>(); stream->reuseTexture = true;
+      auto reader = ImageReader::MakeFrom(stream); ASSERT_NE(reader, nullptr);
+      stream->queueFrame(10, 1000); auto first = reader->acquireNextBuffer(1000);
+      auto firstImage = Image::MakeFrom(first); EXPECT_EQ(DrawAndReadRed(context, firstImage), 10);
+      auto oldTexture = reader->textureView; ASSERT_NE(oldTexture, nullptr);
+      auto oldKey = oldTexture->uniqueKey; ASSERT_FALSE(oldKey.empty());
+      EXPECT_EQ(Resource::Find<TextureView>(context, oldKey), oldTexture);
+      stream->queueFrame(20, 2000); auto second = reader->acquireNextBuffer(2000);
+      EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(second)), 20);
+      EXPECT_EQ(reader->textureView, oldTexture);
+      EXPECT_EQ(second->status(), ImageBufferStatus::Ready);
+      EXPECT_EQ(first->status(), ImageBufferStatus::Expired);
+      EXPECT_EQ(Resource::Find<TextureView>(context, oldKey), nullptr);
+      EXPECT_EQ(DrawAndReadRed(context, firstImage), 0); EXPECT_EQ(stream->readCount, 2);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, EqualTimestampNewBufferDeliversChangedPixels) {
+  TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
+                      ASSERT_NE(context, nullptr); const int64_t timestamps[] = {1000, 1000};
+                      ExpectFramesForTimestamps(context, timestamps, 2);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, ZeroTimestampIsAValidTarget) {
+  TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
+                      ASSERT_NE(context, nullptr); const int64_t timestamps[] = {0, 1000};
+                      ExpectFramesForTimestamps(context, timestamps, 2);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, DecreasingTimestampTargetsAreDelivered) {
+  TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
+                      ASSERT_NE(context, nullptr); const int64_t timestamps[] = {2000, 1000, 0};
+                      ExpectFramesForTimestamps(context, timestamps, 3);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, UnknownSourceTimestampDeliversDefaultTarget) {
+  TGFX_PRIVATE_ACCESS(ContextScope scope; auto context = scope.getContext();
+                      ASSERT_NE(context, nullptr);
+                      auto stream = std::make_shared<QueueImageStream>();
+                      auto reader = ImageReader::MakeFrom(stream); ASSERT_NE(reader, nullptr);
+                      stream->queueFrame(10, -1); auto buffer = reader->acquireNextBuffer();
+                      EXPECT_EQ(buffer->status(), ImageBufferStatus::Pending);
+                      EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(buffer)), 10);
+                      EXPECT_EQ(buffer->status(), ImageBufferStatus::Ready);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, InitialTimeoutRetriesTheSameBufferAndImage) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<QueueImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); ASSERT_NE(reader, nullptr);
+      auto buffer = reader->acquireNextBuffer(1000); auto image = Image::MakeFrom(buffer);
+      EXPECT_EQ(DrawAndReadRed(context, image), 0);
+      EXPECT_EQ(buffer->status(), ImageBufferStatus::Timeout); EXPECT_EQ(stream->readCount, 1);
+      stream->queueFrame(10, 1000); EXPECT_EQ(DrawAndReadRed(context, image), 10);
+      EXPECT_EQ(buffer->status(), ImageBufferStatus::Ready); EXPECT_EQ(stream->readCount, 2);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, InitialFailedReadRetriesTheSameBuffer) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<QueueImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); ASSERT_NE(reader, nullptr);
+      auto buffer = reader->acquireNextBuffer(1000); stream->failNextRead = true;
+      EXPECT_EQ(TextureView::MakeFrom(context, buffer), nullptr);
+      EXPECT_EQ(buffer->status(), ImageBufferStatus::Failed); stream->queueFrame(10, 1000);
+      EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(buffer)), 10);
+      EXPECT_EQ(buffer->status(), ImageBufferStatus::Ready); EXPECT_EQ(stream->readCount, 2);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, AcquiringLatestExpiresOlderFailedBuffer) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<QueueImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); ASSERT_NE(reader, nullptr);
+      auto failed = reader->acquireNextBuffer(1000); stream->failNextRead = true;
+      EXPECT_EQ(TextureView::MakeFrom(context, failed), nullptr);
+      EXPECT_EQ(failed->status(), ImageBufferStatus::Failed);
+      auto latest = reader->acquireNextBuffer(2000);
+      EXPECT_EQ(latest->status(), ImageBufferStatus::Pending);
+      EXPECT_EQ(failed->status(), ImageBufferStatus::Expired); EXPECT_TRUE(failed->expired());
+      EXPECT_EQ(TextureView::MakeFrom(context, failed), nullptr); EXPECT_EQ(stream->readCount, 1);
+      stream->queueFrame(20, 2000); EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(latest)), 20);
+      EXPECT_EQ(latest->status(), ImageBufferStatus::Ready);)
+}
+
+TGFX_TEST_PRIVATE(ImageReaderTest, ReadyWithoutTextureDoesNotClaimDelivery) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<QueueImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); ASSERT_NE(reader, nullptr);
+      stream->readyWithoutTextureNextRead = true; auto first = reader->acquireNextBuffer(1000);
+      EXPECT_EQ(TextureView::MakeFrom(context, first), nullptr);
+      EXPECT_EQ(first->status(), ImageBufferStatus::Failed); stream->queueFrame(10, 1000);
+      EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(first)), 10);
+      EXPECT_EQ(first->status(), ImageBufferStatus::Ready);
+      stream->readyWithoutTextureNextRead = true; auto second = reader->acquireNextBuffer(2000);
+      EXPECT_EQ(TextureView::MakeFrom(context, second), nullptr);
+      EXPECT_EQ(second->status(), ImageBufferStatus::Failed);
+      EXPECT_EQ(first->status(), ImageBufferStatus::Expired);)
+}
+
+TGFX_TEST(ImageReaderTest, NullStreamCannotCreateReader) {
+  EXPECT_EQ(ImageReader::MakeFrom(nullptr), nullptr);
+}
+
+TGFX_TEST(ImageReaderTest, DefaultStatusHonorsExpiredOverride) {
+  ExpiringImageBuffer buffer;
+  EXPECT_EQ(buffer.status(), ImageBufferStatus::Ready);
+  buffer.expire();
+  EXPECT_TRUE(buffer.expired());
+  EXPECT_EQ(buffer.status(), ImageBufferStatus::Expired);
+}
+
+#ifdef TGFX_USE_THREADS
+TGFX_TEST_PRIVATE(ImageReaderTest, BufferPropertiesCanBeQueriedWhileDrawing) {
+  TGFX_PRIVATE_ACCESS(
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      auto stream = std::make_shared<QueueImageStream>();
+      auto reader = ImageReader::MakeFrom(stream); ASSERT_NE(reader, nullptr);
+      stream->queueFrame(10, 1000); auto first = reader->acquireNextBuffer(1000);
+      EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(first)), 10); stream->queueFrame(20, 2000);
+      auto latest = reader->acquireNextBuffer(2000); BufferStatusQuery query(first, latest);
+      std::thread thread(&BufferStatusQuery::run, &query);
+      EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(latest)), 20); thread.join();
+      EXPECT_EQ(first->status(), ImageBufferStatus::Expired);
+      EXPECT_EQ(latest->status(), ImageBufferStatus::Ready); EXPECT_EQ(stream->readCount, 2);)
+}
+#endif
 
 TGFX_TEST(ImageReaderTest, FixedBufferIsAlwaysReady) {
   Bitmap bitmap = {};
