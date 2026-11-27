@@ -60,17 +60,11 @@ class RRectDrawOp : public StandardDrawOp {
                                         uint32_t renderFlags);
 
  protected:
-  std::optional<GeometryLayout> onMakeGeometry(RenderTarget* renderTarget) override;
-
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
-  std::optional<PMColor> uniformGeometryColor() const override {
-    return commonColor;
-  }
-
-  Type type() const override {
+  Type type() override {
     return Type::RRectDrawOp;
   }
 

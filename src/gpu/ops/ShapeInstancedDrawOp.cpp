@@ -22,7 +22,6 @@
 #include "gpu/InstanceProvider.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
-#include "gpu/SamplingArgs.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
@@ -70,38 +69,6 @@ ShapeInstancedDrawOp::ShapeInstancedDrawOp(BlockAllocator* allocator,
     maskBufferProxy = context->proxyProvider()->createVertexBufferProxy(
         std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
   }
-}
-
-std::optional<GeometryLayout> ShapeInstancedDrawOp::onMakeGeometry(RenderTarget* /*renderTarget*/) {
-  if (shapeProxy == nullptr) {
-    return std::nullopt;
-  }
-  auto realUVMatrix = uvMatrix;
-  realUVMatrix.preConcat(shapeProxy->getDrawingMatrix());
-  auto aa = aaType;
-  auto vertexBuffer = shapeProxy->getTriangles();
-  if (vertexBuffer == nullptr) {
-    aa = AAType::None;
-    auto textureProxy = shapeProxy->getTextureProxy();
-    if (textureProxy == nullptr || maskBufferProxy == nullptr ||
-        maskBufferProxy->getBuffer() == nullptr) {
-      return std::nullopt;
-    }
-    Matrix maskMatrix = {};
-    if (!realUVMatrix.invert(&maskMatrix)) {
-      return std::nullopt;
-    }
-    static const SamplingArgs args(TileMode::Clamp, TileMode::Clamp,
-                                   SamplingOptions(FilterMode::Nearest, MipmapMode::None),
-                                   SrcRectConstraint::Fast);
-    auto maskFP = TextureEffect::Make(allocator, std::move(textureProxy), args, &maskMatrix, true);
-    if (maskFP == nullptr) {
-      return std::nullopt;
-    }
-    addCoverageFP(std::move(maskFP));
-  }
-  auto viewMatrix = stateMatrix * realUVMatrix;
-  return ShapeInstancedGeometryLayout(aa, hasInstanceColors, viewMatrix, realUVMatrix);
 }
 
 PlacementPtr<GeometryProcessor> ShapeInstancedDrawOp::onMakeGeometryProcessor(

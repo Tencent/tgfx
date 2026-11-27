@@ -22,7 +22,6 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
-#include "gpu/SamplingArgs.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
@@ -44,47 +43,10 @@ ShapeDrawOp::ShapeDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUShapeProx
   auto context = shapeProxy->getContext();
   if (auto textureProxy = shapeProxy->getTextureProxy()) {
     auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
-    // The DefaultGP binds the color and coverage attributes unconditionally; the mask quad
     auto maskVertexProvider = RectsVertexProvider::MakeFrom(allocator, maskRect, AAType::None);
     maskBufferProxy = context->proxyProvider()->createVertexBufferProxy(
         std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
   }
-}
-
-std::optional<GeometryLayout> ShapeDrawOp::onMakeGeometry(RenderTarget* /*renderTarget*/) {
-  if (shapeProxy == nullptr) {
-    return std::nullopt;
-  }
-  auto viewMatrix = shapeProxy->getDrawingMatrix();
-  auto realUVMatrix = uvMatrix;
-  realUVMatrix.preConcat(viewMatrix);
-  auto vertexBuffer = shapeProxy->getTriangles();
-  auto aa = aaType;
-  if (vertexBuffer == nullptr) {
-    aa = AAType::None;
-    auto textureProxy = shapeProxy->getTextureProxy();
-    // An empty shape rasterizes to nothing, so its texture proxy stays an unpopulated shell that
-    // the proxy cache keeps serving. The runtime path compiles such a mask to transparent black
-    // (GLSLTextureEffect emits vec4(0)), which leaves the destination unchanged — dropping the
-    // draw here is pixel-identical and avoids a useless program.
-    if (textureProxy == nullptr || textureProxy->getTextureView() == nullptr ||
-        maskBufferProxy == nullptr || maskBufferProxy->getBuffer() == nullptr) {
-      return std::nullopt;
-    }
-    Matrix maskMatrix = {};
-    if (!realUVMatrix.invert(&maskMatrix)) {
-      return std::nullopt;
-    }
-    static const SamplingArgs args(TileMode::Clamp, TileMode::Clamp,
-                                   SamplingOptions(FilterMode::Nearest, MipmapMode::None),
-                                   SrcRectConstraint::Fast);
-    auto maskFP = TextureEffect::Make(allocator, std::move(textureProxy), args, &maskMatrix, true);
-    if (maskFP == nullptr) {
-      return std::nullopt;
-    }
-    addCoverageFP(std::move(maskFP));
-  }
-  return DefaultGeometryLayout(color, aa, viewMatrix, realUVMatrix);
 }
 
 PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {

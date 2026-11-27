@@ -31,7 +31,6 @@
 
 namespace tgfx {
 struct RuntimeInputTexture;
-struct DrawIR;
 
 class DrawingManager {
  public:
@@ -50,27 +49,11 @@ class DrawingManager {
   }
 
   /**
-   * Creates a full-rect draw operation using the provided fragment processor without enqueueing it.
-   * The optional coordOffset shifts the coordinates fed to the fragment processor so that it
-   * receives positions in [offset.x .. offset.x+w, offset.y .. offset.y+h] instead of [0..w,
-   * 0..h]. inputAlpha applies the original uniform geometry alpha to a split-off source fill;
-   * the default opaque input is unchanged. Returns nullptr for a null target or processor.
-   */
-  PlacementPtr<DrawOp> makeFillDrawOp(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                      PlacementPtr<FragmentProcessor> processor,
-                                      uint32_t renderFlags,
-                                      const Point& coordOffset = Point::Zero(),
-                                      float inputAlpha = 1.0f);
-
-
-
-  /**
    * Fills the render target using the provided fragment processor, and automatically resolves the
    * render target. Returns false if the render target or fragment processor is nullptr.
    */
   bool fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
-                    PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
-                    const Point& coordOffset = Point::Zero());
+                    PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags);
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   uint32_t renderFlags,
@@ -89,15 +72,8 @@ class DrawingManager {
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                                std::shared_ptr<TextureProxy> dest, int srcX = 0, int srcY = 0);
 
-  /**
-   * Enqueues a copy of the whole source texture into dest (see TextureCopyTask).
-   */
-  void addTextureCopyTask(std::shared_ptr<TextureProxy> source, std::shared_ptr<TextureProxy> dest);
-
   void addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> source, const Rect& srcRect,
                              std::shared_ptr<GPUBufferProxy> dest);
-
-  void addRenderTask(PlacementPtr<RenderTask> renderTask);
 
   void addResourceTask(PlacementPtr<ResourceTask> resourceTask);
 

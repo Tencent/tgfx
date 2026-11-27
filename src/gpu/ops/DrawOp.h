@@ -9,10 +9,10 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the License for the specific language governing permissions
-//  and limitations under the License.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,27 +20,23 @@
 
 #include <optional>
 #include "gpu/AAType.h"
-#include "gpu/ir/XferFacts.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XferProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
-
-class AOTRouter;
-
 /**
  * DrawOp is the minimal contract every deferred draw operation must satisfy. It exposes only
- * what OpsRenderTask needs to schedule an op inside a render pass: an execute() entry point.
- * Concrete pipeline-binding strategies live in subclasses — StandardDrawOp handles the common
+ * what OpsRenderTask needs to schedule an op inside a render pass: an execute() entry point,
+ * plus flags such as needsStencil() that let the task set up the pass correctly. Concrete
+ * pipeline-binding strategies live in subclasses — StandardDrawOp handles the common
  * "framework binds a single pipeline, subclass issues one draw call" pattern; ops that manage
- * their own pipelines inherit from DrawOp directly and implement execute() themselves.
+ * their own pipelines (e.g. StencilCoverPathDrawOp with its stencil + cover passes) inherit
+ * from DrawOp directly and implement execute() themselves.
  */
 class DrawOp {
  public:
-  using ColorProcessorList = std::vector<PlacementPtr<FragmentProcessor>>;
-
   enum class Type {
     RectDrawOp,
     RRectDrawOp,
@@ -51,9 +47,10 @@ class DrawOp {
     HairlineLineOp,
     HairlineQuadOp,
     ShapeInstancedDrawOp,
+    StencilCoverPathDrawOp,
   };
 
-  virtual ~DrawOp();
+  virtual ~DrawOp() = default;
 
   void setScissorRect(const Rect& rect) {
     scissorRect = rect;
@@ -63,19 +60,12 @@ class DrawOp {
     blendMode = mode;
   }
 
-  void setXferProcessor(PlacementPtr<XferProcessor> processor) {
-    xferProcessor = std::move(processor);
-  }
-
   void setCullMode(CullMode mode) {
     cullMode = mode;
   }
 
-  /// Declares the destination texture the draw's shader-side blend formula samples. A present
-  /// value with an empty proxy selects the backend's framebuffer fetch; an absent value means the
-  /// fixed-function blend (or Src) writes the output, no shader xfer stage.
-  void setDstTexture(DstTextureInfo dstTexture) {
-    this->dstTexture = std::move(dstTexture);
+  void setXferProcessor(PlacementPtr<XferProcessor> processor) {
+    xferProcessor = std::move(processor);
   }
 
   void addColorFP(PlacementPtr<FragmentProcessor> colorProcessor) {
@@ -86,30 +76,38 @@ class DrawOp {
     coverages.emplace_back(std::move(coverageProcessor));
   }
 
-  std::vector<PlacementPtr<FragmentProcessor>>& colorProcessors() {
-    return colors;
-  }
-
-  std::vector<PlacementPtr<FragmentProcessor>>& coverageProcessors() {
-    return coverages;
-  }
-
-  /**
-   * Whether the draw produces fractional coverage from any source: its coverage processors, or its
-   * geometry processor (analytic AA edges, glyph masks, per-vertex coverage). Decides whether the
-   * blend needs a dst texture.
-   */
   virtual bool hasCoverage() const {
     return !coverages.empty();
   }
 
   /**
-   * Whether the draw carries coverage processors (clip or mask coverage FPs). Coverage produced by
-   * the geometry processor does not count: it stays inside the geometry processor whatever color
-   * processors the AOT route puts on the draw.
+   * Returns true when the op needs a depth/stencil attachment to be present on the render
+   * pass. OpsRenderTask scans the op list with this hook before beginning the pass and attaches
+   * a stencil texture when at least one op opts in. Default is false so existing draw ops keep
+   * running without a stencil buffer.
    */
-  bool hasCoverageProcessors() const {
-    return !coverages.empty();
+  virtual bool needsStencil() const {
+    return false;
+  }
+
+  /**
+   * Returns the device-space region this op will write to the stencil buffer, so the pass can
+   * scope the initial stencil clear to just that area. The returned rect is in canvas top-left
+   * device space (the same space viewMatrix maps into and Path::getBounds reports in);
+   * OpsRenderTask joins these rects across the pass and applies the render target's origin
+   * transform once before handing them to the backend as clearScissor. Return values:
+   *   - std::nullopt: this op has not declared its stencil-write extent (default). The pass
+   *     conservatively falls back to a full-attachment clear whenever any stencil op returns
+   *     nullopt, since a partial clear could leave stale stencil values wherever the op
+   *     might touch.
+   *   - An empty rect: this op is known to write no stencil (e.g. its cover region was fully
+   *     clipped out). Contributes nothing to the clear union.
+   *   - A non-empty rect: the exact device-space footprint of the op's stencil writes.
+   * Ops that write to stencil (e.g. StencilCoverPathDrawOp) must override this to return an
+   * accurate rect so the clear stays tight. Only meaningful when needsStencil() returns true.
+   */
+  virtual std::optional<Rect> getStencilResolveBounds() const {
+    return std::nullopt;
   }
 
   /**
@@ -120,22 +118,18 @@ class DrawOp {
    */
   virtual void execute(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
 
-  virtual Type type() const = 0;
-
  protected:
   BlockAllocator* allocator = nullptr;
   AAType aaType = AAType::None;
   Rect scissorRect = {};
   std::vector<PlacementPtr<FragmentProcessor>> colors = {};
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
-  /// The draw's destination texture (present but empty = framebuffer fetch; absent = no shader
-  /// xfer stage); see setDstTexture.
-  std::optional<DstTextureInfo> dstTexture = std::nullopt;
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;
 
-  DrawOp(BlockAllocator* allocator, AAType aaType);
+  DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
+  }
 
   /**
    * Applies the op's scissor rectangle to the render pass. An empty scissor expands to the
@@ -147,9 +141,6 @@ class DrawOp {
    */
   void applyScissor(RenderPass* renderPass, RenderTarget* renderTarget) const;
 
- private:
-  // The record-time route's private levers (AOTRouter): the lowering and the in-place pass
-  // annotation belong to that route alone, so nothing else drives them out of order.
-  friend class AOTRouter;
+  virtual Type type() = 0;
 };
 }  // namespace tgfx

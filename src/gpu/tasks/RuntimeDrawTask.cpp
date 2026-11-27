@@ -18,20 +18,18 @@
 
 #include "RuntimeDrawTask.h"
 #include "core/utils/ColorSpaceHelper.h"
-#include "gpu/ContextInternal.h"
 #include "gpu/Program.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/QuadsVertexProvider.h"
-#include "gpu/ir/GeometryLayout.h"
+#include "gpu/Quad.h"
+#include "gpu/RectsVertexProvider.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
-#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
-
 RuntimeDrawTask::RuntimeDrawTask(BlockAllocator* allocator,
                                  std::shared_ptr<RenderTargetProxy> target,
                                  std::vector<RuntimeInputTexture> inputs,
@@ -44,11 +42,7 @@ RuntimeDrawTask::RuntimeDrawTask(BlockAllocator* allocator,
     auto textureProxy = input.textureProxy;
     if (textureProxy != nullptr) {
       auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
-      // The flatten draw is a QuadPerEdgeAA quad, the geometry the texture families accept (a YUV
-      // leaf has no other layout): the provider writes the position, coverage and color slots, the
-      // white color rides the common-color uniform.
-      auto maskVertexProvider =
-          QuadsVertexProvider::MakeFrom(allocator, maskRect, AAType::None, Color::White());
+      auto maskVertexProvider = RectsVertexProvider::MakeFrom(allocator, maskRect, AAType::None);
       auto maskBuffer = context->proxyProvider()->createVertexBufferProxy(
           std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
       inputVertexBuffers.push_back(std::move(maskBuffer));
@@ -135,46 +129,18 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     colorProcessor =
         FragmentProcessor::Compose(allocator, std::move(colorProcessor), std::move(xformEffect));
   }
-  auto geometryLayout = QuadGeometryLayoutOf(renderTarget->width(), renderTarget->height(),
-                                             AAType::None, PMColor::White(), Matrix::I(), false);
-  // The FP-tree route assembles the same flatten draw from the processor tree (the geometry
-  // processor, the color processor, no xfer) and lets the runtime emission build the program;
-  // the precompiled route keeps the IR-based flow below.
-  const bool fpTreeRoute = FPRecordingEnabled(context);
-  std::shared_ptr<Program> program = nullptr;
-  std::unique_ptr<ProgramInfo> programInfo = nullptr;
-  // The geometry processor outlives the program use below (setUniformsAndSamplers reads the tree
-  // again for the upload), so it is held for the whole function scope.
-  PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
-  if (fpTreeRoute) {
-    // The provider writes position-only vertices for a single white quad (no per-vertex UV or
-    // color), so the processor must not declare the uv attribute: an identity matrix keeps the
-    // transform built into the shader and the declared stride equal to the buffer's.
-    geometryProcessor =
-        QuadPerEdgeAAGeometryProcessor::Make(allocator, static_cast<int>(renderTarget->width()),
-                                             static_cast<int>(renderTarget->height()), AAType::None,
-                                             PMColor::White(), Matrix::I(), false);
-    if (geometryProcessor == nullptr) {
-      return nullptr;
-    }
-    std::vector<FragmentProcessor*> fragmentProcessors = {colorProcessor.get()};
-    programInfo =
-        std::make_unique<ProgramInfo>(renderTarget.get(), geometryProcessor.get(),
-                                      std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);
-    program = programInfo->getProgram();
-  } else {
-    LOGE("RuntimeDrawTask::GetFlatTextureView() the IR route is retired");
-    return nullptr;
-  }
+  auto geometryProcessor = DefaultGeometryProcessor::Make(
+      allocator, {}, renderTarget->width(), renderTarget->height(), AAType::None, {}, {});
+  std::vector fragmentProcessors = {colorProcessor.get()};
+  ProgramInfo programInfo(renderTarget.get(), geometryProcessor.get(),
+                          std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);
+  auto program = programInfo.getProgram();
   if (program == nullptr) {
     LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to get the program!");
     return nullptr;
   }
   renderPass->setPipeline(program->getPipeline());
-  if (!programInfo->setUniformsAndSamplers(renderPass.get(), program.get())) {
-    renderPass->end();
-    return nullptr;
-  }
+  programInfo.setUniformsAndSamplers(renderPass.get(), program.get());
   renderPass->setVertexBuffer(0, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 4);
   renderPass->end();

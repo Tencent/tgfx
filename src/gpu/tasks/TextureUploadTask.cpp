@@ -26,10 +26,6 @@ TextureUploadTask::TextureUploadTask(std::shared_ptr<ResourceProxy> proxy,
     : ResourceTask(std::move(proxy)), source(std::move(source)), mipmapped(mipmapped) {
 }
 
-bool TextureUploadTask::execute(Context* context) {
-  return ResourceTask::execute(context);
-}
-
 std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
   if (source == nullptr) {
     return nullptr;

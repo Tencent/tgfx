@@ -61,19 +61,9 @@ AtlasTextOp::AtlasTextOp(BlockAllocator* allocator, RectsVertexProvider* provide
   }
 }
 
-std::optional<GeometryLayout> AtlasTextOp::onMakeGeometry(RenderTarget* /*renderTarget*/) {
-  const bool alphaOnly = textureProxy != nullptr && textureProxy->isAlphaOnly();
-  return AtlasTextGeometryLayout(textureProxy, aaType, commonColor, alphaOnly, sampling);
-}
-
 PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarget*) {
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
   return AtlasTextGeometryProcessor::Make(allocator, textureProxy, aaType, commonColor, sampling);
 }
-
-
 
 void AtlasTextOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   std::shared_ptr<BufferResource> indexBuffer = nullptr;

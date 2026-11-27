@@ -19,14 +19,11 @@
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
-#include "gpu/ContextInternal.h"
-#include "gpu/precompiled/PrecompiledShaderCache.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
-#include "gpu/tasks/TextureCopyTask.h"
 #include "tasks/TransferPixelsTask.h"
 #include "tgfx/gpu/Window.h"
 
@@ -60,69 +57,25 @@ void DrawingManager::collectFrameUsage(std::shared_ptr<RenderTargetProxy> render
   drawingBuffer->windowUsages.push_back(std::move(renderTarget));
 }
 
-PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                                    PlacementPtr<FragmentProcessor> processor,
-                                                    uint32_t renderFlags, const Point& coordOffset,
-                                                    float inputAlpha) {
-  if (renderTarget == nullptr) {
-    return nullptr;
-  }
-  // A null processor is only passed by the plan-pass overload above, which attaches the pass IR
-  // in place of a color processor.
-  auto allocator = drawingAllocator();
-  auto width = static_cast<float>(renderTarget->width());
-  auto height = static_cast<float>(renderTarget->height());
-  PlacementPtr<RectsVertexProvider> provider = nullptr;
-  if (coordOffset.x == 0.0f && coordOffset.y == 0.0f && inputAlpha == 1.0f) {
-    auto bounds = Rect::MakeWH(width, height);
-    // The single-rect MakeFrom leaves the vertex color at Color()'s transparent default. The IR
-    // route modulates a texture read through the input color, so an opaque white is required to
-    // keep the fill equivalent to the text route, which never modulates here.
-    auto record = allocator->make<RectRecord>(bounds, Matrix::I(), Color(1, 1, 1, 1));
-    auto rects = std::vector<PlacementPtr<RectRecord>>();
-    rects.push_back(std::move(record));
-    provider = RectsVertexProvider::MakeFrom(allocator, std::move(rects), {}, {}, AAType::None,
-                                             false, UVSubsetMode::None, {});
-  } else {
-    auto rect = Rect::MakeXYWH(coordOffset.x, coordOffset.y, width, height);
-    auto viewMatrix = Matrix::MakeTrans(-coordOffset.x, -coordOffset.y);
-    // The first split-off pass must see the original draw's input alpha before its pointwise
-    // operators run. For later passes this remains 1: their texture leaf is unmodulated.
-    auto record = allocator->make<RectRecord>(rect, viewMatrix, Color(1, 1, 1, inputAlpha));
-    auto rects = std::vector<PlacementPtr<RectRecord>>();
-    rects.push_back(std::move(record));
-    provider = RectsVertexProvider::MakeFrom(allocator, std::move(rects), {}, {}, AAType::None,
-                                             false, UVSubsetMode::None, {});
-  }
-  if (provider == nullptr) {
-    return nullptr;
-  }
-  PlacementPtr<DrawOp> drawOp =
-      RectDrawOp::Make(renderTarget->getContext(), std::move(provider), renderFlags);
-  if (drawOp == nullptr) {
-    return nullptr;
-  }
-  if (processor != nullptr) {
-    drawOp->addColorFP(std::move(processor));
-  }
-  drawOp->setBlendMode(BlendMode::Src);
-  return drawOp;
-}
-
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                  PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
-                                  const Point& coordOffset) {
-  auto drawOp = makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset);
-  if (drawOp == nullptr) {
+                                  PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags) {
+  if (renderTarget == nullptr || processor == nullptr) {
     return false;
   }
-  // The record-time AOT route's one entry (see AOTRouter::route): the fill's IR is unconditional
-  // and a plan task takes ownership of the draw op on success, so the fill must stop there —
-  // falling through to the plain branch would submit a null op. An offscreen fill owns a fresh
-  // target, so the task clears its full backing first and a shader-side sample cannot observe
-  // pixels left by an earlier scratch allocation. A single-pass chain-capable plan needs no task:
-  // the fill's RectDrawOp is a StandardDrawOp, so the plain lookup serves it at prepare time.
-  auto allocator = drawingAllocator();
+  auto drawingBuffer = getDrawingBuffer();
+  auto allocator = &drawingBuffer->drawingAllocator;
+  auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
+  // The single-rect MakeFrom leaves the vertex color at Color()'s transparent default. The IR
+  // route modulates a texture read through the input color, so an opaque white is required to
+  // keep the fill equivalent to the text route, which never modulates here.
+  auto record = allocator->make<RectRecord>(bounds, Matrix::I(), Color(1, 1, 1, 1));
+  auto rects = std::vector<PlacementPtr<RectRecord>>();
+  rects.push_back(std::move(record));
+  auto provider = RectsVertexProvider::MakeFrom(allocator, std::move(rects), {}, {}, AAType::None,
+                                                false, UVSubsetMode::None, {});
+  auto drawOp = RectDrawOp::Make(renderTarget->getContext(), std::move(provider), renderFlags);
+  drawOp->addColorFP(std::move(processor));
+  drawOp->setBlendMode(BlendMode::Src);
   auto drawOps = allocator->makeArray<DrawOp>(&drawOp, 1);
   auto textureProxy = renderTarget->asTextureProxy();
   std::optional<PMColor> clearColor = std::nullopt;
@@ -134,7 +87,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   }
   auto task = allocator->make<OpsRenderTask>(allocator, std::move(renderTarget), std::move(drawOps),
                                              clearColor);
-  addRenderTask(std::move(task));
+  drawingBuffer->renderTasks.emplace_back(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
   return true;
 }
@@ -203,17 +156,6 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   drawingBuffer->renderTasks.emplace_back(std::move(task));
 }
 
-void DrawingManager::addTextureCopyTask(std::shared_ptr<TextureProxy> source,
-                                        std::shared_ptr<TextureProxy> dest) {
-  if (source == nullptr || dest == nullptr) {
-    return;
-  }
-  auto drawingBuffer = getDrawingBuffer();
-  auto allocator = &drawingBuffer->drawingAllocator;
-  auto task = allocator->make<TextureCopyTask>(allocator, std::move(source), std::move(dest));
-  drawingBuffer->renderTasks.emplace_back(std::move(task));
-}
-
 void DrawingManager::addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> source,
                                            const Rect& srcRect,
                                            std::shared_ptr<GPUBufferProxy> dest) {
@@ -225,14 +167,6 @@ void DrawingManager::addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> so
   auto task =
       allocator->make<TransferPixelsTask>(allocator, std::move(source), srcRect, std::move(dest));
   drawingBuffer->renderTasks.emplace_back(std::move(task));
-}
-
-void DrawingManager::addRenderTask(PlacementPtr<RenderTask> renderTask) {
-  if (renderTask == nullptr) {
-    return;
-  }
-  auto drawingBuffer = getDrawingBuffer();
-  drawingBuffer->renderTasks.emplace_back(std::move(renderTask));
 }
 
 void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
@@ -368,19 +302,8 @@ bool DrawingManager::hasPendingPresentation(
 }
 
 std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
-  if (currentBuffer == nullptr && compositors.empty()) {
-    return nullptr;
-  }
   if (currentBuffer == nullptr) {
-    createDrawingBuffer();
-  }
-  // Settle the simultaneously-live materialized bytes before the recorded draws execute: the
-  // offscreen textures built during this flush cycle (blend-child flattens, plan intermediates)
-  // coexist until their consumers run, so the running total at this point is the cycle's
-  // peak-live footprint. Diagnostic-only, and never influences routing.
-  if (auto* statsCache = ContextCacheAccess::Cache(context);
-      statsCache != nullptr && statsCache->diagnosticRecordingEnabled()) {
-    statsCache->settleActiveTemporaryBytes();
+    return nullptr;
   }
   while (!compositors.empty()) {
     auto compositor = compositors.back();

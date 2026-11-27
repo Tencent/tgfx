@@ -19,6 +19,7 @@
 #include "StandardDrawOp.h"
 #include "core/utils/Log.h"
 #include "gpu/Program.h"
+#include "gpu/processors/GeometryProcessor.h"
 
 namespace tgfx {
 void StandardDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {

@@ -28,7 +28,7 @@ namespace tgfx {
 
 class HairlineLineOp final : public StandardDrawOp {
  public:
-  // LineVertex = Point(2 floats) + coverage(1 float) + white color filler(1 float) = 16 bytes
+  // LineVertex = Point(2 floats) + coverage(1 float) = 12 bytes
   static constexpr size_t BytesPerLineVertex = 12;
   static constexpr size_t VerticesPerLine = 6;
   static constexpr size_t IndicesPerLine = 18;
@@ -39,15 +39,13 @@ class HairlineLineOp final : public StandardDrawOp {
                                            AAType aaType);
 
  protected:
-  std::optional<GeometryLayout> onMakeGeometry(RenderTarget* renderTarget) override;
-
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
   bool onPrepare() override;
 
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
-  Type type() const override {
+  Type type() override {
     return Type::HairlineLineOp;
   }
 

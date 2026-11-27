@@ -27,8 +27,6 @@ class TextureUploadTask : public ResourceTask {
   TextureUploadTask(std::shared_ptr<ResourceProxy> proxy,
                     std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped);
 
-  bool execute(Context* context) override;
-
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:

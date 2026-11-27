@@ -79,21 +79,11 @@ class RectDrawOp : public StandardDrawOp {
                                        uint32_t renderFlags);
 
  protected:
-  std::optional<GeometryLayout> onMakeGeometry(RenderTarget* renderTarget) override;
-
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
-  std::optional<PMColor> uniformGeometryColor() const override {
-    return commonColor;
-  }
-
-  std::optional<Matrix> deviceToLocalMatrix() const override {
-    return deviceToLocal;
-  }
-
-  Type type() const override {
+  Type type() override {
     return Type::RectDrawOp;
   }
 
@@ -102,7 +92,6 @@ class RectDrawOp : public StandardDrawOp {
   std::optional<LineJoin> lineJoin = std::nullopt;
   std::optional<PMColor> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
-  std::optional<Matrix> deviceToLocal = std::nullopt;
   bool hasSubset = false;
   std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<VertexBufferView> vertexBufferProxyView = nullptr;

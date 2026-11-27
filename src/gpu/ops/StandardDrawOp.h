@@ -20,9 +20,6 @@
 
 #include "DrawOp.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/ir/GeometryLayout.h"
-#include "gpu/processors/GeometryProcessor.h"
-#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 /**
@@ -70,19 +67,6 @@ class StandardDrawOp : public DrawOp {
    * Builds the geometry processor that drives this op's pipeline. Called once per execute().
    */
   virtual PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) = 0;
-  // Compatibility shim: feature subclasses override this AOT-expression hook. The main body
-  // never calls it, so a default nullopt keeps them compiling while the retired route stays dead.
-  virtual std::optional<GeometryLayout> onMakeGeometry(RenderTarget* /*renderTarget*/) {
-    return std::nullopt;
-  }
-
-  virtual std::optional<PMColor> uniformGeometryColor() const {
-    return std::nullopt;
-  }
-
-  virtual std::optional<Matrix> deviceToLocalMatrix() const {
-    return std::nullopt;
-  }
 
   /**
    * Hook invoked right before the ProgramInfo is materialised, giving the op a chance to

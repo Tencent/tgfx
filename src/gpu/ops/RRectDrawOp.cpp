@@ -64,15 +64,6 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
   }
 }
 
-std::optional<GeometryLayout> RRectDrawOp::onMakeGeometry(RenderTarget* /*renderTarget*/) {
-  if (aaType == AAType::None) {
-    return isComplex ? ComplexNonAARRectGeometryLayout(hasStroke, commonColor)
-                     : NonAARRectGeometryLayout(hasStroke, commonColor);
-  }
-  return isComplex ? ComplexEllipseGeometryLayout(hasStroke, commonColor)
-                   : EllipseGeometryLayout(hasStroke, commonColor);
-}
-
 PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
   if (aaType == AAType::None) {
     if (isComplex) {

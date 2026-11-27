@@ -37,16 +37,7 @@ MeshDrawOp::MeshDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUMeshProxy> 
       meshProxy(std::move(meshProxy)), color(color), viewMatrix(viewMatrix) {
 }
 
-std::optional<GeometryLayout> MeshDrawOp::onMakeGeometry(RenderTarget* /*renderTarget*/) {
-  const auto& attrs = meshProxy->attributes();
-  return MeshGeometryLayout(attrs.hasTexCoords, attrs.hasColors, attrs.hasCoverage, color,
-                            viewMatrix);
-}
-
 PlacementPtr<GeometryProcessor> MeshDrawOp::onMakeGeometryProcessor(RenderTarget*) {
-  if (meshProxy == nullptr) {
-    return nullptr;
-  }
   const auto& attrs = meshProxy->attributes();
   return MeshGeometryProcessor::Make(allocator, attrs.hasTexCoords, attrs.hasColors,
                                      attrs.hasCoverage, color, viewMatrix);

@@ -27,6 +27,7 @@
 #include "gpu/proxies/GPUMeshProxy.h"
 #include "gpu/proxies/GPUShapeProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/proxies/StencilCoverPathProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/proxies/VertexBufferView.h"
 #include "tgfx/core/ImageGenerator.h"
@@ -88,6 +89,16 @@ class ProxyProvider {
                                                      uint32_t renderFlags = 0);
 
   /**
+   * Creates a StencilCoverPathProxy for the given Shape. The shape's geometry is
+   * decomposed into a bezier vertex stream by StencilCoverPathTessellator in the background and
+   * uploaded to a vertex buffer. The cache key is derived from the shape geometry alone, so
+   * different draws of the same shape that only differ in transform or color hit the same GPU
+   * resource.
+   */
+  std::shared_ptr<StencilCoverPathProxy> createStencilCoverPathProxy(std::shared_ptr<Shape> shape,
+                                                                     uint32_t renderFlags = 0);
+
+  /**
    * Creates a GPUHairlineProxy for the given Path. The hairline vertex data will be generated
    * in a background thread and uploaded to the GPU.
    */
@@ -139,14 +150,9 @@ class ProxyProvider {
    */
   std::shared_ptr<TextureProxy> createTextureProxy(HardwareBufferRef hardwareBuffer);
 
-  /** Wraps an existing view while retaining its resource and requiring the same context. */
-  std::shared_ptr<TextureProxy> wrapTextureView(std::shared_ptr<TextureView> textureView);
-
   /**
    * Creates a texture proxy for the provided BackendTexture. If adopted is true, the backend
-   * texture will be destroyed at a later point after the texture proxy is released. A desktop GL
-   * rectangle texture is copied into a new 2D texture (with renderable formats), and the returned
-   * proxy is that copy.
+   * texture will be destroyed at a later point after the texture proxy is released.
    */
   std::shared_ptr<TextureProxy> wrapExternalTexture(const BackendTexture& backendTexture,
                                                     ImageOrigin origin = ImageOrigin::TopLeft,

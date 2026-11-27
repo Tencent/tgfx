@@ -22,6 +22,7 @@
 #include "core/ShapeMesh.h"
 #include "core/ShapeRasterizer.h"
 #include "core/ShapeVertexSource.h"
+#include "core/StencilCoverPathTessellator.h"
 #include "core/utils/HardwareBufferUtil.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/USE.h"
@@ -30,12 +31,14 @@
 #include "gpu/proxies/DefaultTextureProxy.h"
 #include "gpu/proxies/ExternalTextureRenderTargetProxy.h"
 #include "gpu/proxies/HardwareRenderTargetProxy.h"
+#include "gpu/proxies/StencilCoverPathProxy.h"
 #include "gpu/proxies/TextureRenderTargetProxy.h"
 #include "gpu/tasks/GPUBufferUploadTask.h"
 #include "gpu/tasks/HairlineBufferUploadTask.h"
 #include "gpu/tasks/MeshBufferUploadTask.h"
 #include "gpu/tasks/ReadbackBufferCreateTask.h"
 #include "gpu/tasks/ShapeBufferUploadTask.h"
+#include "gpu/tasks/StencilCoverPathUploadTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
 #include "proxies/HardwareTextureProxy.h"
 #include "tgfx/core/RenderFlags.h"
@@ -274,6 +277,41 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
   return std::make_shared<GPUShapeProxy>(drawingMatrix, triangleProxy, textureProxy);
 }
 
+std::shared_ptr<StencilCoverPathProxy> ProxyProvider::createStencilCoverPathProxy(
+    std::shared_ptr<Shape> shape, uint32_t renderFlags) {
+  if (shape == nullptr) {
+    return nullptr;
+  }
+  // Bezier rasterization geometry is independent of the render target size, transform and color,
+  // so the cache key only mixes the shape's geometry with a dedicated marker. This is what allows
+  // future instanced batching to share a single GPU buffer across draws of the same shape.
+  static const auto StencilCoverPathGeometryType = UniqueID::Next();
+  auto vertexKey = UniqueKey::Append(shape->getUniqueKey(), &StencilCoverPathGeometryType, 1);
+  if (auto cached = findOrWrapGPUBufferProxy(vertexKey)) {
+    return std::make_shared<StencilCoverPathProxy>(std::move(cached));
+  }
+  auto rasterizer = std::make_unique<StencilCoverPathTessellator>(std::move(shape));
+  std::unique_ptr<DataSource<StencilCoverVertexData>> dataSource = nullptr;
+#ifdef TGFX_USE_THREADS
+  if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
+    dataSource = DataSource<StencilCoverVertexData>::Async(std::move(rasterizer));
+  } else {
+    dataSource = std::move(rasterizer);
+  }
+#else
+  dataSource = std::move(rasterizer);
+#endif
+  auto vertexProxy = std::shared_ptr<GPUBufferProxy>(new GPUBufferProxy());
+  addResourceProxy(vertexProxy, vertexKey);
+  if (!(renderFlags & RenderFlags::DisableCache)) {
+    vertexProxy->uniqueKey = vertexKey;
+  }
+  auto task = context->drawingAllocator()->make<StencilCoverPathUploadTask>(vertexProxy,
+                                                                            std::move(dataSource));
+  context->drawingManager()->addResourceTask(std::move(task));
+  return std::make_shared<StencilCoverPathProxy>(std::move(vertexProxy));
+}
+
 std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(
     std::shared_ptr<Mesh> mesh, uint32_t renderFlags, std::shared_ptr<ColorSpace> dstColorSpace) {
   if (mesh == nullptr) {
@@ -427,8 +465,6 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   auto width = imageBuffer->width();
   auto height = imageBuffer->height();
   auto alphaOnly = imageBuffer->isAlphaOnly();
-  // The buffer is still alive here, so its YUV-ness is known exactly, unlike generator-backed
-  // sources whose decode result only exists after the upload task runs.
   auto source = ImageSource::Wrap(std::move(imageBuffer));
   return createTextureProxyByImageSource(std::move(source), width, height, alphaOnly, mipmapped);
 }
@@ -521,35 +557,8 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(HardwareBufferRe
 
 std::shared_ptr<TextureProxy> ProxyProvider::wrapExternalTexture(
     const BackendTexture& backendTexture, ImageOrigin origin, bool adopted) {
-  auto proxy = wrapTextureView(TextureView::MakeFrom(context, backendTexture, origin, adopted));
-  if (proxy == nullptr) {
-    return nullptr;
-  }
-  auto texture = proxy->getTextureView()->getTexture();
-  if (texture->type() != TextureType::Rectangle) {
-    return proxy;
-  }
-  // A desktop GL rectangle texture has its own sampler type, which the precompiled kernels do not
-  // declare. Copy it once into a plain 2D texture and hand that out instead, as CGLHardwareTexture
-  // does for imported pixel buffers. One copy is enough: the caller must keep the texture
-  // unchanged for the lifetime of the image (Image::MakeFrom). The copy reads the source through a
-  // framebuffer, so a format that cannot be rendered keeps the rectangle texture.
-  if (!context->gpu()->isFormatRenderable(texture->format())) {
-    return proxy;
-  }
-  auto copy = createTextureProxy({}, proxy->width(), proxy->height(), texture->format(), false,
-                                 proxy->origin());
-  if (copy == nullptr) {
-    return proxy;
-  }
-  context->drawingManager()->addTextureCopyTask(std::move(proxy), copy);
-  return copy;
-}
-
-std::shared_ptr<TextureProxy> ProxyProvider::wrapTextureView(
-    std::shared_ptr<TextureView> textureView) {
-  if (textureView == nullptr || textureView->getContext() != context ||
-      textureView->getTexture() == nullptr) {
+  auto textureView = TextureView::MakeFrom(context, backendTexture, origin, adopted);
+  if (textureView == nullptr) {
     return nullptr;
   }
   auto format = textureView->getTexture()->format();

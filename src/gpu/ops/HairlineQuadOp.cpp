@@ -47,18 +47,8 @@ HairlineQuadOp::HairlineQuadOp(BlockAllocator* allocator,
       coverage(coverage) {
 }
 
-std::optional<GeometryLayout> HairlineQuadOp::onMakeGeometry(RenderTarget* /*renderTarget*/) {
-  auto viewMatrix = hairlineProxy->getDrawingMatrix();
-  auto realUVMatrix = uvMatrix;
-  realUVMatrix.preConcat(viewMatrix);
-  return HairlineQuadGeometryLayout(color, viewMatrix, realUVMatrix, coverage, aaType);
-}
-
 PlacementPtr<GeometryProcessor> HairlineQuadOp::onMakeGeometryProcessor(
     RenderTarget* /*renderTarget*/) {
-  if (hairlineProxy == nullptr) {
-    return nullptr;
-  }
   auto viewMatrix = hairlineProxy->getDrawingMatrix();
   auto realUVMatrix = uvMatrix;
   realUVMatrix.preConcat(viewMatrix);

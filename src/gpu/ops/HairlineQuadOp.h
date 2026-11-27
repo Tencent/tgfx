@@ -39,15 +39,13 @@ class HairlineQuadOp final : public StandardDrawOp {
                                            AAType aaType);
 
  protected:
-  std::optional<GeometryLayout> onMakeGeometry(RenderTarget* renderTarget) override;
-
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
   bool onPrepare() override;
 
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
-  Type type() const override {
+  Type type() override {
     return Type::HairlineQuadOp;
   }
 

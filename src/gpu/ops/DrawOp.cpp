@@ -9,10 +9,10 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the License for the specific language governing permissions
-//  and limitations under the License.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,11 +22,6 @@
 #include "gpu/OriginFlip.h"
 
 namespace tgfx {
-DrawOp::DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
-}
-
-DrawOp::~DrawOp() = default;
-
 void DrawOp::applyScissor(RenderPass* renderPass, RenderTarget* renderTarget) const {
   if (scissorRect.isEmpty()) {
     renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());

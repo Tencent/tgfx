@@ -53,8 +53,7 @@ std::shared_ptr<TextureProxy> TransformImage::lockTextureProxySubset(
   auto processor = FragmentProcessor::Make(source, fpArgs, samplingOptions, SrcRectConstraint::Fast,
                                            AddressOf(sourceMatrix));
   auto drawingManager = args.context->drawingManager();
-  if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags,
-                                    Point::Zero())) {
+  if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;
   }
   return renderTarget->asTextureProxy();
