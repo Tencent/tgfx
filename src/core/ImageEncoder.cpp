@@ -17,10 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageEncoder.h"
-#include <algorithm>
-#include <cstdlib>
-#include <cstring>
-#include <limits>
 #include <utility>
 #include "core/codecs/ScanlineEncoder.h"
 #include "tgfx/core/ColorSpace.h"
@@ -36,66 +32,8 @@
 
 namespace tgfx {
 
-namespace {
-class EncodedDataStream final : public WriteStream {
- public:
-  ~EncodedDataStream() override {
-    std::free(bytes);
-  }
-
-  bool write(const void* data, size_t size) override {
-    if (size == 0) {
-      return true;
-    }
-    if (size > std::numeric_limits<size_t>::max() - length) {
-      return false;
-    }
-    auto required = length + size;
-    if (required > capacity) {
-      auto growth = capacity + std::min(capacity, std::numeric_limits<size_t>::max() - capacity);
-      auto newCapacity = std::max(required, growth);
-      auto* allocation = static_cast<uint8_t*>(std::realloc(bytes, newCapacity));
-      if (!allocation && newCapacity > required) {
-        newCapacity = required;
-        allocation = static_cast<uint8_t*>(std::realloc(bytes, newCapacity));
-      }
-      if (!allocation) {
-        return false;
-      }
-      bytes = allocation;
-      capacity = newCapacity;
-    }
-    std::memcpy(bytes + length, data, size);
-    length = required;
-    return true;
-  }
-
-  size_t bytesWritten() const override {
-    return length;
-  }
-
-  void flush() override {
-  }
-
-  std::shared_ptr<Data> release() {
-    if (length < capacity) {
-      if (auto* trimmed = static_cast<uint8_t*>(std::realloc(bytes, length))) {
-        bytes = trimmed;
-      }
-    }
-    return Data::MakeAdopted(std::exchange(bytes, nullptr), length, Data::FreeProc);
-  }
-
- private:
-  uint8_t* bytes = nullptr;
-  size_t length = 0;
-  size_t capacity = 0;
-};
-}  // namespace
-
 std::unique_ptr<ScanlineEncoder> ScanlineEncoder::Make(WriteStream* stream, const ImageInfo& info,
-                                                       EncodedFormat format, int quality,
-                                                       bool optimizeJPEG) {
+                                                       EncodedFormat format, int quality) {
 #ifdef TGFX_USE_PNG_ENCODE
   if (format == EncodedFormat::PNG) {
     return PngCodec::MakeEncoder(stream, info);
@@ -103,11 +41,10 @@ std::unique_ptr<ScanlineEncoder> ScanlineEncoder::Make(WriteStream* stream, cons
 #endif
 #ifdef TGFX_USE_JPEG_ENCODE
   if (format == EncodedFormat::JPEG) {
-    return JpegCodec::MakeEncoder(stream, info, quality, optimizeJPEG);
+    return JpegCodec::MakeEncoder(stream, info, quality);
   }
 #else
   static_cast<void>(quality);
-  static_cast<void>(optimizeJPEG);
 #endif
 #if !defined(TGFX_USE_PNG_ENCODE) && !defined(TGFX_USE_JPEG_ENCODE)
   static_cast<void>(stream);
@@ -115,16 +52,6 @@ std::unique_ptr<ScanlineEncoder> ScanlineEncoder::Make(WriteStream* stream, cons
   static_cast<void>(format);
 #endif
   return nullptr;
-}
-
-std::shared_ptr<Data> ScanlineEncoder::Encode(const Pixmap& pixmap, EncodedFormat format,
-                                              int quality) {
-  EncodedDataStream stream;
-  auto encoder = Make(&stream, pixmap.info(), format, quality, true);
-  if (!encoder || !encoder->appendRows(pixmap) || !encoder->finish()) {
-    return nullptr;
-  }
-  return stream.release();
 }
 
 class ImageEncoder::Impl {
@@ -171,7 +98,7 @@ std::unique_ptr<ImageEncoder> ImageEncoder::Make(std::shared_ptr<WriteStream> de
       (format == EncodedFormat::JPEG && imageInfo.alphaType() != AlphaType::Opaque)) {
     return nullptr;
   }
-  auto encoder = ScanlineEncoder::Make(destination.get(), imageInfo, format, quality, false);
+  auto encoder = ScanlineEncoder::Make(destination.get(), imageInfo, format, quality);
   if (!encoder) {
     return nullptr;
   }

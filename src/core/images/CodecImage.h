@@ -46,10 +46,6 @@ class CodecImage : public GeneratorImage {
     return Type::Codec;
   }
 
-  std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
-
-  std::shared_ptr<ImageGenerator> getGeneratorForScale(float scale) const;
-
   float getRasterizedScale(float drawScale) const override;
 
   ISize getRasterizedSize(float scale) const override;

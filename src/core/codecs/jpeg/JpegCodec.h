@@ -31,8 +31,10 @@ class JpegCodec : public ImageCodec {
   static bool IsJpeg(const std::shared_ptr<Data>& data);
 
 #ifdef TGFX_USE_JPEG_ENCODE
+  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality);
+
   static std::unique_ptr<ScanlineEncoder> MakeEncoder(WriteStream* stream, const ImageInfo& info,
-                                                      int quality, bool optimizeCoding);
+                                                      int quality);
 #endif
 
   std::pair<int, int> getScaledDimensions(float scale) const override;

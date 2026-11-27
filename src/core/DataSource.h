@@ -65,19 +65,6 @@ class DataSource {
    * generate a new data.
    */
   virtual std::shared_ptr<T> getData() const = 0;
-
-  // Only asynchronous tasks and wrapped data can report readiness without evaluating getData().
-  virtual bool isAsynchronous() const {
-    return false;
-  }
-
-  virtual bool isReady() const {
-    return false;
-  }
-
-  virtual std::shared_ptr<T> tryGetData() const {
-    return nullptr;
-  }
 };
 
 /**
@@ -90,14 +77,6 @@ class DataWrapper : public DataSource<T> {
   }
 
   std::shared_ptr<T> getData() const override {
-    return data;
-  }
-
-  bool isReady() const override {
-    return true;
-  }
-
-  std::shared_ptr<T> tryGetData() const override {
     return data;
   }
 
@@ -148,19 +127,6 @@ class AsyncDataSource : public DataSource<T> {
 
   ~AsyncDataSource() override {
     task->cancel();
-  }
-
-  bool isAsynchronous() const override {
-    return true;
-  }
-
-  bool isReady() const override {
-    auto status = task->status();
-    return status == TaskStatus::Finished || status == TaskStatus::Canceled;
-  }
-
-  std::shared_ptr<T> tryGetData() const override {
-    return task->status() == TaskStatus::Finished ? task->getData() : nullptr;
   }
 
   std::shared_ptr<T> getData() const override {

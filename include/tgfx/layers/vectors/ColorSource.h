@@ -45,13 +45,6 @@ class ColorSource : public LayerProperty {
   virtual bool fitsToGeometry() const = 0;
 
   /**
-   * Returns true if this ColorSource paints with an ImagePattern.
-   */
-  bool isImagePattern() const {
-    return getType() == Type::ImagePattern;
-  }
-
-  /**
    * Returns the transformation matrix that maps the ColorSource's local coordinate space into the
    * given geometry bounding box. Only consulted when fitsToGeometry() returns true.
    * @param bounds The bounding box of the target geometry.

@@ -23,7 +23,6 @@
 
 namespace tgfx {
 
-class Data;
 class ImageInfo;
 class Pixmap;
 class WriteStream;
@@ -31,9 +30,7 @@ class WriteStream;
 class ScanlineEncoder {
  public:
   static std::unique_ptr<ScanlineEncoder> Make(WriteStream* stream, const ImageInfo& info,
-                                               EncodedFormat format, int quality,
-                                               bool optimizeJPEG);
-  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, EncodedFormat format, int quality);
+                                               EncodedFormat format, int quality);
 
   virtual ~ScanlineEncoder() = default;
   virtual bool appendRows(const Pixmap& band) = 0;

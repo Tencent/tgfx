@@ -34,6 +34,8 @@ class PngCodec : public ImageCodec {
   bool isAlphaOnly() const override;
 
 #ifdef TGFX_USE_PNG_ENCODE
+  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality);
+
   static std::unique_ptr<ScanlineEncoder> MakeEncoder(WriteStream* stream, const ImageInfo& info);
 #endif
 

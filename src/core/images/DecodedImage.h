@@ -28,8 +28,7 @@ namespace tgfx {
 class DecodedImage : public PixelImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator,
-                                         bool tryHardware, bool asyncDecoding, bool mipmapped,
-                                         ISize logicalSize = {});
+                                         bool tryHardware, bool asyncDecoding, bool mipmapped);
 
   int width() const override {
     return _width;
@@ -47,8 +46,6 @@ class DecodedImage : public PixelImage {
     return _colorSpace;
   }
 
-  DecodeStatus decodeStatus() const override;
-
  protected:
   Type type() const override {
     return Type::Decoded;
@@ -59,18 +56,13 @@ class DecodedImage : public PixelImage {
   std::shared_ptr<Image> onMakeMipmapped(bool mipmapped) const override;
 
  private:
-  ISize getRasterizedSize(float) const override {
-    return bufferSize;
-  }
-
-  ISize bufferSize = {};
   int _width = 0;
   int _height = 0;
   bool _alphaOnly = false;
   std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
 
-  DecodedImage(ISize bufferSize, ISize logicalSize, bool alphaOnly,
+  DecodedImage(int width, int height, bool alphaOnly,
                std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped,
                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 };

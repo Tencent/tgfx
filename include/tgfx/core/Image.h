@@ -235,18 +235,6 @@ class Image {
   }
 
   /**
-   * Progress of CPU decoding. Query the Image returned by makeDecoded(); querying the original
-   * Image does not start decoding. This method never waits for a decoding task. Images backed
-   * by a provider or picture report NotStarted when their child images are resolved at draw time.
-   * Decoding deferred until drawing also reports NotStarted.
-   */
-  enum class DecodeStatus { NotStarted, Decoding, Completed, Failed };
-
-  virtual DecodeStatus decodeStatus() const {
-    return isFullyDecoded() ? DecodeStatus::Completed : DecodeStatus::NotStarted;
-  }
-
-  /**
    * Returns an Image backed by a GPU texture associated with the given context. If a corresponding
    * texture cache exists in the context, it returns an Image that wraps that texture. Otherwise, it
    * creates one immediately. If the Image is already texture-backed and the context is compatible
@@ -264,10 +252,10 @@ class Image {
   virtual BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const;
 
   /**
-   * Prepares an Image for drawing. The returned Image shares the original's GPU cache. Decoding
-   * starts immediately when it can run asynchronously. Work that requires synchronous pixel
-   * downsampling on the main thread is deferred until drawing. If the Image is fully decoded
-   * or has a corresponding texture cache in the specified context, the original Image is returned.
+   * Returns a fully decoded Image from this Image. The returned Image shares the same GPU cache
+   * with the original Image and immediately schedules an asynchronous decoding task, which will not
+   * block the calling thread. If the Image is fully decoded or has a corresponding texture cache in
+   * the specified context, the original Image is returned.
    */
   std::shared_ptr<Image> makeDecoded(Context* context = nullptr) const;
 

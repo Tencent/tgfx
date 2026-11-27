@@ -61,28 +61,6 @@ static void PngReaderReadData(png_structp png_ptr, png_bytep data, png_size_t le
   reader->cursor += avail;
 }
 
-static void PngWarning(png_structp, png_const_charp message) {
-#ifdef __EMSCRIPTEN_PTHREADS__
-  if (!emscripten_is_main_runtime_thread()) {
-    // Worker stdio is synchronously proxied. Log directly from the worker.
-    emscripten_console_warn(message);
-    return;
-  }
-#endif
-  fprintf(stderr, "libpng warning: %s\n", message);
-}
-
-static void PngError(png_structp png, png_const_charp message) {
-#ifdef __EMSCRIPTEN_PTHREADS__
-  if (!emscripten_is_main_runtime_thread()) {
-    emscripten_console_error(message);
-    png_longjmp(png, 1);
-  }
-#endif
-  fprintf(stderr, "libpng error: %s\n", message);
-  png_longjmp(png, 1);
-}
-
 class ReadInfo {
  public:
   static std::shared_ptr<ReadInfo> Make(const std::string& filePath,
@@ -98,7 +76,6 @@ class ReadInfo {
     if (readInfo->p == nullptr) {
       return nullptr;
     }
-    png_set_error_fn(readInfo->p, nullptr, PngError, PngWarning);
     readInfo->pi = png_create_info_struct(readInfo->p);
     if (readInfo->pi == nullptr) {
       return nullptr;
@@ -379,7 +356,132 @@ std::shared_ptr<Data> PngCodec::getEncodedData() const {
 }
 
 #ifdef TGFX_USE_PNG_ENCODE
+struct PngWriter {
+  unsigned char* data = nullptr;
+  size_t length = 0;
+};
+
+static void png_reader_write_data(png_structp png_ptr, png_bytep data, png_size_t length) {
+  auto writer = static_cast<PngWriter*>(png_get_io_ptr(png_ptr));
+  size_t nsize = writer->length + length;
+  if (writer->data) {
+    writer->data = static_cast<unsigned char*>(realloc(writer->data, nsize));
+  } else {
+    writer->data = static_cast<unsigned char*>(malloc(nsize));
+  }
+  memcpy(writer->data + writer->length, data, length);
+  writer->length += length;
+}
+
+std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int) {
+  auto srcPixels = static_cast<png_bytep>(const_cast<void*>((pixmap.pixels())));
+  auto srcRowBytes = static_cast<int>(pixmap.rowBytes());
+  uint8_t* alphaPixels = nullptr;
+  Buffer tempBuffer;
+  if (pixmap.colorType() == ColorType::ALPHA_8) {
+    tempBuffer.alloc(static_cast<size_t>(pixmap.width()) * 2);
+    alphaPixels = tempBuffer.bytes();
+    srcRowBytes = static_cast<int>(tempBuffer.size());
+  } else if (pixmap.colorType() != ColorType::RGBA_8888 ||
+             pixmap.alphaType() == AlphaType::Premultiplied) {
+    auto dstInfo = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888,
+                                   AlphaType::Unpremultiplied, 0, pixmap.colorSpace());
+    tempBuffer.alloc(dstInfo.byteSize());
+    if (!pixmap.readPixels(dstInfo, tempBuffer.data())) {
+      return nullptr;
+    }
+    srcPixels = tempBuffer.bytes();
+    srcRowBytes = static_cast<int>(dstInfo.rowBytes());
+  }
+  PngWriter pngWriter;
+  png_structp png_ptr = nullptr;
+  png_infop info_ptr = nullptr;
+  png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+  bool encodeSuccess = false;
+  do {
+    if (png_ptr == nullptr) {
+      break;
+    }
+    info_ptr = png_create_info_struct(png_ptr);
+    if (info_ptr == nullptr) {
+      break;
+    }
+    if (setjmp(png_jmpbuf(png_ptr))) {
+      break;
+    }
+    png_color_8 sigBit = {8, 8, 8, 0, 8};
+    int colorType = PNG_COLOR_TYPE_RGB_ALPHA;
+    if (pixmap.colorType() == ColorType::ALPHA_8) {
+      // We store ALPHA_8 images as GrayAlpha in png. If the gray channel is set to 1, we assume the
+      // gray channel can be ignored, and we output just alpha. We tried 0 at first, but png doesn't
+      // like a 0 sigBit for a channel it expects, hence we chose 1.
+      sigBit = {0, 0, 0, 1, 8};
+      colorType = PNG_COLOR_TYPE_GRAY_ALPHA;
+    }
+    png_set_IHDR(png_ptr, info_ptr, static_cast<png_uint_32>(pixmap.width()),
+                 static_cast<png_uint_32>(pixmap.height()), 8, colorType, PNG_INTERLACE_NONE,
+                 PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+    if (colorType != PNG_COLOR_TYPE_GRAY_ALPHA && pixmap.colorSpace()) {
+      auto iccData = pixmap.colorSpace()->toICCProfile();
+      png_set_iCCP(png_ptr, info_ptr, "TGFX", 0, iccData->bytes(),
+                   static_cast<uint32_t>(iccData->size()));
+    }
+    png_set_sBIT(png_ptr, info_ptr, &sigBit);
+    png_set_write_fn(png_ptr, &pngWriter, png_reader_write_data, nullptr);
+    png_write_info(png_ptr, info_ptr);
+    for (int i = 0; i < pixmap.height(); ++i) {
+      if (pixmap.colorType() == ColorType::ALPHA_8) {
+        // convert alpha8 to gray
+        for (int j = 0; j < pixmap.width(); j++) {
+          *(alphaPixels++) = 0;
+          *(alphaPixels++) = *(srcPixels++);
+        }
+        alphaPixels -= srcRowBytes;
+        srcPixels += (pixmap.rowBytes() - static_cast<size_t>(pixmap.width()));
+        png_write_row(png_ptr, reinterpret_cast<png_const_bytep>(alphaPixels));
+      } else {
+        png_write_row(png_ptr, reinterpret_cast<png_const_bytep>(srcPixels));
+        srcPixels += srcRowBytes;
+      }
+    }
+    png_write_end(png_ptr, info_ptr);
+    encodeSuccess = true;
+  } while (false);
+  if (png_ptr) {
+    png_destroy_write_struct(&png_ptr, &info_ptr);
+  }
+  if (!encodeSuccess) {
+    if (pngWriter.data) {
+      free(pngWriter.data);
+    }
+    return nullptr;
+  }
+  return Data::MakeAdopted(pngWriter.data, pngWriter.length, Data::FreeProc);
+}
+
 namespace {
+static void PngWarning(png_structp, png_const_charp message) {
+#ifdef __EMSCRIPTEN_PTHREADS__
+  if (!emscripten_is_main_runtime_thread()) {
+    // Worker stdio is synchronously proxied. Log directly from the worker.
+    emscripten_console_warn(message);
+    return;
+  }
+#endif
+  fprintf(stderr, "libpng warning: %s\n", message);
+}
+
+static void PngError(png_structp png, png_const_charp message) {
+#ifdef __EMSCRIPTEN_PTHREADS__
+  if (!emscripten_is_main_runtime_thread()) {
+    emscripten_console_error(message);
+    png_longjmp(png, 1);
+  }
+#endif
+  fprintf(stderr, "libpng error: %s\n", message);
+  png_longjmp(png, 1);
+}
+
 class PngScanlineEncoder final : public ScanlineEncoder {
  public:
   explicit PngScanlineEncoder(WriteStream* destination) : stream(destination) {
@@ -392,13 +494,8 @@ class PngScanlineEncoder final : public ScanlineEncoder {
   }
 
   bool initialize(const ImageInfo& info) {
-    alphaOnly = info.colorType() == ColorType::ALPHA_8;
-    if (alphaOnly) {
-      if (!scratch.alloc(static_cast<size_t>(info.width()) * 2)) {
-        return false;
-      }
-    } else if (info.colorType() != ColorType::RGBA_8888 ||
-               info.alphaType() != AlphaType::Unpremultiplied) {
+    if (info.colorType() != ColorType::RGBA_8888 ||
+        info.alphaType() != AlphaType::Unpremultiplied) {
       rowInfo = ImageInfo::Make(info.width(), 1, ColorType::RGBA_8888, AlphaType::Unpremultiplied,
                                 0, info.colorSpace());
       if (!scratch.alloc(rowInfo.byteSize())) {
@@ -406,7 +503,7 @@ class PngScanlineEncoder final : public ScanlineEncoder {
       }
     }
 
-    auto profile = !alphaOnly && info.colorSpace() ? info.colorSpace()->toICCProfile() : nullptr;
+    auto profile = info.colorSpace() ? info.colorSpace()->toICCProfile() : nullptr;
     png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
     if (!png) {
       return false;
@@ -420,14 +517,9 @@ class PngScanlineEncoder final : public ScanlineEncoder {
       return false;
     }
     png_color_8 sigBit = {8, 8, 8, 0, 8};
-    auto colorType = PNG_COLOR_TYPE_RGB_ALPHA;
-    if (alphaOnly) {
-      sigBit = {0, 0, 0, 1, 8};
-      colorType = PNG_COLOR_TYPE_GRAY_ALPHA;
-    }
     png_set_IHDR(png, pngInfo, static_cast<png_uint_32>(info.width()),
-                 static_cast<png_uint_32>(info.height()), 8, colorType, PNG_INTERLACE_NONE,
-                 PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+                 static_cast<png_uint_32>(info.height()), 8, PNG_COLOR_TYPE_RGB_ALPHA,
+                 PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
     if (profile && profile->size()) {
       png_set_iCCP(png, pngInfo, "TGFX", 0, profile->bytes(),
                    static_cast<png_uint_32>(profile->size()));
@@ -445,14 +537,7 @@ class PngScanlineEncoder final : public ScanlineEncoder {
     auto pixels = static_cast<const uint8_t*>(band.pixels());
     for (int row = 0; row < band.height(); ++row) {
       auto* source = pixels + static_cast<size_t>(row) * band.rowBytes();
-      if (alphaOnly) {
-        auto* converted = scratch.bytes();
-        for (int column = 0; column < band.width(); ++column) {
-          *converted++ = 0;
-          *converted++ = source[column];
-        }
-        source = scratch.bytes();
-      } else if (!scratch.isEmpty()) {
+      if (!scratch.isEmpty()) {
         if (!band.readPixels(rowInfo, scratch.data(), 0, row)) {
           return false;
         }
@@ -484,7 +569,6 @@ class PngScanlineEncoder final : public ScanlineEncoder {
   png_infop pngInfo = nullptr;
   ImageInfo rowInfo = {};
   Buffer scratch;
-  bool alphaOnly = false;
 };
 }  // namespace
 

@@ -19,8 +19,8 @@
 #include "tgfx/core/ImageCodec.h"
 #include "BoxFilterDownsample.h"
 #include "core/PixelBuffer.h"
-#include "core/codecs/ScanlineEncoder.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/USE.h"
 #include "core/utils/WeakMap.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageInfo.h"
@@ -126,18 +126,29 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
   if (pixmap.isEmpty()) {
     return nullptr;
   }
+  USE(format);
   if (quality > 100) {
     quality = 100;
   }
   if (quality < 0) {
     quality = 0;
   }
+#ifdef TGFX_USE_JPEG_ENCODE
+  if (format == EncodedFormat::JPEG) {
+    return JpegCodec::Encode(pixmap, quality);
+  }
+#endif
 #ifdef TGFX_USE_WEBP_ENCODE
   if (format == EncodedFormat::WEBP) {
     return WebpCodec::Encode(pixmap, quality);
   }
 #endif
-  return ScanlineEncoder::Encode(pixmap, format, quality);
+#ifdef TGFX_USE_PNG_ENCODE
+  if (format == EncodedFormat::PNG) {
+    return PngCodec::Encode(pixmap, quality);
+  }
+#endif
+  return nullptr;
 }
 
 std::pair<int, int> ImageCodec::getScaledDimensions(float scale) const {

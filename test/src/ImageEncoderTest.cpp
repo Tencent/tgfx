@@ -112,6 +112,39 @@ TEST(ImageEncoderTest, Accepts32768OnEitherAxis) {
   }
 }
 
+TEST(ImageEncoderTest, RejectsInvalidInput) {
+  constexpr int width = 4;
+  constexpr int height = 4;
+  auto info = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Opaque);
+  std::array<uint8_t, width* height* 4> pixels = {};
+
+  auto stream = MemoryWriteStream::Make();
+  EXPECT_EQ(ImageEncoder::Make(stream, info, EncodedFormat::WEBP), nullptr);
+  auto premultiplied =
+      ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  EXPECT_EQ(ImageEncoder::Make(stream, premultiplied, EncodedFormat::JPEG), nullptr);
+
+  auto encoder = ImageEncoder::Make(stream, info, EncodedFormat::PNG);
+  ASSERT_NE(encoder, nullptr);
+  auto narrow = ImageInfo::Make(width - 1, 1, ColorType::RGBA_8888, AlphaType::Opaque);
+  EXPECT_FALSE(encoder->appendRows(Pixmap(narrow, pixels.data())));
+  EXPECT_FALSE(encoder->finish());
+
+  encoder = ImageEncoder::Make(stream, info, EncodedFormat::PNG);
+  ASSERT_NE(encoder, nullptr);
+  auto bandInfo = ImageInfo::Make(width, 3, ColorType::RGBA_8888, AlphaType::Opaque);
+  ASSERT_TRUE(encoder->appendRows(Pixmap(bandInfo, pixels.data())));
+  auto overflowInfo = ImageInfo::Make(width, 2, ColorType::RGBA_8888, AlphaType::Opaque);
+  EXPECT_FALSE(encoder->appendRows(Pixmap(overflowInfo, pixels.data())));
+  EXPECT_FALSE(encoder->finish());
+
+  encoder = ImageEncoder::Make(stream, info, EncodedFormat::PNG);
+  ASSERT_NE(encoder, nullptr);
+  auto alphaMismatch = ImageInfo::Make(width, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  EXPECT_FALSE(encoder->appendRows(Pixmap(alphaMismatch, pixels.data())));
+  EXPECT_FALSE(encoder->finish());
+}
+
 TEST(ImageEncoderTest, FailsOnIncompleteInputOrWriteError) {
   auto info = ImageInfo::Make(2, 2, ColorType::RGBA_8888, AlphaType::Opaque);
   std::array<uint8_t, 16> pixels = {};
