@@ -369,10 +369,14 @@ class D3D12GPU : public GPU {
   // submissions (MAX_FRAMES_IN_FLIGHT). That is not a small number: a tiled DisplayList keeps
   // recording into a single drawing buffer until the next flush, so one flush can encode well
   // over a thousand passes because every tile a frame refines needs its own render pass, and a
-  // stencil pass costs one DSV slot as well. Running out silently drops whole passes, so the
-  // rings are sized with headroom. Neither heap is ever shader visible, and D3D12 has no small
-  // per-heap cap for them; the documented per-heap limits only apply to shader-visible
-  // CBV/SRV/UAV and Sampler heaps.
+  // stencil pass costs one DSV slot as well. Running out fails that pass and logs an error in
+  // D3D12RenderPass, so the tile it belongs to loses that pass's content, which is why the rings
+  // are sized with headroom: 4096 holds about two frames of 4K tiled rendering (187 grid plus 895
+  // tree tiles per frame, two inflight submissions). An 8K frame records about 3.7K passes (608
+  // grid plus 3097 tree tiles), so two inflight submissions need roughly 7.4K slots and can still
+  // exhaust the ring; raise the capacity or cap the passes one frame records if 8K becomes a
+  // target. Neither heap is ever shader visible, and D3D12 has no small per-heap cap for them; the
+  // documented per-heap limits only apply to shader-visible CBV/SRV/UAV and Sampler heaps.
   static constexpr uint32_t RTV_RING_CAPACITY = 4096;
   static constexpr uint32_t DSV_RING_CAPACITY = 512;
   D3D12DescriptorRing _srvRing;
