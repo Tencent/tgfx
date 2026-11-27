@@ -107,6 +107,44 @@ D3D12ShaderModule::D3D12ShaderModule(D3D12GPU* gpu, const ShaderModuleDescriptor
       return;
   }
   collectInputSemantics();
+  collectUniformOffsets();
+}
+
+void D3D12ShaderModule::collectUniformOffsets() {
+  if (bytecode == nullptr) {
+    return;
+  }
+  ComPtr<ID3D12ShaderReflection> reflection = nullptr;
+  if (FAILED(D3DReflect(bytecode->GetBufferPointer(), bytecode->GetBufferSize(),
+                        IID_PPV_ARGS(&reflection)))) {
+    return;
+  }
+  D3D12_SHADER_DESC shaderDesc = {};
+  if (FAILED(reflection->GetDesc(&shaderDesc))) {
+    return;
+  }
+  for (UINT i = 0; i < shaderDesc.ConstantBuffers; ++i) {
+    auto* buffer = reflection->GetConstantBufferByIndex(i);
+    if (buffer == nullptr) {
+      continue;
+    }
+    D3D12_SHADER_BUFFER_DESC bufferDesc = {};
+    if (FAILED(buffer->GetDesc(&bufferDesc))) {
+      continue;
+    }
+    const std::string blockName(bufferDesc.Name);
+    for (UINT v = 0; v < bufferDesc.Variables; ++v) {
+      auto* variable = buffer->GetVariableByIndex(v);
+      if (variable == nullptr) {
+        continue;
+      }
+      D3D12_SHADER_VARIABLE_DESC variableDesc = {};
+      if (FAILED(variable->GetDesc(&variableDesc))) {
+        continue;
+      }
+      _uniformOffsets[blockName + "." + variableDesc.Name] = variableDesc.StartOffset;
+    }
+  }
 }
 
 void D3D12ShaderModule::collectInputSemantics() {

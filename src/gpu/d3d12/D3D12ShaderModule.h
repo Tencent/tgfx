@@ -74,6 +74,26 @@ class D3D12ShaderModule : public VaryingShaderModule, public D3D12Resource {
   }
 
   /**
+   * Returns the register offset, in bytes, the compiled bytecode reads the named block member at.
+   * The HLSL route pins every cbuffer member with packoffset at its std140 placement, and this is
+   * the only observation of what the compiler actually did with it: comparing it against
+   * UniformData's field offset proves the two sides agree, which a wrong packoffset otherwise
+   * hides behind a slightly wrong colour or a subtly skewed transform.
+   */
+  bool uniformOffset(const std::string& blockName, const std::string& memberName,
+                     uint32_t* offset) const {
+    if (offset == nullptr) {
+      return false;
+    }
+    const auto found = _uniformOffsets.find(blockName + "." + memberName);
+    if (found == _uniformOffsets.end()) {
+      return false;
+    }
+    *offset = found->second;
+    return true;
+  }
+
+  /**
    * Returns the compiled DXBC bytecode in the form expected by D3D12 pipeline state descriptors.
    * The returned struct references memory owned by this object; its lifetime is bound to the
    * lifetime of the D3D12ShaderModule.
@@ -117,6 +137,12 @@ class D3D12ShaderModule : public VaryingShaderModule, public D3D12Resource {
   /// Reflects the bytecode's input signature into _inputSemantics. Called once, at the end of
   /// construction, whichever path produced the bytecode.
   void collectInputSemantics();
+
+  /// Reflects every cbuffer member's byte offset into _uniformOffsets, keyed "Block.Member".
+  void collectUniformOffsets();
+
+  /// The reflected cbuffer member offsets, keyed "Block.Member".
+  std::unordered_map<std::string, uint32_t> _uniformOffsets = {};
 #ifdef TGFX_D3D12_DEBUG_LAYER
   std::string _hlslSource;
 #endif
