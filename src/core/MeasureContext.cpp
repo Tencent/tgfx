@@ -112,12 +112,24 @@ void MeasureContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matr
       // Outline glyphs stroke their paths, while color glyphs ignore the stroke. Join both extents
       // so mixed text keeps the unstroked color glyph bounds as well.
       auto textShape = Shape::MakeFrom(textBlob);
-      auto strokedShape = Shape::ApplyStroke(textShape, stroke);
-      if (strokedShape != nullptr) {
-        auto strokedPath = strokedShape->getPath();
-        if (!strokedPath.isEmpty()) {
-          strokedPath.transform(matrix);
-          deviceBounds.join(strokedPath.getBounds());
+      if (textShape != nullptr) {
+        bool measuredStroke = false;
+        auto strokedShape = Shape::ApplyStroke(textShape, stroke);
+        if (strokedShape != nullptr) {
+          auto strokedPath = strokedShape->getPath();
+          if (!strokedPath.isEmpty()) {
+            strokedPath.transform(matrix);
+            deviceBounds.join(strokedPath.getBounds());
+            measuredStroke = true;
+          }
+        }
+        if (!measuredStroke) {
+          // TextShape builds all glyph paths together, so one failed glyph drops the whole outline.
+          // Fall back to conservative text bounds rather than under-reporting the stroke.
+          auto fallbackBounds = textBlob->getBounds();
+          ApplyStrokeToBounds(*stroke, &fallbackBounds, matrix, true);
+          addLocalBounds(matrix, clip, fallbackBounds);
+          return;
         }
       }
     }

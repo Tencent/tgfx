@@ -8376,6 +8376,41 @@ TGFX_TEST(LayerTest, GeometryTightBoundsIncludeTextStrokeMiter) {
       << strokedGlyph.getBounds().right << ", " << strokedGlyph.getBounds().bottom;
 }
 
+TGFX_TEST(LayerTest, GeometryTightBoundsFallbackWhenTextPathIsUnavailable) {
+  PathTypefaceBuilder builder;
+  Path glyph = {};
+  glyph.moveTo(0.0f, -600.0f);
+  glyph.lineTo(-300.0f, 0.0f);
+  glyph.lineTo(300.0f, 0.0f);
+  glyph.close();
+  auto glyphID = builder.addGlyph(glyph, 600.0f);
+  GlyphID glyphs[] = {glyphID, 0};
+  Point positions[] = {{0.0f, 0.0f}, {600.0f, 0.0f}};
+  auto blob = TextBlob::MakeFrom(glyphs, positions, 2, Font(builder.detach(), 1.0f));
+  ASSERT_TRUE(blob != nullptr);
+
+  auto textShape = Shape::MakeFrom(blob);
+  ASSERT_TRUE(textShape != nullptr);
+  EXPECT_TRUE(textShape->getPath().isEmpty()) << "control: the mixed text shape rejects its path";
+
+  const Stroke stroke(12.0f);
+  Paint paint = {};
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(stroke);
+  PictureRecorder recorder;
+  auto canvas = recorder.beginRecording();
+  canvas->drawTextBlob(blob, 0.0f, 0.0f, paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  auto strokedGlyph = glyph;
+  ASSERT_TRUE(stroke.applyToPath(&strokedGlyph));
+  const auto measuredBounds = MeasureContext::GetTightBounds(picture);
+  EXPECT_TRUE(measuredBounds.contains(strokedGlyph.getBounds()))
+      << "when TextShape cannot build the shared path, tight measurement must fall back to "
+         "conservative bounds";
+}
+
 TGFX_TEST_PRIVATE(LayerTest, GeometryContourFallbackIgnoresUnusedFontGlyphs) {
   enum class ContourShadow { None, Drop, InnerSpread, Both };
   auto makeLayer = [](bool pooled, ContourShadow shadow) {
