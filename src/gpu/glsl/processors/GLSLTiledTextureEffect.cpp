@@ -53,6 +53,196 @@ std::string ScaledCoord(const std::string& coord, const std::string& dimensions)
   }
   return "(" + coord + ") * " + dimensions;
 }
+
+ValueID ScalarOf(ProgramIRBuilder* ir, ValueID value, const char* component) {
+  return ir->CreateSwizzle(value, SLType::Float, component);
+}
+
+ValueID PairOf(ProgramIRBuilder* ir, ValueID first, ValueID second) {
+  return ir->CreateConstruct(SLType::Float2, {first, second});
+}
+
+ValueID ZeroColor(ProgramIRBuilder* ir) {
+  const auto zero = ir->CreateConstant(0.0f);
+  return ir->CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
+}
+
+// Reuses a value the builder already knows (a varying, a local, a uniform) under its printed name,
+// and falls back to the caller's kind, whose declaration the interface already carries.
+ValueID InternOrReuse(ProgramIRBuilder* ir, const std::string& name, SLType type,
+                      IRValueKind fallback) {
+  if (ir == nullptr || name.empty()) {
+    return INVALID_VALUE_ID;
+  }
+  if (const auto* existing = ir->FindValue(name)) {
+    return existing->id;
+  }
+  return ir->InternValue(name, type, Precision::High, fallback);
+}
+
+ValueID ScaleCoordIR(ProgramIRBuilder* ir, ValueID coord, ValueID dimensions) {
+  if (dimensions == INVALID_VALUE_ID) {
+    return coord;
+  }
+  return ir->CreateBinary(IRBinaryOp::Mul, SLType::Float2, coord, dimensions);
+}
+
+ValueID AxisClampIR(ProgramIRBuilder* ir, ValueID coord, ValueID clampRect, const char* low,
+                    const char* high, bool on) {
+  return ir->CreateCall(OperatorID::TiledAxisClamp, SLType::Float,
+                        {coord, ScalarOf(ir, clampRect, low), ScalarOf(ir, clampRect, high),
+                         ir->CreateIntConstant(on ? 1 : 0)});
+}
+
+/// The per-axis tiled read state: the text route spells these as call literals, so the IR carries
+/// the same numbers.
+struct TiledReadModes {
+  int axisX = 0;
+  int axisY = 0;
+  bool clampX = false;
+  bool clampY = false;
+  bool repeatX = false;
+  bool repeatY = false;
+  bool borderLinearX = false;
+  bool borderLinearY = false;
+  bool borderNearestX = false;
+  bool borderNearestY = false;
+  bool mipmapX = false;
+  bool mipmapY = false;
+};
+
+/// The IR twin of the tiled read tail: the clamp, the axis map, the tap read and the seam and
+/// border passes, with each library helper as one call the printed body links. Returns the read
+/// color before the sampler's channel selection.
+ValueID EmitTiledReadIR(ProgramIRBuilder* ir, ValueID samplerValue, ValueID texCoord,
+                        ValueID subset, ValueID clampRect, ValueID dimensions,
+                        ValueID strictSubset, const TiledReadModes& modes, bool rectSampler) {
+  const auto zero = ir->CreateConstant(0.0f);
+  const auto subsetValue = subset == INVALID_VALUE_ID ? ZeroColor(ir) : subset;
+  const auto clampValue = clampRect == INVALID_VALUE_ID ? ZeroColor(ir) : clampRect;
+  const auto inCoord = dimensions == INVALID_VALUE_ID
+                           ? texCoord
+                           : ir->CreateBinary(IRBinaryOp::Div, SLType::Float2, texCoord, dimensions);
+  const auto axisX = ir->CreateCall(
+      OperatorID::TiledAxisCoord, SLType::Float4,
+      {ScalarOf(ir, inCoord, "x"), ScalarOf(ir, subsetValue, "x"), ScalarOf(ir, subsetValue, "z"),
+       ir->CreateIntConstant(modes.axisX)});
+  const auto axisY = ir->CreateCall(
+      OperatorID::TiledAxisCoord, SLType::Float4,
+      {ScalarOf(ir, inCoord, "y"), ScalarOf(ir, subsetValue, "y"), ScalarOf(ir, subsetValue, "w"),
+       ir->CreateIntConstant(modes.axisY)});
+  const auto subsetCoord = PairOf(ir, ScalarOf(ir, axisX, "x"), ScalarOf(ir, axisY, "x"));
+  auto clamped =
+      PairOf(ir,
+             AxisClampIR(ir, ScalarOf(ir, subsetCoord, "x"), clampValue, "x", "z", modes.clampX),
+             AxisClampIR(ir, ScalarOf(ir, subsetCoord, "y"), clampValue, "y", "w", modes.clampY));
+  if (strictSubset != INVALID_VALUE_ID) {
+    clamped = ir->CreateCall(OperatorID::ClampSubset, SLType::Float2, {clamped, strictSubset});
+  }
+  const auto scaled = ScaleCoordIR(ir, clamped, dimensions);
+  auto extraX = ScalarOf(ir, axisX, "y");
+  auto extraY = ScalarOf(ir, axisY, "y");
+  if (modes.mipmapX) {
+    extraX = AxisClampIR(ir, extraX, clampValue, "x", "z", modes.clampX);
+  }
+  if (modes.mipmapY) {
+    extraY = AxisClampIR(ir, extraY, clampValue, "y", "w", modes.clampY);
+  }
+  const auto weightX = ScalarOf(ir, axisX, "z");
+  const auto weightY = ScalarOf(ir, axisY, "z");
+  const auto clampedX = ScalarOf(ir, clamped, "x");
+  const auto clampedY = ScalarOf(ir, clamped, "y");
+  ValueID color = INVALID_VALUE_ID;
+  if (modes.mipmapX && modes.mipmapY) {
+    const auto tapX = ScaleCoordIR(ir, PairOf(ir, extraX, clampedY), dimensions);
+    const auto tapY = ScaleCoordIR(ir, PairOf(ir, clampedX, extraY), dimensions);
+    const auto tapXY = ScaleCoordIR(ir, PairOf(ir, extraX, extraY), dimensions);
+    color = ir->CreateCall(rectSampler ? OperatorID::TiledSample4Rect : OperatorID::TiledSample4,
+                           SLType::Float4,
+                           {samplerValue, scaled, tapX, tapY, tapXY, weightX, weightY});
+  } else if (modes.mipmapX) {
+    const auto tapX = ScaleCoordIR(ir, PairOf(ir, extraX, clampedY), dimensions);
+    color = ir->CreateCall(rectSampler ? OperatorID::TiledSample2Rect : OperatorID::TiledSample2,
+                           SLType::Float4, {samplerValue, scaled, tapX, weightX});
+  } else if (modes.mipmapY) {
+    const auto tapY = ScaleCoordIR(ir, PairOf(ir, clampedX, extraY), dimensions);
+    color = ir->CreateCall(rectSampler ? OperatorID::TiledSample2Rect : OperatorID::TiledSample2,
+                           SLType::Float4, {samplerValue, scaled, tapY, weightY});
+  } else {
+    color = ir->CreateCall(rectSampler ? OperatorID::TiledSample1Rect : OperatorID::TiledSample1,
+                           SLType::Float4, {samplerValue, scaled});
+  }
+  const bool needErrX = modes.repeatX || modes.borderLinearX;
+  const bool needErrY = modes.repeatY || modes.borderLinearY;
+  const auto errX = needErrX ? ir->CreateBinary(IRBinaryOp::Sub, SLType::Float,
+                                                ScalarOf(ir, subsetCoord, "x"), clampedX)
+                             : zero;
+  const auto errY = needErrY ? ir->CreateBinary(IRBinaryOp::Sub, SLType::Float,
+                                                ScalarOf(ir, subsetCoord, "y"), clampedY)
+                             : zero;
+  if (modes.repeatX || modes.repeatY) {
+    const auto repeatX =
+        modes.repeatX ? ir->CreateCall(OperatorID::TiledRepeatCoord, SLType::Float,
+                                       {errX, ScalarOf(ir, clampValue, "x"),
+                                        ScalarOf(ir, clampValue, "z")})
+                      : zero;
+    const auto repeatY =
+        modes.repeatY ? ir->CreateCall(OperatorID::TiledRepeatCoord, SLType::Float,
+                                       {errY, ScalarOf(ir, clampValue, "y"),
+                                        ScalarOf(ir, clampValue, "w")})
+                      : zero;
+    const auto repeatCoord = ScaleCoordIR(ir, PairOf(ir, repeatX, repeatY), dimensions);
+    color = ir->CreateCall(
+        rectSampler ? OperatorID::TiledRepeatBlendRect : OperatorID::TiledRepeatBlend,
+        SLType::Float4,
+        {samplerValue, color, scaled, repeatCoord, errX, errY,
+         ir->CreateIntConstant(modes.repeatX ? 1 : 0), ir->CreateIntConstant(modes.repeatY ? 1 : 0)});
+  }
+  if (modes.borderLinearX || modes.borderLinearY) {
+    color = ir->CreateCall(
+        OperatorID::TiledBorderLinear, SLType::Float4,
+        {color, errX, errY, ir->CreateIntConstant(modes.borderLinearX ? 1 : 0),
+         ir->CreateIntConstant(modes.borderLinearY ? 1 : 0)});
+  }
+  if (modes.borderNearestX || modes.borderNearestY) {
+    color = ir->CreateCall(
+        OperatorID::TiledBorderNearest, SLType::Float4,
+        {color, inCoord, subsetValue, ir->CreateIntConstant(modes.borderNearestX ? 1 : 0),
+         ir->CreateIntConstant(modes.borderNearestY ? 1 : 0)});
+  }
+  return color;
+}
+
+/// The tiled read's coordinate in IR. coordName is the name the text route reads: the varying
+/// itself, or the coordinate the caller rewrote for this read (the blur chain's per-tap one). The
+/// text route's emitPerspTextCoord divides a Float3 varying by its z, and that projected name is
+/// not an IR value, so the divide is spelled here.
+ValueID TiledCoordIR(ProgramIRBuilder* ir, const CoordValue& coordVar,
+                     const std::string& coordName) {
+  if (ir == nullptr) {
+    return INVALID_VALUE_ID;
+  }
+  if (coordName != coordVar.name()) {
+    return InternOrReuse(ir, coordName, SLType::Float2, IRValueKind::Local);
+  }
+  auto kind = IRValueKind::Local;
+  for (const auto& varying : ir->IR().interface.varyings) {
+    if (varying.name == coordVar.name()) {
+      kind = IRValueKind::Varying;
+      break;
+    }
+  }
+  if (coordVar.type() != SLType::Float3) {
+    return InternOrReuse(ir, coordVar.name(), SLType::Float2, kind);
+  }
+  const auto varying = InternOrReuse(ir, coordVar.name(), SLType::Float3, kind);
+  if (varying == INVALID_VALUE_ID) {
+    return INVALID_VALUE_ID;
+  }
+  return ir->CreateBinary(IRBinaryOp::Div, SLType::Float2,
+                          ir->CreateSwizzle(varying, SLType::Float2, "xy"),
+                          ir->CreateSwizzle(varying, SLType::Float, "z"));
+}
 }  // namespace
 PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(BlockAllocator* allocator,
                                                          std::shared_ptr<TextureProxy> proxy,
@@ -279,9 +469,11 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend(";");
     if (args.irBuilder != nullptr && args.samplerValue(sampler) != INVALID_VALUE_ID) {
       const auto coordValue = makeCoordValue(texCoordName);
-      textureValue =
-          args.irBuilder->CreateTextureSample(args.samplerValue(sampler), coordValue,
-                                              SLType::Float4, args.outputColor, samplerVar.type());
+      const auto swizzleCode =
+          ShaderBuilder::ReadSwizzleCode(args.uniformHandler->getSamplerSwizzle(sampler));
+      textureValue = args.irBuilder->CreateTextureSample(
+          args.samplerValue(sampler), coordValue, SLType::Float4, args.outputColor,
+          samplerVar.type(), swizzleCode);
     }
   } else {
     bool useClamp[2] = {ShaderModeUsesClamp(sampling.shaderModeX),
@@ -437,21 +629,45 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("%s = textureColor%s;", args.outputColor.c_str(),
                              fragBuilder->getSamplerSwizzleSuffix(sampler).c_str());
     if (args.irBuilder != nullptr && args.samplerValue(sampler) != INVALID_VALUE_ID) {
-      const auto zero = args.irBuilder->CreateConstant(0.0f);
-      const auto coordValue = makeCoordValue(texCoordName);
-      std::vector<ValueID> sampleArgs = {args.samplerValue(sampler), coordValue};
-      OperatorID sampleOp = OperatorID::TiledSample1;
-      if (mipmapX && mipmapY) {
-        sampleArgs.insert(sampleArgs.end(), {coordValue, coordValue, coordValue, zero, zero});
-        sampleOp = typeSuffix == "Rect" ? OperatorID::TiledSample4Rect : OperatorID::TiledSample4;
-      } else if (mipmapX || mipmapY) {
-        sampleArgs.insert(sampleArgs.end(), {coordValue, zero});
-        sampleOp = typeSuffix == "Rect" ? OperatorID::TiledSample2Rect : OperatorID::TiledSample2;
-      } else {
-        sampleOp = typeSuffix == "Rect" ? OperatorID::TiledSample1Rect : OperatorID::TiledSample1;
+      auto ir = args.irBuilder;
+      TiledReadModes modes = {};
+      modes.axisX = modeX;
+      modes.axisY = modeY;
+      modes.clampX = useClamp[0];
+      modes.clampY = useClamp[1];
+      modes.repeatX = repeatX;
+      modes.repeatY = repeatY;
+      modes.borderLinearX = borderLinearX;
+      modes.borderLinearY = borderLinearY;
+      modes.borderNearestX = borderNearestX;
+      modes.borderNearestY = borderNearestY;
+      modes.mipmapX = mipmapX;
+      modes.mipmapY = mipmapY;
+      const auto subsetValue = InternOrReuse(ir, names.subsetName, SLType::Float4, IRValueKind::Uniform);
+      const auto clampValue = InternOrReuse(ir, names.clampName, SLType::Float4, IRValueKind::Uniform);
+      const auto dimensionsValue =
+          InternOrReuse(ir, names.dimensionsName, SLType::Float2, IRValueKind::Uniform);
+      auto strictSubset = INVALID_VALUE_ID;
+      if (constraint == SrcRectConstraint::Strict) {
+        strictSubset = InternOrReuse(ir, args.inputSubset, SLType::Float4, IRValueKind::Uniform);
+        if (strictSubset != INVALID_VALUE_ID && dimensionsValue != INVALID_VALUE_ID) {
+          const auto low = ir->CreateBinary(IRBinaryOp::Div, SLType::Float2,
+                                            ir->CreateSwizzle(strictSubset, SLType::Float2, "xy"),
+                                            dimensionsValue);
+          const auto high = ir->CreateBinary(IRBinaryOp::Div, SLType::Float2,
+                                             ir->CreateSwizzle(strictSubset, SLType::Float2, "zw"),
+                                             dimensionsValue);
+          strictSubset = ir->CreateConstruct(SLType::Float4, {low, high});
+        }
       }
-      textureValue =
-          args.irBuilder->CreateCall(sampleOp, SLType::Float4, sampleArgs, args.outputColor);
+      const auto coordValue = TiledCoordIR(ir, (*args.transformedCoords)[0], texCoordName);
+      textureValue = EmitTiledReadIR(ir, args.samplerValue(sampler), coordValue, subsetValue,
+                                     clampValue, dimensionsValue, strictSubset, modes,
+                                     typeSuffix == "Rect");
+      const auto swizzle = args.uniformHandler->getSamplerSwizzle(sampler);
+      if (textureValue != INVALID_VALUE_ID && swizzle != Swizzle::RGBA()) {
+        textureValue = ir->CreateSwizzle(textureValue, SLType::Float4, swizzle.c_str());
+      }
     }
   }
   if (textureProxy->isAlphaOnly()) {

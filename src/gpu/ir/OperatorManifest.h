@@ -61,7 +61,6 @@ namespace tgfx {
   X(DiamondGradient, 31)                                                                             \
   X(ConicGradient, 32)                                                                               \
   X(ClampedGradient, 33)                                                                             \
-  X(RoundStrokeRectCoverage, 33)                                                                    \
   X(HairlineLineCoverage, 34)                                                                       \
   X(HairlineQuadCoverage, 35)                                                                       \
   X(TextCoverageFromAlpha, 36)                                                                      \
@@ -105,6 +104,10 @@ namespace tgfx {
   X(GlassUDFTentBlur, 74)   \
   X(GlassUDFGeometry, 75)   \
   X(PerlinNoiseKernel, 76)  \
+  X(TiledAxisCoord, 77)     \
+  X(TiledAxisClamp, 78)     \
+  X(TiledRepeatCoord, 79)   \
+  X(RoundStrokeRectCoverage, 80) \
 
 enum class OperatorID : uint32_t {
 #define TGFX_OPERATOR_ENUM(name, value) name = value,

@@ -3,7 +3,10 @@
 // Returns (subsetCoord, extraCoord, weight, 0): extraCoord and weight are meaningful only for
 // mode 2.
 //@function tgfxTiledAxisCoord
-vec4 tgfxTiledAxisCoord(highp float coord, highp float lo, highp float hi, int mode) {
+//@op TiledAxisCoord
+//@frag
+vec4 tgfxTiledAxisCoord(highp float coord /*@in*/, highp float lo /*@in*/, highp float hi /*@in*/,
+                        int mode /*@in*/) {
   if (mode == 0) {
     return vec4(coord, 0.0, 0.0, 0.0);
   }

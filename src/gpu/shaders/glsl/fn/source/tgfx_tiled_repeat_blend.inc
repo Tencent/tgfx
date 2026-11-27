@@ -1,9 +1,11 @@
 // The repeat seam blend: the extra taps land on the mirrored edge, so a zero error keeps the base
 // tap. The per-axis flags are the call site's literals.
 //@function tgfxTiledRepeatBlend
-vec4 tgfxTiledRepeatBlend(sampler2D tex, highp vec4 color, highp vec2 clampedCoord,
-                          highp vec2 repeatCoord, highp float errX, highp float errY, int repeatX,
-                          int repeatY) {
+//@op TiledRepeatBlend
+//@frag
+vec4 tgfxTiledRepeatBlend(sampler2D tex, highp vec4 color /*@in*/, highp vec2 clampedCoord /*@in*/,
+                          highp vec2 repeatCoord /*@in*/, highp float errX /*@in*/, highp float errY /*@in*/, int repeatX /*@in*/,
+                          int repeatY /*@in*/) {
   if (repeatX != 0 && repeatY != 0) {
     if (errX != 0.0 && errY != 0.0) {
       highp float ax = abs(errX);

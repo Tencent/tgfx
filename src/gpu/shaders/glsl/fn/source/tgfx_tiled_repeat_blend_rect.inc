@@ -1,8 +1,10 @@
 // The repeat seam blend for rectangle samplers.
 //@function tgfxTiledRepeatBlendRect
-vec4 tgfxTiledRepeatBlendRect(sampler2DRect tex, highp vec4 color, highp vec2 clampedCoord,
-                              highp vec2 repeatCoord, highp float errX, highp float errY,
-                              int repeatX, int repeatY) {
+//@op TiledRepeatBlendRect
+//@frag
+vec4 tgfxTiledRepeatBlendRect(sampler2DRect tex, highp vec4 color /*@in*/, highp vec2 clampedCoord /*@in*/,
+                              highp vec2 repeatCoord /*@in*/, highp float errX /*@in*/, highp float errY /*@in*/,
+                              int repeatX /*@in*/, int repeatY /*@in*/) {
   if (repeatX != 0 && repeatY != 0) {
     if (errX != 0.0 && errY != 0.0) {
       highp float ax = abs(errX);
