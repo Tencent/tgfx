@@ -18,9 +18,9 @@
 
 #pragma once
 
+#include <cstdint>
 #include <mutex>
 #include "tgfx/core/ImageBuffer.h"
-#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 class TextureView;
@@ -36,10 +36,13 @@ class ImageStream;
  *
  *    1) The generated ImageBuffers are bound to the associated GPU Context when first being drawn
  *       and cannot be drawn to another Context anymore.
- *    2) The generated ImageBuffers may have a limited lifetime and cannot create textures after
- *       expiration. Usually, the previously acquired ImageBuffer will expire after the newly
- *       created ImageBuffer is drawn. So there are only two ImageBuffers that can be accessed
- *       simultaneously.
+ *    2) A new acquisition expires older buffers except the one still bound to valid current pixels.
+ *       A native read that changes or invalidates pixels expires the previously Ready buffer.
+ *       Timeout and Failed buffers can retry until superseded by a newer acquisition.
+ *
+ * Acquisitions and status queries share the reader mutex with texture reads and may wait for an
+ * in-flight read. They do not reserve pixels or guarantee Context/GPU lifetime. Rebuild callers and
+ * subclasses with this version; changed virtual interfaces and layouts are not binary-compatible.
  */
 class ImageReader {
  public:
@@ -56,11 +59,22 @@ class ImageReader {
   int height() const;
 
   /**
-   * Acquires the next ImageBuffer from the ImageReader after a new image frame has been rendered
-   * into the associated video source. Note that the previously returned image buffers will
-   * immediately expire after the newly created ImageBuffer is drawn.
+   * Acquires a Pending buffer without reading source pixels. On Android, texture generation reads
+   * until the requested timestamp is found or the one-second notification-wait budget is exhausted.
+   * GPU, JNI and lock operations can exceed that budget; it is not a hard completion deadline.
+   * Query status() after drawing is flushed. Android Ready confirms a nonnegative requested PTS;
+   * -1 instead selects an available frame. Web ignores PTS and has no upload-result receipt.
+   * Timeout can display the most recently valid latched image, which need not be the previously
+   * accepted image. Failed can retain known-valid prior pixels, but unknown mutations draw nothing.
+   * Neither fallback status implies a target match. Create a new Image from the same nonexpired
+   * buffer to retry; reusing an already cached Image may not perform another source read.
+   * Timestamps do not encode source restart generations. Callers that need to distinguish restarts
+   * must avoid reusing the same native timestamp range for different generations.
+   * @param timestamp The requested frame's presentation timestamp in nanoseconds. For MediaCodec
+   * output released with render set to true, pass presentationTimeUs multiplied by 1000. Pass -1
+   * to draw the next available frame without checking it. Ignored on the web platform.
    */
-  std::shared_ptr<ImageBuffer> acquireNextBuffer();
+  std::shared_ptr<ImageBuffer> acquireNextBuffer(int64_t timestamp = -1);
 
  protected:
   std::mutex locker = {};
@@ -71,15 +85,20 @@ class ImageReader {
 
  private:
   std::shared_ptr<TextureView> textureView = nullptr;
+  bool contentValid = false;
   uint64_t bufferVersion = 0;
   uint64_t textureVersion = 0;
+  uint64_t failedVersion = 0;
+  ImageBufferStatus failedStatus = ImageBufferStatus::Pending;
 
   static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<ImageStream> imageStream);
 
   bool checkExpired(uint64_t contentVersion);
 
-  std::shared_ptr<TextureView> readTexture(uint64_t contentVersion, Context* context,
-                                           bool mipmapped);
+  ImageBufferStatus getStatus(uint64_t contentVersion);
+
+  std::shared_ptr<TextureView> readTexture(uint64_t contentVersion, int64_t timestamp,
+                                           Context* context, bool mipmapped);
 
   friend class ImageReaderBuffer;
   friend class ImageStream;
