@@ -816,7 +816,10 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
     // Not even the finest level fits next to the grid, so the pool keeps nothing for fallbacks.
     treeQuota = 0;
   } else {
-    treeQuota = std::min(std::max(treeQuota, minTreeTileCount), total - minGridTileCount);
+    // The fallback levels keep their floor and leave the grid its demand. ComputeTreeLevelCount()
+    // picked the level count so that the floor fits in what the grid does not need.
+    DEBUG_ASSERT(minTreeTileCount <= total - minGridTileCount);
+    treeQuota = std::clamp(treeQuota, minTreeTileCount, total - minGridTileCount);
   }
   tilePool->setQuota(TileType::Tree, treeQuota);
   tilePool->setQuota(TileType::Grid, total - treeQuota);
