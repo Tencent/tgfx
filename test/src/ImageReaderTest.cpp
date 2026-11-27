@@ -18,6 +18,8 @@
 
 #include <deque>
 #ifdef TGFX_USE_THREADS
+#include <chrono>
+#include <condition_variable>
 #include <thread>
 #endif
 #include "gpu/resources/TextureView.h"
@@ -174,32 +176,57 @@ class ExpiringImageBuffer : public ImageBuffer {
 };
 
 #ifdef TGFX_USE_THREADS
-class BufferStatusQuery {
+class SynchronizedReadStream : public QueueImageStream {
  public:
-  BufferStatusQuery(std::shared_ptr<ImageBuffer> first, std::shared_ptr<ImageBuffer> latest)
-      : first(std::move(first)), latest(std::move(latest)) {
+  void queryDuringRead(std::shared_ptr<ImageBuffer> buffer) {
+    std::unique_lock<std::mutex> lock(control);
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (!reading) {
+      if (condition.wait_until(lock, deadline) == std::cv_status::timeout && !reading) {
+        ADD_FAILURE() << "The rendering thread never entered the source read.";
+        return;
+      }
+    }
+    queryStarted = true;
+    condition.notify_all();
+    lock.unlock();
+    EXPECT_EQ(buffer->status(), ImageBufferStatus::Ready);
+    lock.lock();
+    queryFinished = true;
+    condition.notify_all();
   }
 
-  void run() {
-    for (int index = 0; index < 2000; index++) {
-      auto firstStatus = first->status();
-      EXPECT_TRUE(firstStatus == ImageBufferStatus::Ready ||
-                  firstStatus == ImageBufferStatus::Expired);
-      auto latestStatus = latest->status();
-      EXPECT_TRUE(latestStatus == ImageBufferStatus::Pending ||
-                  latestStatus == ImageBufferStatus::Ready);
-      EXPECT_EQ(first->width(), 1);
-      EXPECT_EQ(first->height(), 1);
-      EXPECT_FALSE(first->isAlphaOnly());
-      EXPECT_EQ(first->colorSpace(), nullptr);
-      EXPECT_FALSE(latest->expired());
-      first->expired();
+ protected:
+  ReadResult onReadTexture(Context* context, bool mipmapped, std::shared_ptr<TextureView> texture,
+                           int64_t timestamp) override {
+    std::unique_lock<std::mutex> lock(control);
+    reading = true;
+    condition.notify_all();
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (!queryStarted) {
+      if (condition.wait_until(lock, deadline) == std::cv_status::timeout && !queryStarted) {
+        ADD_FAILURE() << "The query thread did not start its concurrent status query.";
+        return {};
+      }
     }
+    // status() must wait for this read to finish; without the reader lock it would return Pending.
+    deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(50);
+    while (!queryFinished) {
+      if (condition.wait_until(lock, deadline) == std::cv_status::timeout) {
+        break;
+      }
+    }
+    EXPECT_FALSE(queryFinished);
+    lock.unlock();
+    return QueueImageStream::onReadTexture(context, mipmapped, std::move(texture), timestamp);
   }
 
  private:
-  std::shared_ptr<ImageBuffer> first = nullptr;
-  std::shared_ptr<ImageBuffer> latest = nullptr;
+  std::mutex control = {};
+  std::condition_variable condition = {};
+  bool reading = false;
+  bool queryStarted = false;
+  bool queryFinished = false;
 };
 #endif
 
@@ -477,18 +504,17 @@ TGFX_TEST(ImageReaderTest, DefaultStatusHonorsExpiredOverride) {
 }
 
 #ifdef TGFX_USE_THREADS
-TGFX_TEST_PRIVATE(ImageReaderTest, BufferPropertiesCanBeQueriedWhileDrawing) {
+TGFX_TEST_PRIVATE(ImageReaderTest, StatusQueryWaitsForInFlightSourceRead) {
   TGFX_PRIVATE_ACCESS(
       ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
-      auto stream = std::make_shared<QueueImageStream>();
+      auto stream = std::make_shared<SynchronizedReadStream>();
       auto reader = ImageReader::MakeFrom(stream); ASSERT_NE(reader, nullptr);
-      stream->queueFrame(10, 1000); auto first = reader->acquireNextBuffer(1000);
-      EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(first)), 10); stream->queueFrame(20, 2000);
-      auto latest = reader->acquireNextBuffer(2000); BufferStatusQuery query(first, latest);
-      std::thread thread(&BufferStatusQuery::run, &query);
-      EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(latest)), 20); thread.join();
-      EXPECT_EQ(first->status(), ImageBufferStatus::Expired);
-      EXPECT_EQ(latest->status(), ImageBufferStatus::Ready); EXPECT_EQ(stream->readCount, 2);)
+      stream->queueFrame(20, 2000); auto buffer = reader->acquireNextBuffer(2000);
+      EXPECT_EQ(buffer->status(), ImageBufferStatus::Pending);
+      std::thread thread(&SynchronizedReadStream::queryDuringRead, stream.get(), buffer);
+      EXPECT_EQ(DrawAndReadRed(context, Image::MakeFrom(buffer)), 20); thread.join();
+      EXPECT_EQ(buffer->status(), ImageBufferStatus::Ready); EXPECT_FALSE(buffer->expired());
+      EXPECT_EQ(stream->readCount, 1);)
 }
 #endif
 

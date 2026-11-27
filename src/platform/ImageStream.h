@@ -62,14 +62,16 @@ class ImageStream {
   struct ReadResult {
     std::shared_ptr<TextureView> textureView = nullptr;
     ImageBufferStatus status = ImageBufferStatus::Failed;
-    // Failed with changed content cannot be used as a fallback. Timeout with changed content
-    // retains successfully latched non-target pixels, not a verified match for the request.
+    // Set true for every native latch, pixel write or unknown mutation, including failed attempts.
+    // False promises the supplied texture and pixels stayed intact. Failed changes cannot be a
+    // fallback; Timeout changes must retain a valid latched image, never partial or unknown pixels.
     bool contentChanged = false;
   };
 
   /**
    * Reads the frame with the given timestamp into the texture view, creating the texture view if
-   * it is nullptr. Reads the next available frame if the timestamp is -1.
+   * it is nullptr. Reads the next available frame if the timestamp is -1. Sources return only
+   * Ready, Timeout or Failed; Pending and Expired are reader-owned lifetime states.
    */
   virtual ReadResult onReadTexture(Context* context, bool mipmapped,
                                    std::shared_ptr<TextureView> textureView, int64_t timestamp) = 0;

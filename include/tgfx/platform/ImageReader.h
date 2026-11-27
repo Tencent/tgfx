@@ -69,7 +69,8 @@ class ImageReader {
    * Acquires a Pending buffer without reading source pixels. On Android, texture generation reads
    * until the requested timestamp is found or the one-second notification-wait budget is exhausted.
    * GPU, JNI and lock operations can exceed that budget; it is not a hard completion deadline.
-   * Query status() after drawing is flushed. Ready means the source satisfied this request.
+   * Query status() after drawing is flushed. Android Ready confirms a nonnegative requested PTS;
+   * -1 instead selects an available frame. Web ignores PTS and has no upload-result receipt.
    * Timeout can display the most recently valid latched image, which need not be the previously
    * accepted image. Failed can retain known-valid prior pixels, but unknown mutations draw nothing.
    * Neither fallback status implies a target match. Create a new Image from the same nonexpired
