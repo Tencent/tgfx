@@ -134,6 +134,8 @@ enum class IRStatementKind : uint8_t {
   /// Discard: src holds the premultiplied source; a fully transparent one (rgb all <= 0) kills
   /// the pixel, matching the text route's zero-coverage early-out.
   Discard,
+  /// RawText: the GLSL text an un-IR-ported processor emitted; printed verbatim (GLSL only).
+  RawText,
   StoreVarying,
   Return,
   ForLoopBegin,
@@ -147,6 +149,9 @@ struct IRStatement {
   ExprID expr = INVALID_EXPR_ID;
   /// ForLoopBegin: the loop counter's name, init, bound (i <= bound) and step. The counter
   /// registers as an IR value so the body's expressions reference it by name.
+  /// RawText: the verbatim code; rawDeclaredName (optional) names the variable it declares.
+  std::string rawText;
+  std::string rawDeclaredName;
   std::string loopVarName;
   ValueID loopInit = INVALID_VALUE_ID;
   ValueID loopBound = INVALID_VALUE_ID;

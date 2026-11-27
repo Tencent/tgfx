@@ -141,6 +141,8 @@ bool ValidateStatement(const ProgramIR& program, const IRStatement& statement, s
         return false;
       }
       break;
+    case IRStatementKind::RawText:
+      break;
     case IRStatementKind::Discard:
       if (!HasValue(program, statement.src)) {
         *error = "a discard references an unknown condition value";

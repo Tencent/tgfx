@@ -95,6 +95,7 @@ class ProgramIRBuilder {
 
   void StoreOutput(ValueID dst, ValueID src);
   void CreateDiscard(ValueID condition);
+  void AppendRawText(std::string code, std::string declaredName);
 
   void StoreVarying(LValue dst, ValueID src);
 

@@ -222,7 +222,19 @@ void FragmentProcessor::internalEmitChild(
                      inputName.empty() ? "vec4(1.0)" : inputName, args.inputSubset, &coordVars,
                      &textureSamplers, std::move(coordFunc), args.irBuilder, childInputValue,
                      irChildOutputValue, args.samplerValues);
-  childProcessor(childIndex)->emitCode(childArgs);
+  if (childProcessor(childIndex)->emitsTextOnly()) {
+    // A child without an IR branch: its block becomes one verbatim statement, declaring the
+    // output name the parent's IR already interned (the value would otherwise stay undefined).
+    const size_t mark = fragBuilder->codeSize();
+    childProcessor(childIndex)->emitCode(childArgs);
+    const auto rawText = fragBuilder->codeSlice(mark);
+    fragBuilder->truncateCode(mark);
+    if (!rawText.empty() && args.irBuilder != nullptr) {
+      args.irBuilder->AppendRawText("  vec4 " + outputColor + ";\n" + rawText, outputColor);
+    }
+  } else {
+    childProcessor(childIndex)->emitCode(childArgs);
+  }
   fragBuilder->codeAppend("}\n");
 
   fragBuilder->onAfterChildProcEmitCode();
