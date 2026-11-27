@@ -138,12 +138,18 @@ static inline void DrawSpreadPath(Canvas* canvas, const Path& path, StyledShapeT
       if (type == StyledShapeType::FillStroke) {
         outset += SpreadUtils::StrokeOutset(strokeWidth, strokeAlign);
       }
-      if (outset != 0.0f) {
+      if (outset > 0.0f) {
         // Outsetting a convex contour by |outset| equals filling the contour stroked with a
         // round pen of width 2 * |outset|, the Minkowski sum with a disk.
         auto spreadPath = path;
         Stroke(2.0f * outset, LineCap::Round, LineJoin::Round).applyToPath(&spreadPath);
         canvas->drawPath(spreadPath, paint);
+      } else if (outset < 0.0f) {
+        // A negative spread shrinks the contour; the Minkowski difference has no simple path
+        // form, so fall back to the bounding rect like the previous implementation.
+        auto rect = path.getBounds();
+        rect.outset(outset, outset);
+        canvas->drawRect(rect, paint);
       } else {
         canvas->drawPath(path, paint);
       }
