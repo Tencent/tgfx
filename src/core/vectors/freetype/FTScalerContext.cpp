@@ -27,13 +27,16 @@
 #include "FTUtil.h"
 #include "core/utils/ClearPixels.h"
 #include "core/utils/ColorSpaceHelper.h"
+#include "core/utils/FauxBoldScale.h"
 #include "core/utils/GammaCorrection.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/StrokeUtils.h"
 #include "core/utils/USE.h"
 #include "skcms.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/core/UTF.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
@@ -517,13 +520,22 @@ bool FTScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
     // Fall through to normal path generation if no color layers found
   }
 
-  if (!loadOutlineGlyph(face, glyphID, fauxBold, fauxItalic)) {
+  const bool pathFauxBold = fauxBold && !FT_HAS_COLOR(face);
+  if (!loadOutlineGlyph(face, glyphID, fauxBold && !pathFauxBold, fauxItalic, pathFauxBold)) {
     path->reset();
     return false;
   }
   if (!GenerateGlyphPath(face, path)) {
     path->reset();
     return false;
+  }
+  if (pathFauxBold && !path->isEmpty()) {
+    auto strokePath = *path;
+    Stroke stroke(textSize * FauxBoldScale(textSize));
+    if (!stroke.applyToPath(&strokePath) || !path->addPath(strokePath, PathOp::Union)) {
+      path->reset();
+      return false;
+    }
   }
   return true;
 }
@@ -601,7 +613,43 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
   bbox->yMax = (bbox->yMax + 63) & ~63;
 }
 
+Rect FTScalerContext::getFauxBoldBounds(GlyphID glyphID, bool fauxItalic) const {
+  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  auto face = ftTypeface()->face;
+  // Load the same outline generatePath() starts from: unhinted and not emboldened, so the estimate
+  // and the drawn geometry describe one shape.
+  if (!loadOutlineGlyph(face, glyphID, false, fauxItalic, true)) {
+    return {};
+  }
+  if (face->glyph->format != FT_GLYPH_FORMAT_OUTLINE || face->glyph->outline.n_contours <= 0) {
+    return {};
+  }
+  FT_BBox bbox = {};
+  FT_Outline_Get_CBox(&face->glyph->outline, &bbox);
+  // A zero extent in one axis is not an empty glyph: a horizontal or vertical hairline contour has
+  // no height (or width) of its own but still gains real area once stroked. Only a contour that
+  // collapses in both axes leaves the butt-capped stroke with nothing to draw.
+  if (bbox.xMin == bbox.xMax && bbox.yMin == bbox.yMax) {
+    return {};
+  }
+  Rect bounds =
+      Rect::MakeXYWH(FDot6ToFloat(bbox.xMin), -FDot6ToFloat(bbox.yMax),
+                     FDot6ToFloat(bbox.xMax - bbox.xMin), FDot6ToFloat(bbox.yMax - bbox.yMin));
+  // The drawn glyph is this outline unioned with a miter stroke. Expanding the control box by the
+  // same stroke contains the union without running it, which is also how the CoreGraphics backend
+  // estimates synthetic-bold bounds.
+  Stroke stroke(textSize * FauxBoldScale(textSize));
+  ApplyStrokeToBounds(stroke, &bounds, Matrix::I(), true);
+  bounds.roundOut();
+  return bounds;
+}
+
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
+  // Bounds of a synthetic-bold glyph only need to contain the drawn outline; building the boolean
+  // union here made every measurement pay for a full contour stroke plus path op.
+  if (fauxBold && !hasColor() && hasOutlines()) {
+    return getFauxBoldBounds(glyphID, fauxItalic);
+  }
 #if defined(__ANDROID__) || defined(ANDROID)
   if (ftTypeface()->hasColor() && ftTypeface()->hasOutlines() && GlyphRenderer::IsAvailable()) {
     Rect rect = {};
@@ -781,7 +829,9 @@ Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
 
 Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
                                         Matrix* matrix) const {
-  if (!hasColor() && stroke != nullptr) {
+  // Only outline fonts can be re-rendered from the stroked path; bitmap-only faces keep the
+  // bitmap metrics and image path they had before.
+  if (!hasColor() && (stroke != nullptr || (fauxBold && hasOutlines()))) {
     return {};
   }
   if (!hasColor()) {
@@ -820,9 +870,8 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const St
   return {};
 }
 
-bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
-                                 const ImageInfo& dstInfo, void* dstPixels,
-                                 const Point& glyphOffset) const {
+bool FTScalerContext::readPixels(GlyphID glyphID, bool, const Stroke*, const ImageInfo& dstInfo,
+                                 void* dstPixels, const Point& glyphOffset) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
@@ -865,7 +914,8 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   if (!colorFont) {
     auto face = ftTypeface()->face;
-    if (!loadOutlineGlyph(face, glyphID, fauxBold, false)) {
+    // Non-color synthetic bold outlines use path rendering instead of this glyph rasterizer.
+    if (!loadOutlineGlyph(face, glyphID, false, false)) {
       return false;
     }
     ClearPixels(dstInfo, dstPixels);
@@ -931,7 +981,7 @@ FTTypeface* FTScalerContext::ftTypeface() const {
 }
 
 bool FTScalerContext::loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxBold,
-                                       bool fauxItalic) const {
+                                       bool fauxItalic, bool noHinting) const {
   // FT_IS_SCALABLE is documented to mean the face contains outline glyphs.
   if (!FT_IS_SCALABLE(face) || setupSize(fauxItalic)) {
     return false;
@@ -939,6 +989,9 @@ bool FTScalerContext::loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxB
   auto flags = loadGlyphFlags;
   flags |= FT_LOAD_NO_BITMAP;  // ignore embedded bitmaps so we're sure to get the outline
   flags &= ~FT_LOAD_RENDER;    // don't scan convert (we just want the outline)
+  if (noHinting) {
+    flags |= FT_LOAD_NO_HINTING;
+  }
   auto err = FT_Load_Glyph(face, glyphID, flags);
   if (err != FT_Err_Ok || face->glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
     return false;
