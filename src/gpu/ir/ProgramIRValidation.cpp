@@ -141,6 +141,12 @@ bool ValidateStatement(const ProgramIR& program, const IRStatement& statement, s
         return false;
       }
       break;
+    case IRStatementKind::Discard:
+      if (!HasValue(program, statement.src)) {
+        *error = "a discard references an unknown condition value";
+        return false;
+      }
+      break;
     case IRStatementKind::StoreVarying:
       if (!HasValue(program, statement.dst.base) || !HasValue(program, statement.src)) {
         *error = "a varying store references an unknown value";
