@@ -303,12 +303,14 @@ void OpaqueContext::flushPendingContour(const Contour& contour, const Matrix& ma
       mergeContourBound(globalBounds);
     } else if (pendingContour.type == Contour::Type::RRect) {
       // Compute the largest axis-aligned rectangle inscribed in the RRect: inset each edge by
-      // the max of its two adjacent corner radii so the result stays fully inside all corner arcs.
+      // the max of its two adjacent corner radii scaled by (1 + smoothness), because smoothed
+      // corners extend (1 + smoothness) times their radius along each edge.
+      const auto rScale = 1.0f + pendingContour.rRect.smoothness();
       const auto& radii = pendingContour.rRect.radii();
-      const auto topY = std::max(radii[0].y, radii[1].y);
-      const auto bottomY = std::max(radii[2].y, radii[3].y);
-      const auto leftX = std::max(radii[0].x, radii[3].x);
-      const auto rightX = std::max(radii[1].x, radii[2].x);
+      const auto topY = std::max(radii[0].y, radii[1].y) * rScale;
+      const auto bottomY = std::max(radii[2].y, radii[3].y) * rScale;
+      const auto leftX = std::max(radii[0].x, radii[3].x) * rScale;
+      const auto rightX = std::max(radii[1].x, radii[2].x) * rScale;
       localBounds.setLTRB(localBounds.left + leftX, localBounds.top + topY,
                           localBounds.right - rightX, localBounds.bottom - bottomY);
       if (localBounds.isSorted()) {
