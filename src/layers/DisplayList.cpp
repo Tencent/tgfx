@@ -44,7 +44,7 @@ static constexpr int MAX_TILE_SIZE = 2048;
 static constexpr int MAX_ATLAS_SIZE = 4096;
 // Bounds the tile memory at roughly 2 GB (32 atlases of 64 MB). Every display resolution fits,
 // including 8K, so the bound only stops a surface far larger than any display from exhausting it.
-static constexpr int MAX_ATLAS_COUNT = 32;
+static constexpr size_t MAX_ATLAS_COUNT = 32;
 static constexpr size_t BLANK_MARKS_PER_TILE = 4;
 // Number of rects the per-layer cull loop can afford.
 static constexpr size_t MAX_CULL_RECTS = 32;
@@ -782,55 +782,51 @@ std::vector<Rect> DisplayList::drawTileTasks(
 
 void DisplayList::checkTileCount(Surface* renderSurface) {
   DEBUG_ASSERT(renderSurface != nullptr);
-  const auto surfaceWidth = renderSurface->width();
-  const auto surfaceHeight = renderSurface->height();
-  if (totalTileCount > 0 && surfaceWidth == lastSurfaceWidth &&
-      surfaceHeight == lastSurfaceHeight) {
+  auto width = renderSurface->width();
+  auto height = renderSurface->height();
+  if (totalTileCount > 0 && width == lastSurfaceWidth && height == lastSurfaceHeight) {
     return;
   }
-  lastSurfaceWidth = surfaceWidth;
-  lastSurfaceHeight = surfaceHeight;
-  auto countTiles = [surfaceWidth, surfaceHeight](float tileSize) {
-    return (FloatCeilToInt(static_cast<float>(surfaceWidth) / tileSize) + 2) *
-           (FloatCeilToInt(static_cast<float>(surfaceHeight) / tileSize) + 2);
+  lastSurfaceWidth = width;
+  lastSurfaceHeight = height;
+  auto countTiles = [width, height](float tileSize) {
+    auto countX = static_cast<size_t>(FloatCeilToInt(static_cast<float>(width) / tileSize) + 2);
+    auto countY = static_cast<size_t>(FloatCeilToInt(static_cast<float>(height) / tileSize) + 2);
+    return countX * countY;
   };
-  const auto tileSizeFloat = static_cast<float>(_tileSize);
+  auto tileSize = static_cast<float>(_tileSize);
   // A tree tile of the viewport's level covers more than half a tile size on screen.
-  const auto treeTileCount = countTiles(tileSizeFloat * 0.5f);
-  const auto gridTileCount = countTiles(tileSizeFloat);
-  totalTileCount = 2 * treeTileCount + gridTileCount;
-  auto maxTileCountPerAtlas = getMaxTileCountPerAtlas(renderSurface->getContext());
-  if (maxTileCountPerAtlas > 0) {
-    auto atlasCount = (totalTileCount + maxTileCountPerAtlas - 1) / maxTileCountPerAtlas;
-    totalTileCount = std::min(atlasCount, MAX_ATLAS_COUNT) * maxTileCountPerAtlas;
+  auto treeTiles = countTiles(tileSize * 0.5f);
+  auto gridTiles = countTiles(tileSize);
+  auto total = 2 * treeTiles + gridTiles;
+  auto maxTilesPerAtlas = static_cast<size_t>(getMaxTileCountPerAtlas(renderSurface->getContext()));
+  if (maxTilesPerAtlas > 0) {
+    auto atlasCount = (total + maxTilesPerAtlas - 1) / maxTilesPerAtlas;
+    total = std::min(atlasCount, MAX_ATLAS_COUNT) * maxTilesPerAtlas;
   }
+  totalTileCount = static_cast<int>(total);
+  // The grid is what draws this frame, so the fallback levels only get the slots it does not need.
+  minGridTileCount = std::min(gridTiles, total);
+  treeLevelCount = ComputeTreeLevelCount(total, minGridTileCount, treeTiles);
+  minTreeTileCount = TreeLevelTileCount(treeLevelCount, treeTiles);
   // Splitting by demand gives both types the same safety factor at any aspect ratio.
-  auto treeRatio =
-      static_cast<double>(treeTileCount) / static_cast<double>(treeTileCount + gridTileCount);
-  auto total = static_cast<size_t>(totalTileCount);
+  auto treeRatio = static_cast<double>(treeTiles) / static_cast<double>(treeTiles + gridTiles);
   auto treeQuota = static_cast<size_t>(std::lround(static_cast<double>(total) * treeRatio));
-  // MAX_ATLAS_COUNT can leave less than the viewport and the fallback levels need together. The grid
-  // is what draws the frame, so it keeps its demand first; the fallback levels come second and are
-  // dropped from the coarsest end until they fit, which keeps the chain completable.
-  auto gridDemand = std::min(static_cast<size_t>(gridTileCount), total);
-  minGridTileCount = gridDemand;
-  treeLevelCount = ComputeTreeLevelCount(total, gridDemand, treeTileCount);
-  minTreeTileCount =
-      treeLevelCount == 0
-          ? 0
-          : static_cast<size_t>(FloatCeilToInt(TreeLevelCoverageFactor(treeLevelCount) *
-                                               static_cast<float>(treeTileCount)));
-  treeQuota =
-      treeLevelCount == 0 ? 0 : std::min(std::max(treeQuota, minTreeTileCount), total - gridDemand);
+  if (treeLevelCount == 0) {
+    // Not even the finest level fits next to the grid, so the pool keeps nothing for fallbacks.
+    treeQuota = 0;
+  } else {
+    treeQuota = std::min(std::max(treeQuota, minTreeTileCount), total - minGridTileCount);
+  }
   tilePool->setQuota(TileType::Tree, treeQuota);
   tilePool->setQuota(TileType::Grid, total - treeQuota);
-  if (gridDemand > total || treeLevelCount < MAX_TREE_LEVEL_COUNT) {
+  if (gridTiles > total || treeLevelCount < MAX_TREE_LEVEL_COUNT) {
     LOGI(
-        "DisplayList::checkTileCount() %dx%d limits the pool to %zu tiles: the grid needs %zu and "
-        "%d fallback level(s) are kept.",
-        surfaceWidth, surfaceHeight, total, gridDemand, treeLevelCount);
+        "DisplayList::checkTileCount() %dx%d limits the pool to %zu tiles, %zu for the grid and "
+        "%d fallback level(s).",
+        width, height, total, minGridTileCount, treeLevelCount);
   }
-  blankTiles->setMaxCount(BLANK_MARKS_PER_TILE * static_cast<size_t>(totalTileCount));
+  blankTiles->setMaxCount(BLANK_MARKS_PER_TILE * total);
 }
 
 std::vector<DrawTask> DisplayList::invalidateTiles(const std::vector<Rect>& dirtyRegions,

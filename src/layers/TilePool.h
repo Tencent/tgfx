@@ -105,9 +105,15 @@ static constexpr int MAX_TREE_LEVEL_COUNT = 4;
 
 /**
  * Returns how many times the tiles of the finest fallback level are needed to cover the viewport
- * with the finest levelCount levels, i.e. 1 + 1/4 + ... . A levelCount of 0 returns 0.
+ * with the finest levelCount levels, i.e. 1 + 1/4 + ... .
  */
 float TreeLevelCoverageFactor(int levelCount);
+
+/**
+ * Returns the number of tiles the finest levelCount fallback levels need for a viewport that needs
+ * treeTileCount tiles for its finest level. A levelCount of 0 returns 0.
+ */
+size_t TreeLevelTileCount(int levelCount, size_t treeTileCount);
 
 /**
  * Returns how many fallback levels fit in a pool of totalTileCount slots that must also cover
@@ -115,7 +121,7 @@ float TreeLevelCoverageFactor(int levelCount);
  * from the coarsest end, because the grid always has to be drawn while a missing fallback only
  * makes the next zoom rasterize on the spot.
  */
-int ComputeTreeLevelCount(size_t totalTileCount, size_t gridDemand, int treeTileCount);
+int ComputeTreeLevelCount(size_t totalTileCount, size_t gridDemand, size_t treeTileCount);
 
 /**
  * TileKey identifies a tile in the pool. Grid tiles use scaleInt, which is never zero for a

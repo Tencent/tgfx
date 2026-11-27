@@ -41,11 +41,14 @@ float TreeLevelCoverageFactor(int levelCount) {
   return Coverage[levelCount - 1];
 }
 
-int ComputeTreeLevelCount(size_t totalTileCount, size_t gridDemand, int treeTileCount) {
+size_t TreeLevelTileCount(int levelCount, size_t treeTileCount) {
+  return static_cast<size_t>(
+      std::ceil(TreeLevelCoverageFactor(levelCount) * static_cast<float>(treeTileCount)));
+}
+
+int ComputeTreeLevelCount(size_t totalTileCount, size_t gridDemand, size_t treeTileCount) {
   for (int levels = MAX_TREE_LEVEL_COUNT; levels > 0; --levels) {
-    auto needed = static_cast<size_t>(
-        std::ceil(TreeLevelCoverageFactor(levels) * static_cast<float>(treeTileCount)));
-    if (gridDemand + needed <= totalTileCount) {
+    if (gridDemand + TreeLevelTileCount(levels, treeTileCount) <= totalTileCount) {
       return levels;
     }
   }
