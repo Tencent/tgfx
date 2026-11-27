@@ -263,6 +263,13 @@ class ShaderBuilder {
 
   ValueRef internValue(const std::string& name, SLType type, ValueOrigin origin);
 
+  /**
+   * Defines the clamped coordinate in the IR, statement for statement with the clamps the text
+   * emits. Without it a sampler that consumes the clamped name resolves nothing.
+   */
+  void recordClampSubsetsIR(const std::string& coordName, const std::string& extraSubset,
+                            const std::string& subset, const std::string& out);
+
   std::vector<std::string> shaderStrings;
   std::set<std::string> emittedFunctions = {};
   ShaderLibraryLanguage libraryLanguage = ShaderLibraryLanguage::GLSL;

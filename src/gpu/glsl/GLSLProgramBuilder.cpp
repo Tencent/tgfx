@@ -313,11 +313,15 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     // deduplicated and carries each function's own dependencies.
     for (const auto& expr : programIRBuilder().IR().exprs) {
       if (expr.kind == IRExprKind::TextureSample) {
-        // The printed texture read goes through the shared reader function; the rect samplers
-        // have their own.
-        _fragBuilder.appendFunction(
-            expr.samplerType == SLType::Texture2DRectSampler ? "tgfxTextureSampleRect"
-                                                             : "tgfxTextureSample");
+        // The printed texture read goes through the shared reader function; the rect and external
+        // samplers have their own.
+        const char* reader = "tgfxTextureSample";
+        if (expr.samplerType == SLType::Texture2DRectSampler) {
+          reader = "tgfxTextureSampleRect";
+        } else if (expr.samplerType == SLType::TextureExternalSampler) {
+          reader = "tgfxTextureSampleExternal";
+        }
+        _fragBuilder.appendFunction(reader);
         continue;
       }
       if (expr.kind != IRExprKind::Call) {
@@ -358,8 +362,8 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     const auto swizzle = programInfo->getOutputSwizzle();
     if (swizzle != Swizzle::RGBA()) {
       // The epilogue belongs inside main: swizzle the output before the closing brace.
-      fragmentBody += std::string(CUSTOM_COLOR_OUTPUT_NAME) + " = " +
-                      CUSTOM_COLOR_OUTPUT_NAME + "." + swizzle.c_str() + ";\n";
+      fragmentBody += std::string(CUSTOM_COLOR_OUTPUT_NAME) + " = " + CUSTOM_COLOR_OUTPUT_NAME +
+                      "." + swizzle.c_str() + ";\n";
     }
     fragmentBody += "}\n";
     _fragBuilder.setCodeText(fragmentBody);

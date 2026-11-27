@@ -41,6 +41,25 @@ std::string FormatFloat(float value) {
   return text;
 }
 
+/// The channel selection a read applies to its result. The 2D reader carries it as a code
+/// argument; the rect and external readers take no code, so the same selection rides as a suffix.
+const char* ReadSwizzleSuffix(int32_t code) {
+  switch (code) {
+    case 1:
+      return ".rrrr";
+    case 2:
+      return ".rrra";
+    case 3:
+      return ".rgrg";
+    case 4:
+      return ".aaaa";
+    case 5:
+      return ".bgra";
+    default:
+      return "";
+  }
+}
+
 const char* GLSLTypeName(SLType type) {
   switch (type) {
     case SLType::Float:
@@ -221,9 +240,16 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
           !GLSLOperatorEmitter::EmitValue(program, expr.args[1], &coord, error)) {
         return false;
       }
-      if (expr.samplerType == SLType::Texture2DRectSampler) {
-        // The rect reader takes the sampler and coordinate alone (no subset clamp, no swizzle).
-        *expression = "tgfxTextureSampleRect(" + sampler + ", " + coord + ")";
+      if (expr.samplerType == SLType::Texture2DRectSampler ||
+          expr.samplerType == SLType::TextureExternalSampler) {
+        // The rect and external readers take the sampler and coordinate alone: no subset clamp and
+        // no swizzle code. The channel selection they cannot carry rides as a suffix, which is how
+        // the text route spells the same read.
+        const char* reader = expr.samplerType == SLType::Texture2DRectSampler
+                                 ? "tgfxTextureSampleRect"
+                                 : "tgfxTextureSampleExternal";
+        *expression = std::string(reader) + "(" + sampler + ", " + coord + ")" +
+                      ReadSwizzleSuffix(expr.samplerSwizzleCode);
         return true;
       }
       // A plain sample (no swizzle code recorded) reads the sampler's own channels, which the
@@ -233,8 +259,8 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
       std::string subset = "vec4(0.0)";
       std::string clampOn = "0";
       if (expr.subsetClamped) {
-        const ValueID subsetValue = expr.strictSubset != INVALID_VALUE_ID ? expr.strictSubset
-                                                                          : expr.drawSubset;
+        const ValueID subsetValue =
+            expr.strictSubset != INVALID_VALUE_ID ? expr.strictSubset : expr.drawSubset;
         if (subsetValue != INVALID_VALUE_ID && subsetValue < program.values.size()) {
           std::string subsetName = {};
           if (ValueName(program, subsetValue, &subsetName, error)) {
@@ -243,8 +269,8 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
           }
         }
       }
-      *expression = "tgfxTextureSample(" + sampler + ", " + coord + ", " + subset + ", " +
-                    clampOn + ", " + std::to_string(swizzleCode) + ")";
+      *expression = "tgfxTextureSample(" + sampler + ", " + coord + ", " + subset + ", " + clampOn +
+                    ", " + std::to_string(swizzleCode) + ")";
       return true;
     }
     case IRExprKind::Builtin:

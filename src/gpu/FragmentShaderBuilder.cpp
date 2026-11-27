@@ -59,6 +59,7 @@ std::string FragmentShaderBuilder::clampToSubsets(const std::string& coordName,
   if (!subset.empty()) {
     appendCall(out, entry, {out, subset});
   }
+  recordClampSubsetsIR(coordName, extraSubset, subset, out);
   return out;
 }
 
@@ -74,8 +75,9 @@ TextureReadResult FragmentShaderBuilder::readTexture(
   auto sampler = uniformHandler->getSamplerVariable(handle);
   const char* reader = TextureReaderName(sampler.type());
   const bool carriesSubset = sampler.type() == SLType::Texture2DSampler;
-  const int swizzleCode =
-      carriesSubset ? ReadSwizzleCode(uniformHandler->getSamplerSwizzle(handle)) : -1;
+  // The read records the selection whatever the reader: the 2D function takes it as a code
+  // argument, the rect and external readers apply it as the result's suffix.
+  const int swizzleCode = ReadSwizzleCode(uniformHandler->getSamplerSwizzle(handle));
   auto entry = reader == nullptr ? std::string() : appendFunction(reader);
   const std::string temp = "tgfxRead" + std::to_string(tempCallIndex++);
   const bool clampInside = !strictSubset.empty() || !drawSubset.empty();
@@ -306,14 +308,14 @@ std::string FragmentShaderBuilder::emitPerspTextCoord(const CoordValue& coordVar
     // registers an undefined value (the class of unresolved-name failures).
     {
       auto& ir = programBuilder->programIRBuilder();
-      const auto sourceValue = ir.InternValue(coordVar.name(), SLType::Float3, Precision::High,
-                                              IRValueKind::Varying);
+      const auto sourceValue =
+          ir.InternValue(coordVar.name(), SLType::Float3, Precision::High, IRValueKind::Varying);
       if (sourceValue != INVALID_VALUE_ID) {
         const auto xy = ir.CreateSwizzle(sourceValue, SLType::Float2, "xy");
         const auto z = ir.CreateSwizzle(sourceValue, SLType::Float, "z");
         const auto projected = ir.CreateBinary(IRBinaryOp::Div, SLType::Float2, xy, z);
-        const auto perspValue = ir.InternValue(perspCoordName, SLType::Float2, Precision::High,
-                                               IRValueKind::Local);
+        const auto perspValue =
+            ir.InternValue(perspCoordName, SLType::Float2, Precision::High, IRValueKind::Local);
         if (perspValue != INVALID_VALUE_ID) {
           ir.Assign({perspValue, ""}, projected);
         }

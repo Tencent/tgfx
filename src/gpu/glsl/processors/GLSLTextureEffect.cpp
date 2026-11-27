@@ -156,10 +156,10 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
       if (args.inputValue != INVALID_VALUE_ID) {
         if (textureProxy->isAlphaOnly()) {
           result = args.irBuilder->CreateCall(OperatorID::AlphaModulate, SLType::Float4,
-                                               {read.value, args.inputValue}, read.name);
+                                              {read.value, args.inputValue}, read.name);
         } else {
           result = args.irBuilder->CreateCall(OperatorID::MulAlpha, SLType::Float4,
-                                               {read.value, args.inputValue}, read.name);
+                                              {read.value, args.inputValue}, read.name);
         }
       }
       args.irBuilder->StoreOutput(args.outputValue, result);
@@ -275,8 +275,12 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     if (sampler == INVALID_VALUE_ID || coordinate == INVALID_VALUE_ID) {
       return;
     }
-    const auto sample = args.irBuilder->CreateTextureSample(sampler, coordinate, SLType::Float4, {},
-                                                            SLType::Texture2DSampler);
+    // The plane readers follow the sampler the install walk registered; the channel selection is
+    // spelled by the swizzle below, so the read carries no code of its own.
+    const auto samplerType =
+        uniformHandler->getSamplerVariable(textureSamplers[samplerIndex]).type();
+    const auto sample =
+        args.irBuilder->CreateTextureSample(sampler, coordinate, SLType::Float4, {}, samplerType);
     const auto channel = args.irBuilder->CreateSwizzle(sample, type, swizzle);
     const auto base =
         args.irBuilder->InternValue(baseName, baseName == "yuv" ? SLType::Float3 : SLType::Float,
@@ -352,6 +356,20 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     auto alphaStartName =
         uniformHandler->addUniform("AlphaStart", UniformFormat::Float2, ShaderStage::Fragment);
     std::string alphaVertexColor = "alphaVertexColor";
+    if (args.irBuilder != nullptr) {
+      // The text route spells the offset coordinate as an alias; the IR needs the defining
+      // binary, or the alpha sample below references a name nothing declares.
+      const auto alphaStartValue = args.irBuilder->InternValue(
+          alphaStartName, SLType::Float2, Precision::High, IRValueKind::Uniform);
+      const auto finalCoordValue = args.irBuilder->InternValue(finalCoordName, SLType::Float2,
+                                                               Precision::High, IRValueKind::Local);
+      if (alphaStartValue == INVALID_VALUE_ID || finalCoordValue == INVALID_VALUE_ID) {
+        args.irBuilder->MarkFailed("the alpha texture coordinate could not be recorded");
+        return;
+      }
+      args.irBuilder->CreateBinary(IRBinaryOp::Add, SLType::Float2, finalCoordValue,
+                                   alphaStartValue, alphaVertexColor);
+    }
     fragBuilder->aliasValue("alphaVertexColor", finalCoordName + " + " + alphaStartName,
                             "highp vec2");
     fragBuilder->aliasValue(
