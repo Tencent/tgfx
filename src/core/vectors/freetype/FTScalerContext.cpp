@@ -613,6 +613,10 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
 }
 
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
+  // Generating the stroked path per glyph is heavier than FT_Load_Glyph + CBox, but it is the only
+  // way bounds and rendering describe the same geometry. A conservative outset of the unbolded
+  // bounds (what CGScalerContext does) would be cheaper and still contain the path; switch to that
+  // if profiling ever shows this on a hot path.
   if (fauxBold && !hasColor() && hasOutlines()) {
     Path path;
     if (!generatePath(glyphID, true, fauxItalic, &path)) {
@@ -884,10 +888,15 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
   USE(isColorVector);
   USE(glyphOffset);
 #endif
+  // Kept for signature compatibility: the bitmap branch below never applies synthetic bold.
+  USE(fauxBold);
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   if (!colorFont) {
     auto face = ftTypeface()->face;
-    if (!loadOutlineGlyph(face, glyphID, fauxBold, false)) {
+    // Synthetic bold never reaches this bitmap path: getImageTransform() routes outline faces to
+    // path rendering, and a bitmap-only face cannot load an outline at all. Keep the load
+    // unbolded so this cannot silently diverge from the stroked path used elsewhere.
+    if (!loadOutlineGlyph(face, glyphID, false, false)) {
       return false;
     }
     ClearPixels(dstInfo, dstPixels);
