@@ -31,7 +31,8 @@ class SurfaceTextureReader : public ImageReader {
  public:
   /**
    * Creates a new SurfaceTextureReader with the specified image size and listener. Returns nullptr
-   * if either dimension is not positive, the listener is null, or initialization fails.
+   * if either dimension is not positive, the listener is null, or initialization fails. This reader
+   * is unavailable in builds using the Vulkan backend.
    * @param width The positive width of generated ImageBuffers.
    * @param height The positive height of generated ImageBuffers.
    * @param listener A java object that implements the SurfaceTexture.OnFrameAvailableListener

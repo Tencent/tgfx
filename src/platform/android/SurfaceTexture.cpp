@@ -166,7 +166,7 @@ std::shared_ptr<SurfaceTexture> SurfaceTexture::Make(int width, int height, jobj
   }
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
-    LOGE("SurfaceImageReader::MakeFrom(): failed to create a new SurfaceTexture!");
+    LOGE("SurfaceTexture::Make(): failed to create a new SurfaceTexture!");
     return nullptr;
   }
   auto looper = GetGlobalLooper();
@@ -176,7 +176,7 @@ std::shared_ptr<SurfaceTexture> SurfaceTexture::Make(int width, int height, jobj
   SetOnFrameAvailableListener(env, stObject, listener, looper);
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
-    LOGE("SurfaceImageReader::MakeFrom(): failed to set the OnFrameAvailableListener!");
+    LOGE("SurfaceTexture::Make(): failed to set the OnFrameAvailableListener!");
     return nullptr;
   }
   return std::shared_ptr<SurfaceTexture>(new SurfaceTexture(width, height, env, stObject));
@@ -278,7 +278,8 @@ ImageStream::ReadResult SurfaceTexture::onReadTexture(Context* context, bool,
   // sequences whose alpha plane is packed next to the color plane, displaced alpha against color
   // and exposed the black background of the video as an outline around the content. The padding
   // rows are kept out of the sampling by the subset clamp that needSubset() enables for external
-  // textures.
+  // textures. An unavailable or rejected estimate uses the requested content size; this fallback
+  // does not guarantee correct sampling of padded buffers.
   auto descriptorWidth = textureSize.isEmpty() ? width() : textureSize.width;
   auto descriptorHeight = textureSize.isEmpty() ? height() : textureSize.height;
   TextureDescriptor descriptor = {descriptorWidth,
@@ -312,7 +313,7 @@ unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
     gl->deleteTextures(1, &textureID);
-    LOGE("NativeImageReader::makeTexture(): failed to attached to a SurfaceTexture!");
+    LOGE("SurfaceTexture::makeExternalOESTexture(): failed to attach to a SurfaceTexture!");
     return 0;
   }
   return textureID;
@@ -451,7 +452,8 @@ bool SurfaceTexture::latchTexImage(JNIEnv* env) {
       return false;
     }
     env->DeleteLocalRef(floatArray);
-    // Content dimensions are fixed; retain the first successfully recovered buffer padding.
+    // Assume fixed dimensions and padding. Cache the first matrix's estimate, even when empty;
+    // an empty estimate selects content-size fallback and later matrix changes are not retried.
     textureSize = ComputeTextureSize(matrix, width(), height());
     textureSizeResolved = true;
   }
