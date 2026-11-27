@@ -24,6 +24,7 @@
 #include "gpu/ir/ProgramBodyPrinter.h"
 #include "gpu/ir/ProgramIRValidation.h"
 #include "gpu/ir/ProgramValidation.h"
+#include "gpu/FragmentShaderBuilder.h"
 #include "gpu/metal/MSLPrinter.h"
 #include "gpu/shaders/ShaderLibraryBundle.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
@@ -206,10 +207,17 @@ std::shared_ptr<Program> MetalProgramBuilder::finalize() {
       _fragBuilder.appendFunction(symbol);
     }
     const auto vertexBody = MSLPrinter::PrintVertexBodyFromIR(ir);
-    const auto fragmentBody = MSLPrinter::PrintFragmentBodyFromIR(ir);
+    auto fragmentBody = MSLPrinter::PrintFragmentBodyFromIR(ir);
     if (vertexBody.empty() || fragmentBody.empty()) {
       LOGE("MetalProgramBuilder: the stage bodies cannot be printed from the IR");
       return nullptr;
+    }
+    // Alpha-only targets read the fragment's alpha channel, the same epilogue the GL route
+    // appends before the stage returns its color.
+    const auto swizzle = getProgramInfo()->getOutputSwizzle();
+    if (swizzle != Swizzle::RGBA()) {
+      fragmentBody += std::string(CUSTOM_COLOR_OUTPUT_NAME) + " = " + CUSTOM_COLOR_OUTPUT_NAME +
+                      "." + swizzle.c_str() + ";\n";
     }
     _vertexBuilder.setCodeText(vertexBody);
     _fragBuilder.setCodeText(fragmentBody);
