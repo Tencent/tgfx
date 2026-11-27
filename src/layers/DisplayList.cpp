@@ -91,7 +91,11 @@ class DrawTask {
   }
 
   /**
-   * Returns the rectangle of the tile in the zoomed display list grid.
+   * Returns the area this task covers in the grid its scale applies to. A rasterization task keeps
+   * its tiles' raster grid, which is the zoom grid for a grid task and the raster grid of treeLevel()
+   * for a tree task, so drawTileTasks() scales the latter by zoomScale / GetTileRasterScale(level).
+   * A screen task is built with the inverse of that ratio and therefore reports zoom grid
+   * coordinates, which is what drawScreenTasks() expects.
    */
   const Rect& tileRect() const {
     return _tileRect;
