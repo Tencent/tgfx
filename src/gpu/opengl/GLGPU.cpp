@@ -242,7 +242,7 @@ std::shared_ptr<ShaderModule> GLGPU::createShaderModule(const ShaderModuleDescri
     gl->getShaderInfoLog(shader, 512, nullptr, infoLog);
     LOGE("Could not compile shader:\n%s\ntype:%d info%s", code.c_str(), shaderType, infoLog);
     gl->deleteShader(shader);
-    shader = 0;
+    return nullptr;
   }
 #endif
   return makeResource<GLShaderModule>(shader);
