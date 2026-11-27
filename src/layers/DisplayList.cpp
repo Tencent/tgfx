@@ -583,7 +583,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
 std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) const {
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
-  if (_root->hasBackgroundStyle()) {
+  if (_root->hasBackgroundStyle(1.0f)) {
     snapshotMap = captureBackgrounds(surface, {surfaceRect}, getViewMatrix());
   }
   drawRootLayer(surface, surfaceRect, getViewMatrix(), autoClear, snapshotMap.get());
@@ -652,7 +652,7 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   // Pass the full rect list so each replay is scoped to a single rect; otherwise Layers in the
   // gaps between scattered dirty regions get skipped.
   std::unique_ptr<BackgroundSnapshotMap> snapshotMap = nullptr;
-  if (_root->hasBackgroundStyle()) {
+  if (_root->hasBackgroundStyle(1.0f)) {
     snapshotMap = captureBackgrounds(surface, renderRects, viewMatrix);
   }
   auto canvas = surface->getCanvas();
@@ -710,7 +710,7 @@ void DisplayList::captureBackgroundsByLevel(
   // current zoom.
   levelSnapshots->clear();
   taskSnapshotIndex->assign(tileTasks.size(), -1);
-  if (_root->hasBackgroundStyle()) {
+  if (_root->hasBackgroundStyle(1.0f)) {
     // Group by level first: one capture transform cannot serve two raster scales.
     std::vector<std::pair<int, std::vector<size_t>>> levels = {};
     for (size_t i = 0; i < tileTasks.size(); ++i) {
@@ -1766,7 +1766,8 @@ std::vector<Rect> DisplayList::narrowCullRects(const std::vector<Rect>& footprin
 // draws would break that, so the stroke measurement of rects, round rects and ovals stopped adding
 // a miter those shapes cannot reach.
 void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bounds, bool clipped,
-                                              bool covered, std::vector<Rect>* footprints) {
+                                              bool covered, std::vector<Rect>* footprints,
+                                              float alpha) {
   if (layer->maxBackgroundOutset <= 0 || !layer->bitFields.visible || layer->_alpha <= 0 ||
       !Rect::Intersects(bounds, layer->renderBounds)) {
     return;
@@ -1775,7 +1776,7 @@ void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bo
     clipped = true;
     covered = false;
   }
-  if (!covered && layer->hasOwnBackgroundStyle()) {
+  if (!covered && layer->hasOwnBackgroundStyle(alpha)) {
     auto footprint = layer->renderBounds;
     if (clipped) {
       footprint.outset(layer->maxBackgroundOutset, layer->maxBackgroundOutset);
@@ -1787,13 +1788,14 @@ void DisplayList::collectBackgroundFootprints(const Layer* layer, const Rect& bo
     covered = true;
   }
   for (const auto& child : layer->_children) {
-    collectBackgroundFootprints(child.get(), bounds, clipped, covered, footprints);
+    collectBackgroundFootprints(child.get(), bounds, clipped, covered, footprints,
+                                alpha * child->_alpha);
   }
 }
 
 std::vector<Rect> DisplayList::collectBackgroundFootprints(const Rect& worldBounds) const {
   std::vector<Rect> footprints = {};
-  collectBackgroundFootprints(_root.get(), worldBounds, false, false, &footprints);
+  collectBackgroundFootprints(_root.get(), worldBounds, false, false, &footprints, 1.0f);
   return footprints;
 }
 
@@ -1838,7 +1840,7 @@ bool DisplayList::HasVisibleBackgroundStyle(const Layer* layer, const Rect& unio
 std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     Surface* surface, const std::vector<Rect>& renderRects, const Matrix& viewMatrix) const {
   DEBUG_ASSERT(surface != nullptr);
-  if (!_root->hasBackgroundStyle()) {
+  if (!_root->hasBackgroundStyle(1.0f)) {
     return nullptr;
   }
   if (renderRects.empty()) {
@@ -1930,7 +1932,7 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     bgSource->getCanvas()->drawColor(_backgroundColor, BlendMode::SrcOver);
   }
   BackgroundCapturer::Run(_root.get(), args, std::move(bgSource), snapshotMap.get(), cullWorldRects,
-                          worldRects);
+                          worldRects, 1.0f);
   return snapshotMap;
 }
 

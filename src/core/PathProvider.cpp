@@ -33,6 +33,10 @@ class PathProviderWrapper final : public PathProvider {
     return _path.getBounds();
   }
 
+  PathFillType fillType() const override {
+    return _path.getFillType();
+  }
+
  private:
   Path _path;
 };

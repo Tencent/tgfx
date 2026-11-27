@@ -36,6 +36,8 @@ class UniqueKey;
  * expensive to compute and not required immediately. It can leverage multi-threading to compute the
  * path in parallel during drawing and cache the rasterized form in the GPU for repeated drawing.
  * Shape is thread-safe and immutable once created.
+ *
+ * fillType() and isInverseFillType() may need to compute the path.
  */
 class Shape {
  public:
@@ -73,7 +75,7 @@ class Shape {
 
   /**
    * Merges multiple Shapes into a new Shape using the PathOp::Append operation. Returns nullptr if
-   * the shape vector is empty.
+   * the shape vector is empty or contains only nullptr.
    */
   static std::shared_ptr<Shape> Merge(const std::vector<std::shared_ptr<Shape>>& shapes);
 
@@ -127,14 +129,14 @@ class Shape {
   }
 
   /**
-   * Returns the PathFillType of the Shape.
+   * Returns the fill type of the path returned by getPath(). May compute the path.
    */
   virtual PathFillType fillType() const = 0;
 
   /**
-   * Returns true if the PathFillType is InverseWinding or InverseEvenOdd.
+   * Returns true if fillType() is InverseWinding or InverseEvenOdd. May compute the path.
    */
-  bool isInverseFillType() const;
+  virtual bool isInverseFillType() const;
 
   /**
    * Returns the bounding box of the Shape. The bounds might be larger than the actual shape because

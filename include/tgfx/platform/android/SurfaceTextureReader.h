@@ -24,15 +24,17 @@
 namespace tgfx {
 /**
  * The SurfaceTextureReader class allows direct access to image data rendered into a SurfaceTexture
- * object on the android platform. SurfaceTextureReader is safe across threads.
+ * object on the Android platform. Frame notifications may arrive on another thread. Texture reads
+ * must run on the owning GL context, and color-space access must be serialized with texture reads.
  */
 class SurfaceTextureReader : public ImageReader {
  public:
   /**
    * Creates a new SurfaceTextureReader with the specified image size and listener. Returns nullptr
-   * if the image size is zero or the listener is null.
-   * @param width The width of generated ImageBuffers.
-   * @param height The height of generated ImageBuffers.
+   * if either dimension is not positive, the listener is null, or initialization fails. This reader
+   * is unavailable in builds using the Vulkan backend.
+   * @param width The positive width of generated ImageBuffers.
+   * @param height The positive height of generated ImageBuffers.
    * @param listener A java object that implements the SurfaceTexture.OnFrameAvailableListener
    * interface. The implementation should make a native call to the notifyFrameAvailable() of the
    * returned SurfaceTextureReader.
@@ -41,14 +43,17 @@ class SurfaceTextureReader : public ImageReader {
 
   /**
    * Creates a new Java Surface object connected to the underlying SurfaceTexture. Each call returns
-   * a fresh Surface. The caller owns the returned object and must call Surface.release() when done.
+   * a fresh Surface as a JNI local reference in the caller's current local-reference frame.
+   * @return The new Surface, or nullptr if creation fails. The caller must call Surface.release()
+   * and delete the local reference when done.
    */
   jobject createInputSurface() const;
 
   /**
-   * Notifies that the previously returned ImageBuffer is now available for texture generation.
-   * Otherwise, the previous ImageBuffer will remain blocked for texture generation until this method
-   * is called. This method should be invoked by the listener provided when creating the reader.
+   * Records a frame-availability hint and wakes a pending texture read. Notifications may be
+   * coalesced and do not count queued frames or guarantee a requested timestamp. The listener
+   * provided when creating the reader should invoke this method, possibly on another thread.
+   * A texture read waits for up to one second; individual native calls are not time bounded.
    */
   void notifyFrameAvailable();
 

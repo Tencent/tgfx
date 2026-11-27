@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <emscripten/emscripten.h>
+#include <cstdio>
 #include <string>
 #include "base/TestEnvironment.h"
 #include "gtest/gtest.h"
@@ -46,31 +47,58 @@ static void initTests() {
   }
 }
 
+static int runTests() {
+  auto result = RUN_ALL_TESTS();
+  if (testing::UnitTest::GetInstance()->test_to_run_count() == 0) {
+    std::printf("The test filter matched no tests.\n");
+    result = 1;
+  }
+  tgfx::Baseline::ReportMissingCache();
+  return result;
+}
+
 extern "C" {
+
+/**
+ * Returns the compiled test mode, backend, and source revision for the browser runner.
+ */
+EMSCRIPTEN_KEEPALIVE
+const char* GetTestConfiguration() {
+#ifdef UPDATE_BASELINE
+  static const char* mode = "reference";
+#else
+  static const char* mode = "verify";
+#endif
+  static const std::string configuration = std::string("{\"mode\":\"") + mode +
+                                           "\",\"backend\":\"" TGFX_BACKEND_NAME
+                                           "\",\"commit\":\"" TGFX_TEST_COMMIT "\"}";
+  return configuration.c_str();
+}
 
 EMSCRIPTEN_KEEPALIVE
 int RunAllTests() {
   initTests();
-  auto result = RUN_ALL_TESTS();
-  tgfx::Baseline::ReportMissingCache();
-  return result;
+  testing::GTEST_FLAG(filter) = excludeFilter[0] != '\0' ? excludeFilter : "*";
+  return runTests();
 }
 
 EMSCRIPTEN_KEEPALIVE
 int RunTest(const char* filter) {
-  initTests();
-  if (filter != nullptr && filter[0] != '\0') {
-    if (excludeFilter[0] != '\0') {
-      testing::GTEST_FLAG(filter) = std::string(filter) + ":" + excludeFilter;
-    } else {
-      testing::GTEST_FLAG(filter) = filter;
-    }
-  } else if (excludeFilter[0] != '\0') {
-    testing::GTEST_FLAG(filter) = excludeFilter;
+  if (filter == nullptr || filter[0] == '\0') {
+    std::printf("The test filter must not be empty.\n");
+    return 1;
   }
-  auto result = RUN_ALL_TESTS();
-  tgfx::Baseline::ReportMissingCache();
-  return result;
+  initTests();
+  std::string testFilter = filter;
+  if (excludeFilter[0] != '\0') {
+    if (testFilter.find('-') == std::string::npos) {
+      testFilter += excludeFilter;
+    } else {
+      testFilter += ":";
+      testFilter += excludeFilter + 1;
+    }
+  }
+  testing::GTEST_FLAG(filter) = testFilter;
+  return runTests();
 }
-
 }

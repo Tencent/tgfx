@@ -532,8 +532,10 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
   dstClip.addRect(dstRect);
   dstClip.transform(matrix);
   auto outerClipPath = clip.getClipPath();
-  if (!outerClipPath.isEmpty()) {
-    dstClip.addPath(outerClipPath, PathOp::Intersect);
+  if (!outerClipPath.isEmpty() && !dstClip.addPath(outerClipPath, PathOp::Intersect)) {
+    // A failed Intersect leaves the destination rectangle behind, which is the unclipped image.
+    // That is the one answer that widens what gets drawn, so drop the drawing instead.
+    return;
   }
   if (dstClip.isEmpty()) {
     return;

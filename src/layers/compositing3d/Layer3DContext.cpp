@@ -69,7 +69,7 @@ void Layer3DContext::collectNodes(Layer* layer, const Matrix3D& transform, float
     bounds = layer->getBounds();
   }
   if (!bounds.isEmpty()) {
-    emitNode(layer, bounds, transform, alpha, depth, layer->hasBackgroundStyle());
+    emitNode(layer, bounds, transform, alpha, depth, layer->hasBackgroundStyle(alpha));
   }
   if (!layer->canPreserve3D()) {
     return;

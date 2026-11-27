@@ -31,7 +31,7 @@ class VideoElement : public ImageStream {
  public:
   /**
    * Creates a new VideoElement from the specified HTMLVideoElement object and the video size.
-   * Returns nullptr if the video is null or the buffer size is zero.
+   * Returns nullptr if the video is null or either dimension is non-positive.
    */
   static std::shared_ptr<VideoElement> MakeFrom(emscripten::val video, int width, int height);
 
@@ -40,9 +40,8 @@ class VideoElement : public ImageStream {
   }
 
  protected:
-  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override;
-
-  bool onUpdateTexture(std::shared_ptr<TextureView> textureView) override;
+  ReadResult onReadTexture(Context* context, bool mipmapped,
+                           std::shared_ptr<TextureView> textureView, int64_t timestamp) override;
 
  private:
   emscripten::val source = emscripten::val::null();
@@ -53,5 +52,9 @@ class VideoElement : public ImageStream {
 #endif
 
   VideoElement(emscripten::val video, int width, int height);
+
+  std::shared_ptr<TextureView> makeTexture(Context* context, bool mipmapped);
+
+  void uploadTexture(const std::shared_ptr<TextureView>& textureView);
 };
 }  // namespace tgfx

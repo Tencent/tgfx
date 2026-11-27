@@ -22,6 +22,7 @@
 #include <mutex>
 #include <vector>
 #include "tgfx/core/ColorSpace.h"
+#include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -58,16 +59,22 @@ class ImageStream {
   ImageStream(int width, int height) : _width(width), _height(height) {
   }
 
-  /**
-   * Creates a new TextureView capturing the pixels in the ImageBuffer. The mipmapped parameter
-   * specifies whether created texture view must allocate mip map levels.
-   */
-  virtual std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) = 0;
+  struct ReadResult {
+    std::shared_ptr<TextureView> textureView = nullptr;
+    ImageBufferStatus status = ImageBufferStatus::Failed;
+    // Set true for every native latch, pixel write or unknown mutation, including failed attempts.
+    // False promises the supplied texture and pixels stayed intact. Failed changes cannot be a
+    // fallback; Timeout changes must retain a valid latched image, never partial or unknown pixels.
+    bool contentChanged = false;
+  };
 
   /**
-   * Updates the specified bounds of the texture view with the pixels in the ImageBuffer.
+   * Reads the frame with the given timestamp into the texture view, creating the texture view if
+   * it is nullptr. Reads the next available frame if the timestamp is -1. Sources return only
+   * Ready, Timeout or Failed; Pending and Expired are reader-owned lifetime states.
    */
-  virtual bool onUpdateTexture(std::shared_ptr<TextureView> textureView) = 0;
+  virtual ReadResult onReadTexture(Context* context, bool mipmapped,
+                                   std::shared_ptr<TextureView> textureView, int64_t timestamp) = 0;
 
  private:
   int _width = 0;

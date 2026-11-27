@@ -666,8 +666,18 @@ Path ClipStack::getClipPath() const {
   auto& elems = elements();
   for (size_t i = oldestValidIndex(); i < elems.size(); ++i) {
     const auto& element = elems[i];
-    if (element.isValid()) {
-      result.addPath(element.getDevicePath(), PathOp::Intersect);
+    if (!element.isValid()) {
+      continue;
+    }
+    // A failed Intersect leaves the accumulated path behind, which would widen the clip and draw
+    // more than the caller intends. An empty path means "no clipping" to callers, so return a
+    // zero-area path instead: it is non-empty but clips everything away, keeping every consumer
+    // on the fail-closed side without changing the getClipPath() contract.
+    if (!result.addPath(element.getDevicePath(), PathOp::Intersect)) {
+      LOGE("ClipStack::getClipPath() Failed to intersect a clip element; clipping everything.");
+      Path emptyClip = {};
+      emptyClip.addRect(Rect::MakeWH(0, 0));
+      return emptyClip;
     }
   }
   return result;
