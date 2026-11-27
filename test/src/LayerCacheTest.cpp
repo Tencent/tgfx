@@ -485,6 +485,22 @@ TGFX_TEST_PRIVATE(LayerCacheTest, SimpleShapeSkipsCache) {
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(parentLayer->subtreeCache != nullptr));
   // Child rect should not have subtree cache (simple leaf)
   TGFX_PRIVATE_ACCESS(EXPECT_TRUE(childRect->subtreeCache == nullptr));
+
+  // Test 7: Layer whose children draw nothing - should NOT create subtree cache
+  auto emptyGroup = Layer::Make();
+  emptyGroup->setMatrix(Matrix::MakeTrans(10, 130));
+  emptyGroup->addChild(Layer::Make());
+  auto emptyShape = ShapeLayer::Make();
+  emptyShape->setPath(Path());
+  emptyShape->setFillStyle(ShapeStyle::Make(Color::Black()));
+  emptyGroup->addChild(emptyShape);
+  root->addChild(emptyGroup);
+
+  displayList->render(surface.get());
+  displayList->render(surface.get());
+
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(emptyGroup->getBounds().isEmpty());
+                      EXPECT_TRUE(emptyGroup->subtreeCache == nullptr));
 }
 
 TGFX_TEST_PRIVATE(LayerCacheTest, DirtyFlag) {

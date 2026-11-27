@@ -180,7 +180,7 @@ class BackgroundCapturer : public BackgroundHandler {
 
   // Runs a capture pass: replays captureRoot onto bgSource's canvas, populating snapshots. The
   // replay walks the tree exactly once with renderRects set to the rects the capture actually
-  // samples, so drawLayer culls each layer whose renderBounds does not intersect any of them.
+  // samples, so drawChildren culls each child whose renderBounds does not intersect any of them.
   // styleSourceRects covers the whole captured area: the layer style sources it caches are reused
   // outside those cull rects, so they are recorded against this wider set instead.
   // alpha is the draw alpha of the consume pass: both sides push and read the same snapshots only

@@ -709,6 +709,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasValidMask() const;
 
+  // Whether the layer shows only inside its mask's bounds. An inverted mask shows the layer outside
+  // the mask instead, so the mask's bounds do not limit it.
+  bool isClippedToMaskBounds() const;
+
+  void clearRenderBounds();
+
   // `alpha` is the alpha that reaches this layer from its ancestors. It keeps accumulating through
   // an offscreen boundary on purpose: the subtree drawn offscreen composites with the group alpha
   // afterwards, which leaves a style output and the content under it equally translucent, so the

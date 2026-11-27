@@ -1079,4 +1079,160 @@ TGFX_TEST(LayerMaskTest, MaskUnderPreserve3DParent) {
   EXPECT_EQ(outsidePixel, 0xFFFFFFFFu);
 }
 
+// An inverted mask shows its layer outside the mask, so the mask's bounds must not shrink the
+// layer's bounds: with a mask that draws nothing or lies elsewhere, the whole layer is visible.
+TGFX_TEST(LayerMaskTest, InvertedMaskKeepsBounds) {
+  TGFX_PRIVATE_ACCESS({
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto surface = Surface::Make(context, 300, 200);
+    DisplayList list;
+    Path contentPath;
+    contentPath.addRect(Rect::MakeWH(100, 100));
+    auto group = Layer::Make();
+    list.root()->addChild(group);
+    auto content = ShapeLayer::Make();
+    content->setPath(contentPath);
+    content->setFillStyle(ShapeStyle::Make(Color::Red()));
+    group->addChild(content);
+    auto disjointMask = ShapeLayer::Make();
+    disjointMask->setPath(contentPath);
+    disjointMask->setFillStyle(ShapeStyle::Make(Color::Black()));
+    disjointMask->setMatrix(Matrix::MakeTrans(200, 0));
+    list.root()->addChild(disjointMask);
+    content->setMask(disjointMask);
+
+    content->setMaskType(LayerMaskType::Alpha);
+    list.render(surface.get());
+    EXPECT_TRUE(group->getBounds().isEmpty());
+    EXPECT_TRUE(content->renderBounds.isEmpty());
+
+    for (auto type : {LayerMaskType::AlphaInverted, LayerMaskType::LuminanceInverted,
+                      LayerMaskType::ContourInverted}) {
+      content->setMaskType(type);
+      list.render(surface.get());
+      EXPECT_EQ(group->getBounds(), Rect::MakeWH(100, 100));
+      EXPECT_EQ(content->renderBounds, Rect::MakeWH(100, 100));
+    }
+  });
+}
+
+// A layer's render bounds are empty when it draws nothing, so it is culled. A mask under a hidden
+// ancestor is the exception: it still applies, while updateRenderBounds() leaves it uncomputed.
+TGFX_TEST(LayerMaskTest, MaskUnderHiddenAncestor) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  DisplayList list;
+  list.setRenderMode(RenderMode::Partial);
+  Path contentPath;
+  contentPath.addRect(Rect::MakeWH(100, 100));
+  auto content = ShapeLayer::Make();
+  content->setPath(contentPath);
+  content->setFillStyle(ShapeStyle::Make(Color::Red()));
+  auto hidden = Layer::Make();
+  hidden->setVisible(false);
+  auto mask = ShapeLayer::Make();
+  Path maskPath;
+  maskPath.addRect(Rect::MakeWH(50, 100));
+  mask->setPath(maskPath);
+  mask->setFillStyle(ShapeStyle::Make(Color::Black()));
+  hidden->addChild(mask);
+  content->setMask(mask);
+  list.root()->addChild(content);
+  list.root()->addChild(hidden);
+  list.render(surface.get());
+  auto inside = surface->getColor(25, 50);
+  EXPECT_NEAR(inside.red, 1.0f, 2.0f / 255.0f);
+  EXPECT_NEAR(inside.alpha, 1.0f, 2.0f / 255.0f);
+  auto outside = surface->getColor(75, 50);
+  EXPECT_NEAR(outside.alpha, 0.0f, 2.0f / 255.0f);
+}
+
+// A mask whose ancestor gets hidden after the mask was drawn keeps no stale render bounds in its
+// subtree, so moving the mask's content afterwards still masks the new area under tiled rendering.
+TGFX_TEST(LayerMaskTest, MaskMovedUnderHiddenAncestor) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 100);
+  DisplayList list;
+  list.setRenderMode(RenderMode::Tiled);
+  list.setTileSize(64);
+  Path contentPath;
+  contentPath.addRect(Rect::MakeWH(300, 100));
+  auto content = ShapeLayer::Make();
+  content->setPath(contentPath);
+  content->setFillStyle(ShapeStyle::Make(Color::Red()));
+  auto hidden = Layer::Make();
+  auto mask = Layer::Make();
+  auto maskChild = ShapeLayer::Make();
+  Path maskPath;
+  maskPath.addRect(Rect::MakeWH(50, 100));
+  maskChild->setPath(maskPath);
+  maskChild->setFillStyle(ShapeStyle::Make(Color::Black()));
+  mask->addChild(maskChild);
+  hidden->addChild(mask);
+  content->setMask(mask);
+  list.root()->addChild(content);
+  list.root()->addChild(hidden);
+  list.render(surface.get());
+  hidden->setVisible(false);
+  list.render(surface.get());
+  maskChild->setMatrix(Matrix::MakeTrans(250, 0));
+  list.render(surface.get());
+  auto moved = surface->getColor(275, 50);
+  EXPECT_NEAR(moved.red, 1.0f, 2.0f / 255.0f);
+  EXPECT_NEAR(moved.alpha, 1.0f, 2.0f / 255.0f);
+  auto old = surface->getColor(25, 50);
+  EXPECT_NEAR(old.alpha, 0.0f, 2.0f / 255.0f);
+}
+
+// Same as above, but the mask sits under a layer whose scroll rect and mask no longer overlap, which
+// updateRenderBounds() skips the same way it skips a hidden layer.
+TGFX_TEST(LayerMaskTest, MaskMovedUnderFullyClippedAncestor) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 100);
+  DisplayList list;
+  list.setRenderMode(RenderMode::Tiled);
+  list.setTileSize(64);
+  Path contentPath;
+  contentPath.addRect(Rect::MakeWH(300, 100));
+  auto content = ShapeLayer::Make();
+  content->setPath(contentPath);
+  content->setFillStyle(ShapeStyle::Make(Color::Red()));
+  auto clipped = Layer::Make();
+  clipped->setScrollRect(Rect::MakeWH(300, 100));
+  auto clipMask = ShapeLayer::Make();
+  clipMask->setPath(contentPath);
+  clipMask->setFillStyle(ShapeStyle::Make(Color::Black()));
+  clipped->setMask(clipMask);
+  auto mask = Layer::Make();
+  auto maskChild = ShapeLayer::Make();
+  Path maskPath;
+  maskPath.addRect(Rect::MakeWH(50, 100));
+  maskChild->setPath(maskPath);
+  maskChild->setFillStyle(ShapeStyle::Make(Color::Black()));
+  mask->addChild(maskChild);
+  clipped->addChild(mask);
+  content->setMask(mask);
+  list.root()->addChild(content);
+  list.root()->addChild(clipped);
+  list.root()->addChild(clipMask);
+  list.render(surface.get());
+  clipMask->setMatrix(Matrix::MakeTrans(1000, 0));
+  list.render(surface.get());
+  maskChild->setMatrix(Matrix::MakeTrans(250, 0));
+  list.render(surface.get());
+  auto moved = surface->getColor(275, 50);
+  EXPECT_NEAR(moved.red, 1.0f, 2.0f / 255.0f);
+  EXPECT_NEAR(moved.alpha, 1.0f, 2.0f / 255.0f);
+  auto old = surface->getColor(25, 50);
+  EXPECT_NEAR(old.alpha, 0.0f, 2.0f / 255.0f);
+}
+
 }  // namespace tgfx
