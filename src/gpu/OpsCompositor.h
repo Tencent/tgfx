@@ -230,7 +230,6 @@ class OpsCompositor {
 
   void submitDrawOps();
 
-  friend class DrawingManager;
   friend class PendingOpsAutoReset;
 };
 }  // namespace tgfx

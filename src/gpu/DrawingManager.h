@@ -198,6 +198,5 @@ class DrawingManager {
   WindowTarget& windowTargetEntry(const std::shared_ptr<Window>& window);
 
   friend class OpsCompositor;
-  friend class RenderContext;
 };
 }  // namespace tgfx
