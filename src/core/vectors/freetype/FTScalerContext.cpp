@@ -613,10 +613,8 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
 }
 
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
-  // Generating the stroked path per glyph is heavier than FT_Load_Glyph + CBox, but it is the only
-  // way bounds and rendering describe the same geometry. A conservative outset of the unbolded
-  // bounds (what CGScalerContext does) would be cheaper and still contain the path; switch to that
-  // if profiling ever shows this on a hot path.
+  // Use the rendered outline for exact bounds; expanding regular glyph bounds does not account
+  // for the unhinted geometry and miter joins used by synthetic bold.
   if (fauxBold && !hasColor() && hasOutlines()) {
     Path path;
     if (!generatePath(glyphID, true, fauxItalic, &path)) {
@@ -846,9 +844,8 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const St
   return {};
 }
 
-bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
-                                 const ImageInfo& dstInfo, void* dstPixels,
-                                 const Point& glyphOffset) const {
+bool FTScalerContext::readPixels(GlyphID glyphID, bool, const Stroke*, const ImageInfo& dstInfo,
+                                 void* dstPixels, const Point& glyphOffset) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
@@ -888,14 +885,10 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
   USE(isColorVector);
   USE(glyphOffset);
 #endif
-  // Kept for signature compatibility: the bitmap branch below never applies synthetic bold.
-  USE(fauxBold);
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   if (!colorFont) {
     auto face = ftTypeface()->face;
-    // Synthetic bold never reaches this bitmap path: getImageTransform() routes outline faces to
-    // path rendering, and a bitmap-only face cannot load an outline at all. Keep the load
-    // unbolded so this cannot silently diverge from the stroked path used elsewhere.
+    // Non-color synthetic bold outlines use path rendering instead of this glyph rasterizer.
     if (!loadOutlineGlyph(face, glyphID, false, false)) {
       return false;
     }
