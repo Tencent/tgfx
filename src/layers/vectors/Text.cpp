@@ -66,12 +66,21 @@ void Text::setTextBlob(std::shared_ptr<TextBlob> textBlob, std::vector<Point> an
   invalidateContent();
 }
 
+void Text::clearTextBlob() {
+  if (_textBlob == nullptr && _anchors.empty()) {
+    return;
+  }
+  _textBlob = nullptr;
+  _anchors.clear();
+  invalidateContent();
+}
+
 void Text::apply(VectorContext* context) {
   DEBUG_ASSERT(context != nullptr);
   if (_textBlob == nullptr) {
     return;
   }
-  context->addTextBlob(_textBlob, _position, _anchors);
+  context->addTextBlob(_textBlob, _position, _anchors, sourceTag());
 }
 
 }  // namespace tgfx

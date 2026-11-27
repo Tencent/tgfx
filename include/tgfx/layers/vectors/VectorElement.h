@@ -44,6 +44,21 @@ class VectorElement : public LayerProperty {
   void setEnabled(bool value);
 
   /**
+   * Returns the opaque source identity attached to this element. tgfx never dereferences it.
+   */
+  const void* sourceTag() const {
+    return _sourceTag;
+  }
+
+  /**
+   * Attaches an opaque source identity to this element. Exporters use it to correlate prepared
+   * draws with the elements they built.
+   */
+  void setSourceTag(const void* tag) {
+    _sourceTag = tag;
+  }
+
+  /**
    * The type of a vector element.
    */
   enum class Type {
@@ -79,6 +94,7 @@ class VectorElement : public LayerProperty {
 
  private:
   bool _enabled = true;
+  const void* _sourceTag = nullptr;
 
   friend class VectorLayer;
   friend class VectorGroup;

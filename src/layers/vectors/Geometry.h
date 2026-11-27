@@ -25,6 +25,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
+#include "tgfx/layers/VectorDraw.h"
 
 namespace tgfx {
 
@@ -126,6 +127,20 @@ class Geometry {
    * Individual glyphs with per-glyph transformations, expanded from textBlob for modification.
    */
   std::vector<Glyph> glyphs = {};
+
+  /**
+   * Opaque identity of the element that produced this geometry. It stays owned by the caller and
+   * is never dereferenced by tgfx.
+   */
+  const void* sourceTag = nullptr;
+  const void* sourceEndpoint = nullptr;
+  size_t ordinal = 0;
+  std::vector<VectorCopyProvenance> copyProvenance = {};
+  std::vector<VectorGeometryOrigin> sourceProvenance = {};
+  std::vector<VectorGeometryDependency> dependencies = {};
+  size_t pointCount = 0;
+  size_t glyphCount = 0;
+  class VectorPrepareBudget* budget = nullptr;
 
  private:
   friend class VectorContext;

@@ -176,6 +176,16 @@ void TrimPath::apply(VectorContext* context) {
     return;
   }
   auto geometries = context->getShapeGeometries();
+  if (!context->budget->consumeMetadata(geometries.size())) {
+    return;
+  }
+  for (auto* geometry : geometries) {
+    if (!context->addDependency(geometry, VectorGeometryDependency::Kind::TrimPath,
+                                sourceTag() != nullptr ? sourceTag() : this, this) ||
+        !context->budget->consumePoints(geometry->pointCount)) {
+      return;
+    }
+  }
 
   auto offset = _offset / 360.0f;
   auto start = _start + offset;

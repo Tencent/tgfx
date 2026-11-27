@@ -2184,9 +2184,12 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   // geometry rather than from its content has to enter the recompute through this gate as well.
   const bool hasGeometry = hasGeometryStyle();
   if (bitFields.dirtyContentBounds || (forceDirty && (content != nullptr || hasGeometry))) {
-    if (contentBounds) {
-      _root->invalidateRect(*contentBounds);
-    } else {
+    // The previous bounds still need repainting when the new bounds come out empty, so they are
+    // kept aside and merged into the invalidated region: an empty rect invalidates nothing, which
+    // would leave content that shrank to nothing with stale pixels. The previous bounds are already
+    // in the transformer's output space and must not be transformed twice.
+    auto previousBounds = contentBounds ? *contentBounds : Rect();
+    if (contentBounds == nullptr) {
       contentBounds = new Rect();
     }
     if (content) {
@@ -2203,7 +2206,8 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     if (transformer && !contentBounds->isEmpty()) {
       transformer->transform(contentBounds);
     }
-    _root->invalidateRect(*contentBounds);
+    previousBounds.join(*contentBounds);
+    _root->invalidateRect(previousBounds);
     bitFields.dirtyContentBounds = false;
   }
   if (contentBounds) {

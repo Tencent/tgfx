@@ -66,28 +66,152 @@ void VectorLayer::setContents(std::vector<std::shared_ptr<VectorElement>> value)
   invalidateContent();
 }
 
-void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
-  if (_contents.empty()) {
-    return;
+class RecorderVectorDrawSink : public VectorDrawSink {
+ public:
+  explicit RecorderVectorDrawSink(LayerRecorder* recorder) : recorder(recorder) {
   }
-  VectorContext context = {};
-  for (const auto& element : _contents) {
-    DEBUG_ASSERT(element != nullptr);
-    if (element->enabled()) {
-      element->apply(&context);
+
+  void drawShape(const VectorDrawOp& op) override {
+    record(op);
+  }
+
+  void drawGlyphRun(const VectorDrawOp& op) override {
+    record(op);
+  }
+
+  void drawOwnGeometry(const VectorDrawOp& op) override {
+    recorder->setMatrix(op.matrix);
+    recorder->addShape(op.shape, nullptr);
+    recorder->resetMatrix();
+  }
+
+ private:
+  void record(const VectorDrawOp& op) {
+    recorder->setMatrix(op.matrix);
+    for (const auto& paint : op.paints) {
+      if (op.shape != nullptr) {
+        recorder->addShape(op.shape, &paint);
+      } else {
+        recorder->addTextBlob(op.textBlob, &paint);
+      }
+    }
+    recorder->resetMatrix();
+  }
+
+  LayerRecorder* recorder = nullptr;
+};
+
+class PreparedVectorDrawSink : public VectorDrawSink {
+ public:
+  explicit PreparedVectorDrawSink(VectorPrepareBudget* budget) : budget(budget) {
+  }
+
+  void drawShape(const VectorDrawOp& op) override {
+    append(op, Kind::Shape);
+  }
+
+  void drawGlyphRun(const VectorDrawOp& op) override {
+    append(op, Kind::GlyphRun);
+  }
+
+  void drawOwnGeometry(const VectorDrawOp& op) override {
+    append(op, Kind::OwnGeometry);
+  }
+
+  void deliver(VectorDrawSink* sink) const {
+    for (const auto& entry : entries) {
+      switch (entry.kind) {
+        case Kind::Shape:
+          sink->drawShape(entry.op);
+          break;
+        case Kind::GlyphRun:
+          sink->drawGlyphRun(entry.op);
+          break;
+        case Kind::OwnGeometry:
+          sink->drawOwnGeometry(entry.op);
+          break;
+      }
     }
   }
-  // Render all painters
-  for (const auto& painter : context.painters) {
-    painter->draw(recorder);
+
+ private:
+  enum class Kind { Shape, GlyphRun, OwnGeometry };
+  struct Entry {
+    VectorDrawOp op = {};
+    Kind kind = Kind::Shape;
+  };
+
+  void append(const VectorDrawOp& op, Kind kind) {
+    if (!budget->consumeDrawOp(op)) {
+      return;
+    }
+    Entry entry = {op, kind};
+    entry.op.drawOrdinal = entries.size();
+    entries.push_back(std::move(entry));
   }
-  // Geometries no painter captured are this layer's own geometry; the set is taken after every
-  // element applied, since MergePath clears geometries and painters while Repeater clones and
-  // reorders them. Collecting the captures once keeps the comparison linear in the geometry count.
+
+  VectorPrepareBudget* budget = nullptr;
+  std::vector<Entry> entries = {};
+};
+
+/** Preserves the ledger before the budget is destroyed, including every failed early exit. */
+class VectorPrepareUsageRecorder {
+ public:
+  VectorPrepareUsageRecorder(const VectorPrepareBudget* budget, VectorPrepareUsage* usage)
+      : budget(budget), usage(usage) {
+  }
+
+  ~VectorPrepareUsageRecorder() {
+    if (usage != nullptr) {
+      *usage = budget->getUsage();
+    }
+  }
+
+ private:
+  const VectorPrepareBudget* budget = nullptr;
+  VectorPrepareUsage* usage = nullptr;
+};
+
+void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
+  RecorderVectorDrawSink sink(recorder);
+  VectorPrepareLimits limits = {};
+  prepareDraws(&sink, limits);
+}
+
+bool VectorLayer::prepareDraws(VectorDrawSink* sink, const VectorPrepareLimits& limits,
+                               VectorPrepareUsage* usage) const {
+  if (usage != nullptr) {
+    *usage = {};
+  }
+  if (sink == nullptr) {
+    return false;
+  }
+  VectorContext context(limits);
+  VectorPrepareUsageRecorder usageRecorder(context.budget.get(), usage);
+  for (const auto& element : _contents) {
+    DEBUG_ASSERT(element != nullptr);
+    if (element->enabled() && context.prepareElement(element.get())) {
+      element->apply(&context);
+    }
+    if (context.budget->failed) {
+      break;
+    }
+  }
+  if (context.budget->failed || !context.budget->consumeMetadata(context.geometries.size())) {
+    return false;
+  }
+  for (size_t i = 0; i < context.geometries.size(); i++) {
+    context.geometries[i]->ordinal = i;
+  }
+  PreparedVectorDrawSink preparedSink(context.budget.get());
   std::unordered_set<const Geometry*> capturedGeometries = {};
   capturedGeometries.reserve(context.geometries.size());
   for (const auto& painter : context.painters) {
     DEBUG_ASSERT(painter != nullptr);
+    painter->draw(&preparedSink);
+    if (context.budget->failed || !context.budget->consumeMetadata(painter->geometries.size())) {
+      return false;
+    }
     capturedGeometries.insert(painter->geometries.begin(), painter->geometries.end());
   }
   for (const auto& geometry : context.geometries) {
@@ -95,16 +219,46 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
     if (capturedGeometries.count(geometry.get()) != 0) {
       continue;
     }
+    if (!context.budget->consumeDraws(1) || !context.budget->consumePoints(geometry->pointCount) ||
+        !context.budget->consumeMetadata(geometry->copyProvenance.size()) ||
+        !context.budget->consumeMetadata(geometry->sourceProvenance.size()) ||
+        !context.budget->consumeMetadata(geometry->dependencies.size())) {
+      return false;
+    }
+    for (const auto& origin : geometry->sourceProvenance) {
+      if (!context.budget->consumeMetadata(origin.copyProvenance.size())) {
+        return false;
+      }
+    }
     auto shape = geometry->getShape();
+    if (context.budget->failed) {
+      return false;
+    }
     if (shape == nullptr) {
       continue;
     }
-    // The recorder applies its CTM to the geometry, so the matrix stays a transform instead of
-    // being baked into the shape.
-    recorder->setMatrix(geometry->matrix);
-    recorder->addShape(std::move(shape), nullptr);
-    recorder->resetMatrix();
+    VectorDrawOp op = {};
+    op.shape = std::move(shape);
+    op.matrix = geometry->matrix;
+    op.finalMatrix = geometry->matrix;
+    op.capturedInnerMatrix = geometry->matrix;
+    op.geometry = geometry.get();
+    op.geometryOrdinal = geometry->ordinal;
+    op.sourceTag = geometry->sourceTag;
+    op.sourceEndpoint = geometry->sourceEndpoint;
+    op.copyProvenance = geometry->copyProvenance;
+    op.sourceProvenance = geometry->sourceProvenance;
+    op.dependencies = geometry->dependencies;
+    preparedSink.drawOwnGeometry(op);
   }
+  if (context.budget->failed) {
+    return false;
+  }
+  if (usage != nullptr) {
+    *usage = context.budget->getUsage();
+  }
+  preparedSink.deliver(sink);
+  return true;
 }
 
 std::optional<StyledShape> VectorLayer::onGetContentShape() {
@@ -114,9 +268,15 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
   VectorContext context = {};
   for (const auto& element : _contents) {
     DEBUG_ASSERT(element != nullptr);
-    if (element->enabled()) {
+    if (element->enabled() && context.prepareElement(element.get())) {
       element->apply(&context);
     }
+    if (context.budget->failed) {
+      break;
+    }
+  }
+  if (context.budget->failed) {
+    return std::nullopt;
   }
   // The content shape describes what the layer renders, so it drops the painters whose color source
   // is a fully transparent solid color; any other effectively invisible source, a transparent

@@ -94,7 +94,7 @@ void Rectangle::apply(VectorContext* context) {
     _cachedShape = Shape::MakeFrom(path);
   }
   if (_cachedShape) {
-    context->addShape(_cachedShape);
+    context->addShape(_cachedShape, sourceTag());
   }
 }
 

@@ -166,6 +166,15 @@ void TextPath::apply(VectorContext* context) {
   }
   auto isClosed = pathMeasure->isClosed();
   auto glyphGeometries = context->getGlyphGeometries();
+  if (context->budget->failed) {
+    return;
+  }
+  for (auto* geometry : glyphGeometries) {
+    if (!context->addDependency(geometry, VectorGeometryDependency::Kind::TextPath,
+                                sourceTag() != nullptr ? sourceTag() : this, this)) {
+      return;
+    }
+  }
 
   if (_forceAlignment) {
     // ForceAlignment mode: ignores original glyph positions and baselineOrigin. Glyphs are laid out

@@ -18,12 +18,20 @@
 
 #pragma once
 
+#include <cstdint>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
+
+/**
+ * The authored color space of a ColorSource. Exporters need the intent, because the RGBA values
+ * alone cannot say whether they describe sRGB or Display P3.
+ */
+enum class VectorColorSpace : uint8_t { SRGB, DisplayP3 };
+
 /**
  * ColorSource specifies the source color(s) for what is being drawn in a vector layer. There are
  * three types of ColorSource: SolidColor, Gradient, and ImagePattern. Note: All ColorSource objects
@@ -51,6 +59,20 @@ class ColorSource : public LayerProperty {
    */
   virtual Matrix getFitMatrix(const Rect& bounds) const = 0;
 
+  /**
+   * Returns the authored color space that color() and colors() are expressed in.
+   */
+  VectorColorSpace colorSpace() const {
+    return _colorSpace;
+  }
+
+  /**
+   * Sets the authored color space of the source colors.
+   */
+  void setColorSpace(VectorColorSpace value) {
+    _colorSpace = value;
+  }
+
  protected:
   enum class Type { Gradient, ImagePattern, SolidColor };
 
@@ -60,5 +82,7 @@ class ColorSource : public LayerProperty {
   friend class Types;
   friend class FillStyle;
   friend class StrokeStyle;
+
+  VectorColorSpace _colorSpace = VectorColorSpace::SRGB;
 };
 }  // namespace tgfx

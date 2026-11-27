@@ -278,7 +278,7 @@ void Polystar::apply(VectorContext* context) {
     _cachedShape = Shape::MakeFrom(std::move(pathProvider));
   }
   if (_cachedShape) {
-    context->addShape(_cachedShape);
+    context->addShape(_cachedShape, sourceTag());
   }
 }
 

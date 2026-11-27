@@ -61,7 +61,7 @@ void ShapePath::apply(VectorContext* context) {
     }
   }
   if (_cachedShape) {
-    context->addShape(_cachedShape, _position);
+    context->addShape(_cachedShape, _position, sourceTag());
   }
 }
 

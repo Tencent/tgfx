@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Geometry.h"
+#include <limits>
+#include "VectorContext.h"
 #include "core/GlyphTransform.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -36,12 +38,35 @@ bool GlyphStyle::operator!=(const GlyphStyle& other) const {
 }
 
 std::unique_ptr<Geometry> Geometry::clone() const {
+  if (budget != nullptr) {
+    if (!budget->consumeGeometries(1) || !budget->consumePoints(pointCount) ||
+        !budget->consumeGlyphs(glyphCount) || !budget->consumeMetadata(textAnchors.size()) ||
+        !budget->consumeMetadata(copyProvenance.size()) ||
+        !budget->consumeMetadata(sourceProvenance.size()) ||
+        !budget->consumeMetadata(dependencies.size())) {
+      return nullptr;
+    }
+    for (const auto& origin : sourceProvenance) {
+      if (!budget->consumeMetadata(origin.copyProvenance.size())) {
+        return nullptr;
+      }
+    }
+  }
   auto cloned = std::make_unique<Geometry>();
   cloned->matrix = matrix;
   cloned->shape = shape;
   cloned->textBlob = textBlob;
   cloned->glyphs = glyphs;
   cloned->textAnchors = textAnchors;
+  cloned->sourceTag = sourceTag;
+  cloned->sourceEndpoint = sourceEndpoint;
+  cloned->ordinal = ordinal;
+  cloned->copyProvenance = copyProvenance;
+  cloned->sourceProvenance = sourceProvenance;
+  cloned->dependencies = dependencies;
+  cloned->pointCount = pointCount;
+  cloned->glyphCount = glyphCount;
+  cloned->budget = budget;
   return cloned;
 }
 
@@ -55,6 +80,9 @@ std::shared_ptr<Shape> Geometry::getShape() {
       blobMatrix = result.commonMatrix;
     }
     if (blob != nullptr) {
+      if (budget != nullptr && !budget->consumeTextGlyphs(blob.get())) {
+        return nullptr;
+      }
       shape = Shape::MakeFrom(blob);
       if (!blobMatrix.isIdentity()) {
         shape = Shape::ApplyMatrix(shape, blobMatrix);
@@ -80,10 +108,24 @@ void Geometry::convertToShape() {
 
 void Geometry::expandToGlyphs() {
   DEBUG_ASSERT(textBlob != nullptr);
+  size_t count = 0;
+  for (const auto& run : *textBlob) {
+    if (run.glyphCount > std::numeric_limits<size_t>::max() - count) {
+      if (budget != nullptr) {
+        budget->failed = true;
+      }
+      return;
+    }
+    count += run.glyphCount;
+  }
+  if (budget != nullptr && !budget->consumeGlyphs(count)) {
+    return;
+  }
+  glyphCount = count;
   glyphs.clear();
+  glyphs.reserve(count);
   size_t glyphIndex = 0;
   for (auto run : *textBlob) {
-    glyphs.reserve(glyphs.size() + run.glyphCount);
     for (size_t i = 0; i < run.glyphCount; i++) {
       Glyph glyph = {};
       glyph.glyphID = run.glyphs[i];
@@ -267,6 +309,9 @@ static Geometry::TextBlobResult BuildTextBlob(const Glyph* glyphs, size_t count)
 }
 
 Geometry::TextBlobResult Geometry::buildTextBlob(const std::vector<Glyph>& inputGlyphs) {
+  if (budget != nullptr && !budget->consumeGlyphs(inputGlyphs.size())) {
+    return {};
+  }
   return BuildTextBlob(inputGlyphs.data(), inputGlyphs.size());
 }
 
@@ -274,11 +319,19 @@ void Geometry::buildGlyphRuns() {
   glyphRuns.clear();
   if (glyphs.empty()) {
     if (textBlob) {
+      if (budget != nullptr && !budget->consumeMetadata(1)) {
+        return;
+      }
       glyphRuns.push_back({textBlob, Matrix::I(), {}});
     }
     return;
   }
 
+  if (budget != nullptr &&
+      (!budget->consumeGlyphs(glyphs.size()) || !budget->consumeMetadata(glyphs.size()))) {
+    return;
+  }
+  glyphRuns.reserve(glyphs.size());
   const Glyph* data = glyphs.data();
   size_t count = glyphs.size();
   size_t runStart = 0;

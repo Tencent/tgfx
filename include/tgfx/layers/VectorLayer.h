@@ -22,6 +22,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/layers/Layer.h"
+#include "tgfx/layers/VectorDraw.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
 namespace tgfx {
@@ -59,6 +60,12 @@ class VectorLayer : public Layer {
    * or a VectorGroup containing multiple elements.
    */
   void setContents(std::vector<std::shared_ptr<VectorElement>> value);
+
+  /** Freezes draws within limits before delivery to sink; optional usage receives success/failure costs.
+   * Null sink or exhausted limits return false without callbacks; owned op fields may be retained.
+   */
+  bool prepareDraws(VectorDrawSink* sink, const VectorPrepareLimits& limits,
+                    VectorPrepareUsage* usage = nullptr) const;
 
  protected:
   VectorLayer() = default;
