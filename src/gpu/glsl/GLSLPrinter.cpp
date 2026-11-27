@@ -273,6 +273,18 @@ bool PrintIRStatement(const ProgramIR& program, const IRStatement& statement,
   if (!statement.dst.swizzle.empty()) {
     dst += "." + statement.dst.swizzle;
   }
+  // A field assignment (yuv.x = ...) cannot declare through the whole-variable path below, so
+  // its base is declared once here; the fields then assign into that variable.
+  if (!statement.dst.swizzle.empty() && !isColorOutput && declared->insert(dstValue.debugName).second) {
+    if (const char* typeName = IRTypeGLSLName(dstValue.type)) {
+      *out += "  ";
+      *out += IRPrecisionGLSL(dstValue.precision);
+      *out += typeName;
+      *out += " ";
+      *out += dstValue.debugName;
+      *out += ";\n";
+    }
+  }
   const bool canDeclare = statement.dst.swizzle.empty() && IRTypeGLSLName(dstValue.type) != nullptr;
   const bool needsDeclare =
       canDeclare && !isColorOutput &&
