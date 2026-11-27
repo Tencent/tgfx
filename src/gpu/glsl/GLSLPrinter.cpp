@@ -349,7 +349,16 @@ bool ResolvesIdentifier(const std::string& name, const ProgramIR& program,
       "mix",          "step",         "min",            "max",   "abs",   "texture",
       "highp",        "mediump",      "lowp",           "ivec2", "ivec3", "ivec4",
       "sampler2D",    "sampler2DRect",
-      "tgfxTextureSample", "tgfxTextureSampleRect", "tgfxClamp"};
+      "tgfxTextureSample", "tgfxTextureSampleRect", "tgfxClamp",
+      // The scalar math every library function body may use. Without these the statement printer
+      // rejects an emitted expression that calls a builtin, and the whole program is dropped.
+      "length",       "distance",     "dot",            "cross", "normalize",
+      "sqrt",         "inversesqrt",  "pow",            "exp",   "log",
+      "exp2",         "log2",         "sin",            "cos",   "tan",
+      "asin",         "acos",         "atan",           "sign",  "floor",
+      "ceil",         "fract",        "mod",            "smoothstep",
+      "lessThan",     "lessThanEqual", "greaterThan",   "greaterThanEqual",
+      "equal",        "notEqual",     "any",            "all",   "not"};
   if (builtins.count(name) != 0) {
     return true;
   }
