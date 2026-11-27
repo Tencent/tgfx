@@ -72,6 +72,10 @@ enum class RenderMode {
  * shows a fallback, which is a coarser rendering of the same content prepared ahead of time and
  * therefore still usable after the zoom changes, or is rasterized at the current zoomScale. A
  * frame with nothing left to rasterize prepares fallbacks for later zoom instead.
+ *
+ * TileUpdateMode::Smooth and TileUpdateMode::Fast trade memory for zoom smoothness by keeping the
+ * four fallback levels above the current zoom scale; see setTileSize() for how much memory that
+ * reserves.
  */
 enum class TileUpdateMode {
   /**
@@ -85,7 +89,9 @@ enum class TileUpdateMode {
    * A missing tile shows the fallback covering it as a temporary stand-in, which produces brief
    * zoom blur, and the tiles at the current zoomScale fill in over the following frames at most
    * setMaxTilesRefinedPerFrame() per frame to keep the frame rate stable. An area no fallback
-   * covers yet is rasterized within the same frame, so the screen always shows content.
+   * covers yet is rasterized within the same frame, so the screen always shows content. While the
+   * pool is still preparing fallbacks for a later zoom, hasContentChanged() keeps returning true so
+   * a caller that renders on demand finishes that work.
    */
   Smooth,
 
@@ -196,6 +202,24 @@ class DisplayList {
 
   /**
    * Sets the size of the tiles used in tiled rendering mode.
+   *
+   * The tile pool derives its capacity from the surface instead of taking a tile count: a viewport
+   * needs roughly one tile per tile-sized cell plus the four fallback levels above it, so a fixed
+   * count either wastes memory on small surfaces or runs out on large ones. The demand is rounded
+   * up to whole atlases (up to 4096x4096 RGBA each, 64 MB) and capped at 32 atlases, which reserves
+   * about this much for the default 256 pixel tile:
+   *
+   *    surface            reserved tile memory
+   *    1080x2400 (phone)  192 MB
+   *    1600x900           128 MB
+   *    3840x2160 (4K)     384 MB
+   *    7680x4320 (8K)     1280 MB
+   *    larger             2048 MB (the 32 atlas cap)
+   *
+   * A smaller tile needs more slots for the same viewport and a larger one needs fewer, so the
+   * reserved amount changes with this value: 128 pixels reserves about 128 MB for a phone-sized
+   * surface and 512 pixels about 256 MB. Changing this value or the surface size recomputes the
+   * quotas, so set it before rendering rather than per frame.
    */
   void setTileSize(int tileSize);
 
@@ -229,9 +253,10 @@ class DisplayList {
   }
 
   /**
-   * Sets the maximum number of tiles processed per frame in tiled rendering mode. A value of 0
-   * disables refinement, so a tile stays at the fallback it was drawn with and the tiled loop stops
-   * asking for frames once the viewport is covered.
+   * Sets the maximum number of tiles processed per frame in tiled rendering mode. The budget covers
+   * both the missing tiles at the current zoomScale and the fallbacks prepared for a later zoom. A
+   * value of 0 disables refinement, so a tile stays at the fallback it was drawn with and the tiled
+   * loop stops asking for frames once the viewport is covered.
    */
   void setMaxTilesRefinedPerFrame(int count) {
     _maxTilesRefinedPerFrame = count;
