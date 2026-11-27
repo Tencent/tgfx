@@ -268,7 +268,6 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
                                &programIRBuilder(), inputColorValue, inputCoverageValue,
                                outputValue);
   args.samplerValues = &samplerValues;
-  args.chainTailValue = colorChainValue != INVALID_VALUE_ID ? colorChainValue : coverageChainValue;
   xferProcessor->emitCode(args);
   bool hasOutput = false;
   for (const auto& statement : programIRBuilder().IR().statements) {

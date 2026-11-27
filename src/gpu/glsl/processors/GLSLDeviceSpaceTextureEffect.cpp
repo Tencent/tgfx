@@ -67,9 +67,9 @@ void GLSLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
     const auto xyValue = args.irBuilder->CreateSwizzle(fragCoordValue, SLType::Float2, "xy");
     const auto deviceCoordValue = args.irBuilder->CreateCall(
         OperatorID::DeviceCoord, SLType::Float2, {matrixValue, xyValue}, "deviceCoord");
-    const auto deviceReadValue =
-        args.irBuilder->CreateTextureSample(samplerValue, deviceCoordValue, SLType::Float4,
-                                            "deviceRead", SLType::Texture2DSampler, swizzleCode);
+    const auto deviceReadValue = args.irBuilder->CreateTextureSample(
+        samplerValue, deviceCoordValue, SLType::Float4, "deviceRead",
+        uniformHandler->getSamplerVariable(sampler).type(), swizzleCode);
     const auto op = textureProxy->isAlphaOnly() ? OperatorID::AlphaModulate : OperatorID::MulAlpha;
     const auto result =
         args.irBuilder->CreateCall(static_cast<OperatorID>(op), SLType::Float4,

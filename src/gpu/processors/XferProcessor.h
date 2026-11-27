@@ -60,8 +60,6 @@ class XferProcessor : public Processor {
     ValueID inputColorValue = INVALID_VALUE_ID;
     ValueID inputCoverageValue = INVALID_VALUE_ID;
     ValueID outputValue = INVALID_VALUE_ID;
-    /// The fragment chain's tail value (the text route's discard operand).
-    ValueID chainTailValue = INVALID_VALUE_ID;
     const std::vector<ValueID>* samplerValues = nullptr;
   };
 
