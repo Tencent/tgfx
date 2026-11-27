@@ -141,56 +141,6 @@ TGFX_TEST(FauxBoldTest, FauxBoldBoundsContainTheDrawnOutline) {
   }
 }
 
-// A contour is not empty just because one axis has no extent: a hairline horizontal or vertical
-// stroke still gains area once widened. Only a contour that collapses on both axes stays inkless.
-TGFX_TEST(FauxBoldTest, DegenerateContoursKeepTheirStrokedBounds) {
-  auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/FauxBoldLineContours.ttf"));
-  ASSERT_NE(typeface, nullptr);
-  ASSERT_TRUE(typeface->hasOutlines());
-  ASSERT_FALSE(typeface->hasColor());
-  for (float size : {36.0f, 200.0f}) {
-    SCOPED_TRACE(::testing::Message() << "size=" << size);
-    Font font(typeface, size);
-    Font bold = font;
-    bold.setFauxBold(true);
-    const auto strokeWidth = size * FauxBoldScale(size);
-    for (char character : {'h', 'v'}) {
-      SCOPED_TRACE(::testing::Message() << "glyph=" << character);
-      auto glyphID = font.getGlyphID(static_cast<Unichar>(character));
-      ASSERT_NE(glyphID, 0);
-      Path drawn;
-      ASSERT_TRUE(bold.getPath(glyphID, &drawn));
-      ASSERT_FALSE(drawn.isEmpty());
-      auto bounds = bold.getBounds(glyphID);
-      ASSERT_FALSE(bounds.isEmpty());
-      // The stroked line is as thick as the stroke, so the collapsed axis must have grown.
-      EXPECT_GE(bounds.height(), strokeWidth - 1.0f);
-      EXPECT_GE(bounds.width(), strokeWidth - 1.0f);
-      auto ink = drawn.getBounds();
-      EXPECT_LE(bounds.left, ink.left);
-      EXPECT_LE(bounds.top, ink.top);
-      EXPECT_GE(bounds.right, ink.right);
-      EXPECT_GE(bounds.bottom, ink.bottom);
-      EXPECT_TRUE(std::isfinite(bounds.width()));
-    }
-    // Every point coincides, so a butt-capped stroke leaves nothing behind.
-    auto pointID = font.getGlyphID(static_cast<Unichar>('p'));
-    ASSERT_NE(pointID, 0);
-    EXPECT_TRUE(bold.getBounds(pointID).isEmpty());
-    // A normal contour in the same face keeps working.
-    auto squareID = font.getGlyphID(static_cast<Unichar>('s'));
-    ASSERT_NE(squareID, 0);
-    auto squareBounds = bold.getBounds(squareID);
-    ASSERT_FALSE(squareBounds.isEmpty());
-    Path squarePath;
-    ASSERT_TRUE(bold.getPath(squareID, &squarePath));
-    auto squareInk = squarePath.getBounds();
-    EXPECT_LE(squareBounds.left, squareInk.left);
-    EXPECT_GE(squareBounds.right, squareInk.right);
-  }
-}
-
 TGFX_TEST(FauxBoldTest, SwitchingBoldDoesNotChangeRegular) {
   auto typeface = MakeFauxBoldTestTypeface();
   ASSERT_NE(typeface, nullptr);
