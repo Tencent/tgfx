@@ -126,6 +126,42 @@ static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, StyledSha
   }
 }
 
+static inline void DrawSpreadPath(Canvas* canvas, const Path& path, StyledShapeType type,
+                                  StrokeAlign strokeAlign, float strokeWidth, float spread) {
+  Paint paint = {};
+  paint.setColor(Color::White());
+  paint.setAntiAlias(true);
+  switch (type) {
+    case StyledShapeType::Fill:
+    case StyledShapeType::FillStroke: {
+      auto outset = spread;
+      if (type == StyledShapeType::FillStroke) {
+        outset += SpreadUtils::StrokeOutset(strokeWidth, strokeAlign);
+      }
+      if (outset != 0.0f) {
+        // Outsetting a convex contour by |outset| equals filling the contour stroked with a
+        // round pen of width 2 * |outset|, the Minkowski sum with a disk.
+        auto spreadPath = path;
+        Stroke(2.0f * outset, LineCap::Round, LineJoin::Round).applyToPath(&spreadPath);
+        canvas->drawPath(spreadPath, paint);
+      } else {
+        canvas->drawPath(path, paint);
+      }
+      break;
+    }
+    case StyledShapeType::Stroke: {
+      const auto effectiveWidth = strokeWidth + 2.0f * spread;
+      auto spreadPath = path;
+      // Stroke::applyToPath strokes on the centerline; the non-center strokeAlign offsets used
+      // by DrawSpreadRRect are not reproduced here, matching the previous bounding-rect fallback
+      // which was already an approximation.
+      Stroke(effectiveWidth).applyToPath(&spreadPath);
+      canvas->drawPath(spreadPath, paint);
+      break;
+    }
+  }
+}
+
 SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInput& input,
                                                             float spread) {
   auto* source = input.findExtraSource(StyleInputSource::Type::Contour);
@@ -214,21 +250,11 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
     DrawSpreadRRect(recordCanvas, RRect::MakeOval(rect), type, strokeAlign, strokeWidth, spread);
   } else if (path.isRRect(&rRect)) {
     DrawSpreadRRect(recordCanvas, rRect, type, strokeAlign, strokeWidth, spread);
-  } else {
-    if (!path.isRect(&rect)) {
-      // Complex paths use their bounding rect as an approximation for the shadow source:
-      // FillStroke is treated as a fill with the stroke outset folded into the rect, while
-      // Stroke keeps its band rendering on the rect. A collapsed stroke is already rejected by
-      // IsSpreadCollapsed above, so any stroke reaching here is non-collapsed.
-      rect = path.getBounds();
-      if (type == StyledShapeType::FillStroke) {
-        auto outset = SpreadUtils::StrokeOutset(strokeWidth, styledShape.strokeAlign);
-        rect.outset(outset, outset);
-        type = StyledShapeType::Fill;
-      }
-    }
+  } else if (path.isRect(&rect)) {
     DrawSpreadRRect(recordCanvas, RRect::MakeRectXY(rect, 0, 0), type, strokeAlign, strokeWidth,
                     spread);
+  } else {
+    DrawSpreadPath(recordCanvas, path, type, strokeAlign, strokeWidth, spread);
   }
 
   auto picture = recorder.finishRecordingAsPicture();

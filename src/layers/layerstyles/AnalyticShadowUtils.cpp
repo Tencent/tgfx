@@ -47,9 +47,9 @@ static inline std::optional<RRect> AsAnalyticRRect(const Path& path) {
   if (path.isOval(&rect)) {
     return RRect::MakeOval(rect);
   }
-  // Complex paths use their bounding rect as an approximation for the shadow source, matching
-  // MakeSpreadShapeImage.
-  return RRect::MakeRect(path.getBounds());
+  // Complex paths cannot be expressed as an RRect and fall back to the path-based spread in
+  // MakeSpreadShapeImage, which preserves their outline.
+  return std::nullopt;
 }
 
 std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput& input,
