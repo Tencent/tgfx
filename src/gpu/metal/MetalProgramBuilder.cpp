@@ -31,6 +31,27 @@
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
+namespace {
+
+bool IRReadsStageColor(const ProgramIR& program) {
+  for (const auto& expr : program.exprs) {
+    for (const auto arg : expr.args) {
+      if (arg < program.values.size() &&
+          program.values[arg].debugName == CUSTOM_COLOR_OUTPUT_NAME) {
+        return true;
+      }
+    }
+  }
+  for (const auto& statement : program.statements) {
+    if (statement.src < program.values.size() &&
+        program.values[statement.src].debugName == CUSTOM_COLOR_OUTPUT_NAME) {
+      return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
 
 std::shared_ptr<Program> MetalProgramBuilder::Create(Context* context,
                                                      const ProgramInfo* programInfo) {
@@ -177,6 +198,7 @@ std::shared_ptr<Program> MetalProgramBuilder::finalize() {
     }
     listStart = comma + 1;
   }
+  bool readsDestinationColor = false;
   if (textRoute) {
     _vertexBuilder.setCodeText(MSLPrinter::PrintVertexProgram(description.vertexCalls, callSite));
     _fragBuilder.setCodeText(MSLPrinter::PrintFragmentProgram(description.fragment, callSite));
@@ -221,11 +243,13 @@ std::shared_ptr<Program> MetalProgramBuilder::finalize() {
     }
     _vertexBuilder.setCodeText(vertexBody);
     _fragBuilder.setCodeText(fragmentBody);
+    readsDestinationColor = IRReadsStageColor(ir);
   }
   const auto vertexText = MSLPrinter::PrintStage(*this, ShaderStage::Vertex, description.interface,
                                                  _vertexBuilder, callSite);
   const auto fragmentText = MSLPrinter::PrintStage(*this, ShaderStage::Fragment,
-                                                   description.interface, _fragBuilder, callSite);
+                                                   description.interface, _fragBuilder, callSite,
+                                                   readsDestinationColor);
   if (const char* dumpDir = std::getenv("TGFX_DUMP_PROGRAM")) {
     static std::atomic<int> dumpIndex{0};
     const int index = dumpIndex.fetch_add(1);

@@ -60,7 +60,7 @@ class MSLPrinter {
 
   static std::string PrintStage(const ProgramBuilder& programBuilder, ShaderStage stage,
                                 const InterfaceDesc& interface, const ShaderBuilder& builder,
-                                const MslCallSite& callSite);
+                                const MslCallSite& callSite, bool readsDestinationColor = false);
 };
 
 }  // namespace tgfx

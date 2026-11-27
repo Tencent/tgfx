@@ -74,10 +74,8 @@ ShaderCaps::ShaderCaps(GPU* gpu) {
   maxUBOSize = limits->maxUniformBufferBindingSize;
   uboOffsetAlignment = limits->minUniformBufferOffsetAlignment;
   if (info->backend == Backend::Metal) {
-    // The assembled MSL route reads the destination through a destination texture copy: the
-    // printer emits no [[color(0)]] input, so a fetch that has no color name would leave the
-    // destination operand empty.
-    frameBufferFetchSupport = false;
+    frameBufferFetchSupport = true;
+    frameBufferFetchNeedsCustomOutput = true;
   } else if (info->backend == Backend::WebGPU) {
     frameBufferFetchSupport = false;
     requiresUniformControlFlow = true;

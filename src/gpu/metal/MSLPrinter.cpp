@@ -405,7 +405,7 @@ std::string MSLPrinter::PrintFragmentProgram(const FragmentProgram& program,
 
 std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderStage stage,
                                    const InterfaceDesc& interface, const ShaderBuilder& builder,
-                                   const MslCallSite& callSite) {
+                                   const MslCallSite& callSite, bool readsDestinationColor) {
   (void)programBuilder;
   std::vector<UniformDesc> uniforms = {};
   for (const auto& uniform : interface.uniforms) {
@@ -519,7 +519,15 @@ std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderS
     return out;
   }
 
-  out += "fragment float4 main0(";
+  if (readsDestinationColor) {
+    // Metal's programmable blending wants the color as an output struct member and the fetched
+    // destination as a separate [[color(0)]] input (the shape SPIRV-Cross emits); a single inout
+    // parameter compiles but its write never lands.
+    out += "struct main0_out {\n";
+    out += std::string(Indent) + "float4 " + CUSTOM_COLOR_OUTPUT_NAME + " [[color(0)]];\n";
+    out += "};\n\n";
+  }
+  out += readsDestinationColor ? "fragment main0_out main0(" : "fragment float4 main0(";
   out += "FragmentIn in [[stage_in]]";
   if (!uniforms.empty() || !interface.samplers.empty()) {
     out += ", ";
@@ -538,10 +546,20 @@ std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderS
     out += "texture2d<float> " + sampler.name + "_t [[texture(" + std::to_string(index) +
            ")]], sampler " + sampler.name + "_s [[sampler(" + std::to_string(index) + ")]]";
   }
+  if (readsDestinationColor) {
+    out += ", float4 tgfx_DstColor [[color(0)]]";
+  }
   out += ") {\n";
-  out += std::string(Indent) + "float4 ";
-  out += CUSTOM_COLOR_OUTPUT_NAME;
-  out += " = float4(0.0);\n";
+  if (readsDestinationColor) {
+    out += std::string(Indent) + "main0_out out = {};\n";
+    out += std::string(Indent) + "float4 ";
+    out += CUSTOM_COLOR_OUTPUT_NAME;
+    out += " = tgfx_DstColor;\n";
+  } else {
+    out += std::string(Indent) + "float4 ";
+    out += CUSTOM_COLOR_OUTPUT_NAME;
+    out += " = float4(0.0);\n";
+  }
   out += std::string(Indent) + "float tgfx_FragHeight = in.tgfx_FragHeight;\n";
   for (const auto& varying : interface.varyings) {
     out += Indent + std::string(MslTypeName(varying.type)) + " " + varying.name + " = in." +
@@ -558,9 +576,16 @@ std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderS
     out += " " + uniform.name + " = fb." + uniform.name + ";\n";
   }
   out += body;
-  out += std::string(Indent) + "return ";
-  out += CUSTOM_COLOR_OUTPUT_NAME;
-  out += ";\n}\n";
+  if (readsDestinationColor) {
+    out += std::string(Indent) + "out." + CUSTOM_COLOR_OUTPUT_NAME + " = " +
+           CUSTOM_COLOR_OUTPUT_NAME + ";\n";
+    out += std::string(Indent) + "return out;\n";
+  } else {
+    out += std::string(Indent) + "return ";
+    out += CUSTOM_COLOR_OUTPUT_NAME;
+    out += ";\n";
+  }
+  out += "}\n";
   return out;
 }
 

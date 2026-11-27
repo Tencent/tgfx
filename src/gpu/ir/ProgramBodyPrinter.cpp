@@ -191,7 +191,8 @@ bool ResolvesIdentifier(const std::string& name, const ProgramIR& program,
 }
 
 bool IsReservedName(const std::string& name) {
-  return name == "gl_Position" || name == "gl_FragCoord" || name == "fragmentOutput";
+  return name == "gl_Position" || name == "gl_FragCoord" || name == "fragmentOutput" ||
+         name == CUSTOM_COLOR_OUTPUT_NAME;
 }
 }  // namespace
 

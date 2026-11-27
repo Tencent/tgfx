@@ -1,3 +1,5 @@
+#include <cstdio>
+#include <cstdlib>
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
@@ -18,6 +20,8 @@
 
 #include "GLSLPorterDuffXferProcessor.h"
 #include "GeneratedOperators.h"
+#include "gpu/ProgramInfo.h"
+#include "gpu/ShaderCaps.h"
 #include "gpu/glsl/GLSLBlend.h"
 #include "gpu/glsl/GLSLOperatorEmitter.h"
 #include "gpu/ir/ProgramIRBuilder.h"
@@ -102,6 +106,10 @@ void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
       }
       ir->Assign({dstLocal, ""}, dstSample);
       dstValue = dstLocal;
+    } else if (args.fragBuilder->getProgramInfo()->getContext()->shaderCaps()
+                   ->frameBufferFetchSupport) {
+      dstValue = ir->InternValue(CUSTOM_COLOR_OUTPUT_NAME, SLType::Float4, Precision::High,
+                                 IRValueKind::Local);
     } else {
       const auto one = ir->CreateConstant(1.0f);
       dstValue = ir->CreateConstruct(SLType::Float4, {one, one, one, one});
