@@ -51,6 +51,18 @@ class LayerFilter : public LayerProperty {
                                      const Rect& contentBounds, Point* offset = nullptr);
 
   /**
+   * Internal variant used to preserve the input origin for TextureFilter. This is not a virtual
+   * extension point for third-party LayerFilter subclasses.
+   * @param imageOrigin Position of the current input image origin relative to the full content
+   * bounds, in layer-local units. The value changes with clipped or tiled inputs; applying it
+   * restores coordinates in the stable full-content space. Zero means the input starts at the full
+   * content origin.
+   */
+  std::shared_ptr<Image> filterImage(std::shared_ptr<Image> input, float scale,
+                                     const Rect& contentBounds, Point* offset,
+                                     const Point& imageOrigin);
+
+  /**
    * Returns the bounds of the layer filter after applying it to the scaled layer bounds.
    * @param srcRect The scaled bounds of the layer content.
    * @param contentScale The scale factor of the layer bounds relative to its original size. Some
@@ -72,7 +84,8 @@ class LayerFilter : public LayerProperty {
     InnerShadowFilter,
     MonoNoiseFilter,
     DuoNoiseFilter,
-    MultiNoiseFilter
+    MultiNoiseFilter,
+    TextureFilter
   };
 
   virtual Type type() const {

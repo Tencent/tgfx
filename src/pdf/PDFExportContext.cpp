@@ -30,6 +30,7 @@
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
+#include "core/filters/TextureImageFilter.h"
 #include "core/images/FilterImage.h"
 #include "core/images/PictureImage.h"
 #include "core/shaders/ColorShader.h"
@@ -37,6 +38,7 @@
 #include "core/shaders/MatrixShader.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/PlacementPtr.h"
 #include "core/utils/ShaderUtils.h"
 #include "core/utils/ShapeUtils.h"
@@ -830,6 +832,34 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
       drawBlurLayer(picture, imageFilter, matrix, clip, brush);
       return;
     }
+    if (!ContainsTextureImageFilter(imageFilter)) {
+      picture->playback(this, matrix, clip);
+      return;
+    }
+    auto pictureBounds = picture->getBounds();
+    if (!pictureBounds.isEmpty()) {
+      auto imageMatrix = Matrix::MakeTrans(-pictureBounds.left, -pictureBounds.top);
+      auto image = Image::MakeFrom(picture, FloatCeilToInt(pictureBounds.width()),
+                                   FloatCeilToInt(pictureBounds.height()), &imageMatrix,
+                                   document->dstColorSpace());
+      if (image != nullptr) {
+        Point filterOffset = {};
+        auto filtered = image->makeWithFilter(imageFilter, &filterOffset);
+        if (filtered != nullptr && PDFBitmap::CanSerialize(filtered, document->context())) {
+          auto drawMatrix = matrix;
+          drawMatrix.preTranslate(pictureBounds.left + filterOffset.x,
+                                  pictureBounds.top + filterOffset.y);
+          auto brushMatrix = Matrix::MakeTrans(-pictureBounds.left - filterOffset.x,
+                                               -pictureBounds.top - filterOffset.y);
+          drawImage(std::move(filtered), SamplingOptions(), drawMatrix, clip,
+                    brush.makeWithMatrix(brushMatrix));
+          return;
+        }
+      }
+    }
+    LOGE("PDFExportContext: failed to rasterize texture image filter.");
+    picture->playback(this, matrix, clip);
+    return;
   }
   picture->playback(this, matrix, clip);
 }

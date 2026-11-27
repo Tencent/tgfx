@@ -17,12 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <array>
 #include "core/utils/CopyPixels.h"
 #include "skcms.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/YUVColorSpace.h"
 
 namespace tgfx {
+// Returns 12 floats for a Float3x3 uniform: three rows padded to Float4 alignment.
+std::array<float, 12> GetYUVColorConversionMatrix(YUVColorSpace yuvColorSpace);
+
 std::shared_ptr<ColorSpace> MakeColorSpaceFromYUVColorSpace(YUVColorSpace yuvColorSpace);
 
 std::shared_ptr<ColorSpace> AndroidDataSpaceToColorSpace(int standard, int transfer);

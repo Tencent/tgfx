@@ -37,9 +37,18 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/SurfaceReadback.h"
 #include "tgfx/core/WriteStream.h"
+#include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/GPUBuffer.h"
 
 namespace tgfx {
+
+bool PDFBitmap::CanSerialize(const std::shared_ptr<Image>& image, Context* context) {
+  if (image == nullptr || context == nullptr || image->width() <= 0 || image->height() <= 0) {
+    return false;
+  }
+  auto maxDimension = context->gpu()->limits()->maxTextureDimension2D;
+  return image->width() <= maxDimension && image->height() <= maxDimension;
+}
 
 namespace {
 

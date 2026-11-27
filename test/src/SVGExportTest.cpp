@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
 #include <string>
 #include "base/TGFXTest.h"
+#include "core/filters/TextureImageFilter.h"
 #include "gtest/gtest.h"
 #include "svg/ElementWriter.h"
 #include "svg/SVGExportContext.h"
@@ -42,6 +44,7 @@
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/layers/filters/BlurFilter.h"
+#include "tgfx/layers/filters/TextureFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
@@ -66,6 +69,7 @@ bool CompareSVG(const std::shared_ptr<MemoryWriteStream>& stream, const std::str
   }
   return result;
 }
+
 }  // namespace
 
 TGFX_TEST(SVGExportTest, PureColor) {
@@ -543,6 +547,29 @@ TGFX_TEST(SVGExportTest, ClipState) {
   exporter->close();
   auto SVGString = SVGStream->readString();
   ASSERT_EQ(SVGString, compareString);
+}
+
+TGFX_TEST(SVGExportTest, RasterImageClip) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/assets/bridge.jpg");
+  ASSERT_TRUE(image != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+                                    SVGExportFlags::DisablePrettyXML);
+  auto canvas = exporter->getCanvas();
+  auto scale = 200.0f / static_cast<float>(std::max(image->width(), image->height()));
+  canvas->scale(scale, scale);
+  canvas->clipRect(Rect::MakeXYWH(50, 50, 100, 100));
+  canvas->drawImage(image);
+  exporter->close();
+
+  auto svg = SVGStream->readString();
+  EXPECT_NE(svg.find("<clipPath"), std::string::npos);
+  EXPECT_NE(svg.find("clip-path=\"url(#clip_0)\""), std::string::npos);
+  EXPECT_NE(svg.find("<image"), std::string::npos);
 }
 
 TGFX_TEST(SVGExportTest, GradientMask) {
@@ -1445,6 +1472,187 @@ TGFX_TEST(SVGExportTest, BlurFilterWithRotation) {
   displayList->root()->draw(exporter->getCanvas());
   exporter->close();
   EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/BlurFilterWithRotation"));
+}
+
+TGFX_TEST(SVGExportTest, TextureFilterNativeSVG) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(240, 240));
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = ShapeLayer::Make();
+  Path path = {};
+  path.addOval(Rect::MakeXYWH(50, 50, 140, 100));
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(60, 120, 200)));
+  layer->setFilters({TextureFilter::Make(16.0f, 16.0f, 8.0f, 4294967295u, true)});
+  displayList->root()->addChild(layer);
+  auto canvas = exporter->getCanvas();
+  canvas->clipRect(Rect::MakeXYWH(70, 70, 100, 80));
+  displayList->root()->draw(canvas);
+  exporter->close();
+
+  auto svg = SVGStream->readString();
+  EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("<feTurbulence"), std::string::npos);
+  EXPECT_NE(svg.find("<feDisplacementMap"), std::string::npos);
+  EXPECT_NE(svg.find("seed=\"6849202\""), std::string::npos);
+  EXPECT_NE(svg.find("data-pagx-seed=\"4294967295\""), std::string::npos);
+  EXPECT_NE(svg.find("scale=\"16\""), std::string::npos);
+  EXPECT_NE(svg.find("<feComponentTransfer"), std::string::npos);
+  EXPECT_NE(svg.find("operator=\"atop\""), std::string::npos);
+  EXPECT_EQ(svg.find("operator=\"over\""), std::string::npos);
+  EXPECT_EQ(svg.find("<image"), std::string::npos);
+  EXPECT_NE(svg.find("<clipPath"), std::string::npos);
+}
+
+TGFX_TEST(SVGExportTest, TextureFilterLayerParametersNativeSVG) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto exportLayer = [&](const Rect& viewport, const Matrix& matrix, const Rect& rect,
+                         const Color& color, float sizeX, float sizeY) {
+    auto SVGStream = MemoryWriteStream::Make();
+    auto exporter = SVGExporter::Make(SVGStream, context, viewport);
+    auto displayList = std::make_unique<DisplayList>();
+    auto layer = ShapeLayer::Make();
+    layer->setMatrix(matrix);
+    Path path = {};
+    path.addRect(rect);
+    layer->setPath(path);
+    layer->setFillStyle(ShapeStyle::Make(color));
+    layer->setFilters({TextureFilter::Make(sizeX, sizeY, 8.0f, 3491, false)});
+    displayList->root()->addChild(layer);
+    displayList->root()->draw(exporter->getCanvas());
+    exporter->close();
+    return SVGStream->readString();
+  };
+
+  auto scaled = exportLayer(Rect::MakeWH(240, 160), Matrix::MakeScale(2.0f),
+                            Rect::MakeWH(100.0f, 60.0f), Color::Blue(), 16.0f, 12.0f);
+  const std::string frequencyPrefix = "baseFrequency=\"";
+  auto frequencyStart = scaled.find(frequencyPrefix);
+  ASSERT_NE(frequencyStart, std::string::npos);
+  frequencyStart += frequencyPrefix.size();
+  auto frequencyEnd = scaled.find('"', frequencyStart);
+  ASSERT_NE(frequencyEnd, std::string::npos);
+  auto frequencyValue = scaled.substr(frequencyStart, frequencyEnd - frequencyStart);
+  char* parseEnd = nullptr;
+  auto frequencyX = std::strtof(frequencyValue.c_str(), &parseEnd);
+  ASSERT_NE(parseEnd, frequencyValue.c_str());
+  auto frequencyY = std::strtof(parseEnd, &parseEnd);
+  // SVG numeric attributes are serialized to four decimal places.
+  EXPECT_NEAR(frequencyX, 0.0312f, 1e-5f);
+  EXPECT_NEAR(frequencyY, 0.0417f, 1e-5f);
+  EXPECT_NE(scaled.find("scale=\"32\""), std::string::npos);
+  EXPECT_NE(scaled.find("data-pagx-size-x=\"16\""), std::string::npos);
+  EXPECT_NE(scaled.find("data-pagx-size-y=\"12\""), std::string::npos);
+
+  auto zeroSize = exportLayer(Rect::MakeWH(80, 60), Matrix::I(), Rect::MakeWH(80.0f, 60.0f),
+                              Color::Green(), 0.0f, 25.0f);
+  EXPECT_NE(zeroSize.find("<feOffset"), std::string::npos);
+  EXPECT_EQ(zeroSize.find("<feTurbulence"), std::string::npos);
+  EXPECT_EQ(zeroSize.find("<feDisplacementMap"), std::string::npos);
+  EXPECT_EQ(zeroSize.find("inf"), std::string::npos);
+
+  auto largeSize = exportLayer(Rect::MakeWH(240, 160), Matrix::I(), Rect::MakeWH(200.0f, 120.0f),
+                               Color::Red(), 30000.0f, 25000.0f);
+  auto largeFrequencyStart = largeSize.find(frequencyPrefix);
+  ASSERT_NE(largeFrequencyStart, std::string::npos);
+  largeFrequencyStart += frequencyPrefix.size();
+  auto largeFrequencyEnd = largeSize.find('"', largeFrequencyStart);
+  ASSERT_NE(largeFrequencyEnd, std::string::npos);
+  auto largeFrequencyValue =
+      largeSize.substr(largeFrequencyStart, largeFrequencyEnd - largeFrequencyStart);
+  parseEnd = nullptr;
+  auto largeFrequencyX = std::strtof(largeFrequencyValue.c_str(), &parseEnd);
+  ASSERT_NE(parseEnd, largeFrequencyValue.c_str());
+  auto largeFrequencyY = std::strtof(parseEnd, &parseEnd);
+  EXPECT_GT(largeFrequencyX, 0.0f);
+  EXPECT_GT(largeFrequencyY, 0.0f);
+  EXPECT_NEAR(largeFrequencyX, 1.0f / 30000.0f, 1e-10f);
+  EXPECT_NEAR(largeFrequencyY, 1.0f / 25000.0f, 1e-10f);
+  EXPECT_NE(largeSize.find("<feTurbulence"), std::string::npos);
+}
+
+TGFX_TEST(SVGExportTest, TextureFilterDrawLayerNativeSVG) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  PictureRecorder recorder;
+  auto* recordingCanvas = recorder.beginRecording();
+  Paint bluePaint = {};
+  bluePaint.setColor(Color::Blue());
+  recordingCanvas->drawRect(Rect::MakeXYWH(10, 10, 90, 70), bluePaint);
+  Paint redPaint = {};
+  redPaint.setColor(Color::Red());
+  recordingCanvas->drawRect(Rect::MakeXYWH(90, 50, 80, 70), redPaint);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  auto params = MakeTextureGrainParams(16.0f, 12.0f, 8.0f, Point::Make(90.0f, 65.0f), 3491);
+  Paint paint = {};
+  paint.setImageFilter(std::make_shared<TextureImageFilter>(params));
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(180, 130));
+  exporter->getCanvas()->drawPicture(picture, nullptr, &paint);
+  exporter->close();
+
+  auto svg = SVGStream->readString();
+  EXPECT_FALSE(svg.empty());
+  EXPECT_NE(svg.find("<feTurbulence"), std::string::npos);
+  EXPECT_NE(svg.find("<feDisplacementMap"), std::string::npos);
+  EXPECT_NE(svg.find("scale=\"16\""), std::string::npos);
+  EXPECT_EQ(svg.find("<feComposite"), std::string::npos);
+  EXPECT_EQ(svg.find("<image"), std::string::npos);
+}
+
+TGFX_TEST(SVGExportTest, TextureFilterUserSpaceTransforms) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  PictureRecorder recorder;
+  auto* recordingCanvas = recorder.beginRecording();
+  Paint paint = {};
+  paint.setColor(Color::Blue());
+  recordingCanvas->drawRect(Rect::MakeWH(80.0f, 50.0f), paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  auto exportPicture = [&](const Matrix& matrix, const TextureGrainParams& params) {
+    auto SVGStream = MemoryWriteStream::Make();
+    auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(240, 160));
+    Paint texturePaint = {};
+    texturePaint.setImageFilter(std::make_shared<TextureImageFilter>(params));
+    exporter->getCanvas()->setMatrix(matrix);
+    exporter->getCanvas()->drawPicture(picture, nullptr, &texturePaint);
+    exporter->close();
+    return SVGStream->readString();
+  };
+
+  auto params = MakeTextureGrainParams(16.0f, 12.0f, 8.0f, Point::Make(40.0f, 25.0f), 3491);
+  auto scaled = exportPicture(Matrix::MakeScale(2.0f), params);
+  EXPECT_NE(scaled.find("baseFrequency=\"0.0312 0.0417\""), std::string::npos) << scaled;
+  EXPECT_NE(scaled.find("scale=\"32\""), std::string::npos) << scaled;
+
+  for (auto matrix : {Matrix::MakeRotate(30.0f), Matrix::MakeScale(2.0f, 1.0f)}) {
+    auto rasterized = exportPicture(matrix, params);
+    EXPECT_NE(rasterized.find("<image"), std::string::npos) << rasterized;
+    EXPECT_EQ(rasterized.find("<feTurbulence"), std::string::npos) << rasterized;
+  }
+
+  auto extremeParams =
+      MakeTextureGrainParams(1.0e-37f, 1.0e-37f, 8.0f, Point::Make(40.0f, 25.0f), 3491);
+  auto identity = exportPicture(Matrix::I(), extremeParams);
+  EXPECT_NE(identity.find("<feOffset"), std::string::npos);
+  EXPECT_EQ(identity.find("<feTurbulence"), std::string::npos);
+  EXPECT_EQ(identity.find("inf"), std::string::npos);
 }
 
 TGFX_TEST(SVGExportTest, FilterImageWithBlendMode) {
