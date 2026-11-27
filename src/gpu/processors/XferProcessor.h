@@ -44,6 +44,12 @@ class XferProcessor : public Processor {
           irBuilder(irBuilder), inputColorValue(inputColorValue),
           inputCoverageValue(inputCoverageValue), outputValue(outputValue) {
     }
+    ValueID samplerValue(SamplerHandle handle) const {
+      if (samplerValues == nullptr || handle.toIndex() >= samplerValues->size()) {
+        return INVALID_VALUE_ID;
+      }
+      return (*samplerValues)[handle.toIndex()];
+    }
     FragmentShaderBuilder* fragBuilder;
     UniformHandler* uniformHandler;
     const std::string inputColor;
@@ -54,6 +60,9 @@ class XferProcessor : public Processor {
     ValueID inputColorValue = INVALID_VALUE_ID;
     ValueID inputCoverageValue = INVALID_VALUE_ID;
     ValueID outputValue = INVALID_VALUE_ID;
+    /// The fragment chain's tail value (the text route's discard operand).
+    ValueID chainTailValue = INVALID_VALUE_ID;
+    const std::vector<ValueID>* samplerValues = nullptr;
   };
 
   virtual const TextureView* dstTextureView() const {

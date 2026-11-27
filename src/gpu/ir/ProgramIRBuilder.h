@@ -94,6 +94,7 @@ class ProgramIRBuilder {
   ValueID CreateConvert(ValueID source, SLType target);
 
   void StoreOutput(ValueID dst, ValueID src);
+  void CreateDiscard(ValueID condition);
 
   void StoreVarying(LValue dst, ValueID src);
 

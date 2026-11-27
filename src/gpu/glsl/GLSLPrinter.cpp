@@ -449,6 +449,18 @@ std::string GLSLPrinter::PrintFragmentBodyFromIR(const ProgramIR& program) {
       out += "  }\n";
       continue;
     }
+    if (statement.kind == IRStatementKind::Discard) {
+      std::string condition = {};
+      if (!GLSLOperatorEmitter::EmitValue(program, statement.src, &condition, &error)) {
+        LOGE("IRPrinter: the discard condition cannot be printed: %s", error.c_str());
+        return {};
+      }
+      // The text route's zero-coverage early-out: a fully transparent premultiplied source writes
+      // nothing, so the pixel keeps the destination (a Clear that reaches it would zero it).
+      out += "  if (" + condition + ".r <= 0.0 && " + condition + ".g <= 0.0 && " + condition +
+             ".b <= 0.0) {\n    discard;\n  }\n";
+      continue;
+    }
     if (statement.kind != IRStatementKind::Assign && statement.kind != IRStatementKind::StoreOutput) {
       return {};
     }

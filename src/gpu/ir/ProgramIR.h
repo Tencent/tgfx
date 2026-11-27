@@ -83,6 +83,8 @@ enum class IRBinaryOp : uint8_t {
   Sub,
   Mul,
   Div,
+  Min,
+  Max,
 };
 
 enum class IRExprKind : uint8_t {
@@ -129,6 +131,9 @@ enum class IRStatementKind : uint8_t {
   Assign,
   Call,
   StoreOutput,
+  /// Discard: src holds the premultiplied source; a fully transparent one (rgb all <= 0) kills
+  /// the pixel, matching the text route's zero-coverage early-out.
+  Discard,
   StoreVarying,
   Return,
   ForLoopBegin,

@@ -429,6 +429,14 @@ void ProgramIRBuilder::StoreOutput(ValueID dst, ValueID src) {
       .push_back(std::move(statement));
 }
 
+void ProgramIRBuilder::CreateDiscard(ValueID condition) {
+  IRStatement statement = {};
+  statement.kind = IRStatementKind::Discard;
+  statement.src = condition;
+  (currentStage == ShaderStage::Vertex ? ir.vertexStatements : ir.statements)
+      .push_back(std::move(statement));
+}
+
 void ProgramIRBuilder::StoreVarying(LValue dst, ValueID src) {
   IRStatement statement = {};
   statement.kind = IRStatementKind::StoreVarying;

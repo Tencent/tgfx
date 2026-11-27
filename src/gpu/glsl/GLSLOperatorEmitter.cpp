@@ -183,6 +183,11 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
           !GLSLOperatorEmitter::EmitValue(program, expr.args[1], &right, error)) {
         return false;
       }
+      if (expr.binaryOp == IRBinaryOp::Min || expr.binaryOp == IRBinaryOp::Max) {
+        *expression = std::string(expr.binaryOp == IRBinaryOp::Min ? "min(" : "max(") + left +
+                      ", " + right + ")";
+        return true;
+      }
       const char* op = nullptr;
       switch (expr.binaryOp) {
         case IRBinaryOp::Add:
@@ -196,6 +201,9 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
           break;
         case IRBinaryOp::Div:
           op = "/";
+          break;
+        case IRBinaryOp::Min:
+        case IRBinaryOp::Max:
           break;
       }
       *expression = "(" + left + " " + op + " " + right + ")";

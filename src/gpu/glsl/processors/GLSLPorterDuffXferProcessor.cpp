@@ -16,7 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "GeneratedOperators.h"
 #include "GLSLPorterDuffXferProcessor.h"
+#include "gpu/glsl/GLSLOperatorEmitter.h"
 #include "gpu/glsl/GLSLBlend.h"
 #include "gpu/ir/ProgramIRBuilder.h"
 
@@ -33,14 +35,218 @@ GLSLPorterDuffXferProcessor::GLSLPorterDuffXferProcessor(BlendMode blend,
 }
 
 void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
+  if (std::getenv("BLENDDBG") != nullptr) {
+    BlendFormula dbgFormula = {};
+    const bool coeff = BlendModeAsCoeff(blendMode, true, &dbgFormula);
+    fprintf(stderr, "BLENDDBG mode=%d coeff=%d primary=%d dst=%d\n", static_cast<int>(blendMode),
+            coeff ? 1 : 0, coeff ? static_cast<int>(dbgFormula.primaryOutputType()) : -1,
+            args.dstTextureSamplerHandle.isValid() ? 1 : 0);
+  }
   auto fragBuilder = args.fragBuilder;
   auto uniformHandler = args.uniformHandler;
   const auto& dstColor = fragBuilder->dstColor();
+  fragBuilder->codeAppendf("// blendMode=%d\n", static_cast<int>(blendMode));
   if (args.irBuilder != nullptr && args.inputColorValue != INVALID_VALUE_ID &&
       args.inputCoverageValue != INVALID_VALUE_ID && args.outputValue != INVALID_VALUE_ID) {
-    const auto result = args.irBuilder->CreateBinary(IRBinaryOp::Mul, SLType::Float4,
-                                                     args.inputColorValue, args.inputCoverageValue);
-    args.irBuilder->StoreOutput(args.outputValue, result);
+    auto ir = args.irBuilder;
+    // The IR route carries the whole blend: the named chain values, the coefficient-mode primary
+    // output transform, the destination read (a FragCoord-offset sample of the dst copy), the
+    // mode's XpBlend operator, and — for the non-coefficient modes — the coverage mix against the
+    // destination. The text tail below stays for the dual-source coefficient modes.
+    auto resolveName = [&](const std::string& name) -> ValueID {
+      if (name.empty() || name == "vec4(1.0)" || name == "1.0") {
+        const auto one = ir->CreateConstant(1.0f);
+        return ir->CreateConstruct(SLType::Float4, {one, one, one, one});
+      }
+      if (name == "vec4(0.0)" || name == "0.0") {
+        const auto zero = ir->CreateConstant(0.0f);
+        return ir->CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
+      }
+      return ir->InternValue(name, SLType::Float4, Precision::High, IRValueKind::Local);
+    };
+    const auto srcValue = resolveName(args.inputColor);
+    const auto covValue = resolveName(args.inputCoverage);
+    if (srcValue == INVALID_VALUE_ID || covValue == INVALID_VALUE_ID) {
+      ir->MarkFailed("the porter-duff chain values have no IR form");
+      return;
+    }
+    // The text route's zero-coverage early-out: it discards on the fragment chain's tail, so the
+    // discard source is that tail when the builder records one.
+    ir->CreateDiscard(args.chainTailValue != INVALID_VALUE_ID ? args.chainTailValue : covValue);
+    ValueID dstValue = INVALID_VALUE_ID;
+    if (args.dstTextureSamplerHandle.isValid()) {
+      const auto dstSampler = args.samplerValue(args.dstTextureSamplerHandle);
+      const auto swizzleCode = ShaderBuilder::ReadSwizzleCode(
+          uniformHandler->getSamplerSwizzle(args.dstTextureSamplerHandle));
+      if (dstSampler == INVALID_VALUE_ID || swizzleCode < 0) {
+        ir->MarkFailed("the porter-duff dst sampler has no IR value");
+        return;
+      }
+      const auto upperLeftName = uniformHandler->addUniform("DstTextureUpperLeft",
+                                                            UniformFormat::Float2,
+                                                            ShaderStage::Fragment);
+      const auto coordScaleName = uniformHandler->addUniform(
+          "DstTextureCoordScale", UniformFormat::Float2, ShaderStage::Fragment);
+      const auto upperLeft =
+          ir->InternValue(upperLeftName, SLType::Float2, Precision::High, IRValueKind::Uniform);
+      const auto coordScale = ir->InternValue(coordScaleName, SLType::Float2, Precision::High,
+                                              IRValueKind::Uniform);
+      const auto fragCoord = ir->CreateBuiltin("gl_FragCoord", SLType::Float4);
+      const auto fragXY = ir->CreateSwizzle(fragCoord, SLType::Float2, "xy");
+      const auto shifted =
+          ir->CreateBinary(IRBinaryOp::Sub, SLType::Float2, fragXY, upperLeft);
+      const auto dstCoord =
+          ir->CreateBinary(IRBinaryOp::Mul, SLType::Float2, shifted, coordScale);
+      dstValue = ir->CreateTextureSample(dstSampler, dstCoord, SLType::Float4, "dstRead",
+                                         SLType::Texture2DSampler, swizzleCode);
+    } else {
+      const auto one = ir->CreateConstant(1.0f);
+      dstValue = ir->CreateConstruct(SLType::Float4, {one, one, one, one});
+    }
+    // The coefficient modes follow the BlendFormula fields exactly: the primary-output
+    // transform, the src/dst coefficient handlers, the blend operation and the clamp — the text
+    // route's AppendCoeffBlend spelled out with IR expressions. The separable modes keep the text
+    // route's xpBlendColors-missing fallback: the source chain value passes through unchanged
+    // (the coverage mix below still applies).
+    BlendFormula formula = {};
+    ValueID blended = INVALID_VALUE_ID;
+    if (BlendModeAsCoeff(blendMode, true, &formula)) {
+      const auto one = ir->CreateConstant(1.0f);
+      const auto zero = ir->CreateConstant(0.0f);
+      const auto oneVec = ir->CreateConstruct(SLType::Float4, {one, one, one, one});
+      const auto zeroVec = ir->CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
+      ValueID primary = srcValue;
+      switch (formula.primaryOutputType()) {
+        case BlendFormula::OutputType::None:
+          primary = zeroVec;
+          break;
+        case BlendFormula::OutputType::Coverage:
+          primary = covValue;
+          break;
+        case BlendFormula::OutputType::Modulate:
+          primary = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, srcValue, covValue);
+          break;
+        case BlendFormula::OutputType::SAModulate:
+          primary = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4,
+                                     ir->CreateSwizzle(srcValue, SLType::Float4, "aaaa"), covValue);
+          break;
+        case BlendFormula::OutputType::ISAModulate:
+          primary = ir->CreateBinary(
+              IRBinaryOp::Mul, SLType::Float4,
+              ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, oneVec,
+                               ir->CreateSwizzle(srcValue, SLType::Float4, "aaaa")),
+              covValue);
+          break;
+        case BlendFormula::OutputType::ISCModulate:
+          primary = ir->CreateBinary(
+              IRBinaryOp::Mul, SLType::Float4,
+              ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, oneVec, srcValue), covValue);
+          break;
+      }
+      const auto applyFactor = [&](ValueID base, BlendFactor factor) -> ValueID {
+        switch (factor) {
+          case BlendFactor::Zero:
+            return zeroVec;
+          case BlendFactor::One:
+            return base;
+          case BlendFactor::Src:
+            return ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, base, primary);
+          case BlendFactor::OneMinusSrc:
+            return ir->CreateBinary(
+                IRBinaryOp::Mul, SLType::Float4, base,
+                ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, oneVec, primary));
+          case BlendFactor::Dst:
+            return ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, base, dstValue);
+          case BlendFactor::OneMinusDst:
+            return ir->CreateBinary(
+                IRBinaryOp::Mul, SLType::Float4, base,
+                ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, oneVec, dstValue));
+          case BlendFactor::SrcAlpha:
+            return ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, base,
+                                    ir->CreateSwizzle(primary, SLType::Float4, "aaaa"));
+          case BlendFactor::OneMinusSrcAlpha:
+            return ir->CreateBinary(
+                IRBinaryOp::Mul, SLType::Float4, base,
+                ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, oneVec,
+                                 ir->CreateSwizzle(primary, SLType::Float4, "aaaa")));
+          case BlendFactor::DstAlpha:
+            return ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, base,
+                                    ir->CreateSwizzle(dstValue, SLType::Float4, "aaaa"));
+          case BlendFactor::OneMinusDstAlpha:
+            return ir->CreateBinary(
+                IRBinaryOp::Mul, SLType::Float4, base,
+                ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, oneVec,
+                                 ir->CreateSwizzle(dstValue, SLType::Float4, "aaaa")));
+          case BlendFactor::Src1:
+          case BlendFactor::OneMinusSrc1:
+          case BlendFactor::Src1Alpha:
+          case BlendFactor::OneMinusSrc1Alpha:
+            ir->MarkFailed("dual-source blend factors have no single-value IR form");
+            return INVALID_VALUE_ID;
+        }
+        return INVALID_VALUE_ID;
+      };
+      const auto applyOp = [&](ValueID srcTerm, ValueID dstTerm,
+                               BlendOperation operation) -> ValueID {
+        switch (operation) {
+          case BlendOperation::Min:
+            return ir->CreateBinary(IRBinaryOp::Min, SLType::Float4, srcTerm, dstTerm);
+          case BlendOperation::Max:
+            return ir->CreateBinary(IRBinaryOp::Max, SLType::Float4, srcTerm, dstTerm);
+          case BlendOperation::Add:
+          case BlendOperation::Subtract:
+          case BlendOperation::ReverseSubtract: {
+            const auto sum = operation == BlendOperation::Add
+                                 ? ir->CreateBinary(IRBinaryOp::Add, SLType::Float4, srcTerm,
+                                                    dstTerm)
+                             : operation == BlendOperation::Subtract
+                                 ? ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, srcTerm,
+                                                    dstTerm)
+                                 : ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, dstTerm,
+                                                    srcTerm);
+            return ir->CreateBinary(
+                IRBinaryOp::Min, SLType::Float4,
+                ir->CreateBinary(IRBinaryOp::Max, SLType::Float4, sum, zeroVec), oneVec);
+          }
+        }
+        return INVALID_VALUE_ID;
+      };
+      const auto srcWithCoeff = applyFactor(primary, formula.srcFactor());
+      const auto dstWithCoeff = applyFactor(dstValue, formula.dstFactor());
+      if (srcWithCoeff == INVALID_VALUE_ID || dstWithCoeff == INVALID_VALUE_ID) {
+        return;
+      }
+      blended = applyOp(srcWithCoeff, dstWithCoeff, formula.operation());
+    } else {
+      // The separable modes' text fallback: xpBlendColors is not in the GL bundle, so the route
+      // passes the source through and lets the coverage mix below finish the tail.
+      blended = srcValue;
+    }
+    if (blended == INVALID_VALUE_ID) {
+      ir->MarkFailed("the porter-duff blend mode has no XpBlend operator");
+      return;
+    }
+    ValueID result = blended;
+    if (!BlendModeAsCoeff(blendMode, true)) {
+      const auto covered = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, blended,
+                                            args.inputCoverageValue);
+      const auto one = ir->CreateConstant(1.0f);
+      const auto white = ir->CreateConstruct(SLType::Float4, {one, one, one, one});
+      const auto oneMinusCoverage =
+          ir->CreateBinary(IRBinaryOp::Sub, SLType::Float4, white, args.inputCoverageValue);
+      const auto uncovered =
+          ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, oneMinusCoverage, dstValue);
+      result = ir->CreateBinary(IRBinaryOp::Add, SLType::Float4, covered, uncovered);
+    }
+    ir->StoreOutput(args.outputValue, result);
+    if (std::getenv("XPEXPR") != nullptr) {
+      std::string expr = {};
+      std::string error = {};
+      if (GLSLOperatorEmitter::EmitValue(ir->IR(), result, &expr, &error)) {
+        fprintf(stderr, "XPEXPR mode=%d %s\n", static_cast<int>(blendMode), expr.c_str());
+      }
+    }
+    return;
   }
 
   if (args.dstTextureSamplerHandle.isValid()) {

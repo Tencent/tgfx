@@ -1475,6 +1475,12 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
           case IRBinaryOp::Div:
             opcode = spirv::kOpFDiv;
             break;
+          case IRBinaryOp::Min:
+            opcode = spirv::kOpFMin;
+            break;
+          case IRBinaryOp::Max:
+            opcode = spirv::kOpFMax;
+            break;
         }
       }
       if (opcode == 0) {

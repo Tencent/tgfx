@@ -68,6 +68,8 @@ enum : uint16_t {
   kOpFSub = 130,
   kOpFMul = 133,
   kOpFDiv = 136,
+  kOpFMin = 187,
+  kOpFMax = 188,
   kOpVectorTimesScalar = 142,
   kOpMatrixTimesVector = 145,
   kOpDot = 148,

@@ -71,6 +71,8 @@ bool BuildStage(const ProgramIR& program, const std::vector<IRStatement>& statem
           return false;
         }
         break;
+      case IRStatementKind::Discard:
+        return Fail(error, "the SPIR-V backend does not emit discard statements yet");
       case IRStatementKind::Call:
       case IRStatementKind::Return:
         break;
