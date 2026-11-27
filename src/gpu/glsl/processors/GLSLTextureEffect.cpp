@@ -235,7 +235,8 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
       args.irBuilder->MarkFailed("the alpha modulation could not be recorded");
       return;
     }
-    args.irBuilder->Assign({colorValue, ""}, result);
+    // Only the store: assigning the result back into 'color' first would make the stored
+    // expression read the already-premultiplied rgb and multiply by the alpha plane twice.
     args.irBuilder->StoreOutput(args.outputValue, result);
 
     std::string coordExpression = {};
