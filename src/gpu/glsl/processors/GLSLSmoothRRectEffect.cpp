@@ -54,8 +54,7 @@ namespace tgfx {
  *                b2x = transitionStart - 3*step. C3 is C1 reflected across y = x. The elliptical
  *                corner scales both per axis by radii.
  *     arcCoeffs  the coefficients of C2: x and y are the sine and cosine of the angle the tangent
- *                turns through along C1, and z is the handle length with unit radius of the cubic
- *                Bezier curve that approximates C2
+ *                turns through along C1; z is unused in this effect
  *     antiAlias  whether coverage is antialiased
  * They return the signed distance from q to C, negative inside. Non-antialiased coverage only
  * needs the inside/outside sign, so when antiAlias is false they evaluate the implicit equations
