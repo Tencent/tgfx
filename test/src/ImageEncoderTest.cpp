@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
 #include <array>
 #include <vector>
 #include "gtest/gtest.h"
@@ -92,22 +93,24 @@ TEST(ImageEncoderTest, StreamingAndWholeImageAgree) {
 
 TEST(ImageEncoderTest, Accepts32768OnEitherAxis) {
   for (auto format : {EncodedFormat::PNG, EncodedFormat::JPEG}) {
-    for (int width : {16, 32768}) {
-      int height = width == 16 ? 32768 : 16;
-      auto info = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Opaque);
-      auto bandInfo = ImageInfo::Make(width, 16, ColorType::RGBA_8888, AlphaType::Opaque);
+    for (auto imageSize : {ISize::Make(16, 32765), ISize::Make(32768, 13)}) {
+      auto info = ImageInfo::Make(imageSize.width, imageSize.height, ColorType::RGBA_8888,
+                                  AlphaType::Opaque);
+      auto bandInfo = ImageInfo::Make(imageSize.width, 16, ColorType::RGBA_8888, AlphaType::Opaque);
       std::vector<uint8_t> pixels(bandInfo.byteSize(), 255);
       auto stream = MemoryWriteStream::Make();
       auto encoder = ImageEncoder::Make(stream, info, format);
       ASSERT_NE(encoder, nullptr);
-      for (int row = 0; row < height; row += bandInfo.height()) {
-        ASSERT_TRUE(encoder->appendRows(Pixmap(bandInfo, pixels.data())));
+      for (int row = 0; row < imageSize.height; row += bandInfo.height()) {
+        auto remaining = std::min(bandInfo.height(), imageSize.height - row);
+        auto infoForBand = bandInfo.makeWH(imageSize.width, remaining);
+        ASSERT_TRUE(encoder->appendRows(Pixmap(infoForBand, pixels.data())));
       }
       ASSERT_TRUE(encoder->finish());
       auto codec = ImageCodec::MakeFrom(stream->readData());
       ASSERT_NE(codec, nullptr);
-      EXPECT_EQ(codec->width(), width);
-      EXPECT_EQ(codec->height(), height);
+      EXPECT_EQ(codec->width(), imageSize.width);
+      EXPECT_EQ(codec->height(), imageSize.height);
     }
   }
 }
