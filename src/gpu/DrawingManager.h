@@ -78,11 +78,6 @@ class DrawingManager {
   bool fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                     PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags);
 
-  std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                                  uint32_t renderFlags,
-                                                  std::optional<PMColor> clearColor = std::nullopt,
-                                                  std::shared_ptr<ColorSpace> colorSpace = nullptr);
-
   void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                         PlacementArray<DrawOp> drawOps, std::optional<PMColor> clearColor);
 
@@ -158,6 +153,21 @@ class DrawingManager {
   }
 
  private:
+  // Only RenderContext obtains a compositor, and it marks every draw it forwards. Keeping this out
+  // of the public interface makes that structural: a new drawing path cannot record ops without
+  // going through RenderContext::getOpsCompositor() and its mark, which is what tells DisplayList
+  // whether a tile produced any content.
+  friend class RenderContext;
+
+  /**
+   * Creates a compositor for the given render target. RenderContext owns the returned compositor
+   * and is the only caller.
+   */
+  std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
+                                                  uint32_t renderFlags,
+                                                  std::optional<PMColor> clearColor = std::nullopt,
+                                                  std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
   struct WindowTarget {
     std::weak_ptr<Window> window;
     std::weak_ptr<RenderTargetProxy> target;

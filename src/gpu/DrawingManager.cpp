@@ -88,8 +88,10 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
 std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
     std::shared_ptr<RenderTargetProxy> target, uint32_t renderFlags,
     std::optional<PMColor> clearColor, std::shared_ptr<ColorSpace> colorSpace) {
-  auto compositor = std::make_shared<OpsCompositor>(std::move(target), renderFlags, clearColor,
-                                                    std::move(colorSpace));
+  // The constructor is private to keep other drawing paths out, and std::make_shared cannot see a
+  // friend declaration, so build the shared_ptr here instead.
+  std::shared_ptr<OpsCompositor> compositor(
+      new OpsCompositor(std::move(target), renderFlags, clearColor, std::move(colorSpace)));
   compositors.push_back(compositor);
   compositor->cachedPosition = --compositors.end();
   return compositor;
