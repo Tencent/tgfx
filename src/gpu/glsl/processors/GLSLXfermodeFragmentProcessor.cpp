@@ -124,8 +124,15 @@ void GLSLXfermodeFragmentProcessor::emitCode(EmitArgs& args) const {
     return;
   }
   std::string childColor = "child";
-  const auto childValue = emitChildIR(0, "", &childColor, args, INVALID_VALUE_ID);
   const auto input = inputOrWhite();
+  // The single-child form hands the child the opaque input too (the text route's
+  // vec4(input.rgb, 1.0)): the child's own epilogue modulates through that input's alpha.
+  const auto childInput = [&]() -> ValueID {
+    const auto rgb = ir->CreateSwizzle(input, SLType::Float3, "rgb");
+    const auto one = ir->CreateConstant(1.0f);
+    return ir->CreateConstruct(SLType::Float4, {rgb, one});
+  };
+  const auto childValue = emitChildIR(0, "", &childColor, args, childInput());
   // The single-child form blends the child against the input; which side is src depends on the
   // child kind (the text route's argument order).
   const auto src = child == XfermodeFragmentProcessor::Child::DstChild ? input : childValue;
