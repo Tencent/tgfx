@@ -104,6 +104,7 @@ namespace tgfx {
   X(GlassRefraction, 73)    \
   X(GlassUDFTentBlur, 74)   \
   X(GlassUDFGeometry, 75)   \
+  X(PerlinNoiseKernel, 76)  \
 
 enum class OperatorID : uint32_t {
 #define TGFX_OPERATOR_ENUM(name, value) name = value,

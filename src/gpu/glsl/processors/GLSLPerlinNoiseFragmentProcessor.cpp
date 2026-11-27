@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "GeneratedOperators.h"
 #include "GLSLPerlinNoiseFragmentProcessor.h"
 #include "core/shaders/PerlinNoiseShader.h"
 #include "gpu/resources/TextureView.h"
@@ -78,177 +79,31 @@ GLSLPerlinNoiseFragmentProcessor::GLSLPerlinNoiseFragmentProcessor(
 }
 
 void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  auto uniformHandler = args.uniformHandler;
-  auto& permSampler = (*args.textureSamplers)[0];
-  auto& noiseSampler = (*args.textureSamplers)[1];
-
-  auto baseFreqName =
-      uniformHandler->addUniform("baseFrequency", UniformFormat::Float2, ShaderStage::Fragment);
-
-  std::string stitchDataName;
-  if (stitchTiles) {
-    stitchDataName =
-        uniformHandler->addUniform("stitchData", UniformFormat::Float2, ShaderStage::Fragment);
-  }
-
-  auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
-
-  // tgfx feeds the fragment shader transformedCoords sitting on the pixel centre (X+0.5, Y+0.5).
-  // Multiplying by baseFrequency directly would shift every pixel onto a noise lattice point
-  // whenever baseFrequency is an integer: every fragment ends up with fract(noiseVec) = 0, all
-  // four corner gradient dot products vanish, and the output collapses to a flat 0.5 grey
-  // (visible bug at baseFrequency=1, which the SVG feTurbulence reference uses). To prevent
-  // this we add a tiny sub-lattice bias so fract(noiseVec) stays bounded away from 0. 1/128 is
-  // exactly representable in float and stays well below half a lattice cell at typical
-  // baseFrequencies, so it is invisible in output.
-  //
-  // Octave doubling: every iteration multiplies noiseVec by 2.0, so the bias becomes 2^k/128.
-  // For k <= 6 the bias contribution to fract is non-zero, keeping each octave non-degenerate;
-  // for k >= 7 the bias lands back on an integer and that octave can degenerate, but its
-  // weight in the final accumulation is ratio = 2^-k <= 1/128, contributing < 1% of the total
-  // amplitude. With the supported numOctaves <= 8 this is invisible. The exact bias value is
-  // not load-bearing — any small non-zero constant breaks the integer-baseFrequency case.
-  auto coordEntry = fragBuilder->appendFunction("tgfxNoiseCoord");
-  if (coordEntry.empty()) {
+  if (args.irBuilder == nullptr || args.outputValue == INVALID_VALUE_ID ||
+      args.textureSamplers == nullptr || args.transformedCoords == nullptr ||
+      args.textureSamplers->count() < 2 || args.transformedCoords->count() < 1) {
     return;
   }
-  fragBuilder->codeAppendf("highp vec2 noiseVec = %s(%s, %s);", coordEntry.c_str(),
-                           texCoordName.c_str(), baseFreqName.c_str());
-
-  fragBuilder->codeAppend("vec4 color = vec4(0.0);");
-
-  if (stitchTiles) {
-    fragBuilder->aliasValue("stitchData", stitchDataName, "highp vec2");
-  }
-
-  fragBuilder->codeAppend("float ratio = 1.0;");
-
-  fragBuilder->codeAppendf("for (int octave = 0; octave < %d; ++octave) {", numOctaves);
-
-  fragBuilder->codeAppend("highp vec4 floorVal;");
-  fragBuilder->codeAppend("floorVal.xy = floor(noiseVec);");
-  fragBuilder->codeAppend("floorVal.zw = floorVal.xy + vec2(1.0);");
-  fragBuilder->codeAppend("highp vec2 fractVal = fract(noiseVec);");
-
-  // Hermite interpolation
-  fragBuilder->codeAppend("vec2 noiseSmooth = smoothstep(0.0, 1.0, fractVal);");
-
-  if (stitchTiles) {
-    fragBuilder->codeAppend("floorVal -= step(stitchData.xyxy, floorVal) * stitchData.xyxy;");
-  }
-
-  // Wrap floorVal into [0, 256) so that permutation and noise texture lookups stay in range
-  // across octaves (where noiseVec doubles each iteration and can exceed 256).
-  fragBuilder->codeAppend("floorVal = mod(floorVal, 256.0);");
-
-  // Look up permutation values. Permutations texture is 256x1 A8 (swizzled to RRRR).
-  // Texel center: (i + 0.5) / 256.0
-  fragBuilder->codeAppend("highp float permX = ");
-  fragBuilder->appendTextureLookup(permSampler, "vec2((floorVal.x + 0.5) / 256.0, 0.5)");
-  fragBuilder->codeAppend(".r;");
-
-  fragBuilder->codeAppend("highp float permZ = ");
-  fragBuilder->appendTextureLookup(permSampler, "vec2((floorVal.z + 0.5) / 256.0, 0.5)");
-  fragBuilder->codeAppend(".r;");
-
-  // Recover [0,255] index from [0,1] texture value.
-  auto idxEntry = fragBuilder->appendFunction("tgfxNoiseLatticeIdx");
-  if (idxEntry.empty()) {
+  auto ir = args.irBuilder;
+  const auto permSampler = args.samplerValue((*args.textureSamplers)[0]);
+  const auto noiseSampler = args.samplerValue((*args.textureSamplers)[1]);
+  if (permSampler == INVALID_VALUE_ID || noiseSampler == INVALID_VALUE_ID) {
+    ir->MarkFailed("the perlin noise samplers have no IR values");
     return;
   }
-  fragBuilder->codeAppendf("highp vec2 latticeIdx = %s(vec2(permX, permZ));", idxEntry.c_str());
-
-  // bcoords: (latticeIdx + floorY) mod 256, used to index into noise texture.
-  auto bcoordsEntry = fragBuilder->appendFunction("tgfxNoiseBcoords");
-  if (bcoordsEntry.empty()) {
+  const auto coord = ir->InternValue((*args.transformedCoords)[0].name(), SLType::Float2,
+                                     Precision::High, IRValueKind::Varying);
+  if (coord == INVALID_VALUE_ID) {
+    ir->MarkFailed("the perlin noise coordinate has no IR value");
     return;
   }
-  fragBuilder->codeAppendf("highp vec4 bcoords = %s(latticeIdx, floorVal);", bcoordsEntry.c_str());
-
-  fragBuilder->codeAppend("vec4 noiseResult;");
-
-  // Channel Y coordinates: noise texture is 256x4, each row is one channel.
-  // Texel center Y: (row + 0.5) / 4.0
-  static const char* chanCoords[] = {"0.125", "0.375", "0.625", "0.875"};
-  static const char* chanNames[] = {"x", "y", "z", "w"};
-
-  for (int ch = 0; ch < 4; ++ch) {
-    fragBuilder->codeAppend("{");
-
-    // Corner A: gradient at (floor.x, floor.y), dot with fractVal
-    fragBuilder->codeAppend("vec4 lattice = ");
-    fragBuilder->appendTextureLookup(
-        noiseSampler, std::string("vec2((bcoords.x + 0.5) / 256.0, ") + chanCoords[ch] + ")");
-    fragBuilder->codeAppend(";");
-    auto gradEntry = fragBuilder->appendFunction("tgfxNoiseGradDot");
-    if (gradEntry.empty()) {
-      return;
-    }
-    fragBuilder->codeAppendf("float u = %s(lattice, fractVal, vec2(0.0, 0.0));", gradEntry.c_str());
-
-    // Corner B: gradient at (floor.x+1, floor.y), dot with (fractVal - (1,0))
-    fragBuilder->codeAppend("lattice = ");
-    fragBuilder->appendTextureLookup(
-        noiseSampler, std::string("vec2((bcoords.y + 0.5) / 256.0, ") + chanCoords[ch] + ")");
-    fragBuilder->codeAppend(";");
-    fragBuilder->codeAppendf("float v = %s(lattice, fractVal, vec2(1.0, 0.0));", gradEntry.c_str());
-
-    fragBuilder->codeAppend("float a = mix(u, v, noiseSmooth.x);");
-
-    // Corner C: gradient at (floor.x+1, floor.y+1), dot with (fractVal - (1,1))
-    fragBuilder->codeAppend("lattice = ");
-    fragBuilder->appendTextureLookup(
-        noiseSampler, std::string("vec2((bcoords.w + 0.5) / 256.0, ") + chanCoords[ch] + ")");
-    fragBuilder->codeAppend(";");
-    fragBuilder->codeAppendf("v = %s(lattice, fractVal, vec2(1.0, 1.0));", gradEntry.c_str());
-
-    // Corner D: gradient at (floor.x, floor.y+1), dot with (fractVal - (0,1))
-    fragBuilder->codeAppend("lattice = ");
-    fragBuilder->appendTextureLookup(
-        noiseSampler, std::string("vec2((bcoords.z + 0.5) / 256.0, ") + chanCoords[ch] + ")");
-    fragBuilder->codeAppend(";");
-    fragBuilder->codeAppendf("u = %s(lattice, fractVal, vec2(0.0, 1.0));", gradEntry.c_str());
-
-    fragBuilder->codeAppend("float b = mix(u, v, noiseSmooth.x);");
-
-    fragBuilder->codeAppendf("noiseResult.%s = mix(a, b, noiseSmooth.y);", chanNames[ch]);
-
-    fragBuilder->codeAppend("}");
-  }
-
-  // Accumulate this octave
-  fragBuilder->codeAppend("color += ");
-  if (noiseType != PerlinNoiseType::FractalNoise) {
-    fragBuilder->codeAppend("abs(");
-  }
-  fragBuilder->codeAppend("noiseResult");
-  if (noiseType != PerlinNoiseType::FractalNoise) {
-    fragBuilder->codeAppend(")");
-  }
-  fragBuilder->codeAppend(" * ratio;");
-
-  fragBuilder->codeAppend("noiseVec *= 2.0;");
-  fragBuilder->codeAppend("ratio *= 0.5;");
-  if (stitchTiles) {
-    fragBuilder->codeAppend("stitchData *= 2.0;");
-  }
-  fragBuilder->codeAppend("}");  // end octave loop
-
-  // FractalNoise: map from [-1,1] to [0,1]
-  if (noiseType == PerlinNoiseType::FractalNoise) {
-    fragBuilder->codeAppend("color = color * 0.5 + 0.5;");
-  }
-
-  // Clamp each channel to [0, 1], then output premultiplied RGBA. The fourth noise channel
-  // serves as alpha and the RGB channels are premultiplied by it. Downstream filters consuming
-  // premultiplied inputs (e.g. ColorFilter::Matrix) will unpremultiply correctly; callers
-  // needing unpremultiplied noise should compose an appropriate color matrix.
-  auto premulEntry = fragBuilder->appendFunction("tgfxNoisePremul");
-  if (premulEntry.empty()) {
-    return;
-  }
-  fragBuilder->codeAppendf("%s = %s(color);", args.outputColor.c_str(), premulEntry.c_str());
+  PerlinNoiseKernelOp::UniformNames names = {};
+  ir->StoreOutput(args.outputValue,
+                  PerlinNoiseKernelOp::Emit(ir, args.uniformHandler, &names, permSampler,
+                                            noiseSampler, coord,
+                                            static_cast<int32_t>(numOctaves),
+                                            static_cast<int32_t>(noiseType),
+                                            stitchTiles ? 1 : 0));
 }
 
 void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
