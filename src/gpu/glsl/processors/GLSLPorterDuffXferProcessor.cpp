@@ -35,17 +35,9 @@ GLSLPorterDuffXferProcessor::GLSLPorterDuffXferProcessor(BlendMode blend,
 }
 
 void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
-  if (std::getenv("BLENDDBG") != nullptr) {
-    BlendFormula dbgFormula = {};
-    const bool coeff = BlendModeAsCoeff(blendMode, true, &dbgFormula);
-    fprintf(stderr, "BLENDDBG mode=%d coeff=%d primary=%d dst=%d\n", static_cast<int>(blendMode),
-            coeff ? 1 : 0, coeff ? static_cast<int>(dbgFormula.primaryOutputType()) : -1,
-            args.dstTextureSamplerHandle.isValid() ? 1 : 0);
-  }
   auto fragBuilder = args.fragBuilder;
   auto uniformHandler = args.uniformHandler;
   const auto& dstColor = fragBuilder->dstColor();
-  fragBuilder->codeAppendf("// blendMode=%d\n", static_cast<int>(blendMode));
   if (args.irBuilder != nullptr && args.inputColorValue != INVALID_VALUE_ID &&
       args.inputCoverageValue != INVALID_VALUE_ID && args.outputValue != INVALID_VALUE_ID) {
     auto ir = args.irBuilder;
@@ -255,9 +247,40 @@ void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
       }
       blended = applyOp(srcWithCoeff, dstWithCoeff, formula.operation());
     } else {
-      // The separable modes' text fallback: xpBlendColors is not in the GL bundle, so the route
-      // passes the source through and lets the coverage mix below finish the tail.
-      blended = srcValue;
+      // The separable modes call their XpBlend operator: the text route's inline generators
+      // (Darken's min, HardLight's component branches, ...) now live in fn/xp/xpBlend_*.inc, one
+      // function per mode, and the coverage mix below finishes the tail.
+      const auto sepSrcAlpha = ir->CreateSwizzle(srcValue, SLType::Float4, "aaaa");
+      const auto sepDstAlpha = ir->CreateSwizzle(dstValue, SLType::Float4, "aaaa");
+      const auto sepDstSrcAlpha =
+          ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, dstValue, sepSrcAlpha);
+      const auto sepSrcDstAlpha =
+          ir->CreateBinary(IRBinaryOp::Mul, SLType::Float4, srcValue, sepDstAlpha);
+#define EMIT_SEP_CASE(name)                                                                        \
+  case BlendMode::name:                                                                            \
+    blended = XpBlend##name##Op::Emit(ir, uniformHandler, nullptr, srcValue, dstValue,             \
+                                      sepDstSrcAlpha, sepSrcDstAlpha);                             \
+    break;
+      switch (blendMode) {
+        EMIT_SEP_CASE(Overlay)
+        EMIT_SEP_CASE(Darken)
+        EMIT_SEP_CASE(Lighten)
+        EMIT_SEP_CASE(ColorDodge)
+        EMIT_SEP_CASE(ColorBurn)
+        EMIT_SEP_CASE(HardLight)
+        EMIT_SEP_CASE(SoftLight)
+        EMIT_SEP_CASE(Difference)
+        EMIT_SEP_CASE(Exclusion)
+        EMIT_SEP_CASE(Multiply)
+        EMIT_SEP_CASE(Hue)
+        EMIT_SEP_CASE(Saturation)
+        EMIT_SEP_CASE(Color)
+        EMIT_SEP_CASE(Luminosity)
+        EMIT_SEP_CASE(PlusDarker)
+        default:
+          break;
+      }
+#undef EMIT_SEP_CASE
     }
     if (blended == INVALID_VALUE_ID) {
       ir->MarkFailed("the porter-duff blend mode has no XpBlend operator");
@@ -276,13 +299,6 @@ void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
       result = ir->CreateBinary(IRBinaryOp::Add, SLType::Float4, covered, uncovered);
     }
     ir->StoreOutput(args.outputValue, result);
-    if (std::getenv("XPEXPR") != nullptr) {
-      std::string expr = {};
-      std::string error = {};
-      if (GLSLOperatorEmitter::EmitValue(ir->IR(), result, &expr, &error)) {
-        fprintf(stderr, "XPEXPR mode=%d %s\n", static_cast<int>(blendMode), expr.c_str());
-      }
-    }
     return;
   }
 
