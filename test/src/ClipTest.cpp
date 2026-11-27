@@ -702,7 +702,9 @@ TGFX_TEST(ClipTest, ScissorOnlyClip) {
   ASSERT_NE(context, nullptr);
   auto renderTarget = RenderTargetProxy::Make(context, 100, 100, false);
   ASSERT_NE(renderTarget, nullptr);
-  OpsCompositor compositor(renderTarget, 0);
+  // The compositor constructor is private so that no production draw path can skip the draw mark;
+  // this test only needs the clip helpers, which are already behind TGFX_PRIVATE_ACCESS.
+  TGFX_PRIVATE_ACCESS(OpsCompositor compositor(renderTarget, 0);)
 
   // Case 1: A non-AA axis-aligned rect maps to an exact integer pixel box, so the clip is a pure
   // scissor with no coverage FP.
@@ -753,7 +755,9 @@ TGFX_TEST(ClipTest, EmptyElementClippedOut) {
   ASSERT_NE(context, nullptr);
   auto renderTarget = RenderTargetProxy::Make(context, 100, 100, false);
   ASSERT_NE(renderTarget, nullptr);
-  OpsCompositor compositor(renderTarget, 0);
+  // The compositor constructor is private so that no production draw path can skip the draw mark;
+  // this test only needs the clip helpers, which are already behind TGFX_PRIVATE_ACCESS.
+  TGFX_PRIVATE_ACCESS(OpsCompositor compositor(renderTarget, 0);)
 
   // A non-AA rect compressed below one pixel by transform() degenerates into an empty element
   // (ClipElement::simplify marks it Empty because it covers no pixel center). ClipStack keeps the
@@ -775,7 +779,9 @@ TGFX_TEST(ClipTest, SubPixelClipMaskRasterizeNoNullOp) {
   ASSERT_NE(context, nullptr);
   auto renderTarget = RenderTargetProxy::Make(context, 100, 100, false);
   ASSERT_NE(renderTarget, nullptr);
-  OpsCompositor compositor(renderTarget, 0);
+  // The compositor constructor is private so that no production draw path can skip the draw mark;
+  // this test only needs the clip helpers, which are already behind TGFX_PRIVATE_ACCESS.
+  TGFX_PRIVATE_ACCESS(OpsCompositor compositor(renderTarget, 0);)
 
   // End-to-end rendering path: an empty clip region reports ClippedOut, so a degenerate clip
   // never reaches the mask rasterizer and no null draw op is queued. Flushing must not crash.
