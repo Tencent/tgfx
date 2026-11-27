@@ -87,11 +87,12 @@ enum class TileUpdateMode {
 
   /**
    * A missing tile shows the fallback covering it as a temporary stand-in, which produces brief
-   * zoom blur, and the tiles at the current zoomScale fill in over the following frames at most
-   * setMaxTilesRefinedPerFrame() per frame to keep the frame rate stable. An area no fallback
-   * covers yet is rasterized within the same frame, so the screen always shows content. While the
-   * pool is still preparing fallbacks for a later zoom, hasContentChanged() keeps returning true so
-   * a caller that renders on demand finishes that work.
+   * zoom blur. While the viewport moves, the budget sharpens those fallbacks one step at a time and
+   * no exact tile is rasterized; the tiles at the current zoomScale start filling in once the
+   * viewport stops, at most setMaxTilesRefinedPerFrame() per frame to keep the frame rate stable.
+   * An area no fallback covers yet is rasterized within the same frame, so the screen always shows
+   * content. While the pool is still preparing fallbacks for a later zoom, hasContentChanged() keeps
+   * returning true so a caller that renders on demand finishes that work.
    */
   Smooth,
 
