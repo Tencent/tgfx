@@ -118,6 +118,7 @@ static uint8_t DrawAndReadRed(Context* context, std::shared_ptr<Image> image) {
   return pixels[0];
 }
 
+#ifdef TGFX_TEST_ACCESS_PRIVATE
 static void ExpectFramesForTimestamps(Context* context, const int64_t* timestamps, size_t count) {
   auto stream = std::make_shared<QueueImageStream>();
   auto reader = ImageReader::MakeFrom(stream);
@@ -138,6 +139,7 @@ static void ExpectFramesForTimestamps(Context* context, const int64_t* timestamp
   }
   EXPECT_EQ(stream->readCount, static_cast<int>(count));
 }
+#endif
 
 class ExpiringImageBuffer : public ImageBuffer {
  public:
@@ -491,8 +493,8 @@ TGFX_TEST_PRIVATE(ImageReaderTest, ReadyWithoutTextureDoesNotClaimDelivery) {
       EXPECT_EQ(first->status(), ImageBufferStatus::Expired);)
 }
 
-TGFX_TEST(ImageReaderTest, NullStreamCannotCreateReader) {
-  EXPECT_EQ(ImageReader::MakeFrom(nullptr), nullptr);
+TGFX_TEST_PRIVATE(ImageReaderTest, NullStreamCannotCreateReader) {
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(ImageReader::MakeFrom(nullptr), nullptr);)
 }
 
 TGFX_TEST(ImageReaderTest, DefaultStatusHonorsExpiredOverride) {
