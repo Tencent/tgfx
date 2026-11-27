@@ -189,6 +189,11 @@ void FragmentProcessor::internalEmitChild(
   TransformedCoordVars coordVars = args.transformedCoords->childInputs(childIndex);
   TextureSamplers textureSamplers = args.textureSamplers->childInputs(childIndex);
 
+  // The IR route can carry the child's input override directly: the child's IR emission reads
+  // EmitArgs.inputValue, which needs no text alias to exist first.
+  if (inputName.empty() && args.irBuilder != nullptr && inputColorValue != INVALID_VALUE_ID) {
+    inputName = "_childInput" + programInfo->getMangledSuffix(childProc);
+  }
   ValueID childInputValue = args.inputValue;
   if (!inputName.empty() && args.irBuilder != nullptr) {
     childInputValue =
