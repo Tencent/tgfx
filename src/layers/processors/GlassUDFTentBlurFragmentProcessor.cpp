@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
+#include "GeneratedOperators.h"
 #include "core/utils/Log.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
@@ -61,80 +62,39 @@ GlassUDFTentBlurFragmentProcessor::GlassUDFTentBlurFragmentProcessor(
   }
 }
 
-// Returns the shader expression for sampling the child at a coord offset by the tent kernel.
-static std::string TentBlurOffsetCoordFunc(std::string_view coord) {
-  return "(" + std::string(coord) + " + offset * offsetValue)";
-}
-
 void GlassUDFTentBlurFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-
-  std::string radiusName =
-      args.uniformHandler->addUniform("Radius", UniformFormat::Float, ShaderStage::Fragment);
-  std::string texelSizeName =
-      args.uniformHandler->addUniform("Step", UniformFormat::Float2, ShaderStage::Fragment);
-
-  fragBuilder->codeAppendf("vec2 offset = %s;", texelSizeName.c_str());
-
-  fragBuilder->codeAppendf("float radius = %s;", radiusName.c_str());
-  fragBuilder->codeAppend("float sum = 0.0;");
-  fragBuilder->codeAppend("float total = 0.0;");
-
-  // RGBA8 unpack constants: dot(rgba, UNPACK) recovers the original float.
-  fragBuilder->codeAppend("const vec4 UNPACK = vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0);");
-
-  // Pairwise bilinear sampling: combine adjacent positions (k, k+1) into a single texture fetch
-  // via hardware bilinear filtering. The tent kernel's linear weights make this exact. The fixed
-  // 64-iteration upper bound satisfies GLSL ES 1.0's constant-loop constraint; the actual exit is
-  // the weight<=0 break at radius+1 iterations.
-  fragBuilder->codeAppend("int k = 1;");
-  fragBuilder->codeAppend("float s = 1.0;");
-  fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", maxRadius);
-  fragBuilder->codeAppend("float offsetValue;");
-  fragBuilder->codeAppend("float weight;");
-  fragBuilder->codeAppend("if (j == 0) {");
-  fragBuilder->codeAppend("  offsetValue = 0.0;");
-  fragBuilder->codeAppend("  weight = radius;");
-  fragBuilder->codeAppend("} else {");
-  fragBuilder->codeAppend("  float w1 = max(0.0, radius - float(k));");
-  fragBuilder->codeAppend("  float w2 = max(0.0, radius - float(k + 1));");
-  fragBuilder->codeAppend("  weight = w1 + w2;");
-  fragBuilder->codeAppend("  offsetValue = (weight > 0.0) ? s * (float(k) + w2 / weight) : 0.0;");
-  fragBuilder->codeAppend("}");
-  fragBuilder->codeAppend("if (weight <= 0.0) { break; }");
-  fragBuilder->codeAppend("total += weight;");
-
-  std::string tempColor = "tempColor";
-  emitChild(0, &tempColor, args, TentBlurOffsetCoordFunc);
-
-  // Unpack sample: the fine field's packed input decodes RGBA8 to a float; the coarse field (and
-  // the fine field's first pass) reads the alpha channel.
-  if (field == GlassUDFField::Refraction && inputIsPacked) {
-    fragBuilder->codeAppendf("sum += dot(%s, UNPACK) * weight;", tempColor.c_str());
-  } else {
-    fragBuilder->codeAppendf("sum += %s.a * weight;", tempColor.c_str());
+  if (args.irBuilder == nullptr || args.outputValue == INVALID_VALUE_ID) {
+    return;
   }
-  fragBuilder->codeAppend("if (j > 0) {");
-  fragBuilder->codeAppend("  if (s < 0.0) { k += 2; }");
-  fragBuilder->codeAppend("  s = -s;");
-  fragBuilder->codeAppend("}");
-  fragBuilder->codeAppend("}");
-
-  fragBuilder->codeAppend("float result = sum / total;");
-  if (field == GlassUDFField::EdgeLight) {
-    // The coarse field carries one 8-bit value in alpha.
-    fragBuilder->codeAppendf("%s = vec4(0.0, 0.0, 0.0, clamp(result, 0.0, 1.0));",
-                             args.outputColor.c_str());
-  } else {
-    // Encode the fine field into RGB with true 24-bit precision; the fract chain pre-compensates
-    // the 8-bit rounding of the following channel. The upper clamp is required because fract(1.0)
-    // == 0.0 and interior UDF samples are exactly 1.0.
-    fragBuilder->codeAppend("float fineValue = clamp(result, 0.0, 1.0 - 1.0 / 16581375.0);");
-    fragBuilder->codeAppend("vec3 enc = fract(vec3(1.0, 255.0, 65025.0) * fineValue);");
-    fragBuilder->codeAppend("enc.x -= enc.y / 255.0;");
-    fragBuilder->codeAppend("enc.y -= enc.z / 255.0;");
-    fragBuilder->codeAppendf("%s = vec4(enc, 0.0);", args.outputColor.c_str());
+  if (args.textureSamplers == nullptr || args.transformedCoords == nullptr) {
+    return;
   }
+  auto childSamplers = args.textureSamplers->childInputs(0);
+  auto childCoords = args.transformedCoords->childInputs(0);
+  if (childSamplers.count() != 1 || childCoords.count() < 1 ||
+      childCoords[0].type() != SLType::Float2) {
+    args.irBuilder->MarkFailed("the UDF tent blur child input is not a single vec2 texture read");
+    return;
+  }
+  auto ir = args.irBuilder;
+  const auto samplerValue = args.samplerValue(childSamplers[0]);
+  if (samplerValue == INVALID_VALUE_ID) {
+    args.irBuilder->MarkFailed("the UDF tent blur sampler has no IR value");
+    return;
+  }
+  const auto texCoord =
+      ir->InternValue(childCoords[0].name(), SLType::Float2, Precision::High, IRValueKind::Varying);
+  if (texCoord == INVALID_VALUE_ID) {
+    args.irBuilder->MarkFailed("the UDF tent blur coordinate has no IR value");
+    return;
+  }
+  GlassUDFTentBlurOp::UniformNames names = {};
+  const int32_t maxRadiusInt = static_cast<int32_t>(maxRadius);
+  const int32_t refractionPacked = (field == GlassUDFField::Refraction && inputIsPacked) ? 1 : 0;
+  const int32_t edgeLight = field == GlassUDFField::EdgeLight ? 1 : 0;
+  ir->StoreOutput(args.outputValue,
+                  GlassUDFTentBlurOp::Emit(ir, args.uniformHandler, &names, samplerValue,
+                                           texCoord, maxRadiusInt, refractionPacked, edgeLight));
 }
 
 void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
