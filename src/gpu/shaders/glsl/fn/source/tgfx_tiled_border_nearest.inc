@@ -4,17 +4,18 @@
 //@frag
 vec4 tgfxTiledBorderNearest(highp vec4 color /*@in*/, highp vec2 inCoord /*@in*/, highp vec4 subset /*@in*/, int modeX /*@in*/,
                             int modeY /*@in*/) {
+  vec4 result = color;
   if (modeX != 0) {
     highp float snappedX = floor(inCoord.x + 0.001) + 0.5;
     if (snappedX < subset.x || snappedX > subset.z) {
-      color = vec4(0.0);
+      result = vec4(0.0);
     }
   }
   if (modeY != 0) {
     highp float snappedY = floor(inCoord.y + 0.001) + 0.5;
     if (snappedY < subset.y || snappedY > subset.w) {
-      color = vec4(0.0);
+      result = vec4(0.0);
     }
   }
-  return color;
+  return result;
 }
