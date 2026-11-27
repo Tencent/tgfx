@@ -19,11 +19,14 @@
 #include <hb-subset.h>
 #include <hb.h>
 #include <cstring>
+#include <sstream>
 #include "base/TGFXTest.h"
 #include "core/utils/MD5.h"
 #include "pdf/PDFDocumentImpl.h"
+#include "pdf/PDFFont.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
@@ -1977,6 +1980,92 @@ TGFX_TEST(PDFExportTest, ShapeNoiseStyle) {
   surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
   root->draw(surface->getCanvas());
   EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/ShapeNoiseStyle"));
+}
+
+namespace {
+
+static Path ExportRuleTestRing(PathFillType rule) {
+  Path path = {};
+  path.addRect(Rect::MakeLTRB(0.0f, 0.0f, 100.0f, 100.0f));
+  path.addRect(Rect::MakeLTRB(20.0f, 20.0f, 80.0f, 80.0f));
+  path.setFillType(rule);
+  return path;
+}
+
+static std::string ReadTestCharProc(const std::string& pdf, const std::string& glyphName) {
+  auto dictionary = pdf.find("/CharProcs");
+  if (dictionary == std::string::npos) {
+    return {};
+  }
+  auto reference = pdf.find("/" + glyphName + " ", dictionary);
+  if (reference == std::string::npos) {
+    return {};
+  }
+  std::istringstream input(pdf.substr(reference + glyphName.size() + 2));
+  int object = 0;
+  if (!(input >> object) || object <= 0) {
+    return {};
+  }
+  auto objectStart = pdf.find("\n" + std::to_string(object) + " 0 obj");
+  if (objectStart == std::string::npos) {
+    return {};
+  }
+  auto objectEnd = pdf.find("endobj", objectStart);
+  auto streamStart = pdf.find("stream\n", objectStart);
+  auto streamEnd = pdf.find("endstream", streamStart);
+  if (objectEnd == std::string::npos || streamStart == std::string::npos ||
+      streamEnd == std::string::npos || streamEnd > objectEnd) {
+    return {};
+  }
+  return pdf.substr(streamStart + 7, streamEnd - streamStart - 7);
+}
+
+}  // namespace
+
+TGFX_TEST(PDFExportTest, Type3CharProcUsesActualGlyphFillRule) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  PathTypefaceBuilder builder(100);
+  ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::Winding), 100.0f), 0);
+  ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::EvenOdd), 100.0f), 0);
+  ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::InverseWinding), 100.0f), 0);
+  // PDF reserves glyph zero when calculating the resource range. Keep an unused trailing glyph
+  // so all requested glyphs lie inside that range for a custom typeface.
+  ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::Winding), 100.0f), 0);
+  auto typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+  auto stream = MemoryWriteStream::Make();
+  PDFMetadata metadata = {};
+  metadata.compressionLevel = PDFMetadata::CompressionLevel::None;
+  auto document = PDFDocument::Make(stream, context, metadata);
+  ASSERT_TRUE(document != nullptr);
+  auto impl = static_cast<PDFDocumentImpl*>(document.get());
+  impl->toUnicodeMap[typeface->uniqueID()] = std::vector<Unichar>(typeface->glyphsCount(), 'A');
+  document->beginPage(240.0f, 120.0f);
+  auto strike = PDFStrike::Make(impl, Font(typeface, 100.0f));
+  ASSERT_TRUE(strike != nullptr);
+  auto font = strike->getFontResource(1);
+  ASSERT_TRUE(font != nullptr);
+  font->noteGlyphUsage(1);
+  font->noteGlyphUsage(2);
+  font->noteGlyphUsage(3);
+  document->endPage();
+  document->close();
+  auto pdf = stream->readString();
+  ASSERT_NE(pdf.find("/Subtype /Type3"), std::string::npos);
+  auto winding = ReadTestCharProc(pdf, "g1");
+  auto parity = ReadTestCharProc(pdf, "g2");
+  auto inverse = ReadTestCharProc(pdf, "g3");
+  ASSERT_FALSE(winding.empty());
+  ASSERT_FALSE(parity.empty());
+  ASSERT_FALSE(inverse.empty());
+  EXPECT_NE(winding.find("\nf\n"), std::string::npos);
+  EXPECT_EQ(winding.find("\nf*\n"), std::string::npos);
+  EXPECT_NE(parity.find("\nf*\n"), std::string::npos);
+  EXPECT_NE(inverse.find(" d1\n"), std::string::npos);
+  EXPECT_EQ(inverse.find("\nf\n"), std::string::npos);
+  EXPECT_EQ(inverse.find("\nf*\n"), std::string::npos);
 }
 
 }  // namespace tgfx

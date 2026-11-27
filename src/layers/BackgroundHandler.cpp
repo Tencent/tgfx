@@ -214,7 +214,7 @@ int BackgroundCapturer::lastCaptureChildIndex(const Layer* parent) const {
   }
   const auto& children = parent->children();
   for (int i = static_cast<int>(children.size()) - 1; i >= 0; --i) {
-    if (children[static_cast<size_t>(i)]->hasBackgroundStyle()) {
+    if (children[static_cast<size_t>(i)]->hasBackgroundStyle(1.0f)) {
       return i;
     }
   }
@@ -222,7 +222,7 @@ int BackgroundCapturer::lastCaptureChildIndex(const Layer* parent) const {
 }
 
 bool BackgroundCapturer::needsSurface(Layer* layer) const {
-  return layer != nullptr && layer->hasDescendantBackgroundStyle();
+  return layer != nullptr && layer->hasDescendantBackgroundStyle(1.0f);
 }
 
 std::unique_ptr<BackgroundCapturer> BackgroundCapturer::buildSubCapturer(
@@ -581,7 +581,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
 void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
                              std::shared_ptr<BackgroundSource> bgSource,
                              BackgroundSnapshotMap* snapshots, const std::vector<Rect>& renderRects,
-                             const std::vector<Rect>& styleSourceRects) {
+                             const std::vector<Rect>& styleSourceRects, float alpha) {
   DEBUG_ASSERT(captureRoot != nullptr);
   DEBUG_ASSERT(bgSource != nullptr);
   DEBUG_ASSERT(snapshots != nullptr);
@@ -595,7 +595,7 @@ void BackgroundCapturer::Run(Layer* captureRoot, const DrawArgs& baseArgs,
   DrawArgs captureArgs = baseArgs;
   captureArgs.backgroundHandler = &capturer;
   captureArgs.renderRects = &renderRects;
-  captureRoot->drawLayer(captureArgs, bgCanvas, 1.0f, BlendMode::SrcOver);
+  captureRoot->drawLayer(captureArgs, bgCanvas, alpha, BlendMode::SrcOver);
 }
 
 }  // namespace tgfx

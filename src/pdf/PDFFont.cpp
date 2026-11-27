@@ -519,8 +519,13 @@ void PDFFont::emitSubsetType3(PDFDocumentImpl* doc) const {
     Path glyphPath;
     if (!typeface->hasColor() && scaleContext->generatePath(glyphID, false, false, &glyphPath)) {
       SetGlyphWidthAndBoundingBox(glyphWidth, glyphBBox, content);
-      PDFUtils::EmitPath(glyphPath, true, content);
-      PDFUtils::PaintPath(PathFillType::Winding, content);
+      if (glyphPath.isInverseFillType()) {
+        LOGE(
+            "PDF Type3: inverse-filled glyphs require a finite clipping region; skipping outline.");
+      } else {
+        PDFUtils::EmitPath(glyphPath, true, content);
+        PDFUtils::PaintPath(glyphPath.getFillType(), content);
+      }
     } else {
       SetGlyphWidthAndBoundingBox(glyphWidth, glyphBBox, content);
     }

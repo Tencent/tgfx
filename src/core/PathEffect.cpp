@@ -32,9 +32,19 @@ class SkPathEffectWrapper : public PathEffect {
     if (path == nullptr) {
       return false;
     }
-    auto& skPath = PathRef::WriteAccess(*path);
+    auto fillType = path->getFillType();
+    SkPath result;
     SkStrokeRec rec(SkStrokeRec::kHairline_InitStyle);
-    return pathEffect->filterPath(&skPath, skPath, &rec, nullptr);
+    if (!pathEffect->filterPath(&result, PathRef::ReadAccess(*path), &rec, nullptr)) {
+      return false;
+    }
+    PathRef::WriteAccess(*path) = result;
+    // Effects rewrite the outline, so the input rule only carries over when it does not flip the
+    // filled area: applying an inverse rule to dash contours would draw the plane minus the dashes.
+    if (fillType != PathFillType::InverseWinding && fillType != PathFillType::InverseEvenOdd) {
+      path->setFillType(fillType);
+    }
+    return true;
   }
 
  private:
