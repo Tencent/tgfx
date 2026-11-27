@@ -281,8 +281,9 @@ static void ForEachTileUnderRect(const Rect& rect, int tileSize,
   }
 }
 
-// Looks up every tile of the levels L to L+3 inside the viewport. Hits are touched regardless of
-// whether the frame displays them, which is what keeps the coarse levels from being evicted.
+// Looks up every tile of the retained fallback levels, L and up to three levels above it, inside the
+// viewport. Hits are touched regardless of whether the frame displays them, which is what keeps the
+// coarse levels from being evicted.
 static std::vector<TreeLevelCoverage> CollectTreeCoverages(TilePool* tilePool,
                                                            const BlankTileSet* blankTiles,
                                                            float zoomScale, const Rect& renderRect,
@@ -1169,19 +1170,20 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       }
     }
     // Every viewport cell has its exact tile, so the screen is sharp and the budget can top up the
-    // coarser fallback levels. A zoom-in remaps them onto the next frame's L+3..L+1; without them
-    // that zoom has to rasterize a fallback level on the spot. A frame that already has other tile
-    // work only reports what is left, so the loop keeps running until the levels are full.
+    // coarser fallback levels. A zoom-in remaps them onto the coarser levels of the next frame;
+    // without them that zoom has to rasterize a fallback level on the spot. A frame that already has
+    // other tile work only reports what is left, so the loop keeps running until the levels are
+    // full.
     if (useFallback) {
       DEBUG_ASSERT(coverages.size() == static_cast<size_t>(treeLevelCount));
       const bool mayRefine = tileTasks->empty();
       const bool gridComplete = missingGrids.empty();
-      // Once the grid is complete, the budget tops up L+2, L+1 and then L itself. L+3 is left to
-      // pass 1.
+      // Once the grid is complete, the budget tops up the retained levels from the coarsest one
+      // below the coarsest down to L. The coarsest level itself is left to pass 1.
       auto chainBudget = gridComplete ? std::max(_maxTilesRefinedPerFrame, 0) : 0;
       size_t chainRefined = 0;
       if (mayRefine) {
-        // coverages[0] is L and coverages[3] is L+3.
+        // coverages[0] is L and the last entry is the coarsest retained level.
         for (int index = treeLevelCount - 2; index >= 0 && chainBudget > 0; --index) {
           auto& coverage = coverages[static_cast<size_t>(index)];
           auto cells = CollectMissingTreeTiles(coverage, {renderRect}, _tileSize);

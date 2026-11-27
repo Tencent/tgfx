@@ -73,7 +73,7 @@ enum class RenderMode {
  * therefore still usable after the zoom changes, or is rasterized at the current zoomScale. A
  * frame with nothing left to rasterize prepares fallbacks for later zoom instead.
  *
- * TileUpdateMode::Smooth and TileUpdateMode::Fast trade memory for zoom smoothness by keeping the
+ * TileUpdateMode::Smooth and TileUpdateMode::Fast trade memory for zoom smoothness by keeping up to
  * four fallback levels above the current zoom scale; see setTileSize() for how much memory that
  * reserves.
  */
@@ -204,10 +204,10 @@ class DisplayList {
    * Sets the size of the tiles used in tiled rendering mode.
    *
    * The tile pool derives its capacity from the surface instead of taking a tile count: a viewport
-   * needs roughly one tile per tile-sized cell plus the four fallback levels above it, so a fixed
+   * needs roughly one tile per tile-sized cell plus up to four fallback levels above it, so a fixed
    * count either wastes memory on small surfaces or runs out on large ones. The demand is rounded
    * up to whole atlases (up to 4096x4096 RGBA each, 64 MB) and capped at 32 atlases, which reserves
-   * about this much for the default 256 pixel tile:
+   * about this much for the default 256 pixel tile when all four levels fit:
    *
    *    surface            reserved tile memory
    *    1080x2400 (phone)  192 MB
