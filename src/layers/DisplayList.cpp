@@ -1308,8 +1308,14 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(const Surface* rend
     return tiles;
   }
   if (type == TileType::Tree) {
-    // Tree tiles are only requested when nothing else can fill the screen, which outranks
-    // sharpness.
+    // A tree tile outranks the grid because it cannot be recovered retroactively: a missing grid
+    // tile is rasterized again on demand, or shown through a fallback, while a fallback that was
+    // never prepared makes the next zoom rasterize a coarser level on the spot, which is the frame
+    // drop this pool exists to avoid. All three callers follow from that: pass 1 needs a tree tile
+    // as the only content for a cell, and the refinement pass and the chain top up spend their
+    // budget preparing the next zoom. Eviction only reaches tiles nothing references, so the grid
+    // tiles this frame draws are safe, and the grid can borrow back down to the fallback coverage
+    // through the branch below.
     evictInto(TileType::Grid, tileCount);
     return tiles;
   }
