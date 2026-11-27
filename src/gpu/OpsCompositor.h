@@ -67,13 +67,6 @@ enum class PendingOpType {
 class OpsCompositor {
  public:
   /**
-   * Creates an OpsCompositor with the given render target proxy, render flags and render queue.
-   */
-  OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
-                std::optional<PMColor> clearColor = std::nullopt,
-                std::shared_ptr<ColorSpace> colorSpace = nullptr);
-
-  /**
    * Fills the given image with the given sampling options, state and fill.
    */
   void fillImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
@@ -143,6 +136,20 @@ class OpsCompositor {
   }
 
  private:
+  // Only DrawingManager creates a compositor, and only RenderContext obtains one, so every draw that
+  // reaches a render target passes through RenderContext::getOpsCompositor(), the single place that
+  // records the draw for the blank tile check. Do not make this constructor or
+  // DrawingManager::addOpsCompositor public: a new drawing path would then be able to record ops
+  // without marking, and DisplayList would recycle the tile as blank and never draw it again.
+  friend class DrawingManager;
+
+  /**
+   * Creates an OpsCompositor with the given render target proxy, render flags and render queue.
+   */
+  OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
+                std::optional<PMColor> clearColor = std::nullopt,
+                std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
   Context* context = nullptr;
   std::list<std::shared_ptr<OpsCompositor>>::iterator cachedPosition;
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
@@ -223,7 +230,6 @@ class OpsCompositor {
 
   void submitDrawOps();
 
-  friend class DrawingManager;
   friend class PendingOpsAutoReset;
 };
 }  // namespace tgfx

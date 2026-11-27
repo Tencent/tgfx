@@ -27,7 +27,6 @@ JTGFXView::JTGFXView(ANativeWindow* nativeWindow, std::shared_ptr<tgfx::Window> 
     : nativeWindow(nativeWindow), window(std::move(window)), appHost(std::move(appHost)) {
   displayList.setRenderMode(tgfx::RenderMode::Tiled);
   displayList.setTileUpdateMode(tgfx::TileUpdateMode::Smooth);
-  displayList.setMaxTileCount(512);
   updateSize();
 }
 

@@ -36,6 +36,32 @@ class DrawingManager {
  public:
   explicit DrawingManager(Context* context);
 
+  /**
+   * Returns a mark of the draws started so far. DisplayList takes one before drawing a tile and
+   * passes it to hasDrawnSince() to tell whether the tile produced any content.
+   */
+  uint64_t drawMark() const {
+    return drawCount;
+  }
+
+  /**
+   * Returns true if a draw started on this context after the given mark. A draw that ends up
+   * producing no pixels still counts, so the answer errs towards "the tile has content".
+   */
+  bool hasDrawnSince(uint64_t mark) const {
+    return drawCount != mark;
+  }
+
+  /**
+   * Records that this context is about to draw something. RenderContext calls it when a canvas
+   * obtains its OpsCompositor, which every draw path goes through except
+   * RenderContext::replaceRenderTarget(), which draws into the new target itself and records its
+   * own draw.
+   */
+  void markDrawn() {
+    ++drawCount;
+  }
+
   BlockAllocator* drawingAllocator() {
     return &getDrawingBuffer()->drawingAllocator;
   }
@@ -54,11 +80,6 @@ class DrawingManager {
    */
   bool fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                     PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags);
-
-  std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                                  uint32_t renderFlags,
-                                                  std::optional<PMColor> clearColor = std::nullopt,
-                                                  std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                         PlacementArray<DrawOp> drawOps, std::optional<PMColor> clearColor);
@@ -135,6 +156,21 @@ class DrawingManager {
   }
 
  private:
+  // Only RenderContext obtains a compositor, and it marks every draw it forwards. Keeping this out
+  // of the public interface makes that structural: a new drawing path cannot record ops without
+  // going through RenderContext::getOpsCompositor() and its mark, which is what tells DisplayList
+  // whether a tile produced any content.
+  friend class RenderContext;
+
+  /**
+   * Creates a compositor for the given render target. RenderContext owns the returned compositor
+   * and is the only caller.
+   */
+  std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
+                                                  uint32_t renderFlags,
+                                                  std::optional<PMColor> clearColor = std::nullopt,
+                                                  std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
   struct WindowTarget {
     std::weak_ptr<Window> window;
     std::weak_ptr<RenderTargetProxy> target;
@@ -151,6 +187,7 @@ class DrawingManager {
   std::deque<std::shared_ptr<DrawingBuffer>> bufferPool = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   std::unordered_map<TextureProxy*, AtlasUploadTask*> atlasTaskMap = {};
+  uint64_t drawCount = 0;
 
   DrawingBuffer* getDrawingBuffer() {
     return currentBuffer ? currentBuffer.get() : createDrawingBuffer();
@@ -161,6 +198,5 @@ class DrawingManager {
   WindowTarget& windowTargetEntry(const std::shared_ptr<Window>& window);
 
   friend class OpsCompositor;
-  friend class RenderContext;
 };
 }  // namespace tgfx

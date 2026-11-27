@@ -1400,19 +1400,22 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleShareCompactGate){TGFX_PRIVATE_ACCESS
   // Two 100x100 rects across the diagonal of a 200x200 box: the union is exactly twice their sum,
   // which is the gate's boundary, and the boundary itself still shares.
   auto atBoundary = displayList.captureBackgrounds(
-      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(100, 100, 100, 100)});
+      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(100, 100, 100, 100)},
+      displayList.getViewMatrix());
   ASSERT_TRUE(atBoundary != nullptr);
   EXPECT_TRUE(atBoundary->styleShareCompact);
 
   // One pixel further apart and the union grows past the boundary.
   auto pastBoundary = displayList.captureBackgrounds(
-      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(101, 100, 100, 100)});
+      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(101, 100, 100, 100)},
+      displayList.getViewMatrix());
   ASSERT_TRUE(pastBoundary != nullptr);
   EXPECT_FALSE(pastBoundary->styleShareCompact);
 
   // Opposite corners of the surface: the union is the whole surface.
   auto scattered = displayList.captureBackgrounds(
-      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(300, 300, 100, 100)});
+      surface.get(), {Rect::MakeXYWH(0, 0, 100, 100), Rect::MakeXYWH(300, 300, 100, 100)},
+      displayList.getViewMatrix());
   ASSERT_TRUE(scattered != nullptr);
   EXPECT_FALSE(scattered->styleShareCompact);
 
@@ -1464,7 +1467,8 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, StyleOutputOversizeFallsBack){TGFX_PRIVATE
   const auto height = static_cast<float>(TargetHeight);
   auto snapshots = displayList.captureBackgrounds(
       surface.get(),
-      {Rect::MakeWH(halfWidth, height), Rect::MakeXYWH(halfWidth, 0.f, halfWidth, height)});
+      {Rect::MakeWH(halfWidth, height), Rect::MakeXYWH(halfWidth, 0.f, halfWidth, height)},
+      displayList.getViewMatrix());
   ASSERT_TRUE(snapshots != nullptr);
   displayList.drawRootLayer(surface.get(), Rect::MakeWH(static_cast<float>(TargetWidth), height),
                             displayList.getViewMatrix(), true, snapshots.get());
@@ -3091,21 +3095,24 @@ TGFX_TEST_PRIVATE(BackgroundBlurTest, OpaqueContentHidesBackgroundBlur) {
     EXPECT_NEAR(inside.blue, 220.0f / 255.0f, 2.0f / 255.0f);
 
     // Nothing samples the background, so the frame skips the capture pass entirely.
-    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)}) == nullptr);
+    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)},
+                                               displayList.getViewMatrix()) == nullptr);
 
     // A child that lets the backdrop through brings the blur back.
     child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 220, 0, 200)));
     displayList.render(surface.get());
     EXPECT_TRUE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
     EXPECT_TRUE(container->hasBackgroundStyle(1.0f));
-    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)}) != nullptr);
+    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)},
+                                               displayList.getViewMatrix()) != nullptr);
 
     // So does a fill that is not fully opaque.
     child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 220, 0, 255)));
     card->setColor(Color::FromRGBA(30, 120, 220, 252));
     displayList.render(surface.get());
     EXPECT_TRUE(card->needsBackgroundStyleOutput(blur.get(), 1.0f));
-    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)}) != nullptr);
+    EXPECT_TRUE(displayList.captureBackgrounds(surface.get(), {Rect::MakeWH(240, 200)},
+                                               displayList.getViewMatrix()) != nullptr);
 
     // Whichever source bucket the blur samples, the opaque fill still covers it.
     card->setColor(Color::FromRGBA(30, 120, 220, 255));

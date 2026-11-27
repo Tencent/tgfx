@@ -496,6 +496,10 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   } else if (discardContent) {
     opsCompositor->discardAll();
   }
+  // Every canvas draw obtains its compositor here, so this is where the draw is recorded and
+  // DisplayList learns whether the tile produced any content. replaceRenderTarget() is the one path
+  // that draws without coming through here, and it records its own draw.
+  renderTarget->getContext()->drawingManager()->markDrawn();
   return opsCompositor.get();
 }
 
@@ -512,6 +516,8 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
     opsCompositor->fillImageRect(std::move(oldContent), renderTarget->bounds(),
                                  renderTarget->bounds(), {}, Matrix::I(), ClipStack{}, brush,
                                  SrcRectConstraint::Fast);
+    // This path draws without going through getOpsCompositor(), so it records the draw itself.
+    drawingManager->markDrawn();
   }
 }
 
