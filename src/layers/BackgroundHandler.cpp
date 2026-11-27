@@ -281,6 +281,11 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (contentSource == nullptr) {
     return;
   }
+  // From here on the consumer reads one entry for this dispatch, so reserve it up front: any
+  // failure below leaves it empty, which keeps the read cursor in step when the style is
+  // dispatched more than once and the consumer then skips the style for this dispatch.
+  auto& entries = snapshots->snapshots[BackgroundSnapshotKey{layer, style}];
+  entries.emplace_back();
   auto contentOffset = contentSource->imageOffset();
   auto contentWidth = static_cast<float>(contentSource->image()->width());
   auto contentHeight = static_cast<float>(contentSource->image()->height());
@@ -358,10 +363,8 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   auto smallBgImage = MakeDetachedBgCopy(args.context, bgImage, bgPixelToLocal, contentBounds,
                                          args.dstColorSpace, &smallBgOffset);
   if (smallBgImage == nullptr) {
-    // Without a detached copy the style draws nothing here. An empty entry keeps the consumer's
-    // read cursor in step without holding the capture surface's snapshot, which would make every
-    // later draw into that surface copy it.
-    snapshots->snapshots[BackgroundSnapshotKey{layer, style}].push_back({});
+    // Leave the entry empty rather than recording bgImage: holding the capture surface's snapshot
+    // would make every later draw into that surface copy it.
     return;
   }
   PictureRecorder recorder = {};
@@ -381,8 +384,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (image == nullptr) {
     return;
   }
-  snapshots->snapshots[BackgroundSnapshotKey{layer, style}].push_back(
-      BackgroundSnapshotEntry{std::move(image), offset});
+  entries.back() = {std::move(image), offset};
 }
 
 const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* layer) const {
@@ -488,7 +490,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     }
     auto& entry = it->second[cursor++];
     if (entry.image == nullptr) {
-      // The capture could not make a detached copy for this style, so it draws nothing here.
+      // The capture produced no backdrop for this dispatch, so the style draws nothing here.
       return;
     }
     bgImage = entry.image;
