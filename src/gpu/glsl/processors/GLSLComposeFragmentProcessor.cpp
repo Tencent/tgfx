@@ -33,7 +33,32 @@ GLSLComposeFragmentProcessor::GLSLComposeFragmentProcessor(
 }
 
 void GLSLComposeFragmentProcessor::emitCode(EmitArgs& args) const {
-  // The first guy's input might be nil.
+  // The children chain through their predecessors: the first guy's input might be nil, and each
+  // later child reads the previous child's output. The text route threads that through an alias
+  // name; the IR route threads the child output value itself.
+  if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID &&
+      args.inputValue != INVALID_VALUE_ID) {
+    auto ir = args.irBuilder;
+    const size_t last = numChildProcessors() - 1;
+    std::string temp = "out0";
+    ValueID inputValue = emitChildIR(0, args.inputColor, &temp, args, args.inputValue);
+    for (size_t i = 1; i < last; ++i) {
+      temp = "out" + std::to_string(i);
+      inputValue = emitChildIR(i, "", &temp, args, inputValue);
+      if (inputValue == INVALID_VALUE_ID) {
+        ir->MarkFailed("a compose child emitted no IR value");
+        return;
+      }
+    }
+    std::string lastOut = "outLast";
+    const auto lastValue = emitChildIR(last, "", &lastOut, args, inputValue);
+    if (lastValue == INVALID_VALUE_ID) {
+      ir->MarkFailed("the compose tail child emitted no IR value");
+      return;
+    }
+    ir->StoreOutput(args.outputValue, lastValue);
+    return;
+  }
   std::string temp = "out0";
   emitChild(0, args.inputColor, &temp, args);
   std::string input = temp;
