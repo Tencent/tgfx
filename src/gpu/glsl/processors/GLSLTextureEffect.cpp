@@ -204,8 +204,16 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
     const auto one = args.irBuilder->CreateConstant(1.0f);
     const auto clampedColor =
         args.irBuilder->CreateCall(OperatorID::Clamp, SLType::Float4, {colorValue, zero, one});
-    const auto alphaSample = args.irBuilder->CreateTextureSample(
-        alphaSampler, coordValue, SLType::Float4, "alphaRead", SLType::Texture2DSampler);
+    // The alpha plane lives in the same texture, so the read names the sampler's own reader and
+    // carries the same channel selection the color read does.
+    const auto samplerVar = uniformHandler->getSamplerVariable(textureSampler);
+    const auto alphaSwizzleCode =
+        samplerVar.type() == SLType::Texture2DSampler
+            ? ShaderBuilder::ReadSwizzleCode(uniformHandler->getSamplerSwizzle(textureSampler))
+            : -1;
+    const auto alphaSample =
+        args.irBuilder->CreateTextureSample(alphaSampler, coordValue, SLType::Float4, "alphaRead",
+                                           samplerVar.type(), alphaSwizzleCode);
     args.irBuilder->Assign({alphaValue, ""}, alphaSample);
     const auto clampedAlpha =
         args.irBuilder->CreateCall(OperatorID::Clamp, SLType::Float4, {alphaValue, zero, one});

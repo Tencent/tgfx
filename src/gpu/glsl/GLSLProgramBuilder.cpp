@@ -331,6 +331,10 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
       if (desc == nullptr || desc->glslSymbol == nullptr) {
         continue;
       }
+      // A builtin wrapper (clamp) has no library source: pulling it would only log a miss.
+      if (desc->includes.empty()) {
+        continue;
+      }
       _fragBuilder.appendFunction(desc->glslSymbol);
     }
     auto fragmentBody = GLSLPrinter::PrintFragmentBodyFromIR(programIRBuilder().IR());
