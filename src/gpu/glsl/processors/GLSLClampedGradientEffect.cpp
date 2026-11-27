@@ -42,8 +42,6 @@ void GLSLClampedGradientEffect::emitCode(EmitArgs& args) const {
       uniformHandler->addUniform("leftBorderColor", UniformFormat::Float4, ShaderStage::Fragment);
   auto rightBorderColorName = uniformHandler->addUniform("rightBorderColor", UniformFormat::Float4,
                                                           ShaderStage::Fragment);
-  (void)leftBorderColorName;
-  (void)rightBorderColorName;
   // Both children emit once (their declarations and IR blocks); the boundary selection, the
   // premultiply and the input modulation all live in the shared function the call below records.
   // Note: the IR route evaluates the colorizer on border fragments too (the call's arguments are
@@ -56,10 +54,21 @@ void GLSLClampedGradientEffect::emitCode(EmitArgs& args) const {
   if (args.irBuilder != nullptr && tValue != INVALID_VALUE_ID &&
       colorizedValue != INVALID_VALUE_ID && args.inputValue != INVALID_VALUE_ID &&
       args.outputValue != INVALID_VALUE_ID) {
-    ClampedGradientOp::UniformNames names = {};
-    const auto result = ClampedGradientOp::Emit(args.irBuilder, uniformHandler, &names, tValue,
-                                                colorizedValue, args.inputValue);
-    args.irBuilder->StoreOutput(args.outputValue, result);
+    // The bounds come from this processor's own uniforms: the operator's declared pair would be a
+    // second set nothing uploads, and the call would read zeros.
+    auto ir = args.irBuilder;
+    const auto leftBorderValue = ir->InternValue(leftBorderColorName, SLType::Float4,
+                                                 Precision::High, IRValueKind::Uniform);
+    const auto rightBorderValue = ir->InternValue(rightBorderColorName, SLType::Float4,
+                                                  Precision::High, IRValueKind::Uniform);
+    const auto result =
+        ir->CreateCall(OperatorID::ClampedGradient, SLType::Float4,
+                       {tValue, colorizedValue, args.inputValue, leftBorderValue, rightBorderValue});
+    if (result == INVALID_VALUE_ID) {
+      ir->MarkFailed("the clamped gradient could not be recorded");
+      return;
+    }
+    ir->StoreOutput(args.outputValue, result);
   }
 }
 
