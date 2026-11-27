@@ -26,6 +26,7 @@
 #include "gpu/ShaderBuilder.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/VertexShaderBuilder.h"
+#include "gpu/ir/ProgramBodyPrinter.h"
 #include "gpu/shaders/ShaderLibraryBundle.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 
@@ -279,6 +280,14 @@ void AppendSection(std::string* out, const std::string& section) {
 }
 
 }  // namespace
+
+std::string MSLPrinter::PrintVertexBodyFromIR(const ProgramIR& program) {
+  return ProgramBodyPrinter::PrintVertex(program, ProgramBodyPrinter::MSLTraits());
+}
+
+std::string MSLPrinter::PrintFragmentBodyFromIR(const ProgramIR& program) {
+  return ProgramBodyPrinter::PrintFragment(program, ProgramBodyPrinter::MSLTraits());
+}
 
 std::string MSLPrinter::PrintVertexProgram(const std::vector<VertexCall>& calls,
                                            const MslCallSite& /*callSite*/) {

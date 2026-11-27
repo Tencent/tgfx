@@ -20,22 +20,26 @@
 
 #include <string>
 #include "gpu/ir/ProgramIR.h"
+#include "gpu/shaders/contract/ShaderLibraryBundleFormat.h"
 
 namespace tgfx {
 
-/// Lowers one ProgramIR operator call to the GLSL expression the manifest declares. Values keep
-/// their debug names because the GL path still prints those names verbatim.
+/// Lowers one ProgramIR operator call to the expression the manifest declares, spelled in the
+/// requested shader language. Values keep their debug names because the printers write those
+/// names verbatim.
 class GLSLOperatorEmitter {
  public:
   /// Emits the expression for the call that defines result. Returns false when the value is not a
   /// call, the operator is unknown, or an argument has no printable name.
   static bool EmitCall(const ProgramIR& program, ValueID result, std::string* expression,
-                       std::string* error = nullptr);
+                       std::string* error = nullptr,
+                       ShaderLibraryLanguage language = ShaderLibraryLanguage::GLSL);
 
   /// Emits the value as a GLSL expression, ignoring its debug name when it has a defining
   /// expression. Resource values still use their debug names.
   static bool EmitValue(const ProgramIR& program, ValueID value, std::string* expression,
-                        std::string* error = nullptr);
+                        std::string* error = nullptr,
+                        ShaderLibraryLanguage language = ShaderLibraryLanguage::GLSL);
 };
 
 }  // namespace tgfx

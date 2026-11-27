@@ -18,6 +18,7 @@
 
 #include "GLSLOperatorEmitter.h"
 #include <cmath>
+#include "gpu/ir/ShaderLanguageNaming.h"
 #include <cstdio>
 #include <cstring>
 
@@ -60,40 +61,14 @@ const char* ReadSwizzleSuffix(int32_t code) {
   }
 }
 
-const char* GLSLTypeName(SLType type) {
-  switch (type) {
-    case SLType::Float:
-      return "float";
-    case SLType::Float2:
-      return "vec2";
-    case SLType::Float3:
-      return "vec3";
-    case SLType::Float4:
-      return "vec4";
-    case SLType::Int:
-      return "int";
-    case SLType::Int2:
-      return "ivec2";
-    case SLType::Int3:
-      return "ivec3";
-    case SLType::Int4:
-      return "ivec4";
-    case SLType::Float2x2:
-      return "mat2";
-    case SLType::Float3x3:
-      return "mat3";
-    case SLType::Float4x4:
-      return "mat4";
-    default:
-      return nullptr;
-  }
-}
 
-bool ValueName(const ProgramIR& program, ValueID id, std::string* name, std::string* error);
+bool ValueName(const ProgramIR& program, ValueID id, std::string* name, std::string* error,
+               ShaderLibraryLanguage language);
 bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expression,
-                    std::string* error);
+                    std::string* error, ShaderLibraryLanguage language);
 
-bool ValueName(const ProgramIR& program, ValueID id, std::string* name, std::string* error) {
+bool ValueName(const ProgramIR& program, ValueID id, std::string* name, std::string* error,
+               ShaderLibraryLanguage language) {
   if (id == INVALID_VALUE_ID || id >= program.values.size()) {
     return Fail(error, "an operator argument has an invalid value");
   }
@@ -124,7 +99,7 @@ bool ValueName(const ProgramIR& program, ValueID id, std::string* name, std::str
     return true;
   }
   if (value.kind == IRValueKind::Expr || value.kind == IRValueKind::Field) {
-    return EmitExpression(program, id, name, error);
+    return EmitExpression(program, id, name, error, language);
   }
   if (error != nullptr) {
     *error = "an operator argument has no printable name (id=" + std::to_string(id) +
@@ -135,7 +110,7 @@ bool ValueName(const ProgramIR& program, ValueID id, std::string* name, std::str
 }
 
 bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expression,
-                    std::string* error) {
+                    std::string* error, ShaderLibraryLanguage language) {
   const auto& value = program.values[id];
   if (value.definingExpr == INVALID_EXPR_ID || value.definingExpr >= program.exprs.size()) {
     return Fail(error, "an operator argument expression has no definition");
@@ -144,21 +119,21 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
   switch (expr.kind) {
     case IRExprKind::Swizzle: {
       std::string source = {};
-      if (!GLSLOperatorEmitter::EmitValue(program, expr.args[0], &source, error)) {
+      if (!GLSLOperatorEmitter::EmitValue(program, expr.args[0], &source, error, language)) {
         return false;
       }
       *expression = source + "." + expr.swizzle;
       return true;
     }
     case IRExprKind::Construct: {
-      const char* typeName = GLSLTypeName(expr.type);
+      const char* typeName = ValueTypeName(language, expr.type);
       if (typeName == nullptr) {
         return Fail(error, "a construct expression has no GLSL type");
       }
       std::vector<std::string> args(expr.args.size());
       bool sameArgument = true;
       for (size_t index = 0; index < expr.args.size(); ++index) {
-        if (!GLSLOperatorEmitter::EmitValue(program, expr.args[index], &args[index], error)) {
+        if (!GLSLOperatorEmitter::EmitValue(program, expr.args[index], &args[index], error, language)) {
           return false;
         }
         if (index != 0 && expr.args[index] != expr.args[0]) {
@@ -189,7 +164,7 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
         return Fail(error, "a conversion needs one source");
       }
       std::string source = {};
-      if (!GLSLOperatorEmitter::EmitValue(program, expr.args[0], &source, error)) {
+      if (!GLSLOperatorEmitter::EmitValue(program, expr.args[0], &source, error, language)) {
         return false;
       }
       *expression = (expr.type == SLType::Float ? "float(" : "int(") + source + ")";
@@ -198,8 +173,8 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
     case IRExprKind::Binary: {
       std::string left = {};
       std::string right = {};
-      if (!GLSLOperatorEmitter::EmitValue(program, expr.args[0], &left, error) ||
-          !GLSLOperatorEmitter::EmitValue(program, expr.args[1], &right, error)) {
+      if (!GLSLOperatorEmitter::EmitValue(program, expr.args[0], &left, error, language) ||
+          !GLSLOperatorEmitter::EmitValue(program, expr.args[1], &right, error, language)) {
         return false;
       }
       if (expr.binaryOp == IRBinaryOp::Min || expr.binaryOp == IRBinaryOp::Max) {
@@ -229,15 +204,15 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
       return true;
     }
     case IRExprKind::Call:
-      return GLSLOperatorEmitter::EmitCall(program, id, expression, error);
+      return GLSLOperatorEmitter::EmitCall(program, id, expression, error, language);
     case IRExprKind::TextureSample: {
       if (expr.args.size() != 2) {
         return Fail(error, "a texture sample needs a sampler and a coordinate");
       }
       std::string sampler = {};
       std::string coord = {};
-      if (!ValueName(program, expr.args[0], &sampler, error) ||
-          !GLSLOperatorEmitter::EmitValue(program, expr.args[1], &coord, error)) {
+      if (!ValueName(program, expr.args[0], &sampler, error, language) ||
+          !GLSLOperatorEmitter::EmitValue(program, expr.args[1], &coord, error, language)) {
         return false;
       }
       if (expr.samplerType == SLType::Texture2DRectSampler ||
@@ -256,14 +231,14 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
       // shared reader expresses with the identity swizzle code. A clamped sample carries the
       // subset uniform (the stricter of the strict/draw pair rides the call) with clamp on.
       const int32_t swizzleCode = expr.samplerSwizzleCode < 0 ? 0 : expr.samplerSwizzleCode;
-      std::string subset = "vec4(0.0)";
+      std::string subset = std::string(ValueTypeName(language, SLType::Float4)) + "(0.0)";
       std::string clampOn = "0";
       if (expr.subsetClamped) {
         const ValueID subsetValue =
             expr.strictSubset != INVALID_VALUE_ID ? expr.strictSubset : expr.drawSubset;
         if (subsetValue != INVALID_VALUE_ID && subsetValue < program.values.size()) {
           std::string subsetName = {};
-          if (ValueName(program, subsetValue, &subsetName, error)) {
+          if (ValueName(program, subsetValue, &subsetName, error, language)) {
             subset = subsetName;
             clampOn = "1";
           }
@@ -288,7 +263,8 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
 }  // namespace
 
 bool GLSLOperatorEmitter::EmitCall(const ProgramIR& program, ValueID result,
-                                   std::string* expression, std::string* error) {
+                                   std::string* expression, std::string* error,
+                                   ShaderLibraryLanguage language) {
   if (expression == nullptr) {
     return Fail(error, "the output expression is null");
   }
@@ -318,7 +294,7 @@ bool GLSLOperatorEmitter::EmitCall(const ProgramIR& program, ValueID result,
     // An argument with a defining expression prints the expression inline: the IR printer route
     // has no named staging local for it, and a bare debug name would be undeclared there. Resource
     // and named values keep their names, which the text route declares.
-    if (!EmitValue(program, call.args[index], &argument, error)) {
+    if (!EmitValue(program, call.args[index], &argument, error, language)) {
       return false;
     }
     if (index != 0) {
@@ -332,15 +308,16 @@ bool GLSLOperatorEmitter::EmitCall(const ProgramIR& program, ValueID result,
 }
 
 bool GLSLOperatorEmitter::EmitValue(const ProgramIR& program, ValueID value,
-                                    std::string* expression, std::string* error) {
+                                    std::string* expression, std::string* error,
+                                    ShaderLibraryLanguage language) {
   if (value == INVALID_VALUE_ID || value >= program.values.size()) {
     return Fail(error, "the value has an invalid id");
   }
   const auto kind = program.values[value].kind;
   if (kind == IRValueKind::Expr || kind == IRValueKind::Field) {
-    return EmitExpression(program, value, expression, error);
+    return EmitExpression(program, value, expression, error, language);
   }
-  return ValueName(program, value, expression, error);
+  return ValueName(program, value, expression, error, language);
 }
 
 }  // namespace tgfx

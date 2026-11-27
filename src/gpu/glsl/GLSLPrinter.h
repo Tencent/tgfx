@@ -20,6 +20,7 @@
 
 #include <string>
 #include "gpu/ir/ProgramIR.h"
+#include "gpu/shaders/contract/ShaderLibraryBundleFormat.h"
 #include <vector>
 #include "gpu/ir/ProgramDescription.h"
 #include "tgfx/gpu/ShaderStage.h"
