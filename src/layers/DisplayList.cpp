@@ -1178,8 +1178,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       DEBUG_ASSERT(coverages.size() == static_cast<size_t>(treeLevelCount));
       const bool mayRefine = tileTasks->empty();
       const bool gridComplete = missingGrids.empty();
-      // Once the grid is complete, the budget tops up the retained levels from the coarsest one
-      // below the coarsest down to L. The coarsest level itself is left to pass 1.
+      // Once the grid is complete, the budget tops up the retained levels from the second coarsest
+      // down to L. The coarsest level itself is left to pass 1.
       auto chainBudget = gridComplete ? std::max(_maxTilesRefinedPerFrame, 0) : 0;
       size_t chainRefined = 0;
       if (mayRefine) {

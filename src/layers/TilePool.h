@@ -97,9 +97,9 @@ int GetTileLevel(float zoomScale);
 float GetTileRasterScale(int level);
 
 /**
- * The number of fallback levels the pool keeps above the current zoom scale. Each level adds a
- * quarter of the tiles of the previous one, so the deepest window costs 1.328 times the tiles of
- * the finest level.
+ * The maximum number of fallback levels the pool keeps above the current zoom scale. Each level
+ * adds a quarter of the tiles of the previous one, so the deepest window costs 1.328 times the
+ * tiles of the finest level; a pool that cannot hold the whole window keeps fewer.
  */
 static constexpr int MAX_TREE_LEVEL_COUNT = 4;
 
