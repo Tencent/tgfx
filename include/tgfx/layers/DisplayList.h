@@ -340,6 +340,8 @@ class DisplayList {
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
   size_t minTreeTileCount = 0;
+  size_t minGridTileCount = 0;
+  int treeLevelCount = 0;
   std::vector<std::shared_ptr<Surface>> surfaceCaches = {};
   std::unique_ptr<TilePool> tilePool;
   std::unique_ptr<BlankTileSet> blankTiles;

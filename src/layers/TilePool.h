@@ -97,6 +97,27 @@ int GetTileLevel(float zoomScale);
 float GetTileRasterScale(int level);
 
 /**
+ * The number of fallback levels the pool keeps above the current zoom scale. Each level adds a
+ * quarter of the tiles of the previous one, so the deepest window costs 1.328 times the tiles of
+ * the finest level.
+ */
+static constexpr int MAX_TREE_LEVEL_COUNT = 4;
+
+/**
+ * Returns how many times the tiles of the finest fallback level are needed to cover the viewport
+ * with the finest levelCount levels, i.e. 1 + 1/4 + ... . A levelCount of 0 returns 0.
+ */
+float TreeLevelCoverageFactor(int levelCount);
+
+/**
+ * Returns how many fallback levels fit in a pool of totalTileCount slots that must also cover
+ * gridDemand grid tiles, from MAX_TREE_LEVEL_COUNT down to 0. A level that does not fit is dropped
+ * from the coarsest end, because the grid always has to be drawn while a missing fallback only
+ * makes the next zoom rasterize on the spot.
+ */
+int ComputeTreeLevelCount(size_t totalTileCount, size_t gridDemand, int treeTileCount);
+
+/**
  * TileKey identifies a tile in the pool. Grid tiles use scaleInt, which is never zero for a
  * rendered zoom scale, while tree tiles use level with scaleInt fixed at zero.
  */

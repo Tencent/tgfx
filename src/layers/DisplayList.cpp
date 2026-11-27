@@ -45,10 +45,6 @@ static constexpr int MAX_ATLAS_SIZE = 4096;
 // Bounds the tile memory at roughly 2 GB (32 atlases of 64 MB). Every display resolution fits,
 // including 8K, so the bound only stops a surface far larger than any display from exhausting it.
 static constexpr int MAX_ATLAS_COUNT = 32;
-// Covering a viewport with the tree levels L to L+3 takes 1 + 1/4 + 1/16 + 1/64 times the tiles of
-// level L.
-static constexpr float TREE_LEVELS_COVERAGE_FACTOR = 1.33f;
-static constexpr int TREE_LEVEL_COUNT = 4;
 static constexpr size_t BLANK_MARKS_PER_TILE = 4;
 // Number of rects the per-layer cull loop can afford.
 static constexpr size_t MAX_CULL_RECTS = 32;
@@ -290,12 +286,12 @@ static void ForEachTileUnderRect(const Rect& rect, int tileSize,
 static std::vector<TreeLevelCoverage> CollectTreeCoverages(TilePool* tilePool,
                                                            const BlankTileSet* blankTiles,
                                                            float zoomScale, const Rect& renderRect,
-                                                           int tileSize) {
+                                                           int tileSize, int levelCount) {
   std::vector<TreeLevelCoverage> coverages = {};
-  coverages.reserve(TREE_LEVEL_COUNT);
+  coverages.reserve(static_cast<size_t>(levelCount));
   auto baseLevel = GetTileLevel(zoomScale);
   auto tileSizeFloat = static_cast<float>(tileSize);
-  for (int i = 0; i < TREE_LEVEL_COUNT; ++i) {
+  for (int i = 0; i < levelCount; ++i) {
     TreeLevelCoverage coverage = {};
     coverage.level = baseLevel + i;
     coverage.zoomToRaster = GetTileRasterScale(coverage.level) / zoomScale;
@@ -808,21 +804,32 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
     auto atlasCount = (totalTileCount + maxTileCountPerAtlas - 1) / maxTileCountPerAtlas;
     totalTileCount = std::min(atlasCount, MAX_ATLAS_COUNT) * maxTileCountPerAtlas;
   }
-  minTreeTileCount = static_cast<size_t>(
-      FloatCeilToInt(TREE_LEVELS_COVERAGE_FACTOR * static_cast<float>(treeTileCount)));
   // Splitting by demand gives both types the same safety factor at any aspect ratio.
   auto treeRatio =
       static_cast<double>(treeTileCount) / static_cast<double>(treeTileCount + gridTileCount);
   auto total = static_cast<size_t>(totalTileCount);
   auto treeQuota = static_cast<size_t>(std::lround(static_cast<double>(total) * treeRatio));
-  // MAX_ATLAS_COUNT can leave less than the viewport and the fallback levels need together. Keep the
-  // viewport sharp first and the fallback levels second, so a capped pool degrades instead of
-  // starving one side; the proportional split only decides how the slack is spent.
+  // MAX_ATLAS_COUNT can leave less than the viewport and the fallback levels need together. The grid
+  // is what draws the frame, so it keeps its demand first; the fallback levels come second and are
+  // dropped from the coarsest end until they fit, which keeps the chain completable.
   auto gridDemand = std::min(static_cast<size_t>(gridTileCount), total);
-  auto treeDemand = std::min(minTreeTileCount, total);
-  treeQuota = std::min(std::max(treeQuota, treeDemand), total - gridDemand);
+  minGridTileCount = gridDemand;
+  treeLevelCount = ComputeTreeLevelCount(total, gridDemand, treeTileCount);
+  minTreeTileCount =
+      treeLevelCount == 0
+          ? 0
+          : static_cast<size_t>(FloatCeilToInt(TreeLevelCoverageFactor(treeLevelCount) *
+                                               static_cast<float>(treeTileCount)));
+  treeQuota =
+      treeLevelCount == 0 ? 0 : std::min(std::max(treeQuota, minTreeTileCount), total - gridDemand);
   tilePool->setQuota(TileType::Tree, treeQuota);
   tilePool->setQuota(TileType::Grid, total - treeQuota);
+  if (gridDemand > total || treeLevelCount < MAX_TREE_LEVEL_COUNT) {
+    LOGI(
+        "DisplayList::checkTileCount() %dx%d limits the pool to %zu tiles: the grid needs %zu and "
+        "%d fallback level(s) are kept.",
+        surfaceWidth, surfaceHeight, total, gridDemand, treeLevelCount);
+  }
   blankTiles->setMaxCount(BLANK_MARKS_PER_TILE * static_cast<size_t>(totalTileCount));
 }
 
@@ -893,7 +900,7 @@ void DisplayList::invalidateTreeTiles(const std::vector<Rect>& dirtyRegions,
     // Only the coarsest level is patched, because the finer fallbacks are not drawn while the
     // grid covers every cell: patching them would replay the whole scene for pixels nobody sees.
     // They are dropped here instead and rebuilt by the chain top-up once the grid is settled.
-    const auto coarsestLevel = baseLevel + TREE_LEVEL_COUNT - 1;
+    const auto coarsestLevel = baseLevel + treeLevelCount - 1;
     if (key.level != coarsestLevel || !Rect::Intersects(tileRect, rects.viewportRect)) {
       dirtyKeys.push_back(key);
       continue;
@@ -988,7 +995,9 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks,
                                                       std::vector<Rect>* skippedRects) {
   auto refineBudget = std::max(_maxTilesRefinedPerFrame, 0);
-  const auto useFallback = _tileUpdateMode != TileUpdateMode::Immediate;
+  // Without any fallback level the pool cannot hold, a missing cell has nothing to show, so the
+  // frame rasterizes it right away instead of leaving the background exposed.
+  const auto useFallback = _tileUpdateMode != TileUpdateMode::Immediate && treeLevelCount > 0;
   // Grid tiles drawn while the viewport moves are often stale by the next frame, so a moving
   // viewport spends the budget on tree tiles, which stay valid across zoom scales.
   const auto viewportChanged =
@@ -1023,8 +1032,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   screenTasks.reserve(tileCount);
   std::vector<TreeLevelCoverage> coverages = {};
   if (useFallback) {
-    coverages =
-        CollectTreeCoverages(tilePool.get(), blankTiles.get(), zoomScale, renderRect, _tileSize);
+    coverages = CollectTreeCoverages(tilePool.get(), blankTiles.get(), zoomScale, renderRect,
+                                     _tileSize, treeLevelCount);
   }
   auto getGridRect = [&](const std::pair<int, int>& grid) {
     auto rect =
@@ -1166,7 +1175,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     // that zoom has to rasterize a fallback level on the spot. A frame that already has other tile
     // work only reports what is left, so the loop keeps running until the levels are full.
     if (useFallback) {
-      DEBUG_ASSERT(coverages.size() == static_cast<size_t>(TREE_LEVEL_COUNT));
+      DEBUG_ASSERT(coverages.size() == static_cast<size_t>(treeLevelCount));
       const bool mayRefine = tileTasks->empty();
       const bool gridComplete = missingGrids.empty();
       // Once the grid is complete, the budget tops up L+2, L+1 and then L itself. L+3 is left to
@@ -1175,7 +1184,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       size_t chainRefined = 0;
       if (mayRefine) {
         // coverages[0] is L and coverages[3] is L+3.
-        for (int index = TREE_LEVEL_COUNT - 2; index >= 0 && chainBudget > 0; --index) {
+        for (int index = treeLevelCount - 2; index >= 0 && chainBudget > 0; --index) {
           auto& coverage = coverages[static_cast<size_t>(index)];
           auto cells = CollectMissingTreeTiles(coverage, {renderRect}, _tileSize);
           if (cells.empty()) {
@@ -1194,7 +1203,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       // loop alive, so only a complete one needs the scan.
       bool chainPending = false;
       if (gridComplete) {
-        for (int index = TREE_LEVEL_COUNT - 2; index >= 0; --index) {
+        for (int index = treeLevelCount - 2; index >= 0; --index) {
           auto& coverage = coverages[static_cast<size_t>(index)];
           if (!CollectMissingTreeTiles(coverage, {renderRect}, _tileSize).empty()) {
             chainPending = true;
@@ -1311,12 +1320,15 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(const Surface* rend
     // A tree tile outranks the grid because it cannot be recovered retroactively: a missing grid
     // tile is rasterized again on demand, or shown through a fallback, while a fallback that was
     // never prepared makes the next zoom rasterize a coarser level on the spot, which is the frame
-    // drop this pool exists to avoid. All three callers follow from that: pass 1 needs a tree tile
-    // as the only content for a cell, and the refinement pass and the chain top up spend their
-    // budget preparing the next zoom. Eviction only reaches tiles nothing references, so the grid
-    // tiles this frame draws are safe, and the grid can borrow back down to the fallback coverage
-    // through the branch below.
-    evictInto(TileType::Grid, tileCount);
+    // drop this pool exists to avoid. The grid still keeps the slots this frame needs to cover the
+    // viewport, so preparing a fallback can never leave a hole on screen; eviction only reaches
+    // tiles nothing references. The grid can borrow back down to the fallback coverage through the
+    // branch below.
+    auto gridCount = tilePool->size(TileType::Grid);
+    auto gridFloor = std::min(minGridTileCount, gridCount);
+    if (gridCount > gridFloor) {
+      evictInto(TileType::Grid, std::min(tileCount, gridCount - gridFloor));
+    }
     return tiles;
   }
   // Grid tiles may borrow from the tree tiles as long as the grid stays within its quota and the

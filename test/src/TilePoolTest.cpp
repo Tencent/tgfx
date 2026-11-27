@@ -799,4 +799,24 @@ TGFX_TEST(TilePoolTest, PassThroughSeedMatchesDirectRendering) {
   EXPECT_EQ(MaxDifference(tiled, direct), 0);
 }
 
+TGFX_TEST(TilePoolTest, FallbackLevelCountFollowsTheBudget) {
+  // Covering the viewport with the levels L to L+k takes 1 + 1/4 + ... of the tiles of L.
+  EXPECT_FLOAT_EQ(TreeLevelCoverageFactor(1), 1.0f);
+  EXPECT_FLOAT_EQ(TreeLevelCoverageFactor(2), 1.25f);
+  EXPECT_FLOAT_EQ(TreeLevelCoverageFactor(3), 1.3125f);
+  EXPECT_FLOAT_EQ(TreeLevelCoverageFactor(4), 1.328125f);
+  EXPECT_FLOAT_EQ(TreeLevelCoverageFactor(0), 0.0f);
+
+  // A typical viewport fits all four levels: 512 slots, 54 grid tiles, 150 tiles per level.
+  EXPECT_EQ(ComputeTreeLevelCount(512, 54, 150), 4);
+  EXPECT_EQ(ComputeTreeLevelCount(256, 16, 36), 4);
+  // A capped pool drops levels from the coarsest end: 9000x9000 needs 8532 slots for four levels,
+  // 8106 for two and 8192 is available.
+  EXPECT_EQ(ComputeTreeLevelCount(8192, 1444, 5329), 2);
+  // 10240x10240 cannot even hold the finest level next to the grid, so the frame rasterizes cells
+  // as it goes instead of keeping a fallback.
+  EXPECT_EQ(ComputeTreeLevelCount(8192, 1764, 6724), 0);
+  EXPECT_EQ(ComputeTreeLevelCount(100, 120, 10), 0);
+}
+
 }  // namespace tgfx

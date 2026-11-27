@@ -32,6 +32,26 @@ float GetTileRasterScale(int level) {
   return std::ldexp(1.0f, -level);
 }
 
+float TreeLevelCoverageFactor(int levelCount) {
+  // Covering the viewport with the levels L to L+k takes 1 + 1/4 + ... of the tiles of level L.
+  static constexpr float Coverage[MAX_TREE_LEVEL_COUNT] = {1.0f, 1.25f, 1.3125f, 1.328125f};
+  if (levelCount <= 0 || levelCount > MAX_TREE_LEVEL_COUNT) {
+    return 0.0f;
+  }
+  return Coverage[levelCount - 1];
+}
+
+int ComputeTreeLevelCount(size_t totalTileCount, size_t gridDemand, int treeTileCount) {
+  for (int levels = MAX_TREE_LEVEL_COUNT; levels > 0; --levels) {
+    auto needed = static_cast<size_t>(
+        std::ceil(TreeLevelCoverageFactor(levels) * static_cast<float>(treeTileCount)));
+    if (gridDemand + needed <= totalTileCount) {
+      return levels;
+    }
+  }
+  return 0;
+}
+
 size_t TileKeyHash::operator()(const TileKey& key) const {
   auto combine = [](size_t seed, size_t value) -> size_t {
     return seed ^ (value + static_cast<size_t>(0x9e3779b9u) + (seed << 6) + (seed >> 2));
