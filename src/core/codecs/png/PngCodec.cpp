@@ -17,6 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/codecs/png/PngCodec.h"
+#ifdef __EMSCRIPTEN_PTHREADS__
+#include <emscripten/console.h>
+#include <emscripten/threading.h>
+#endif
+#include "core/codecs/ScanlineEncoder.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "png.h"
 #include "skcms.h"
@@ -24,6 +29,7 @@
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/core/WriteStream.h"
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> PngCodec::MakeFrom(const std::string& filePath) {
@@ -451,6 +457,127 @@ std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, int) {
     return nullptr;
   }
   return Data::MakeAdopted(pngWriter.data, pngWriter.length, Data::FreeProc);
+}
+
+namespace {
+static void PngWarning(png_structp, png_const_charp message) {
+#ifdef __EMSCRIPTEN_PTHREADS__
+  if (!emscripten_is_main_runtime_thread()) {
+    // Worker stdio is synchronously proxied. Log directly from the worker.
+    emscripten_console_warn(message);
+    return;
+  }
+#endif
+  fprintf(stderr, "libpng warning: %s\n", message);
+}
+
+static void PngError(png_structp png, png_const_charp message) {
+#ifdef __EMSCRIPTEN_PTHREADS__
+  if (!emscripten_is_main_runtime_thread()) {
+    emscripten_console_error(message);
+    png_longjmp(png, 1);
+  }
+#endif
+  fprintf(stderr, "libpng error: %s\n", message);
+  png_longjmp(png, 1);
+}
+
+class PngScanlineEncoder final : public ScanlineEncoder {
+ public:
+  explicit PngScanlineEncoder(WriteStream* destination) : stream(destination) {
+  }
+
+  ~PngScanlineEncoder() override {
+    if (png) {
+      png_destroy_write_struct(&png, &pngInfo);
+    }
+  }
+
+  bool initialize(const ImageInfo& info) {
+    if (info.colorType() != ColorType::RGBA_8888 ||
+        info.alphaType() != AlphaType::Unpremultiplied) {
+      rowInfo = ImageInfo::Make(info.width(), 1, ColorType::RGBA_8888, AlphaType::Unpremultiplied,
+                                0, info.colorSpace());
+      if (!scratch.alloc(rowInfo.byteSize())) {
+        return false;
+      }
+    }
+
+    auto profile = info.colorSpace() ? info.colorSpace()->toICCProfile() : nullptr;
+    png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+    if (!png) {
+      return false;
+    }
+    if (setjmp(png_jmpbuf(png))) {
+      return false;
+    }
+    png_set_error_fn(png, nullptr, PngError, PngWarning);
+    pngInfo = png_create_info_struct(png);
+    if (!pngInfo) {
+      return false;
+    }
+    png_color_8 sigBit = {8, 8, 8, 0, 8};
+    png_set_IHDR(png, pngInfo, static_cast<png_uint_32>(info.width()),
+                 static_cast<png_uint_32>(info.height()), 8, PNG_COLOR_TYPE_RGB_ALPHA,
+                 PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+    if (profile && profile->size()) {
+      png_set_iCCP(png, pngInfo, "TGFX", 0, profile->bytes(),
+                   static_cast<png_uint_32>(profile->size()));
+    }
+    png_set_sBIT(png, pngInfo, &sigBit);
+    png_set_write_fn(png, stream, WriteData, nullptr);
+    png_write_info(png, pngInfo);
+    return true;
+  }
+
+  bool appendRows(const Pixmap& band) override {
+    if (setjmp(png_jmpbuf(png))) {
+      return false;
+    }
+    auto pixels = static_cast<const uint8_t*>(band.pixels());
+    for (int row = 0; row < band.height(); ++row) {
+      auto* source = pixels + static_cast<size_t>(row) * band.rowBytes();
+      if (!scratch.isEmpty()) {
+        if (!band.readPixels(rowInfo, scratch.data(), 0, row)) {
+          return false;
+        }
+        source = scratch.bytes();
+      }
+      png_write_row(png, source);
+    }
+    return true;
+  }
+
+  bool finish() override {
+    if (setjmp(png_jmpbuf(png))) {
+      return false;
+    }
+    png_write_end(png, pngInfo);
+    return true;
+  }
+
+ private:
+  static void WriteData(png_structp encoder, png_bytep bytes, png_size_t size) {
+    auto* destination = static_cast<WriteStream*>(png_get_io_ptr(encoder));
+    if (!destination->write(bytes, size)) {
+      png_error(encoder, "Unable to write PNG data");
+    }
+  }
+
+  WriteStream* stream = nullptr;
+  png_structp png = nullptr;
+  png_infop pngInfo = nullptr;
+  ImageInfo rowInfo = {};
+  Buffer scratch;
+};
+}  // namespace
+
+std::unique_ptr<ScanlineEncoder> PngCodec::MakeEncoder(WriteStream* stream, const ImageInfo& info) {
+  auto encoder = std::make_unique<PngScanlineEncoder>(stream);
+  if (!encoder->initialize(info)) {
+    return nullptr;
+  }
+  return encoder;
 }
 #endif
 

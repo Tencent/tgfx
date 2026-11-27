@@ -22,6 +22,9 @@
 #include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
+class ScanlineEncoder;
+class WriteStream;
+
 class PngCodec : public ImageCodec {
  public:
   static std::shared_ptr<ImageCodec> MakeFrom(const std::string& filePath);
@@ -32,6 +35,8 @@ class PngCodec : public ImageCodec {
 
 #ifdef TGFX_USE_PNG_ENCODE
   static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality);
+
+  static std::unique_ptr<ScanlineEncoder> MakeEncoder(WriteStream* stream, const ImageInfo& info);
 #endif
 
  protected:

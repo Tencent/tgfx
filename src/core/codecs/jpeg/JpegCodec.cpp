@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/codecs/jpeg/JpegCodec.h"
+#include <algorithm>
 #include <csetjmp>
+#include "core/codecs/ScanlineEncoder.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -26,6 +28,7 @@
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/WriteStream.h"
 
 extern "C" {
 #include "jerror.h"
@@ -439,6 +442,129 @@ std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality) {
   jpeg_finish_compress(&cinfo);
   jpeg_destroy_compress(&cinfo);
   return Data::MakeAdopted(dstBuffer, dstBufferSize, Data::FreeProc);
+}
+
+namespace {
+class JpegScanlineEncoder final : public ScanlineEncoder {
+ public:
+  explicit JpegScanlineEncoder(WriteStream* destination) : stream(destination) {
+  }
+
+  ~JpegScanlineEncoder() override {
+    if (jpeg.mem) {
+      jpeg_destroy_compress(&jpeg);
+    }
+  }
+
+  bool initialize(const ImageInfo& info, int quality) {
+    if (info.width() > JPEG_MAX_DIMENSION || info.height() > JPEG_MAX_DIMENSION) {
+      return false;
+    }
+    auto inputColorSpace = JCS_EXT_RGBA;
+    switch (info.colorType()) {
+      case ColorType::RGBA_8888:
+        break;
+      case ColorType::BGRA_8888:
+        inputColorSpace = JCS_EXT_BGRA;
+        break;
+      default:
+        return false;
+    }
+
+    auto profile = info.colorSpace() ? info.colorSpace()->toICCProfile() : nullptr;
+    jpeg.err = jpeg_std_error(&error);
+    jpeg.err->error_exit = Fail;
+    jpeg.client_data = this;
+    if (setjmp(jump)) {
+      return false;
+    }
+    jpeg_create_compress(&jpeg);
+    jpeg.dest = &destination;
+    destination.init_destination = InitDestination;
+    destination.empty_output_buffer = WriteBuffer;
+    destination.term_destination = FinishDestination;
+    jpeg.image_width = static_cast<JDIMENSION>(info.width());
+    jpeg.image_height = static_cast<JDIMENSION>(info.height());
+    jpeg.input_components = 4;
+    jpeg.in_color_space = inputColorSpace;
+    jpeg_set_defaults(&jpeg);
+    // Optimizing the Huffman tables retains every coefficient of the image in memory, so the
+    // streaming encoder keeps the single-pass default instead.
+    jpeg.optimize_coding = FALSE;
+    jpeg_set_quality(&jpeg, std::clamp(quality, 0, 100), TRUE);
+    jpeg_start_compress(&jpeg, TRUE);
+    if (profile && profile->size()) {
+      jpeg_write_icc_profile(&jpeg, profile->bytes(), static_cast<unsigned int>(profile->size()));
+    }
+    return true;
+  }
+
+  bool appendRows(const Pixmap& band) override {
+    if (setjmp(jump)) {
+      return false;
+    }
+    auto pixels = static_cast<const uint8_t*>(band.pixels());
+    for (int row = 0; row < band.height(); ++row) {
+      auto* scanline = const_cast<JSAMPLE*>(pixels + static_cast<size_t>(row) * band.rowBytes());
+      if (jpeg_write_scanlines(&jpeg, &scanline, 1) != 1) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool finish() override {
+    if (setjmp(jump)) {
+      return false;
+    }
+    jpeg_finish_compress(&jpeg);
+    return true;
+  }
+
+ private:
+  static void Fail(j_common_ptr encoder) {
+    longjmp(static_cast<JpegScanlineEncoder*>(encoder->client_data)->jump, 1);
+  }
+
+  static void InitDestination(j_compress_ptr encoder) {
+    auto* self = static_cast<JpegScanlineEncoder*>(encoder->client_data);
+    encoder->dest->next_output_byte = self->outputBuffer;
+    encoder->dest->free_in_buffer = sizeof(self->outputBuffer);
+  }
+
+  static boolean WriteBuffer(j_compress_ptr encoder) {
+    auto* self = static_cast<JpegScanlineEncoder*>(encoder->client_data);
+    if (!self->stream->write(self->outputBuffer, sizeof(self->outputBuffer))) {
+      ERREXIT(encoder, JERR_FILE_WRITE);
+    }
+    InitDestination(encoder);
+    return TRUE;
+  }
+
+  static void FinishDestination(j_compress_ptr encoder) {
+    auto* self = static_cast<JpegScanlineEncoder*>(encoder->client_data);
+    auto size = sizeof(self->outputBuffer) - encoder->dest->free_in_buffer;
+    if (size != 0 && !self->stream->write(self->outputBuffer, size)) {
+      ERREXIT(encoder, JERR_FILE_WRITE);
+    }
+  }
+
+  WriteStream* stream = nullptr;
+  jpeg_compress_struct jpeg = {};
+  jpeg_error_mgr error = {};
+  jpeg_destination_mgr destination = {};
+  jmp_buf jump = {};
+  JOCTET outputBuffer[16 * 1024] = {};
+};
+}  // namespace
+
+std::unique_ptr<ScanlineEncoder> JpegCodec::MakeEncoder(WriteStream* stream, const ImageInfo& info,
+                                                        int quality) {
+  auto encoder = std::make_unique<JpegScanlineEncoder>(stream);
+  if (!encoder->initialize(info, quality)) {
+    return nullptr;
+  }
+  return encoder;
 }
 #endif
 

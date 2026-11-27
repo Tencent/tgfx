@@ -21,6 +21,9 @@
 #include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
+class ScanlineEncoder;
+class WriteStream;
+
 class JpegCodec : public ImageCodec {
  public:
   static std::shared_ptr<ImageCodec> MakeFrom(const std::string& filePath);
@@ -29,6 +32,9 @@ class JpegCodec : public ImageCodec {
 
 #ifdef TGFX_USE_JPEG_ENCODE
   static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality);
+
+  static std::unique_ptr<ScanlineEncoder> MakeEncoder(WriteStream* stream, const ImageInfo& info,
+                                                      int quality);
 #endif
 
   std::pair<int, int> getScaledDimensions(float scale) const override;
