@@ -37,15 +37,16 @@ class DrawingManager {
   explicit DrawingManager(Context* context);
 
   /**
-   * Returns a mark of the draw calls recorded so far. DisplayList takes one before drawing a tile
-   * and passes it to hasDrawnSince() to tell whether the tile produced any content.
+   * Returns a mark of the draws started so far. DisplayList takes one before drawing a tile and
+   * passes it to hasDrawnSince() to tell whether the tile produced any content.
    */
   uint64_t drawMark() const {
     return drawCount;
   }
 
   /**
-   * Returns true if an OpsCompositor of this context recorded a draw call after the given mark.
+   * Returns true if a draw started on this context after the given mark. A draw that ends up
+   * producing no pixels still counts, so the answer errs towards "the tile has content".
    */
   bool hasDrawnSince(uint64_t mark) const {
     return drawCount != mark;
@@ -53,7 +54,9 @@ class DrawingManager {
 
   /**
    * Records that this context is about to draw something. RenderContext calls it when a canvas
-   * obtains its OpsCompositor, which every draw path goes through.
+   * obtains its OpsCompositor, which every draw path goes through except
+   * RenderContext::replaceRenderTarget(), which draws into the new target itself and records its
+   * own draw.
    */
   void markDrawn() {
     ++drawCount;
