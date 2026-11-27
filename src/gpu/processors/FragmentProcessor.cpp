@@ -253,6 +253,33 @@ ValueID FragmentProcessor::emitChildIR(
   ValueID childOutput = INVALID_VALUE_ID;
   internalEmitChild(childIndex, inputColor, *outputColor, args, std::move(coordFunc),
                     inputColorValue, &childOutput);
+  // The IR contract: a child that returns an output value must define it, or the printed body
+  // references a value nothing writes and the stage silently draws nothing.
+  if (args.irBuilder != nullptr && childOutput != INVALID_VALUE_ID) {
+    const auto& ir = args.irBuilder->IR();
+    bool defined = false;
+    bool textOnly = false;
+    for (const auto& statement : ir.statements) {
+      if (statement.kind == IRStatementKind::RawText) {
+        textOnly = true;
+      }
+      if ((statement.kind == IRStatementKind::Assign ||
+           statement.kind == IRStatementKind::StoreOutput) &&
+          statement.dst.base == childOutput) {
+        defined = true;
+        break;
+      }
+    }
+    if (!defined) {
+      const auto* child = childProcessor(childIndex);
+      const std::string outputName =
+          childOutput < ir.values.size() ? ir.values[childOutput].debugName : std::string();
+      const std::string childName = child != nullptr ? child->name() : "?";
+      LOGE("IRContract: child %zu '%s' never defines its output '%s' (id=%u, textOnly=%d)",
+           childIndex, childName.c_str(), outputName.c_str(), childOutput,
+           textOnly ? 1 : 0);
+    }
+  }
   return childOutput;
 }
 

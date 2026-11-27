@@ -380,6 +380,24 @@ std::string ProgramBodyPrinter::PrintFragment(const ProgramIR& program,
       }
     }
   }
+  // The stage contract: a fragment body that never stores the color output draws nothing at
+  // all, and the caller would see a silently empty pass.
+  {
+    bool storesColor = false;
+    for (const auto& statement : program.statements) {
+      if (statement.kind == IRStatementKind::StoreOutput &&
+          statement.dst.base < program.values.size()) {
+        const auto& name = program.values[statement.dst.base].debugName;
+        if (name == "fragmentOutput" || name == CUSTOM_COLOR_OUTPUT_NAME) {
+          storesColor = true;
+          break;
+        }
+      }
+    }
+    if (!storesColor) {
+      LOGE("IRContract: the fragment stage never stores the color output");
+    }
+  }
   return out;
 }
 
