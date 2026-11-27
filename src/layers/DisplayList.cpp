@@ -1161,7 +1161,8 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     // coarser fallback levels. A zoom-in remaps them onto the next frame's L+3..L+1; without them
     // that zoom has to rasterize a fallback level on the spot. A frame that already has other tile
     // work only reports what is left, so the loop keeps running until the levels are full.
-    if (useFallback && !coverages.empty()) {
+    if (useFallback) {
+      DEBUG_ASSERT(coverages.size() == static_cast<size_t>(TREE_LEVEL_COUNT));
       const bool mayRefine = tileTasks->empty();
       const bool gridComplete = missingGrids.empty();
       // Once the grid is complete, the budget tops up L+2, L+1 and then L itself. L+3 is left to
