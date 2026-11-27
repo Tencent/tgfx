@@ -105,6 +105,21 @@ class UniformData {
     return bufferSize;
   }
 
+  /// One field's derived std140 placement, as the layout wrote the bytes.
+  struct FieldLayout {
+    size_t offset = 0;
+    size_t size = 0;
+    size_t align = 0;
+  };
+
+  /**
+   * Returns the derived std140 placement of the field named `name`. Backends whose uniform block
+   * spelling follows its own packing rules (HLSL cbuffers pack a float3 and a following float into
+   * one register) address each member through this one table, so their spelling cannot drift from
+   * the bytes the CPU side writes.
+   */
+  bool fieldLayout(const std::string& name, FieldLayout* layout) const;
+
   /**
    * Returns the list of uniforms in this data.
    */

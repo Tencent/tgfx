@@ -210,6 +210,7 @@ file(GLOB_RECURSE SRC_FILES
         src/core/shapes/*.*
         src/core/utils/*.*
         src/gpu/glsl/*.*
+        src/gpu/hlsl/*.*
         src/gpu/ir/*.*
         src/gpu/precompiled/*.*
         src/gpu/spirv/*.*

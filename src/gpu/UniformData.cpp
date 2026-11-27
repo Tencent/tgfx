@@ -47,6 +47,20 @@ void UniformData::setBuffer(void* buffer) {
   _buffer = static_cast<uint8_t*>(buffer);
 }
 
+bool UniformData::fieldLayout(const std::string& name, FieldLayout* layout) const {
+  if (layout == nullptr) {
+    return false;
+  }
+  const auto* field = findField(name);
+  if (field == nullptr) {
+    return false;
+  }
+  layout->offset = field->offset;
+  layout->size = field->size;
+  layout->align = field->align;
+  return true;
+}
+
 void UniformData::onSetData(const std::string& name, const void* data, size_t size) const {
   DEBUG_ASSERT(_buffer != nullptr);
 

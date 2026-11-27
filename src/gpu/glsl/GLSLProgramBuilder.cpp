@@ -35,6 +35,9 @@
 #if defined(TGFX_USE_METAL)
 #include "gpu/metal/MetalProgramBuilder.h"
 #endif
+#if defined(TGFX_USE_D3D12)
+#include "gpu/hlsl/HLSLProgramBuilder.h"
+#endif
 
 namespace tgfx {
 static std::string TypeModifierString(ShaderVar::TypeModifier t, ShaderStage stage) {
@@ -129,6 +132,13 @@ std::shared_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
 #if defined(TGFX_USE_METAL)
   if (context != nullptr && context->backend() == Backend::Metal) {
     return MetalProgramBuilder::Create(context, programInfo);
+  }
+#endif
+#if defined(TGFX_USE_D3D12)
+  if (context != nullptr && context->backend() == Backend::D3D12) {
+    // Direct3D compiles HLSL, not GLSL: the builder below would hand the backend a language it
+    // rejects at module creation. There is no GLSL fallback on this backend by design.
+    return HLSLProgramBuilder::Create(context, programInfo);
   }
 #endif
   GLSLProgramBuilder builder(context, programInfo);
