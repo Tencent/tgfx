@@ -18,8 +18,30 @@
 
 #include "ColorSpaceXFormEffect.h"
 #include "gpu/ColorSpaceXformHelper.h"
+#include "gpu/ir/ProgramIREmit.h"
 
 namespace tgfx {
+
+namespace {
+/// The color the transform reads: the child's output, or the white a top-level emission sees.
+ValueID InputColorIR(FragmentProcessor::EmitArgs& args) {
+  if (args.inputValue != INVALID_VALUE_ID) {
+    return args.inputValue;
+  }
+  const auto one = args.irBuilder->CreateConstant(1.0f);
+  return args.irBuilder->CreateConstruct(SLType::Float4, {one, one, one, one});
+}
+
+/// The uniform an enabled stage declared, or the fallback value when the stage is off.
+ValueID StageUniformIR(ProgramIRBuilder* ir, const std::string& name) {
+  return internOrReuseIR(ir, name, SLType::Float4, IRValueKind::Uniform);
+}
+
+ValueID GamutUniformIR(ProgramIRBuilder* ir, const std::string& name) {
+  const auto value = internOrReuseIR(ir, name, SLType::Float3x3, IRValueKind::Uniform);
+  return value == INVALID_VALUE_ID ? identityMatrixIR(ir) : value;
+}
+}  // namespace
 
 PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(BlockAllocator* allocator,
                                                             ColorSpace* src, AlphaType srcAT,
@@ -39,8 +61,15 @@ void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   ColorSpaceXformHelper helper{};
   helper.emitCode(uniformHandler, colorSpaceXformSteps.get());
+  const bool recordIR = args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID;
   if (helper.isNoop()) {
     fragBuilder->copyValue(args.outputColor, args.inputColor);
+    if (recordIR) {
+      const auto source = InputColorIR(args);
+      if (source != INVALID_VALUE_ID) {
+        args.irBuilder->StoreOutput(args.outputValue, source);
+      }
+    }
     return;
   }
   uint32_t flags = helper.flagsMask();
@@ -72,6 +101,30 @@ void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
       args.outputColor, entry,
       {args.inputColor, std::to_string(flags), srcTF0, srcTF1, std::to_string(srcTFType), srcOOTF,
        colorXform, dstOOTF, dstTF0, dstTF1, std::to_string(dstTFType)});
+  if (!recordIR) {
+    return;
+  }
+  // The IR form of the same call: the disabled stages pass the identity value the text route
+  // spells as a literal, and the flags mask keeps the function from reading them.
+  auto ir = args.irBuilder;
+  const std::vector<ValueID> operands = {
+      InputColorIR(args),
+      ir->CreateIntConstant(static_cast<int32_t>(flags)),
+      helper.applySrcTF() ? StageUniformIR(ir, helper.srcTFUniform0()) : zeroColorIR(ir),
+      helper.applySrcTF() ? StageUniformIR(ir, helper.srcTFUniform1()) : zeroColorIR(ir),
+      ir->CreateIntConstant(static_cast<int32_t>(srcTFType)),
+      helper.applySrcOOTF() ? StageUniformIR(ir, helper.srcOOTFUniform()) : zeroColorIR(ir),
+      helper.applyGamutXform() ? GamutUniformIR(ir, helper.gamutXformUniform()) : identityMatrixIR(ir),
+      helper.applyDstOOTF() ? StageUniformIR(ir, helper.dstOOTFUniform()) : zeroColorIR(ir),
+      helper.applyDstTF() ? StageUniformIR(ir, helper.dstTFUniform0()) : zeroColorIR(ir),
+      helper.applyDstTF() ? StageUniformIR(ir, helper.dstTFUniform1()) : zeroColorIR(ir),
+      ir->CreateIntConstant(static_cast<int32_t>(dstTFType))};
+  const auto result = ir->CreateCall(OperatorID::ColorSpaceXform, SLType::Float4, operands);
+  if (result == INVALID_VALUE_ID) {
+    ir->MarkFailed("the color-space transform could not be recorded");
+    return;
+  }
+  ir->StoreOutput(args.outputValue, result);
 }
 
 void ColorSpaceXformEffect::onSetData(UniformData* /*vertexUniformData*/,

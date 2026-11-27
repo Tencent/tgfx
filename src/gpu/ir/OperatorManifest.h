@@ -108,6 +108,7 @@ namespace tgfx {
   X(TiledAxisClamp, 78)     \
   X(TiledRepeatCoord, 79)   \
   X(RoundStrokeRectCoverage, 80) \
+  X(ColorSpaceXform, 81)    \
 
 enum class OperatorID : uint32_t {
 #define TGFX_OPERATOR_ENUM(name, value) name = value,

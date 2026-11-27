@@ -18,6 +18,7 @@
 
 #include "GLSLTiledTextureEffect.h"
 #include "gpu/SamplerState.h"
+#include "gpu/ir/ProgramIREmit.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/processors/TextureEffect.h"
 
@@ -62,24 +63,6 @@ ValueID PairOf(ProgramIRBuilder* ir, ValueID first, ValueID second) {
   return ir->CreateConstruct(SLType::Float2, {first, second});
 }
 
-ValueID ZeroColor(ProgramIRBuilder* ir) {
-  const auto zero = ir->CreateConstant(0.0f);
-  return ir->CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
-}
-
-// Reuses a value the builder already knows (a varying, a local, a uniform) under its printed name,
-// and falls back to the caller's kind, whose declaration the interface already carries.
-ValueID InternOrReuse(ProgramIRBuilder* ir, const std::string& name, SLType type,
-                      IRValueKind fallback) {
-  if (ir == nullptr || name.empty()) {
-    return INVALID_VALUE_ID;
-  }
-  if (const auto* existing = ir->FindValue(name)) {
-    return existing->id;
-  }
-  return ir->InternValue(name, type, Precision::High, fallback);
-}
-
 ValueID ScaleCoordIR(ProgramIRBuilder* ir, ValueID coord, ValueID dimensions) {
   if (dimensions == INVALID_VALUE_ID) {
     return coord;
@@ -118,8 +101,8 @@ ValueID EmitTiledReadIR(ProgramIRBuilder* ir, ValueID samplerValue, ValueID texC
                         ValueID subset, ValueID clampRect, ValueID dimensions,
                         ValueID strictSubset, const TiledReadModes& modes, bool rectSampler) {
   const auto zero = ir->CreateConstant(0.0f);
-  const auto subsetValue = subset == INVALID_VALUE_ID ? ZeroColor(ir) : subset;
-  const auto clampValue = clampRect == INVALID_VALUE_ID ? ZeroColor(ir) : clampRect;
+  const auto subsetValue = subset == INVALID_VALUE_ID ? zeroColorIR(ir) : subset;
+  const auto clampValue = clampRect == INVALID_VALUE_ID ? zeroColorIR(ir) : clampRect;
   const auto inCoord = dimensions == INVALID_VALUE_ID
                            ? texCoord
                            : ir->CreateBinary(IRBinaryOp::Div, SLType::Float2, texCoord, dimensions);
@@ -223,7 +206,7 @@ ValueID TiledCoordIR(ProgramIRBuilder* ir, const CoordValue& coordVar,
     return INVALID_VALUE_ID;
   }
   if (coordName != coordVar.name()) {
-    return InternOrReuse(ir, coordName, SLType::Float2, IRValueKind::Local);
+    return internOrReuseIR(ir, coordName, SLType::Float2, IRValueKind::Local);
   }
   auto kind = IRValueKind::Local;
   for (const auto& varying : ir->IR().interface.varyings) {
@@ -233,9 +216,9 @@ ValueID TiledCoordIR(ProgramIRBuilder* ir, const CoordValue& coordVar,
     }
   }
   if (coordVar.type() != SLType::Float3) {
-    return InternOrReuse(ir, coordVar.name(), SLType::Float2, kind);
+    return internOrReuseIR(ir, coordVar.name(), SLType::Float2, kind);
   }
-  const auto varying = InternOrReuse(ir, coordVar.name(), SLType::Float3, kind);
+  const auto varying = internOrReuseIR(ir, coordVar.name(), SLType::Float3, kind);
   if (varying == INVALID_VALUE_ID) {
     return INVALID_VALUE_ID;
   }
@@ -643,13 +626,13 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
       modes.borderNearestY = borderNearestY;
       modes.mipmapX = mipmapX;
       modes.mipmapY = mipmapY;
-      const auto subsetValue = InternOrReuse(ir, names.subsetName, SLType::Float4, IRValueKind::Uniform);
-      const auto clampValue = InternOrReuse(ir, names.clampName, SLType::Float4, IRValueKind::Uniform);
+      const auto subsetValue = internOrReuseIR(ir, names.subsetName, SLType::Float4, IRValueKind::Uniform);
+      const auto clampValue = internOrReuseIR(ir, names.clampName, SLType::Float4, IRValueKind::Uniform);
       const auto dimensionsValue =
-          InternOrReuse(ir, names.dimensionsName, SLType::Float2, IRValueKind::Uniform);
+          internOrReuseIR(ir, names.dimensionsName, SLType::Float2, IRValueKind::Uniform);
       auto strictSubset = INVALID_VALUE_ID;
       if (constraint == SrcRectConstraint::Strict) {
-        strictSubset = InternOrReuse(ir, args.inputSubset, SLType::Float4, IRValueKind::Uniform);
+        strictSubset = internOrReuseIR(ir, args.inputSubset, SLType::Float4, IRValueKind::Uniform);
         if (strictSubset != INVALID_VALUE_ID && dimensionsValue != INVALID_VALUE_ID) {
           const auto low = ir->CreateBinary(IRBinaryOp::Div, SLType::Float2,
                                             ir->CreateSwizzle(strictSubset, SLType::Float2, "xy"),

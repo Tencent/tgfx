@@ -32,6 +32,38 @@ namespace tgfx {
 /// The shared IR emission templates: the statement shapes every processor used to copy by hand.
 /// One place per template, so a change (a new uniform, a type fix) lands once instead of N times.
 
+/// Reuses a value the builder already knows under its printed name, and declares the name with the
+/// caller's kind when it is new.
+inline ValueID internOrReuseIR(ProgramIRBuilder* ir, const std::string& name, SLType type,
+                               IRValueKind fallback) {
+  if (ir == nullptr || name.empty()) {
+    return INVALID_VALUE_ID;
+  }
+  if (const auto* existing = ir->FindValue(name)) {
+    return existing->id;
+  }
+  return ir->InternValue(name, type, Precision::High, fallback);
+}
+
+/// The zero vec4 an absent optional operator argument takes.
+inline ValueID zeroColorIR(ProgramIRBuilder* ir) {
+  if (ir == nullptr) {
+    return INVALID_VALUE_ID;
+  }
+  const auto zero = ir->CreateConstant(0.0f);
+  return ir->CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
+}
+
+/// The identity mat3 an absent gamut transform takes.
+inline ValueID identityMatrixIR(ProgramIRBuilder* ir) {
+  if (ir == nullptr) {
+    return INVALID_VALUE_ID;
+  }
+  const auto zero = ir->CreateConstant(0.0f);
+  const auto one = ir->CreateConstant(1.0f);
+  return ir->CreateConstruct(SLType::Float3x3, {one, zero, zero, zero, one, zero, zero, zero, one});
+}
+
 /// Emits the whole vertex position path:
 ///   position3 = vec3(position.xy, 1);  transformed = matrixUniform * position3;
 ///   ndc = transformed.xy (+ offsetAttribute) * RTAdjust.xz + RTAdjust.yw;
