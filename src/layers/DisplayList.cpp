@@ -687,7 +687,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   if (zoomChanged) {
     recycleGridTiles();
   }
-  auto tileTasks = invalidateTileCaches(dirtyRegions, GetViewportRect(surface, _contentOffset));
+  auto tileTasks = invalidateTiles(dirtyRegions, GetViewportRect(surface, _contentOffset));
   std::vector<Rect> skippedRects = {};
   auto screenTasks = collectScreenTasks(surface, &tileTasks, &skippedRects);
   // Skipped rects must keep the tiled path; only fall back when both are empty.
@@ -826,8 +826,8 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
   blankTiles->setMaxCount(BLANK_MARKS_PER_TILE * static_cast<size_t>(totalTileCount));
 }
 
-std::vector<DrawTask> DisplayList::invalidateTileCaches(const std::vector<Rect>& dirtyRegions,
-                                                        const Rect& viewportRect) {
+std::vector<DrawTask> DisplayList::invalidateTiles(const std::vector<Rect>& dirtyRegions,
+                                                   const Rect& viewportRect) {
   if (dirtyRegions.empty()) {
     return {};
   }

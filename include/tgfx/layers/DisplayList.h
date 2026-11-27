@@ -356,8 +356,8 @@ class DisplayList {
 
   void checkTileCount(Surface* renderSurface);
 
-  std::vector<DrawTask> invalidateTileCaches(const std::vector<Rect>& dirtyRegions,
-                                             const Rect& viewportRect);
+  std::vector<DrawTask> invalidateTiles(const std::vector<Rect>& dirtyRegions,
+                                        const Rect& viewportRect);
 
   void invalidateCurrentGridTiles(const std::vector<Rect>& dirtyRegions, const Rect& viewportRect,
                                   std::vector<DrawTask>* tileTasks);
