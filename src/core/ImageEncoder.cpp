@@ -55,6 +55,10 @@ class EncodedDataStream final : public WriteStream {
       auto growth = capacity + std::min(capacity, std::numeric_limits<size_t>::max() - capacity);
       auto newCapacity = std::max(required, growth);
       auto* allocation = static_cast<uint8_t*>(std::realloc(bytes, newCapacity));
+      if (!allocation && newCapacity > required) {
+        newCapacity = required;
+        allocation = static_cast<uint8_t*>(std::realloc(bytes, newCapacity));
+      }
       if (!allocation) {
         return false;
       }

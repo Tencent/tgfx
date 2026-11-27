@@ -18,6 +18,7 @@
 
 #include "core/codecs/png/PngCodec.h"
 #ifdef __EMSCRIPTEN_PTHREADS__
+#include <emscripten/console.h>
 #include <emscripten/threading.h>
 #endif
 #include "core/codecs/ScanlineEncoder.h"
@@ -60,30 +61,25 @@ static void PngReaderReadData(png_structp png_ptr, png_bytep data, png_size_t le
   reader->cursor += avail;
 }
 
-// Worker stderr is synchronously proxied on the web. Copy the message before the libpng callback
-// returns and deliver it asynchronously, independently of the caller's decoding lifecycle.
-static void LogPngMessage(const char* prefix, png_const_charp message) {
+static void PngWarning(png_structp, png_const_charp message) {
 #ifdef __EMSCRIPTEN_PTHREADS__
   if (!emscripten_is_main_runtime_thread()) {
-    auto copy = new std::string(std::string(prefix) + message);
-    emscripten_async_run_in_main_runtime_thread(
-        EM_FUNC_SIG_VI, +[](void* data) {
-          auto text = static_cast<std::string*>(data);
-          fprintf(stderr, "%s\n", text->c_str());
-          delete text;
-        }, copy);
+    // Worker stdio is synchronously proxied. Log directly from the worker.
+    emscripten_console_warn(message);
     return;
   }
 #endif
-  fprintf(stderr, "%s%s\n", prefix, message);
-}
-
-static void PngWarning(png_structp, png_const_charp message) {
-  LogPngMessage("libpng warning: ", message);
+  fprintf(stderr, "libpng warning: %s\n", message);
 }
 
 static void PngError(png_structp png, png_const_charp message) {
-  LogPngMessage("libpng error: ", message);
+#ifdef __EMSCRIPTEN_PTHREADS__
+  if (!emscripten_is_main_runtime_thread()) {
+    emscripten_console_error(message);
+    png_longjmp(png, 1);
+  }
+#endif
+  fprintf(stderr, "libpng error: %s\n", message);
   png_longjmp(png, 1);
 }
 

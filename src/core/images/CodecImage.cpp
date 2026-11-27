@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CodecImage.h"
+#include <algorithm>
 #include "DecodedImage.h"
 #include "core/ScaledImageGenerator.h"
 #include "core/utils/NextCacheScaleLevel.h"
@@ -56,6 +57,9 @@ ISize CodecImage::getRasterizedSize(float scale) const {
   auto codec = getCodec();
   auto codecScale = static_cast<float>(width()) * scale / static_cast<float>(codec->width());
   auto [scaleWidth, scaleHeight] = codec->getScaledDimensions(codecScale);
+  // Rounding the shorter edge of a nonempty image can produce zero at small scales.
+  scaleWidth = std::max(1, scaleWidth);
+  scaleHeight = std::max(1, scaleHeight);
   if (scaleWidth < generator->width() && scaleHeight < generator->height()) {
     return ISize::Make(scaleWidth, scaleHeight);
   }
@@ -71,7 +75,11 @@ std::shared_ptr<ImageGenerator> CodecImage::getGeneratorForScale(float scale) co
 }
 
 std::shared_ptr<Image> CodecImage::onMakeDecoded(Context*, bool tryHardware) const {
-  return DecodedImage::MakeFrom(getGeneratorForScale(1.0f), tryHardware, true, mipmapped,
+  auto decodeGenerator = getGeneratorForScale(1.0f);
+  // A main-thread codec can wrap its native image directly, but its scaled generator reads and
+  // downsamples the pixels. Defer that work until the texture is needed.
+  auto asyncDecoding = decodeGenerator == generator || generator->asyncSupport();
+  return DecodedImage::MakeFrom(std::move(decodeGenerator), tryHardware, asyncDecoding, mipmapped,
                                 ISize::Make(width(), height()));
 }
 

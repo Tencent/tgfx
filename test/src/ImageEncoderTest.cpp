@@ -51,7 +51,7 @@ TEST(ImageEncoderTest, StreamingAndWholeImageAgree) {
     constexpr size_t rowBytes = 80;
     auto info =
         ImageInfo::Make(width, height, ColorType::BGRA_8888, alpha, rowBytes, ColorSpace::SRGB());
-    std::array<uint8_t, rowBytes * height> pixels = {};
+    std::array<uint8_t, rowBytes* height> pixels = {};
     for (int row = 0; row < height; ++row) {
       for (int column = 0; column < width; ++column) {
         auto* pixel = pixels.data() + static_cast<size_t>(row) * rowBytes + column * 4;
@@ -132,7 +132,7 @@ TEST(ImageEncoderTest, FailsOnIncompleteInputOrWriteError) {
 TEST(ImageEncoderTest, WholeImageKeepsAlphaAndGrayFormats) {
   constexpr int width = 17;
   constexpr int height = 9;
-  std::array<uint8_t, width * height> source = {};
+  std::array<uint8_t, width* height> source = {};
   for (size_t index = 0; index < source.size(); ++index) {
     source[index] = static_cast<uint8_t>(index);
   }
@@ -142,7 +142,7 @@ TEST(ImageEncoderTest, WholeImageKeepsAlphaAndGrayFormats) {
       ImageCodec::Encode(Pixmap(alphaInfo, source.data()), EncodedFormat::PNG, 100));
   ASSERT_NE(png, nullptr);
   EXPECT_TRUE(png->isAlphaOnly());
-  std::array<uint8_t, width * height> output = {};
+  std::array<uint8_t, width* height> output = {};
   ASSERT_TRUE(png->readPixels(alphaInfo, output.data()));
   EXPECT_EQ(output, source);
 

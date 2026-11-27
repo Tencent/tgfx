@@ -631,6 +631,33 @@ TGFX_TEST(ImageRenderTest, RasterizedScaledProxySize) {
 }
 
 namespace {
+class MainThreadBitmapCodec : public ImageCodec {
+ public:
+  MainThreadBitmapCodec() : ImageCodec(16, 16) {
+  }
+
+  bool asyncSupport() const override {
+    return false;
+  }
+
+  mutable int pixelReads = 0;
+
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool) const override {
+    return bitmap.makeBuffer();
+  }
+
+  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t rowBytes,
+                    std::shared_ptr<ColorSpace> colorSpace, void* pixels) const override {
+    ++pixelReads;
+    auto info = ImageInfo::Make(width(), height(), colorType, alphaType, rowBytes, colorSpace);
+    return bitmap.readPixels(info, pixels);
+  }
+
+ private:
+  Bitmap bitmap = Bitmap(width(), height(), false, false);
+};
+
 class VariantOnlyProvider : public ImageProvider {
  public:
   VariantOnlyProvider(int width, int height, std::shared_ptr<Image> variant)
@@ -688,12 +715,61 @@ TGFX_TEST(ImageRenderTest, DecodedSubsetCache) {
   std::vector<uint8_t> expected(info.byteSize()), actual(info.byteSize());
   surface->getCanvas()->drawImage(crop());
   ASSERT_TRUE(surface->readPixels(info, expected.data()));
+  ASSERT_EQ(expected[3], 255);
+  surface->getCanvas()->clear();
   surface->getCanvas()->drawImage(image->makeDecoded());
   ASSERT_TRUE(surface->readPixels(info, actual.data()));
   EXPECT_EQ(actual, expected);
+  surface->getCanvas()->clear();
   surface->getCanvas()->drawImage(image);
   ASSERT_TRUE(surface->readPixels(info, actual.data()));
   EXPECT_EQ(actual, expected);
+}
+
+TGFX_TEST(ImageRenderTest, DecodeNarrowScaledImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto info = ImageInfo::Make(128, 8, ColorType::RGBA_8888, AlphaType::Opaque);
+  std::vector<uint32_t> pixels(128 * 8, 0xFF00FF00u);
+  auto source = Image::MakeFrom(info, Data::MakeWithCopy(pixels.data(), info.byteSize()));
+  ASSERT_NE(source, nullptr);
+  auto scaled = source->makeScaled(4, 8);
+  ASSERT_NE(scaled, nullptr);
+  auto decoded = scaled->makeDecoded();
+  ASSERT_NE(decoded, scaled);
+  EXPECT_EQ(decoded->width(), 4);
+  EXPECT_EQ(decoded->height(), 8);
+  auto surface = Surface::Make(context, 4, 8);
+  ASSERT_NE(surface, nullptr);
+  surface->getCanvas()->drawImage(decoded);
+  auto output = ImageInfo::Make(4, 8, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  std::vector<uint32_t> result(4 * 8);
+  ASSERT_TRUE(surface->readPixels(output, result.data()));
+  EXPECT_EQ(result, std::vector<uint32_t>(4 * 8, 0xFF00FF00u));
+}
+
+TGFX_TEST(ImageRenderTest, DeferMainThreadCodecDownsampling) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto codec = std::make_shared<MainThreadBitmapCodec>();
+  auto image = Image::MakeFrom(codec);
+  ASSERT_NE(image, nullptr);
+  EXPECT_EQ(image->makeDecoded()->decodeStatus(), Image::DecodeStatus::Completed);
+  auto scaled = image->makeScaled(8, 8);
+  ASSERT_NE(scaled, nullptr);
+  auto decoded = scaled->makeDecoded();
+  ASSERT_NE(decoded, scaled);
+  EXPECT_EQ(decoded->decodeStatus(), Image::DecodeStatus::NotStarted);
+  EXPECT_EQ(codec->pixelReads, 0);
+  auto texture = decoded->makeTextureImage(context);
+  ASSERT_NE(texture, nullptr);
+  EXPECT_TRUE(texture->getBackendTexture(context).isValid());
+  EXPECT_EQ(texture->width(), 8);
+  EXPECT_EQ(texture->height(), 8);
+  EXPECT_EQ(codec->pixelReads, 1);
+  EXPECT_EQ(scaled->makeDecoded(context), scaled);
 }
 
 TGFX_TEST(ImageRenderTest, RasterizedProviderVariant) {
