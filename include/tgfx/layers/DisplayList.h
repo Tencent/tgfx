@@ -307,8 +307,11 @@ class DisplayList {
   void showDirtyRegions(bool show);
 
   /**
-   * Returns true if the content of the display list has changed since the last rendering. This can
-   * be used to determine if the display list needs to be re-rendered.
+   * Returns true if the display list needs another rendering pass. Changed content is one reason,
+   * but in tiled rendering mode this also stays true while fallback tiles are still being prepared
+   * after a zoom or pan, even when no content changed. Use it to decide whether to render again; it
+   * does not mean the pixels seen so far are stale, so it is not a signal to re-upload or invalidate
+   * whatever consumed the previous frame.
    */
   bool hasContentChanged() const;
 
