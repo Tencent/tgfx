@@ -19,6 +19,7 @@
 #include "GLSLTextureEffect.h"
 #include <unordered_map>
 #include "gpu/glsl/GLSLOperatorEmitter.h"
+#include "gpu/ir/ProgramIREmit.h"
 
 namespace tgfx {
 static std::array<float, 12> AlignMat3(const float* mat3) {
@@ -84,6 +85,12 @@ void GLSLTextureEffect::emitCode(EmitArgs& args) const {
   if (textureView == nullptr) {
     // emit a transparent color as the output color.
     fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
+    if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID) {
+      const auto transparent = zeroColorIR(args.irBuilder);
+      if (transparent != INVALID_VALUE_ID) {
+        args.irBuilder->StoreOutput(args.outputValue, transparent);
+      }
+    }
     return;
   }
   if (textureView->isYUV()) {
