@@ -76,8 +76,23 @@ void GLSLGaussianBlur2DFragmentProcessor::emitCode(EmitArgs& args) const {
       return ir->InternValue(base + "[" + std::to_string(index) + "]", SLType::Float4,
                              Precision::High, IRValueKind::Uniform);
     };
+    // The tap starts at the child's own coordinate displaced by the draw's origin offset: the
+    // origin alone is a constant, so a loop based on it would sample one texel everywhere.
+    if (args.transformedCoords == nullptr) {
+      ir->MarkFailed("the gaussian blur 2D path has no child coordinate");
+      return;
+    }
+    auto childCoords = args.transformedCoords->childInputs(0);
+    if (childCoords.count() < 1 || childCoords[0].type() != SLType::Float2) {
+      ir->MarkFailed("the gaussian blur 2D coordinate is not a vec2");
+      return;
+    }
+    const auto childCoord = ir->InternValue(childCoords[0].name(), SLType::Float2, Precision::High,
+                                            IRValueKind::Varying);
+    const auto baseCoord =
+        ir->CreateBinary(IRBinaryOp::Add, SLType::Float2, childCoord, originValue);
     const auto sumValue = emitWeightedTapLoop2D(
-        ir, radiusXValue, radiusYValue, stepXValue, stepYValue, originValue, slot(kernelXName, 0),
+        ir, radiusXValue, radiusYValue, stepXValue, stepYValue, baseCoord, slot(kernelXName, 0),
         slot(kernelXName, 1), slot(kernelYName, 0), slot(kernelYName, 1),
         [&](ValueID /*tapCoordValue*/, const std::string& tapCoordName) -> ValueID {
           std::string childName = "blur2DTapChild";
