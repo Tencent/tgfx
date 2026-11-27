@@ -48,10 +48,13 @@ class NoOpImpl : public BackgroundHandler {
 // references the copy rather than bgImage. bgImage IS bgSource->surface's cachedImage; holding a
 // reference to it during capture would trigger Surface::aboutToDraw's copy-on-write path on every
 // subsequent write to bgCanvas — a full RT reallocation plus blit that dominates GPU submit time.
-// Returns nullptr on failure (no context, over-budget, or non-invertible matrix).
+// Returns nullptr when no detached copy can be made: the background transform is not invertible,
+// layerBounds does not intersect bgImage, or the private surface cannot be created. The first two
+// leave the style nothing to draw. On a surface creation failure the caller skips the style as
+// well rather than falling back to bgImage, which would bring back the copy-on-write cost above.
 std::shared_ptr<Image> MakeDetachedBgCopy(Context* context, const std::shared_ptr<Image>& bgImage,
                                           const Matrix& bgPixelToLocal, const Rect& layerBounds,
-                                          Point* offset, std::shared_ptr<ColorSpace> colorSpace) {
+                                          std::shared_ptr<ColorSpace> colorSpace, Point* offset) {
   Matrix localToBgPixel = Matrix::I();
   if (!bgPixelToLocal.invert(&localToBgPixel)) {
     return nullptr;
@@ -278,6 +281,11 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (contentSource == nullptr) {
     return;
   }
+  // From here on the consumer reads one entry for this dispatch, so reserve it up front: any
+  // failure below leaves it empty, which keeps the read cursor in step when the style is
+  // dispatched more than once and the consumer then skips the style for this dispatch.
+  auto& entries = snapshots->snapshots[BackgroundSnapshotKey{layer, style}];
+  entries.emplace_back();
   auto contentOffset = contentSource->imageOffset();
   auto contentWidth = static_cast<float>(contentSource->image()->width());
   auto contentHeight = static_cast<float>(contentSource->image()->height());
@@ -353,19 +361,19 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   bgPixelToLocal.preConcat(bgSource->backgroundMatrix());
   Point smallBgOffset = {};
   auto smallBgImage = MakeDetachedBgCopy(args.context, bgImage, bgPixelToLocal, contentBounds,
-                                         &smallBgOffset, args.dstColorSpace);
+                                         args.dstColorSpace, &smallBgOffset);
+  if (smallBgImage == nullptr) {
+    // Leave the entry empty rather than recording bgImage: holding the capture surface's snapshot
+    // would make every later draw into that surface copy it.
+    return;
+  }
   PictureRecorder recorder = {};
   auto* recording = recorder.beginRecording();
   recording->scale(contentScale, contentScale);
   recording->concat(worldToLocal);
   recording->concat(bgSource->backgroundMatrix());
-  if (smallBgImage != nullptr) {
-    recording->translate(smallBgOffset.x, smallBgOffset.y);
-    recording->drawImage(std::move(smallBgImage));
-  } else {
-    // Fallback when detached copy is unavailable; original path may trigger COW.
-    recording->drawImage(bgImage);
-  }
+  recording->translate(smallBgOffset.x, smallBgOffset.y);
+  recording->drawImage(std::move(smallBgImage));
   auto picture = recorder.finishRecordingAsPicture();
   if (picture == nullptr) {
     return;
@@ -376,8 +384,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (image == nullptr) {
     return;
   }
-  snapshots->snapshots[BackgroundSnapshotKey{layer, style}].push_back(
-      BackgroundSnapshotEntry{std::move(image), offset});
+  entries.back() = {std::move(image), offset};
 }
 
 const LayerStyleSource* BackgroundCapturer::getCachedLayerStyleSource(Layer* layer) const {
@@ -482,6 +489,10 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       return;
     }
     auto& entry = it->second[cursor++];
+    if (entry.image == nullptr) {
+      // The capture produced no backdrop for this dispatch, so the style draws nothing here.
+      return;
+    }
     bgImage = entry.image;
     bgOffset = entry.offset;
   } else {
