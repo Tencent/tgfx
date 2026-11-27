@@ -103,7 +103,16 @@
             };
         }
         // When Asyncify is enabled, ccall returns a Promise; await handles both Asyncify and non-Asyncify cases.
-        const result = await module.ccall('RunAllTests', 'number', [], [], {async: true});
+        const filter = parameters.get('filter');
+        if (filter !== null && !filter.trim()) {
+            throw new Error('The test filter must not be empty.');
+        }
+        if (mode === 'reference' && filter !== null) {
+            throw new Error('Reference generation must run the complete test suite without a filter.');
+        }
+        const result = filter !== null
+            ? await module.ccall('RunTest', 'number', ['string'], [filter], {async: true})
+            : await module.ccall('RunAllTests', 'number', [], [], {async: true});
         if (backend === 'webgpu' && moduleOptions.preinitializedWebGPUDevice) {
             await moduleOptions.preinitializedWebGPUDevice.queue.onSubmittedWorkDone();
             await new Promise(function(resolve) { setTimeout(resolve, 0); });

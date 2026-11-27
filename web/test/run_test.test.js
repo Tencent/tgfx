@@ -125,7 +125,7 @@ function RunScenario(options) {
         argv: ['node', 'run_test.js', `--backend=${backend}`, `--mode=${mode}`].concat(
           mode === 'reference' ? [`--reference-commit=${commit}`,
             `--web-root=${options.webRoot ||
-              path.join(__dirname, `build-reference-${backend}`, 'session/runtime')}`] : []),
+              path.join(__dirname, `build-reference-${backend}`, 'session/runtime')}`] : [], options.args || []),
         platform: 'darwin',
         execPath: process.execPath,
         env: options.env || {},
@@ -175,11 +175,36 @@ const CASES = [
   ['archive traversal is rejected', { messages: [SUCCESS, DONE], files: ['test-out.zip'], zipEntry: '../baseline/version.json' }, 1],
 ];
 
+test('verify filter preserves artifact mode backend and commit parameters', async function() {
+  const pattern = 'ImageReaderTest.*:VideoElementReadTest.*-SomeSuite.Case';
+  const result = await RunScenario({ args: [`--filter=${pattern}`], messages: [SUCCESS, DONE] });
+  assert.equal(result.code, 0, result.output.join('\n'));
+  const opening = result.output.find(function(line) { return line.startsWith('Opening '); });
+  const url = new URL(opening.slice('Opening '.length, -'...'.length));
+  assert.equal(url.searchParams.get('mode'), 'verify');
+  assert.equal(url.searchParams.get('backend'), 'webgpu');
+  assert.equal(url.searchParams.get('commit'), '');
+  assert.equal(url.searchParams.get('filter'), pattern);
+});
+
+for (const args of [['--filter='], ['--filter', 'ImageReaderTest.*'],
+                    ['--filter=A.*', '--filter=B.*']]) {
+  test(`invalid filter is rejected before starting browser ${args.join(' ')}`, function() {
+    const { spawnSync } = require('node:child_process');
+    const result = spawnSync(process.execPath, [path.join(__dirname, 'run_test.js'), ...args],
+                             { encoding: 'utf8', timeout: 5000 });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Provide one nonempty test filter/);
+    assert.doesNotMatch(result.stdout, /Starting http-server|Opening /);
+  });
+}
+
 const REFERENCE_CASES = [
   ['complete generation publishes', {}, 0],
   ['GPU error blocks publishing', { messages: [GPU_ERROR] }, 1],
   ['GTest failure blocks publishing', { messages: ['All tests finished with exit code: 1'] }, 1],
   ['empty suite blocks publishing', { stats: [0, 0, 0] }, 1],
+  ['filtered suite is rejected before publishing', { args: ['--filter=ImageReaderTest.*'] }, 1],
   ['incomplete suite blocks publishing', { stats: [3, 2, 2] }, 1],
   ['skipped test blocks publishing', { messages: ['[  SKIPPED ] SomeTest.Case'] }, 1],
   ['missing archive blocks publishing', { files: [] }, 1],
@@ -259,7 +284,8 @@ async function RunPage(options) {
     TGFXTest: async function() { return module; },
     TGFXBind() {},
     navigator: {},
-    location: { search: `?mode=${mode}&backend=webgpu&commit=${'a'.repeat(40)}` },
+    location: { search: `?mode=${mode}&backend=webgpu&commit=${'a'.repeat(40)}` +
+      (options.filter !== undefined ? `&filter=${encodeURIComponent(options.filter)}` : '') },
     URLSearchParams,
     URL: { createObjectURL() { return 'blob:test'; }, revokeObjectURL() {} },
     JSZip: Zip,
@@ -277,6 +303,9 @@ async function RunPage(options) {
 
 const PAGE_CASES = [
   ['ordinary run exports no reference', {}, false, false],
+  ['filtered verify run uses RunTest', { filter: 'ImageReaderTest.*' }, false, false],
+  ['empty filter fails without running tests', { filter: '' }, false, true],
+  ['reference filter fails without running tests', { mode: 'reference', filter: 'ImageReaderTest.*' }, false, true],
   ['reference run exports both cache files', { mode: 'reference' }, true, false],
   ['failed reference run exports no reference', { mode: 'reference', exitCode: 1 }, false, true],
   ['reference rejects ordinary artifact', { mode: 'reference', configuration: { mode: 'verify' } }, false, true],
@@ -291,7 +320,11 @@ for (const [name, options, exportsReference, fails] of PAGE_CASES) {
     assert.equal(result.messages.includes('All tests finished with exit code: 1'), fails);
     assert.equal(result.messages.at(-1), DONE);
     if (exportsReference) assert.deepEqual(result.files, ['md5.json', 'version.json']);
-    if (options.configuration) assert.deepEqual(result.calls, ['GetTestConfiguration']);
+    if (options.configuration || (options.filter !== undefined && fails)) {
+      assert.deepEqual(result.calls, ['GetTestConfiguration']);
+    } else if (options.filter !== undefined) {
+      assert.deepEqual(result.calls, ['GetTestConfiguration', 'RunTest']);
+    }
   });
 }
 

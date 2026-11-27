@@ -40,6 +40,7 @@ static jmethodID SurfaceTexture_detachFromGLContext;
 static jmethodID SurfaceTexture_release;
 static jmethodID SurfaceTexture_getDataSpace;
 static jmethodID SurfaceTexture_getTransformMatrix;
+static jmethodID SurfaceTexture_getTimestamp;
 static Global<jclass> SurfaceClass;
 static jmethodID Surface_Constructor;
 static Global<jclass> HandlerClass;
@@ -85,6 +86,7 @@ void SurfaceTexture::JNIInit(JNIEnv* env) {
   SurfaceTexture_detachFromGLContext =
       env->GetMethodID(SurfaceTextureClass.get(), "detachFromGLContext", "()V");
   SurfaceTexture_release = env->GetMethodID(SurfaceTextureClass.get(), "release", "()V");
+  SurfaceTexture_getTimestamp = env->GetMethodID(SurfaceTextureClass.get(), "getTimestamp", "()J");
   SurfaceTexture_getDataSpace = env->GetMethodID(SurfaceTextureClass.get(), "getDataSpace", "()I");
   if (SurfaceTexture_getDataSpace == nullptr) {
     env->ExceptionClear();
@@ -98,13 +100,20 @@ void SurfaceTexture::JNIInit(JNIEnv* env) {
   Surface_Constructor =
       env->GetMethodID(SurfaceClass.get(), "<init>", "(Landroid/graphics/SurfaceTexture;)V");
   DataSpaceClass = env->FindClass("android/hardware/DataSpace");
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+  }
   if (DataSpaceClass.get() != nullptr) {
     DataSpaceClass_getStandard =
         env->GetStaticMethodID(DataSpaceClass.get(), "getStandard", "(I)I");
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+    }
     DataSpaceClass_getTransfer =
         env->GetStaticMethodID(DataSpaceClass.get(), "getTransfer", "(I)I");
-  } else {
-    env->ExceptionClear();
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+    }
   }
 }
 
@@ -157,7 +166,7 @@ std::shared_ptr<SurfaceTexture> SurfaceTexture::Make(int width, int height, jobj
   }
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
-    LOGE("SurfaceImageReader::MakeFrom(): failed to create a new SurfaceTexture!");
+    LOGE("SurfaceTexture::Make(): failed to create a new SurfaceTexture!");
     return nullptr;
   }
   auto looper = GetGlobalLooper();
@@ -167,7 +176,7 @@ std::shared_ptr<SurfaceTexture> SurfaceTexture::Make(int width, int height, jobj
   SetOnFrameAvailableListener(env, stObject, listener, looper);
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
-    LOGE("SurfaceImageReader::MakeFrom(): failed to set the OnFrameAvailableListener!");
+    LOGE("SurfaceTexture::Make(): failed to set the OnFrameAvailableListener!");
     return nullptr;
   }
   return std::shared_ptr<SurfaceTexture>(new SurfaceTexture(width, height, env, stObject));
@@ -196,12 +205,19 @@ jobject SurfaceTexture::createInputSurface() const {
   if (env == nullptr) {
     return nullptr;
   }
-  return env->NewObject(SurfaceClass.get(), Surface_Constructor, surfaceTexture.get());
+  auto surface = env->NewObject(SurfaceClass.get(), Surface_Constructor, surfaceTexture.get());
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    if (surface != nullptr) {
+      env->DeleteLocalRef(surface);
+    }
+    return nullptr;
+  }
+  return surface;
 }
 
 void SurfaceTexture::notifyFrameAvailable() {
-  // Note: If there is a pending frame available already, SurfaceTexture will not dispatch any new
-  // frame-available event until you have called the SurfaceTexture.updateTexImage().
+  // Android may coalesce notifications until updateTexImage() consumes the queued frame.
   std::lock_guard<std::mutex> autoLock(locker);
   frameAvailable = true;
   condition.notify_all();
@@ -239,15 +255,21 @@ static ISize ComputeTextureSize(const float matrix[16], int width, int height) {
   return result;
 }
 
-std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, bool) {
+ImageStream::ReadResult SurfaceTexture::onReadTexture(Context* context, bool,
+                                                      std::shared_ptr<TextureView> textureView,
+                                                      int64_t timestamp) {
+  if (textureView != nullptr) {
+    auto frame = updateTexImage(timestamp);
+    return {std::move(textureView), frame.status, frame.latched};
+  }
   auto textureID = makeExternalOESTexture(context);
   if (textureID == 0) {
-    return nullptr;
+    return {};
   }
-  if (!updateTexImage()) {
-    auto gl = static_cast<GLGPU*>(context->gpu())->functions();
-    gl->deleteTextures(1, &textureID);
-    return nullptr;
+  auto frame = updateTexImage(timestamp);
+  if (!frame.latched || frame.status == ImageBufferStatus::Failed) {
+    releaseExternalOESTexture(context, textureID);
+    return {nullptr, frame.status, false};
   }
   // The descriptor must match the real size of the OES texture, otherwise getTextureCoord()
   // converts pixel coordinates with a wrong base: hardware decoders pad the output buffer to an
@@ -256,7 +278,8 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
   // sequences whose alpha plane is packed next to the color plane, displaced alpha against color
   // and exposed the black background of the video as an outline around the content. The padding
   // rows are kept out of the sampling by the subset clamp that needSubset() enables for external
-  // textures.
+  // textures. An unavailable or rejected estimate uses the requested content size; this fallback
+  // does not guarantee correct sampling of padded buffers.
   auto descriptorWidth = textureSize.isEmpty() ? width() : textureSize.width;
   auto descriptorHeight = textureSize.isEmpty() ? height() : textureSize.height;
   TextureDescriptor descriptor = {descriptorWidth,
@@ -268,15 +291,13 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
   auto gpu = static_cast<GLGPU*>(context->gpu());
   auto texture = gpu->makeResource<GLTexture>(
       descriptor, static_cast<unsigned>(GL_TEXTURE_EXTERNAL_OES), textureID);
-  return Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
-}
-
-bool SurfaceTexture::onUpdateTexture(std::shared_ptr<TextureView>) {
-  return updateTexImage();
+  textureView = Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
+  return {std::move(textureView), frame.status, true};
 }
 
 unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
   std::lock_guard<std::mutex> autoLock(locker);
+  latchedValid = false;
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
@@ -292,65 +313,152 @@ unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
     gl->deleteTextures(1, &textureID);
-    LOGE("NativeImageReader::makeTexture(): failed to attached to a SurfaceTexture!");
+    LOGE("SurfaceTexture::makeExternalOESTexture(): failed to attach to a SurfaceTexture!");
     return 0;
   }
   return textureID;
 }
 
-bool SurfaceTexture::updateTexImage() {
-  std::unique_lock<std::mutex> autoLock(locker);
-  if (!frameAvailable) {
-    static const auto TIMEOUT = std::chrono::seconds(1);
-    auto status = condition.wait_for(autoLock, TIMEOUT);
-    if (status == std::cv_status::timeout) {
-      LOGE("NativeImageReader::onUpdateTexture(): timeout when waiting for the frame available!");
-      return false;
+void SurfaceTexture::releaseExternalOESTexture(Context* context, unsigned textureID) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  latchedValid = false;
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env != nullptr) {
+    // Detaching also deletes the texture, and allows attaching again later.
+    env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_detachFromGLContext);
+    if (!env->ExceptionCheck()) {
+      return;
     }
+    env->ExceptionClear();
   }
+  auto gl = static_cast<GLGPU*>(context->gpu())->functions();
+  gl->deleteTextures(1, &textureID);
+}
+
+SurfaceTexture::FrameResult SurfaceTexture::updateTexImage(int64_t timestamp) {
+  static const auto TIMEOUT = std::chrono::seconds(1);
+  auto deadline = std::chrono::steady_clock::now() + TIMEOUT;
+  std::unique_lock<std::mutex> autoLock(locker);
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
-    return false;
+    return {};
   }
-  frameAvailable = false;
+  FrameResult result = {};
+  if (!frameAvailable && latchedValid && timestamp >= 0) {
+    if (latchedTimestamp == timestamp) {
+      result.status = ImageBufferStatus::Ready;
+      return result;
+    }
+    if (latchedTimestamp > timestamp) {
+      result.status = ImageBufferStatus::Timeout;
+      return result;
+    }
+  }
+  while (true) {
+    // Check even while frames keep arriving. The budget cannot interrupt an in-flight JNI call.
+    if (std::chrono::steady_clock::now() >= deadline) {
+      result.status = ImageBufferStatus::Timeout;
+      return result;
+    }
+    if (!frameAvailable) {
+      condition.wait_until(autoLock, deadline);
+      continue;
+    }
+    frameAvailable = false;
+    auto previousTimestamp = latchedTimestamp;
+    result.latched = true;
+    if (!latchTexImage(env)) {
+      result.status = ImageBufferStatus::Failed;
+      return result;
+    }
+    if (timestamp < 0 || latchedTimestamp == timestamp) {
+      result.status = ImageBufferStatus::Ready;
+      return result;
+    }
+    if (latchedTimestamp > timestamp) {
+      result.status = ImageBufferStatus::Timeout;
+      return result;
+    }
+    if (latchedTimestamp != previousTimestamp) {
+      // Queued frames may share one notification; probe while advancing toward the target.
+      frameAvailable = true;
+    }
+  }
+}
+
+bool SurfaceTexture::latchTexImage(JNIEnv* env) {
+  latchedValid = false;
   env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
-    LOGE("NativeImageReader::onUpdateTexture(): failed to updateTexImage!");
+    // The queued frame may still need consuming, and Android may not send another notification.
+    frameAvailable = true;
+    LOGE("SurfaceTexture::latchTexImage(): failed to updateTexImage!");
     return false;
   }
-  if (SurfaceTexture_getDataSpace) {
-    jint dataSpace = env->CallIntMethod(surfaceTexture.get(), SurfaceTexture_getDataSpace);
-    jint standard =
+  auto nextTimestamp =
+      static_cast<int64_t>(env->CallLongMethod(surfaceTexture.get(), SurfaceTexture_getTimestamp));
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    LOGE("SurfaceTexture::latchTexImage(): failed to getTimestamp!");
+    return false;
+  }
+  if (SurfaceTexture_getDataSpace != nullptr) {
+    if (DataSpaceClass.get() == nullptr || DataSpaceClass_getStandard == nullptr ||
+        DataSpaceClass_getTransfer == nullptr) {
+      return false;
+    }
+    auto dataSpace = env->CallIntMethod(surfaceTexture.get(), SurfaceTexture_getDataSpace);
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+      return false;
+    }
+    auto standard =
         env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getStandard, dataSpace);
-    jint transfer =
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+      return false;
+    }
+    auto transfer =
         env->CallStaticIntMethod(DataSpaceClass.get(), DataSpaceClass_getTransfer, dataSpace);
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+      return false;
+    }
     _colorSpace = AndroidDataSpaceToColorSpace(standard, transfer);
   }
   if (SurfaceTexture_getTransformMatrix != nullptr && !textureSizeResolved) {
     auto floatArray = env->NewFloatArray(16);
-    if (floatArray == nullptr) {
+    if (floatArray == nullptr || env->ExceptionCheck()) {
       env->ExceptionClear();
-    } else {
-      env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_getTransformMatrix, floatArray);
-      if (env->ExceptionCheck()) {
-        env->ExceptionClear();
-      } else {
-        auto matrix = env->GetFloatArrayElements(floatArray, nullptr);
-        if (matrix != nullptr) {
-          // The content size is fixed for the lifetime of a SurfaceTexture, so the buffer padding
-          // never changes after the first frame; resolve the texture size once and reuse it.
-          textureSize = ComputeTextureSize(matrix, width(), height());
-          textureSizeResolved = true;
-          env->ReleaseFloatArrayElements(floatArray, matrix, JNI_ABORT);
-        } else {
-          env->ExceptionClear();
-        }
+      if (floatArray != nullptr) {
+        env->DeleteLocalRef(floatArray);
       }
-      env->DeleteLocalRef(floatArray);
+      return false;
     }
+    env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_getTransformMatrix, floatArray);
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+      env->DeleteLocalRef(floatArray);
+      return false;
+    }
+    float matrix[16] = {};
+    env->GetFloatArrayRegion(floatArray, 0, 16, matrix);
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+      env->DeleteLocalRef(floatArray);
+      return false;
+    }
+    env->DeleteLocalRef(floatArray);
+    // Assume fixed dimensions and padding. Cache the first matrix's estimate, even when empty;
+    // an empty estimate selects content-size fallback and later matrix changes are not retried.
+    textureSize = ComputeTextureSize(matrix, width(), height());
+    textureSizeResolved = true;
   }
+  latchedTimestamp = nextTimestamp;
+  latchedValid = true;
   return true;
 }
 

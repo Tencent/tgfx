@@ -42,13 +42,30 @@ VideoElement::VideoElement(emscripten::val video, int width, int height)
     : ImageStream(width, height), source(video) {
 }
 
-std::shared_ptr<TextureView> VideoElement::onMakeTexture(Context* context, bool mipmapped) {
+ImageStream::ReadResult VideoElement::onReadTexture(Context* context, bool mipmapped,
+                                                    std::shared_ptr<TextureView> textureView,
+                                                    int64_t) {
+  if (textureView == nullptr) {
+    textureView = makeTexture(context, mipmapped);
+    if (textureView == nullptr) {
+      return {};
+    }
+  }
+  // The upload calls drop frames silently on failure (video not ready, device lost), in which case
+  // the texture keeps its previous content. Report success either way: the first upload targets a
+  // zero-initialized texture, and during playback keeping the previous frame is preferable to
+  // flickering transparent.
+  uploadTexture(textureView);
+  return {std::move(textureView), ImageBufferStatus::Ready, true};
+}
+
+std::shared_ptr<TextureView> VideoElement::makeTexture(Context* context, bool mipmapped) {
   static auto isAndroidMiniprogram =
       val::module_property("tgfx").call<bool>("isAndroidMiniprogram");
   auto textureWidth = width();
   auto textureHeight = height();
   if (isAndroidMiniprogram) {
-    // https://stackoverflow.com/questions/28291204/something-about-stagefright-codec-input-format-in-android
+    // https://stackoverflow.com/q/28291204
     // Video decoder will align to multiples of 16 on the Android WeChat mini-program.
     if (textureWidth % ANDROID_MINIPROGRAM_ALIGNMENT != 0) {
       textureWidth +=
@@ -63,15 +80,11 @@ std::shared_ptr<TextureView> VideoElement::onMakeTexture(Context* context, bool 
   _deviceHandle = reinterpret_cast<uintptr_t>(
       static_cast<WGPUDevice>(static_cast<WebGPUDevice*>(context->device())->webgpuDevice()));
 #endif
-  auto textureView = TextureView::MakeFormat(context, textureWidth, textureHeight,
-                                             PixelFormat::RGBA_8888, mipmapped);
-  if (textureView != nullptr) {
-    onUpdateTexture(textureView);
-  }
-  return textureView;
+  return TextureView::MakeFormat(context, textureWidth, textureHeight, PixelFormat::RGBA_8888,
+                                 mipmapped);
 }
 
-bool VideoElement::onUpdateTexture(std::shared_ptr<TextureView> textureView) {
+void VideoElement::uploadTexture(const std::shared_ptr<TextureView>& textureView) {
 #ifdef TGFX_USE_WEBGPU
   auto webgpuTexture = std::static_pointer_cast<WebGPUTexture>(textureView->getTexture());
   auto wgpuTexture = webgpuTexture->webgpuTexture();
@@ -85,10 +98,5 @@ bool VideoElement::onUpdateTexture(std::shared_ptr<TextureView> textureView) {
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
                                           source, glTexture->textureID(), 0, 0, false);
 #endif
-  // The upload calls above drop frames silently on failure (video not ready, device lost), in
-  // which case the texture keeps its previous content. Report success either way: the first
-  // upload targets a zero-initialized texture, and during playback keeping the previous frame is
-  // preferable to flickering transparent.
-  return true;
 }
 }  // namespace tgfx

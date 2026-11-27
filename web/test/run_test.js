@@ -17,12 +17,24 @@ const PROJECT_ROOT = path.resolve(__dirname, '../..');
 const WEB_TEST_DIR = fs.realpathSync(path.resolve(ReadOption('--web-root', __dirname)));
 const DOWNLOADS_DIR = path.join(WEB_TEST_DIR, '.downloads');
 const PORT = 8082;
+const filterArgs = process.argv.slice(2).filter(a => a.startsWith('--filter'));
+if (filterArgs.length > 1 || (filterArgs.length === 1 &&
+    (!filterArgs[0].startsWith('--filter=') || !filterArgs[0].slice('--filter='.length).trim()))) {
+  console.error('Provide one nonempty test filter using --filter=PATTERN.');
+  process.exit(1);
+}
+const TEST_FILTER = filterArgs.length === 1 ? filterArgs[0].slice('--filter='.length) : '';
 const TIMEOUT_MS = 10 * 60 * 1000;
 const BACKEND = ReadOption('--backend', 'webgl');
 const MODE = ReadOption('--mode', 'verify');
 const REFERENCE_COMMIT = ReadOption('--reference-commit', '');
 const TEST_URL = `http://127.0.0.1:${PORT}/index.html?mode=${encodeURIComponent(MODE)}` +
-  `&backend=${encodeURIComponent(BACKEND)}&commit=${encodeURIComponent(REFERENCE_COMMIT)}`;
+  `&backend=${encodeURIComponent(BACKEND)}&commit=${encodeURIComponent(REFERENCE_COMMIT)}` +
+  (TEST_FILTER ? `&filter=${encodeURIComponent(TEST_FILTER)}` : '');
+if (MODE === 'reference' && filterArgs.length !== 0) {
+  console.error('Reference generation must run the complete test suite without a filter.');
+  process.exit(1);
+}
 if (!['verify', 'reference'].includes(MODE)) {
   console.error(`Invalid mode: "${MODE}". Must be one of: verify, reference`);
   process.exit(1);
