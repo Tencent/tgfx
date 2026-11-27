@@ -1834,6 +1834,34 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialDrawLayer_shapeLayer"));
 }
 
+TGFX_TEST(LayerTest, Preserve3DDraw) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+
+  // A preserve3D layer whose own matrix moves its origin far outside the surface. The canvas
+  // matrix maps that origin back to the surface center, so the 100x100 content lands centered
+  // with a 50px margin and must not be clipped away by the clip check.
+  auto frame = Layer::Make();
+  frame->setPreserve3D(true);
+  frame->setMatrix3D(Matrix3D::MakeTranslate(5000, 3000, 0));
+  auto shape = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  shape->setPath(path);
+  shape->setFillStyle(ShapeStyle::Make(Color::Red()));
+  frame->addChild(shape);
+
+  canvas->setMatrix(Matrix::MakeTrans(-4950, -2950));
+  frame->draw(canvas);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Preserve3DDraw"));
+}
+
 TGFX_TEST_PRIVATE(LayerTest, ContourTest) {
   ContextScope scope;
   auto context = scope.getContext();
