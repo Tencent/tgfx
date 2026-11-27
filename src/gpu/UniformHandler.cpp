@@ -26,14 +26,17 @@ static constexpr char OES_TEXTURE_EXTENSION[] = "GL_OES_EGL_image_external_essl3
 std::string UniformHandler::addUniform(const std::string& name, UniformFormat format,
                                        ShaderStage stage, uint32_t count) {
   auto uniformName = programBuilder->nameVariable(name);
-  switch (stage) {
-    case ShaderStage::Vertex:
-      vertexUniforms.emplace_back(uniformName, format, count);
-      break;
-    case ShaderStage::Fragment:
-      fragmentUniforms.emplace_back(uniformName, format, count);
-      break;
+  // Operators that share one uniform set (the blur's kernel slots feed both the whole-kernel
+  // call and the in-loop weight) each run their EnsureUniforms; a name already registered for
+  // this processor is that same uniform, not a second one. Deduplicating here keeps the block
+  // layout matching the single upload the data side writes.
+  auto& uniforms = stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms;
+  for (const auto& uniform : uniforms) {
+    if (uniform.name() == uniformName) {
+      return uniformName;
+    }
   }
+  uniforms.emplace_back(uniformName, format, count);
   return uniformName;
 }
 
