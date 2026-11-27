@@ -104,7 +104,8 @@ class GeometryInputSource : public StyleInputSource {
    */
   static std::shared_ptr<GeometryInputSource> Make(std::shared_ptr<Picture> picture,
                                                    float contentScale,
-                                                   std::shared_ptr<ColorSpace> colorSpace);
+                                                   std::shared_ptr<ColorSpace> colorSpace,
+                                                   const Rect* fallbackBounds = nullptr);
 
   /** The same recording, rasterized for a GPU cache; the offset and shape are carried over. */
   std::shared_ptr<GeometryInputSource> makeRasterized() const;

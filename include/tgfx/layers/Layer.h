@@ -702,6 +702,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getContentContourImage(const DrawArgs& args, float contentScale,
                                                 Point* offset, bool* contourMatchesContent,
                                                 bool useTightBounds = false);
+  std::optional<Rect> getStyleSourceFallbackBounds(const DrawArgs& args, float contentScale);
 
   // Records the layer's geometry, not what it paints: the contour keeps the geometries no paint
   // captured and the painters with alpha=0. The returned source pairs that one recording's raster

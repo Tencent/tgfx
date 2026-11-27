@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeasureContext.h"
+#include "core/GlyphTransform.h"
 #include "core/utils/Log.h"
 #include "core/utils/StrokeUtils.h"
 #include "tgfx/core/RRect.h"
@@ -24,6 +25,43 @@
 #include "utils/MathExtra.h"
 
 namespace tgfx {
+static Rect MeasureFallbackTextStrokeBounds(const TextBlob& textBlob, const Matrix& matrix,
+                                            const Stroke& stroke) {
+  Rect result = {};
+  for (auto run : textBlob) {
+    const auto& font = run.font;
+    for (size_t index = 0; index < run.glyphCount; index++) {
+      auto glyphMatrix = GetGlyphMatrix(run, index);
+      const auto glyphID = run.glyphs[index];
+      const auto isColor = font.hasColor();
+      if (font.hasOutlines() && !isColor) {
+        Path glyphPath = {};
+        if (font.getPath(glyphID, &glyphPath)) {
+          glyphPath.transform(glyphMatrix);
+          auto resolutionScale = matrix.getMaxScale() * glyphMatrix.getMaxScale();
+          if (stroke.applyToPath(&glyphPath, resolutionScale)) {
+            glyphPath.transform(matrix);
+            result.join(glyphPath.getBounds());
+            continue;
+          }
+        }
+      }
+
+      auto glyphBounds = font.getBounds(glyphID);
+      if (glyphBounds.isEmpty()) {
+        continue;
+      }
+      if (!isColor) {
+        auto resolutionScale = matrix.getMaxScale() * glyphMatrix.getMaxScale();
+        ApplyStrokeToBounds(stroke, &glyphBounds, Matrix::MakeScale(resolutionScale), true);
+      }
+      glyphBounds = glyphMatrix.mapRect(glyphBounds);
+      result.join(matrix.mapRect(glyphBounds));
+    }
+  }
+  return result;
+}
+
 Rect MeasureContext::GetTightBounds(const std::shared_ptr<Picture>& picture) {
   if (picture == nullptr) {
     return Rect::MakeEmpty();
@@ -125,10 +163,10 @@ void MeasureContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matr
         }
         if (!measuredStroke) {
           // TextShape builds all glyph paths together, so one failed glyph drops the whole outline.
-          // Fall back to conservative text bounds rather than under-reporting the stroke.
-          auto fallbackBounds = textBlob->getBounds();
-          ApplyStrokeToBounds(*stroke, &fallbackBounds, matrix, true);
-          addLocalBounds(matrix, clip, fallbackBounds);
+          // Rebuild the stroke extent per glyph so one failed glyph does not discard every valid
+          // glyph's tight bounds.
+          auto fallbackBounds = MeasureFallbackTextStrokeBounds(*textBlob, matrix, *stroke);
+          addDeviceBounds(clip, fallbackBounds);
           return;
         }
       }

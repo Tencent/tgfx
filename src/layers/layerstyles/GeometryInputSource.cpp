@@ -29,15 +29,29 @@
 namespace tgfx {
 
 std::shared_ptr<GeometryInputSource> GeometryInputSource::Make(
-    std::shared_ptr<Picture> picture, float contentScale, std::shared_ptr<ColorSpace> colorSpace) {
+    std::shared_ptr<Picture> picture, float contentScale, std::shared_ptr<ColorSpace> colorSpace,
+    const Rect* fallbackBounds) {
   if (picture == nullptr) {
     return nullptr;
   }
   // Read the shape before the conversion consumes the picture, so both describe one recording.
   auto shape = GeometryShapeContext::Extract(picture, contentScale);
-  // Physical styles use the image extent as the geometry size. A text blob's conservative bounds
-  // can include unrelated glyphs in its font, so measure the same recording's drawn geometry.
-  auto bounds = MeasureContext::GetTightBounds(picture);
+  // An extracted single outline already describes the recording's full opaque coverage. Reuse its
+  // bounds so the common geometry case does not play the same picture back a second time.
+  auto bounds =
+      shape.has_value() && shape->shape != nullptr ? shape->getBounds() : Rect::MakeEmpty();
+  if (!bounds.isEmpty()) {
+    bounds.scale(contentScale, contentScale);
+  } else if (picture->hasUnboundedFill()) {
+    if (fallbackBounds == nullptr || fallbackBounds->isEmpty()) {
+      return nullptr;
+    }
+    bounds = *fallbackBounds;
+  } else {
+    // Rejected shapes still need the recording's tight extent for styles whose geometry cannot be
+    // represented as one outline, such as strokes or image-sampled painters.
+    bounds = MeasureContext::GetTightBounds(picture);
+  }
   Point offset = Point::Zero();
   auto image =
       PictureUtils::ToImageWithOffset(std::move(picture), &offset, &bounds, std::move(colorSpace));
