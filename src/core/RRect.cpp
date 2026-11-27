@@ -46,7 +46,9 @@ static inline void UpdateMinScale(float a, float b, double limit, double& scale)
 static inline void ScaleSmoothness(const Rect& rect, const std::array<Point, 4>& radii,
                                    float& smoothness) {
   smoothness = std::clamp(smoothness, 0.0f, 1.0f);
-  if (smoothness == 0.0f) {
+  // std::clamp keeps NaN unchanged, so zero it out with the comparison as well.
+  if (!(smoothness > 0.0f)) {
+    smoothness = 0.0f;
     return;
   }
 
