@@ -93,10 +93,10 @@ TEST(ImageEncoderTest, StreamingAndWholeImageAgree) {
 
 TEST(ImageEncoderTest, Accepts32768OnEitherAxis) {
   for (auto format : {EncodedFormat::PNG, EncodedFormat::JPEG}) {
-    for (auto imageSize : {ISize::Make(16, 32765), ISize::Make(32768, 13)}) {
+    for (auto imageSize : {ISize::Make(16, 32768), ISize::Make(32768, 13)}) {
       auto info = ImageInfo::Make(imageSize.width, imageSize.height, ColorType::RGBA_8888,
                                   AlphaType::Opaque);
-      auto bandInfo = ImageInfo::Make(imageSize.width, 16, ColorType::RGBA_8888, AlphaType::Opaque);
+      auto bandInfo = ImageInfo::Make(imageSize.width, 15, ColorType::RGBA_8888, AlphaType::Opaque);
       std::vector<uint8_t> pixels(bandInfo.byteSize(), 255);
       auto stream = MemoryWriteStream::Make();
       auto encoder = ImageEncoder::Make(stream, info, format);
