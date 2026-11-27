@@ -94,10 +94,11 @@ class Rectangle : public VectorElement {
 
   /**
    * Sets the corner smoothness shared by all four corners.
-   * Values are clamped to [0, 1]. A value of 0 produces a circular corner arc. Larger values make
-   * the curvature change more gradually, and the points where each corner meets the edges move
-   * away from the corner vertex, to (1 + smoothness) times the roundness. When an edge is too short
-   * to fit the smoothed corners at both of its ends, the smoothness is reduced.
+   * Negative values are treated as 0 and values greater than 1 are treated as 1. A value of 0
+   * produces a circular corner arc. Larger values make the curvature change more gradually, and
+   * the points where each corner meets the edges move away from the corner vertex, to (1 +
+   * smoothness) times the roundness. When an edge is too short to fit the smoothed corners at
+   * both of its ends, the smoothness is reduced.
    * @param value corner smoothness applied uniformly to all corners
    */
   void setSmoothness(float value);
