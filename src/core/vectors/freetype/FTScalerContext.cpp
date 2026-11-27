@@ -31,6 +31,7 @@
 #include "core/utils/GammaCorrection.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/StrokeUtils.h"
 #include "core/utils/USE.h"
 #include "skcms.h"
 #include "tgfx/core/Buffer.h"
@@ -612,17 +613,39 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
   bbox->yMax = (bbox->yMax + 63) & ~63;
 }
 
+Rect FTScalerContext::getFauxBoldBounds(GlyphID glyphID, bool fauxItalic) const {
+  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  auto face = ftTypeface()->face;
+  // Load the same outline generatePath() starts from: unhinted and not emboldened, so the estimate
+  // and the drawn geometry describe one shape.
+  if (!loadOutlineGlyph(face, glyphID, false, fauxItalic, true)) {
+    return {};
+  }
+  if (face->glyph->format != FT_GLYPH_FORMAT_OUTLINE || face->glyph->outline.n_contours <= 0) {
+    return {};
+  }
+  FT_BBox bbox = {};
+  FT_Outline_Get_CBox(&face->glyph->outline, &bbox);
+  if (bbox.xMin >= bbox.xMax || bbox.yMin >= bbox.yMax) {
+    return {};
+  }
+  Rect bounds =
+      Rect::MakeXYWH(FDot6ToFloat(bbox.xMin), -FDot6ToFloat(bbox.yMax),
+                     FDot6ToFloat(bbox.xMax - bbox.xMin), FDot6ToFloat(bbox.yMax - bbox.yMin));
+  // The drawn glyph is this outline unioned with a miter stroke. Expanding the control box by the
+  // same stroke contains the union without running it, which is also how the CoreGraphics backend
+  // estimates synthetic-bold bounds.
+  Stroke stroke(textSize * FauxBoldScale(textSize));
+  ApplyStrokeToBounds(stroke, &bounds, Matrix::I(), true);
+  bounds.roundOut();
+  return bounds;
+}
+
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
-  // Use the rendered outline for exact bounds; expanding regular glyph bounds does not account
-  // for the unhinted geometry and miter joins used by synthetic bold.
+  // Bounds of a synthetic-bold glyph only need to contain the drawn outline; building the boolean
+  // union here made every measurement pay for a full contour stroke plus path op.
   if (fauxBold && !hasColor() && hasOutlines()) {
-    Path path;
-    if (!generatePath(glyphID, true, fauxItalic, &path)) {
-      return {};
-    }
-    auto bounds = path.getBounds();
-    bounds.roundOut();
-    return bounds;
+    return getFauxBoldBounds(glyphID, fauxItalic);
   }
 #if defined(__ANDROID__) || defined(ANDROID)
   if (ftTypeface()->hasColor() && ftTypeface()->hasOutlines() && GlyphRenderer::IsAvailable()) {

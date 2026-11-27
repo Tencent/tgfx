@@ -75,31 +75,63 @@ TGFX_TEST_PRIVATE(FauxBoldTest, OutlineMatchesUnhintedStroke) {
 }
 #endif
 
-TGFX_TEST(FauxBoldTest, BoundsAndImageUseTheSameOutline) {
+TGFX_TEST(FauxBoldTest, FauxBoldBoundsContainTheDrawnOutline) {
   auto typeface = MakeFauxBoldTestTypeface();
   ASSERT_NE(typeface, nullptr);
   for (float size : {12.0f, 36.0f, 72.0f, 160.0f}) {
-    Font font(typeface, size);
-    Font bold = font;
-    bold.setFauxBold(true);
-    for (Unichar character : {'A', 'O', 'g'}) {
-      auto glyphID = font.getGlyphID(character);
-      ASSERT_NE(glyphID, 0);
-      Path path;
-      ASSERT_TRUE(bold.getPath(glyphID, &path));
-      auto bounds = path.getBounds();
-      bounds.roundOut();
-      EXPECT_EQ(bold.getBounds(glyphID), bounds);
-      EXPECT_EQ(bold.getImage(glyphID, nullptr, nullptr), nullptr);
-      EXPECT_NE(font.getImage(glyphID, nullptr, nullptr), nullptr);
-      EXPECT_EQ(bold.getAdvance(glyphID), font.getAdvance(glyphID));
+    for (bool italic : {false, true}) {
+      SCOPED_TRACE(::testing::Message() << "size=" << size << " italic=" << italic);
+      Font font(typeface, size);
+      font.setFauxItalic(italic);
+      Font bold = font;
+      bold.setFauxBold(true);
+      // 'A' and 'W' carry sharp corners where a miter join reaches furthest.
+      for (Unichar character : {'A', 'O', 'g', 'W'}) {
+        SCOPED_TRACE(::testing::Message() << "glyph=" << character);
+        auto glyphID = font.getGlyphID(character);
+        ASSERT_NE(glyphID, 0);
+        Path drawn;
+        ASSERT_TRUE(bold.getPath(glyphID, &drawn));
+        ASSERT_FALSE(drawn.isEmpty());
+        // The bounds only need to contain the drawn geometry now; they are no longer an exact
+        // re-measurement of the unioned path. Path::getBounds() is the control-point box, which is
+        // already at least as large as the curves, so containment here is a necessary condition.
+        auto ink = drawn.getBounds();
+        auto bounds = bold.getBounds(glyphID);
+        ASSERT_FALSE(bounds.isEmpty());
+        EXPECT_LE(bounds.left, ink.left);
+        EXPECT_LE(bounds.top, ink.top);
+        EXPECT_GE(bounds.right, ink.right);
+        EXPECT_GE(bounds.bottom, ink.bottom);
+        // Whole pixels keep the raster origin and the atlas cell size predictable.
+        EXPECT_EQ(bounds.left, std::floor(bounds.left));
+        EXPECT_EQ(bounds.top, std::floor(bounds.top));
+        EXPECT_EQ(bounds.right, std::floor(bounds.right));
+        EXPECT_EQ(bounds.bottom, std::floor(bounds.bottom));
+        // Synthetic bold is rasterised from the path, not from a glyph bitmap.
+        EXPECT_EQ(bold.getImage(glyphID, nullptr, nullptr), nullptr);
+        EXPECT_EQ(bold.getAdvance(glyphID), font.getAdvance(glyphID));
+      }
+      auto space = font.getGlyphID(' ');
+      ASSERT_NE(space, 0);
+      Path spacePath;
+      ASSERT_TRUE(bold.getPath(space, &spacePath));
+      EXPECT_TRUE(spacePath.isEmpty());
+      // An empty glyph has nothing to contain, so it must not be expanded either.
+      EXPECT_TRUE(bold.getBounds(space).isEmpty());
+      // Measuring with synthetic bold on must not disturb the metrics of the same font.
+      auto probe = font.getGlyphID('A');
+      auto regularBounds = font.getBounds(probe);
+      auto regularAdvance = font.getAdvance(probe);
+      Path regularPath;
+      ASSERT_TRUE(font.getPath(probe, &regularPath));
+      (void)bold.getBounds(probe);
+      EXPECT_EQ(font.getBounds(probe), regularBounds);
+      EXPECT_EQ(font.getAdvance(probe), regularAdvance);
+      Path regularPathAfter;
+      ASSERT_TRUE(font.getPath(probe, &regularPathAfter));
+      EXPECT_EQ(regularPathAfter, regularPath);
     }
-    auto space = font.getGlyphID(' ');
-    ASSERT_NE(space, 0);
-    Path path;
-    ASSERT_TRUE(bold.getPath(space, &path));
-    EXPECT_TRUE(path.isEmpty());
-    EXPECT_TRUE(bold.getBounds(space).isEmpty());
   }
 }
 

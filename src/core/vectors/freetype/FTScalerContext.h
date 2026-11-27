@@ -78,6 +78,8 @@ class FTScalerContext : public ScalerContext {
   bool loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxBold, bool fauxItalic,
                         bool noHinting = false) const;
 
+  Rect getFauxBoldBounds(GlyphID glyphID, bool fauxItalic) const;
+
   void collectCOLRv1GlyphPaths(FT_Face face, const FT_OpaquePaint& opaquePaint, bool fauxBold,
                                bool fauxItalic, Path* path) const;
 
