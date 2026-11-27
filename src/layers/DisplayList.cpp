@@ -1167,6 +1167,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
       // Once the grid is complete, the budget tops up L+2, L+1 and then L itself. L+3 is left to
       // pass 1.
       auto chainBudget = gridComplete ? std::max(_maxTilesRefinedPerFrame, 0) : 0;
+      size_t chainRefined = 0;
       if (mayRefine) {
         // coverages[0] is L and coverages[3] is L+3.
         for (int index = TREE_LEVEL_COUNT - 2; index >= 0 && chainBudget > 0; --index) {
@@ -1180,6 +1181,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
           }
           auto refined = rasterizeTreeTiles(surface, cells, &coverage, tileTasks);
           chainBudget -= static_cast<int>(refined);
+          chainRefined += refined;
         }
       }
       // Report the state left after this frame: a skipped frame still has to keep the loop alive,
@@ -1195,12 +1197,11 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
           }
         }
       }
-      // Without a budget the chain can never progress, and a capped pool that cannot hold the
-      // levels would keep asking for frames that never fill them, so neither may keep the loop
-      // running.
-      auto treeCapacity = tilePool->quota(TileType::Tree) + tilePool->quota(TileType::Grid);
-      if (chainPending && _maxTilesRefinedPerFrame > 0 &&
-          tilePool->size(TileType::Tree) < treeCapacity) {
+      // Keep the loop alive only while it can make progress. A budget of 0 never refines, and a
+      // pool too small for the levels hands out no tile at all, so a frame that refined nothing and
+      // had no other tile work would repeat itself: neither may keep the loop running. A frame with
+      // other tile work still reports the chain as pending, because the next frame can refine.
+      if (chainPending && _maxTilesRefinedPerFrame > 0 && (chainRefined > 0 || !mayRefine)) {
         hasZoomBlurTiles = true;
       }
     }
