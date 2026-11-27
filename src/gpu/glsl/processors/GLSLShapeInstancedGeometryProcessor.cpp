@@ -45,8 +45,26 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   auto viewMatrixName =
       uniformHandler->addUniform("ViewMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
 
-  // UV transforms use the unshifted local coords ('local'), computed in the IR block below: the
-  // mask texture and shader patterns are local-space, only the device position takes the offset.
+  // UV transforms use the unshifted local coords ('local'): the mask texture and shader patterns
+  // are local-space, only the device position takes the offset. The IR route computes the value
+  // before the transform walk, so the walk's varying store reads an already-defined value.
+  if (args.irBuilder != nullptr) {
+    auto ir = args.irBuilder;
+    const auto one = ir->CreateConstant(1.0f);
+    const auto positionValue = ir->InternValue(position.name(), SLType::Float2, Precision::High,
+                                               IRValueKind::Attribute);
+    const auto position3 = ir->CreateConstruct(SLType::Float3, {positionValue, one});
+    const auto uvMatrixValue =
+        ir->InternValue(uvMatrixName, SLType::Float3x3, Precision::High, IRValueKind::Uniform);
+    const auto localTrans =
+        ir->CreateBinary(IRBinaryOp::Mul, SLType::Float3, uvMatrixValue, position3);
+    const auto localXY = ir->CreateSwizzle(localTrans, SLType::Float2, "xy");
+    // The transform walk interns 'local' by name; minting a fresh value would split the name into
+    // two ids the printer must rename apart, and the transform would read the empty one.
+    const auto local = ir->InternValue("local", SLType::Float2, Precision::High,
+                                       IRValueKind::Local);
+    ir->Assign({local, ""}, localXY);
+  }
   ShaderVar localVar("local", SLType::Float2);
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, localVar);
 
@@ -67,18 +85,6 @@ void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
   if (args.irBuilder != nullptr) {
     auto ir = args.irBuilder;
     const auto one = ir->CreateConstant(1.0f);
-    const auto positionValue = ir->InternValue(position.name(), SLType::Float2, Precision::High,
-                                               IRValueKind::Attribute);
-    const auto position3 = ir->CreateConstruct(SLType::Float3, {positionValue, one});
-    // local = uvMatrix * position (the coordinate-transform source, in local space).
-    const auto uvMatrixValue =
-        ir->InternValue(uvMatrixName, SLType::Float3x3, Precision::High, IRValueKind::Uniform);
-    const auto localTrans =
-        ir->CreateBinary(IRBinaryOp::Mul, SLType::Float3, uvMatrixValue, position3);
-    const auto localXY = ir->CreateSwizzle(localTrans, SLType::Float2, "xy");
-    const auto local = ir->CreateValue(SLType::Float2, Precision::High, IRValueKind::Local,
-                                       "local");
-    ir->Assign({local, ""}, localXY);
     if (aa == AAType::Coverage) {
       emitVaryingIR(args, coverageVar, ShaderVar(coverage));
     }
