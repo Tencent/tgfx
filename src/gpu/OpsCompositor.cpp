@@ -1191,10 +1191,6 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
   }
   op->setBlendMode(brush.blendMode);
   auto aaType = getAAType(brush);
-  if (std::getenv("COVDBG") != nullptr && static_cast<int>(brush.blendMode) == 13) {
-    fprintf(stderr, "MODCOV hasCoverage=%d aaType=%d\n", op->hasCoverage() ? 1 : 0,
-            static_cast<int>(aaType));
-  }
   if (BlendModeNeedDstTexture(brush.blendMode, op->hasCoverage())) {
     auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
     auto shaderCaps = context->shaderCaps();
