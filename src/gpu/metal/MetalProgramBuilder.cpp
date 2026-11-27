@@ -21,6 +21,8 @@
 #include <cstdlib>
 #include <string>
 #include "core/utils/Log.h"
+#include "gpu/ir/ProgramBodyPrinter.h"
+#include "gpu/ir/ProgramIRValidation.h"
 #include "gpu/ir/ProgramValidation.h"
 #include "gpu/metal/MSLPrinter.h"
 #include "gpu/shaders/ShaderLibraryBundle.h"
@@ -103,11 +105,55 @@ std::shared_ptr<Program> MetalProgramBuilder::finalize() {
     description.interface.samplers.push_back({sampler.name(), ShaderVar(sampler).type()});
     description.values.Intern(sampler.name(), ShaderVar(sampler).type(), ValueOrigin::Sampler);
   }
+  // The IR route prints the bodies from ProgramIR, so its interface has to carry the same names the
+  // description does: the printer resolves every identifier against it.
+  for (const auto& attribute : description.interface.attributes) {
+    programIRBuilder().AddAttribute({attribute.name, attribute.type, Precision::High, 0});
+  }
+  for (const auto& varying : description.interface.varyings) {
+    programIRBuilder().AddVarying(
+        {varying.name, varying.type, Precision::High, varying.location, varying.flat});
+  }
+  for (const auto& uniform : description.interface.uniforms) {
+    if (uniform.count > 1) {
+      programIRBuilder().AddUniformArray(
+          {uniform.name, uniform.type, Precision::Default, uniform.stage, uniform.count});
+    } else {
+      programIRBuilder().AddUniform(
+          {uniform.name, uniform.type, Precision::Default, uniform.stage, uniform.count});
+    }
+  }
+  for (const auto& sampler : description.interface.samplers) {
+    programIRBuilder().AddSampler({sampler.name, sampler.type, 0});
+  }
   finalizeShaders();
   std::string validationError;
-  if (!ValidateProgramDescription(&description, &validationError)) {
-    LOGE("MetalProgramBuilder: %s", validationError.c_str());
-    return nullptr;
+  // The processors emit their bodies into the ProgramIR; only the text escape hatch still fills
+  // the typed description, so the two routes validate different graphs.
+  const bool textRoute = std::getenv("TGFX_TEXT_PRINTER") != nullptr;
+  if (textRoute) {
+    if (!ValidateProgramDescription(&description, &validationError)) {
+      LOGE("MetalProgramBuilder: %s", validationError.c_str());
+      return nullptr;
+    }
+  } else {
+    if (!ValidateProgramIR(programIRBuilder().IR(), &validationError)) {
+      LOGE("MetalProgramBuilder: %s", validationError.c_str());
+      return nullptr;
+    }
+    bool writesPosition = false;
+    for (const auto& statement : programIRBuilder().IR().vertexStatements) {
+      if (statement.kind == IRStatementKind::StoreOutput &&
+          statement.dst.base < programIRBuilder().IR().values.size() &&
+          programIRBuilder().IR().values[statement.dst.base].debugName == "gl_Position") {
+        writesPosition = true;
+        break;
+      }
+    }
+    if (!writesPosition) {
+      LOGE("MetalProgramBuilder: the vertex stage never writes the clip-space position");
+      return nullptr;
+    }
   }
   MslCallSite callSite = {};
   for (const auto& sampler : description.interface.samplers) {
@@ -130,8 +176,44 @@ std::shared_ptr<Program> MetalProgramBuilder::finalize() {
     }
     listStart = comma + 1;
   }
-  _vertexBuilder.setCodeText(MSLPrinter::PrintVertexProgram(description.vertexCalls, callSite));
-  _fragBuilder.setCodeText(MSLPrinter::PrintFragmentProgram(description.fragment, callSite));
+  if (textRoute) {
+    _vertexBuilder.setCodeText(MSLPrinter::PrintVertexProgram(description.vertexCalls, callSite));
+    _fragBuilder.setCodeText(MSLPrinter::PrintFragmentProgram(description.fragment, callSite));
+  } else {
+    // The IR route prints the same bodies the GL path prints, spelled in MSL: the shared operator
+    // functions are pulled per stage, because each stage compiles on its own in Metal.
+    auto& ir = programIRBuilder().IR();
+    ProgramBodyPrinter::Uniquify(ir);
+    for (const auto& expr : ir.exprs) {
+      const char* symbol = nullptr;
+      if (expr.kind == IRExprKind::TextureSample) {
+        symbol = expr.samplerType == SLType::Texture2DRectSampler
+                     ? "tgfxTextureSampleRect"
+                     : (expr.samplerType == SLType::TextureExternalSampler
+                            ? "tgfxTextureSampleExternal"
+                            : "tgfxTextureSample");
+      } else if (expr.kind == IRExprKind::Call) {
+        const auto* desc = FindOperator(expr.op);
+        if (desc == nullptr || desc->glslSymbol == nullptr || desc->includes.empty()) {
+          continue;
+        }
+        symbol = desc->glslSymbol;
+      }
+      if (symbol == nullptr) {
+        continue;
+      }
+      _vertexBuilder.appendFunction(symbol);
+      _fragBuilder.appendFunction(symbol);
+    }
+    const auto vertexBody = MSLPrinter::PrintVertexBodyFromIR(ir);
+    const auto fragmentBody = MSLPrinter::PrintFragmentBodyFromIR(ir);
+    if (vertexBody.empty() || fragmentBody.empty()) {
+      LOGE("MetalProgramBuilder: the stage bodies cannot be printed from the IR");
+      return nullptr;
+    }
+    _vertexBuilder.setCodeText(vertexBody);
+    _fragBuilder.setCodeText(fragmentBody);
+  }
   const auto vertexText = MSLPrinter::PrintStage(*this, ShaderStage::Vertex, description.interface,
                                                  _vertexBuilder, callSite);
   const auto fragmentText = MSLPrinter::PrintStage(*this, ShaderStage::Fragment,
