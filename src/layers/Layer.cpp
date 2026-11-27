@@ -552,7 +552,7 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
   _children.erase(_children.begin() + index);
   if (_root) {
     _root->invalidateRect(child->renderBounds);
-    child->renderBounds = {};
+    child->clearRenderBounds();
   }
   invalidateDescendents();
   return child;
@@ -592,7 +592,7 @@ bool Layer::setChildIndex(std::shared_ptr<Layer> child, int index) {
     // Immediately invalidate the old render bounds, as this may affect the background of the above
     // layer styles.
     _root->invalidateRect(child->renderBounds);
-    child->renderBounds = {};
+    child->clearRenderBounds();
   }
   child->invalidateTransform();
   invalidateDescendents();
@@ -643,7 +643,7 @@ void Layer::setChildren(const std::vector<std::shared_ptr<Layer>>& children) {
       ptr->onDetachFromRoot();
       if (_root) {
         _root->invalidateRect(ptr->renderBounds);
-        ptr->renderBounds = {};
+        ptr->clearRenderBounds();
       }
     } else {
       retainedChildren.push_back(ptr);
@@ -896,6 +896,34 @@ static Rect GetClippedBounds(const Rect& bounds, const Canvas* canvas) {
   return clippedBounds;
 }
 
+static bool IsReachedByRenderBounds(const Layer* layer, const Layer* root) {
+  for (auto current = layer; current != nullptr && current != root; current = current->parent()) {
+    if (!current->visible() || current->alpha() <= 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Culling belongs to the parent: the layer a draw starts from is drawn on request, so its own
+// render bounds never cull it, which keeps Layer::draw() working on a hidden or fully transparent
+// layer. A child is skipped when it draws nothing (empty render bounds) or lies outside every cull
+// rect. An empty rect list means no culling at all.
+static bool IsCulledByRenderRects(const Rect& renderBounds, const std::vector<Rect>* renderRects) {
+  if (renderRects == nullptr || renderRects->empty()) {
+    return false;
+  }
+  if (renderBounds.isEmpty()) {
+    return true;
+  }
+  for (const auto& rect : *renderRects) {
+    if (Rect::Intersects(rect, renderBounds)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   if (canvas == nullptr || alpha <= 0) {
     return;
@@ -921,8 +949,12 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     // draw alpha down instead of assuming an opaque draw.
     _root->updateRenderBounds(nullptr, false, alpha);
     renderRect = localToGlobalMatrix.mapRect(clippedBounds);
-    renderRectsVec = {renderRect};
-    args.renderRects = &renderRectsVec;
+    // A hidden or fully transparent subtree has its render bounds cleared and never recomputed, so
+    // below such a layer the render bounds are empty and cannot cull anything.
+    if (IsReachedByRenderBounds(this, _root)) {
+      renderRectsVec = {renderRect};
+      args.renderRects = &renderRectsVec;
+    }
   }
 
   if (surface) {
@@ -1163,21 +1195,6 @@ bool Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (FloatNearlyZero(contentScale)) {
     return true;
   }
-  if (args.renderRects != nullptr && !args.renderRects->empty()) {
-    if (renderBounds.isEmpty()) {
-      return true;
-    }
-    bool anyHit = false;
-    for (const auto& rect : *args.renderRects) {
-      if (Rect::Intersects(rect, renderBounds)) {
-        anyHit = true;
-        break;
-      }
-    }
-    if (!anyHit) {
-      return true;
-    }
-  }
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
   if (!prepareMask(args, canvas, &maskFilter)) {
     return true;
@@ -1240,11 +1257,6 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   DrawArgs maskArgs = args;
   maskArgs.excludeEffects |= isContourMode;
   maskArgs.backgroundHandler = BackgroundHandler::NoOp();
-  // A mask under a hidden ancestor still applies, but updateRenderBounds() skips hidden subtrees,
-  // so its render bounds are empty and would cull the whole mask. Draw such a mask uncut.
-  if (_mask->renderBounds.isEmpty()) {
-    maskArgs.renderRects = nullptr;
-  }
   auto maskCanPreserve3D = _mask->canPreserve3D();
   // When mask enables 3D context, the full 3D relative matrix is handled by the 3D context.
   // Otherwise, use the 2D projection of the relative matrix on canvas.
@@ -1878,6 +1890,9 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
     if (child->maskOwner || !child->visible() || child->_alpha <= 0) {
       continue;
     }
+    if (IsCulledByRenderRects(child->renderBounds, args.renderRects)) {
+      continue;
+    }
     if (args.backgroundHandler != nullptr && i < maxIndex) {
       args.backgroundHandler->beginForceDrawChildren();
       drawChild(args, canvas, child.get(), alpha, &Layer::drawLayer);
@@ -2294,6 +2309,13 @@ bool Layer::isClippedToMaskBounds() const {
          maskType != LayerMaskType::ContourInverted;
 }
 
+void Layer::clearRenderBounds() {
+  renderBounds = {};
+  for (auto& child : _children) {
+    child->clearRenderBounds();
+  }
+}
+
 void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty,
                                float alpha) {
   const auto accumulatedAlpha = alpha * _alpha;
@@ -2367,7 +2389,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     if (!child->bitFields.visible || child->_alpha <= 0) {
       if (child->bitFields.dirtyTransform) {
         _root->invalidateRect(child->renderBounds);
-        child->renderBounds = {};
+        child->clearRenderBounds();
       }
       child->bitFields.dirtyTransform = false;
       continue;
@@ -2391,7 +2413,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
         if (!clipRect->intersect(maskBounds)) {
           if (child->bitFields.dirtyTransform) {
             _root->invalidateRect(child->renderBounds);
-            child->renderBounds = {};
+            child->clearRenderBounds();
           }
           child->bitFields.dirtyTransform = false;
           continue;

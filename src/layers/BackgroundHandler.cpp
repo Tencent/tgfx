@@ -344,6 +344,11 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (contentSource == nullptr) {
     return;
   }
+  // From here on the consumer reads one entry for this dispatch, so reserve it up front: any
+  // failure below leaves it empty, which keeps the read cursor in step when the style is
+  // dispatched more than once and the consumer then skips the style for this dispatch.
+  auto& entries = snapshots->snapshots[BackgroundSnapshotKey{layer, style}];
+  entries.emplace_back();
   auto contentOffset = contentSource->imageOffset();
   auto contentWidth = static_cast<float>(contentSource->image()->width());
   auto contentHeight = static_cast<float>(contentSource->image()->height());
@@ -428,10 +433,8 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
                                          &smallBgOffset, args.dstColorSpace, &disjoint);
   if (disjoint) {
     // The style's area lies outside the captured surface, so it is outside every area drawn with
-    // this capture and draws nothing there. An empty entry keeps the consumer's read cursor in
-    // step without holding the capture surface's snapshot, which would make every later draw into
-    // that surface copy it.
-    snapshots->snapshots[BackgroundSnapshotKey{layer, style}].push_back({});
+    // this capture and draws nothing there. The entry stays empty rather than recording bgImage:
+    // holding the capture surface's snapshot would make every later draw into it copy it.
     return;
   }
   PictureRecorder recorder = {};
@@ -459,8 +462,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (image == nullptr) {
     return;
   }
-  snapshots->snapshots[BackgroundSnapshotKey{layer, style}].push_back(
-      BackgroundSnapshotEntry{std::move(image), offset});
+  entries.back() = BackgroundSnapshotEntry{std::move(image), offset};
   ++gCaptureProbe.snapshots;
   gCaptureProbe.snapshotMs += ProbeMsSince(probeStart);
 }
