@@ -656,6 +656,46 @@ class VariantOnlyProvider : public ImageProvider {
 };
 }  // namespace
 
+TGFX_TEST(ImageRenderTest, ProviderDecodeStatus) {
+  auto child = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(child, nullptr);
+  auto image = Image::MakeFrom(std::make_shared<VariantOnlyProvider>(128, 128, child));
+  ASSERT_NE(image, nullptr);
+  EXPECT_EQ(image->makeDecoded()->decodeStatus(), Image::DecodeStatus::NotStarted);
+
+  PictureRecorder recorder;
+  auto canvas = recorder.beginRecording();
+  canvas->drawImage(child);
+  canvas->drawImage(image, 16, 16);
+  auto picture = Image::MakeFrom(recorder.finishRecordingAsPicture(), 144, 144);
+  ASSERT_NE(picture, nullptr);
+  EXPECT_EQ(picture->makeDecoded()->decodeStatus(), Image::DecodeStatus::NotStarted);
+}
+
+TGFX_TEST(ImageRenderTest, DecodedSubsetCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto source = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(source, nullptr);
+  auto crop = [&]() {
+    return source->makeScaled(64, 64)->makeSubset(Rect::MakeXYWH(32, 16, 24, 24))->makeRasterized();
+  };
+  auto image = crop();
+  auto surface = Surface::Make(context, 24, 24);
+  ASSERT_NE(surface, nullptr);
+  auto info = ImageInfo::Make(24, 24, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  std::vector<uint8_t> expected(info.byteSize()), actual(info.byteSize());
+  surface->getCanvas()->drawImage(crop());
+  ASSERT_TRUE(surface->readPixels(info, expected.data()));
+  surface->getCanvas()->drawImage(image->makeDecoded());
+  ASSERT_TRUE(surface->readPixels(info, actual.data()));
+  EXPECT_EQ(actual, expected);
+  surface->getCanvas()->drawImage(image);
+  ASSERT_TRUE(surface->readPixels(info, actual.data()));
+  EXPECT_EQ(actual, expected);
+}
+
 TGFX_TEST(ImageRenderTest, RasterizedProviderVariant) {
   ContextScope scope;
   auto context = scope.getContext();

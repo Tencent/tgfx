@@ -45,6 +45,11 @@ class ProviderImage : public Image {
     return imageColorSpace;
   }
 
+  // The images used by a draw are resolved during rendering.
+  DecodeStatus decodeStatus() const override {
+    return DecodeStatus::NotStarted;
+  }
+
   bool hasMipmaps() const override {
     return mipmapped;
   }

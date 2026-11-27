@@ -24,27 +24,30 @@
 
 namespace tgfx {
 std::shared_ptr<Image> DecodedImage::MakeFrom(std::shared_ptr<ImageGenerator> generator,
-                                              bool tryHardware, bool asyncDecoding,
-                                              bool mipmapped) {
+                                              bool tryHardware, bool asyncDecoding, bool mipmapped,
+                                              ISize logicalSize) {
   if (generator == nullptr) {
     return nullptr;
   }
-  auto width = generator->width();
-  auto height = generator->height();
+  auto size = ISize::Make(generator->width(), generator->height());
+  if (logicalSize.isEmpty()) {
+    logicalSize = size;
+  }
   auto alphaOnly = generator->isAlphaOnly();
   auto source = ImageSource::MakeFrom(generator, tryHardware, asyncDecoding);
   auto colorSpace = generator->colorSpace();
   auto image = std::shared_ptr<DecodedImage>(
-      new DecodedImage(width, height, alphaOnly, std::move(source), mipmapped, colorSpace));
+      new DecodedImage(size, logicalSize, alphaOnly, std::move(source), mipmapped, colorSpace));
   image->weakThis = image;
   return image;
 }
 
-DecodedImage::DecodedImage(int width, int height, bool alphaOnly,
+DecodedImage::DecodedImage(ISize bufferSize, ISize logicalSize, bool alphaOnly,
                            std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped,
                            std::shared_ptr<ColorSpace> colorSpace)
-    : PixelImage(mipmapped), _width(width), _height(height), _alphaOnly(alphaOnly),
-      source(std::move(source)), _colorSpace(std::move(colorSpace)) {
+    : PixelImage(mipmapped), bufferSize(bufferSize), _width(logicalSize.width),
+      _height(logicalSize.height), _alphaOnly(alphaOnly), source(std::move(source)),
+      _colorSpace(std::move(colorSpace)) {
 }
 
 Image::DecodeStatus DecodedImage::decodeStatus() const {
@@ -59,13 +62,13 @@ Image::DecodeStatus DecodedImage::decodeStatus() const {
 }
 
 std::shared_ptr<TextureProxy> DecodedImage::lockTextureProxy(const TPArgs& args) const {
-  return args.context->proxyProvider()->createTextureProxy(source, _width, _height, _alphaOnly,
-                                                           args.mipmapped);
+  return args.context->proxyProvider()->createTextureProxy(
+      source, bufferSize.width, bufferSize.height, _alphaOnly, args.mipmapped);
 }
 
 std::shared_ptr<Image> DecodedImage::onMakeMipmapped(bool mipmapped) const {
-  auto image = std::shared_ptr<DecodedImage>(
-      new DecodedImage(_width, _height, _alphaOnly, source, mipmapped, colorSpace()));
+  auto image = std::shared_ptr<DecodedImage>(new DecodedImage(
+      bufferSize, ISize::Make(_width, _height), _alphaOnly, source, mipmapped, colorSpace()));
   image->weakThis = image;
   return image;
 }

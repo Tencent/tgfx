@@ -236,7 +236,8 @@ class Image {
 
   /**
    * Progress of CPU decoding. Query the Image returned by makeDecoded(); querying the original
-   * Image does not start decoding. This method never waits for a decoding task.
+   * Image does not start decoding. This method never waits for a decoding task. Images backed
+   * by a provider or picture report NotStarted when their child images are resolved at draw time.
    */
   enum class DecodeStatus { NotStarted, Decoding, Completed, Failed };
 

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CodecImage.h"
-#include "RasterizedImage.h"
+#include "DecodedImage.h"
 #include "core/ScaledImageGenerator.h"
 #include "core/utils/NextCacheScaleLevel.h"
 #include "gpu/ProxyProvider.h"
@@ -62,13 +62,21 @@ ISize CodecImage::getRasterizedSize(float scale) const {
   return ISize::Make(generator->width(), generator->height());
 }
 
-std::shared_ptr<TextureProxy> CodecImage::lockTextureProxy(const TPArgs& args) const {
-  auto tempGenerator = generator;
-  auto size = getRasterizedSize(args.drawScale);
+std::shared_ptr<ImageGenerator> CodecImage::getGeneratorForScale(float scale) const {
+  auto size = getRasterizedSize(scale);
   if (size.width < generator->width() && size.height < generator->height()) {
-    tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), size.width, size.height);
+    return ScaledImageGenerator::MakeFrom(getCodec(), size.width, size.height);
   }
-  return args.context->proxyProvider()->createTextureProxy(tempGenerator, args.mipmapped,
-                                                           args.renderFlags);
+  return generator;
+}
+
+std::shared_ptr<Image> CodecImage::onMakeDecoded(Context*, bool tryHardware) const {
+  return DecodedImage::MakeFrom(getGeneratorForScale(1.0f), tryHardware, true, mipmapped,
+                                ISize::Make(width(), height()));
+}
+
+std::shared_ptr<TextureProxy> CodecImage::lockTextureProxy(const TPArgs& args) const {
+  return args.context->proxyProvider()->createTextureProxy(getGeneratorForScale(args.drawScale),
+                                                           args.mipmapped, args.renderFlags);
 }
 }  // namespace tgfx

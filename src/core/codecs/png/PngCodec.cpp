@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/codecs/png/PngCodec.h"
-#ifdef __EMSCRIPTEN__
+#ifdef __EMSCRIPTEN_PTHREADS__
 #include <emscripten/threading.h>
 #endif
 #include "core/codecs/ScanlineEncoder.h"
@@ -62,20 +62,29 @@ static void PngReaderReadData(png_structp png_ptr, png_bytep data, png_size_t le
 
 // Worker stderr is synchronously proxied on the web. Copy the message before the libpng callback
 // returns and deliver it asynchronously, independently of the caller's decoding lifecycle.
-static void PngWarning(png_structp, png_const_charp message) {
-#ifdef __EMSCRIPTEN__
+static void LogPngMessage(const char* prefix, png_const_charp message) {
+#ifdef __EMSCRIPTEN_PTHREADS__
   if (!emscripten_is_main_runtime_thread()) {
-    auto copy = new std::string(message);
+    auto copy = new std::string(std::string(prefix) + message);
     emscripten_async_run_in_main_runtime_thread(
         EM_FUNC_SIG_VI, +[](void* data) {
           auto text = static_cast<std::string*>(data);
-          fprintf(stderr, "libpng warning: %s\n", text->c_str());
+          fprintf(stderr, "%s\n", text->c_str());
           delete text;
         }, copy);
     return;
   }
 #endif
-  fprintf(stderr, "libpng warning: %s\n", message);
+  fprintf(stderr, "%s%s\n", prefix, message);
+}
+
+static void PngWarning(png_structp, png_const_charp message) {
+  LogPngMessage("libpng warning: ", message);
+}
+
+static void PngError(png_structp png, png_const_charp message) {
+  LogPngMessage("libpng error: ", message);
+  png_longjmp(png, 1);
 }
 
 class ReadInfo {
@@ -93,7 +102,7 @@ class ReadInfo {
     if (readInfo->p == nullptr) {
       return nullptr;
     }
-    png_set_error_fn(readInfo->p, nullptr, nullptr, PngWarning);
+    png_set_error_fn(readInfo->p, nullptr, PngError, PngWarning);
     readInfo->pi = png_create_info_struct(readInfo->p);
     if (readInfo->pi == nullptr) {
       return nullptr;
@@ -403,10 +412,13 @@ class PngScanlineEncoder final : public ScanlineEncoder {
 
     auto profile = !alphaOnly && info.colorSpace() ? info.colorSpace()->toICCProfile() : nullptr;
     png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-    if (!png || setjmp(png_jmpbuf(png))) {
+    if (!png) {
       return false;
     }
-    png_set_error_fn(png, nullptr, nullptr, PngWarning);
+    if (setjmp(png_jmpbuf(png))) {
+      return false;
+    }
+    png_set_error_fn(png, nullptr, PngError, PngWarning);
     pngInfo = png_create_info_struct(png);
     if (!pngInfo) {
       return false;
