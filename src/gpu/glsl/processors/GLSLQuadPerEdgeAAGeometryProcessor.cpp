@@ -105,6 +105,19 @@ void GLSLQuadPerEdgeAAGeometryProcessor::onSetTransformData(UniformData* uniform
   }
 }
 
+static ValueID TransformSubsetCorner(ProgramIRBuilder* ir, ValueID corner, ValueID matrix,
+                                     bool hasPerspective) {
+  const auto one = ir->CreateConstant(1.0f);
+  const auto point = ir->CreateConstruct(SLType::Float3, {corner, one});
+  const auto transformed = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float3, matrix, point);
+  const auto xy = ir->CreateSwizzle(transformed, SLType::Float2, "xy");
+  if (!hasPerspective) {
+    return xy;
+  }
+  const auto z = ir->CreateSwizzle(transformed, SLType::Float, "z");
+  return ir->CreateBinary(IRBinaryOp::Div, SLType::Float2, xy, z);
+}
+
 void GLSLQuadPerEdgeAAGeometryProcessor::onEmitTransform(EmitArgs& args,
                                                          VertexShaderBuilder* vertexBuilder,
                                                          VaryingHandler* varyingHandler,
@@ -117,6 +130,32 @@ void GLSLQuadPerEdgeAAGeometryProcessor::onEmitTransform(EmitArgs& args,
     if (uvCoord.empty()) {
       subsetMatrixName = uniformHandler->addUniform("texSubsetMatrix", UniformFormat::Float3x3,
                                                     ShaderStage::Vertex);
+    }
+    if (args.irBuilder != nullptr) {
+      // The same corner transform the text calls spell out, so the subset varying has an IR
+      // writer of its own: the IR route links the program by reading the varying back here.
+      auto ir = args.irBuilder;
+      const auto subsetValue = ir->InternValue(subset.name(), SLType::Float4, Precision::High,
+                                               IRValueKind::Attribute);
+      const auto matrix = ir->InternValue(subsetMatrixName, SLType::Float3x3, Precision::High,
+                                          IRValueKind::Uniform);
+      const auto leftTop =
+          TransformSubsetCorner(ir, ir->CreateSwizzle(subsetValue, SLType::Float2, "xy"), matrix,
+                                hasPerspective);
+      const auto rightBottom =
+          TransformSubsetCorner(ir, ir->CreateSwizzle(subsetValue, SLType::Float2, "zw"), matrix,
+                                hasPerspective);
+      const auto corners = ir->CreateConstruct(SLType::Float4, {leftTop, rightBottom});
+      const auto low = ir->CreateBinary(IRBinaryOp::Min, SLType::Float2,
+                                        ir->CreateSwizzle(corners, SLType::Float2, "xy"),
+                                        ir->CreateSwizzle(corners, SLType::Float2, "zw"));
+      const auto high = ir->CreateBinary(IRBinaryOp::Max, SLType::Float2,
+                                         ir->CreateSwizzle(corners, SLType::Float2, "xy"),
+                                         ir->CreateSwizzle(corners, SLType::Float2, "zw"));
+      const auto normalized = ir->CreateConstruct(SLType::Float4, {low, high});
+      const auto varyingValue = ir->AddVarying(
+          {varying.name(), varying.type(), Precision::High, 0, varying.isFlat()});
+      ir->StoreVarying({varyingValue, ""}, normalized);
     }
     const std::string srcLT = "srcLT";
     const std::string srcRB = "srcRB";
