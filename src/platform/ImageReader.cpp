@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/ImageReader.h"
-#include "core/PixelRef.h"
 #include "core/utils/Log.h"
 #include "gpu/resources/TextureView.h"
 #include "platform/ImageStream.h"
@@ -25,8 +24,9 @@
 namespace tgfx {
 class ImageReaderBuffer : public ImageBuffer {
  public:
-  explicit ImageReaderBuffer(std::shared_ptr<ImageReader> imageReader, uint64_t bufferVersion)
-      : imageReader(std::move(imageReader)), contentVersion(bufferVersion) {
+  ImageReaderBuffer(std::shared_ptr<ImageReader> imageReader, uint64_t bufferVersion,
+                    int64_t timestamp)
+      : imageReader(std::move(imageReader)), contentVersion(bufferVersion), timestamp(timestamp) {
   }
 
   int width() const override {
@@ -45,14 +45,19 @@ class ImageReaderBuffer : public ImageBuffer {
     return imageReader->checkExpired(contentVersion);
   }
 
+  ImageBufferStatus status() const override {
+    return imageReader->getStatus(contentVersion);
+  }
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override {
-    return imageReader->readTexture(contentVersion, context, mipmapped);
+    return imageReader->readTexture(contentVersion, timestamp, context, mipmapped);
   }
 
  private:
   std::shared_ptr<ImageReader> imageReader = nullptr;
   uint64_t contentVersion = 0;
+  int64_t timestamp = -1;
 };
 
 std::shared_ptr<ImageReader> ImageReader::MakeFrom(std::shared_ptr<ImageStream> imageStream) {
@@ -76,11 +81,11 @@ int ImageReader::height() const {
   return stream->height();
 }
 
-std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {
+std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer(int64_t timestamp) {
   std::lock_guard<std::mutex> autoLock(locker);
   DEBUG_ASSERT(!weakThis.expired());
   bufferVersion++;
-  return std::make_shared<ImageReaderBuffer>(weakThis.lock(), bufferVersion);
+  return std::make_shared<ImageReaderBuffer>(weakThis.lock(), bufferVersion, timestamp);
 }
 
 bool ImageReader::checkExpired(uint64_t contentVersion) {
@@ -88,10 +93,24 @@ bool ImageReader::checkExpired(uint64_t contentVersion) {
   return contentVersion != textureVersion && contentVersion < bufferVersion;
 }
 
-std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t contentVersion, Context* context,
-                                                      bool mipmapped) {
+ImageBufferStatus ImageReader::getStatus(uint64_t contentVersion) {
   std::lock_guard<std::mutex> autoLock(locker);
   if (contentVersion == textureVersion) {
+    return ImageBufferStatus::Ready;
+  }
+  if (contentVersion < bufferVersion) {
+    return ImageBufferStatus::Expired;
+  }
+  if (contentVersion == failedVersion) {
+    return failedStatus;
+  }
+  return ImageBufferStatus::Pending;
+}
+
+std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t contentVersion, int64_t timestamp,
+                                                      Context* context, bool mipmapped) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (contentVersion == textureVersion && contentValid) {
     return textureView;
   }
   if (contentVersion < bufferVersion) {
@@ -100,17 +119,32 @@ std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t contentVersion, C
         "already expired!");
     return nullptr;
   }
-  bool success = true;
-  if (textureView == nullptr) {
-    textureView = stream->onMakeTexture(context, mipmapped);
-    success = textureView != nullptr;
-  } else {
-    success = stream->onUpdateTexture(textureView);
+  auto result = stream->onReadTexture(context, mipmapped, textureView, timestamp);
+  auto changed = result.contentChanged || result.textureView != textureView;
+  if (changed) {
+    if (textureView != nullptr) {
+      textureView->removeUniqueKey();
+    }
+    if (result.textureView != nullptr && result.textureView != textureView) {
+      result.textureView->removeUniqueKey();
+    }
+    textureVersion = 0;
+    contentValid = false;
   }
-  if (success) {
-    textureView->removeUniqueKey();
+  textureView = std::move(result.textureView);
+  if (textureView != nullptr &&
+      (result.status == ImageBufferStatus::Ready ||
+       (result.status == ImageBufferStatus::Timeout && result.contentChanged))) {
+    contentValid = true;
+  }
+  if (result.status == ImageBufferStatus::Ready && contentValid) {
     textureVersion = contentVersion;
+  } else {
+    failedVersion = contentVersion;
+    failedStatus =
+        result.status == ImageBufferStatus::Ready ? ImageBufferStatus::Failed : result.status;
   }
-  return textureView;
+  // A timeout can retain successfully latched non-target pixels. Unknown failed mutations cannot.
+  return contentValid ? textureView : nullptr;
 }
 }  // namespace tgfx

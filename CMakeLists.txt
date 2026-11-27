@@ -612,7 +612,11 @@ if (TGFX_BUILD_TESTS)
             third_party/googletest/googletest
             third_party/googletest/googletest/include)
 
-    list(APPEND TGFX_TEST_COMPILE_OPTIONS ${TGFX_COMPILE_OPTIONS} -fno-access-control)
+    list(APPEND TGFX_TEST_COMPILE_OPTIONS ${TGFX_COMPILE_OPTIONS})
+    if (NOT MSVC)
+        list(APPEND TGFX_TEST_COMPILE_OPTIONS -fno-access-control)
+        list(APPEND TGFX_TEST_DEFINES TGFX_TEST_ACCESS_PRIVATE)
+    endif ()
     list(APPEND TGFX_TEST_DEFINES ${TGFX_DEFINES})
 
     foreach (FILE_PATH ${TGFX_TEST_FILES})

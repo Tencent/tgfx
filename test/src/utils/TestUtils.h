@@ -32,6 +32,14 @@
 
 namespace tgfx {
 
+#ifdef TGFX_TEST_ACCESS_PRIVATE
+#define TGFX_TEST_PRIVATE(suite, name) TGFX_TEST(suite, name)
+#define TGFX_PRIVATE_ACCESS(...) __VA_ARGS__
+#else
+#define TGFX_TEST_PRIVATE(suite, name) static void Disabled_##suite##_##name()
+#define TGFX_PRIVATE_ACCESS(...) /* skipped on MSVC */
+#endif
+
 unsigned CreateGLProgram(Context* context, const std::string& vertex, const std::string& fragment);
 
 bool CreateGLTexture(Context* context, int width, int height, GLTextureInfo* texture);
