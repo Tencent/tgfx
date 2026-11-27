@@ -626,7 +626,10 @@ Rect FTScalerContext::getFauxBoldBounds(GlyphID glyphID, bool fauxItalic) const 
   }
   FT_BBox bbox = {};
   FT_Outline_Get_CBox(&face->glyph->outline, &bbox);
-  if (bbox.xMin >= bbox.xMax || bbox.yMin >= bbox.yMax) {
+  // A zero extent in one axis is not an empty glyph: a horizontal or vertical hairline contour has
+  // no height (or width) of its own but still gains real area once stroked. Only a contour that
+  // collapses in both axes leaves the butt-capped stroke with nothing to draw.
+  if (bbox.xMin == bbox.xMax && bbox.yMin == bbox.yMax) {
     return {};
   }
   Rect bounds =
