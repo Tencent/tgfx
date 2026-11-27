@@ -1160,6 +1160,241 @@ bool BuildCatalogMsl(const std::vector<CatalogEntry>& entries, StageCompiler* co
   return true;
 }
 
+// Functions the HLSL section cannot own. The `...Rect` variants and the external-sampler read are
+// GL text only: sampler2DRect and samplerExternalOES have no Direct3D equivalent. The
+// entry-coupled entries read the entry's cbuffer or the fragment coordinate, so they only compile
+// inside an assembled shader.
+bool IsHlslSkippedFunction(const CatalogEntry& entry) {
+  if (entry.name.size() > 4 && entry.name.compare(entry.name.size() - 4, 4, "Rect") == 0) {
+    return true;
+  }
+  if (entry.name.rfind("chainTail_", 0) == 0) {
+    return true;
+  }
+  if (entry.source.find("samplerExternalOES") != std::string::npos) {
+    return true;
+  }
+  return entry.source.find("DstTexture") != std::string::npos ||
+         entry.source.find("XPBlendMode") != std::string::npos ||
+         entry.source.find("gl_FragCoord") != std::string::npos;
+}
+
+// Removes the Direct3D preamble, the entry point and the module-level declarations, then cuts the
+// rest into top-level blocks. A translated module carries the entry wrapper (SPIRV_Cross_Input /
+// SPIRV_Cross_Output and main), the module-level globals the dummy main wrote, and the functions
+// the catalog declares; only the last group travels.
+bool CollectHlslBlocks(const std::string& hlsl, std::vector<std::string>* blocks,
+                       std::string* error) {
+  std::string body = {};
+  bool skippingStruct = false;
+  bool skippingFunction = false;
+  int functionDepth = 0;
+  size_t lineStart = 0;
+  while (lineStart <= hlsl.size()) {
+    size_t lineEnd = hlsl.find('\n', lineStart);
+    if (lineEnd == std::string::npos) {
+      lineEnd = hlsl.size();
+    }
+    const std::string line = hlsl.substr(lineStart, lineEnd - lineStart);
+    const size_t first = line.find_first_not_of(" \t");
+    const std::string trimmed = first == std::string::npos ? "" : line.substr(first);
+    if (skippingStruct) {
+      if (trimmed.find("};") != std::string::npos) {
+        skippingStruct = false;
+      }
+    } else if (skippingFunction) {
+      for (const char character : line) {
+        if (character == '{') {
+          ++functionDepth;
+        } else if (character == '}') {
+          --functionDepth;
+          if (functionDepth == 0) {
+            skippingFunction = false;
+          }
+        }
+      }
+    } else if (trimmed.empty() || trimmed[0] == '#') {
+      // The includes, line markers and pragmas are supplied once by the assembling shader.
+    } else if (trimmed.rfind("struct SPIRV_Cross_", 0) == 0 ||
+               trimmed.rfind("struct spirv_", 0) == 0) {
+      if (trimmed.find("};") == std::string::npos) {
+        skippingStruct = true;
+      }
+    } else if (trimmed.find("main(") != std::string::npos) {
+      // The entry wrapper (main, frag_main, vert_main): its signature may span lines, so entering
+      // the skip is unconditional and the brace count starts at the first '{' the head carries.
+      functionDepth = 0;
+      bool opened = false;
+      for (const char character : line) {
+        if (character == '{') {
+          ++functionDepth;
+          opened = true;
+        } else if (character == '}' && opened) {
+          --functionDepth;
+        }
+      }
+      skippingFunction = !(opened && functionDepth == 0);
+    } else if (trimmed.rfind("static ", 0) == 0 && trimmed.find('(') == std::string::npos) {
+      // A module-level constant or resource the dummy main carried: its names are per-module, so
+      // it must not travel into the shared support text.
+      if (trimmed.find(';') == std::string::npos) {
+        skippingStruct = true;
+      }
+    } else {
+      body += line;
+      body += '\n';
+    }
+    if (lineEnd == hlsl.size()) {
+      break;
+    }
+    lineStart = lineEnd + 1;
+  }
+  size_t index = 0;
+  while (index < body.size()) {
+    while (index < body.size() && std::isspace(static_cast<unsigned char>(body[index])) != 0) {
+      ++index;
+    }
+    if (index >= body.size()) {
+      break;
+    }
+    const size_t start = index;
+    const size_t open = body.find('{', index);
+    const size_t semi = body.find(';', index);
+    if (open == std::string::npos && semi == std::string::npos) {
+      break;
+    }
+    if (semi != std::string::npos && (open == std::string::npos || semi < open)) {
+      index = semi + 1;
+      continue;
+    }
+    int depth = 0;
+    size_t end = open;
+    for (; end < body.size(); ++end) {
+      if (body[end] == '{') {
+        ++depth;
+      } else if (body[end] == '}') {
+        --depth;
+        if (depth == 0) {
+          ++end;
+          break;
+        }
+      }
+    }
+    const std::string header = body.substr(start, open - start);
+    const bool initializer =
+        header.find('=') != std::string::npos && header.find("struct ") == std::string::npos;
+    if (initializer ||
+        (header.find("struct ") == std::string::npos && header.find('(') == std::string::npos)) {
+      while (end < body.size() && body[end] != ';') {
+        ++end;
+      }
+      index = end < body.size() ? end + 1 : end;
+      continue;
+    }
+    const bool isStruct = header.find("struct ") != std::string::npos;
+    if (isStruct && end < body.size() && body[end] == ';') {
+      ++end;
+    }
+    blocks->push_back(body.substr(start, end - start));
+    index = end;
+  }
+  if (blocks->empty()) {
+    *error = "the translated module carries no blocks";
+    return false;
+  }
+  return true;
+}
+
+// Translates every catalog function to HLSL and keys the result by name, the same walk the MSL
+// section uses: each function body stands alone so the runtime assembles a shader the way it
+// assembles GLSL, and the support types the translator emitted land in one shared prelude entry.
+bool BuildCatalogHlsl(const std::vector<CatalogEntry>& entries, StageCompiler* compiler,
+                      std::map<std::string, std::string>* hlslByName, std::string* support,
+                      std::string* error) {
+  std::set<std::string> catalogNames = {};
+  for (const auto& entry : entries) {
+    catalogNames.insert(entry.name);
+  }
+  uint32_t moduleIndex = 0;
+  for (const auto& entry : entries) {
+    if (IsHlslSkippedFunction(entry)) {
+      // An empty entry keeps the sections aligned by name; nothing looks the name up.
+      hlslByName->insert({entry.name, ""});
+      continue;
+    }
+    std::set<std::string> done = {};
+    std::vector<const CatalogEntry*> ordered = {};
+    if (!CollectMslOrder(entries, entry, &done, &ordered, error)) {
+      return false;
+    }
+    const std::string glsl = BuildMslModuleGLSL(entry, ordered, error);
+    if (glsl.empty()) {
+      return false;
+    }
+    const auto& spirv = compiler->compileSpirv(glsl, ShaderStageType::Fragment, "catalog_hlsl",
+                                               moduleIndex++, false);
+    if (!spirv.success) {
+      *error = "HLSL section, " + entry.name + ": GLSL to SPIR-V: " + spirv.error;
+      return false;
+    }
+    const auto& hlsl = compiler->translateHLSL(spirv.spirv, ShaderStageType::Fragment);
+    if (!hlsl.success) {
+      *error = "HLSL section, " + entry.name + ": SPIR-V to HLSL: " + hlsl.error;
+      return false;
+    }
+    std::vector<std::string> blocks = {};
+    if (!CollectHlslBlocks(hlsl.text, &blocks, error)) {
+      *error = "HLSL section, " + entry.name + ": " + *error;
+      return false;
+    }
+    bool found = false;
+    for (const auto& block : blocks) {
+      const std::string name = BlockName(block);
+      if (catalogNames.find(name) == catalogNames.end()) {
+        if (support->find(block) == std::string::npos) {
+          *support += block;
+          *support += '\n';
+        }
+        continue;
+      }
+      if (name == entry.name) {
+        found = true;
+      }
+      hlslByName->emplace(name, block);
+    }
+    if (!found) {
+      if (const char* dumpDir = std::getenv("TGFX_HLSL_DUMP")) {
+        std::ofstream dump(std::string(dumpDir) + "/" + entry.name + ".hlsl", std::ios::binary);
+        dump << hlsl.text;
+      }
+      *error = "HLSL section, " + entry.name + ": the translated module lost the function";
+      return false;
+    }
+  }
+  for (const auto& name : catalogNames) {
+    if (hlslByName->find(name) == hlslByName->end()) {
+      *error = "HLSL section: '" + name + "' was never translated";
+      return false;
+    }
+  }
+  // The translator splits a sampler parameter into the texture and the sampler state, so a
+  // function that reads a texture needs two arguments at its call site. The runtime spells that
+  // split for the shared reader; the list below records which entries carry one, so a future call
+  // shape can be checked against what the section actually holds.
+  std::string samplerList = {};
+  for (const auto& pair : *hlslByName) {
+    if (pair.second.find("Texture2D<") == std::string::npos) {
+      continue;
+    }
+    if (!samplerList.empty()) {
+      samplerList += ",";
+    }
+    samplerList += pair.first;
+  }
+  hlslByName->insert({"__hlsl_samplers__", samplerList});
+  return true;
+}
+
 bool DeriveOperatorParams(const CatalogEntry& entry, std::string* returnType,
                           std::vector<OperatorParamInfo>* params, std::string* error) {
   // The signature is parsed here rather than through SignatureParams: that helper's contract
@@ -1435,7 +1670,63 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
     mslOffsets.push_back(supportOffset);
   }
 
-  const uint32_t sectionCount = compiler != nullptr ? 2 : 1;
+  std::string hlslPool = {};
+  std::vector<FunctionOffset> hlslOffsets = {};
+  if (compiler != nullptr) {
+    std::map<std::string, std::string> hlslByName = {};
+    std::string hlslSupport = {};
+    if (!BuildCatalogHlsl(entries, compiler, &hlslByName, &hlslSupport, error)) {
+      return false;
+    }
+    hlslOffsets.reserve(sorted.size() + 2);
+    for (const CatalogEntry* entry : sorted) {
+      const auto found = hlslByName.find(entry->name);
+      if (found == hlslByName.end()) {
+        *error = "HLSL section: '" + entry->name + "' was never translated";
+        return false;
+      }
+      FunctionOffset offset = {};
+      offset.name = static_cast<uint32_t>(hlslPool.size());
+      hlslPool += entry->name;
+      hlslPool.push_back('\0');
+      offset.source = static_cast<uint32_t>(hlslPool.size());
+      offset.sourceSize = static_cast<uint32_t>(found->second.size());
+      hlslPool += found->second;
+      hlslPool.push_back('\0');
+      const std::string requires = RequiresOf(*entry);
+      offset.requires = static_cast<uint32_t>(hlslPool.size());
+      hlslPool += requires;
+      hlslPool.push_back('\0');
+      hlslOffsets.push_back(offset);
+    }
+    const auto hlslSamplerEntry = hlslByName.find("__hlsl_samplers__");
+    if (hlslSamplerEntry != hlslByName.end() && !hlslSamplerEntry->second.empty()) {
+      FunctionOffset samplerOffset = {};
+      samplerOffset.name = static_cast<uint32_t>(hlslPool.size());
+      hlslPool += "__hlsl_samplers__";
+      hlslPool.push_back('\0');
+      samplerOffset.source = static_cast<uint32_t>(hlslPool.size());
+      samplerOffset.sourceSize = static_cast<uint32_t>(hlslSamplerEntry->second.size());
+      hlslPool += hlslSamplerEntry->second;
+      hlslPool.push_back('\0');
+      samplerOffset.requires = static_cast<uint32_t>(hlslPool.size());
+      hlslPool.push_back('\0');
+      hlslOffsets.push_back(samplerOffset);
+    }
+    FunctionOffset hlslSupportOffset = {};
+    hlslSupportOffset.name = static_cast<uint32_t>(hlslPool.size());
+    hlslPool += "__hlsl_support__";
+    hlslPool.push_back('\0');
+    hlslSupportOffset.source = static_cast<uint32_t>(hlslPool.size());
+    hlslSupportOffset.sourceSize = static_cast<uint32_t>(hlslSupport.size());
+    hlslPool += hlslSupport;
+    hlslPool.push_back('\0');
+    hlslSupportOffset.requires = static_cast<uint32_t>(hlslPool.size());
+    hlslPool.push_back('\0');
+    hlslOffsets.push_back(hlslSupportOffset);
+  }
+
+  const uint32_t sectionCount = compiler != nullptr ? 3 : 1;
   const uint32_t entryTableOffset =
       SHADER_LIBRARY_BUNDLE_HEADER_SIZE + sectionCount * SHADER_LIBRARY_BUNDLE_SECTION_SIZE;
   const uint32_t poolOffset =
@@ -1445,6 +1736,10 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
   const uint32_t mslPoolOffset =
       mslEntryOffset +
       static_cast<uint32_t>(mslOffsets.size() * SHADER_LIBRARY_BUNDLE_FUNCTION_SIZE);
+  const uint32_t hlslEntryOffset = mslPoolOffset + static_cast<uint32_t>(mslPool.size());
+  const uint32_t hlslPoolOffset =
+      hlslEntryOffset +
+      static_cast<uint32_t>(hlslOffsets.size() * SHADER_LIBRARY_BUNDLE_FUNCTION_SIZE);
   std::string bundle = {};
   bundle.append(SHADER_LIBRARY_BUNDLE_MAGIC, sizeof(SHADER_LIBRARY_BUNDLE_MAGIC) - 1);
   AppendU32(&bundle, SHADER_LIBRARY_BUNDLE_VERSION);
@@ -1453,6 +1748,7 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
   uint32_t languageMask = ShaderLibraryLanguageMask(ShaderLibraryLanguage::GLSL);
   if (compiler != nullptr) {
     languageMask |= ShaderLibraryLanguageMask(ShaderLibraryLanguage::MSL);
+    languageMask |= ShaderLibraryLanguageMask(ShaderLibraryLanguage::HLSL);
   }
   AppendU32(&bundle, languageMask);
   AppendU64(&bundle, HashSource(pool));
@@ -1468,6 +1764,12 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
     AppendU32(&bundle, mslEntryOffset);
     AppendU32(&bundle, mslPoolOffset);
     AppendU32(&bundle, static_cast<uint32_t>(mslPool.size()));
+    AppendU32(&bundle, 0);
+    AppendU32(&bundle, static_cast<uint32_t>(ShaderLibraryLanguage::HLSL));
+    AppendU32(&bundle, static_cast<uint32_t>(hlslOffsets.size()));
+    AppendU32(&bundle, hlslEntryOffset);
+    AppendU32(&bundle, hlslPoolOffset);
+    AppendU32(&bundle, static_cast<uint32_t>(hlslPool.size()));
     AppendU32(&bundle, 0);
   }
   for (const auto& offset : offsets) {
@@ -1485,6 +1787,13 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
       AppendU32(&bundle, offset.requires);
     }
     bundle += mslPool;
+    for (const auto& offset : hlslOffsets) {
+      AppendU32(&bundle, offset.name);
+      AppendU32(&bundle, offset.source);
+      AppendU32(&bundle, offset.sourceSize);
+      AppendU32(&bundle, offset.requires);
+    }
+    bundle += hlslPool;
   }
   std::ofstream out(outPath, std::ios::binary);
   if (!out.is_open()) {
