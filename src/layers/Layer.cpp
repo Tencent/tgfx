@@ -550,7 +550,7 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
   _children.erase(_children.begin() + index);
   if (_root) {
     _root->invalidateRect(child->renderBounds);
-    child->renderBounds = {};
+    child->clearRenderBounds();
   }
   invalidateDescendents();
   return child;
@@ -590,7 +590,7 @@ bool Layer::setChildIndex(std::shared_ptr<Layer> child, int index) {
     // Immediately invalidate the old render bounds, as this may affect the background of the above
     // layer styles.
     _root->invalidateRect(child->renderBounds);
-    child->renderBounds = {};
+    child->clearRenderBounds();
   }
   child->invalidateTransform();
   invalidateDescendents();
@@ -641,7 +641,7 @@ void Layer::setChildren(const std::vector<std::shared_ptr<Layer>>& children) {
       ptr->onDetachFromRoot();
       if (_root) {
         _root->invalidateRect(ptr->renderBounds);
-        ptr->renderBounds = {};
+        ptr->clearRenderBounds();
       }
     } else {
       retainedChildren.push_back(ptr);
@@ -928,8 +928,8 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     // draw alpha down instead of assuming an opaque draw.
     _root->updateRenderBounds(nullptr, false, alpha);
     renderRect = localToGlobalMatrix.mapRect(clippedBounds);
-    // updateRenderBounds() skips hidden and fully transparent subtrees, so below such a layer the
-    // render bounds are empty or stale and cannot cull anything.
+    // A hidden or fully transparent subtree has its render bounds cleared and never recomputed, so
+    // below such a layer the render bounds are empty and cannot cull anything.
     if (IsReachedByRenderBounds(this, _root)) {
       renderRectsVec = {renderRect};
       args.renderRects = &renderRectsVec;
@@ -1236,8 +1236,8 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   DrawArgs maskArgs = args;
   maskArgs.excludeEffects |= isContourMode;
   maskArgs.backgroundHandler = BackgroundHandler::NoOp();
-  // A mask under a hidden ancestor still applies, but updateRenderBounds() skips hidden subtrees,
-  // so the bounds of the mask's descendants were never computed and culling would drop them. Draw
+  // A mask under a hidden ancestor still applies, but a hidden or fully transparent subtree has its
+  // render bounds cleared and never recomputed, so culling would drop the mask's descendants. Draw
   // such a mask uncut.
   if (_mask->renderBounds.isEmpty()) {
     maskArgs.renderRects = nullptr;
@@ -2181,6 +2181,13 @@ bool Layer::isClippedToMaskBounds() const {
          maskType != LayerMaskType::ContourInverted;
 }
 
+void Layer::clearRenderBounds() {
+  renderBounds = {};
+  for (auto& child : _children) {
+    child->clearRenderBounds();
+  }
+}
+
 void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty,
                                float alpha) {
   const auto accumulatedAlpha = alpha * _alpha;
@@ -2254,7 +2261,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     if (!child->bitFields.visible || child->_alpha <= 0) {
       if (child->bitFields.dirtyTransform) {
         _root->invalidateRect(child->renderBounds);
-        child->renderBounds = {};
+        child->clearRenderBounds();
       }
       child->bitFields.dirtyTransform = false;
       continue;
@@ -2278,7 +2285,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
         if (!clipRect->intersect(maskBounds)) {
           if (child->bitFields.dirtyTransform) {
             _root->invalidateRect(child->renderBounds);
-            child->renderBounds = {};
+            child->clearRenderBounds();
           }
           child->bitFields.dirtyTransform = false;
           continue;
