@@ -109,6 +109,12 @@ namespace tgfx {
   X(TiledRepeatCoord, 79)   \
   X(RoundStrokeRectCoverage, 80) \
   X(ColorSpaceXform, 81)    \
+  X(ShapeBlurRectCoverage, 82) \
+  X(ShapeBlurRRectCoverageLow, 83) \
+  X(ShapeBlurRRectCoverageHigh, 84) \
+  X(ShapeMaskRectSDF, 85) \
+  X(ShapeMaskRRectSDF, 86) \
+  X(ShapeMaskCoverage, 87) \
 
 enum class OperatorID : uint32_t {
 #define TGFX_OPERATOR_ENUM(name, value) name = value,
