@@ -62,6 +62,44 @@ bool ValidateExpr(const ProgramIR& program, const IRExpr& expr, std::string* err
     *error = "a swizzle needs one operand and a swizzle spelling";
     return false;
   }
+  if (expr.kind == IRExprKind::Swizzle && expr.args[0] < program.values.size()) {
+    // A swizzle names components of its operand; a letter past the operand's width would print an
+    // invalid expression and lose the draw at driver compile time, so it is a construction error.
+    const auto& source = program.values[expr.args[0]];
+    uint32_t components = 1;
+    switch (source.type) {
+      case SLType::Float2:
+      case SLType::Int2:
+        components = 2;
+        break;
+      case SLType::Float3:
+      case SLType::Int3:
+        components = 3;
+        break;
+      case SLType::Float4:
+      case SLType::Int4:
+        components = 4;
+        break;
+      default:
+        components = 1;
+        break;
+    }
+    for (const char character : expr.swizzle) {
+      uint32_t component = 4;
+      switch (character) {
+        case 'x': case 'r': component = 0; break;
+        case 'y': case 'g': component = 1; break;
+        case 'z': case 'b': component = 2; break;
+        case 'w': case 'a': component = 3; break;
+        default: component = 4; break;
+      }
+      if (component >= components) {
+        *error = "a swizzle reads component '" + std::string(1, character) +
+                 "' of a type with " + std::to_string(components) + " components";
+        return false;
+      }
+    }
+  }
   if (expr.kind == IRExprKind::Binary && expr.args.size() != 2) {
     *error = "a binary expression needs two operands";
     return false;
