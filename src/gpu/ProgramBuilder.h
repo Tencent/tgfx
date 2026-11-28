@@ -83,6 +83,10 @@ class ProgramBuilder {
     return programIR;
   }
 
+  /// Builds one stage's CPU uniform block from the IR: offsets and sizes are copied from the
+  /// single place they were assigned, never recomputed.
+  std::unique_ptr<UniformData> makeUniformData(ShaderStage stage);
+
   /// The fragment chain's tail outputs (the id protocol): the xfer reads these directly
   /// instead of searching values by name. A chain that never emitted stays invalid.
   ValueID colorChainValue = INVALID_VALUE_ID;

@@ -283,8 +283,8 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   descriptor.vertex.module = vertexShader;
   descriptor.fragment.module = fragmentShader;
   descriptor.fragment.colorAttachments.push_back(programInfo->getPipelineColorAttachment());
-  auto vertexUniformData = _uniformHandler.makeUniformData(ShaderStage::Vertex);
-  auto fragmentUniformData = _uniformHandler.makeUniformData(ShaderStage::Fragment);
+  auto vertexUniformData = makeUniformData(ShaderStage::Vertex);
+  auto fragmentUniformData = makeUniformData(ShaderStage::Fragment);
   if (vertexUniformData) {
     BindingEntry vertexBinding = {VertexUniformBlockName, VERTEX_UBO_BINDING_POINT,
                                   ShaderVisibility::Vertex};

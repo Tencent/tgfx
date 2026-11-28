@@ -41,6 +41,10 @@ ProgramBuilder::ProgramBuilder(Context* context, const ProgramInfo* programInfo)
     : context(context), programInfo(programInfo) {
 }
 
+std::unique_ptr<UniformData> ProgramBuilder::makeUniformData(ShaderStage stage) {
+  return UniformData::Make(programIR.IR().interface, stage);
+}
+
 bool ProgramBuilder::emitAndInstallProcessors() {
   std::string inputColor;
   std::string inputCoverage;

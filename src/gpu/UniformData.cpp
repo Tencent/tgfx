@@ -4,39 +4,52 @@
 //
 //  Copyright (C) 2023 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
-//  compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  Unless required by applicable law or agreed to in writing, software distributed under the
-//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the License for the specific language governing permissions
-//  and limitations under the License.
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "UniformData.h"
+#include <cstring>
 #include "core/utils/Log.h"
-#include "gpu/UniformLayout.h"
+#include "gpu/ir/ProgramIR.h"
 
 namespace tgfx {
 
-UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(uniforms)) {
-  for (const auto& uniform : _uniforms) {
-    const auto layout = Std140LayoutOf(uniform.format());
-    if (layout.size == 0) {
-      // A sampler (or an unknown format) is a binding, not a member of the block.
+std::unique_ptr<UniformData> UniformData::Make(const InterfaceIR& interface, ShaderStage stage) {
+  const UniformBlockIR* block = nullptr;
+  for (const auto& candidate : interface.uniformBlocks) {
+    if (candidate.stage != stage) {
       continue;
     }
-    const auto count = uniform.count();
-    const size_t size = count > 1 ? static_cast<size_t>(layout.arrayStride) * count : layout.size;
-    const size_t offset = alignCursor(layout.alignment);
-    fieldMap[uniform.name()] = {uniform.name(), uniform.format(), offset, size, layout.alignment};
-    cursor = offset + size;
+    if (block != nullptr) {
+      // More than one block per stage needs a per-block name mapping the upload does not have;
+      // reject instead of silently picking the first.
+      LOGE("UniformData::Make(): the stage declares more than one uniform block");
+      return nullptr;
+    }
+    block = &candidate;
   }
-
-  bufferSize = alignCursor(16);
+  if (block == nullptr) {
+    return nullptr;
+  }
+  auto data = std::unique_ptr<UniformData>(new UniformData());
+  data->bufferSize = block->size;
+  for (const auto& uniform : interface.uniforms) {
+    if (uniform.stage != stage || uniform.size == 0) {
+      continue;
+    }
+    DEBUG_ASSERT(uniform.offset + uniform.size <= block->size);
+    data->fieldMap[uniform.name] = {uniform.offset, uniform.size};
+  }
+  return data;
 }
 
 void UniformData::setBuffer(void* buffer) {
@@ -72,10 +85,6 @@ const UniformData::Field* UniformData::findField(const std::string& key) const {
     return &iter->second;
   }
   return nullptr;
-}
-
-size_t UniformData::alignCursor(size_t alignment) const {
-  return Std140AlignUp(static_cast<uint32_t>(cursor), static_cast<uint32_t>(alignment));
 }
 
 }  // namespace tgfx

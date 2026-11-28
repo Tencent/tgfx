@@ -69,17 +69,4 @@ ShaderVar UniformHandler::getSamplerVariable(SamplerHandle handle) const {
   return ShaderVar(uniform);
 }
 
-std::unique_ptr<UniformData> UniformHandler::makeUniformData(ShaderStage stage) const {
-  if (stage == ShaderStage::Vertex && vertexUniforms.empty()) {
-    return nullptr;
-  }
-
-  if (stage == ShaderStage::Fragment && fragmentUniforms.empty()) {
-    return nullptr;
-  }
-
-  return std::unique_ptr<UniformData>(
-      new UniformData(stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms));
-}
-
 }  // namespace tgfx

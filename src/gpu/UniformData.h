@@ -4,15 +4,15 @@
 //
 //  Copyright (C) 2023 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
-//  compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  Unless required by applicable law or agreed to in writing, software distributed under the
-//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the License for the specific language governing permissions
-//  and limitations under the License.
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,21 +23,29 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
-#include <vector>
-#include "gpu/Uniform.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
 
+struct InterfaceIR;
+
 /**
  * One stage's uniform block: the byte size of the block and the field table the uploads address.
- * The layout is derived once from the processor declarations; a write names the uniform by its
- * base name and copies the value into the field's offset.
+ * The layout is read from the program IR, the single place the offsets are assigned; a write names
+ * the uniform by its base name and copies the value into the field's offset.
  */
 class UniformData {
  public:
+  /**
+   * Builds the block from the IR the program already carries: offsets and sizes are copied, never
+   * recomputed. Returns null when the stage declares no block, and refuses (null) when a stage
+   * declares more than one, because the per-block name mapping does not exist yet.
+   */
+  static std::unique_ptr<UniformData> Make(const InterfaceIR& interface, ShaderStage stage);
+
   /**
    *
    * Copies value into the uniform data. The data must have the same size as the uniform specified
@@ -99,45 +107,22 @@ class UniformData {
     return bufferSize;
   }
 
-  /**
-   * Returns the list of uniforms in this data.
-   */
-  const std::vector<Uniform>& uniforms() const {
-    return _uniforms;
-  }
-
  private:
   struct Field {
-    std::string name = "";
-    UniformFormat format = UniformFormat::Float;
     size_t offset = 0;
     size_t size = 0;
-    size_t align = 0;
   };
+
+  UniformData() = default;
 
   uint8_t* _buffer = nullptr;
   size_t bufferSize = 0;
-  std::vector<Uniform> _uniforms = {};
   std::string nameSuffix = "";
   std::unordered_map<std::string, Field> fieldMap = {};
-  size_t cursor = 0;
-
-  explicit UniformData(std::vector<Uniform> uniforms);
 
   void onSetData(const std::string& name, const void* data, size_t size) const;
 
   const Field* findField(const std::string& key) const;
-
-  size_t alignCursor(size_t alignment) const;
-
-  /**
-   * Dump UniformData's memory layout information is printed to the console for debugging.
-   */
-#if DEBUG
-  static const char* ToUniformFormatName(UniformFormat format);
-
-  void dump() const;
-#endif
 
   friend class ProgramInfo;
   friend class UniformHandler;

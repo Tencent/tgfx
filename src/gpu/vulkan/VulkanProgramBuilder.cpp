@@ -167,8 +167,8 @@ std::shared_ptr<Program> VulkanProgramBuilder::buildIRProgram() {
     LOGE("VulkanProgramBuilder: the IR render pipeline could not be created");
     return nullptr;
   }
-  auto vertexUniformData = _uniformHandler.makeUniformData(ShaderStage::Vertex);
-  auto fragmentUniformData = _uniformHandler.makeUniformData(ShaderStage::Fragment);
+  auto vertexUniformData = makeUniformData(ShaderStage::Vertex);
+  auto fragmentUniformData = makeUniformData(ShaderStage::Fragment);
   LOGI("VulkanProgramBuilder: built an IR program (%zu bindings)",
        modules.layout.bindings().size());
   return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),

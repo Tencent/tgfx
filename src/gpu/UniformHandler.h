@@ -21,6 +21,7 @@
 #include "gpu/SamplerHandle.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/Swizzle.h"
+#include "gpu/Uniform.h"
 #include "gpu/UniformData.h"
 #include "tgfx/gpu/ShaderStage.h"
 #include "tgfx/gpu/Texture.h"
@@ -73,8 +74,6 @@ class UniformHandler {
   Swizzle getSamplerSwizzle(SamplerHandle samplerHandle) const {
     return samplerSwizzles[samplerHandle.toIndex()];
   }
-
-  std::unique_ptr<UniformData> makeUniformData(ShaderStage stage) const;
 
  private:
   // This is not owned by the class
