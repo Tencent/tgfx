@@ -52,7 +52,6 @@ void GLSLStencilCoverStencilPassGeometryProcessor::emitCode(EmitArgs& args) cons
   //     ColorWriteMask = 0, so the values written here are dropped before reaching the
   //     colour attachment.
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -66,10 +65,6 @@ void GLSLStencilCoverStencilPassGeometryProcessor::emitCode(EmitArgs& args) cons
 
   // Loop-Blinn quadratic implicit-curve test: discard fragments where k*k - l > 0
   // (convex / exterior side of the bezier).
-  fragBuilder->codeAppendf("if (%s.x * %s.x - %s.y > 0.0) { discard; }", klmVarying.fsIn().c_str(),
-                           klmVarying.fsIn().c_str(), klmVarying.fsIn().c_str());
-  fragBuilder->storeColor(args.outputColor, "vec4(0.0)");
-  fragBuilder->storeCoverage(args.outputCoverage, "vec4(1.0)", false);
 
   vertBuilder->storePosition(positionName);
 }

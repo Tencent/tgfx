@@ -91,10 +91,6 @@ void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
       fragBuilder->onAfterChildProcEmitCode();
       const bool tiledRead = described && !tiled.plainRead;
       if (described && (!tiledRead || (!tiled.subsetName.empty() && !tiled.clampName.empty()))) {
-        auto entry = fragBuilder->appendFunction("gaussianBlur1D");
-        if (entry.empty()) {
-          return;
-        }
         const auto samplerName = args.uniformHandler->getSamplerVariable(childSamplers[0]).name();
         const std::string subset = tiledRead ? tiled.subsetName : std::string("vec4(0.0)");
         const std::string clamp = tiledRead ? tiled.clampName : std::string("vec4(0.0)");
@@ -185,7 +181,6 @@ void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
         callArgs.push_back(names.kernelSlot14);
         callArgs.push_back(names.kernelSlot15);
         callArgs.push_back(names.kernelSlot16);
-        fragBuilder->appendCall(args.outputColor, entry, callArgs, "", expression);
         return;
       }
     }

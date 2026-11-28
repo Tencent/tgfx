@@ -57,11 +57,6 @@ GLSLRectEffect::GLSLRectEffect(const Rect& localRect, const Matrix& deviceToLoca
 }
 
 void GLSLRectEffect::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  const auto entry = fragBuilder->appendFunction("pmRectEffect");
-  if (entry.empty()) {
-    return;
-  }
   if (args.irBuilder == nullptr || args.inputValue == INVALID_VALUE_ID ||
       args.outputValue == INVALID_VALUE_ID) {
     return;
@@ -74,20 +69,6 @@ void GLSLRectEffect::emitCode(EmitArgs& args) const {
   const auto result = RectCoverageOp::Emit(args.irBuilder, args.uniformHandler, &names,
                                            args.inputValue, fragCoordXY);
   args.irBuilder->StoreOutput(args.outputValue, result);
-  std::string expression = {};
-  std::string error = {};
-  if (result == INVALID_VALUE_ID ||
-      !GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error)) {
-    args.irBuilder->MarkFailed(error.empty() ? "the rect operator could not be emitted" : error);
-    return;
-  }
-  fragBuilder->appendCall(
-      args.outputColor, entry,
-      {args.inputColorValue, ValueRef("gl_FragCoord.xy", SLType::Float2, ValueOrigin::Literal),
-       ValueRef(names.rect, SLType::Float4, ValueOrigin::Uniform),
-       ValueRef(names.antiAlias, SLType::Float, ValueOrigin::Uniform),
-       ValueRef(names.deviceToLocal, SLType::Float3x3, ValueOrigin::Uniform)},
-      "", expression);
 }
 
 void GLSLRectEffect::onSetData(UniformData*, UniformData* fragmentUniformData) const {

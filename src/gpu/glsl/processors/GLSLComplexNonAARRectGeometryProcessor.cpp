@@ -34,7 +34,6 @@ GLSLComplexNonAARRectGeometryProcessor::GLSLComplexNonAARRectGeometryProcessor(
 
 void GLSLComplexNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
   auto varyingHandler = args.varyingHandler;
   auto uniformHandler = args.uniformHandler;
 
@@ -130,21 +129,8 @@ void GLSLComplexNonAARRectGeometryProcessor::emitCode(EmitArgs& args) const {
   // Fragment shader - evaluate the per-corner round rect through the shared SDF. The stroke form
   // rides the function's runtime flag as a literal, so the driver folds the arm this draw does
   // not use.
-  fragBuilder->aliasValue("localCoord", localCoordVarying.fsIn(), "highp vec2");
-  fragBuilder->aliasValue("xR", xRadiiVarying.fsIn(), "highp vec4");
-  fragBuilder->aliasValue("yR", yRadiiVarying.fsIn(), "highp vec4");
-  fragBuilder->aliasValue("bounds", boundsVarying.fsIn(), "highp vec4");
-  auto coverageEntry = fragBuilder->appendFunction("complexRRectCoverage");
-  if (coverageEntry.empty()) {
-    return;
-  }
   if (stroke) {
-    fragBuilder->aliasValue("sw", strokeWidthVarying.fsIn(), "highp vec2");
-    fragBuilder->appendCall(args.outputCoverage, coverageEntry,
-                            {"localCoord", "bounds", "xR", "yR", "sw", "1"}, "vec4");
   } else {
-    fragBuilder->appendCall(args.outputCoverage, coverageEntry,
-                            {"localCoord", "bounds", "xR", "yR", "vec2(0.0)", "0"}, "vec4");
   }
 }
 

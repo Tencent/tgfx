@@ -58,12 +58,10 @@ PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(
 
 void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
   auto uniformHandler = args.uniformHandler;
-  auto fragBuilder = args.fragBuilder;
   ColorSpaceXformHelper helper{};
   helper.emitCode(uniformHandler, colorSpaceXformSteps.get());
   const bool recordIR = args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID;
   if (helper.isNoop()) {
-    fragBuilder->copyValue(args.outputColor, args.inputColor);
     if (recordIR) {
       const auto source = InputColorIR(args);
       if (source != INVALID_VALUE_ID) {
@@ -85,10 +83,6 @@ void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
     flags &= ~8u;
     dstTFType = 0;
   }
-  auto entry = fragBuilder->appendFunction("chainApplyColorSpaceXform");
-  if (entry.empty()) {
-    return;
-  }
   const std::string srcTF0 = helper.applySrcTF() ? helper.srcTFUniform0() : "vec4(0.0)";
   const std::string srcTF1 = helper.applySrcTF() ? helper.srcTFUniform1() : "vec4(0.0)";
   const std::string srcOOTF = helper.applySrcOOTF() ? helper.srcOOTFUniform() : "vec4(0.0)";
@@ -97,10 +91,6 @@ void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
   const std::string dstOOTF = helper.applyDstOOTF() ? helper.dstOOTFUniform() : "vec4(0.0)";
   const std::string dstTF0 = helper.applyDstTF() ? helper.dstTFUniform0() : "vec4(0.0)";
   const std::string dstTF1 = helper.applyDstTF() ? helper.dstTFUniform1() : "vec4(0.0)";
-  fragBuilder->appendCall(
-      args.outputColor, entry,
-      {args.inputColor, std::to_string(flags), srcTF0, srcTF1, std::to_string(srcTFType), srcOOTF,
-       colorXform, dstOOTF, dstTF0, dstTF1, std::to_string(dstTFType)});
   if (!recordIR) {
     return;
   }

@@ -17,7 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLUnrolledBinaryGradientColorizer.h"
+#include <cstdarg>
+#include <cstdio>
 #include "core/utils/MathExtra.h"
+
+namespace {
+
+/// Appends the printf-style text the cascade is built from. The text becomes one RawText IR
+/// statement, so the body printer never sees this processor as source code.
+void AppendFormatted(std::string* out, const char* format, ...) {
+  char buffer[1024] = {};
+  va_list arguments;
+  va_start(arguments, format);
+  auto length = vsnprintf(buffer, sizeof(buffer), format, arguments);
+  va_end(arguments);
+  if (length > 0) {
+    out->append(buffer, static_cast<size_t>(length));
+  }
+}
+
+}  // namespace
 
 namespace tgfx {
 struct UnrolledBinaryUniformName {
@@ -120,103 +139,103 @@ std::string AddUniform(UniformHandler* uniformHandler, const std::string& name, 
   return "";
 }
 
-void AppendCode1(FragmentShaderBuilder* fragBuilder, int intervalCount,
+void AppendCode1(std::string* out, int intervalCount,
                  const UnrolledBinaryUniformName& name) {
   if (intervalCount >= 2) {
-    fragBuilder->codeAppend("// thresholds1_7.y is mid-point for intervals (0,3) and (4,7)\n");
-    fragBuilder->codeAppendf("if (t < %s.y) {", name.thresholds1_7.c_str());
+    *out += "// thresholds1_7.y is mid-point for intervals (0,3) and (4,7)\n";
+    AppendFormatted(out, "if (t < %s.y) {", name.thresholds1_7.c_str());
   }
-  fragBuilder->codeAppend("// thresholds1_7.x is mid-point for intervals (0,1) and (2,3)\n");
-  fragBuilder->codeAppendf("if (t < %s.x) {", name.thresholds1_7.c_str());
-  fragBuilder->codeAppendf("scale = %s;", name.scale0_1.c_str());
-  fragBuilder->codeAppendf("bias = %s;", name.bias0_1.c_str());
+  *out += "// thresholds1_7.x is mid-point for intervals (0,1) and (2,3)\n";
+  AppendFormatted(out, "if (t < %s.x) {", name.thresholds1_7.c_str());
+  AppendFormatted(out, "scale = %s;", name.scale0_1.c_str());
+  AppendFormatted(out, "bias = %s;", name.bias0_1.c_str());
   if (intervalCount > 1) {
-    fragBuilder->codeAppend("} else {");
-    fragBuilder->codeAppendf("scale = %s;",
+    *out += "} else {";
+    AppendFormatted(out, "scale = %s;",
                              name.scale2_3.empty() ? "vec4(0.0)" : name.scale2_3.c_str());
-    fragBuilder->codeAppendf("bias = %s;",
+    AppendFormatted(out, "bias = %s;",
                              name.bias2_3.empty() ? "vec4(0.0)" : name.bias2_3.c_str());
   }
-  fragBuilder->codeAppend("}");
+  *out += "}";
   if (intervalCount > 2) {
-    fragBuilder->codeAppend("} else {");
+    *out += "} else {";
   }
   if (intervalCount >= 3) {
-    fragBuilder->codeAppend("// thresholds1_7.z is mid-point for intervals (4,5) and (6,7)\n");
-    fragBuilder->codeAppendf("if (t < %s.z) {", name.thresholds1_7.c_str());
-    fragBuilder->codeAppendf("scale = %s;",
+    *out += "// thresholds1_7.z is mid-point for intervals (4,5) and (6,7)\n";
+    AppendFormatted(out, "if (t < %s.z) {", name.thresholds1_7.c_str());
+    AppendFormatted(out, "scale = %s;",
                              name.scale4_5.empty() ? "vec4(0.0)" : name.scale4_5.c_str());
-    fragBuilder->codeAppendf("bias = %s;",
+    AppendFormatted(out, "bias = %s;",
                              name.bias4_5.empty() ? "vec4(0.0)" : name.bias4_5.c_str());
   }
   if (intervalCount > 3) {
-    fragBuilder->codeAppend("} else {");
-    fragBuilder->codeAppendf("scale = %s;",
+    *out += "} else {";
+    AppendFormatted(out, "scale = %s;",
                              name.scale6_7.empty() ? "vec4(0.0)" : name.scale6_7.c_str());
-    fragBuilder->codeAppendf("bias = %s;",
+    AppendFormatted(out, "bias = %s;",
                              name.bias6_7.empty() ? "vec4(0.0)" : name.bias6_7.c_str());
   }
   if (intervalCount >= 3) {
-    fragBuilder->codeAppend("}");
+    *out += "}";
   }
   if (intervalCount >= 2) {
-    fragBuilder->codeAppend("}");
+    *out += "}";
   }
 }
 
-void AppendCode2(FragmentShaderBuilder* fragBuilder, int intervalCount,
+void AppendCode2(std::string* out, int intervalCount,
                  const UnrolledBinaryUniformName& name) {
   if (intervalCount >= 6) {
-    fragBuilder->codeAppend("// thresholds9_13.y is mid-point for intervals (8,11) and (12,15)\n");
-    fragBuilder->codeAppendf("if (t < %s.y) {", name.thresholds9_13.c_str());
+    *out += "// thresholds9_13.y is mid-point for intervals (8,11) and (12,15)\n";
+    AppendFormatted(out, "if (t < %s.y) {", name.thresholds9_13.c_str());
   }
   if (intervalCount >= 5) {
-    fragBuilder->codeAppend("// thresholds9_13.x is mid-point for intervals (8,9) and (10,11)\n");
-    fragBuilder->codeAppendf("if (t < %s.x) {", name.thresholds9_13.c_str());
-    fragBuilder->codeAppendf("scale = %s;",
+    *out += "// thresholds9_13.x is mid-point for intervals (8,9) and (10,11)\n";
+    AppendFormatted(out, "if (t < %s.x) {", name.thresholds9_13.c_str());
+    AppendFormatted(out, "scale = %s;",
                              name.scale8_9.empty() ? "vec4(0.0)" : name.scale8_9.c_str());
-    fragBuilder->codeAppendf("bias = %s;",
+    AppendFormatted(out, "bias = %s;",
                              name.bias8_9.empty() ? "vec4(0.0)" : name.bias8_9.c_str());
   }
   if (intervalCount > 5) {
-    fragBuilder->codeAppend("} else {");
-    fragBuilder->codeAppendf("scale = %s;",
+    *out += "} else {";
+    AppendFormatted(out, "scale = %s;",
                              name.scale10_11.empty() ? "vec4(0.0)" : name.scale10_11.c_str());
-    fragBuilder->codeAppendf("bias = %s;",
+    AppendFormatted(out, "bias = %s;",
                              name.bias10_11.empty() ? "vec4(0.0)" : name.bias10_11.c_str());
   }
 
   if (intervalCount >= 5) {
-    fragBuilder->codeAppend("}");
+    *out += "}";
   }
   if (intervalCount > 6) {
-    fragBuilder->codeAppend("} else {");
+    *out += "} else {";
   }
   if (intervalCount >= 7) {
-    fragBuilder->codeAppend("// thresholds9_13.z is mid-point for intervals (12,13) and (14,15)\n");
-    fragBuilder->codeAppendf("if (t < %s.z) {", name.thresholds9_13.c_str());
-    fragBuilder->codeAppendf("scale = %s;",
+    *out += "// thresholds9_13.z is mid-point for intervals (12,13) and (14,15)\n";
+    AppendFormatted(out, "if (t < %s.z) {", name.thresholds9_13.c_str());
+    AppendFormatted(out, "scale = %s;",
                              name.scale12_13.empty() ? "vec4(0.0)" : name.scale12_13.c_str());
-    fragBuilder->codeAppendf("bias = %s;",
+    AppendFormatted(out, "bias = %s;",
                              name.bias12_13.empty() ? "vec4(0.0)" : name.bias12_13.c_str());
   }
   if (intervalCount > 7) {
-    fragBuilder->codeAppend("} else {");
-    fragBuilder->codeAppendf("scale = %s;",
+    *out += "} else {";
+    AppendFormatted(out, "scale = %s;",
                              name.scale14_15.empty() ? "vec4(0.0)" : name.scale14_15.c_str());
-    fragBuilder->codeAppendf("bias = %s;",
+    AppendFormatted(out, "bias = %s;",
                              name.bias14_15.empty() ? "vec4(0.0)" : name.bias14_15.c_str());
   }
   if (intervalCount >= 7) {
-    fragBuilder->codeAppend("}");
+    *out += "}";
   }
   if (intervalCount >= 6) {
-    fragBuilder->codeAppend("}");
+    *out += "}";
   }
 }
 
 void GLSLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
+  std::string cascade = {};
   auto uniformHandler = args.uniformHandler;
   UnrolledBinaryUniformName uniformNames = {};
   uniformNames.scale0_1 = AddUniform(uniformHandler, "scale0_1", intervalCount, 0);
@@ -240,24 +259,26 @@ void GLSLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) const {
   uniformNames.thresholds9_13 = args.uniformHandler->addUniform(
       "thresholds9_13", UniformFormat::Float4, ShaderStage::Fragment);
 
-  fragBuilder->codeAppendf("float t = %s.x;", args.inputColor.c_str());
-  fragBuilder->codeAppend("vec4 scale, bias;");
-  fragBuilder->codeAppendf("// interval count: %d\n", intervalCount);
+  AppendFormatted(&cascade, "float t = %s.x;", args.inputColor.c_str());
+  cascade += "vec4 scale, bias;";
+  AppendFormatted(&cascade, "// interval count: %d\n", intervalCount);
 
   if (intervalCount >= 4) {
-    fragBuilder->codeAppend("// thresholds1_7.w is mid-point for intervals (0,7) and (8,15)\n");
-    fragBuilder->codeAppendf("if (t < %s.w) {", uniformNames.thresholds1_7.c_str());
+    cascade += "// thresholds1_7.w is mid-point for intervals (0,7) and (8,15)\n";
+    AppendFormatted(&cascade, "if (t < %s.w) {", uniformNames.thresholds1_7.c_str());
   }
-  AppendCode1(fragBuilder, intervalCount, uniformNames);
+  AppendCode1(&cascade, intervalCount, uniformNames);
   if (intervalCount > 4) {
-    fragBuilder->codeAppend("} else {");
+    cascade += "} else {";
   }
-  AppendCode2(fragBuilder, intervalCount, uniformNames);
+  AppendCode2(&cascade, intervalCount, uniformNames);
   if (intervalCount >= 4) {
-    fragBuilder->codeAppend("}");
+    cascade += "}";
   }
 
-  fragBuilder->codeAppendf("%s = vec4(t * scale + bias);", args.outputColor.c_str());
+  AppendFormatted(&cascade, "%s = vec4(t * scale + bias);", args.outputColor.c_str());
+  args.irBuilder->AppendRawText("  vec4 " + args.outputColor + ";\n" + cascade,
+                                args.outputColor);
 }
 
 void SetUniformData(UniformData* uniformData, const std::string& name, int intervalCount, int limit,

@@ -89,16 +89,6 @@ void GLSLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
       return;
     }
     const auto samplerName = uniformHandler->getSamplerVariable(sampler).name();
-    fragBuilder->codeAppend("vec2 deviceCoord;");
-    fragBuilder->appendCall("deviceCoord", coordEntry, {deviceCoordMatrixName, "gl_FragCoord.xy"},
-                            "", coordExpression);
-    fragBuilder->codeAppend("vec4 deviceRead;");
-    fragBuilder->appendCall(
-        "deviceRead", readEntry,
-        {samplerName, "deviceCoord", "vec4(0.0)", "0", std::to_string(swizzleCode)}, "",
-        readExpression);
-    fragBuilder->appendCall(args.outputColor, mulEntry, {"deviceRead", args.inputColor}, "",
-                            mulExpression);
   }
 }
 

@@ -48,17 +48,8 @@ GLSLRRectInnerShadowFragmentProcessor::GLSLRRectInnerShadowFragmentProcessor(
 
 void GLSLRRectInnerShadowFragmentProcessor::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
-  // The quadrature count is baked into the library function, so the count picks the function.
-  const bool highQuadrature = quadratureCount >= 8;
-  const char* coverageSymbol =
-      highQuadrature ? "shapeBlurRRectCoverageHigh" : "shapeBlurRRectCoverageLow";
-  auto blurEntry = fragBuilder->appendFunction(coverageSymbol);
-  auto maskSdfEntry = fragBuilder->appendFunction("shapeMaskRRectSDF");
-  auto maskCoverageEntry = fragBuilder->appendFunction("shapeMaskCoverage");
-  if (blurEntry.empty() || maskSdfEntry.empty() || maskCoverageEntry.empty()) {
-    return;
-  }
 
+  const bool highQuadrature = quadratureCount >= 8;
   auto maskHalfName = args.uniformHandler->addUniform("MaskHalfOverSigma", UniformFormat::Float2,
                                                       ShaderStage::Fragment);
   auto maskCornerName = args.uniformHandler->addUniform(
@@ -72,14 +63,7 @@ void GLSLRRectInnerShadowFragmentProcessor::emitCode(EmitArgs& args) const {
 
   auto shadowCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
   auto maskCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[1]);
-  fragBuilder->codeAppendf("highp float coverage = 1.0 - %s(%s, %s, %s);", blurEntry.c_str(),
-                           maskCoordName.c_str(), maskHalfName.c_str(), maskCornerName.c_str());
-  fragBuilder->codeAppendf("coverage *= %s(%s(%s, %s, %s));", maskCoverageEntry.c_str(),
-                           maskSdfEntry.c_str(), shadowCoordName.c_str(), shadowHalfName.c_str(),
-                           shadowCornerName.c_str());
-  fragBuilder->codeAppendf("%s = %s * coverage;", args.outputColor.c_str(), colorName.c_str());
   // Only the input alpha is consumed; the shadow color comes from the uniform.
-  fragBuilder->codeAppendf("%s *= %s.a;", args.outputColor.c_str(), args.inputColor.c_str());
   // TODO: Add dithering. The blurred coverage changes gradually from 1 to 0, which can quantize
   // into visible bands on an 8-bit target.
 

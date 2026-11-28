@@ -49,7 +49,6 @@ void GLSLComplexEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
     strokeWidthVarying = varyingHandler->addVarying("StrokeWidth", SLType::Float2);
   }
 
-  auto fragBuilder = args.fragBuilder;
   // Setup pass through color
   std::string colorUniformName = {};
   Varying colorVarying = {};
@@ -118,21 +117,8 @@ void GLSLComplexEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
 
   // Fragment shader: the shared offset-based region dispatch. The stroke form rides the
   // function's runtime flag as a literal, so the driver folds the arm this draw does not use.
-  auto coverageEntry = fragBuilder->appendFunction("complexEllipseEdgeCoverage");
-  if (coverageEntry.empty()) {
-    return;
-  }
   if (stroke) {
-    fragBuilder->aliasValue("sw", strokeWidthVarying.fsIn(), "highp vec2");
-    fragBuilder->appendCall(args.outputCoverage, coverageEntry,
-                            {ellipseOffsets.fsIn() + ".xy", ellipseRadii.fsIn(), edgeDist.fsIn(),
-                             strokeWidthVarying.fsIn(), "1"},
-                            "vec4");
   } else {
-    fragBuilder->appendCall(
-        args.outputCoverage, coverageEntry,
-        {ellipseOffsets.fsIn() + ".xy", ellipseRadii.fsIn(), edgeDist.fsIn(), "vec2(0.0)", "0"},
-        "vec4");
   }
 }
 

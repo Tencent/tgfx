@@ -31,11 +31,6 @@ GLSLSingleIntervalGradientColorizer::GLSLSingleIntervalGradientColorizer(Color s
 }
 
 void GLSLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  auto entry = fragBuilder->appendFunction("tgfxSingleGradientColor");
-  if (entry.empty()) {
-    return;
-  }
   if (args.irBuilder == nullptr || args.inputValue == INVALID_VALUE_ID ||
       args.outputValue == INVALID_VALUE_ID) {
     return;
@@ -53,12 +48,6 @@ void GLSLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) const {
                                              : error);
     return;
   }
-  fragBuilder->appendCall(
-      args.outputColor, entry,
-      {ValueRef(args.inputColor + ".x", SLType::Float, ValueOrigin::Local),
-       ValueRef(names.start, SLType::Float4, ValueOrigin::Uniform),
-       ValueRef(names.end, SLType::Float4, ValueOrigin::Uniform)},
-      "", expression);
 }
 
 void GLSLSingleIntervalGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,

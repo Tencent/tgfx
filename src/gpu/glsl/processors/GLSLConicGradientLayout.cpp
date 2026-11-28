@@ -38,13 +38,6 @@ void GLSLConicGradientLayout::emitCode(EmitArgs& args) const {
     ConicGradientOp::EnsureUniforms(args.irBuilder, args.uniformHandler, &names);
   }
   const auto coordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
-  auto entry = fragBuilder->appendFunction("tgfxConicGradientT");
-  if (entry.empty()) {
-    return;
-  }
-  fragBuilder->codeAppendf("%s = vec4(%s(%s, %s, %s), 1.0, 0.0, 0.0);", args.outputColor.c_str(),
-                           entry.c_str(), coordName.c_str(), names.bias.c_str(),
-                           names.scale.c_str());
   // The IR route: the angle position through the shared function, splatted to vec4.
   if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID) {
     auto ir = args.irBuilder;

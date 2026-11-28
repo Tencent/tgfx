@@ -27,11 +27,6 @@ PlacementPtr<FragmentProcessor> LumaFragmentProcessor::Make(
 }
 
 void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  auto entry = fragBuilder->appendFunction("pmApplyLuma");
-  if (entry.empty()) {
-    return;
-  }
   if (args.irBuilder == nullptr || args.inputValue == INVALID_VALUE_ID ||
       args.outputValue == INVALID_VALUE_ID) {
     return;
@@ -39,19 +34,6 @@ void GLSLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
   LumaOp::UniformNames names = {};
   const auto result = LumaOp::Emit(args.irBuilder, args.uniformHandler, &names, args.inputValue);
   args.irBuilder->StoreOutput(args.outputValue, result);
-  std::string expression = {};
-  std::string error = {};
-  if (result == INVALID_VALUE_ID ||
-      !GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error)) {
-    args.irBuilder->MarkFailed(error.empty() ? "the luma operator could not be emitted" : error);
-    return;
-  }
-  fragBuilder->appendCall(
-      args.outputColor, entry,
-      {args.inputColorValue, ValueRef(names.kr, SLType::Float, ValueOrigin::Uniform),
-       ValueRef(names.kg, SLType::Float, ValueOrigin::Uniform),
-       ValueRef(names.kb, SLType::Float, ValueOrigin::Uniform)},
-      "", expression);
 }
 
 void GLSLLumaFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

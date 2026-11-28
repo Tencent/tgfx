@@ -153,7 +153,6 @@ void FragmentProcessor::emitChild(size_t childIndex, const std::string& inputCol
   auto fragBuilder = args.fragBuilder;
   auto programInfo = fragBuilder->getProgramInfo();
   outputColor->append(programInfo->getMangledSuffix(this));
-  fragBuilder->codeAppendf("vec4 %s;", outputColor->c_str());
   internalEmitChild(childIndex, inputColor, *outputColor, args, std::move(coordFunc));
 }
 
@@ -179,13 +178,9 @@ void FragmentProcessor::internalEmitChild(
     // unique to the child processor (exactly what we want for its input).
     inputName += "_childInput";
     inputName += programInfo->getMangledSuffix(childProc);
-    fragBuilder->aliasValue(inputName, inputColor, "vec4");
   }
 
   // emit the code for the child in its own scope
-  fragBuilder->codeAppend("{\n");
-  fragBuilder->codeAppendf("// Processor%d : %s\n", programInfo->getProcessorIndex(childProc),
-                           childProc->name().c_str());
   TransformedCoordVars coordVars = args.transformedCoords->childInputs(childIndex);
   TextureSamplers textureSamplers = args.textureSamplers->childInputs(childIndex);
 
@@ -235,7 +230,6 @@ void FragmentProcessor::internalEmitChild(
   } else {
     childProcessor(childIndex)->emitCode(childArgs);
   }
-  fragBuilder->codeAppend("}\n");
 
   fragBuilder->onAfterChildProcEmitCode();
   if (childOutputValue != nullptr) {
@@ -249,7 +243,6 @@ ValueID FragmentProcessor::emitChildIR(
   auto fragBuilder = args.fragBuilder;
   auto programInfo = fragBuilder->getProgramInfo();
   outputColor->append(programInfo->getMangledSuffix(this));
-  fragBuilder->codeAppendf("vec4 %s;", outputColor->c_str());
   ValueID childOutput = INVALID_VALUE_ID;
   internalEmitChild(childIndex, inputColor, *outputColor, args, std::move(coordFunc),
                     inputColorValue, &childOutput);

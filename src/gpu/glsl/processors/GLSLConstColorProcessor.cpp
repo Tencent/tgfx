@@ -31,16 +31,11 @@ GLSLConstColorProcessor::GLSLConstColorProcessor(PMColor color, InputMode mode)
 }
 
 void GLSLConstColorProcessor::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  auto entry = fragBuilder->appendFunction("pmApplyConstColor");
-  if (entry.empty()) {
-    return;
-  }
   if (args.irBuilder == nullptr || args.outputValue == INVALID_VALUE_ID) {
     return;
   }
   // The xfer's input is the stage's geometry color, which a draw that never set one leaves
-  // invalid; the text route treats that as white, so the IR names the same constant.
+  // invalid; the chain head is white.
   ValueID inputValue = args.inputValue;
   if (inputValue == INVALID_VALUE_ID) {
     const auto one = args.irBuilder->CreateConstant(1.0f);
@@ -50,19 +45,6 @@ void GLSLConstColorProcessor::emitCode(EmitArgs& args) const {
   const auto result = ConstColorOp::Emit(args.irBuilder, args.uniformHandler, &names, inputValue,
                                          static_cast<int32_t>(inputMode));
   args.irBuilder->StoreOutput(args.outputValue, result);
-  std::string expression = {};
-  std::string error = {};
-  if (result == INVALID_VALUE_ID ||
-      !GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error)) {
-    args.irBuilder->MarkFailed(error.empty() ? "the const-color operator could not be emitted"
-                                             : error);
-    return;
-  }
-  fragBuilder->appendCall(
-      args.outputColor, entry,
-      {ValueRef(names.constColor, SLType::Float4, ValueOrigin::Uniform), args.inputColorValue,
-       ValueRef(std::to_string(static_cast<int>(inputMode)), SLType::Int, ValueOrigin::Literal)},
-      "", expression);
 }
 
 void GLSLConstColorProcessor::onSetData(UniformData* /*vertexUniformData*/,

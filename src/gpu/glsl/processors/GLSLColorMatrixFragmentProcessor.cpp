@@ -32,11 +32,6 @@ GLSLColorMatrixFragmentProcessor::GLSLColorMatrixFragmentProcessor(
 }
 
 void GLSLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  auto entry = fragBuilder->appendFunction("pmApplyColorMatrix");
-  if (entry.empty()) {
-    return;
-  }
   if (args.irBuilder == nullptr || args.inputValue == INVALID_VALUE_ID ||
       args.outputValue == INVALID_VALUE_ID) {
     return;
@@ -45,19 +40,6 @@ void GLSLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
   const auto result =
       ColorMatrixOp::Emit(args.irBuilder, args.uniformHandler, &names, args.inputValue);
   args.irBuilder->StoreOutput(args.outputValue, result);
-  std::string expression = {};
-  std::string error = {};
-  if (result == INVALID_VALUE_ID ||
-      !GLSLOperatorEmitter::EmitCall(args.irBuilder->IR(), result, &expression, &error)) {
-    args.irBuilder->MarkFailed(error.empty() ? "the color-matrix operator could not be emitted"
-                                             : error);
-    return;
-  }
-  fragBuilder->appendCall(
-      args.outputColor, entry,
-      {args.inputColorValue, ValueRef(names.matrix, SLType::Float4x4, ValueOrigin::Uniform),
-       ValueRef(names.vector, SLType::Float4, ValueOrigin::Uniform)},
-      "", expression);
 }
 
 void GLSLColorMatrixFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

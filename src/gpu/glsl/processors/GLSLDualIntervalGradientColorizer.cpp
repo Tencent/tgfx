@@ -52,11 +52,6 @@ GLSLDualIntervalGradientColorizer::GLSLDualIntervalGradientColorizer(Color scale
 }
 
 void GLSLDualIntervalGradientColorizer::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  auto entry = fragBuilder->appendFunction("tgfxDualGradientColor");
-  if (entry.empty()) {
-    return;
-  }
   if (args.irBuilder == nullptr || args.inputValue == INVALID_VALUE_ID ||
       args.outputValue == INVALID_VALUE_ID) {
     return;
@@ -73,15 +68,6 @@ void GLSLDualIntervalGradientColorizer::emitCode(EmitArgs& args) const {
                                              : error);
     return;
   }
-  fragBuilder->appendCall(
-      args.outputColor, entry,
-      {ValueRef(args.inputColor + ".x", SLType::Float, ValueOrigin::Local),
-       ValueRef(names.scale01, SLType::Float4, ValueOrigin::Uniform),
-       ValueRef(names.bias01, SLType::Float4, ValueOrigin::Uniform),
-       ValueRef(names.scale23, SLType::Float4, ValueOrigin::Uniform),
-       ValueRef(names.bias23, SLType::Float4, ValueOrigin::Uniform),
-       ValueRef(names.threshold, SLType::Float, ValueOrigin::Uniform)},
-      "", expression);
 }
 
 void GLSLDualIntervalGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,

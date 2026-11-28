@@ -43,6 +43,5 @@ void GLSLEmptyXferProcessor::emitCode(const EmitArgs& args) const {
         args.irBuilder->CreateBinary(IRBinaryOp::Mul, SLType::Float4, inputColor, inputCoverage);
     args.irBuilder->StoreOutput(args.outputValue, result);
   }
-  args.fragBuilder->combineColorWithCoverage(args.outputColor, args.inputColor, args.inputCoverage);
 }
 }  // namespace tgfx

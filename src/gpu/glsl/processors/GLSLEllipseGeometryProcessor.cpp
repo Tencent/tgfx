@@ -42,7 +42,6 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
 
   auto ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float4);
 
-  auto fragBuilder = args.fragBuilder;
   // setup pass through color
   std::string colorUniformName = {};
   Varying colorVarying = {};
@@ -106,13 +105,6 @@ void GLSLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
 
   // Fragment shader: the shared ellipse edge coverage. The stroke form rides the function's
   // runtime flag as a literal, so the driver folds the arm this draw does not use.
-  auto coverageEntry = fragBuilder->appendFunction("ellipseEdgeCoverage");
-  if (coverageEntry.empty()) {
-    return;
-  }
-  fragBuilder->appendCall(
-      args.outputCoverage, coverageEntry,
-      {ellipseOffsets.fsIn() + ".xy", ellipseRadii.fsIn(), std::to_string(stroke ? 1 : 0)}, "vec4");
 }
 
 void GLSLEllipseGeometryProcessor::setData(UniformData* vertexUniformData,

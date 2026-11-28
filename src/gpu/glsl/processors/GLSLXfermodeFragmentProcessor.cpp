@@ -19,7 +19,6 @@
 #include "GeneratedOperators.h"
 #include "gpu/ir/ProgramIREmit.h"
 #include "GLSLXfermodeFragmentProcessor.h"
-#include "gpu/glsl/GLSLBlend.h"
 #include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {

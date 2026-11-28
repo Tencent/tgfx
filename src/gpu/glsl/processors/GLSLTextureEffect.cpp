@@ -81,10 +81,8 @@ GLSLTextureEffect::GLSLTextureEffect(std::shared_ptr<TextureProxy> proxy, const 
 
 void GLSLTextureEffect::emitCode(EmitArgs& args) const {
   auto textureView = getTextureView();
-  auto fragBuilder = args.fragBuilder;
   if (textureView == nullptr) {
     // emit a transparent color as the output color.
-    fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
     if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID) {
       const auto transparent = zeroColorIR(args.irBuilder);
       if (transparent != INVALID_VALUE_ID) {
@@ -98,14 +96,8 @@ void GLSLTextureEffect::emitCode(EmitArgs& args) const {
   } else {
     emitDefaultTextureCode(args);
   }
-  auto entry = fragBuilder->appendFunction("tgfxMulAlpha");
-  if (entry.empty()) {
-    return;
-  }
   if (textureProxy->isAlphaOnly()) {
-    fragBuilder->appendCall(args.outputColor, entry, {args.inputColor, args.outputColor});
   } else {
-    fragBuilder->appendCall(args.outputColor, entry, {args.outputColor, args.inputColor});
   }
 }
 
@@ -118,7 +110,6 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
     // instead of dereferencing a missing sampler handle.
     LOGE("GLSLTextureEffect: no sampler registered for %s (view=%p); the draw renders transparent",
          name().c_str(), static_cast<const void*>(getTextureView()));
-    fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
     return;
   }
   auto& textureSampler = (*args.textureSamplers)[0];
@@ -154,7 +145,6 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
         textureSampler, texCoordName, extraSubsetName, subsetName, &recorded, args.irBuilder,
         args.samplerValue(textureSampler), (*args.transformedCoords)[0].type(), strictSubsetValue,
         drawSubsetValue, args.isCoverage);
-    fragBuilder->storeColor(args.outputColor, read.name);
     if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID &&
         read.value != INVALID_VALUE_ID) {
       // The text route's epilogue modulates the read through tgfxMulAlpha/tgfxAlphaModulate; the
@@ -180,7 +170,6 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
                                              args.irBuilder, args.samplerValue(textureSampler),
                                              (*args.transformedCoords)[0].type(), INVALID_VALUE_ID,
                                              INVALID_VALUE_ID, args.isCoverage);
-  fragBuilder->aliasValue("color", read.name, "vec4");
   if (alphaStart != Point::Zero()) {
     if (args.irBuilder == nullptr || args.outputValue == INVALID_VALUE_ID ||
         read.value == INVALID_VALUE_ID) {
@@ -254,14 +243,7 @@ void GLSLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
       args.irBuilder->MarkFailed(error);
       return;
     }
-    fragBuilder->aliasValue("color", colorExpression, "");
-    fragBuilder->aliasValue("alphaVertexColor", coordExpression, "highp vec2");
-    fragBuilder->aliasValue(
-        "alpha", fragBuilder->textureLookupExpression(textureSampler, "alphaVertexColor"), "vec4");
-    fragBuilder->aliasValue("alpha", alphaExpression, "");
-    fragBuilder->aliasValue("color", resultExpression, "");
   }
-  fragBuilder->storeColor(args.outputColor, "color");
 }
 
 void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
@@ -303,32 +285,18 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
                                     Precision::High, IRValueKind::Local);
     args.irBuilder->Assign({base, field}, channel);
   };
-  fragBuilder->codeAppend("vec3 yuv;");
-  fragBuilder->aliasValue(
-      "yuv.x", fragBuilder->textureLookupExpression(textureSamplers[0], finalCoordName) + ".r", "");
   recordSample(0, finalCoordName, "yuv", "r", "x", SLType::Float);
   if (yuvTexture->yuvFormat() == YUVFormat::I420) {
     auto chromaCoord = fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
-    fragBuilder->aliasValue(
-        "yuv.y", fragBuilder->textureLookupExpression(textureSamplers[1], chromaCoord) + ".r", "");
     recordSample(1, chromaCoord, "yuv", "r", "y", SLType::Float);
     chromaCoord = fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
-    fragBuilder->aliasValue(
-        "yuv.z", fragBuilder->textureLookupExpression(textureSamplers[2], chromaCoord) + ".r", "");
     recordSample(2, chromaCoord, "yuv", "r", "z", SLType::Float);
   } else if (yuvTexture->yuvFormat() == YUVFormat::NV12) {
     auto chromaCoord = fragBuilder->clampToSubsets(texCoordName, extraSubsetName, subsetName);
-    fragBuilder->aliasValue(
-        "yuv.yz", fragBuilder->textureLookupExpression(textureSamplers[1], chromaCoord) + ".ra",
-        "");
     recordSample(1, chromaCoord, "yuv", "ra", "yz", SLType::Float2);
   }
   auto mat3Name = uniformHandler->addUniform("Mat3ColorConversion", UniformFormat::Float3x3,
                                              ShaderStage::Fragment);
-  auto entry = fragBuilder->appendFunction("tgfxYUVToRGB");
-  if (entry.empty()) {
-    return;
-  }
   const std::string limitedRange =
       std::to_string(IsLimitedYUVColorRange(yuvTexture->yuvColorSpace()) ? 1 : 0);
   auto emitYUVCall = [&](bool hasAlpha, std::string* expression) -> bool {
@@ -366,8 +334,6 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     if (!emitYUVCall(false, &expression)) {
       return;
     }
-    fragBuilder->appendCall(args.outputColor, entry, {"yuv", mat3Name, limitedRange, "0", "1.0"},
-                            "", expression);
   } else {
     auto alphaStartName =
         uniformHandler->addUniform("AlphaStart", UniformFormat::Float2, ShaderStage::Fragment);
@@ -386,18 +352,11 @@ void GLSLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
       args.irBuilder->CreateBinary(IRBinaryOp::Add, SLType::Float2, finalCoordValue,
                                    alphaStartValue, alphaVertexColor);
     }
-    fragBuilder->aliasValue("alphaVertexColor", finalCoordName + " + " + alphaStartName,
-                            "highp vec2");
-    fragBuilder->aliasValue(
-        "yuv_a", fragBuilder->textureLookupExpression(textureSamplers[0], alphaVertexColor) + ".r",
-        "float");
     recordSample(0, alphaVertexColor, "yuv_a", "r", "", SLType::Float);
     std::string expression = {};
     if (!emitYUVCall(true, &expression)) {
       return;
     }
-    fragBuilder->appendCall(args.outputColor, entry, {"yuv", mat3Name, limitedRange, "1", "yuv_a"},
-                            "", expression);
   }
 }
 

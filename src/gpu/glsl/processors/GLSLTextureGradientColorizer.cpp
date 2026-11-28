@@ -34,10 +34,7 @@ GLSLTextureGradientColorizer::GLSLTextureGradientColorizer(std::shared_ptr<Textu
 
 void GLSLTextureGradientColorizer::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
-  fragBuilder->codeAppendf("highp vec2 coord = vec2(%s.x, 0.5);", args.inputColor.c_str());
-  fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
   fragBuilder->appendTextureLookup((*args.textureSamplers)[0], "coord");
-  fragBuilder->codeAppend(";");
   // The IR route: the ramp coordinate from the input's x, a fixed half, one texture read.
   if (args.irBuilder != nullptr && args.inputValue != INVALID_VALUE_ID &&
       args.outputValue != INVALID_VALUE_ID && args.textureSamplers != nullptr &&

@@ -47,15 +47,6 @@ GLSLRRectBlurFragmentProcessor::GLSLRRectBlurFragmentProcessor(const Point& half
 
 void GLSLRRectBlurFragmentProcessor::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
-  // The quadrature count is baked into the library function, so the count picks the function.
-  const bool highQuadrature = quadratureCount >= 8;
-  const char* coverageSymbol =
-      highQuadrature ? "shapeBlurRRectCoverageHigh" : "shapeBlurRRectCoverageLow";
-  auto coverageEntry = fragBuilder->appendFunction(coverageSymbol);
-  if (coverageEntry.empty()) {
-    return;
-  }
-
   auto halfSizeName = args.uniformHandler->addUniform("HalfSizeOverSigma", UniformFormat::Float2,
                                                       ShaderStage::Fragment);
   auto cornerName = args.uniformHandler->addUniform("CornerOverSigma", UniformFormat::Float2,
@@ -64,11 +55,7 @@ void GLSLRRectBlurFragmentProcessor::emitCode(EmitArgs& args) const {
                                                    ShaderStage::Fragment);
 
   auto coordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
-  fragBuilder->codeAppendf("highp float coverage = %s(%s, %s, %s);", coverageEntry.c_str(),
-                           coordName.c_str(), halfSizeName.c_str(), cornerName.c_str());
-  fragBuilder->codeAppendf("%s = %s * coverage;", args.outputColor.c_str(), colorName.c_str());
   // Only the input alpha is consumed; the shadow color comes from the uniform.
-  fragBuilder->codeAppendf("%s *= %s.a;", args.outputColor.c_str(), args.inputColor.c_str());
   // TODO: Add dithering. The blurred coverage changes gradually from 1 to 0, which can quantize
   // into visible bands on an 8-bit target.
 
@@ -82,6 +69,7 @@ void GLSLRRectBlurFragmentProcessor::emitCode(EmitArgs& args) const {
       ir->InternValue(halfSizeName, SLType::Float2, Precision::High, IRValueKind::Uniform);
   const auto corner =
       ir->InternValue(cornerName, SLType::Float2, Precision::High, IRValueKind::Uniform);
+  const bool highQuadrature = quadratureCount >= 8;
   const auto coverage =
       highQuadrature
           ? ShapeBlurRRectCoverageHighOp::Emit(ir, args.uniformHandler, nullptr, coord, halfSize,

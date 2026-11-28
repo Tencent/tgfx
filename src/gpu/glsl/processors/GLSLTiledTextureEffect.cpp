@@ -418,7 +418,6 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     // emit a transparent color as the output color.
-    fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
     return;
   }
   auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
@@ -447,9 +446,7 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
   };
   if (sampling.shaderModeX == TiledTextureEffect::ShaderMode::None &&
       sampling.shaderModeY == TiledTextureEffect::ShaderMode::None) {
-    fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
     fragBuilder->appendTextureLookup(sampler, texCoordName);
-    fragBuilder->codeAppend(";");
     if (args.irBuilder != nullptr && args.samplerValue(sampler) != INVALID_VALUE_ID) {
       const auto coordValue = makeCoordValue(texCoordName);
       const auto swizzleCode =
@@ -489,128 +486,44 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
     if (axisCoord.empty() || axisClamp.empty()) {
       return;
     }
-    fragBuilder->aliasValue("inCoord", texCoordName, "highp vec2");
     if (!names.dimensionsName.empty()) {
-      fragBuilder->codeAppendf("inCoord /= %s;", names.dimensionsName.c_str());
     }
-    fragBuilder->codeAppendf("highp vec4 axisX = %s(inCoord.x, %s.x, %s.z, %d);", axisCoord.c_str(),
-                             subsetArg.c_str(), subsetArg.c_str(), modeX);
-    fragBuilder->codeAppendf("highp vec4 axisY = %s(inCoord.y, %s.y, %s.w, %d);", axisCoord.c_str(),
-                             subsetArg.c_str(), subsetArg.c_str(), modeY);
-    fragBuilder->codeAppend("highp vec2 subsetCoord = vec2(axisX.x, axisY.x);");
-    fragBuilder->codeAppendf(
-        "highp vec2 clampedCoord = vec2(%s(axisX.x, %s.x, %s.z, %d), "
-        "%s(axisY.x, %s.y, %s.w, %d));",
-        axisClamp.c_str(), clampArg.c_str(), clampArg.c_str(), useClamp[0] ? 1 : 0,
-        axisClamp.c_str(), clampArg.c_str(), clampArg.c_str(), useClamp[1] ? 1 : 0);
     if (constraint == SrcRectConstraint::Strict) {
       std::string strictSubset = args.inputSubset;
       if (!names.dimensionsName.empty()) {
-        fragBuilder->aliasValue("extraSubset", strictSubset, "highp vec4");
-        fragBuilder->codeAppendf("extraSubset.xy /= %s;", names.dimensionsName.c_str());
-        fragBuilder->codeAppendf("extraSubset.zw /= %s;", names.dimensionsName.c_str());
         strictSubset = "extraSubset";
       }
-      fragBuilder->codeAppendf("clampedCoord = tgfxClampSubset(clampedCoord, %s);",
-                               strictSubset.c_str());
     }
     if (mipmapX) {
-      fragBuilder->codeAppendf("axisX.y = %s(axisX.y, %s.x, %s.z, %d);", axisClamp.c_str(),
-                               clampArg.c_str(), clampArg.c_str(), useClamp[0] ? 1 : 0);
     }
     if (mipmapY) {
-      fragBuilder->codeAppendf("axisY.y = %s(axisY.y, %s.y, %s.w, %d);", axisClamp.c_str(),
-                               clampArg.c_str(), clampArg.c_str(), useClamp[1] ? 1 : 0);
     }
-    fragBuilder->codeAppend("vec4 textureColor;");
     const std::string clampedScaled = ScaledCoord("clampedCoord", names.dimensionsName);
     if (mipmapX && mipmapY) {
-      auto sample = fragBuilder->appendFunction(("tgfxTiledSample4" + typeSuffix).c_str());
-      if (sample.empty()) {
-        return;
-      }
-      fragBuilder->codeAppendf(
-          "textureColor = %s(%s, %s, %s, %s, %s, axisX.z, axisY.z);", sample.c_str(),
-          samplerName.c_str(), clampedScaled.c_str(),
-          ScaledCoord("vec2(axisX.y, clampedCoord.y)", names.dimensionsName).c_str(),
-          ScaledCoord("vec2(clampedCoord.x, axisY.y)", names.dimensionsName).c_str(),
-          ScaledCoord("vec2(axisX.y, axisY.y)", names.dimensionsName).c_str());
     } else if (mipmapX) {
-      auto sample = fragBuilder->appendFunction(("tgfxTiledSample2" + typeSuffix).c_str());
-      if (sample.empty()) {
-        return;
-      }
-      fragBuilder->codeAppendf(
-          "textureColor = %s(%s, %s, %s, axisX.z);", sample.c_str(), samplerName.c_str(),
-          clampedScaled.c_str(),
-          ScaledCoord("vec2(axisX.y, clampedCoord.y)", names.dimensionsName).c_str());
     } else if (mipmapY) {
-      auto sample = fragBuilder->appendFunction(("tgfxTiledSample2" + typeSuffix).c_str());
-      if (sample.empty()) {
-        return;
-      }
-      fragBuilder->codeAppendf(
-          "textureColor = %s(%s, %s, %s, axisY.z);", sample.c_str(), samplerName.c_str(),
-          clampedScaled.c_str(),
-          ScaledCoord("vec2(clampedCoord.x, axisY.y)", names.dimensionsName).c_str());
     } else {
-      auto sample = fragBuilder->appendFunction(("tgfxTiledSample1" + typeSuffix).c_str());
-      if (sample.empty()) {
-        return;
-      }
-      fragBuilder->codeAppendf("textureColor = %s(%s, %s);", sample.c_str(), samplerName.c_str(),
-                               clampedScaled.c_str());
     }
     const bool needErrX = repeatX || borderLinearX;
     const bool needErrY = repeatY || borderLinearY;
     if (needErrX) {
-      fragBuilder->codeAppend("highp float errX = subsetCoord.x - clampedCoord.x;");
     }
     if (needErrY) {
-      fragBuilder->codeAppend("highp float errY = subsetCoord.y - clampedCoord.y;");
     }
     if (repeatX) {
-      fragBuilder->codeAppendf("highp float repeatCoordX = errX > 0.0 ? %s.x : %s.z;",
-                               clampArg.c_str(), clampArg.c_str());
     }
     if (repeatY) {
-      fragBuilder->codeAppendf("highp float repeatCoordY = errY > 0.0 ? %s.y : %s.w;",
-                               clampArg.c_str(), clampArg.c_str());
     }
     if (repeatX || repeatY) {
-      auto blend = fragBuilder->appendFunction(("tgfxTiledRepeatBlend" + typeSuffix).c_str());
-      if (blend.empty()) {
-        return;
-      }
       const std::string repeatScaled =
           ScaledCoord(std::string("vec2(") + (repeatX ? "repeatCoordX" : "0.0") + ", " +
                           (repeatY ? "repeatCoordY" : "0.0") + ")",
                       names.dimensionsName);
-      fragBuilder->codeAppendf("textureColor = %s(%s, textureColor, %s, %s, %s, %s, %d, %d);",
-                               blend.c_str(), samplerName.c_str(), clampedScaled.c_str(),
-                               repeatScaled.c_str(), needErrX ? "errX" : "0.0",
-                               needErrY ? "errY" : "0.0", repeatX ? 1 : 0, repeatY ? 1 : 0);
     }
     if (borderLinearX || borderLinearY) {
-      auto border = fragBuilder->appendFunction("tgfxTiledBorderLinear");
-      if (border.empty()) {
-        return;
-      }
-      fragBuilder->codeAppendf("textureColor = %s(textureColor, %s, %s, %d, %d);", border.c_str(),
-                               needErrX ? "errX" : "0.0", needErrY ? "errY" : "0.0",
-                               borderLinearX ? 1 : 0, borderLinearY ? 1 : 0);
     }
     if (borderNearestX || borderNearestY) {
-      auto border = fragBuilder->appendFunction("tgfxTiledBorderNearest");
-      if (border.empty()) {
-        return;
-      }
-      fragBuilder->codeAppendf("textureColor = %s(textureColor, inCoord, %s, %d, %d);",
-                               border.c_str(), subsetArg.c_str(), borderNearestX ? 1 : 0,
-                               borderNearestY ? 1 : 0);
     }
-    fragBuilder->codeAppendf("%s = textureColor%s;", args.outputColor.c_str(),
-                             fragBuilder->getSamplerSwizzleSuffix(sampler).c_str());
     if (args.irBuilder != nullptr && args.samplerValue(sampler) != INVALID_VALUE_ID) {
       auto ir = args.irBuilder;
       TiledReadModes modes = {};
@@ -654,11 +567,7 @@ void GLSLTiledTextureEffect::emitCode(EmitArgs& args) const {
     }
   }
   if (textureProxy->isAlphaOnly()) {
-    args.fragBuilder->codeAppendf("%s = %s.a * %s;", args.outputColor.c_str(),
-                                  args.outputColor.c_str(), args.inputColor.c_str());
   } else {
-    args.fragBuilder->codeAppendf("%s = %s * %s.a;", args.outputColor.c_str(),
-                                  args.outputColor.c_str(), args.inputColor.c_str());
   }
   if (textureValue != INVALID_VALUE_ID && args.irBuilder != nullptr &&
       args.outputValue != INVALID_VALUE_ID) {

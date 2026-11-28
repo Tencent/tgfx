@@ -38,22 +38,13 @@ GLSLRectBlurFragmentProcessor::GLSLRectBlurFragmentProcessor(const Point& halfSi
 
 void GLSLRectBlurFragmentProcessor::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
-  auto coverageEntry = fragBuilder->appendFunction("shapeBlurRectCoverage");
-  if (coverageEntry.empty()) {
-    return;
-  }
-
   auto halfSizeName = args.uniformHandler->addUniform("HalfSizeOverSigma", UniformFormat::Float2,
                                                       ShaderStage::Fragment);
   auto colorName = args.uniformHandler->addUniform("Color", UniformFormat::Float4,
                                                    ShaderStage::Fragment);
 
   auto coordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
-  fragBuilder->codeAppendf("highp float coverage = %s(%s, %s);", coverageEntry.c_str(),
-                           coordName.c_str(), halfSizeName.c_str());
-  fragBuilder->codeAppendf("%s = %s * coverage;", args.outputColor.c_str(), colorName.c_str());
   // Only the input alpha is consumed; the shadow color comes from the uniform.
-  fragBuilder->codeAppendf("%s *= %s.a;", args.outputColor.c_str(), args.inputColor.c_str());
   // TODO: Add dithering. The blurred coverage changes gradually from 1 to 0, which can quantize
   // into visible bands on an 8-bit target.
 

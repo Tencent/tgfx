@@ -31,12 +31,6 @@ GLSLRadialGradientLayout::GLSLRadialGradientLayout(Matrix matrix) : RadialGradie
 void GLSLRadialGradientLayout::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
   const auto coordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
-  auto entry = fragBuilder->appendFunction("tgfxRadialGradientT");
-  if (entry.empty()) {
-    return;
-  }
-  fragBuilder->codeAppendf("%s = vec4(%s(%s), 1.0, 0.0, 0.0);", args.outputColor.c_str(),
-                           entry.c_str(), coordName.c_str());
   // The IR route: the ramp position through the shared function, splatted to the layout's
   // vec4 form (t, 1, 0, 0).
   if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID) {
