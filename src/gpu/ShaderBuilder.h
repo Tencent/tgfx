@@ -75,21 +75,6 @@ class ShaderBuilder {
 
   void codeAppend(const std::string& str);
 
-  /// The current end offset of the code buffer (a mark for slicing text an emission appends).
-  size_t codeSize() const {
-    return shaderStrings[Type::Code].size();
-  }
-
-  /// The code appended since the mark, without consuming it.
-  std::string codeSlice(size_t from) const {
-    return shaderStrings[Type::Code].substr(from);
-  }
-
-  /// Drops the code appended since the mark (the text-only fallback moves it into the IR instead).
-  void truncateCode(size_t size) {
-    shaderStrings[Type::Code].resize(size);
-  }
-
   void addFunction(const std::string& str);
 
   /**
