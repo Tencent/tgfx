@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProgramInfo.h"
+#include <cstdlib>
 #include <iomanip>
 #include <sstream>
 #include "AlignTo.h"
@@ -309,6 +310,16 @@ void ProgramInfo::writePipelineStateKey(BytesKey* key) const {
   EncodeStencilFace(*key, depthStencil.stencilBack);
 }
 
+#if DEBUG
+/// The program-key audit: on a cache hit, rebuild the program and compare the emitted source.
+/// A key that maps two different shaders onto one entry is otherwise invisible, because the
+/// second draw never reaches the builder. Off unless the environment asks for it.
+static bool ProgramKeyAuditEnabled() {
+  static const bool enabled = std::getenv("TGFX_AUDIT_PROGRAM_KEYS") != nullptr;
+  return enabled;
+}
+#endif
+
 std::shared_ptr<Program> ProgramInfo::getProgram() {
   auto context = renderTarget->getContext();
   if (geometryProcessor != nullptr) {
@@ -338,6 +349,15 @@ std::shared_ptr<Program> ProgramInfo::getProgram() {
       }
       context->globalCache()->addProgram(programKey, program);
     }
+#if DEBUG
+    else if (ProgramKeyAuditEnabled()) {
+      auto rebuilt = ProgramBuilder::CreateProgram(context, this);
+      if (rebuilt != nullptr && rebuilt->sourceDigest() != 0 && program->sourceDigest() != 0 &&
+          rebuilt->sourceDigest() != program->sourceDigest()) {
+        LOGE("ProgramInfo: the program key reuses a program built from other source");
+      }
+    }
+#endif
     return program;
   }
   // Without a geometry processor the tree has nothing to build: the draw has no program source.

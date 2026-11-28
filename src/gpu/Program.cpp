@@ -21,9 +21,9 @@
 namespace tgfx {
 Program::Program(std::shared_ptr<RenderPipeline> pipeline,
                  std::unique_ptr<UniformData> vertexUniformData,
-                 std::unique_ptr<UniformData> fragmentUniformData)
+                 std::unique_ptr<UniformData> fragmentUniformData, uint64_t sourceDigest)
     : pipeline(std::move(pipeline)), vertexUniformData(std::move(vertexUniformData)),
-      fragmentUniformData(std::move(fragmentUniformData))  {
+      fragmentUniformData(std::move(fragmentUniformData)), _sourceDigest(sourceDigest) {
 }
 
 Program::~Program() = default;

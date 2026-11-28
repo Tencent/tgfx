@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <list>
 #include "gpu/UniformData.h"
 #include "tgfx/core/BytesKey.h"
@@ -28,7 +29,7 @@ namespace tgfx {
 class Program {
  public:
   Program(std::shared_ptr<RenderPipeline> pipeline, std::unique_ptr<UniformData> vertexUniformData,
-          std::unique_ptr<UniformData> fragmentUniformData);
+          std::unique_ptr<UniformData> fragmentUniformData, uint64_t sourceDigest = 0);
   ~Program();
 
   std::shared_ptr<RenderPipeline> getPipeline() const {
@@ -37,12 +38,19 @@ class Program {
 
   UniformData* getUniformData(ShaderStage stage) const;
 
+  /// The digest of the shader source this program was built from. Zero when the backend does not
+  /// supply one. The Debug program-key audit compares it between a cache hit and a rebuild.
+  uint64_t sourceDigest() const {
+    return _sourceDigest;
+  }
+
  private:
   BytesKey programKey = {};
   std::list<Program*>::iterator cachedPosition;
   std::shared_ptr<RenderPipeline> pipeline = nullptr;
   std::unique_ptr<UniformData> vertexUniformData = nullptr;
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
+  uint64_t _sourceDigest = 0;
 
   friend class GlobalCache;
 };

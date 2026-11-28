@@ -37,6 +37,20 @@
 #endif
 
 namespace tgfx {
+namespace {
+
+/// FNV-1a over one stage's printed source. The Debug program-key audit uses the digest of the
+/// whole program's source to prove that two draws sharing one cache key really emit the same
+/// shader; Release never reads it.
+uint64_t HashSource(uint64_t seed, const std::string& text) {
+  for (const char raw : text) {
+    seed ^= static_cast<unsigned char>(raw);
+    seed *= 0x00000100000001B3ULL;
+  }
+  return seed;
+}
+
+}  // namespace
 static std::string TypeModifierString(ShaderVar::TypeModifier t, ShaderStage stage) {
   switch (t) {
     case ShaderVar::TypeModifier::Attribute:
@@ -315,8 +329,10 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   if (pipeline == nullptr) {
     return nullptr;
   }
+  const auto sourceDigest =
+      HashSource(HashSource(0xCBF29CE484222325ULL, vertexText), fragmentText);
   return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
-                                   std::move(fragmentUniformData));
+                                   std::move(fragmentUniformData), sourceDigest);
 }
 
 bool GLSLProgramBuilder::checkSamplerCounts() {
