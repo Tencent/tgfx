@@ -315,6 +315,21 @@ bool ValidateProgramIR(const ProgramIR& program, std::string* error) {
       return false;
     }
   }
+  // A fragment statement may read the interface values it declares and any value a fragment
+  // emitter created, but never a vertex-stage local or expression: the stages compile separately,
+  // so the printed body would reference a name the fragment shader never declares.
+  for (const auto& statement : program.statements) {
+    const auto id = statement.src;
+    if (id == INVALID_VALUE_ID || id >= program.values.size()) {
+      continue;
+    }
+    const auto& value = program.values[id];
+    if (value.stage == ShaderStage::Vertex &&
+        (value.kind == IRValueKind::Local || value.kind == IRValueKind::Expr)) {
+      *error = "a fragment statement reads the vertex-stage value '" + value.debugName + "'";
+      return false;
+    }
+  }
   return ValidateInterface(program.interface, error);
 }
 

@@ -77,6 +77,9 @@ struct IRValue {
   SLType type = SLType::Void;
   Precision precision = Precision::Default;
   IRValueKind kind = IRValueKind::Local;
+  /// The stage whose emitter created this value. Interface values serve both stages; a Local or
+  /// Expr belongs to exactly one, and a cross-stage read is a construction error.
+  ShaderStage stage = ShaderStage::Fragment;
   ExprID definingExpr = INVALID_EXPR_ID;
   std::string debugName = {};
 };

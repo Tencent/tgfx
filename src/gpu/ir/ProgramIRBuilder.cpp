@@ -39,6 +39,7 @@ ValueID ProgramIRBuilder::CreateValue(SLType type, Precision precision, IRValueK
   value.type = type;
   value.precision = precision;
   value.kind = kind;
+  value.stage = currentStage;
   value.debugName = debugName;
   const auto id = value.id;
   ir.values.push_back(std::move(value));
