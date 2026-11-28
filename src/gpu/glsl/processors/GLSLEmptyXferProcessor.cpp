@@ -26,10 +26,21 @@ const EmptyXferProcessor* EmptyXferProcessor::GetInstance() {
 }
 
 void GLSLEmptyXferProcessor::emitCode(const EmitArgs& args) const {
-  if (args.irBuilder != nullptr && args.inputColorValue != INVALID_VALUE_ID &&
-      args.inputCoverageValue != INVALID_VALUE_ID && args.outputValue != INVALID_VALUE_ID) {
-    const auto result = args.irBuilder->CreateBinary(IRBinaryOp::Mul, SLType::Float4,
-                                                     args.inputColorValue, args.inputCoverageValue);
+  if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID) {
+    // A draw with no color or coverage processor leaves the corresponding input unset; the text
+    // route treats that as white, so the IR names the same constant.
+    ValueID inputColor = args.inputColorValue;
+    if (inputColor == INVALID_VALUE_ID) {
+      const auto one = args.irBuilder->CreateConstant(1.0f);
+      inputColor = args.irBuilder->CreateConstruct(SLType::Float4, {one, one, one, one});
+    }
+    ValueID inputCoverage = args.inputCoverageValue;
+    if (inputCoverage == INVALID_VALUE_ID) {
+      const auto one = args.irBuilder->CreateConstant(1.0f);
+      inputCoverage = args.irBuilder->CreateConstruct(SLType::Float4, {one, one, one, one});
+    }
+    const auto result =
+        args.irBuilder->CreateBinary(IRBinaryOp::Mul, SLType::Float4, inputColor, inputCoverage);
     args.irBuilder->StoreOutput(args.outputValue, result);
   }
   args.fragBuilder->combineColorWithCoverage(args.outputColor, args.inputColor, args.inputCoverage);

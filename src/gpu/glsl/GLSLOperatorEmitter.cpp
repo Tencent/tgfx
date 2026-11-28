@@ -313,6 +313,10 @@ bool GLSLOperatorEmitter::EmitCall(const ProgramIR& program, ValueID result,
           break;
         }
       }
+      // WGSL's clamp has no scalar-bounds overload for vector values; the GLSL built-in does.
+      if (desc->glslSymbol != nullptr && std::string(desc->glslSymbol) == "clamp" && index > 0) {
+        argument = std::string(ValueTypeName(language, desc->returnType)) + "(" + argument + ")";
+      }
     }
     if (index != 0) {
       out += ", ";

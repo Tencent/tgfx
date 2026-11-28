@@ -172,8 +172,15 @@ std::pair<std::string, ValueID> ProgramBuilder::emitAndInstallFragProc(
   FragmentProcessor::TransformedCoordVars coords(
       processor, GetPointer(transformedCoordVars, transformedCoordVarsIdx));
   FragmentProcessor::TextureSamplers textureSamplers(processor, GetPointer(texSamplers, 0));
-  const auto inputValue =
-      programIR.InternValue(input, SLType::Float4, Precision::High, IRValueKind::Local);
+  ValueID inputValue = INVALID_VALUE_ID;
+  if (!input.empty()) {
+    inputValue = programIR.InternValue(input, SLType::Float4, Precision::High, IRValueKind::Local);
+  } else {
+    // A chain head has no input color; the text route uses white, so the IR names the same
+    // constant instead of interning an unnamed value no processor can define.
+    const auto one = programIR.CreateConstant(1.0f);
+    inputValue = programIR.CreateConstruct(SLType::Float4, {one, one, one, one});
+  }
   const auto outputValue =
       programIR.InternValue(output, SLType::Float4, Precision::High, IRValueKind::Local);
   FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output, input,

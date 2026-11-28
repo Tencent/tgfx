@@ -36,12 +36,18 @@ void GLSLComposeFragmentProcessor::emitCode(EmitArgs& args) const {
   // The children chain through their predecessors: the first guy's input might be nil, and each
   // later child reads the previous child's output. The text route threads that through an alias
   // name; the IR route threads the child output value itself.
-  if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID &&
-      args.inputValue != INVALID_VALUE_ID) {
+  if (args.irBuilder != nullptr && args.outputValue != INVALID_VALUE_ID) {
     auto ir = args.irBuilder;
+    // A compose at the head of a chain has no input color; the text route treats that as white,
+    // so the IR names the same constant.
+    ValueID chainInput = args.inputValue;
+    if (chainInput == INVALID_VALUE_ID) {
+      const auto one = ir->CreateConstant(1.0f);
+      chainInput = ir->CreateConstruct(SLType::Float4, {one, one, one, one});
+    }
     const size_t last = numChildProcessors() - 1;
     std::string temp = "out0";
-    ValueID inputValue = emitChildIR(0, args.inputColor, &temp, args, args.inputValue);
+    ValueID inputValue = emitChildIR(0, args.inputColor, &temp, args, chainInput);
     for (size_t i = 1; i < last; ++i) {
       temp = "out" + std::to_string(i);
       inputValue = emitChildIR(i, "", &temp, args, inputValue);

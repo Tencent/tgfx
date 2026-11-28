@@ -61,7 +61,10 @@ static PlacementPtr<FragmentProcessor> MakeColorizer(const Context* context, con
     return SingleIntervalGradientColorizer::Make(allocator, colors[offset], colors[offset + 1]);
   }
 
-  if (count <= UnrolledBinaryGradientColorizer::MaxColorCount) {
+  // The unrolled colorizer needs an if/else ladder the backend-neutral IR cannot express; WebGPU
+  // falls through to the sampled gradient below, which reaches the same colors.
+  if (context->backend() != Backend::WebGPU &&
+      count <= UnrolledBinaryGradientColorizer::MaxColorCount) {
     if (count == 3) {
       // Must be a dual interval gradient, where the middle point is at offset+1 and the two
       // intervals share the middle color stop.

@@ -152,7 +152,8 @@ struct VertexIn {
 
 struct VertexOut {
   @builtin(position) position: vec4f,
-  @location(0) colors: array<vec4f, 2>,
+  @location(0) colors0: vec4f,
+  @location(1) colors1: vec4f,
   @location(2) lastColor: vec4f,
 };
 
@@ -160,8 +161,8 @@ struct VertexOut {
 fn main(in: VertexIn) -> VertexOut {
   var out: VertexOut;
   out.position = vec4f(in.aPosition, 0.0, 1.0);
-  out.colors[0] = vec4f(1.0, 0.0, 0.0, 1.0);
-  out.colors[1] = vec4f(0.0, 1.0, 0.0, 1.0);
+  out.colors0 = vec4f(1.0, 0.0, 0.0, 1.0);
+  out.colors1 = vec4f(0.0, 1.0, 0.0, 1.0);
   out.lastColor = vec4f(0.0, 0.0, 1.0, 1.0);
   return out;
 }
@@ -170,13 +171,14 @@ fn main(in: VertexIn) -> VertexOut {
 static constexpr char WGSL_FRAGMENT_SHADER[] = R"(
 struct VertexOut {
   @builtin(position) position: vec4f,
-  @location(0) colors: array<vec4f, 2>,
+  @location(0) colors0: vec4f,
+  @location(1) colors1: vec4f,
   @location(2) lastColor: vec4f,
 };
 
 @fragment
 fn main(in: VertexOut) -> @location(0) vec4f {
-  return in.lastColor + in.colors[0] * 0.0 + in.colors[1] * 0.0;
+  return in.lastColor + in.colors0 * 0.0 + in.colors1 * 0.0;
 }
 )";
 
