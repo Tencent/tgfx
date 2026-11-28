@@ -32,9 +32,9 @@
 namespace tgfx {
 
 /**
- * One stage's uniform block. The JIT route declares its uniforms by name and writes them through
- * setData(); the precompiled route addresses every field by the derived layout's offset through
- * writableBytes(), so both routes share one backing buffer of the block's size.
+ * One stage's uniform block: the byte size of the block and the field table the uploads address.
+ * The layout is derived once from the processor declarations; a write names the uniform by its
+ * base name and copies the value into the field's offset.
  */
 class UniformData {
  public:
