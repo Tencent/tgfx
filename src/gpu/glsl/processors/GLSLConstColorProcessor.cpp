@@ -36,13 +36,19 @@ void GLSLConstColorProcessor::emitCode(EmitArgs& args) const {
   if (entry.empty()) {
     return;
   }
-  if (args.irBuilder == nullptr || args.inputValue == INVALID_VALUE_ID ||
-      args.outputValue == INVALID_VALUE_ID) {
+  if (args.irBuilder == nullptr || args.outputValue == INVALID_VALUE_ID) {
     return;
   }
+  // The xfer's input is the stage's geometry color, which a draw that never set one leaves
+  // invalid; the text route treats that as white, so the IR names the same constant.
+  ValueID inputValue = args.inputValue;
+  if (inputValue == INVALID_VALUE_ID) {
+    const auto one = args.irBuilder->CreateConstant(1.0f);
+    inputValue = args.irBuilder->CreateConstruct(SLType::Float4, {one, one, one, one});
+  }
   ConstColorOp::UniformNames names = {};
-  const auto result = ConstColorOp::Emit(args.irBuilder, args.uniformHandler, &names,
-                                         args.inputValue, static_cast<int32_t>(inputMode));
+  const auto result = ConstColorOp::Emit(args.irBuilder, args.uniformHandler, &names, inputValue,
+                                         static_cast<int32_t>(inputMode));
   args.irBuilder->StoreOutput(args.outputValue, result);
   std::string expression = {};
   std::string error = {};

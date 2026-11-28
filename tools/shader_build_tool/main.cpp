@@ -45,10 +45,12 @@ int main(int argc, char** argv) {
   if (!options.libraryBundlePath.empty()) {
     std::string bundleError;
     const bool withMSL = options.libraryLanguages.find("msl") != std::string::npos;
+    const bool withWgsl = options.libraryLanguages.find("wgsl") != std::string::npos;
     tgfx::StageCache stageCache;
     tgfx::StageCompiler stageCompiler(&stageCache);
     if (!tgfx::WriteShaderLibraryBundle(options.shaderDir, options.libraryBundlePath,
-                                        withMSL ? &stageCompiler : nullptr, &bundleError)) {
+                                        (withMSL || withWgsl) ? &stageCompiler : nullptr, withWgsl,
+                                        &bundleError)) {
       std::cerr << "ERROR: " << bundleError << "\n";
       return 1;
     }

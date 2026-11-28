@@ -28,29 +28,30 @@ namespace tgfx {
 /// void): the statement printer treats those as "this program is not printable here".
 inline const char* ValueTypeName(ShaderLibraryLanguage language, SLType type) {
   const bool msl = language == ShaderLibraryLanguage::MSL;
+  const bool wgsl = language == ShaderLibraryLanguage::WGSL;
   switch (type) {
     case SLType::Float:
-      return "float";
+      return wgsl ? "f32" : "float";
     case SLType::Float2:
-      return msl ? "float2" : "vec2";
+      return wgsl ? "vec2<f32>" : (msl ? "float2" : "vec2");
     case SLType::Float3:
-      return msl ? "float3" : "vec3";
+      return wgsl ? "vec3<f32>" : (msl ? "float3" : "vec3");
     case SLType::Float4:
-      return msl ? "float4" : "vec4";
+      return wgsl ? "vec4<f32>" : (msl ? "float4" : "vec4");
     case SLType::Int:
-      return "int";
+      return wgsl ? "i32" : "int";
     case SLType::Int2:
-      return msl ? "int2" : "ivec2";
+      return wgsl ? "vec2<i32>" : (msl ? "int2" : "ivec2");
     case SLType::Int3:
-      return msl ? "int3" : "ivec3";
+      return wgsl ? "vec3<i32>" : (msl ? "int3" : "ivec3");
     case SLType::Int4:
-      return msl ? "int4" : "ivec4";
+      return wgsl ? "vec4<i32>" : (msl ? "int4" : "ivec4");
     case SLType::Float2x2:
-      return msl ? "float2x2" : "mat2";
+      return wgsl ? "mat2x2<f32>" : (msl ? "float2x2" : "mat2");
     case SLType::Float3x3:
-      return msl ? "float3x3" : "mat3";
+      return wgsl ? "mat3x3<f32>" : (msl ? "float3x3" : "mat3");
     case SLType::Float4x4:
-      return msl ? "float4x4" : "mat4";
+      return wgsl ? "mat4x4<f32>" : (msl ? "float4x4" : "mat4");
     default:
       return nullptr;
   }

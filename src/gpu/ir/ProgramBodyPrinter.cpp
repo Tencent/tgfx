@@ -78,12 +78,16 @@ bool PrintIRStatement(const ProgramIR& program, const IRStatement& statement,
   // its base is declared once here; the fields then assign into that variable.
   if (!statement.dst.swizzle.empty() && !isColorOutput && declared->insert(dstValue.debugName).second) {
     if (const char* typeName = ValueTypeName(traits.language, dstValue.type)) {
-      *out += "  ";
-      *out += ValuePrecisionPrefix(traits.language, dstValue.precision);
-      *out += typeName;
-      *out += " ";
-      *out += dstValue.debugName;
-      *out += ";\n";
+      if (traits.language == ShaderLibraryLanguage::WGSL) {
+        *out += std::string("  var ") + dstValue.debugName + ": " + typeName + ";\n";
+      } else {
+        *out += "  ";
+        *out += ValuePrecisionPrefix(traits.language, dstValue.precision);
+        *out += typeName;
+        *out += " ";
+        *out += dstValue.debugName;
+        *out += ";\n";
+      }
     }
   }
   const bool canDeclare =
@@ -93,14 +97,18 @@ bool PrintIRStatement(const ProgramIR& program, const IRStatement& statement,
       (dstValue.kind == IRValueKind::Local || dstValue.kind == IRValueKind::Expr) &&
       declared->insert(dstValue.debugName).second;
   if (needsDeclare) {
-    *out += "  ";
-    *out += ValuePrecisionPrefix(traits.language, dstValue.precision);
-    *out += ValueTypeName(traits.language, dstValue.type);
-    *out += " ";
-    *out += dst;
-    *out += " = ";
-    *out += source;
-    *out += ";\n";
+    if (traits.language == ShaderLibraryLanguage::WGSL) {
+      *out += "  var " + dst + " = " + source + ";\n";
+    } else {
+      *out += "  ";
+      *out += ValuePrecisionPrefix(traits.language, dstValue.precision);
+      *out += ValueTypeName(traits.language, dstValue.type);
+      *out += " ";
+      *out += dst;
+      *out += " = ";
+      *out += source;
+      *out += ";\n";
+    }
   } else {
     *out += "  ";
     *out += dst;
@@ -143,6 +151,13 @@ bool ResolvesIdentifier(const std::string& name, const ProgramIR& program,
     if (sampler.name == name) {
       return true;
     }
+    // The WGSL reader pairs each combined sampler with a "_Sampler" resource; a call site names
+    // that pair, and neither half is an interface entry on its own.
+    if (traits.language == ShaderLibraryLanguage::WGSL && name.size() > sampler.name.size() &&
+        name.compare(0, sampler.name.size(), sampler.name) == 0 &&
+        name.compare(sampler.name.size(), std::string::npos, "_Sampler") == 0) {
+      return true;
+    }
   }
   for (const auto& value : program.values) {
     if (value.kind == IRValueKind::Uniform || value.kind == IRValueKind::Varying ||
@@ -177,6 +192,19 @@ bool ResolvesIdentifier(const std::string& name, const ProgramIR& program,
         "float4x4",     "int2",         "int3",       "int4",       "out",
         "in",           "uint",         "discard_fragment", "tgfx_FragHeight"};
     if (msl.count(name) != 0) {
+      return true;
+    }
+  }
+  if (traits.language == ShaderLibraryLanguage::WGSL) {
+    static const std::set<std::string> wgsl = {
+        "f32",       "i32",          "u32",           "bool",      "vec2",
+        "vec3",      "vec4",         "mat2x2",        "mat3x3",    "mat4x4",
+        "array",     "var",          "let",           "fn",        "struct",
+        "return",    "discard",      "in",            "out",       "textureSample",
+        "textureSampleLevel",        "textureDimensions",          "textureLoad",
+        "select",    "saturate",     "tgfxTextureSample",          "tgfxTextureSampleRect",
+        "tgfxTextureSampleExternal", "tgfxClamp"};
+    if (wgsl.count(name) != 0) {
       return true;
     }
   }
@@ -278,8 +306,13 @@ std::string ProgramBodyPrinter::PrintFragment(const ProgramIR& program,
       }
       // The counter is a loop-local declared by the header itself.
       declared.insert(statement.loopVarName);
-      out += "  for (int " + statement.loopVarName + " = " + init + "; " + statement.loopVarName +
-             " <= " + bound + "; ++" + statement.loopVarName + ") {\n";
+      if (traits.language == ShaderLibraryLanguage::WGSL) {
+        out += "  for (var " + statement.loopVarName + " = " + init + "; " +
+               statement.loopVarName + " <= " + bound + "; " + statement.loopVarName + "++) {\n";
+      } else {
+        out += "  for (int " + statement.loopVarName + " = " + init + "; " +
+               statement.loopVarName + " <= " + bound + "; ++" + statement.loopVarName + ") {\n";
+      }
       continue;
     }
     if (statement.kind == IRStatementKind::ForLoopEnd) {
@@ -304,10 +337,8 @@ std::string ProgramBodyPrinter::PrintFragment(const ProgramIR& program,
       }
       // The text route's zero-coverage early-out: a fully transparent premultiplied source writes
       // nothing, so the pixel keeps the destination (a Clear that reaches it would zero it).
-      const char* discard = traits.language == ShaderLibraryLanguage::MSL ? "discard_fragment();"
-                                                                  : "discard;";
       out += "  if (" + condition + ".r <= 0.0 && " + condition + ".g <= 0.0 && " + condition +
-             ".b <= 0.0) {\n    " + discard + "\n  }\n";
+             ".b <= 0.0) {\n    " + traits.discardStatement + "\n  }\n";
       continue;
     }
     if (statement.kind != IRStatementKind::Assign && statement.kind != IRStatementKind::StoreOutput) {

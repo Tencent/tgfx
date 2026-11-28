@@ -250,7 +250,10 @@ static std::vector<uint32_t> compileSPIRVForWGSL(const std::string& source, Shad
                                                  std::string* error) {
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
-  options.SetOptimizationLevel(shaderc_optimization_level_performance);
+  // The library bundle slices the translation by function; an optimized module inlines the
+  // catalog function into the dummy entry and the slice loses its name. Zero keeps every
+  // function as written, which both the library slicing and the runtime call sites rely on.
+  options.SetOptimizationLevel(shaderc_optimization_level_zero);
   options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_1);
   auto shaderKind =
       (stage == ShaderStageType::Vertex) ? shaderc_vertex_shader : shaderc_fragment_shader;

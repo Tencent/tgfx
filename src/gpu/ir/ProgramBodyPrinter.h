@@ -53,6 +53,12 @@ class ProgramBodyPrinter {
     return {ShaderLibraryLanguage::MSL, "out.position", "discard_fragment();", true};
   }
 
+  /// The WGSL spellings: WebGPU's clip space points the same way MSL's does, and the discard is
+  /// the WGSL statement.
+  static BodyPrintTraits WGSLTraits() {
+    return {ShaderLibraryLanguage::WGSL, "out.position", "discard;", true};
+  }
+
   /// Renames the printable values in place: two emitters that named a value alike (or left it
   /// nameless) get stable generated names, so a printed reference and a printed definition can
   /// only match when they are the same value. Interface-owned names and builtin outputs keep

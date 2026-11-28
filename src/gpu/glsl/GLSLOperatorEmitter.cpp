@@ -167,7 +167,10 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
       if (!GLSLOperatorEmitter::EmitValue(program, expr.args[0], &source, error, language)) {
         return false;
       }
-      *expression = (expr.type == SLType::Float ? "float(" : "int(") + source + ")";
+      const bool wgsl = language == ShaderLibraryLanguage::WGSL;
+      const char* cast = wgsl ? (expr.type == SLType::Float ? "f32(" : "i32(")
+                              : (expr.type == SLType::Float ? "float(" : "int(");
+      *expression = std::string(cast) + source + ")";
       return true;
     }
     case IRExprKind::Binary: {
@@ -244,8 +247,14 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
           }
         }
       }
-      *expression = "tgfxTextureSample(" + sampler + ", " + coord + ", " + subset + ", " + clampOn +
-                    ", " + std::to_string(swizzleCode) + ")";
+      // WGSL has no combined samplers: the library reader takes the texture and the sampler state
+      // as two arguments, so the call site names the paired sampler resource as well.
+      std::string samplerArguments = sampler;
+      if (language == ShaderLibraryLanguage::WGSL) {
+        samplerArguments += ", " + sampler + "_Sampler";
+      }
+      *expression = "tgfxTextureSample(" + samplerArguments + ", " + coord + ", " + subset + ", " +
+                    clampOn + ", " + std::to_string(swizzleCode) + ")";
       return true;
     }
     case IRExprKind::Builtin:
@@ -296,6 +305,14 @@ bool GLSLOperatorEmitter::EmitCall(const ProgramIR& program, ValueID result,
     // and named values keep their names, which the text route declares.
     if (!EmitValue(program, call.args[index], &argument, error, language)) {
       return false;
+    }
+    if (language == ShaderLibraryLanguage::WGSL) {
+      for (const auto& sampler : program.interface.samplers) {
+        if (sampler.name == argument) {
+          argument += ", " + argument + "_Sampler";
+          break;
+        }
+      }
     }
     if (index != 0) {
       out += ", ";

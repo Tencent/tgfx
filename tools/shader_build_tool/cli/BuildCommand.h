@@ -158,7 +158,7 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options);
  * lands beside the bundle.
  */
 bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& outPath,
-                              StageCompiler* compiler, std::string* error);
+                              StageCompiler* compiler, bool withWgsl, std::string* error);
 
 /// Runs the build: loads the sources, plans and compiles every family's variants through the
 /// emitters, runs the contract rules, and writes the bundles and the reports. Returns the process

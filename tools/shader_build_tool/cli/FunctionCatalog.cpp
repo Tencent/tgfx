@@ -23,6 +23,7 @@
 #include <fstream>
 #include <functional>
 #include <map>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <string>
@@ -1160,6 +1161,347 @@ bool BuildCatalogMsl(const std::vector<CatalogEntry>& entries, StageCompiler* co
   return true;
 }
 
+static int BraceDelta(const std::string& line) {
+  int delta = 0;
+  for (const char character : line) {
+    if (character == '{') {
+      ++delta;
+    } else if (character == '}') {
+      --delta;
+    }
+  }
+  return delta;
+}
+
+// Cuts the Tint output into top-level blocks: functions go to the caller keyed by name, every other
+// top-level declaration (structs, constants, binding variables) joins the shared support list. The
+// dummy entry function is dropped.
+static bool CollectWgslBlocks(const std::string& wgsl, std::vector<std::string>* functions,
+                              std::vector<std::string>* supportBlocks, std::string* error) {
+  std::string pendingAttributes = {};
+  std::string current = {};
+  std::string currentName = {};
+  bool collecting = false;
+  bool currentIsFunction = false;
+  int depth = 0;
+  size_t lineStart = 0;
+  while (lineStart <= wgsl.size()) {
+    size_t lineEnd = wgsl.find('\n', lineStart);
+    if (lineEnd == std::string::npos) {
+      lineEnd = wgsl.size();
+    }
+    const std::string line = wgsl.substr(lineStart, lineEnd - lineStart);
+    const size_t first = line.find_first_not_of(" \t");
+    const std::string trimmed = first == std::string::npos ? "" : line.substr(first);
+    if (!collecting) {
+      if (trimmed.empty() || trimmed.rfind("//", 0) == 0) {
+        // Blank lines and comments do not open a block.
+      } else if (trimmed[0] == '@' && trimmed.find('{') == std::string::npos &&
+                 trimmed.find(';') == std::string::npos) {
+        pendingAttributes += line + "\n";
+      } else if (trimmed.rfind("fn ", 0) == 0 || trimmed.rfind("struct ", 0) == 0) {
+        current = pendingAttributes + line + "\n";
+        pendingAttributes.clear();
+        collecting = true;
+        currentIsFunction = trimmed.rfind("fn ", 0) == 0;
+        currentName = BlockName(trimmed);
+        depth = BraceDelta(line);
+        if (depth == 0) {
+          collecting = false;
+          if (currentIsFunction) {
+            if (currentName.rfind("main", 0) != 0) {
+              functions->push_back(current);
+            }
+          } else {
+            supportBlocks->push_back(current);
+          }
+          current.clear();
+          currentName.clear();
+        }
+      } else if (trimmed.rfind("@group", 0) == 0 || trimmed.rfind("@binding", 0) == 0) {
+        // The runtime owns every binding; the library fragments receive their resources as
+        // parameters, so the module-level declarations Tint emits are dropped.
+      } else {
+        if (!pendingAttributes.empty()) {
+          supportBlocks->push_back(pendingAttributes);
+          pendingAttributes.clear();
+        }
+        supportBlocks->push_back(line + "\n");
+      }
+    } else {
+      current += line + "\n";
+      depth += BraceDelta(line);
+      if (depth == 0) {
+        collecting = false;
+        if (currentIsFunction) {
+          if (currentName.rfind("main", 0) != 0) {
+            functions->push_back(current);
+          }
+        } else {
+          supportBlocks->push_back(current);
+        }
+        current.clear();
+        currentName.clear();
+      }
+    }
+    if (lineEnd == wgsl.size()) {
+      break;
+    }
+    lineStart = lineEnd + 1;
+  }
+  if (collecting) {
+    *error = "a WGSL block is not terminated";
+    return false;
+  }
+  if (!pendingAttributes.empty()) {
+    supportBlocks->push_back(pendingAttributes);
+  }
+  return true;
+}
+
+static bool IsWgslWordChar(char character) {
+  return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_';
+}
+
+static void ReplaceWgslWord(std::string* text, const std::string& from, const std::string& to) {
+  size_t offset = 0;
+  while ((offset = text->find(from, offset)) != std::string::npos) {
+    const bool leftOk = offset == 0 || !IsWgslWordChar((*text)[offset - 1]);
+    const size_t end = offset + from.size();
+    const bool rightOk = end >= text->size() || !IsWgslWordChar((*text)[end]);
+    if (leftOk && rightOk) {
+      text->replace(offset, from.size(), to);
+      offset += to.size();
+    } else {
+      offset = end;
+    }
+  }
+}
+
+// Tint stamps a parameter-type suffix on every function name (WGSL has no overloading), so the
+// sliced name no longer matches the catalog name the runtime asks for. The suffix is stripped by
+// matching the longest known catalog or dependency name that prefixes it.
+static std::string WgslBaseName(const std::string& raw, const std::set<std::string>& known) {
+  if (known.count(raw) != 0) {
+    return raw;
+  }
+  const std::string* best = nullptr;
+  for (const auto& name : known) {
+    if (raw.size() > name.size() && raw.compare(0, name.size(), name) == 0 &&
+        raw[name.size()] == '_' && (best == nullptr || name.size() > best->size())) {
+      best = &name;
+    }
+  }
+  return best != nullptr ? *best : raw;
+}
+
+static void RenameWgslWords(std::string* text,
+                            const std::map<std::string, std::string>& renames) {
+  for (auto it = renames.rbegin(); it != renames.rend(); ++it) {
+    ReplaceWgslWord(text, it->first, it->second);
+  }
+}
+
+// Tint spells every non-entry parameter as a function pointer. The runtime call sites pass values
+// (the GLSL sources declare plain `in` parameters), so the pointer wrapper is removed together
+// with its dereference and address-of forms.
+static void StripWgslPointers(std::string* text) {
+  static const std::regex parameterRegex(R"((\w+)\s*:\s*ptr<function,\s*([^>]+)>)");
+  *text = std::regex_replace(*text, parameterRegex, "$1 : $2");
+  static const std::regex parenthesizedDereference(R"(\(\*\((\w+)\)\))");
+  *text = std::regex_replace(*text, parenthesizedDereference, "($1)");
+  static const std::regex dereferenceRegex(R"(\*\((\w+)\))");
+  *text = std::regex_replace(*text, dereferenceRegex, "$1");
+  std::string stripped;
+  for (size_t index = 0; index < text->size(); ++index) {
+    const char character = (*text)[index];
+    const bool addressOf =
+        character == '&' && (index == 0 || (*text)[index - 1] != '&') &&
+        index + 1 < text->size() &&
+        (std::isalpha(static_cast<unsigned char>((*text)[index + 1])) != 0 ||
+         (*text)[index + 1] == '_' || (*text)[index + 1] == '(');
+    if (!addressOf) {
+      stripped += character;
+    }
+  }
+  *text = std::move(stripped);
+}
+
+static std::vector<std::string> SplitWgslArguments(const std::string& arguments) {
+  std::vector<std::string> result = {};
+  std::string current = {};
+  int depth = 0;
+  for (const char character : arguments) {
+    if (character == '(') {
+      ++depth;
+    } else if (character == ')') {
+      --depth;
+    }
+    if (character == ',' && depth == 0) {
+      result.push_back(current);
+      current.clear();
+    } else {
+      current += character;
+    }
+  }
+  if (!current.empty() || !result.empty()) {
+    result.push_back(current);
+  }
+  return result;
+}
+
+static std::string TrimWgsl(const std::string& text) {
+  const size_t first = text.find_first_not_of(" \t\r\n");
+  const size_t last = text.find_last_not_of(" \t\r\n");
+  return first == std::string::npos ? "" : text.substr(first, last - first + 1);
+}
+
+// WGSL parameters are immutable; the GLSL sources freely assign to their `in` parameters. Each
+// value parameter is renamed and copied into a local `var` of the original name, so the body's
+// reads and writes keep their spelling.
+static void MakeWgslParametersMutable(std::string* block) {
+  const size_t functionAt = block->find("fn ");
+  if (functionAt == std::string::npos) {
+    return;
+  }
+  const size_t open = block->find('(', functionAt);
+  const size_t close = block->find(')', open);
+  if (open == std::string::npos || close == std::string::npos) {
+    return;
+  }
+  const auto arguments = SplitWgslArguments(block->substr(open + 1, close - open - 1));
+  std::string signature;
+  std::string copies;
+  for (size_t index = 0; index < arguments.size(); ++index) {
+    const std::string argument = TrimWgsl(arguments[index]);
+    const size_t colon = argument.find(':');
+    if (colon == std::string::npos) {
+      signature += argument;
+    } else {
+      const std::string name = TrimWgsl(argument.substr(0, colon));
+      const std::string type = TrimWgsl(argument.substr(colon + 1));
+      if (name.empty() || type.find("texture_") != std::string::npos ||
+          type.find("sampler") != std::string::npos) {
+        signature += argument;
+      } else {
+        signature += name + "_param : " + type;
+        copies += "  var " + name + " = " + name + "_param;\n";
+      }
+    }
+    if (index + 1 < arguments.size()) {
+      signature += ", ";
+    }
+  }
+  block->replace(open + 1, close - open - 1, signature);
+  if (copies.empty()) {
+    return;
+  }
+  const size_t brace = block->find('{', open + signature.size());
+  if (brace == std::string::npos) {
+    return;
+  }
+  block->insert(brace + 1, "\n" + copies);
+}
+
+bool BuildCatalogWgsl(const std::vector<CatalogEntry>& entries, StageCompiler* compiler,
+                      std::map<std::string, std::string>* wgslByName, std::string* support,
+                      std::string* error) {
+  std::set<std::string> catalogNames = {};
+  for (const auto& entry : entries) {
+    catalogNames.insert(entry.name);
+  }
+  std::set<std::string> supportSeen = {};
+  uint32_t moduleIndex = 0;
+  for (const auto& entry : entries) {
+    if (IsMslSkippedFunction(entry)) {
+      wgslByName->insert({entry.name, ""});
+      continue;
+    }
+    std::set<std::string> done = {};
+    std::vector<const CatalogEntry*> ordered = {};
+    if (!CollectMslOrder(entries, entry, &done, &ordered, error)) {
+      return false;
+    }
+    const std::string glsl = BuildMslModuleGLSL(entry, ordered, error);
+    if (glsl.empty()) {
+      return false;
+    }
+    const auto& wgsl = compiler->compileWgsl(glsl, ShaderStageType::Fragment, "catalog_wgsl",
+                                             moduleIndex++);
+    if (!wgsl.success) {
+      if (const char* dumpDir = std::getenv("TGFX_WGSL_DUMP")) {
+        std::ofstream dump(std::string(dumpDir) + "/" + entry.name + ".glsl", std::ios::binary);
+        dump << glsl;
+      }
+      *error = "WGSL section, " + entry.name + ": " + wgsl.error;
+      return false;
+    }
+    std::vector<std::string> functions = {};
+    std::vector<std::string> supportBlocks = {};
+    if (!CollectWgslBlocks(wgsl.text, &functions, &supportBlocks, error)) {
+      *error = "WGSL section, " + entry.name + ": " + *error;
+      return false;
+    }
+    std::set<std::string> knownNames = catalogNames;
+    for (const auto* dependency : ordered) {
+      knownNames.insert(dependency->name);
+    }
+    std::map<std::string, std::string> renames = {};
+    for (const auto& function : functions) {
+      const std::string raw = BlockName(function);
+      const std::string base = WgslBaseName(raw, knownNames);
+      if (raw != base) {
+        renames[raw] = base;
+      }
+    }
+    for (auto& function : functions) {
+      RenameWgslWords(&function, renames);
+      StripWgslPointers(&function);
+      MakeWgslParametersMutable(&function);
+    }
+    for (auto& block : supportBlocks) {
+      RenameWgslWords(&block, renames);
+      StripWgslPointers(&block);
+      MakeWgslParametersMutable(&block);
+    }
+    for (const auto& block : supportBlocks) {
+      if (supportSeen.insert(block).second) {
+        *support += block;
+      }
+    }
+    bool found = false;
+    for (const auto& function : functions) {
+      const std::string name = BlockName(function);
+      if (name.empty()) {
+        continue;
+      }
+      if (catalogNames.find(name) != catalogNames.end()) {
+        wgslByName->emplace(name, function);
+        if (name == entry.name) {
+          found = true;
+        }
+      } else if (supportSeen.insert(function).second) {
+        *support += function;
+      }
+    }
+    if (!found) {
+      if (const char* dumpDir = std::getenv("TGFX_WGSL_DUMP")) {
+        std::ofstream dump(std::string(dumpDir) + "/" + entry.name + ".wgsl", std::ios::binary);
+        dump << wgsl.text;
+      }
+      *error = "WGSL section, " + entry.name + ": the translated module lost the function";
+      return false;
+    }
+  }
+  for (const auto& name : catalogNames) {
+    if (wgslByName->find(name) == wgslByName->end()) {
+      *error = "WGSL section: '" + name + "' was never translated";
+      return false;
+    }
+  }
+  return true;
+}
+
 bool DeriveOperatorParams(const CatalogEntry& entry, std::string* returnType,
                           std::vector<OperatorParamInfo>* params, std::string* error) {
   // The signature is parsed here rather than through SignatureParams: that helper's contract
@@ -1336,7 +1678,7 @@ bool CollectOperatorSignatures(const std::string& shaderDir,
 }
 
 bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& outPath,
-                              StageCompiler* compiler, std::string* error) {
+                              StageCompiler* compiler, bool withWgsl, std::string* error) {
   if (error == nullptr) {
     return false;
   }
@@ -1435,7 +1777,53 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
     mslOffsets.push_back(supportOffset);
   }
 
-  const uint32_t sectionCount = compiler != nullptr ? 2 : 1;
+  std::string wgslPool = {};
+  std::vector<FunctionOffset> wgslOffsets = {};
+  if (withWgsl) {
+    if (compiler == nullptr) {
+      *error = "the WGSL section needs the stage compiler";
+      return false;
+    }
+    std::map<std::string, std::string> wgslByName = {};
+    std::string support = {};
+    if (!BuildCatalogWgsl(entries, compiler, &wgslByName, &support, error)) {
+      return false;
+    }
+    wgslOffsets.reserve(sorted.size() + 1);
+    for (const CatalogEntry* entry : sorted) {
+      const auto found = wgslByName.find(entry->name);
+      if (found == wgslByName.end()) {
+        *error = "WGSL section: '" + entry->name + "' was never translated";
+        return false;
+      }
+      FunctionOffset offset = {};
+      offset.name = static_cast<uint32_t>(wgslPool.size());
+      wgslPool += entry->name;
+      wgslPool.push_back('\0');
+      offset.source = static_cast<uint32_t>(wgslPool.size());
+      offset.sourceSize = static_cast<uint32_t>(found->second.size());
+      wgslPool += found->second;
+      wgslPool.push_back('\0');
+      const std::string requires = RequiresOf(*entry);
+      offset.requires = static_cast<uint32_t>(wgslPool.size());
+      wgslPool += requires;
+      wgslPool.push_back('\0');
+      wgslOffsets.push_back(offset);
+    }
+    FunctionOffset supportOffset = {};
+    supportOffset.name = static_cast<uint32_t>(wgslPool.size());
+    wgslPool += "__wgsl_support__";
+    wgslPool.push_back('\0');
+    supportOffset.source = static_cast<uint32_t>(wgslPool.size());
+    supportOffset.sourceSize = static_cast<uint32_t>(support.size());
+    wgslPool += support;
+    wgslPool.push_back('\0');
+    supportOffset.requires = static_cast<uint32_t>(wgslPool.size());
+    wgslPool.push_back('\0');
+    wgslOffsets.push_back(supportOffset);
+  }
+
+  const uint32_t sectionCount = 1 + (compiler != nullptr ? 1 : 0) + (withWgsl ? 1 : 0);
   const uint32_t entryTableOffset =
       SHADER_LIBRARY_BUNDLE_HEADER_SIZE + sectionCount * SHADER_LIBRARY_BUNDLE_SECTION_SIZE;
   const uint32_t poolOffset =
@@ -1445,6 +1833,10 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
   const uint32_t mslPoolOffset =
       mslEntryOffset +
       static_cast<uint32_t>(mslOffsets.size() * SHADER_LIBRARY_BUNDLE_FUNCTION_SIZE);
+  const uint32_t wgslEntryOffset = mslPoolOffset + static_cast<uint32_t>(mslPool.size());
+  const uint32_t wgslPoolOffset =
+      wgslEntryOffset +
+      static_cast<uint32_t>(wgslOffsets.size() * SHADER_LIBRARY_BUNDLE_FUNCTION_SIZE);
   std::string bundle = {};
   bundle.append(SHADER_LIBRARY_BUNDLE_MAGIC, sizeof(SHADER_LIBRARY_BUNDLE_MAGIC) - 1);
   AppendU32(&bundle, SHADER_LIBRARY_BUNDLE_VERSION);
@@ -1453,6 +1845,9 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
   uint32_t languageMask = ShaderLibraryLanguageMask(ShaderLibraryLanguage::GLSL);
   if (compiler != nullptr) {
     languageMask |= ShaderLibraryLanguageMask(ShaderLibraryLanguage::MSL);
+  }
+  if (withWgsl) {
+    languageMask |= ShaderLibraryLanguageMask(ShaderLibraryLanguage::WGSL);
   }
   AppendU32(&bundle, languageMask);
   AppendU64(&bundle, HashSource(pool));
@@ -1470,6 +1865,14 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
     AppendU32(&bundle, static_cast<uint32_t>(mslPool.size()));
     AppendU32(&bundle, 0);
   }
+  if (withWgsl) {
+    AppendU32(&bundle, static_cast<uint32_t>(ShaderLibraryLanguage::WGSL));
+    AppendU32(&bundle, static_cast<uint32_t>(wgslOffsets.size()));
+    AppendU32(&bundle, wgslEntryOffset);
+    AppendU32(&bundle, wgslPoolOffset);
+    AppendU32(&bundle, static_cast<uint32_t>(wgslPool.size()));
+    AppendU32(&bundle, 0);
+  }
   for (const auto& offset : offsets) {
     AppendU32(&bundle, offset.name);
     AppendU32(&bundle, offset.source);
@@ -1485,6 +1888,15 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
       AppendU32(&bundle, offset.requires);
     }
     bundle += mslPool;
+  }
+  if (withWgsl) {
+    for (const auto& offset : wgslOffsets) {
+      AppendU32(&bundle, offset.name);
+      AppendU32(&bundle, offset.source);
+      AppendU32(&bundle, offset.sourceSize);
+      AppendU32(&bundle, offset.requires);
+    }
+    bundle += wgslPool;
   }
   std::ofstream out(outPath, std::ios::binary);
   if (!out.is_open()) {

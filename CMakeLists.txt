@@ -1079,6 +1079,9 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     if (TGFX_USE_METAL)
         set(TGFX_SHADER_LIBRARY_LANGUAGES "glsl,msl")
     endif ()
+    if (TGFX_USE_WEBGPU)
+        set(TGFX_SHADER_LIBRARY_LANGUAGES "${TGFX_SHADER_LIBRARY_LANGUAGES},wgsl")
+    endif ()
     add_custom_command(
             OUTPUT ${TGFX_SHADER_LIBRARY_BUNDLE}
             BYPRODUCTS ${TGFX_SHADER_LIBRARY_REGISTRY}
