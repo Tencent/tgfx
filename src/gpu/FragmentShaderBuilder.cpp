@@ -101,11 +101,6 @@ void FragmentShaderBuilder::onAfterChildProcEmitCode() const {
 
 std::string FragmentShaderBuilder::emitPerspTextCoord(const CoordValue& coordVar) {
   if (coordVar.type() == SLType::Float2) {
-    FragmentInstruction instruction = {};
-    instruction.kind = FragmentInstructionKind::ReadVarying;
-    instruction.src = coordVar.name();
-    instruction.varying = coordVar.varying;
-    recordFragmentInstruction(std::move(instruction));
     return coordVar.name();
   }
   if (coordVar.type() == SLType::Float3) {
@@ -127,12 +122,6 @@ std::string FragmentShaderBuilder::emitPerspTextCoord(const CoordValue& coordVar
         }
       }
     }
-    FragmentInstruction instruction = {};
-    instruction.kind = FragmentInstructionKind::Project;
-    instruction.output = perspCoordName;
-    instruction.src = coordVar.name();
-    instruction.varying = coordVar.varying;
-    recordFragmentInstruction(std::move(instruction));
     return perspCoordName;
   }
   DEBUG_ASSERT(false);

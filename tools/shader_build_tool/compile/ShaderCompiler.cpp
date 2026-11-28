@@ -41,7 +41,6 @@ extern char** environ;
 #include <d3dcompiler.h>
 #endif
 #include "compile/WebGPUDialect.h"
-#include "gpu/shaders/contract/ShaderBundleContract.h"
 #ifdef TGFX_SHADER_TOOL_HAS_TINT
 #include "src/tint/lang/spirv/reader/reader.h"
 #include "src/tint/lang/wgsl/writer/writer.h"

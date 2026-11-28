@@ -27,8 +27,6 @@
 namespace tgfx {
 static const std::string RTAdjustName = "tgfx_RTAdjust";
 
-using VertexCallRecord = VertexCall;
-
 class VertexShaderBuilder : public ShaderBuilder {
  public:
   explicit VertexShaderBuilder(ProgramBuilder* program) : ShaderBuilder(program) {
@@ -36,15 +34,6 @@ class VertexShaderBuilder : public ShaderBuilder {
 
   ShaderStage shaderStage() const override {
     return ShaderStage::Vertex;
-  }
-
-  /**
-   * The sink a bytecode builder installs to collect the structured writes; nullptr keeps the
-   * records off (the GLSL route). The records append in emission order.
-   */
-  void setVertexRecorder(std::vector<VertexCallRecord>* records) {
-    vertexRecorder = records;
-    suppressText = records != nullptr;
   }
 
   virtual void emitNormalizedPosition(const std::string& devPos) = 0;
@@ -109,15 +98,5 @@ class VertexShaderBuilder : public ShaderBuilder {
    * Writes the clip-space position the stage's normalized device coordinates come from.
    */
   void storePosition(const std::string& devPos);
-
- protected:
-  /// Appends one record when a recorder is installed; the callers print the text when text is on.
-  void recordVertexCall(VertexCallKind kind, const std::string& dst, const std::string& src,
-                        const std::string& operand, const std::string& extra, bool hasPerspective,
-                        bool declaresResult = false, SLType resultType = SLType::Void);
-
- private:
-  std::vector<VertexCallRecord>* vertexRecorder = nullptr;
-  bool suppressText = false;
 };
 }  // namespace tgfx

@@ -21,9 +21,6 @@
 
 namespace tgfx {
 
-UniformData::UniformData(size_t size) : bufferSize(size) {
-}
-
 UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(uniforms)) {
   for (const auto& uniform : _uniforms) {
     const auto& [entrySize, entryAlign] = EntryOf(uniform.format());

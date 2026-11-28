@@ -118,7 +118,6 @@ std::string NameOf(const std::string& path) {
 const std::set<std::string>& AllowedRuntimeHeaders() {
   static const std::set<std::string> allowed = {
       // contract layer
-      "gpu/shaders/contract/ShaderBundleContract.h",
       "gpu/shaders/contract/ShaderLibraryBundleFormat.h",
       "gpu/ShaderBindingLayout.h",
       // declaration layer
@@ -133,7 +132,6 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
 // The contract headers: constants and pure functions shared by the tool and the runtime.
 const std::vector<std::string>& ContractHeaders() {
   static const std::vector<std::string> headers = {
-      "gpu/shaders/contract/ShaderBundleContract.h",
       "gpu/shaders/contract/ShaderLibraryBundleFormat.h",
       // The binding and naming constants the tool and the runtime share; it lives at the src/gpu
       // top level because it survives the contract directory's retirement.
@@ -253,7 +251,7 @@ TEST(LayeringTest, ContractHeadersIncludeOnlyTheStandardLibraryAndEachOther) {
 
 TEST(LayeringTest, ContractHeadersAreNotRuntimeClasses) {
   // UniformData is a runtime class that happens to share a name prefix with a contract header;
-  // the binding layout lives in ShaderBundleContract.h exactly so the tool never needs UniformData.
+  // the binding layout lives in ShaderBindingLayout.h exactly so the tool never needs UniformData.
   for (const auto& header : ContractHeaders()) {
     EXPECT_EQ(header.find("UniformData"), std::string::npos) << header;
   }
@@ -267,7 +265,8 @@ TEST(LayeringTest, ContractHeadersAreNotRuntimeClasses) {
 }
 
 TEST(LayeringTest, TheRuntimeOnlyProfileResolverIsNotUsedByTheTool) {
-  // ShaderProfileResolver.h depends on the runtime Backend type. The tool uses ShaderBundleContract.h.
+  // ShaderProfileResolver.h depends on the runtime Backend type. The tool uses
+  // ShaderBindingLayout.h.
   for (const auto& file : FilesIn(ToolDir(), {".cpp", ".h"})) {
     for (const auto& include : IncludesOf(file)) {
       EXPECT_NE(include.target, "gpu/aot/select/ShaderProfileResolver.h") << NameOf(file);

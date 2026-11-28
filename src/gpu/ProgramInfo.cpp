@@ -76,14 +76,6 @@ static void EncodeStencilFace(BytesKey& key, const StencilDescriptor& face) {
   key.write(static_cast<uint32_t>(face.passOp));
 }
 
-ProgramInfo::ProgramInfo(RenderTarget* renderTarget, const GeometryLayout& geometryLayout,
-                         const std::optional<DstTextureInfo>& dstTexture, BlendMode blendMode,
-                         bool blendFormulaHasCoverage)
-    : renderTarget(renderTarget), geometryLayout(geometryLayout), blendMode(blendMode),
-      hasCoverageForBlend(blendFormulaHasCoverage) {
-  updateXferFacts(dstTexture);
-}
-
 ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
                          std::vector<FragmentProcessor*> fragmentProcessors,
                          size_t numColorProcessors, XferProcessor* xferProcessor,
@@ -96,17 +88,13 @@ ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometry
 }
 
 const std::vector<Attribute>& ProgramInfo::getVertexAttributes() const {
-  if (geometryProcessor != nullptr) {
-    return geometryProcessor->vertexAttributes();
-  }
-  return getGeometryLayout().vertexAttributes;
+  static const std::vector<Attribute> empty = {};
+  return geometryProcessor != nullptr ? geometryProcessor->vertexAttributes() : empty;
 }
 
 const std::vector<Attribute>& ProgramInfo::getInstanceAttributes() const {
-  if (geometryProcessor != nullptr) {
-    return geometryProcessor->instanceAttributes();
-  }
-  return getGeometryLayout().instanceAttributes;
+  static const std::vector<Attribute> empty = {};
+  return geometryProcessor != nullptr ? geometryProcessor->instanceAttributes() : empty;
 }
 
 void ProgramInfo::updateProcessorIndices() {
@@ -182,12 +170,6 @@ std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
   return samplers;
 }
 
-void ProgramInfo::updateXferFacts(const std::optional<DstTextureInfo>& dstTexture) {
-  // An absent value leaves the output to the fixed-function blend; a present one runs the formula
-  // in the shader, its empty proxy selecting the backend's framebuffer fetch.
-  xferFacts.dstTexture = dstTexture;
-}
-
 Swizzle ProgramInfo::getOutputSwizzle() const {
   return Swizzle::ForWrite(renderTarget->format());
 }
@@ -200,10 +182,9 @@ PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
   PipelineColorAttachment colorAttachment = {};
   colorAttachment.format = renderTarget->format();
   colorAttachment.colorWriteMask = colorWriteMask;
-  // A bound xfer processor runs the blend formula in the shader (the JIT route keeps the dst
-  // fact on the processor rather than in xferFacts), so the fixed-function blend must stay off
-  // there too — porter-duff modes such as SrcIn have no fixed-function equivalent.
-  if (xferProcessor != nullptr || xferFacts.shaderBlend() || blendMode == BlendMode::Src) {
+  // A bound xfer processor runs the blend formula in the shader, so the fixed-function blend must
+  // stay off there too — porter-duff modes such as SrcIn have no fixed-function equivalent.
+  if (xferProcessor != nullptr || blendMode == BlendMode::Src) {
     return colorAttachment;
   }
   BlendFormula blendFormula = {};
@@ -406,38 +387,13 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
     }
     return true;
   }
-  // The precompiled variant route that carried a writer is retired; a draw without a geometry
-  // processor has no program source any more.
+  // A draw without a geometry processor has no program source.
   LOGE("ProgramInfo::setUniformsAndSamplers() the info carries no geometry processor");
   return false;
 }
 
 Backend ProgramInfo::backend() const {
   return renderTarget->getContext()->backend();
-}
-
-bool ProgramInfo::samplersAre2D() const {
-  // The texture set the binders fill, walked from the IR without building a list: the gate runs
-  // before a program exists (twice per draw), so it must not allocate.
-  auto isTwoD = [](const std::shared_ptr<Texture>& texture) {
-    // Only TwoD is supported by the precompiled samplers (see the gate in MatchPermutationImpl for
-    // where rectangle and External (OES) textures come from). A slot without a texture counts as
-    // "not 2D": the draw would bind a dummy there.
-    return texture != nullptr && texture->type() == TextureType::TwoD;
-  };
-  if (geometryLayout.parameters.atlasProxy != nullptr) {
-    auto atlasView = geometryLayout.parameters.atlasProxy->getTextureView();
-    if (atlasView != nullptr && !isTwoD(atlasView->getTexture())) {
-      return false;
-    }
-  }
-  if (xferFacts.shaderBlend() && xferFacts.dstProxy() != nullptr) {
-    auto dstView = xferFacts.dstProxy()->getTextureView();
-    if (dstView != nullptr && !isTwoD(dstView->getTexture())) {
-      return false;
-    }
-  }
-  return true;
 }
 
 }  // namespace tgfx

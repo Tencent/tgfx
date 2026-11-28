@@ -53,6 +53,10 @@ inline constexpr int VERTEX_UBO_BINDING_POINT = 0;
 /// The binding of the fragment uniform block inside its descriptor set.
 inline constexpr int FRAGMENT_UBO_BINDING_POINT = 1;
 
+/// The starting binding index of the WebGPU sampler packing: textures and their paired samplers
+/// are numbered from this index in pairs. The tool's rewrite and the runtime path must agree.
+inline constexpr int WEBGPU_TEXTURE_BINDING_START = 0;
+
 // The bindings the shader build tool's dummy main uses for its stand-in samplers. The dummy entry
 // (and these declarations) are stripped before linking; the numbers only have to avoid the real
 // sampler range a compiling module could carry.

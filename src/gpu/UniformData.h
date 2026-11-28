@@ -92,12 +92,6 @@ class UniformData {
    */
   void setBuffer(void* buffer);
 
-  /// The backing bytes the layout-addressed writers (ParamBuffer) memcpy into; null before
-  /// setBuffer. The offsets come from the same derived layout the assembled text declared.
-  uint8_t* writableBytes() const {
-    return _buffer;
-  }
-
   /**
    * Returns the size of the uniform data in bytes.
    */
@@ -133,10 +127,6 @@ class UniformData {
   std::unordered_map<std::string, Field> fieldMap = {};
   size_t cursor = 0;
 
-  /// A block of the given byte size: the precompiled route addresses every field through its
-  /// derived layout's offsets, so the block needs only its size and a buffer.
-  explicit UniformData(size_t size);
-
   explicit UniformData(std::vector<Uniform> uniforms);
 
   void onSetData(const std::string& name, const void* data, size_t size) const;
@@ -156,7 +146,6 @@ class UniformData {
   void dump() const;
 #endif
 
-  friend class PrecompiledProgramCreator;
   friend class ProgramInfo;
   friend class UniformHandler;
 };

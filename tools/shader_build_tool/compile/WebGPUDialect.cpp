@@ -22,7 +22,7 @@
 #include <regex>
 #include <string>
 #include <vector>
-#include "gpu/shaders/contract/ShaderBundleContract.h"
+#include "gpu/ShaderBindingLayout.h"
 
 namespace tgfx {
 

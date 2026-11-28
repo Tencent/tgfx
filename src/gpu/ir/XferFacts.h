@@ -33,26 +33,4 @@ struct DstTextureInfo {
   Point offset = {};
 };
 
-/// The draw's output formula as one plain value: where the shader-side formula's destination comes
-/// from. One optional encodes the three states the pipeline distinguishes:
-///   absent                       -> the fixed-function blend (or Src) writes the output;
-///   present, dst proxy non-null  -> the formula samples the bound destination texture;
-///   present, dst proxy null      -> the backend's framebuffer fetch supplies it.
-struct XferFacts {
-  std::optional<DstTextureInfo> dstTexture = std::nullopt;
-
-  /// Whether the formula runs in the shader (the xfer stage) rather than the fixed-function
-  /// pipeline: the presence of the destination value.
-  bool shaderBlend() const {
-    return dstTexture.has_value();
-  }
-
-  /// The bound destination proxy, or a shared empty value when the backend's framebuffer fetch
-  /// supplies the destination (or no formula runs at all).
-  const std::shared_ptr<TextureProxy>& dstProxy() const {
-    static const std::shared_ptr<TextureProxy> empty = {};
-    return dstTexture.has_value() ? dstTexture->textureProxy : empty;
-  }
-};
-
 }  // namespace tgfx

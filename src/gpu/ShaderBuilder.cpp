@@ -91,20 +91,12 @@ void ShaderBuilder::codeAppend(const std::string& str) {
     return;
   }
   auto& code = shaderStrings[Type::Code];
-  const size_t start = code.size();
   appendIndentationIfNeeded(str);
   code += str;
   if (NeedsAppendEnter(code)) {
     appendEnterIfNotEmpty(Type::Code);
   }
   atLineStart = code[code.size() - 1] == '\n';
-  if (fragmentProgramRecorder != nullptr && rawCaptureEnabled &&
-      shaderStage() == ShaderStage::Fragment) {
-    FragmentInstruction instruction = {};
-    instruction.kind = FragmentInstructionKind::RawText;
-    instruction.text = code.substr(start);
-    fragmentProgramRecorder->instructions.push_back(std::move(instruction));
-  }
 }
 
 void ShaderBuilder::addFunction(const std::string& str) {

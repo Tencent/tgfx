@@ -918,9 +918,8 @@ TGFX_TEST(GPURenderTest, ProgramInfoStencilAccessors) {
   ASSERT_TRUE(proxy != nullptr);
   auto renderTarget = proxy->getRenderTarget();
   ASSERT_TRUE(renderTarget != nullptr);
-  auto geometryLayout = DefaultGeometryLayout({}, AAType::None, {}, {});
-  ProgramInfo info(renderTarget.get(), geometryLayout, /*dstTexture=*/std::nullopt,
-                   BlendMode::SrcOver, /*blendFormulaHasCoverage=*/false);
+  ProgramInfo info(renderTarget.get(), /*geometryProcessor=*/nullptr, /*fragmentProcessors=*/{},
+                   /*numColorProcessors=*/0, /*xferProcessor=*/nullptr, BlendMode::SrcOver);
 
   // Defaults: no-op stencil, all colour channels writable.
   EXPECT_EQ(info.getColorWriteMask(), ColorWriteMask::All);

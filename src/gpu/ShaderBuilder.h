@@ -32,18 +32,6 @@
 namespace tgfx {
 class ProgramBuilder;
 
-/**
- * One structured call the emitCode sites made, in emission order: the bytecode builders turn
- * these into instructions, and the GLSL builder is free to ignore them.
- */
-struct CallRecord {
-  std::string output;
-  std::string function;
-  std::vector<std::string> args;
-  /// The record's position among every emission record of the stage (calls, aliases and stage
-  /// outputs share one counter), so a consumer can rebuild the emission order.
-  uint32_t order = 0;
-};
 class ProgramInfo;
 class ShaderCaps;
 
@@ -120,29 +108,9 @@ class ShaderBuilder {
     libraryLanguage = language;
   }
 
-  /**
-   * The sink a bytecode builder installs to collect the structured calls; nullptr keeps the
-   * records off (the GLSL route). The records are appended in call order.
-   */
-  void setCallRecorder(std::vector<CallRecord>* records) {
-    callRecorder = records;
-  }
-
-  /// The sink a GLSL fragment builder installs to record its statements and calls.
-  void setFragmentRecorder(FragmentProgram* program) {
-    fragmentProgramRecorder = program;
-  }
-
   /// The symbol table the builder interns call outputs and arguments into.
   void setValueTable(ValueTable* table) {
     valueTable = table;
-  }
-
-  /**
-   * The next position in the stage's emission order, shared by every kind of record.
-   */
-  uint32_t nextEmitOrder() {
-    return emitOrder++;
   }
 
   /**
@@ -249,18 +217,6 @@ class ShaderBuilder {
 
   void appendIndentationIfNeeded(const std::string& code);
 
-  size_t codeTextSize() const {
-    return shaderStrings[Type::Code].size();
-  }
-
-  std::string codeTextFrom(size_t offset) const {
-    return shaderStrings[Type::Code].substr(offset);
-  }
-
-  void setRawCaptureEnabled(bool enabled) {
-    rawCaptureEnabled = enabled;
-  }
-
   ValueRef internValue(const std::string& name, SLType type, ValueOrigin origin);
 
   /**
@@ -273,12 +229,8 @@ class ShaderBuilder {
   std::vector<std::string> shaderStrings;
   std::set<std::string> emittedFunctions = {};
   ShaderLibraryLanguage libraryLanguage = ShaderLibraryLanguage::GLSL;
-  std::vector<CallRecord>* callRecorder = nullptr;
-  FragmentProgram* fragmentProgramRecorder = nullptr;
   ValueTable* valueTable = nullptr;
-  bool rawCaptureEnabled = true;
   int tempCallIndex = 0;
-  uint32_t emitOrder = 0;
   int clampedCoordIndex = 0;
   ProgramBuilder* programBuilder = nullptr;
   std::vector<ShaderVar> inputs;

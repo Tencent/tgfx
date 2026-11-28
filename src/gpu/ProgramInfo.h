@@ -18,13 +18,10 @@
 
 #pragma once
 
-#include <optional>
 #include <string>
 #include <unordered_map>
 #include "gpu/Program.h"
 #include "gpu/Swizzle.h"
-#include "gpu/ir/GeometryLayout.h"
-#include "gpu/ir/XferFacts.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
@@ -35,7 +32,6 @@
 namespace tgfx {
 
 class Context;
-struct DrawIR;
 class GeometryProcessor;
 class XferProcessor;
 
@@ -45,26 +41,14 @@ struct SamplerInfo {
 };
 
 /**
- * One draw's program-lookup input and result: the pipeline state and the expression the draw asks
- * for (the carried DrawIR), plus the selection resolved from them by getProgram().
+ * One draw's program-lookup input and result: the processor tree, the pipeline state, and the
+ * program the cache resolves from them.
  */
 class ProgramInfo {
  public:
   /**
-   * The draw's program description: the expression rides the carried DrawIR (attached through
-   * setCarriedIR before first use), so the matcher, the program key and the upload never read a
-   * processor list. blendFormulaHasCoverage carries the one blend-formula fact that used to come
-   * from the processor order: whether coverage processors follow the color ones.
-   */
-  ProgramInfo(RenderTarget* renderTarget, const GeometryLayout& geometryLayout,
-              const std::optional<DstTextureInfo>& dstTexture, BlendMode blendMode,
-              bool blendFormulaHasCoverage);
-
-  /**
-   * The JIT-route constructor: the processor tree the runtime ProgramBuilder walks. The AOT route
-   * (the layout-and-carried-IR constructor above) and this route share the pipeline state and the
-   * uniform plumbing below; only the program source differs (precompiled selection vs on-the-fly
-   * emission).
+   * The processor tree the runtime ProgramBuilder walks: the geometry processor, the fragment
+   * chain and the xfer processor.
    */
   ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
               std::vector<FragmentProcessor*> fragmentProcessors, size_t numColorProcessors,
@@ -93,23 +77,11 @@ class ProgramInfo {
     return renderTarget;
   }
 
-  /// The output formula facts: whether the shader runs the xfer stage and where its destination
-  /// comes from. Every reader below (writer, matcher, program key) addresses this value.
-  const XferFacts& getXferFacts() const {
-    return xferFacts;
-  }
-
   BlendMode getBlendMode() const {
     return blendMode;
   }
 
   Swizzle getOutputSwizzle() const;
-
-  /// The geometry value every reader addresses: the attribute layout, the physical slots and the
-  /// uniform values, built by the draw itself.
-  const GeometryLayout& getGeometryLayout() const {
-    return geometryLayout;
-  }
 
   const std::vector<Attribute>& getVertexAttributes() const;
 
@@ -120,18 +92,15 @@ class ProgramInfo {
   int getSampleCount() const;
 
   /**
-   * Resolves the program for this info from the caches. Precompiled artifacts are the only
-   * program source: a miss drops the draw, with no runtime fallback. The first call also runs the
-   * draw's single selection and keeps the resulting plan on this info (see getPlan), so the upload
-   * never re-matches.
+   * Resolves the program for this info from the caches: the processor keys plus the pipeline
+   * state name the entry, and a miss emits the program through the runtime ProgramBuilder.
    */
   std::shared_ptr<Program> getProgram();
 
   /**
    * Writes the pipeline-state fields the program keys carry — everything past the processor keys
    * (blend mode, output swizzle, cull, target format and samples, colour write mask, depth and
-   * stencil). The plain route's key and the AOT route's key share this tail, so the two routes
-   * encode identical state identically.
+   * stencil).
    */
   void writePipelineStateKey(BytesKey* key) const;
 
@@ -245,46 +214,21 @@ class ProgramInfo {
     return renderTarget != nullptr ? renderTarget->getContext() : nullptr;
   }
 
-  /**
-   * Returns the GLSL profile tag ("opengl" for desktop GL, "opengles" for the GLES-family
-   * contexts: GLES, WebGL, SwiftShader) the precompiled bundle must serve this context from.
-   */
-
-  /**
-   * Returns true when the loaded precompiled bundle was built for this context's GLSL profile;
-   * a bundle for the other GL profile hashes its entries under a different tag and can never
-   * serve this context.
-   */
-
-  /**
-   * Returns true when every texture sampled by this program uses the 2D texture type.
-   * External (OES) textures are not supported by the precompiled shaders.
-   */
-  bool samplersAre2D() const;
-
  private:
   RenderTarget* renderTarget = nullptr;
-  // The JIT route's processor tree; null on the AOT route.
   GeometryProcessor* geometryProcessor = nullptr;
   std::vector<FragmentProcessor*> fragmentProcessors = {};
   std::unordered_map<const Processor*, int> processorIndices = {};
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
   XferProcessor* xferProcessor = nullptr;
-  GeometryLayout geometryLayout = {};
-  /// The xfer facts derived from the processor once per program: the shader-side blend flag and
-  /// the destination it samples. The writers and the matcher read this, not the processor.
-  XferFacts xferFacts = {};
   BlendMode blendMode = BlendMode::SrcOver;
-  // Whether coverage processors follow the color ones — the only fragment-list fact the pipeline's
-  // blend formula reads (see the AOT-route constructor for the list-free form).
+  // Whether coverage processors follow the color ones: the only fragment-list fact the pipeline's
+  // blend formula reads.
   bool hasCoverageForBlend = false;
   CullMode cullMode = CullMode::None;
   DepthStencilDescriptor depthStencil = {};
   uint32_t colorWriteMask = ColorWriteMask::All;
-
-  /// Derives the xfer facts from the processor once, at construction.
-  void updateXferFacts(const std::optional<DstTextureInfo>& dstTexture);
 
   void updateProcessorIndices();
 
@@ -295,11 +239,5 @@ class ProgramInfo {
 
   // The diagnostics-only signature (see setEffectSignature).
   std::string effectSignature = {};
-
-  // The draw's single selection result (see getPlan), filled by getProgram()'s first call. An
-  // input to the upload, never recomputed; null when no selection ran.
-
-  friend class ProgramWriter;
-  friend class ChainProgramWriter;
 };
 }  // namespace tgfx

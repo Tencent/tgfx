@@ -63,9 +63,6 @@ OperatorBundle BuildOperatorBundle() {
 VulkanProgramBuilder::VulkanProgramBuilder(Context* context, const ProgramInfo* programInfo)
     : ProgramBuilder(context, programInfo), _varyingHandler(this), _uniformHandler(this),
       _vertexBuilder(this), _fragBuilder(this) {
-  // The bytecode route never spells shader text: the calls land in the record list instead.
-  _fragBuilder.setCallRecorder(&fragmentCalls);
-  _vertexBuilder.setVertexRecorder(&vertexCalls);
 }
 
 std::string VulkanProgramBuilder::getShaderVarDeclarations(const ShaderVar&, ShaderStage) const {

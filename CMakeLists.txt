@@ -956,16 +956,12 @@ if (TGFX_EMBED_SHADER_BUNDLES)
             src/gpu/shaders/glsl/*.vert
             src/gpu/shaders/glsl/*.inc
             src/gpu/shaders/glsl/*.glsl)
-    # The toolchain ABI constant rides in a regular header outside the shader directory; a bump
-    # changes what the writer stamps into every bundle, so it must trigger a rebuild like a
-    # shader-source change (otherwise the bundles keep the old ABI and the runtime rejects them).
-    # The contract header joins it for the same reason: it carries the ABI constant and the
-    # binding layout the templates get their values injected from, so a change to either must
-    # rebuild every bundle.
-    # The declaration headers need no glob: they are compiled into the tool, so a change
-    # relinks it and the bundle rule depends on the tool binary.
+    # The binding and naming constants ride in a regular header outside the shader directory: the
+    # templates get their binding values injected from it, so a change must trigger a rebuild like
+    # a shader-source change. The declaration headers need no glob: they are compiled into the
+    # tool, so a change relinks it and the bundle rule depends on the tool binary.
     list(APPEND TGFX_SHADER_SOURCES
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/contract/ShaderBundleContract.h")
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/ShaderBindingLayout.h")
     if (TGFX_SHADER_TOOL_FROM_HOST)
             # Configures this same source tree for the machine running the build, with no
             # toolchain file, and builds only shader_build_tool there. It builds the tool's
