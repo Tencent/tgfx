@@ -454,9 +454,8 @@ bool CollectCatalogEntries(const std::string& shaderDir, std::vector<CatalogEntr
     *error = "no fn directory under " + shaderDir;
     return false;
   }
-  // The geometry directory carries the per-pixel edge-coverage formulas beside the vertex-side
-  // layout fragments (gp_*_layout.inc, plain text the catalog cannot parse); only the coverage
-  // files join the scan, by name.
+  // The geometry directory carries per-pixel edge-coverage formulas beside the vertex-side
+  // layouts the printers append as plain text; only the coverage files join the scan, by name.
   const fs::path geometryRoot = fs::path(shaderDir) / "geometry";
   std::vector<CatalogEntry> entries = {};
   for (auto it = fs::recursive_directory_iterator(root); it != fs::recursive_directory_iterator();

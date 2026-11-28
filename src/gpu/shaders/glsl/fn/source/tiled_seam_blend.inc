@@ -1,7 +1,7 @@
 //@function tiledSeamBlend
 // The RepeatLinearNone seam blend, parameterized for the assembled text: the leaf sampler rides the
 // call (the assembly names its own TextureSampler_N statically) and the recipe arrives as arguments
-// instead of the interpreter's globals. The math matches source/texture_sampling.inc's tiled path.
+// instead of the interpreter's globals.
 vec4 tiledSeamBlend(sampler2D texSampler, vec4 texColor, int modeX, int modeY, vec4 clampRect,
                     vec2 dimension, vec2 inCoord, vec2 subsetCoord, vec2 clampedCoord,
                     int readSwizzle) {

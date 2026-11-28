@@ -1,6 +1,6 @@
 //@function tiledApplyBorder
 // The ClampToBorder post-pass, parameterized for the assembled text: the interpreter's global
-// ShaderModeX/Y and Subset ride the call. The math matches source/tiled_sample.inc.
+// ShaderModeX/Y and Subset ride the call.
 vec4 tiledApplyBorder(vec4 color, int modeX, int modeY, vec4 subsetRect, vec2 inCoord,
                       vec2 subsetCoord, vec2 clampedCoord) {
   if (modeX == 8) {

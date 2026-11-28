@@ -1,7 +1,7 @@
 //@function tiledMapCoord
 // The tiling coordinate map, parameterized for the assembled text: the interpreter's globals
 // (ShaderModeX/Y, Subset, Clamp, Dimension) ride the call instead of a shared block, so one
-// assembly serves every draw's own recipe. The math matches source/tiled_sample.inc.
+// assembly serves every draw's own recipe.
 vec2 tiledMapCoord(vec3 texCoord, bool strict, int modeX, int modeY, vec4 subsetRect,
                    vec4 clampRect, vec2 dimension, out vec2 inCoordOut, out vec2 subsetCoordOut,
                    out vec2 clampedCoordOut) {
