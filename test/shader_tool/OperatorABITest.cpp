@@ -57,8 +57,8 @@ TEST(OperatorABITest, MatchesOnlyWhenEveryParameterAgrees) {
   EXPECT_TRUE(MatchesDeclaredAbi(declared, {OperatorABIType::Vec4, OperatorABIType::Float,
                                             OperatorABIType::Float, OperatorABIType::Float}));
   // A shorter or longer module signature is a mismatch even when the common prefix agrees.
-  EXPECT_FALSE(MatchesDeclaredAbi(declared, {OperatorABIType::Vec4, OperatorABIType::Float,
-                                             OperatorABIType::Float}));
+  EXPECT_FALSE(MatchesDeclaredAbi(
+      declared, {OperatorABIType::Vec4, OperatorABIType::Float, OperatorABIType::Float}));
   // The failure the wrapper compile cannot see: a parameter lowered to another scalar type.
   EXPECT_FALSE(MatchesDeclaredAbi(declared, {OperatorABIType::Vec4, OperatorABIType::Float,
                                              OperatorABIType::Int, OperatorABIType::Float}));
@@ -70,8 +70,8 @@ TEST(OperatorABITest, DescribesBothSidesForDiagnostics) {
   const std::vector<OperatorModuleParam> declared = {{SLType::Float4, false, 0},
                                                      {SLType::Texture2DSampler, false, 0}};
   EXPECT_EQ(DescribeAbi(declared), "vec4, sampler");
-  EXPECT_EQ(DescribeAbi(std::vector<OperatorABIType>{OperatorABIType::Vec4,
-                                                     OperatorABIType::SampledImage}),
+  EXPECT_EQ(DescribeAbi(
+                std::vector<OperatorABIType>{OperatorABIType::Vec4, OperatorABIType::SampledImage}),
             "vec4, sampler");
 }
 

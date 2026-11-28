@@ -33,16 +33,18 @@ TEST(UniformDataTest, EmptyInterfaceHasNoBlock) {
 
 TEST(UniformDataTest, CopiesTheIROffsetsAndSizes) {
   ProgramIRBuilder builder = {};
-  ASSERT_NE(builder.AddUniform({"scalar", SLType::Float, Precision::Default, ShaderStage::Fragment, 1}),
-            INVALID_VALUE_ID);
+  ASSERT_NE(
+      builder.AddUniform({"scalar", SLType::Float, Precision::Default, ShaderStage::Fragment, 1}),
+      INVALID_VALUE_ID);
   ASSERT_NE(
       builder.AddUniform({"vector3", SLType::Float3, Precision::Default, ShaderStage::Fragment, 1}),
       INVALID_VALUE_ID);
   ASSERT_NE(
       builder.AddUniform({"vector4", SLType::Float4, Precision::Default, ShaderStage::Fragment, 1}),
       INVALID_VALUE_ID);
-  ASSERT_NE(builder.AddUniform({"kernel", SLType::Float4, Precision::Default, ShaderStage::Fragment, 2}),
-            INVALID_VALUE_ID);
+  ASSERT_NE(
+      builder.AddUniform({"kernel", SLType::Float4, Precision::Default, ShaderStage::Fragment, 2}),
+      INVALID_VALUE_ID);
 
   auto data = UniformData::Make(builder.IR().interface, ShaderStage::Fragment);
   ASSERT_NE(data, nullptr);
@@ -69,10 +71,10 @@ TEST(UniformDataTest, ResolvesTheMemberByOwner) {
   InterfaceIR interface = {};
   interface.uniformBlocks.push_back({ShaderStage::Fragment, 0, 32, "FragmentUniformBlock"});
   // Two processors declare the same base name; only the owner tells their slots apart.
-  interface.uniforms.push_back({"kernel_P0", SLType::Float4, Precision::High,
-                                ShaderStage::Fragment, 1, 0, 0, 16, 16, "kernel", 0});
-  interface.uniforms.push_back({"kernel_P1", SLType::Float4, Precision::High,
-                                ShaderStage::Fragment, 1, 0, 16, 16, 16, "kernel", 1});
+  interface.uniforms.push_back({"kernel_P0", SLType::Float4, Precision::High, ShaderStage::Fragment,
+                                1, 0, 0, 16, 16, "kernel", 0});
+  interface.uniforms.push_back({"kernel_P1", SLType::Float4, Precision::High, ShaderStage::Fragment,
+                                1, 0, 16, 16, 16, "kernel", 1});
   auto data = UniformData::Make(interface, ShaderStage::Fragment);
   ASSERT_NE(data, nullptr);
   EXPECT_EQ(data->size(), 32u);
@@ -116,8 +118,8 @@ TEST(UniformDataTest, CountsTheMembersNoWriteReached) {
   interface.uniformBlocks.push_back({ShaderStage::Fragment, 0, 32, "FragmentUniformBlock"});
   interface.uniforms.push_back({"scalar", SLType::Float, Precision::High, ShaderStage::Fragment, 1,
                                 0, 0, 4, 4, "scalar", 0});
-  interface.uniforms.push_back({"vector4", SLType::Float4, Precision::High,
-                                ShaderStage::Fragment, 1, 0, 16, 16, 16, "vector4", 0});
+  interface.uniforms.push_back({"vector4", SLType::Float4, Precision::High, ShaderStage::Fragment,
+                                1, 0, 16, 16, 16, "vector4", 0});
   auto data = UniformData::Make(interface, ShaderStage::Fragment);
   ASSERT_NE(data, nullptr);
   std::vector<uint8_t> buffer(data->size(), 0);
