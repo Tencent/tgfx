@@ -22,10 +22,14 @@
 
 namespace tgfx {
 
-/// The shader library bundle is one file carrying the function sources of every target language.
-/// A package may keep only the sections its platform needs; the header and section table stay
-/// self-contained so a trimmed bundle still parses.
-constexpr uint32_t SHADER_LIBRARY_BUNDLE_VERSION = 1;
+/// The shader library bundle is one file carrying the artifacts of every target language: function
+/// sources for the text languages and one linkable module per operator for SPIR-V. A package may
+/// keep only the sections its platform needs; the header and section table stay self-contained so
+/// a trimmed bundle still parses.
+/// Version 2 adds the SPIR-V section (the operator modules the Vulkan stitching route links); a
+/// version 1 bundle carries no such section and is refused rather than read through a branch the
+/// loader no longer has.
+constexpr uint32_t SHADER_LIBRARY_BUNDLE_VERSION = 2;
 constexpr uint32_t SHADER_LIBRARY_BUNDLE_HEADER_SIZE = 32;
 constexpr uint32_t SHADER_LIBRARY_BUNDLE_SECTION_SIZE = 24;
 constexpr uint32_t SHADER_LIBRARY_BUNDLE_FUNCTION_SIZE = 16;

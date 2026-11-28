@@ -52,8 +52,6 @@
 
 namespace tgfx {
 
-namespace {
-/// The SLType of one GLSL type spelling, or Void outside the supported set.
 SLType SLTypeFromName(const std::string& glslType) {
   if (glslType == "float") return SLType::Float;
   if (glslType == "int") return SLType::Int;
@@ -67,7 +65,6 @@ SLType SLTypeFromName(const std::string& glslType) {
   if (glslType == "sampler2DRect") return SLType::Texture2DRectSampler;
   return SLType::Void;
 }
-}  // namespace
 
 namespace {
 
@@ -761,105 +758,18 @@ void CompileAssembledFamilies(const BuildOptions& options, StageCompiler* /*comp
       if (unsupported) {
         continue;
       }
-      std::string text = "#version 450\n";
-      bool needsDummySampler = false;
-      bool needsRectSampler = false;
-      for (const auto& param : desc.params) {
-        if (param.type == SLType::Texture2DSampler) {
-          needsDummySampler = true;
-        } else if (param.type == SLType::Texture2DRectSampler) {
-          needsRectSampler = true;
-        }
-      }
-      if (needsDummySampler) {
-        text += "layout(set = " + std::to_string(TEXTURE_DESCRIPTOR_SET) + ", binding = " +
-                std::to_string(DUMMY_LEAF_SAMPLER_BINDING) + ") uniform sampler2D " +
-                DUMMY_LEAF_SAMPLER_NAME + ";\n";
-      }
-      if (needsRectSampler) {
-        text += "layout(set = " + std::to_string(TEXTURE_DESCRIPTOR_SET) + ", binding = " +
-                std::to_string(DUMMY_RECT_SAMPLER_BINDING) + ") uniform sampler2DRect " +
-                DUMMY_RECT_SAMPLER_NAME + ";\n";
-      }
+      std::vector<std::string> includeSources = {};
+      includeSources.reserve(desc.includes.size());
       for (const auto* include : desc.includes) {
-        text += readExpanded(include);
+        includeSources.push_back(readExpanded(include));
       }
-      text += "\nlayout(location = 0) out vec4 dummyOut;\nvoid main() {\n  dummyOut = ";
-      std::string widenPrefix;
-      std::string widenSuffix;
-      switch (desc.returnType) {
-        case SLType::Float:
-          widenPrefix = "vec4(";
-          widenSuffix = ")";
-          break;
-        case SLType::Float2:
-          widenPrefix = "vec4(";
-          widenSuffix = ", 0.0, 0.0)";
-          break;
-        case SLType::Float3:
-          widenPrefix = "vec4(";
-          widenSuffix = ", 0.0)";
-          break;
-        default:
-          break;
+      std::vector<OperatorModuleParam> moduleParams = {};
+      moduleParams.reserve(desc.params.size());
+      for (const auto& param : desc.params) {
+        moduleParams.push_back({param.type, false, 0});
       }
-      text += widenPrefix;
-      text += desc.glslSymbol;
-      text += "(";
-      for (size_t argument = 0; argument < desc.params.size(); ++argument) {
-        if (argument > 0) {
-          text += ", ";
-        }
-        const auto& param = desc.params[argument];
-        if (param.isArray) {
-          text += "vec4[" + std::to_string(param.arrayCount) + "](";
-          for (uint32_t element = 0; element < param.arrayCount; ++element) {
-            if (element > 0) {
-              text += ", ";
-            }
-            text += "vec4(1.0)";
-          }
-          text += ")";
-          continue;
-        }
-        switch (param.type) {
-          case SLType::Float:
-            text += "0.0";
-            break;
-          case SLType::Int:
-            text += "0";
-            break;
-          case SLType::Float2:
-            text += "vec2(1.0)";
-            break;
-          case SLType::Float3:
-            text += "vec3(1.0)";
-            break;
-          case SLType::Float4:
-            text += "vec4(1.0)";
-            break;
-          case SLType::Float3x3:
-            text += "mat3(1.0)";
-            break;
-          case SLType::Float4x4:
-            text += "mat4(1.0)";
-            break;
-          case SLType::Int4:
-            text += "ivec4(0)";
-            break;
-          case SLType::Texture2DSampler:
-            text += DUMMY_LEAF_SAMPLER_NAME;
-            break;
-          case SLType::Texture2DRectSampler:
-            text += DUMMY_RECT_SAMPLER_NAME;
-            break;
-          default:
-            break;
-        }
-      }
-      text += ")";
-      text += widenSuffix;
-      text += ";\n}\n";
+      const std::string text =
+          BuildOperatorWrapperSource(desc.glslSymbol, desc.returnType, moduleParams, includeSources);
       std::string buildError;
       auto patched =
           CompileSPIRVLibraryModule(text, desc.glslSymbol, desc.glslSymbol, &buildError);

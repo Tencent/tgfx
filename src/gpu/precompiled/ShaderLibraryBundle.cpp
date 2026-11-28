@@ -185,6 +185,23 @@ bool ShaderLibraryBundle::containsFunction(ShaderLibraryLanguage language, const
   return false;
 }
 
+ShaderLibraryBundle::OperatorModule ShaderLibraryBundle::findOperatorModule(OperatorID op) const {
+  const auto* desc = FindOperator(op);
+  if (desc == nullptr || desc->glslSymbol == nullptr) {
+    return {};
+  }
+  const auto* section = findSection(ShaderLibraryLanguage::SPIRV);
+  if (section == nullptr) {
+    return {};
+  }
+  for (const auto& function : section->functions) {
+    if (function.name == desc->glslSymbol) {
+      return {reinterpret_cast<const uint8_t*>(function.source.data()), function.source.size()};
+    }
+  }
+  return {};
+}
+
 bool ShaderLibraryBundle::appendFunction(ShaderLibraryLanguage language, const char* name,
                                          std::set<std::string>* emitted, std::string* out) const {
   const auto* section = findSection(language);

@@ -21,25 +21,17 @@
 namespace tgfx {
 
 class Context;
-class PrecompiledShaderCache;
+class ShaderCache;
 
 /**
- * The one internal way to a Context's precompiled shader cache. The cache is an AOT artefact store:
- * it is not part of the public API, and the public Context header exposes no accessor for it. Code
- * inside the library (routing, the program creator, the diagnostics) and the tests reach it here.
+ * The one internal way to a Context's shader-object cache. The cache reuses compiled shader
+ * modules and render pipelines by content; it is not part of the public API, and the public
+ * Context header exposes no accessor for it. Code inside the library and the tests reach it here.
  */
 class ContextCacheAccess {
  public:
   /// The cache of `context`, or null when the context has none (a context without a GPU backend).
-  static PrecompiledShaderCache* Cache(const Context* context);
+  static ShaderCache* ShaderCacheOf(const Context* context);
 };
-
-/**
- * Whether the FP-tree route serves the context's draws. The route assembles a program from the
- * processor tree and emits GLSL at runtime, which only the GL family implements; the other
- * backends resolve their programs through the precompiled route, whose artifacts carry the
- * shader binaries for their own stages, so they must stay off this route.
- */
-bool FPRecordingEnabled(const Context* context);
 
 }  // namespace tgfx

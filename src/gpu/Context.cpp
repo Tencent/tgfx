@@ -30,9 +30,8 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceCache.h"
+#include "gpu/ShaderCache.h"
 #include "gpu/ShaderCaps.h"
-#include "gpu/precompiled/EmbeddedShaderBundles.h"
-#include "gpu/precompiled/PrecompiledShaderCache.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -51,38 +50,7 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
   _proxyProvider = new ProxyProvider(this);
   _atlasManager = new AtlasManager(this);
   _atlasStrikeCache = new AtlasStrikeCache();
-  _precompiledShaderCache = new PrecompiledShaderCache(this, _gpu->info()->backend);
-  {
-    auto backend = _gpu->info()->backend;
-    auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(backend);
-    if (bundleData != nullptr && bundleSize > 0) {
-      bool loaded = _precompiledShaderCache->loadBundle(bundleData, bundleSize);
-      _precompiledShaderCache->setEmbeddedBundleState(loaded ? EmbeddedBundleState::Loaded
-                                                             : EmbeddedBundleState::Rejected);
-      // loadBundle has logged the specific reason; this line says what it means for rendering.
-      // Once per process: tests and apps create many Contexts, and the cause is the same.
-      static std::atomic_flag rejectedReported = ATOMIC_FLAG_INIT;
-      if (!loaded && !rejectedReported.test_and_set()) {
-        LOGE(
-            "Context: the precompiled shader bundle embedded for this backend was REJECTED (reason "
-            "logged above). It is damaged or was built for another toolchain; every draw is "
-            "dropped until the bundle is regenerated.");
-      }
-    } else {
-      _precompiledShaderCache->setEmbeddedBundleState(EmbeddedBundleState::NoBundleForBackend);
-      static std::atomic_flag absentReported = ATOMIC_FLAG_INIT;
-      if (!absentReported.test_and_set()) {
-        if (backend == Backend::Unknown) {
-          LOGI("Context: this backend has no precompiled shader support; every draw is dropped.");
-        } else {
-          LOGI(
-              "Context: this build embeds no precompiled shader bundle for this backend "
-              "(TGFX_EMBED_SHADER_BUNDLES is off, or the bundle was not generated); every draw "
-              "is dropped.");
-        }
-      }
-    }
-  }
+  _shaderCache = new ShaderCache(this);
 }
 
 Context::~Context() {
@@ -93,7 +61,7 @@ Context::~Context() {
   delete _resourceCache;
   delete _shaderCaps;
   delete _atlasStrikeCache;
-  delete _precompiledShaderCache;
+  delete _shaderCache;
 }
 
 Backend Context::backend() const {
@@ -245,19 +213,8 @@ bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit) {
   return _resourceCache->purgeUntilMemoryTo(bytesLimit);
 }
 
-PrecompiledShaderCache* ContextCacheAccess::Cache(const Context* context) {
-  return context == nullptr ? nullptr : context->_precompiledShaderCache;
-}
-
-bool FPRecordingEnabled(const Context* context) {
-  if (context == nullptr) {
-    return false;
-  }
-  // These backends serve the processor tree through their own runtime emission: OpenGL prints the
-  // GLSL text, Vulkan emits and links the SPIR-V modules, and Metal prints the MSL text from the
-  // library bundle's MSL section.
-  return context->backend() == Backend::OpenGL || context->backend() == Backend::Vulkan ||
-         context->backend() == Backend::Metal;
+ShaderCache* ContextCacheAccess::ShaderCacheOf(const Context* context) {
+  return context == nullptr ? nullptr : context->_shaderCache;
 }
 
 }  // namespace tgfx

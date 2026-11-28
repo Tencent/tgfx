@@ -26,7 +26,6 @@
 #include <vector>
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/PixelFormatUtil.h"
-#include "gpu/ContextInternal.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
@@ -35,8 +34,6 @@
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLTexture.h"
 #include "gpu/opengl/GLUtil.h"
-#include "gpu/precompiled/EmbeddedShaderBundles.h"
-#include "gpu/precompiled/PrecompiledShaderCache.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
@@ -344,8 +341,8 @@ TGFX_TEST(GLRenderTest, InvalidShaderReturnsNull) {
 }
 
 // An external rectangle texture is copied into a 2D texture when it is wrapped
-// (ProxyProvider::wrapExternalTexture), so the precompiled kernels can sample it. The copy must
-// keep every pixel in place for both origins, and drawing the image must need no runtime program.
+// (ProxyProvider::wrapExternalTexture), so the shader kernels can sample it. The copy must keep
+// every pixel in place for both origins.
 TGFX_TEST(GLRenderTest, RectangleTextureImportCopiesTo2D) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -368,8 +365,6 @@ TGFX_TEST(GLRenderTest, RectangleTextureImportCopiesTo2D) {
   gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
                  height, 0, textureFormat.externalFormat, textureFormat.externalType,
                  source.data());
-  auto* cache = ContextCacheAccess::Cache(context);
-  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   for (auto origin : {ImageOrigin::TopLeft, ImageOrigin::BottomLeft}) {
     SCOPED_TRACE(origin == ImageOrigin::TopLeft ? "TopLeft" : "BottomLeft");
     auto image = Image::MakeFrom(context, BackendTexture(glInfo, width, height), origin);
@@ -377,13 +372,8 @@ TGFX_TEST(GLRenderTest, RectangleTextureImportCopiesTo2D) {
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
     context->globalCache()->clearPrograms();
-    context->globalCache()->resetProgramStats();
-    cache->setDiagnosticRecordingEnabled(true);
-    cache->resetStats();
     surface->getCanvas()->drawImage(image, 0, 0);
     context->flushAndSubmit(true);
-    EXPECT_EQ(cache->drawStats().droppedDraws, 0u);
-    cache->setDiagnosticRecordingEnabled(false);
     std::array<uint32_t, width* height> result = {};
     auto info = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
     ASSERT_TRUE(surface->readPixels(info, result.data()));

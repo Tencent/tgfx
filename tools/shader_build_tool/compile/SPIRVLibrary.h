@@ -21,9 +21,31 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "gpu/SLType.h"
 #include "gpu/shaders/contract/OpTable.h"
 
 namespace tgfx {
+
+/// One operator parameter as the wrapper builder spells it.
+struct OperatorModuleParam {
+  SLType type = SLType::Void;
+  bool isArray = false;
+  uint32_t arrayCount = 0;
+};
+
+/**
+ * Builds the GLSL wrapper whose dummy entry forces the operator's emission: the dependency
+ * sources (already expanded, callees first), the dummy samplers the signature needs, and a main
+ * that calls the operator with type-appropriate placeholders. The compiler emits the operator body
+ * into the module; ExportSPIRVFunctionForLinking then strips the entry and exports the function.
+ * @param symbol          The operator's GLSL function name (the string the export carries).
+ * @param returnType      The operator's return type; the call is widened to the dummy output.
+ * @param params          The parameters in call order.
+ * @param includeSources  The expanded dependency sources, in compile order.
+ */
+std::string BuildOperatorWrapperSource(const char* symbol, SLType returnType,
+                                       const std::vector<OperatorModuleParam>& params,
+                                       const std::vector<std::string>& includeSources);
 
 /**
  * Turns one compiled wrapper module into a linkable SPIR-V library: the named function gains an

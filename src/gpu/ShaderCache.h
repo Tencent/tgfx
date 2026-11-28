@@ -112,8 +112,8 @@ using PipelineKey = ShaderModuleKey;
  * Entries are strong references kept in LRUs, so a program evicted from the program cache does
  * not cost a recompilation when it comes back. Backend pipelines keep no reference to the modules
  * they were built from, so without L1 a module is released as soon as its program is built. The
- * cache is owned by the Context's PrecompiledShaderCache and destroyed with the Context, after the
- * program cache, which is also what happens when the GPU context is lost.
+ * cache is owned by the Context and destroyed with it, after the program cache, which is also what
+ * happens when the GPU context is lost.
  */
 class ShaderCache {
  public:

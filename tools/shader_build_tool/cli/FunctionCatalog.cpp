@@ -31,7 +31,10 @@
 #include <utility>
 #include <vector>
 #include "cli/BuildCommand.h"
+#include "compile/SPIRVLibrary.h"
 #include "compile/StageCompiler.h"
+#include "core/ShaderSources.h"
+#include "gpu/ir/OperatorManifest.h"
 #include "gpu/shaders/contract/ShaderLibraryBundleFormat.h"
 
 namespace tgfx {
@@ -1677,8 +1680,132 @@ bool CollectOperatorSignatures(const std::string& shaderDir,
   return true;
 }
 
+namespace {
+
+/// Reads one operator dependency and expands its includes against the shader directory, so the
+/// wrapper the SPIR-V module compiles sees the same text a stage build would.
+std::string ReadExpandedOperatorSource(const std::string& shaderDir, const std::string& path) {
+  std::ifstream file(shaderDir + "/" + path, std::ios::binary);
+  if (!file.is_open()) {
+    return "";
+  }
+  std::ostringstream buffer;
+  buffer << file.rdbuf();
+  std::string error = {};
+  return ExpandStageIncludes(buffer.str(), shaderDir, &error);
+}
+
+/// One entry of a library section: three pool offsets. The source may be text or SPIR-V words;
+/// sourceSize is authoritative either way.
+struct LibrarySectionEntry {
+  uint32_t name = 0;
+  uint32_t source = 0;
+  uint32_t sourceSize = 0;
+  uint32_t requires = 0;
+};
+
+struct LibrarySection {
+  ShaderLibraryLanguage language = ShaderLibraryLanguage::GLSL;
+  std::string pool = {};
+  std::vector<LibrarySectionEntry> entries = {};
+};
+
+/// Appends one name/source/requires triple. Every string is NUL terminated so the runtime resolves
+/// it through the pool; the source's length, not its terminator, decides how much is read.
+void AppendLibraryEntry(LibrarySection* section, const std::string& name,
+                        const std::string& source, const std::string& requires) {
+  LibrarySectionEntry entry = {};
+  entry.name = static_cast<uint32_t>(section->pool.size());
+  section->pool += name;
+  section->pool.push_back('\0');
+  entry.source = static_cast<uint32_t>(section->pool.size());
+  entry.sourceSize = static_cast<uint32_t>(source.size());
+  section->pool += source;
+  section->pool.push_back('\0');
+  entry.requires = static_cast<uint32_t>(section->pool.size());
+  section->pool += requires;
+  section->pool.push_back('\0');
+  section->entries.push_back(entry);
+}
+
+/// Appends one linkable SPIR-V module per operator: the payload the Vulkan stitching route links
+/// against the main it prints from the IR. Operators the route cannot call (builtin wrappers with
+/// no module source, array-parameter forms) are skipped; a signature that cannot be represented
+/// fails the build instead of silently shrinking the runtime's operator set.
+bool AppendSpirvSection(const std::string& shaderDir,
+                        const std::vector<OperatorSignature>& signatures, LibrarySection* section,
+                        std::string* error) {
+  for (const auto& signature : signatures) {
+    if (signature.includes.empty()) {
+      continue;
+    }
+    std::vector<OperatorModuleParam> params = {};
+    bool unsupported = false;
+    for (const auto& param : signature.params) {
+      if (param.arrayCount > 0) {
+        unsupported = true;
+        break;
+      }
+      const auto type = SLTypeFromName(param.type);
+      if (type == SLType::Void) {
+        *error = "SPIR-V section: '" + signature.functionName + "' has the parameter '" +
+                 param.name + "' of type '" + param.type + "', which has no SLType";
+        return false;
+      }
+      params.push_back({type, false, 0});
+    }
+    if (unsupported) {
+      continue;
+    }
+    const auto returnType = SLTypeFromName(signature.returnType);
+    if (returnType == SLType::Void) {
+      *error = "SPIR-V section: '" + signature.functionName + "' returns '" +
+               signature.returnType + "', which has no SLType";
+      return false;
+    }
+    std::vector<std::string> includeSources = {};
+    includeSources.reserve(signature.includes.size());
+    for (const auto& include : signature.includes) {
+      auto source = ReadExpandedOperatorSource(shaderDir, include);
+      if (source.empty()) {
+        *error = "SPIR-V section: cannot read the dependency '" + include + "'";
+        return false;
+      }
+      includeSources.push_back(std::move(source));
+    }
+    const auto wrapper = BuildOperatorWrapperSource(signature.functionName.c_str(), returnType,
+                                                    params, includeSources);
+    std::string compileError = {};
+    const auto words = CompileSPIRVLibraryModule(wrapper, signature.functionName.c_str(),
+                                                 signature.functionName.c_str(), &compileError);
+    if (words.empty()) {
+      *error =
+          "SPIR-V section: '" + signature.functionName + "' did not compile: " + compileError;
+      return false;
+    }
+    LibrarySectionEntry entry = {};
+    entry.name = static_cast<uint32_t>(section->pool.size());
+    section->pool += signature.functionName;
+    section->pool.push_back('\0');
+    while (section->pool.size() % sizeof(uint32_t) != 0) {
+      section->pool.push_back('\0');
+    }
+    entry.source = static_cast<uint32_t>(section->pool.size());
+    entry.sourceSize = static_cast<uint32_t>(words.size() * sizeof(uint32_t));
+    const auto* bytes = reinterpret_cast<const char*>(words.data());
+    section->pool.append(bytes, entry.sourceSize);
+    entry.requires = static_cast<uint32_t>(section->pool.size());
+    section->pool.push_back('\0');
+    section->entries.push_back(entry);
+  }
+  return true;
+}
+
+}  // namespace
+
 bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& outPath,
-                              StageCompiler* compiler, bool withWgsl, std::string* error) {
+                              StageCompiler* compiler, bool withWgsl, bool withSpirv,
+                              std::string* error) {
   if (error == nullptr) {
     return false;
   }
@@ -1694,91 +1821,46 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
     return left->name < right->name;
   });
 
-  struct FunctionOffset {
-    uint32_t name = 0;
-    uint32_t source = 0;
-    uint32_t sourceSize = 0;
-    uint32_t requires = 0;
-  };
-  std::string pool = {};
-  std::vector<FunctionOffset> offsets = {};
-  offsets.reserve(sorted.size());
-  for (const CatalogEntry* entry : sorted) {
-    FunctionOffset offset = {};
-    offset.name = static_cast<uint32_t>(pool.size());
-    pool += entry->name;
-    pool.push_back('\0');
-    offset.source = static_cast<uint32_t>(pool.size());
-    offset.sourceSize = static_cast<uint32_t>(entry->source.size());
-    pool += entry->source;
-    pool.push_back('\0');
-    const std::string requires = RequiresOf(*entry);
-    offset.requires = static_cast<uint32_t>(pool.size());
-    pool += requires;
-    pool.push_back('\0');
-    offsets.push_back(offset);
+  std::vector<OperatorSignature> signatures = {};
+  if (!CollectOperatorSignatures(shaderDir, &signatures, error)) {
+    return false;
   }
 
-  std::string mslPool = {};
-  std::vector<FunctionOffset> mslOffsets = {};
+  LibrarySection glsl = {};
+  glsl.language = ShaderLibraryLanguage::GLSL;
+  glsl.entries.reserve(sorted.size());
+  for (const CatalogEntry* entry : sorted) {
+    AppendLibraryEntry(&glsl, entry->name, entry->source, RequiresOf(*entry));
+  }
+
+  LibrarySection msl = {};
+  msl.language = ShaderLibraryLanguage::MSL;
   if (compiler != nullptr) {
     std::map<std::string, std::string> mslByName = {};
     std::string support = {};
     if (!BuildCatalogMsl(entries, compiler, &mslByName, &support, error)) {
       return false;
     }
-    mslOffsets.reserve(sorted.size() + 1);
+    msl.entries.reserve(sorted.size() + 2);
     for (const CatalogEntry* entry : sorted) {
       const auto found = mslByName.find(entry->name);
       if (found == mslByName.end()) {
         *error = "MSL section: '" + entry->name + "' was never translated";
         return false;
       }
-      FunctionOffset offset = {};
-      offset.name = static_cast<uint32_t>(mslPool.size());
-      mslPool += entry->name;
-      mslPool.push_back('\0');
-      offset.source = static_cast<uint32_t>(mslPool.size());
-      offset.sourceSize = static_cast<uint32_t>(found->second.size());
-      mslPool += found->second;
-      mslPool.push_back('\0');
-      const std::string requires = RequiresOf(*entry);
-      offset.requires = static_cast<uint32_t>(mslPool.size());
-      mslPool += requires;
-      mslPool.push_back('\0');
-      mslOffsets.push_back(offset);
+      AppendLibraryEntry(&msl, entry->name, found->second, RequiresOf(*entry));
     }
     // The support types the translator emitted travel once, under a name no catalog function can
     // claim; the assembling shader appends them ahead of the functions.
     const auto samplerEntry = mslByName.find("__msl_samplers__");
     if (samplerEntry != mslByName.end() && !samplerEntry->second.empty()) {
-      FunctionOffset samplerOffset = {};
-      samplerOffset.name = static_cast<uint32_t>(mslPool.size());
-      mslPool += "__msl_samplers__";
-      mslPool.push_back('\0');
-      samplerOffset.source = static_cast<uint32_t>(mslPool.size());
-      samplerOffset.sourceSize = static_cast<uint32_t>(samplerEntry->second.size());
-      mslPool += samplerEntry->second;
-      mslPool.push_back('\0');
-      samplerOffset.requires = static_cast<uint32_t>(mslPool.size());
-      mslPool.push_back('\0');
-      mslOffsets.push_back(samplerOffset);
+      AppendLibraryEntry(&msl, "__msl_samplers__", samplerEntry->second, "");
     }
-    FunctionOffset supportOffset = {};
-    supportOffset.name = static_cast<uint32_t>(mslPool.size());
-    mslPool += "__msl_support__";
-    mslPool.push_back('\0');
-    supportOffset.source = static_cast<uint32_t>(mslPool.size());
-    supportOffset.sourceSize = static_cast<uint32_t>(support.size());
-    mslPool += support;
-    mslPool.push_back('\0');
-    supportOffset.requires = static_cast<uint32_t>(mslPool.size());
-    mslPool.push_back('\0');
-    mslOffsets.push_back(supportOffset);
+    AppendLibraryEntry(&msl, "__msl_support__", support, "");
   }
 
-  std::string wgslPool = {};
-  std::vector<FunctionOffset> wgslOffsets = {};
+  LibrarySection wgsl = {};
+  wgsl.language = ShaderLibraryLanguage::WGSL;
   if (withWgsl) {
     if (compiler == nullptr) {
       *error = "the WGSL section needs the stage compiler";
@@ -1789,114 +1871,79 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
     if (!BuildCatalogWgsl(entries, compiler, &wgslByName, &support, error)) {
       return false;
     }
-    wgslOffsets.reserve(sorted.size() + 1);
+    wgsl.entries.reserve(sorted.size() + 1);
     for (const CatalogEntry* entry : sorted) {
       const auto found = wgslByName.find(entry->name);
       if (found == wgslByName.end()) {
         *error = "WGSL section: '" + entry->name + "' was never translated";
         return false;
       }
-      FunctionOffset offset = {};
-      offset.name = static_cast<uint32_t>(wgslPool.size());
-      wgslPool += entry->name;
-      wgslPool.push_back('\0');
-      offset.source = static_cast<uint32_t>(wgslPool.size());
-      offset.sourceSize = static_cast<uint32_t>(found->second.size());
-      wgslPool += found->second;
-      wgslPool.push_back('\0');
-      const std::string requires = RequiresOf(*entry);
-      offset.requires = static_cast<uint32_t>(wgslPool.size());
-      wgslPool += requires;
-      wgslPool.push_back('\0');
-      wgslOffsets.push_back(offset);
+      AppendLibraryEntry(&wgsl, entry->name, found->second, RequiresOf(*entry));
     }
-    FunctionOffset supportOffset = {};
-    supportOffset.name = static_cast<uint32_t>(wgslPool.size());
-    wgslPool += "__wgsl_support__";
-    wgslPool.push_back('\0');
-    supportOffset.source = static_cast<uint32_t>(wgslPool.size());
-    supportOffset.sourceSize = static_cast<uint32_t>(support.size());
-    wgslPool += support;
-    wgslPool.push_back('\0');
-    supportOffset.requires = static_cast<uint32_t>(wgslPool.size());
-    wgslPool.push_back('\0');
-    wgslOffsets.push_back(supportOffset);
+    AppendLibraryEntry(&wgsl, "__wgsl_support__", support, "");
   }
 
-  const uint32_t sectionCount = 1 + (compiler != nullptr ? 1 : 0) + (withWgsl ? 1 : 0);
-  const uint32_t entryTableOffset =
-      SHADER_LIBRARY_BUNDLE_HEADER_SIZE + sectionCount * SHADER_LIBRARY_BUNDLE_SECTION_SIZE;
-  const uint32_t poolOffset =
-      entryTableOffset +
-      static_cast<uint32_t>(offsets.size() * SHADER_LIBRARY_BUNDLE_FUNCTION_SIZE);
-  const uint32_t mslEntryOffset = poolOffset + static_cast<uint32_t>(pool.size());
-  const uint32_t mslPoolOffset =
-      mslEntryOffset +
-      static_cast<uint32_t>(mslOffsets.size() * SHADER_LIBRARY_BUNDLE_FUNCTION_SIZE);
-  const uint32_t wgslEntryOffset = mslPoolOffset + static_cast<uint32_t>(mslPool.size());
-  const uint32_t wgslPoolOffset =
-      wgslEntryOffset +
-      static_cast<uint32_t>(wgslOffsets.size() * SHADER_LIBRARY_BUNDLE_FUNCTION_SIZE);
+  LibrarySection spirv = {};
+  spirv.language = ShaderLibraryLanguage::SPIRV;
+  if (withSpirv) {
+    if (!AppendSpirvSection(shaderDir, signatures, &spirv, error)) {
+      return false;
+    }
+  }
+
+  std::vector<LibrarySection*> sections = {&glsl};
+  if (compiler != nullptr) {
+    sections.push_back(&msl);
+  }
+  if (withWgsl) {
+    sections.push_back(&wgsl);
+  }
+  if (withSpirv) {
+    sections.push_back(&spirv);
+  }
+  const uint32_t sectionCount = static_cast<uint32_t>(sections.size());
+  std::vector<uint32_t> entryOffsets(sectionCount);
+  std::vector<uint32_t> poolOffsets(sectionCount);
+  uint32_t cursor = SHADER_LIBRARY_BUNDLE_HEADER_SIZE +
+                    sectionCount * SHADER_LIBRARY_BUNDLE_SECTION_SIZE;
+  for (size_t index = 0; index < sections.size(); ++index) {
+    entryOffsets[index] = cursor;
+    cursor += static_cast<uint32_t>(sections[index]->entries.size() *
+                                    SHADER_LIBRARY_BUNDLE_FUNCTION_SIZE);
+    poolOffsets[index] = cursor;
+    cursor += static_cast<uint32_t>(sections[index]->pool.size());
+  }
   std::string bundle = {};
   bundle.append(SHADER_LIBRARY_BUNDLE_MAGIC, sizeof(SHADER_LIBRARY_BUNDLE_MAGIC) - 1);
   AppendU32(&bundle, SHADER_LIBRARY_BUNDLE_VERSION);
   AppendU32(&bundle, SHADER_LIBRARY_BUNDLE_HEADER_SIZE);
   AppendU32(&bundle, sectionCount);
-  uint32_t languageMask = ShaderLibraryLanguageMask(ShaderLibraryLanguage::GLSL);
-  if (compiler != nullptr) {
-    languageMask |= ShaderLibraryLanguageMask(ShaderLibraryLanguage::MSL);
-  }
-  if (withWgsl) {
-    languageMask |= ShaderLibraryLanguageMask(ShaderLibraryLanguage::WGSL);
+  uint32_t languageMask = 0;
+  for (const auto* section : sections) {
+    languageMask |= ShaderLibraryLanguageMask(section->language);
   }
   AppendU32(&bundle, languageMask);
-  AppendU64(&bundle, HashSource(pool));
-  AppendU32(&bundle, static_cast<uint32_t>(ShaderLibraryLanguage::GLSL));
-  AppendU32(&bundle, static_cast<uint32_t>(offsets.size()));
-  AppendU32(&bundle, entryTableOffset);
-  AppendU32(&bundle, poolOffset);
-  AppendU32(&bundle, static_cast<uint32_t>(pool.size()));
-  AppendU32(&bundle, 0);
-  if (compiler != nullptr) {
-    AppendU32(&bundle, static_cast<uint32_t>(ShaderLibraryLanguage::MSL));
-    AppendU32(&bundle, static_cast<uint32_t>(mslOffsets.size()));
-    AppendU32(&bundle, mslEntryOffset);
-    AppendU32(&bundle, mslPoolOffset);
-    AppendU32(&bundle, static_cast<uint32_t>(mslPool.size()));
+  AppendU64(&bundle, HashSource(glsl.pool));
+  for (size_t index = 0; index < sections.size(); ++index) {
+    const auto* section = sections[index];
+    AppendU32(&bundle, static_cast<uint32_t>(section->language));
+    AppendU32(&bundle, static_cast<uint32_t>(section->entries.size()));
+    AppendU32(&bundle, entryOffsets[index]);
+    AppendU32(&bundle, poolOffsets[index]);
+    AppendU32(&bundle, static_cast<uint32_t>(section->pool.size()));
     AppendU32(&bundle, 0);
   }
-  if (withWgsl) {
-    AppendU32(&bundle, static_cast<uint32_t>(ShaderLibraryLanguage::WGSL));
-    AppendU32(&bundle, static_cast<uint32_t>(wgslOffsets.size()));
-    AppendU32(&bundle, wgslEntryOffset);
-    AppendU32(&bundle, wgslPoolOffset);
-    AppendU32(&bundle, static_cast<uint32_t>(wgslPool.size()));
-    AppendU32(&bundle, 0);
-  }
-  for (const auto& offset : offsets) {
-    AppendU32(&bundle, offset.name);
-    AppendU32(&bundle, offset.source);
-    AppendU32(&bundle, offset.sourceSize);
-    AppendU32(&bundle, offset.requires);
-  }
-  bundle += pool;
-  if (compiler != nullptr) {
-    for (const auto& offset : mslOffsets) {
-      AppendU32(&bundle, offset.name);
-      AppendU32(&bundle, offset.source);
-      AppendU32(&bundle, offset.sourceSize);
-      AppendU32(&bundle, offset.requires);
+  // Each section's entry table is followed by its own pool, matching the offsets computed above;
+  // writing every table first and every pool afterwards would desynchronize the second section's
+  // declared offsets from the bytes on disk.
+  for (const auto* section : sections) {
+    for (const auto& entry : section->entries) {
+      AppendU32(&bundle, entry.name);
+      AppendU32(&bundle, entry.source);
+      AppendU32(&bundle, entry.sourceSize);
+      AppendU32(&bundle, entry.requires);
     }
-    bundle += mslPool;
-  }
-  if (withWgsl) {
-    for (const auto& offset : wgslOffsets) {
-      AppendU32(&bundle, offset.name);
-      AppendU32(&bundle, offset.source);
-      AppendU32(&bundle, offset.sourceSize);
-      AppendU32(&bundle, offset.requires);
-    }
-    bundle += wgslPool;
+    bundle += section->pool;
   }
   std::ofstream out(outPath, std::ios::binary);
   if (!out.is_open()) {
@@ -1911,10 +1958,6 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
   const std::filesystem::path outputPath(outPath);
   const std::filesystem::path registryPath = outputPath.parent_path() / "ChainOpRegistry.inc";
   if (!WriteChainOpRegistry(entries, registryPath.string(), error)) {
-    return false;
-  }
-  std::vector<OperatorSignature> signatures = {};
-  if (!CollectOperatorSignatures(shaderDir, &signatures, error)) {
     return false;
   }
   const std::filesystem::path operatorHeader = outputPath.parent_path() / "GeneratedOperators.h";

@@ -22,10 +22,9 @@
 #include <cstring>
 #include <map>
 #include "core/utils/Log.h"
-#include "gpu/ContextInternal.h"
 #include "gpu/Program.h"
 #include "gpu/ShaderCaps.h"
-#include "gpu/precompiled/PrecompiledShaderCache.h"
+#include "gpu/shaders/ShaderLibraryBundle.h"
 #include "gpu/shaders/contract/ChainISA.h"
 #include "gpu/shaders/contract/FragmentLibrary.h"
 #include "gpu/shaders/contract/OpTable.h"
@@ -37,28 +36,27 @@
 namespace tgfx {
 namespace {
 
-OperatorBundle BuildOperatorBundle(Context* context) {
+/// Collects the linkable operator modules from the library bundle's SPIR-V section. The section is
+/// the single source the Vulkan route links against; a missing module is a build-contract
+/// violation, and the caller logs it instead of silently shrinking the operator set.
+OperatorBundle BuildOperatorBundle() {
   std::vector<OperatorArtifact> artifacts = {};
-  auto* cache = ContextCacheAccess::Cache(context);
-  if (cache == nullptr) {
-    return OperatorBundle(std::move(artifacts));
-  }
+  const auto& bundle = ShaderLibraryBundle::Get();
   for (size_t index = 0; index < OperatorCount(); ++index) {
     const auto* desc = OperatorAt(index);
     if (desc == nullptr || desc->glslSymbol == nullptr) {
       continue;
     }
-    const auto* blob =
-        cache->findComposed(FragmentPackSPIRVOpBase | static_cast<uint32_t>(desc->id));
-    if (blob == nullptr || blob->data.size() % sizeof(uint32_t) != 0) {
+    const auto module = bundle.findOperatorModule(desc->id);
+    if (module.data == nullptr || module.size % sizeof(uint32_t) != 0) {
       continue;
     }
     OperatorArtifact artifact = {};
     artifact.id = desc->id;
     artifact.backend = OperatorBackend::SPIRV;
     artifact.symbol = desc->glslSymbol;
-    const auto* words = reinterpret_cast<const uint32_t*>(blob->data.data());
-    artifact.spirv.assign(words, words + blob->data.size() / sizeof(uint32_t));
+    artifact.spirv.resize(module.size / sizeof(uint32_t));
+    std::memcpy(artifact.spirv.data(), module.data, module.size);
     artifacts.push_back(std::move(artifact));
   }
   return OperatorBundle(std::move(artifacts));
@@ -126,7 +124,7 @@ std::shared_ptr<Program> VulkanProgramBuilder::buildIRProgram() {
 
   SPIRVProgramModules modules = {};
   std::string error = {};
-  const auto operatorBundle = BuildOperatorBundle(context);
+  const auto operatorBundle = BuildOperatorBundle();
   if (!SPIRVProgramBuilder::Build(programIRBuilder().IR(), &modules, &error, &operatorBundle)) {
     LOGE("VulkanProgramBuilder: the SPIR-V IR route failed: %s", error.c_str());
     return nullptr;

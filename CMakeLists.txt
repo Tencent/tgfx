@@ -35,7 +35,7 @@ option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
 option(TGFX_USE_VULKAN "Use Vulkan as the GPU backend" OFF)
 option(TGFX_USE_TEXT_GAMMA_CORRECTION "Enable gamma correction when rendering text" OFF)
-option(TGFX_EMBED_SHADER_BUNDLES "Embed precompiled shader bundles into libtgfx" ON)
+option(TGFX_EMBED_SHADER_BUNDLES "Embed the shader library bundle into libtgfx" ON)
 option(TGFX_BUILD_WEBGPU_BUNDLE "Generate the WebGPU shader bundle in native builds" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
@@ -959,12 +959,6 @@ if (TGFX_EMBED_SHADER_BUNDLES)
 
     set(TGFX_SHADER_BUNDLE_DIR "${CMAKE_BINARY_DIR}/generated/shaders")
     file(MAKE_DIRECTORY ${TGFX_SHADER_BUNDLE_DIR})
-
-    set(TGFX_SHADER_BUNDLE_STAMP "${TGFX_SHADER_BUNDLE_DIR}/bundle_stamp")
-    set(TGFX_SHADER_BUNDLE_FILES "")
-    foreach (B ${TGFX_SHADER_BACKENDS})
-        list(APPEND TGFX_SHADER_BUNDLE_FILES "${TGFX_SHADER_BUNDLE_DIR}/shader_bundle.${B}.bin")
-    endforeach ()
     file(GLOB_RECURSE TGFX_SHADER_SOURCES CONFIGURE_DEPENDS
             src/gpu/shaders/glsl/*.frag
             src/gpu/shaders/glsl/*.vert
@@ -1023,54 +1017,10 @@ if (TGFX_EMBED_SHADER_BUNDLES)
             # stamp was deleted by hand.
             set(TGFX_SHADER_TOOL_DEPENDS shader_build_tool "$<TARGET_FILE:shader_build_tool>")
         endif ()
-        # A metallib only works on the platform it was compiled for (a macOS one fails to create a
-        # pipeline on an iOS device or in the simulator), so an iOS build compiles it for its own
-        # SDK and deployment target. macOS builds keep the tool's defaults.
-        set(TGFX_SHADER_TOOL_METAL_ARGS "")
-        # What a d3d12 bundle stores. dxbc removes the first-use compile from the backend; hlsl
-        # keeps the source so the backend compiles it. The tool refuses dxbc on a host that cannot
-        # produce it rather than quietly writing the other form.
-        set(TGFX_SHADER_TOOL_FORMAT_ARGS "")
-        if ("d3d12" IN_LIST TGFX_SHADER_BACKENDS)
-            list(APPEND TGFX_SHADER_TOOL_FORMAT_ARGS
-                    --d3d12-shader-format ${TGFX_D3D12_SHADER_FORMAT})
-        endif ()
-        if (IOS AND "metal" IN_LIST TGFX_SHADER_BACKENDS)
-            string(TOLOWER "${CMAKE_OSX_SYSROOT};${SDK_NAME}" TGFX_IOS_SDK_HINT)
-            if (TGFX_IOS_SDK_HINT MATCHES "simulator")
-                set(TGFX_METAL_SDK "iphonesimulator")
-            else ()
-                set(TGFX_METAL_SDK "iphoneos")
-            endif ()
-            list(APPEND TGFX_SHADER_TOOL_METAL_ARGS
-                    --metal-sdk ${TGFX_METAL_SDK}
-                    --metal-min-os ${CMAKE_OSX_DEPLOYMENT_TARGET})
-        endif ()
-        add_custom_command(
-                OUTPUT ${TGFX_SHADER_BUNDLE_STAMP}
-                BYPRODUCTS ${TGFX_SHADER_BUNDLE_FILES}
-                COMMAND ${TGFX_SHADER_TOOL_COMMAND}
-                        --shader-dir ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/glsl
-                        --out-dir ${TGFX_SHADER_BUNDLE_DIR}
-                        --backends ${TGFX_SHADER_BACKENDS_ARG}
-                        ${TGFX_SHADER_TOOL_METAL_ARGS}
-                        ${TGFX_SHADER_TOOL_FORMAT_ARGS}
-                        --compress
-                        --stamp ${TGFX_SHADER_BUNDLE_STAMP}
-                DEPENDS ${TGFX_SHADER_TOOL_DEPENDS} ${TGFX_SHADER_SOURCES}
-                        src/gpu/ir/OperatorManifest.cpp
-                        src/gpu/ir/OperatorManifest.h
-                COMMENT "Compiling precompiled shader bundles (${TGFX_SHADER_BACKENDS})")
-
-    # Depend on the stamp only: the bundle files are BYPRODUCTS of the rule that writes the stamp,
-    # and the Makefile generators cannot resolve a direct dependency on a byproduct that does not
-    # exist yet on the first build ("No rule to make target"). The stamp is a manifest the tool
-    # writes (its own identity plus every bundle's digest), and the target re-verifies it on every
-    # build, so a stale, tampered or missing bundle fails loudly instead of embedding quietly.
-    # The shader library bundle: one file carrying the function sources of every target language.
-    # This phase writes only the GLSL section; later phases append MSL/HLSL/WGSL/SPIR-V sections.
-    # Packaging may keep only the sections its platform needs; the runtime never builds a variant
-    # program from this file.
+    # The shader library bundle: one file carrying the artifacts of every target language — the
+    # operator sources the text backends concatenate and the linkable modules the SPIR-V backend
+    # links. Packaging may keep only the sections its platform needs; every stage the runtime
+    # builds is assembled from this file.
     set(TGFX_SHADER_LIBRARY_BUNDLE "${TGFX_SHADER_BUNDLE_DIR}/shader_library.bundle")
     set(TGFX_SHADER_LIBRARY_REGISTRY "${TGFX_SHADER_BUNDLE_DIR}/ChainOpRegistry.inc")
     # The Metal backend assembles its shaders from the MSL section the tool translates, so a build
@@ -1082,6 +1032,10 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     if (TGFX_USE_WEBGPU)
         set(TGFX_SHADER_LIBRARY_LANGUAGES "${TGFX_SHADER_LIBRARY_LANGUAGES},wgsl")
     endif ()
+    if (TGFX_USE_VULKAN)
+        # The Vulkan route links the main it prints against one precompiled module per operator.
+        set(TGFX_SHADER_LIBRARY_LANGUAGES "${TGFX_SHADER_LIBRARY_LANGUAGES},spirv")
+    endif ()
     add_custom_command(
             OUTPUT ${TGFX_SHADER_LIBRARY_BUNDLE}
             BYPRODUCTS ${TGFX_SHADER_LIBRARY_REGISTRY}
@@ -1092,7 +1046,9 @@ if (TGFX_EMBED_SHADER_BUNDLES)
                     --library-bundle ${TGFX_SHADER_LIBRARY_BUNDLE}
                     --library-languages ${TGFX_SHADER_LIBRARY_LANGUAGES}
             DEPENDS ${TGFX_SHADER_TOOL_DEPENDS} ${TGFX_SHADER_SOURCES}
-            COMMENT "Generating the shader library bundle")
+                    src/gpu/ir/OperatorManifest.cpp
+                    src/gpu/ir/OperatorManifest.h
+            COMMENT "Generating the shader library bundle (${TGFX_SHADER_LIBRARY_LANGUAGES})")
     add_custom_target(shader_library_bundle DEPENDS ${TGFX_SHADER_LIBRARY_BUNDLE})
     add_dependencies(tgfx shader_library_bundle)
     target_include_directories(tgfx PRIVATE ${TGFX_SHADER_BUNDLE_DIR})
@@ -1119,87 +1075,6 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     target_sources(tgfx PRIVATE ${TGFX_GENERATED_OPERATORS})
     set_source_files_properties(${TGFX_GENERATED_OPERATORS} PROPERTIES GENERATED TRUE)
 
-    # The stamp is removed after every build on purpose: the bundle generator keys off its
-    # OUTPUT (the stamp), so a missing stamp forces a fresh tool run on the next build. The tool
-    # re-verifies what it just wrote, then the removal restarts the cycle. This trades a full
-    # bundle regeneration per build (a few seconds; the embedded-source steps stay content-based)
-    # for the recurring class of stale-bundle failures where an input changed but the rule's
-    # dependency scan judged everything up to date.
-    add_custom_target(tgfx_shader_bundles
-            COMMAND ${TGFX_SHADER_TOOL_COMMAND} --verify ${TGFX_SHADER_BUNDLE_STAMP}
-            COMMAND ${CMAKE_COMMAND} -E rm -f ${TGFX_SHADER_BUNDLE_STAMP}
-            DEPENDS ${TGFX_SHADER_BUNDLE_STAMP} ${TGFX_SHADER_TOOL_DEPENDS})
-
-    set(TGFX_EMBEDDED_BUNDLE_DIR "${CMAKE_BINARY_DIR}/generated/embedded")
-    file(MAKE_DIRECTORY ${TGFX_EMBEDDED_BUNDLE_DIR})
-
-    foreach (B ${TGFX_SHADER_BACKENDS})
-        set(BUNDLE_BIN "${TGFX_SHADER_BUNDLE_DIR}/shader_bundle.${B}.bin")
-        string(REPLACE "-" "_" BUNDLE_VAR "kShaderBundle_${B}")
-        string(REPLACE "-" "_" FUNC_SUFFIX "${B}")
-        if (B STREQUAL "metal")
-            set(BACKEND_ENUM "Metal")
-        elseif (B STREQUAL "vulkan")
-            set(BACKEND_ENUM "Vulkan")
-        elseif (B STREQUAL "webgpu")
-            set(BACKEND_ENUM "WebGPU")
-        elseif (B STREQUAL "d3d12")
-            set(BACKEND_ENUM "D3D12")
-        elseif (B STREQUAL "opengles")
-            # The ES profile bundle registers under the same Backend::OpenGL key; the runtime
-            # serves it only to ES contexts (ProgramInfo glProfileMatchesCache).
-            set(BACKEND_ENUM "OpenGL")
-        elseif (B STREQUAL "opengl")
-            set(BACKEND_ENUM "OpenGL")
-        else ()
-            message(FATAL_ERROR "No Backend enum is mapped to the shader profile '${B}'")
-        endif ()
-        set(BUNDLE_CPP "${TGFX_EMBEDDED_BUNDLE_DIR}/EmbeddedShaderBundle_${B}.cpp")
-        add_custom_command(
-                OUTPUT ${BUNDLE_CPP}
-                COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/BundleToCpp.cmake
-                        ${BUNDLE_BIN} ${BUNDLE_CPP} ${BUNDLE_VAR} ${BACKEND_ENUM} ${FUNC_SUFFIX}
-                DEPENDS ${TGFX_SHADER_BUNDLE_STAMP} ${BUNDLE_BIN}
-                        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/BundleToCpp.cmake
-                COMMENT "Embedding shader bundle: ${B}")
-        list(APPEND TGFX_EMBEDDED_BUNDLE_SOURCES ${BUNDLE_CPP})
-    endforeach ()
-
-    # A generated trampoline aggregates the per-backend registration functions into one symbol
-    # referenced by EmbeddedShaderBundles::GetBundle. That reference chain is what pulls the
-    # bundle objects into any consumer that links tgfx, replacing the whole-archive requirement.
-    set(TRAMPOLINE_CPP "${TGFX_EMBEDDED_BUNDLE_DIR}/EmbeddedBundleTrampoline.cpp")
-    set(TRAMPOLINE_DECLS "")
-    set(TRAMPOLINE_CALLS "")
-    foreach (B ${TGFX_SHADER_BACKENDS})
-        string(REPLACE "-" "_" FUNC_SUFFIX "${B}")
-        string(APPEND TRAMPOLINE_DECLS "void RegisterEmbeddedBundle_${FUNC_SUFFIX}();\n    ")
-        string(APPEND TRAMPOLINE_CALLS "  RegisterEmbeddedBundle_${FUNC_SUFFIX}();\n")
-    endforeach ()
-    file(GENERATE OUTPUT "${TRAMPOLINE_CPP}" CONTENT
-"// Auto-generated — do not edit.
-#include \"gpu/precompiled/EmbeddedShaderBundles.h\"
-
-namespace tgfx {
-namespace embedded {
-
-${TRAMPOLINE_DECLS}
-void RegisterAllEmbeddedBundles() {
-${TRAMPOLINE_CALLS}}
-
-}  // namespace embedded
-}  // namespace tgfx
-")
-    list(APPEND TGFX_EMBEDDED_BUNDLE_SOURCES ${TRAMPOLINE_CPP})
-
-    # Include generated objects in the physical tgfx archive/framework, not just its CMake
-    # link interface. The registration symbol chain keeps them reachable without force-load.
-    add_library(tgfx_embedded_bundles OBJECT ${TGFX_EMBEDDED_BUNDLE_SOURCES})
-    target_include_directories(tgfx_embedded_bundles PRIVATE src include)
-    add_dependencies(tgfx_embedded_bundles tgfx_shader_bundles)
-    set(TGFX_EMBEDDED_BUNDLES_TARGET tgfx_embedded_bundles CACHE INTERNAL "")
-    target_sources(tgfx PRIVATE $<TARGET_OBJECTS:tgfx_embedded_bundles>)
-    target_compile_definitions(tgfx PRIVATE TGFX_EMBED_SHADER_BUNDLES=1)
 endif ()
 
 if (TGFX_BUILD_HELLO2D)
@@ -1394,26 +1269,6 @@ if (TGFX_BUILD_TESTS)
         target_link_options(ShaderBuildToolTest PRIVATE ${TGFX_TEST_LINK_OPTIONS})
         target_link_libraries(ShaderBuildToolTest shader_build_tool_core ${TGFX_TEST_LIBS})
         add_test(NAME ShaderBuildToolTest COMMAND ShaderBuildToolTest)
-    endif ()
-    # Minimal embedding consumer (audit F07): links tgfx and nothing else — no forced loading
-    # and no whole archive. Its link and startup assertions prove the embedded bundle travels
-    # with the library through ordinary symbol resolution.
-    if (TGFX_EMBED_SHADER_BUNDLES AND TARGET tgfx_embedded_bundles
-            AND TEST_TARGET_SUFFIX STREQUAL "OpenGL")
-        add_executable(EmbeddedBundleMinimalApp test/minimal/EmbeddedBundleMinimalApp.cpp)
-        target_compile_definitions(EmbeddedBundleMinimalApp PRIVATE TGFX_BACKEND_NAME="opengl")
-        target_include_directories(EmbeddedBundleMinimalApp PRIVATE include src ${TGFX_INCLUDES})
-        target_link_libraries(EmbeddedBundleMinimalApp tgfx)
-        if (APPLE)
-            target_link_libraries(EmbeddedBundleMinimalApp "-framework OpenGL")
-        endif ()
-        # Use the physical archive, not the tgfx target's transitive link interface. This is
-        # the contract used by consumers receiving only tgfx.a/lib or a static framework.
-        add_executable(EmbeddedBundleArchiveApp test/minimal/EmbeddedBundleMinimalApp.cpp)
-        target_include_directories(EmbeddedBundleArchiveApp PRIVATE include src ${TGFX_INCLUDES})
-        add_dependencies(EmbeddedBundleArchiveApp tgfx)
-        target_link_libraries(EmbeddedBundleArchiveApp PRIVATE "$<TARGET_FILE:tgfx>"
-                ${TGFX_SHARED_LIBS})
     endif ()
 endif ()
 

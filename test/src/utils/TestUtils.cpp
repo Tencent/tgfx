@@ -24,49 +24,12 @@
 #include "core/utils/Log.h"
 #include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/precompiled/EmbeddedShaderBundles.h"
-#include "gpu/precompiled/PrecompiledShaderCache.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-ScopedAOTStatsPause::ScopedAOTStatsPause(Context* context, bool active) {
-  if (!active || context == nullptr) {
-    return;
-  }
-  cache = ContextCacheAccess::Cache(context);
-  prevCachePaused = cache->statsRecordingPaused();
-  cache->setStatsRecordingPaused(true);
-  globalCache = context->globalCache();
-  prevGlobalPaused = globalCache->programStatsPaused();
-  globalCache->setProgramStatsPaused(true);
-}
-
-ScopedAOTStatsPause::~ScopedAOTStatsPause() {
-  if (cache != nullptr) {
-    cache->setStatsRecordingPaused(prevCachePaused);
-  }
-  if (globalCache != nullptr) {
-    globalCache->setProgramStatsPaused(prevGlobalPaused);
-  }
-}
-
-ScopedAOTDeliberateMiss::ScopedAOTDeliberateMiss(Context* context, bool active) {
-  if (active && context != nullptr) {
-    cache = ContextCacheAccess::Cache(context);
-    previous = cache->deliberateMissMarking();
-    cache->setDeliberateMissMarking(true);
-  }
-}
-
-ScopedAOTDeliberateMiss::~ScopedAOTDeliberateMiss() {
-  if (cache != nullptr) {
-    cache->setDeliberateMissMarking(previous);
-  }
-}
-
 testing::AssertionResult BitmapPremulLegal(const Bitmap& bitmap) {
   if (bitmap.isEmpty()) {
     return testing::AssertionFailure() << "bitmap is empty";
@@ -98,26 +61,6 @@ testing::AssertionResult BitmapPremulLegal(const Bitmap& bitmap) {
   }
   mutableBitmap.unlockPixels();
   return result;
-}
-
-std::pair<const uint8_t*, size_t> GetEmbeddedBundle(Backend backend) {
-  return EmbeddedShaderBundles::GetBundle(backend);
-}
-
-bool LoadEmbeddedBundle(PrecompiledShaderCache* cache, Backend backend) {
-  auto [data, size] = EmbeddedShaderBundles::GetBundle(backend);
-  if (cache == nullptr || data == nullptr || size == 0) {
-    return false;
-  }
-  return cache->loadBundle(data, size);
-}
-
-std::vector<uint8_t> CopyEmbeddedBundle(Backend backend) {
-  auto [data, size] = EmbeddedShaderBundles::GetBundle(backend);
-  if (data == nullptr || size == 0) {
-    return {};
-  }
-  return std::vector<uint8_t>(data, data + size);
 }
 
 bool IsSwiftShaderContext(Context* context) {

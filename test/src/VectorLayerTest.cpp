@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/GlobalCache.h"
-#include "gpu/precompiled/PrecompiledShaderCache.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/PathMeasure.h"
 #include "tgfx/core/RSXform.h"

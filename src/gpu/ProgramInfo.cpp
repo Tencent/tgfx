@@ -21,11 +21,10 @@
 #include <sstream>
 #include "AlignTo.h"
 #include "gpu/BlendFormula.h"
-#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
+#include "gpu/ShaderBindingLayout.h"
 #include "gpu/ShaderCaps.h"
-#include "gpu/precompiled/PrecompiledShaderCache.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
 #include "gpu/processors/XferProcessor.h"

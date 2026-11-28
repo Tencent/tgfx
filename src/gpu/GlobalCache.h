@@ -36,7 +36,6 @@ struct ProgramCacheStats {
   uint64_t requests = 0;
   uint64_t cacheHits = 0;
   uint64_t cacheMisses = 0;
-  uint64_t precompiledArtifactCreations = 0;
 };
 
 /**

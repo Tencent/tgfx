@@ -209,9 +209,6 @@ void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program
     return;
   }
   program->programKey = programKey;
-  if (!programStatsPaused()) {
-    _programStats.precompiledArtifactCreations++;
-  }
   programLRU.push_front(program.get());
   program->cachedPosition = programLRU.begin();
   programMap[programKey] = std::move(program);

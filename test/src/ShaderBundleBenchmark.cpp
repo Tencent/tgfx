@@ -18,13 +18,10 @@
 
 #include <algorithm>
 #include <cstdio>
-#if defined(__APPLE__)
-#include <mach/mach.h>
-#endif
 #include <cstdlib>
 #include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/precompiled/PrecompiledShaderCache.h"
+#include "gpu/ShaderCache.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/core/Font.h"
@@ -112,11 +109,10 @@ static void DrawScene(Canvas* canvas, const std::shared_ptr<Image>& image,
 }
 
 static void PrintStats(const char* label, double ms, const ProgramCacheStats& stats) {
-  std::printf("[Bench] %s ms=%.2f requests=%llu hits=%llu misses=%llu precompiled=%llu\n", label,
-              ms, static_cast<unsigned long long>(stats.requests),
+  std::printf("[Bench] %s ms=%.2f requests=%llu hits=%llu misses=%llu\n", label, ms,
+              static_cast<unsigned long long>(stats.requests),
               static_cast<unsigned long long>(stats.cacheHits),
-              static_cast<unsigned long long>(stats.cacheMisses),
-              static_cast<unsigned long long>(stats.precompiledArtifactCreations));
+              static_cast<unsigned long long>(stats.cacheMisses));
 }
 
 TGFX_TEST(ShaderBundleBenchmark, DISABLED_FirstFrame) {
@@ -142,7 +138,7 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_FirstFrame) {
     auto label = "frame" + std::to_string(frame);
     PrintStats(label.c_str(), micros / 1000.0, context->globalCache()->programStats());
   }
-  auto& modules = ContextCacheAccess::Cache(context)->shaderCache()->stats();
+  auto& modules = ContextCacheAccess::ShaderCacheOf(context)->stats();
   std::printf("[Bench] modules requests=%llu hits=%llu created=%llu createMs=%.2f\n",
               static_cast<unsigned long long>(modules.moduleRequests),
               static_cast<unsigned long long>(modules.moduleHits),
@@ -173,7 +169,7 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_ColdFrames) {
   ASSERT_TRUE(surface != nullptr);
   for (int round = 1; round <= 6; round++) {
     // Two frames per round: the second one creates the programs a first frame leaves for later.
-    auto* shaderCache = ContextCacheAccess::Cache(context)->shaderCache();
+    auto* shaderCache = ContextCacheAccess::ShaderCacheOf(context);
     context->globalCache()->clearPrograms();
     if (std::getenv("TGFX_BENCH_KEEP_SHADER_CACHE") == nullptr) {
       shaderCache->clear();
@@ -194,7 +190,7 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_ColdFrames) {
         "[Bench] mode=%s coldRound%d firstMs=%.2f secondMs=%.2f newPrograms=%llu "
         "moduleRequests=%llu moduleHits=%llu modulesCreated=%llu moduleCreateMs=%.2f "
         "pipelineHits=%llu pipelinesCreated=%llu pipelineCreateMs=%.2f\n",
-        "AOT", round, firstMicros / 1000.0, secondMicros / 1000.0,
+        "cold", round, firstMicros / 1000.0, secondMicros / 1000.0,
         static_cast<unsigned long long>(after.cacheMisses - before.cacheMisses),
         static_cast<unsigned long long>(modulesAfter.moduleRequests - modulesBefore.moduleRequests),
         static_cast<unsigned long long>(modulesAfter.moduleHits - modulesBefore.moduleHits),
@@ -240,48 +236,6 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_SteadyState) {
   std::sort(waitMs.begin(), waitMs.end());
   std::printf("[Bench] mode=%s steady cpuSubmitMs=%.3f gpuWaitMs=%.3f\n", "AOT",
               submitMs[submitMs.size() / 2], waitMs[waitMs.size() / 2]);
-  std::fflush(stdout);
-}
-
-// Bytes of physical memory the process currently holds, or 0 where it cannot be read.
-static uint64_t ResidentBytes() {
-#if defined(__APPLE__)
-  task_vm_info_data_t info = {};
-  mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
-  if (task_info(mach_task_self(), TASK_VM_INFO, reinterpret_cast<task_info_t>(&info), &count) ==
-      KERN_SUCCESS) {
-    return info.phys_footprint;
-  }
-#endif
-  return 0;
-}
-
-// Loads the embedded bundle into fresh caches and reports what each load costs in time and in
-// process memory. A Context does exactly this when it is created,
-// so every Context pays this cost again and holds its own copy. The caches are kept alive so the
-// memory they hold adds up.
-TGFX_TEST(ShaderBundleBenchmark, DISABLED_BundleLoad) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  std::vector<std::unique_ptr<PrecompiledShaderCache>> caches;
-  auto baseline = ResidentBytes();
-  for (int i = 0; i < 6; i++) {
-    auto before = ResidentBytes();
-    auto start = Clock::Now();
-    auto cache = std::make_unique<PrecompiledShaderCache>(context, context->backend());
-    auto loaded = LoadEmbeddedBundle(cache.get(), context->backend());
-    auto micros = Clock::Now() - start;
-    ASSERT_TRUE(loaded);
-    auto after = ResidentBytes();
-    std::printf("[Bench] bundleLoad%d ms=%.2f entries=%zu footprintDeltaKB=%lld totalKB=%lld\n",
-                i + 1, micros / 1000.0, cache->entryCount(),
-                static_cast<long long>(after - before) / 1024,
-                static_cast<long long>(after - baseline) / 1024);
-    caches.push_back(std::move(cache));
-  }
-  auto bundle = CopyEmbeddedBundle(context->backend());
-  std::printf("[Bench] embeddedBundleBytes=%zu\n", bundle.size());
   std::fflush(stdout);
 }
 

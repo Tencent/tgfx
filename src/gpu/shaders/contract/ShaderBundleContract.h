@@ -38,7 +38,7 @@ namespace tgfx {
 //        ^                                   ^
 //        |                                   |
 //   shader_build_tool                    runtime loader
-//   BundleWriter                  PrecompiledShaderCache  UniformData  pipelines
+//   BundleWriter                  ShaderLibraryBundle  UniformData  pipelines
 //        (writes)                           (reads)
 //
 // It carries four facts that must agree byte for byte on both sides: the shader profile (the

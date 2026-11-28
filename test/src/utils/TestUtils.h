@@ -74,32 +74,7 @@ std::shared_ptr<Image> ScaleImage(const std::shared_ptr<Image>& image, float sca
 
 class Context;
 class GlobalCache;
-class PrecompiledShaderCache;
 class Bitmap;
-
-/**
- * The precompiled shader bundle embedded in this build for the backend: the exact bytes Context
- * loads when it is created and that shipping code consumes. {nullptr, 0} when the build embeds no
- * bundle for the backend.
- *
- * Tests must use this instead of reading a bundle file from disk: every build generates and
- * embeds its own bundle, and a rendering test must consume exactly the bytes the product
- * consumes.
- */
-std::pair<const uint8_t*, size_t> GetEmbeddedBundle(Backend backend);
-
-/**
- * Loads the embedded bundle of the backend into the cache. Returns false when the build embeds no
- * bundle for the backend or the cache rejects it, so ASSERT_TRUE(LoadEmbeddedBundle(...)) fails
- * loudly instead of letting a test run on the plain path unnoticed.
- */
-bool LoadEmbeddedBundle(PrecompiledShaderCache* cache, Backend backend);
-
-/**
- * A mutable copy of the embedded bundle, for tests that corrupt or recompress the bytes. Empty
- * when the build embeds no bundle for the backend.
- */
-std::vector<uint8_t> CopyEmbeddedBundle(Backend backend);
 
 /**
  * Premultiplied-alpha legality of a bitmap's pixels: every pixel must satisfy RGB <= A and
@@ -160,36 +135,5 @@ bool IsSwiftShaderEnvironment();
                       "variants do not compile (environment limit)";   \
     }                                                                  \
   } while (false)
-
-/**
- * Pauses AOT statistics recording and program-creation counting on the given context for the
- * scope's lifetime when active is true. Wrap intentional JIT reference renders (bundle unloaded)
- * with this so they do not enter the AOT hit-rate accounting; the pause always unwinds even if
- * an assertion aborts the helper.
- */
-class ScopedAOTStatsPause {
- public:
-  ScopedAOTStatsPause(Context* context, bool active);
-  ~ScopedAOTStatsPause();
-
- private:
-  PrecompiledShaderCache* cache = nullptr;
-  GlobalCache* globalCache = nullptr;
-  bool prevCachePaused = false;
-  bool prevGlobalPaused = false;
-};
-
-// Unlike a stats pause, deliberate marking preserves raw counters for local JIT assertions.
-class ScopedAOTDeliberateMiss {
- public:
-  explicit ScopedAOTDeliberateMiss(Context* context, bool active = true);
-  ~ScopedAOTDeliberateMiss();
-  ScopedAOTDeliberateMiss(const ScopedAOTDeliberateMiss&) = delete;
-  ScopedAOTDeliberateMiss& operator=(const ScopedAOTDeliberateMiss&) = delete;
-
- private:
-  PrecompiledShaderCache* cache = nullptr;
-  bool previous = false;
-};
 
 }  // namespace tgfx
