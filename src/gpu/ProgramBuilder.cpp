@@ -305,9 +305,7 @@ SamplerHandle ProgramBuilder::emitSampler(std::shared_ptr<Texture> texture,
                                           const std::string& name) {
   ++numFragmentSamplers;
   const auto handle = uniformHandler()->addSampler(texture, name);
-  const auto samplerVar = uniformHandler()->getSamplerVariable(handle);
-  const auto value =
-      programIR.AddSampler({samplerVar.name(), samplerVar.type(), static_cast<uint32_t>(0)});
+  const auto value = uniformHandler()->getSamplerValue(handle);
   if (samplerValues.size() <= handle.toIndex()) {
     samplerValues.resize(handle.toIndex() + 1, INVALID_VALUE_ID);
   }

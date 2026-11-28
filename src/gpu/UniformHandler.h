@@ -24,6 +24,7 @@
 #include "gpu/ShaderVar.h"
 #include "gpu/Swizzle.h"
 #include "gpu/Uniform.h"
+#include "gpu/ir/ValueRef.h"
 #include "tgfx/gpu/ShaderStage.h"
 #include "tgfx/gpu/Texture.h"
 
@@ -62,6 +63,13 @@ class UniformHandler {
   ShaderVar getSamplerVariable(SamplerHandle samplerHandle) const;
 
   /**
+   * Returns the IR value the sampler registered when it was added.
+   */
+  ValueID getSamplerValue(SamplerHandle samplerHandle) const {
+    return samplerValues[samplerHandle.toIndex()];
+  }
+
+  /**
    * Returns the sampler swizzle for the given sampler handle.
    */
   Swizzle getSamplerSwizzle(SamplerHandle samplerHandle) const {
@@ -73,5 +81,7 @@ class UniformHandler {
   ProgramBuilder* programBuilder = nullptr;
   std::vector<Uniform> samplers = {};
   std::vector<Swizzle> samplerSwizzles = {};
+  /// The IR value each sampler registered, parallel to samplers.
+  std::vector<ValueID> samplerValues = {};
 };
 }  // namespace tgfx
