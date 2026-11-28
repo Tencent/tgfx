@@ -28,7 +28,9 @@ Varying VaryingHandler::addVarying(const std::string& name, SLType type, bool is
   varying._id = static_cast<VaryingID>(varyings.size());
   varying._isFlat = isFlat;
   varyings.push_back(std::move(varying));
-  return varyings[varyings.size() - 1];
+  const auto& added = varyings.back();
+  programBuilder->registerVarying(added.name(), added.type(), added.isFlat());
+  return added;
 }
 
 }  // namespace tgfx

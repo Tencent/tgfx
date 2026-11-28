@@ -19,6 +19,7 @@
 #include "UniformHandler.h"
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/ProgramBuilder.h"
+#include "gpu/UniformLayout.h"
 
 namespace tgfx {
 static constexpr char OES_TEXTURE_EXTENSION[] = "GL_OES_EGL_image_external_essl3";
@@ -52,6 +53,9 @@ SamplerHandle UniformHandler::addSampler(std::shared_ptr<Texture> texture,
   }
   auto samplerName = programBuilder->nameVariable(name);
   samplers.emplace_back(samplerName, format);
+  // Registered here rather than in ProgramBuilder::emitSampler: some processors add a sampler
+  // directly through the handler, and the interface must carry every sampler the shader uses.
+  programBuilder->registerSampler(samplerName, SLTypeOf(format));
   auto swizzle = Swizzle::ForRead(texture->format());
   samplerSwizzles.push_back(swizzle);
   return SamplerHandle(samplers.size() - 1);

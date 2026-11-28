@@ -72,6 +72,14 @@ class ProgramBuilder {
   /// Whether the stage declares a uniform block (one per stage; more than one is rejected).
   bool hasUniformBlock(ShaderStage stage) const;
 
+  /// Registers one varying into the program IR where it is declared, so the interface and the
+  /// handler cannot disagree about which varyings exist.
+  ValueID registerVarying(const std::string& name, SLType type, bool isFlat);
+
+  /// Registers one sampler into the program IR where it is created. Both the emit path and the
+  /// processors that call UniformHandler::addSampler directly end up here.
+  ValueID registerSampler(const std::string& name, SLType type);
+
   virtual UniformHandler* uniformHandler() = 0;
 
   virtual const UniformHandler* uniformHandler() const = 0;

@@ -59,8 +59,6 @@ class ProgramAssembler {
                 std::string* libraryText);
 
  private:
-  bool registerInterface();
-
   ProgramBuilder* builder = nullptr;
 };
 }  // namespace tgfx

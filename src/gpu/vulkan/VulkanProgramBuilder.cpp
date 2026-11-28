@@ -86,14 +86,6 @@ std::shared_ptr<Program> VulkanProgramBuilder::buildIRProgram() {
          program.vertexStatements.size(), program.statements.size());
     return nullptr;
   }
-  for (const auto& sampler : _uniformHandler.getSamplers()) {
-    programIRBuilder().AddSampler({sampler.name(), ShaderVar(sampler).type(), 0});
-  }
-  for (const auto& varying : _varyingHandler.getVaryings()) {
-    programIRBuilder().AddVarying(
-        {varying.name(), varying.type(), Precision::High, 0, varying.isFlat()});
-  }
-
   SPIRVProgramModules modules = {};
   std::string error = {};
   const auto operatorBundle = BuildOperatorBundle();

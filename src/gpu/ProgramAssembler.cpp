@@ -29,31 +29,8 @@ namespace tgfx {
 ProgramAssembler::ProgramAssembler(ProgramBuilder* builder) : builder(builder) {
 }
 
-bool ProgramAssembler::registerInterface() {
-  auto* programInfo = builder->getProgramInfo();
-  auto* varyingHandler = builder->varyingHandler();
-  auto* uniformHandler = builder->uniformHandler();
-  auto& ir = builder->programIRBuilder();
-  for (const auto& attribute : programInfo->getVertexAttributes()) {
-    ir.AddAttribute({attribute.name(), ShaderVar(attribute).type(), Precision::High, 0});
-  }
-  for (const auto& attribute : programInfo->getInstanceAttributes()) {
-    ir.AddAttribute({attribute.name(), ShaderVar(attribute).type(), Precision::High, 0});
-  }
-  for (const auto& varying : varyingHandler->getVaryings()) {
-    ir.AddVarying({varying.name(), varying.type(), Precision::High, 0, varying.isFlat()});
-  }
-  for (const auto& sampler : uniformHandler->getSamplers()) {
-    ir.AddSampler({sampler.name(), ShaderVar(sampler).type(), 0});
-  }
-  return true;
-}
-
 bool ProgramAssembler::assemble(const LanguageTraits& traits, std::string* vertexBody,
                                 std::string* fragmentBody, std::string* libraryText) {
-  if (!registerInterface()) {
-    return false;
-  }
   builder->finalizeShaders();
   auto& ir = builder->programIRBuilder().IR();
   std::string validationError = {};

@@ -63,6 +63,14 @@ ValueID ProgramBuilder::registerUniform(const std::string& baseName, const std::
   return programIR.AddUniform(std::move(uniform));
 }
 
+ValueID ProgramBuilder::registerVarying(const std::string& name, SLType type, bool isFlat) {
+  return programIR.AddVarying({name, type, Precision::High, 0, isFlat});
+}
+
+ValueID ProgramBuilder::registerSampler(const std::string& name, SLType type) {
+  return programIR.AddSampler({name, type, 0});
+}
+
 bool ProgramBuilder::hasUniformBlock(ShaderStage stage) const {
   for (const auto& block : programIR.IR().interface.uniformBlocks) {
     if (block.stage == stage) {

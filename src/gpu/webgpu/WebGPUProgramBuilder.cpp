@@ -87,21 +87,6 @@ bool WebGPUProgramBuilder::checkSamplerCounts() {
 
 std::shared_ptr<Program> WebGPUProgramBuilder::finalize() {
   fragmentShaderBuilder()->declareCustomOutputColor();
-  for (const auto& attribute : getProgramInfo()->getVertexAttributes()) {
-    programIRBuilder().AddAttribute(
-        {attribute.name(), ShaderVar(attribute).type(), Precision::High, 0});
-  }
-  for (const auto& attribute : getProgramInfo()->getInstanceAttributes()) {
-    programIRBuilder().AddAttribute(
-        {attribute.name(), ShaderVar(attribute).type(), Precision::High, 0});
-  }
-  for (const auto& varying : _varyingHandler.getVaryings()) {
-    programIRBuilder().AddVarying(
-        {varying.name(), varying.type(), Precision::High, 0, varying.isFlat()});
-  }
-  for (const auto& sampler : _uniformHandler.getSamplers()) {
-    programIRBuilder().AddSampler({sampler.name(), ShaderVar(sampler).type(), 0});
-  }
   finalizeShaders();
 
   auto& ir = programIRBuilder().IR();
