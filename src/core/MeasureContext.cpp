@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeasureContext.h"
+#include "core/GlyphTransform.h"
 #include "core/utils/Log.h"
 #include "core/utils/StrokeUtils.h"
 #include "tgfx/core/RRect.h"
@@ -24,6 +25,52 @@
 #include "utils/MathExtra.h"
 
 namespace tgfx {
+static Rect MeasureFallbackTextStrokeBounds(const TextBlob& textBlob, const Matrix& matrix,
+                                            const Stroke& stroke) {
+  Rect result = {};
+  for (auto run : textBlob) {
+    const auto& font = run.font;
+    for (size_t index = 0; index < run.glyphCount; index++) {
+      auto glyphMatrix = GetGlyphMatrix(run, index);
+      const auto glyphID = run.glyphs[index];
+      const auto isColor = font.hasColor();
+      if (font.hasOutlines() && !isColor) {
+        Path glyphPath = {};
+        if (font.getPath(glyphID, &glyphPath)) {
+          glyphPath.transform(glyphMatrix);
+          auto resolutionScale = matrix.getMaxScale() * glyphMatrix.getMaxScale();
+          if (stroke.applyToPath(&glyphPath, resolutionScale)) {
+            glyphPath.transform(matrix);
+            result.join(glyphPath.getBounds());
+            continue;
+          }
+        }
+      }
+
+      auto glyphBounds = font.getBounds(glyphID);
+      if (glyphBounds.isEmpty()) {
+        continue;
+      }
+      if (!isColor) {
+        auto resolutionScale = matrix.getMaxScale() * glyphMatrix.getMaxScale();
+        ApplyStrokeToBounds(stroke, &glyphBounds, Matrix::MakeScale(resolutionScale), true);
+      }
+      glyphBounds = glyphMatrix.mapRect(glyphBounds);
+      result.join(matrix.mapRect(glyphBounds));
+    }
+  }
+  return result;
+}
+
+Rect MeasureContext::GetTightBounds(const std::shared_ptr<Picture>& picture) {
+  if (picture == nullptr) {
+    return Rect::MakeEmpty();
+  }
+  MeasureContext context(true);
+  picture->playback(&context, Matrix::I(), ClipStack());
+  return context.getBounds();
+}
+
 void MeasureContext::drawFill(const Brush&) {
 }
 
@@ -69,7 +116,7 @@ static bool HasNoMiterReach(const Shape& shape) {
 void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix,
                                const ClipStack& clip, const Brush&, const Stroke* stroke) {
   DEBUG_ASSERT(shape != nullptr);
-  auto localBounds = shape->getBounds();
+  auto localBounds = useTightBounds ? shape->getPath().getBounds() : shape->getBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &localBounds, matrix, !HasNoMiterReach(*shape));
   }
@@ -97,6 +144,36 @@ void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Re
 void MeasureContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Matrix& matrix,
                                   const ClipStack& clip, const Brush&, const Stroke* stroke) {
   DEBUG_ASSERT(textBlob != nullptr);
+  if (useTightBounds) {
+    auto deviceBounds = textBlob->getTightBounds(&matrix);
+    if (stroke != nullptr) {
+      // Outline glyphs stroke their paths, while color glyphs ignore the stroke. Join both extents
+      // so mixed text keeps the unstroked color glyph bounds as well.
+      auto textShape = Shape::MakeFrom(textBlob);
+      if (textShape != nullptr) {
+        bool measuredStroke = false;
+        auto strokedShape = Shape::ApplyStroke(textShape, stroke);
+        if (strokedShape != nullptr) {
+          auto strokedPath = strokedShape->getPath();
+          if (!strokedPath.isEmpty()) {
+            strokedPath.transform(matrix);
+            deviceBounds.join(strokedPath.getBounds());
+            measuredStroke = true;
+          }
+        }
+        if (!measuredStroke) {
+          // TextShape builds all glyph paths together, so one failed glyph drops the whole outline.
+          // Rebuild the stroke extent per glyph so one failed glyph does not discard every valid
+          // glyph's tight bounds.
+          auto fallbackBounds = MeasureFallbackTextStrokeBounds(*textBlob, matrix, *stroke);
+          addDeviceBounds(clip, fallbackBounds);
+          return;
+        }
+      }
+    }
+    addDeviceBounds(clip, deviceBounds);
+    return;
+  }
   auto localBounds = textBlob->getBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &localBounds, matrix);
@@ -108,7 +185,7 @@ void MeasureContext::drawLayer(std::shared_ptr<Picture> picture,
                                std::shared_ptr<ImageFilter> imageFilter, const Matrix& matrix,
                                const ClipStack& clip, const Brush&) {
   DEBUG_ASSERT(picture != nullptr);
-  auto localBounds = picture->getBounds();
+  auto localBounds = useTightBounds ? GetTightBounds(picture) : picture->getBounds();
   if (imageFilter) {
     localBounds = imageFilter->filterBounds(localBounds);
   }

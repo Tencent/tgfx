@@ -19,9 +19,11 @@
 #include <math.h>
 #include <vector>
 #include "core/Matrix3DUtils.h"
+#include "core/MeasureContext.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/PictureUtils.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
@@ -36,9 +38,11 @@
 #include "layers/contents/RectsContent.h"
 #include "layers/contents/TextContent.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
+#include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/ImageProvider.h"
 #include "tgfx/core/Mesh.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/layers/DisplayList.h"
@@ -8241,6 +8245,519 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryShapeUndoesTheRecordingScale) {
   ASSERT_TRUE(identityProbe.shape->shape != nullptr && scaledProbe.shape->shape != nullptr);
   EXPECT_EQ(scaledProbe.shape->shape->getBounds(), identityProbe.shape->shape->getBounds())
       << "the shape lives in layer coordinates, so it does not grow with the content scale";
+}
+
+static std::shared_ptr<TextBlob> MakePooledBoundsText(bool unrelatedGlyph) {
+  PathTypefaceBuilder builder;
+  if (unrelatedGlyph) {
+    Path unrelated;
+    unrelated.addRect(Rect::MakeLTRB(-60.0f, -180.0f, 120.0f, 70.0f));
+    builder.addGlyph(unrelated, 0.0f);
+  }
+  Path glyph;
+  glyph.addRoundRect(Rect::MakeLTRB(2.25f, -46.5f, 43.5f, 1.25f), 8.0f, 8.0f);
+  glyph.addRect(Rect::MakeLTRB(15.0f, -33.0f, 30.0f, -12.0f), true);
+  auto glyphID = builder.addGlyph(glyph, 52.0f);
+  GlyphID glyphs[] = {glyphID, glyphID, glyphID, glyphID, glyphID};
+  Point positions[] = {{0.0f, 0.0f}, {52.0f, 0.0f}, {104.0f, 0.0f}, {156.0f, 0.0f}, {208.0f, 0.0f}};
+  return TextBlob::MakeFrom(glyphs, positions, 5, Font(builder.detach(), 1.0f));
+}
+
+static std::shared_ptr<TextBlob> MakeSharpStrokeText(Path* glyphPath) {
+  Path glyph;
+  glyph.moveTo(0.0f, -600.0f);
+  glyph.lineTo(-300.0f, 0.0f);
+  glyph.lineTo(300.0f, 0.0f);
+  glyph.close();
+  if (glyphPath != nullptr) {
+    *glyphPath = glyph;
+  }
+  PathTypefaceBuilder builder;
+  auto glyphID = builder.addGlyph(glyph, 600.0f);
+  GlyphID glyphs[] = {glyphID};
+  Point positions[] = {{0.0f, 0.0f}};
+  return TextBlob::MakeFrom(glyphs, positions, 1, Font(builder.detach(), 1.0f));
+}
+
+TGFX_TEST(LayerTest, GeometryRecordingIgnoresUnusedFontGlyphs) {
+  auto isolated = MakePooledBoundsText(false);
+  auto pooled = MakePooledBoundsText(true);
+  ASSERT_TRUE(isolated != nullptr && pooled != nullptr);
+  EXPECT_GT(pooled->getBounds().height(), isolated->getBounds().height());
+
+  for (auto style : {PaintStyle::Fill, PaintStyle::Stroke}) {
+    Paint textPaint = {};
+    textPaint.setStyle(style);
+    if (style == PaintStyle::Stroke) {
+      textPaint.setStrokeWidth(12.0f);
+    }
+    for (auto scale : {0.22f, 1.0f, 4.0f}) {
+      auto makeSource = [scale, &textPaint](const std::shared_ptr<TextBlob>& blob) {
+        PictureRecorder recorder;
+        auto canvas = recorder.beginRecording();
+        canvas->scale(scale, scale);
+        canvas->drawTextBlob(blob, 30.0f, 100.0f, textPaint);
+        // A second outline prevents extracting a single shape. Bounds must still describe every
+        // drawn glyph, independently of whether the vector-shape optimization can be used.
+        canvas->drawRect(Rect::MakeXYWH(290.0f, 90.0f, 8.0f, 8.0f), Paint());
+        return GeometryInputSource::Make(recorder.finishRecordingAsPicture(), scale,
+                                         ColorSpace::SRGB());
+      };
+      auto isolatedSource = makeSource(isolated);
+      auto pooledSource = makeSource(pooled);
+      ASSERT_TRUE(isolatedSource != nullptr && pooledSource != nullptr);
+      EXPECT_FALSE(isolatedSource->shape().has_value());
+      EXPECT_FALSE(pooledSource->shape().has_value());
+      EXPECT_EQ(isolatedSource->imageOffset(), pooledSource->imageOffset());
+      EXPECT_EQ(isolatedSource->image()->width(), pooledSource->image()->width());
+      EXPECT_EQ(isolatedSource->image()->height(), pooledSource->image()->height());
+    }
+  }
+}
+
+TGFX_TEST(LayerTest, GeometryRecordingUsesTightBoundsForFontText) {
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  auto blob = TextBlob::MakeFrom("I", Font(typeface, 48.0f));
+  ASSERT_TRUE(blob != nullptr);
+
+  PictureRecorder recorder;
+  auto canvas = recorder.beginRecording();
+  canvas->drawTextBlob(blob, 30.0f, 100.0f, Paint());
+  canvas->drawRect(Rect::MakeXYWH(120.0f, 80.0f, 8.0f, 8.0f), Paint());
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  const auto conservativeBounds = picture->getBounds();
+  const auto tightBounds = MeasureContext::GetTightBounds(picture);
+  EXPECT_TRUE(conservativeBounds.contains(tightBounds));
+  EXPECT_NE(conservativeBounds, tightBounds);
+
+  auto source = GeometryInputSource::Make(picture, 1.0f, ColorSpace::SRGB());
+  Point expectedOffset = {};
+  auto expectedImage =
+      PictureUtils::ToImageWithOffset(picture, &expectedOffset, &tightBounds, ColorSpace::SRGB());
+  ASSERT_TRUE(source != nullptr && expectedImage != nullptr);
+  EXPECT_EQ(source->imageOffset(), expectedOffset);
+  EXPECT_EQ(source->image()->width(), expectedImage->width());
+  EXPECT_EQ(source->image()->height(), expectedImage->height());
+
+  Point legacyOffset = {};
+  auto legacyImage =
+      PictureUtils::ToImageWithOffset(picture, &legacyOffset, nullptr, ColorSpace::SRGB());
+  ASSERT_TRUE(legacyImage != nullptr);
+  EXPECT_TRUE(legacyImage->width() != expectedImage->width() ||
+              legacyImage->height() != expectedImage->height())
+      << "regular font TextBlob must not keep the old font-wide raster extent";
+}
+
+TGFX_TEST(LayerTest, GeometrySourceUsesExtractedShapeBounds) {
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr);
+  auto blob = TextBlob::MakeFrom("TGFX", Font(typeface, 36.0f));
+  ASSERT_TRUE(blob != nullptr);
+
+  constexpr float ContentScale = 0.22f;
+  PictureRecorder recorder;
+  auto canvas = recorder.beginRecording();
+  canvas->scale(ContentScale, ContentScale);
+  canvas->drawTextBlob(blob, 30.0f, 100.0f, Paint());
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  auto source = GeometryInputSource::Make(picture, ContentScale, ColorSpace::SRGB());
+  ASSERT_TRUE(source != nullptr);
+  ASSERT_TRUE(source->shape().has_value());
+  ASSERT_TRUE(source->shape()->shape != nullptr);
+  auto expectedBounds = source->shape()->getBounds();
+  expectedBounds.scale(ContentScale, ContentScale);
+  expectedBounds.roundOut();
+  EXPECT_EQ(source->imageOffset(), Point::Make(expectedBounds.left, expectedBounds.top));
+  EXPECT_EQ(source->image()->width(), FloatCeilToInt(expectedBounds.width()));
+  EXPECT_EQ(source->image()->height(), FloatCeilToInt(expectedBounds.height()));
+}
+
+TGFX_TEST(LayerTest, GeometryTightBoundsIncludeTextStrokeMiter) {
+  Path glyphPath = {};
+  auto blob = MakeSharpStrokeText(&glyphPath);
+  ASSERT_TRUE(blob != nullptr);
+
+  const Stroke stroke(12.0f);
+  Paint paint = {};
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(stroke);
+  PictureRecorder recorder;
+  auto canvas = recorder.beginRecording();
+  canvas->drawTextBlob(blob, 0.0f, 0.0f, paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  auto strokedGlyph = glyphPath;
+  ASSERT_TRUE(stroke.applyToPath(&strokedGlyph));
+  const auto measuredBounds = MeasureContext::GetTightBounds(picture);
+  EXPECT_TRUE(measuredBounds.contains(strokedGlyph.getBounds()))
+      << "measured " << measuredBounds.left << ", " << measuredBounds.top << ", "
+      << measuredBounds.right << ", " << measuredBounds.bottom << "; stroked glyph "
+      << strokedGlyph.getBounds().left << ", " << strokedGlyph.getBounds().top << ", "
+      << strokedGlyph.getBounds().right << ", " << strokedGlyph.getBounds().bottom;
+}
+
+TGFX_TEST(LayerTest, GeometryTightBoundsFallbackWhenTextPathIsUnavailable) {
+  PathTypefaceBuilder builder;
+  Path glyph = {};
+  glyph.moveTo(0.0f, -600.0f);
+  glyph.lineTo(-300.0f, 0.0f);
+  glyph.lineTo(300.0f, 0.0f);
+  glyph.close();
+  auto glyphID = builder.addGlyph(glyph, 600.0f);
+  GlyphID glyphs[] = {glyphID, 0};
+  Point positions[] = {{0.0f, 0.0f}, {600.0f, 0.0f}};
+  auto blob = TextBlob::MakeFrom(glyphs, positions, 2, Font(builder.detach(), 1.0f));
+  ASSERT_TRUE(blob != nullptr);
+
+  auto textShape = Shape::MakeFrom(blob);
+  ASSERT_TRUE(textShape != nullptr);
+  EXPECT_TRUE(textShape->getPath().isEmpty()) << "control: the mixed text shape rejects its path";
+
+  const Stroke stroke(12.0f);
+  Paint paint = {};
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(stroke);
+  PictureRecorder recorder;
+  auto canvas = recorder.beginRecording();
+  canvas->drawTextBlob(blob, 0.0f, 0.0f, paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+
+  auto strokedGlyph = glyph;
+  ASSERT_TRUE(stroke.applyToPath(&strokedGlyph));
+  const auto measuredBounds = MeasureContext::GetTightBounds(picture);
+  const auto expectedBounds = strokedGlyph.getBounds();
+  EXPECT_TRUE(measuredBounds.contains(expectedBounds))
+      << "when TextShape cannot build the shared path, measurement must preserve the exact bounds "
+         "of glyphs whose paths are available";
+  EXPECT_NEAR(measuredBounds.left, expectedBounds.left, 0.1f);
+  EXPECT_NEAR(measuredBounds.top, expectedBounds.top, 0.1f);
+  EXPECT_NEAR(measuredBounds.right, expectedBounds.right, 0.1f);
+  EXPECT_NEAR(measuredBounds.bottom, expectedBounds.bottom, 0.1f);
+}
+
+TGFX_TEST_PRIVATE(LayerTest, GeometryContourFallbackIgnoresUnusedFontGlyphs) {
+  enum class ContourShadow { None, Drop, InnerSpread, Both };
+  auto makeLayer = [](bool pooled, ContourShadow shadow) {
+    auto text = Text::Make(MakePooledBoundsText(pooled));
+    text->setPosition({30.0f, 100.0f});
+    auto child = VectorLayer::Make();
+    child->setContents({text, FillStyle::Make(SolidColor::Make(Color::White()))});
+    auto parent = Layer::Make();
+    parent->addChild(child);
+    std::vector<std::shared_ptr<LayerStyle>> styles = {
+        GlassStyle::Make(100, 65, 4, 60, 30, 45, 90)};
+    if (shadow == ContourShadow::Drop || shadow == ContourShadow::Both) {
+      styles.push_back(DropShadowStyle::Make(3, 4, 0, 5, Color::Black()));
+    }
+    if (shadow == ContourShadow::InnerSpread || shadow == ContourShadow::Both) {
+      auto inner = InnerShadowStyle::Make(3, 4, 0, 5, Color::Black());
+      inner->setSpread(6.0f);
+      styles.push_back(inner);
+    }
+    parent->setLayerStyles(styles);
+    return parent;
+  };
+  for (auto shadow : {ContourShadow::None, ContourShadow::Drop, ContourShadow::InnerSpread,
+                      ContourShadow::Both}) {
+    auto isolated = makeLayer(false, shadow);
+    auto pooled = makeLayer(true, shadow);
+    TGFX_PRIVATE_ACCESS(
+        DrawArgs args; auto isolatedSource = isolated->getLayerStyleSource(args, Matrix::I(), 1.0f);
+        auto pooledSource = pooled->getLayerStyleSource(args, Matrix::I(), 1.0f);
+        ASSERT_TRUE(isolatedSource != nullptr && pooledSource != nullptr);
+        auto isolatedContour = isolatedSource->groups[0]->contour;
+        auto pooledContour = pooledSource->groups[0]->contour;
+        ASSERT_TRUE(isolatedContour != nullptr && pooledContour != nullptr);
+        EXPECT_EQ(isolatedContour->imageOffset(), pooledContour->imageOffset());
+        EXPECT_EQ(isolatedContour->image()->width(), pooledContour->image()->width());
+        EXPECT_EQ(isolatedContour->image()->height(), pooledContour->image()->height());)
+  }
+}
+
+TGFX_TEST_PRIVATE(LayerTest, TightGeometryKeepsSharedContentExtent) {
+  auto makeLayer = [](bool withGlass) {
+    auto parent = Layer::Make();
+    auto child = VectorLayer::Make();
+    auto text = Text::Make(MakePooledBoundsText(true));
+    text->setPosition({30.0f, 100.0f});
+    child->setContents({text, FillStyle::Make(SolidColor::Make(Color::White()))});
+    parent->addChild(child);
+    auto shadow = DropShadowStyle::Make(0, 8, 0, 8, Color::Black());
+    shadow->setSpread(10.0f);
+    std::vector<std::shared_ptr<LayerStyle>> styles = {shadow};
+    if (withGlass) {
+      styles.push_back(GlassStyle::Make(100, 65, 4, 60, 30, 45, 90));
+    }
+    parent->setLayerStyles(styles);
+    return parent;
+  };
+
+  TGFX_PRIVATE_ACCESS(
+      DrawArgs args; auto shadowLayer = makeLayer(false); auto mixedLayer = makeLayer(true);
+      auto shadowSource = shadowLayer->getLayerStyleSource(args, Matrix::I(), 1.0f);
+      auto mixedSource = mixedLayer->getLayerStyleSource(args, Matrix::I(), 1.0f);
+      ASSERT_TRUE(shadowSource != nullptr && mixedSource != nullptr);
+      ASSERT_TRUE(shadowSource->groups[0] != nullptr && mixedSource->groups[0] != nullptr);
+      auto shadowContent = shadowSource->groups[0]->content;
+      auto mixedContent = mixedSource->groups[0]->content;
+      ASSERT_TRUE(shadowContent != nullptr && mixedContent != nullptr);
+      EXPECT_EQ(mixedContent->imageOffset(), shadowContent->imageOffset())
+      << "adding Glass must not move the content used by a spread shadow";
+      EXPECT_EQ(mixedContent->image()->width(), shadowContent->image()->width())
+      << "adding Glass must not resize the content used by a spread shadow";
+      EXPECT_EQ(mixedContent->image()->height(), shadowContent->image()->height())
+      << "adding Glass must not resize the content used by a spread shadow";)
+}
+
+TGFX_TEST_PRIVATE(LayerTest, TightContourPropagatesThroughMaskedChildren) {
+  auto makeLayer = [](bool pooled) {
+    auto parent = Layer::Make();
+    auto child = VectorLayer::Make();
+    auto text = Text::Make(MakePooledBoundsText(pooled));
+    text->setPosition({30.0f, 100.0f});
+    child->setContents({text, FillStyle::Make(SolidColor::Make(Color::White()))});
+    auto mask = SolidLayer::Make();
+    mask->setWidth(400.0f);
+    mask->setHeight(200.0f);
+    mask->setColor(Color::White());
+    child->setMask(mask);
+    child->setMaskType(LayerMaskType::Luminance);
+    parent->addChild(child);
+    parent->addChild(mask);
+    parent->setLayerStyles({GlassStyle::Make(100, 65, 4, 60, 30, 45, 90)});
+    return parent;
+  };
+
+  TGFX_PRIVATE_ACCESS(
+      DrawArgs args; auto isolated = makeLayer(false); auto pooled = makeLayer(true);
+      auto isolatedSource = isolated->getLayerStyleSource(args, Matrix::I(), 1.0f);
+      auto pooledSource = pooled->getLayerStyleSource(args, Matrix::I(), 1.0f);
+      ASSERT_TRUE(isolatedSource != nullptr && pooledSource != nullptr);
+      ASSERT_TRUE(isolatedSource->groups[0] != nullptr && pooledSource->groups[0] != nullptr);
+      auto isolatedContour = isolatedSource->groups[0]->contour;
+      auto pooledContour = pooledSource->groups[0]->contour;
+      ASSERT_TRUE(isolatedContour != nullptr && pooledContour != nullptr);
+      EXPECT_EQ(isolatedContour->imageOffset(), pooledContour->imageOffset());
+      EXPECT_EQ(isolatedContour->image()->width(), pooledContour->image()->width());
+      EXPECT_EQ(isolatedContour->image()->height(), pooledContour->image()->height());)
+}
+
+TGFX_TEST_PRIVATE(LayerTest, InvertedMaskDoesNotCullDisjointGlassContour) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  struct MaskedPanel {
+    std::shared_ptr<Layer> parent = nullptr;
+    std::shared_ptr<VectorLayer> child = nullptr;
+  };
+  auto makePanel = [](LayerMaskType maskType, bool pooled, bool withGlass) {
+    MaskedPanel panel = {};
+    panel.parent = Layer::Make();
+    panel.child = VectorLayer::Make();
+    auto text = Text::Make(MakePooledBoundsText(pooled));
+    text->setPosition({30.0f, 100.0f});
+    panel.child->setContents({text, FillStyle::Make(SolidColor::Make(Color::White()))});
+    auto mask = SolidLayer::Make();
+    mask->setWidth(100.0f);
+    mask->setHeight(30.0f);
+    mask->setColor(Color::White());
+    panel.child->setMask(mask);
+    panel.child->setMaskType(maskType);
+    panel.parent->addChild(panel.child);
+    panel.parent->addChild(mask);
+    if (withGlass) {
+      panel.parent->setLayerStyles({GlassStyle::Make(0, 50, 100, 0, 0, 45, 90)});
+    }
+    return panel;
+  };
+
+  constexpr Rect TextRoi = Rect::MakeXYWH(32.0f, 53.0f, 250.0f, 49.0f);
+  for (auto maskType : {LayerMaskType::AlphaInverted, LayerMaskType::LuminanceInverted,
+                        LayerMaskType::ContourInverted}) {
+    for (auto pooled : {false, true}) {
+      auto panel = makePanel(maskType, pooled, true);
+      TGFX_PRIVATE_ACCESS(auto bounds = panel.parent->computeBounds(Matrix3D::I(), false, true);
+                          ASSERT_FALSE(bounds.isEmpty()); DrawArgs args;
+                          auto source = panel.parent->getLayerStyleSource(args, Matrix::I(), 1.0f);
+                          ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
+                          auto contour = source->groups[0]->contour;
+                          ASSERT_TRUE(contour != nullptr); ASSERT_TRUE(contour->image() != nullptr);
+                          EXPECT_EQ(contour->image()->width(), 250);
+                          EXPECT_EQ(contour->image()->height(), 49);
+                          EXPECT_EQ(contour->imageOffset(), Point::Make(32.0f, 53.0f));)
+    }
+
+    for (auto mode : {RenderMode::Direct, RenderMode::Tiled}) {
+      auto render = [&](bool withGlass) {
+        auto surface = Surface::Make(context, 320, 180);
+        if (surface == nullptr) {
+          return std::shared_ptr<Surface>();
+        }
+        DisplayList displayList;
+        displayList.setRenderMode(mode);
+        auto background = VectorLayer::Make();
+        auto path = ShapePath::Make();
+        Path backgroundPath = {};
+        backgroundPath.addRect(Rect::MakeWH(320, 180));
+        path->setPath(backgroundPath);
+        auto gradient = Gradient::MakeLinear({0.0f, 0.0f}, {1.0f, 1.0f},
+                                             {Color::Red(), Color::Blue()}, {0.0f, 1.0f});
+        background->setContents({path, FillStyle::Make(gradient)});
+        displayList.root()->addChild(background);
+        auto panel = makePanel(maskType, false, withGlass);
+        displayList.root()->addChild(panel.parent);
+        displayList.render(surface.get());
+        TGFX_PRIVATE_ACCESS(EXPECT_FALSE(panel.child->renderBounds.isEmpty());)
+        return surface;
+      };
+      auto plain = render(false);
+      auto styled = render(true);
+      ASSERT_TRUE(plain != nullptr && styled != nullptr);
+      EXPECT_GT(CountDifferingPixels(plain.get(), styled.get(), TextRoi, 16), 100)
+          << "the disjoint inverted mask keeps the text visible, so Glass must still change it";
+    }
+  }
+}
+
+TGFX_TEST_PRIVATE(LayerTest, GeometrySourceUsesFiniteBoundsForUnboundedFill) {
+  auto layer = ShapeLayer::Make();
+  Path inversePath = {};
+  inversePath.setFillType(PathFillType::InverseWinding);
+  auto inverseShape = Shape::MakeFrom(std::move(inversePath));
+  ASSERT_TRUE(inverseShape != nullptr);
+  inverseShape = Shape::ApplyMatrix(inverseShape, Matrix::MakeTrans(1.0f, 1.0f));
+  layer->setShape(inverseShape);
+  layer->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 255, 255, 128)));
+
+  auto child = ShapeLayer::Make();
+  Path childPath = {};
+  childPath.addRect(Rect::MakeXYWH(10.0f, 10.0f, 40.0f, 40.0f));
+  child->setPath(std::move(childPath));
+  child->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 255)));
+  layer->addChild(child);
+  layer->setLayerStyles({GlassStyle::Make(100, 65, 4, 60, 30, 45, 90)});
+
+  std::vector<Rect> renderRects = {Rect::MakeWH(300.0f, 200.0f)};
+  DrawArgs args = {};
+  args.renderRects = &renderRects;
+  TGFX_PRIVATE_ACCESS(
+      auto fallback = layer->getStyleSourceFallbackBounds(args, 1.0f);
+      ASSERT_TRUE(fallback.has_value()); EXPECT_EQ(*fallback, renderRects[0]);
+      auto content = layer->getContent(); ASSERT_TRUE(content != nullptr);
+      OpaqueContext opaqueContext; auto* canvas = opaqueContext.beginRecording();
+      content->drawContour(canvas, true, true);
+      auto geometryPicture = opaqueContext.finishRecordingAsPicture();
+      ASSERT_TRUE(geometryPicture != nullptr); EXPECT_TRUE(geometryPicture->hasUnboundedFill());
+      auto geometrySource = layer->getGeometryImage(args, 1.0f);
+      ASSERT_TRUE(geometrySource != nullptr); ASSERT_TRUE(geometrySource->image() != nullptr);
+      auto source = layer->getLayerStyleSource(args, Matrix::I(), 1.0f);
+      ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
+      ASSERT_TRUE(source->groups[0]->geometry != nullptr);
+      auto geometry = source->groups[0]->geometry->image(); ASSERT_TRUE(geometry != nullptr);
+      EXPECT_EQ(geometry->width(), 300); EXPECT_EQ(geometry->height(), 200);
+      Point contourOffset = {}; bool contourMatchesContent = false;
+      auto contour =
+          layer->getContentContourImage(args, 1.0f, &contourOffset, &contourMatchesContent, true);
+      ASSERT_TRUE(contour != nullptr); EXPECT_EQ(contourOffset, Point::Zero());
+      EXPECT_EQ(contour->width(), 300); EXPECT_EQ(contour->height(), 200);)
+}
+
+static std::vector<uint8_t> RenderPooledGlass(Context* context, bool unrelatedGlyph,
+                                              RenderMode mode, bool lowZoomFirst, bool withGlass) {
+  auto surface = Surface::Make(context, 640, 360);
+  if (surface == nullptr) {
+    return {};
+  }
+  DisplayList displayList;
+  displayList.setRenderMode(mode);
+  displayList.setTileUpdateMode(TileUpdateMode::Immediate);
+  auto background = VectorLayer::Make();
+  auto path = ShapePath::Make();
+  Path bounds;
+  bounds.addRect(Rect::MakeWH(320, 180));
+  path->setPath(bounds);
+  auto gradient =
+      Gradient::MakeLinear({0.0f, 0.0f}, {1.0f, 1.0f}, {Color::Red(), Color::Blue()}, {0.0f, 1.0f});
+  background->setContents({path, FillStyle::Make(gradient)});
+  displayList.root()->addChild(background);
+
+  auto text = Text::Make(MakePooledBoundsText(unrelatedGlyph));
+  text->setPosition({30.0f, 100.0f});
+  auto layer = VectorLayer::Make();
+  layer->setContents({text, FillStyle::Make(SolidColor::Make(Color::White()))});
+  if (withGlass) {
+    layer->setLayerStyles({GlassStyle::Make(100, 65, 4, 60, 30, 45, 90)});
+  }
+  displayList.root()->addChild(layer);
+  if (lowZoomFirst) {
+    displayList.setZoomScale(0.22f);
+    displayList.render(surface.get());
+  }
+  displayList.setZoomScale(2.0f);
+  displayList.render(surface.get());
+  std::vector<uint8_t> pixels(640 * 360 * 4);
+  auto info = ImageInfo::Make(640, 360, ColorType::RGBA_8888);
+  if (!surface->readPixels(info, pixels.data())) {
+    return {};
+  }
+  return pixels;
+}
+
+struct PixelDiff {
+  size_t different = 0;
+  int maxChannelDifference = 0;
+};
+
+static PixelDiff ComparePixels(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b,
+                               int tolerance) {
+  if (a.size() != b.size()) {
+    return {a.size() + b.size(), 255};
+  }
+  PixelDiff result = {};
+  for (size_t i = 0; i + 3 < a.size(); i += 4) {
+    int pixelDifference = 0;
+    for (size_t channel = 0; channel < 4; ++channel) {
+      pixelDifference = std::max(pixelDifference, std::abs(static_cast<int>(a[i + channel]) -
+                                                           static_cast<int>(b[i + channel])));
+    }
+    result.maxChannelDifference = std::max(result.maxChannelDifference, pixelDifference);
+    if (pixelDifference > tolerance) {
+      ++result.different;
+    }
+  }
+  return result;
+}
+
+TGFX_TEST(LayerTest, GlassRefractionIgnoresUnusedFontGlyphsAndInitialZoom) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  for (auto mode : {RenderMode::Direct, RenderMode::Tiled}) {
+    const auto plain = RenderPooledGlass(context, true, mode, false, false);
+    const auto isolated = RenderPooledGlass(context, false, mode, false, true);
+    const auto pooled = RenderPooledGlass(context, true, mode, false, true);
+    const auto afterLowZoom = RenderPooledGlass(context, true, mode, true, true);
+    ASSERT_FALSE(plain.empty());
+    ASSERT_FALSE(isolated.empty());
+    ASSERT_FALSE(pooled.empty());
+    ASSERT_FALSE(afterLowZoom.empty());
+    EXPECT_GT(ComparePixels(plain, pooled, 4).different, 100u)
+        << "the Glass must change a substantial part of the panel; equality with the no-style "
+           "control would make the bounds comparisons vacuous";
+    const auto isolatedVsPooled = ComparePixels(isolated, pooled, 1);
+    EXPECT_EQ(isolatedVsPooled.different, 0u)
+        << "max channel difference: " << isolatedVsPooled.maxChannelDifference;
+    const auto zoomVsPooled = ComparePixels(afterLowZoom, pooled, 1);
+    EXPECT_EQ(zoomVsPooled.different, 0u)
+        << "max channel difference: " << zoomVsPooled.maxChannelDifference;
+  }
 }
 
 // The geometry is not painted content: it is recorded as an unpainted entry, so nothing draws

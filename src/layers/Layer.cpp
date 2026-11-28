@@ -27,6 +27,7 @@
 #include "compositing3d/Context3DCompositor.h"
 #include "compositing3d/Layer3DContext.h"
 #include "core/Matrix3DUtils.h"
+#include "core/MeasureContext.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -63,6 +64,13 @@ static bool NeedsBackgroundSource(uint32_t sourceFlags) {
 
 static bool NeedsContourSource(uint32_t sourceFlags) {
   return HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour);
+}
+
+static bool IsInvertedMaskType(LayerMaskType type) {
+  // An inverted mask covers the complement of its layer, so the mask layer's bounds are not a
+  // finite visible-region clip.
+  return type == LayerMaskType::AlphaInverted || type == LayerMaskType::LuminanceInverted ||
+         type == LayerMaskType::ContourInverted;
 }
 
 // The minimum size (longest edge) for subtree cache. This prevents creating excessively small
@@ -765,7 +773,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
         continue;
       }
     }
-    if (child->hasValidMask()) {
+    if (child->hasValidMask() && !IsInvertedMaskType(child->maskType())) {
       auto maskRelativeMatrix = child->_mask->getRelativeMatrix3D(child.get());
       maskRelativeMatrix.postConcat(childMatrix);
       auto maskBounds = child->_mask->getBoundsInternal(maskRelativeMatrix, computeTightBounds);
@@ -1275,9 +1283,7 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
       maskType == LayerMaskType::Contour || maskType == LayerMaskType::ContourInverted;
   bool needLuminance =
       maskType == LayerMaskType::Luminance || maskType == LayerMaskType::LuminanceInverted;
-  bool inverted = maskType == LayerMaskType::AlphaInverted ||
-                  maskType == LayerMaskType::LuminanceInverted ||
-                  maskType == LayerMaskType::ContourInverted;
+  bool inverted = IsInvertedMaskType(maskType);
 
   auto relativeMatrix3D = _mask->getRelativeMatrix3D(this);
   auto maskPicture = getMaskPicture(args, isContourMode, scale, relativeMatrix3D);
@@ -1322,7 +1328,8 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
 }
 
 std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float contentScale,
-                                                     Point* offset, bool* contourMatchesContent) {
+                                                     Point* offset, bool* contourMatchesContent,
+                                                     bool useTightBounds) {
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
@@ -1334,6 +1341,7 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
   contourArgs.opaqueContext = &opaqueContext;
   // Contour recording is an intermediate artifact — skip background capture / consume.
   contourArgs.backgroundHandler = BackgroundHandler::NoOp();
+  contourArgs.useTightContourBounds = useTightBounds;
   // Detach from any active 3D rendering context: the contour image we are about to record is the
   // merged self + descendants outline used as a layerStyle / mask source, not a node within the
   // 3D BSP. Without this clear, drawContourInternal's "skip children when rasterizing a
@@ -1343,8 +1351,25 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
     allMatch = false;
   }
   auto picture = opaqueContext.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return nullptr;
+  }
   auto imageOffset = Point::Zero();
-  auto image = PictureUtils::ToImageWithOffset(std::move(picture), &imageOffset, nullptr,
+  std::optional<Rect> fallbackBounds = std::nullopt;
+  Rect bounds = Rect::MakeEmpty();
+  const Rect* imageBounds = nullptr;
+  if (picture->hasUnboundedFill()) {
+    fallbackBounds = getStyleSourceFallbackBounds(args, contentScale);
+    if (!fallbackBounds.has_value()) {
+      return nullptr;
+    }
+    bounds = *fallbackBounds;
+    imageBounds = &bounds;
+  } else if (useTightBounds) {
+    bounds = MeasureContext::GetTightBounds(picture);
+    imageBounds = &bounds;
+  }
+  auto image = PictureUtils::ToImageWithOffset(std::move(picture), &imageOffset, imageBounds,
                                                args.dstColorSpace);
   if (offset) {
     *offset = imageOffset;
@@ -1353,6 +1378,28 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
     *contourMatchesContent = allMatch;
   }
   return image;
+}
+
+std::optional<Rect> Layer::getStyleSourceFallbackBounds(const DrawArgs& args, float contentScale) {
+  Rect localBounds = Rect::MakeEmpty();
+  if (args.renderRects != nullptr && !args.renderRects->empty()) {
+    auto globalMatrix = getGlobalMatrix();
+    Matrix3D globalToLocal = {};
+    if (!globalMatrix.invert(&globalToLocal)) {
+      return std::nullopt;
+    }
+    for (const auto& renderRect : *args.renderRects) {
+      localBounds.join(globalToLocal.mapRect(renderRect));
+    }
+  } else {
+    localBounds = computeBounds(Matrix3D::I(), false, true);
+  }
+  if (localBounds.isEmpty()) {
+    return std::nullopt;
+  }
+  localBounds.scale(contentScale, contentScale);
+  localBounds.roundOut();
+  return localBounds;
 }
 
 std::shared_ptr<GeometryInputSource> Layer::getGeometryImage(const DrawArgs& args,
@@ -1371,8 +1418,16 @@ std::shared_ptr<GeometryInputSource> Layer::getGeometryImage(const DrawArgs& arg
     content->drawContour(contourCanvas, bitFields.allowsEdgeAntialiasing, true);
   }
   auto picture = opaqueContext.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return nullptr;
+  }
   // The source owns the pairing: the raster and the shape are read from this one picture.
-  return GeometryInputSource::Make(std::move(picture), contentScale, args.dstColorSpace);
+  std::optional<Rect> fallbackBounds = std::nullopt;
+  if (picture->hasUnboundedFill()) {
+    fallbackBounds = getStyleSourceFallbackBounds(args, contentScale);
+  }
+  return GeometryInputSource::Make(std::move(picture), contentScale, args.dstColorSpace,
+                                   fallbackBounds.has_value() ? &*fallbackBounds : nullptr);
 }
 
 bool Layer::shouldPassThroughBackground(BlendMode blendMode) const {
@@ -1695,7 +1750,8 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
     auto contentScale = canvas->getMatrix().getMaxScale();
     auto offset = Point::Zero();
     bool contourMatchesContent = true;
-    auto image = getContentContourImage(args, contentScale, &offset, &contourMatchesContent);
+    auto image = getContentContourImage(args, contentScale, &offset, &contourMatchesContent,
+                                        args.useTightContourBounds);
     if (image == nullptr) {
       return allMatch;
     }
@@ -1899,13 +1955,17 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     if (needContour[i]) {
       std::shared_ptr<Image> image = nullptr;
       Point offset = {};
-      image = getContentContourImage(drawArgs, contentScale, &offset, &allContourMatch);
+      image = getContentContourImage(drawArgs, contentScale, &offset, &allContourMatch,
+                                     bucketNeedsGeometry[i]);
       if (image == nullptr) {
         bucketUsable = false;
       } else {
         auto contourSource = std::make_shared<ContourInputSource>(image, offset);
-        if (allContourMatch) {
-          // The contour also answers as content: both roles wrap the same recording.
+        if (allContourMatch && !bucketNeedsGeometry[i]) {
+          // Tight geometry and ordinary content have different extents. Reusing the tight contour
+          // would let adding a Geometry style resize the content consumed by sibling styles.
+          // Ordinary contour bounds describe the content too, so both roles can share one
+          // recording.
           group->content = std::make_shared<StyleInputSource>(image, offset);
           needContent[i] = false;
         }
@@ -1946,7 +2006,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
         // recording reads drawArgs.excludeEffects, so it must stay inside the loop.
         std::shared_ptr<Image> image = nullptr;
         Point offset = {};
-        image = getContentContourImage(drawArgs, contentScale, &offset, nullptr);
+        image = getContentContourImage(drawArgs, contentScale, &offset, nullptr, true);
         if (image != nullptr) {
           group->contour = std::make_shared<ContourInputSource>(image, offset);
           bucketUsable = true;
@@ -2233,7 +2293,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     if (child->_scrollRect) {
       clipRect = *child->_scrollRect;
     }
-    if (child->hasValidMask()) {
+    if (child->hasValidMask() && !IsInvertedMaskType(child->maskType())) {
       auto maskBounds = child->_mask->getBounds(child.get());
       if (clipRect.has_value()) {
         if (!clipRect->intersect(maskBounds)) {

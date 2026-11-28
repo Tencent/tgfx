@@ -18,6 +18,7 @@
 
 #include <memory>
 #include <utility>
+#include "core/MeasureContext.h"
 #include "core/utils/PictureUtils.h"
 #include "layers/GeometryShapeContext.h"
 #include "layers/LayerStyleSource.h"
@@ -28,15 +29,32 @@
 namespace tgfx {
 
 std::shared_ptr<GeometryInputSource> GeometryInputSource::Make(
-    std::shared_ptr<Picture> picture, float contentScale, std::shared_ptr<ColorSpace> colorSpace) {
+    std::shared_ptr<Picture> picture, float contentScale, std::shared_ptr<ColorSpace> colorSpace,
+    const Rect* fallbackBounds) {
   if (picture == nullptr) {
     return nullptr;
   }
   // Read the shape before the conversion consumes the picture, so both describe one recording.
   auto shape = GeometryShapeContext::Extract(picture, contentScale);
+  // An extracted single outline already describes the recording's full opaque coverage. Reuse its
+  // bounds so the common geometry case does not play the same picture back a second time.
+  auto bounds =
+      shape.has_value() && shape->shape != nullptr ? shape->getBounds() : Rect::MakeEmpty();
+  if (!bounds.isEmpty()) {
+    bounds.scale(contentScale, contentScale);
+  } else if (picture->hasUnboundedFill()) {
+    if (fallbackBounds == nullptr || fallbackBounds->isEmpty()) {
+      return nullptr;
+    }
+    bounds = *fallbackBounds;
+  } else {
+    // Rejected shapes still need the recording's tight extent for styles whose geometry cannot be
+    // represented as one outline, such as strokes or image-sampled painters.
+    bounds = MeasureContext::GetTightBounds(picture);
+  }
   Point offset = Point::Zero();
   auto image =
-      PictureUtils::ToImageWithOffset(std::move(picture), &offset, nullptr, std::move(colorSpace));
+      PictureUtils::ToImageWithOffset(std::move(picture), &offset, &bounds, std::move(colorSpace));
   if (image == nullptr) {
     return nullptr;
   }
