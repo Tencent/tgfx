@@ -677,4 +677,108 @@ std::vector<OperatorABIType> ReflectFunctionSignature(const std::vector<uint32_t
   return reflected;
 }
 
+namespace {
+
+const char* AbiTypeName(OperatorABIType type) {
+  switch (type) {
+    case OperatorABIType::Float:
+      return "float";
+    case OperatorABIType::Int:
+      return "int";
+    case OperatorABIType::Vec2:
+      return "vec2";
+    case OperatorABIType::Vec3:
+      return "vec3";
+    case OperatorABIType::Vec4:
+      return "vec4";
+    case OperatorABIType::Mat3:
+      return "mat3";
+    case OperatorABIType::Mat4:
+      return "mat4";
+    case OperatorABIType::IVec4:
+      return "ivec4";
+    case OperatorABIType::Vec4Array8:
+      return "vec4[8]";
+    case OperatorABIType::SampledImage:
+      return "sampler";
+    case OperatorABIType::Unknown:
+      return "unknown";
+  }
+  return "unknown";
+}
+
+}  // namespace
+
+OperatorABIType AbiOf(SLType type) {
+  switch (type) {
+    case SLType::Float:
+      return OperatorABIType::Float;
+    case SLType::Int:
+      return OperatorABIType::Int;
+    case SLType::Float2:
+      return OperatorABIType::Vec2;
+    case SLType::Float3:
+      return OperatorABIType::Vec3;
+    case SLType::Float4:
+      return OperatorABIType::Vec4;
+    case SLType::Float3x3:
+      return OperatorABIType::Mat3;
+    case SLType::Float4x4:
+      return OperatorABIType::Mat4;
+    case SLType::Int4:
+      return OperatorABIType::IVec4;
+    case SLType::Texture2DSampler:
+    case SLType::Texture2DRectSampler:
+    case SLType::TextureExternalSampler:
+      return OperatorABIType::SampledImage;
+    default:
+      return OperatorABIType::Unknown;
+  }
+}
+
+OperatorABIType AbiOf(const OperatorModuleParam& param) {
+  if (!param.isArray) {
+    return AbiOf(param.type);
+  }
+  // The SPIR-V section skips array parameters today; the spelling stays here so the comparison
+  // cannot silently accept an array as its element type once they come back.
+  if (param.type == SLType::Float4 && param.arrayCount == 8) {
+    return OperatorABIType::Vec4Array8;
+  }
+  return OperatorABIType::Unknown;
+}
+
+bool MatchesDeclaredAbi(const std::vector<OperatorModuleParam>& declared,
+                        const std::vector<OperatorABIType>& reflected) {
+  if (declared.size() != reflected.size()) {
+    return false;
+  }
+  for (size_t index = 0; index < declared.size(); ++index) {
+    if (AbiOf(declared[index]) != reflected[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::string DescribeAbi(const std::vector<OperatorABIType>& types) {
+  std::string text = {};
+  for (const auto& type : types) {
+    if (!text.empty()) {
+      text += ", ";
+    }
+    text += AbiTypeName(type);
+  }
+  return text;
+}
+
+std::string DescribeAbi(const std::vector<OperatorModuleParam>& params) {
+  std::vector<OperatorABIType> types = {};
+  types.reserve(params.size());
+  for (const auto& param : params) {
+    types.push_back(AbiOf(param));
+  }
+  return DescribeAbi(types);
+}
+
 }  // namespace tgfx

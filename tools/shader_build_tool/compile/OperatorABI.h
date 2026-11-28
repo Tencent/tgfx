@@ -36,6 +36,8 @@ enum class OperatorABIType : uint8_t {
   IVec4,
   Vec4Array8,
   SampledImage,
+  /// The type has no compact ABI spelling; a caller that meets it must reject the parameter.
+  Unknown,
 };
 
 }  // namespace tgfx

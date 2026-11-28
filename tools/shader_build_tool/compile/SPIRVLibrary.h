@@ -96,4 +96,17 @@ std::vector<uint32_t> ImportSPIRVFunction(const std::vector<uint32_t>& words,
 std::vector<OperatorABIType> ReflectFunctionSignature(const std::vector<uint32_t>& words,
                                                      const char* functionName, std::string* error);
 
+/// The compact ABI spelling of one declared parameter; Unknown when it has none.
+OperatorABIType AbiOf(const OperatorModuleParam& param);
+OperatorABIType AbiOf(SLType type);
+
+/// Whether the compiled function type matches the declared parameters one for one. This is the
+/// only check that compares a compiled artifact with the table the runtime builds its calls from.
+bool MatchesDeclaredAbi(const std::vector<OperatorModuleParam>& declared,
+                        const std::vector<OperatorABIType>& reflected);
+
+/// The diagnostic spelling of an ABI parameter list ("vec4, float, sampled image").
+std::string DescribeAbi(const std::vector<OperatorABIType>& types);
+std::string DescribeAbi(const std::vector<OperatorModuleParam>& params);
+
 }  // namespace tgfx

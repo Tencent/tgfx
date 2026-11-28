@@ -1712,6 +1712,24 @@ bool AppendSpirvSection(const std::string& shaderDir,
           "SPIR-V section: '" + signature.functionName + "' did not compile: " + compileError;
       return false;
     }
+    // The module is linked at runtime against the manifest's parameter table, so the compiled
+    // function type and that table must agree before the module enters the bundle. The wrapper
+    // synthesis alone cannot prove this: GLSL implicit conversions let a mis-parsed parameter
+    // compile while the callee keeps its real type.
+    std::string reflectError = {};
+    const auto reflected =
+        ReflectFunctionSignature(words, signature.functionName.c_str(), &reflectError);
+    if (!reflectError.empty()) {
+      *error = "SPIR-V section: cannot reflect '" + signature.functionName +
+               "': " + reflectError;
+      return false;
+    }
+    if (!MatchesDeclaredAbi(params, reflected)) {
+      *error = "SPIR-V section: '" + signature.functionName +
+               "' compiles to a different ABI than the manifest declares (module: " +
+               DescribeAbi(reflected) + "; manifest: " + DescribeAbi(params) + ")";
+      return false;
+    }
     LibrarySectionEntry entry = {};
     entry.name = static_cast<uint32_t>(section->pool.size());
     section->pool += signature.functionName;
