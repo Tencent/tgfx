@@ -121,8 +121,6 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
       "gpu/shaders/contract/ShaderLibraryBundleFormat.h",
       "gpu/ShaderBindingLayout.h",
       // declaration layer
-      // the operator table the composed SPIR-V pool is generated from
-      "gpu/ir/OperatorManifest.h",
       // the shader type vocabulary the generated glue spells
       "gpu/SLType.h",
   };

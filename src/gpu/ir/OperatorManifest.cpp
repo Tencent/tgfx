@@ -25,8 +25,9 @@ namespace tgfx {
 const std::vector<OperatorDesc>& Operators() {
   // The table comes from the same //@op signatures as the Emit/upload glue (GeneratedOperators.cpp
   // generates it beside the bundle): the .inc files are the single source of truth, and a
-  // signature drift fails the build of the generated file instead of surfacing at runtime. The id
-  // enumerators stay hand-written above for stable values across builds.
+  // signature drift fails the build of the generated file instead of surfacing at runtime. The
+  // ids live in GeneratedOperatorIDs.h, generated from the same set, so the enum, the name lookup
+  // and this table cannot disagree.
   //
   // One entry stays hand-written: Clamp is a wrapper over the GLSL built-in clamp(), so it has no
   // .inc source, no bundle module, and only the SPIR-V hand lowering behind it.

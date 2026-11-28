@@ -34,7 +34,6 @@
 #include "compile/SPIRVLibrary.h"
 #include "compile/StageCompiler.h"
 #include "core/ShaderSources.h"
-#include "gpu/ir/OperatorManifest.h"
 #include "gpu/shaders/contract/ShaderLibraryBundleFormat.h"
 
 namespace tgfx {
@@ -1888,8 +1887,9 @@ bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& o
   const std::filesystem::path outputPath(outPath);
   const std::filesystem::path operatorHeader = outputPath.parent_path() / "GeneratedOperators.h";
   const std::filesystem::path operatorSource = outputPath.parent_path() / "GeneratedOperators.cpp";
+  const std::filesystem::path operatorIds = outputPath.parent_path() / "GeneratedOperatorIDs.h";
   return WriteGeneratedOperators(signatures, operatorHeader.string(), operatorSource.string(),
-                                 error);
+                                 operatorIds.string(), error);
 }
 
 }  // namespace tgfx

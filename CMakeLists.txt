@@ -1025,19 +1025,20 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     endif ()
     add_custom_command(
             OUTPUT ${TGFX_SHADER_LIBRARY_BUNDLE}
-            BYPRODUCTS ${TGFX_SHADER_BUNDLE_DIR}/GeneratedOperators.h
+            BYPRODUCTS ${TGFX_SHADER_BUNDLE_DIR}/GeneratedOperatorIDs.h
+                       ${TGFX_SHADER_BUNDLE_DIR}/GeneratedOperators.h
                        ${TGFX_SHADER_BUNDLE_DIR}/GeneratedOperators.cpp
             COMMAND ${TGFX_SHADER_TOOL_COMMAND}
                     --shader-dir ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/glsl
                     --library-bundle ${TGFX_SHADER_LIBRARY_BUNDLE}
                     --library-languages ${TGFX_SHADER_LIBRARY_LANGUAGES}
             DEPENDS ${TGFX_SHADER_TOOL_DEPENDS} ${TGFX_SHADER_SOURCES}
-                    src/gpu/ir/OperatorManifest.cpp
-                    src/gpu/ir/OperatorManifest.h
             COMMENT "Generating the shader library bundle (${TGFX_SHADER_LIBRARY_LANGUAGES})")
     add_custom_target(shader_library_bundle DEPENDS ${TGFX_SHADER_LIBRARY_BUNDLE})
     add_dependencies(tgfx shader_library_bundle)
-    target_include_directories(tgfx PRIVATE ${TGFX_SHADER_BUNDLE_DIR})
+    # The generated operator ids are compiled into every consumer through OperatorManifest.h, so
+    # the bundle directory is part of the library's public include surface.
+    target_include_directories(tgfx PUBLIC ${TGFX_SHADER_BUNDLE_DIR})
 
     # Embed the single bundle as bytes. The generated source is the only bridge into the library;
     # no runtime file lookup, and a platform package can ship a trimmed bundle by dropping the

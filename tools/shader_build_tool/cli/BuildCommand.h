@@ -101,7 +101,7 @@ bool CollectOperatorSignatures(const std::string& shaderDir,
 /// operator. The output is deterministic: unchanged input rewrites identical bytes.
 bool WriteGeneratedOperators(const std::vector<OperatorSignature>& signatures,
                              const std::string& outHeader, const std::string& outSource,
-                             std::string* error);
+                             const std::string& outIdsHeader, std::string* error);
 
 /// The usage text, one entry per option ParseArgs accepts. Returned rather than printed so a test
 /// can assert the documented options and the parser agree (see test/shader_tool/CliTest.cpp).

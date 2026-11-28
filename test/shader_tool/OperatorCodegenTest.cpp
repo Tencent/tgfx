@@ -170,8 +170,9 @@ TEST_F(OperatorCodegenTest, GeneratesEnumTableAndUniforms) {
 
   const auto headerPath = root / "GeneratedOperators.h";
   const auto sourcePath = root / "GeneratedOperators.cpp";
+  const auto idsPath = root / "GeneratedOperatorIDs.h";
   ASSERT_TRUE(WriteGeneratedOperators(signatures, headerPath.string(), sourcePath.string(),
-                                      &error))
+                                      idsPath.string(), &error))
       << error;
 
   std::ifstream headerFile(headerPath);
@@ -231,8 +232,9 @@ TEST_F(OperatorCodegenTest, GeneratesAnEmptyTableWithoutAnnotations) {
 
   const auto headerPath = root / "GeneratedOperators.h";
   const auto sourcePath = root / "GeneratedOperators.cpp";
+  const auto idsPath = root / "GeneratedOperatorIDs.h";
   ASSERT_TRUE(WriteGeneratedOperators(signatures, headerPath.string(), sourcePath.string(),
-                                      &error))
+                                      idsPath.string(), &error))
       << error;
 
   std::ifstream sourceFile(sourcePath);
