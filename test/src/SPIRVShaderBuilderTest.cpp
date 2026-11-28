@@ -18,6 +18,7 @@
 
 #include <cstdlib>
 #include <fstream>
+#include "gpu/ShaderBindingLayout.h"
 #include "gpu/ir/ProgramIRBuilder.h"
 #include "gpu/spirv/SPIRVProgramBuilder.h"
 #include "gpu/spirv/SPIRVShaderBuilder.h"
@@ -454,7 +455,7 @@ TEST(SPIRVShaderBuilderTest, VulkanAcceptsUniformAndSamplerPipeline) {
   fragmentDesc.format = ShaderCodeFormat::SPIRV;
   fragmentDesc.stage = ShaderStage::Fragment;
   fragmentDesc.binaryData = WordsToBytes(modules.fragment);
-  fragmentDesc.uniformSlots = {{"FragmentUniforms", 0}};
+  fragmentDesc.uniformSlots = {{FragmentUniformBlockName, 0}};
   auto fragmentModule = gpu->createShaderModule(fragmentDesc);
   ASSERT_TRUE(fragmentModule != nullptr);
 

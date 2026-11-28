@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/ir/ProgramIRBuilder.h"
+#include "gpu/ShaderBindingLayout.h"
 #include "gpu/UniformLayout.h"
 
 namespace tgfx {
@@ -131,7 +132,7 @@ UniformBlockIR& ProgramIRBuilder::EnsureUniformBlock(ShaderStage stage, uint32_t
   UniformBlockIR block = {};
   block.stage = stage;
   block.binding = binding;
-  block.name = stage == ShaderStage::Vertex ? "VertexUniforms" : "FragmentUniforms";
+  block.name = stage == ShaderStage::Vertex ? VertexUniformBlockName : FragmentUniformBlockName;
   ir.interface.uniformBlocks.push_back(block);
   return ir.interface.uniformBlocks.back();
 }
@@ -145,7 +146,8 @@ ValueID ProgramIRBuilder::AddUniform(UniformIR uniform) {
   if (uniform.baseName.empty()) {
     uniform.baseName = uniform.name;
   }
-  uniform.binding = uniform.stage == ShaderStage::Vertex ? 0 : 1;
+  uniform.binding =
+      uniform.stage == ShaderStage::Vertex ? VERTEX_UBO_BINDING_POINT : FRAGMENT_UBO_BINDING_POINT;
   const auto layout = Std140LayoutOf(uniform.type);
   auto& cursor = uniform.stage == ShaderStage::Vertex ? vertexUniformCursor : fragmentUniformCursor;
   if (layout.size != 0) {

@@ -203,6 +203,29 @@ bool ValidateInterface(const InterfaceIR& interface, std::string* error) {
       *error = "uniform array '" + uniform.name + "' has invalid std140 layout";
       return false;
     }
+    if (uniform.count > 1) {
+      // MSL and WGSL stride an array element by its natural size, which equals the std140 stride
+      // only for the types below: a float2 array (std140 stride 16, native 8) would silently read
+      // the wrong elements on Metal and WebGPU.
+      bool portable = false;
+      switch (uniform.type) {
+        case SLType::Float3:
+        case SLType::Int3:
+        case SLType::Float4:
+        case SLType::Int4:
+        case SLType::Float3x3:
+        case SLType::Float4x4:
+          portable = true;
+          break;
+        default:
+          break;
+      }
+      if (!portable) {
+        *error = "uniform array '" + uniform.name +
+                 "' uses an element type whose stride differs on Metal and WebGPU";
+        return false;
+      }
+    }
     const UniformBlockIR* block = nullptr;
     for (const auto& candidate : interface.uniformBlocks) {
       if (candidate.stage == uniform.stage) {
@@ -217,6 +240,21 @@ bool ValidateInterface(const InterfaceIR& interface, std::string* error) {
     if (uniform.offset + uniform.size > block->size) {
       *error = "uniform '" + uniform.name + "' exceeds its uniform block";
       return false;
+    }
+  }
+  // The upload writes the members in declaration order; two members sharing bytes would let one
+  // write clobber another, and nothing downstream would notice.
+  for (const auto& block : interface.uniformBlocks) {
+    uint32_t cursor = 0;
+    for (const auto& uniform : interface.uniforms) {
+      if (uniform.stage != block.stage) {
+        continue;
+      }
+      if (uniform.offset < cursor) {
+        *error = "uniform '" + uniform.name + "' overlaps the previous member";
+        return false;
+      }
+      cursor = uniform.offset + uniform.size;
     }
   }
   for (size_t i = 0; i < interface.bindings.size(); ++i) {

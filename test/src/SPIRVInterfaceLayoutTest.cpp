@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "gpu/ShaderBindingLayout.h"
 #include "gpu/ir/ProgramIRBuilder.h"
 #include "gpu/spirv/SPIRVInterfaceLayout.h"
 #include "gtest/gtest.h"
@@ -33,12 +34,12 @@ TEST(SPIRVInterfaceLayoutTest, MapsUniformsAndSamplersToDescriptorSets) {
   ASSERT_TRUE(layout.Build(program.IR().interface, &error)) << error;
   ASSERT_EQ(layout.bindings().size(), 3u);
 
-  EXPECT_EQ(layout.bindings()[0].name, "VertexUniforms");
+  EXPECT_EQ(layout.bindings()[0].name, VertexUniformBlockName);
   EXPECT_EQ(layout.bindings()[0].set, 0u);
   EXPECT_EQ(layout.bindings()[0].binding, 0u);
   EXPECT_EQ(layout.bindings()[0].stage, ShaderStage::Vertex);
 
-  EXPECT_EQ(layout.bindings()[1].name, "FragmentUniforms");
+  EXPECT_EQ(layout.bindings()[1].name, FragmentUniformBlockName);
   EXPECT_EQ(layout.bindings()[1].set, 1u);
   EXPECT_EQ(layout.bindings()[1].binding, 1u);
   EXPECT_EQ(layout.bindings()[1].stage, ShaderStage::Fragment);
@@ -52,8 +53,8 @@ TEST(SPIRVInterfaceLayoutTest, MapsUniformsAndSamplersToDescriptorSets) {
   ASSERT_TRUE(layout.BuildBindingLayout(&pipelineLayout, &error)) << error;
   ASSERT_EQ(pipelineLayout.uniformBlocks.size(), 2u);
   ASSERT_EQ(pipelineLayout.textureSamplers.size(), 1u);
-  EXPECT_EQ(pipelineLayout.uniformBlocks[0].name, "VertexUniforms");
-  EXPECT_EQ(pipelineLayout.uniformBlocks[1].name, "FragmentUniforms");
+  EXPECT_EQ(pipelineLayout.uniformBlocks[0].name, VertexUniformBlockName);
+  EXPECT_EQ(pipelineLayout.uniformBlocks[1].name, FragmentUniformBlockName);
   EXPECT_EQ(pipelineLayout.textureSamplers[0].name, "TextureSampler_0");
 }
 
