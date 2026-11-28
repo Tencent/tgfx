@@ -115,11 +115,6 @@ class UniformData {
     size_t align = 0;
   };
 
-  struct Entry {
-    size_t size;
-    size_t align;
-  };
-
   uint8_t* _buffer = nullptr;
   size_t bufferSize = 0;
   std::vector<Uniform> _uniforms = {};
@@ -134,8 +129,6 @@ class UniformData {
   const Field* findField(const std::string& key) const;
 
   size_t alignCursor(size_t alignment) const;
-
-  static Entry EntryOf(UniformFormat format);
 
   /**
    * Dump UniformData's memory layout information is printed to the console for debugging.

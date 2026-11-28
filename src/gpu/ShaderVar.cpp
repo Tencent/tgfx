@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShaderVar.h"
+#include "gpu/UniformLayout.h"
 
 namespace tgfx {
 static SLType GetSLType(VertexFormat format) {
@@ -57,47 +58,13 @@ static SLType GetSLType(VertexFormat format) {
   return SLType::Void;
 }
 
-static SLType GetSLType(UniformFormat format) {
-  switch (format) {
-    case UniformFormat::Float:
-      return SLType::Float;
-    case UniformFormat::Float2:
-      return SLType::Float2;
-    case UniformFormat::Float3:
-      return SLType::Float3;
-    case UniformFormat::Float4:
-      return SLType::Float4;
-    case UniformFormat::Float2x2:
-      return SLType::Float2x2;
-    case UniformFormat::Float3x3:
-      return SLType::Float3x3;
-    case UniformFormat::Float4x4:
-      return SLType::Float4x4;
-    case UniformFormat::Int:
-      return SLType::Int;
-    case UniformFormat::Int2:
-      return SLType::Int2;
-    case UniformFormat::Int3:
-      return SLType::Int3;
-    case UniformFormat::Int4:
-      return SLType::Int4;
-    case UniformFormat::Texture2DSampler:
-      return SLType::Texture2DSampler;
-    case UniformFormat::TextureExternalSampler:
-      return SLType::TextureExternalSampler;
-    case UniformFormat::Texture2DRectSampler:
-      return SLType::Texture2DRectSampler;
-  }
-  return SLType::Void;
-}
-
 ShaderVar::ShaderVar(const Attribute& attribute)
     : _name(attribute.name()), _type(GetSLType(attribute.format())),
       _modifier(TypeModifier::Attribute) {
 }
 
 ShaderVar::ShaderVar(const Uniform& uniform)
-    : _name(uniform.name()), _type(GetSLType(uniform.format())), _modifier(TypeModifier::Uniform) {
+    : _name(uniform.name()), _type(SLTypeOf(uniform.format())), _modifier(TypeModifier::Uniform) {
 }
 
 }  // namespace tgfx

@@ -18,22 +18,21 @@
 
 #include "UniformData.h"
 #include "core/utils/Log.h"
+#include "gpu/UniformLayout.h"
 
 namespace tgfx {
 
 UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(uniforms)) {
   for (const auto& uniform : _uniforms) {
-    const auto& [entrySize, entryAlign] = EntryOf(uniform.format());
+    const auto layout = Std140LayoutOf(uniform.format());
+    if (layout.size == 0) {
+      // A sampler (or an unknown format) is a binding, not a member of the block.
+      continue;
+    }
     const auto count = uniform.count();
-    // The std140 layout aligns every array element to a 16-byte boundary, so only formats whose
-    // element size is 16 bytes (e.g. Float4) match the contiguous CPU-side layout. Other element
-    // types would be misaligned in the GPU uniform block and must not be used as arrays.
-    DEBUG_ASSERT(count <= 1 || entrySize == 16);
-    const size_t size = entrySize * count;
-    const size_t align = entryAlign;
-
-    const size_t offset = alignCursor(align);
-    fieldMap[uniform.name()] = {uniform.name(), uniform.format(), offset, size, align};
+    const size_t size = count > 1 ? static_cast<size_t>(layout.arrayStride) * count : layout.size;
+    const size_t offset = alignCursor(layout.alignment);
+    fieldMap[uniform.name()] = {uniform.name(), uniform.format(), offset, size, layout.alignment};
     cursor = offset + size;
   }
 
@@ -76,36 +75,7 @@ const UniformData::Field* UniformData::findField(const std::string& key) const {
 }
 
 size_t UniformData::alignCursor(size_t alignment) const {
-  return (cursor + alignment - 1) / alignment * alignment;
-}
-
-UniformData::Entry UniformData::EntryOf(UniformFormat format) {
-  switch (format) {
-    case UniformFormat::Float:
-      return {4, 4};
-    case UniformFormat::Float2:
-      return {8, 8};
-    case UniformFormat::Float3:
-      return {12, 16};
-    case UniformFormat::Float4:
-      return {16, 16};
-    case UniformFormat::Float2x2:
-      return {32, 16};
-    case UniformFormat::Float3x3:
-      return {48, 16};
-    case UniformFormat::Float4x4:
-      return {64, 16};
-    case UniformFormat::Int:
-      return {4, 4};
-    case UniformFormat::Int2:
-      return {8, 8};
-    case UniformFormat::Int3:
-      return {12, 16};
-    case UniformFormat::Int4:
-      return {16, 16};
-    default:
-      return {0, 0};
-  }
+  return Std140AlignUp(static_cast<uint32_t>(cursor), static_cast<uint32_t>(alignment));
 }
 
 }  // namespace tgfx

@@ -17,54 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/ir/ProgramIRBuilder.h"
+#include "gpu/UniformLayout.h"
 
 namespace tgfx {
 namespace {
 
 bool CanAppend(size_t count) {
   return count < static_cast<size_t>(INVALID_VALUE_ID);
-}
-
-struct Std140Layout {
-  uint32_t size = 0;
-  uint32_t alignment = 0;
-  uint32_t arrayStride = 0;
-};
-
-Std140Layout LayoutOf(SLType type) {
-  switch (type) {
-    case SLType::Float:
-      return {4, 4, 16};
-    case SLType::Float2:
-      return {8, 8, 16};
-    case SLType::Float3:
-      return {12, 16, 16};
-    case SLType::Float4:
-      return {16, 16, 16};
-    case SLType::Float2x2:
-      return {32, 16, 32};
-    case SLType::Float3x3:
-      return {48, 16, 48};
-    case SLType::Float4x4:
-      return {64, 16, 64};
-    case SLType::Int:
-      return {4, 4, 16};
-    case SLType::Int2:
-      return {8, 8, 16};
-    case SLType::Int3:
-      return {12, 16, 16};
-    case SLType::Int4:
-      return {16, 16, 16};
-    default:
-      return {};
-  }
-}
-
-uint32_t AlignUp(uint32_t value, uint32_t alignment) {
-  if (alignment == 0) {
-    return value;
-  }
-  return (value + alignment - 1) / alignment * alignment;
 }
 
 }  // namespace
@@ -180,15 +139,14 @@ UniformBlockIR& ProgramIRBuilder::EnsureUniformBlock(ShaderStage stage, uint32_t
 ValueID ProgramIRBuilder::AddUniform(UniformIR uniform) {
   for (const auto& existing : ir.interface.uniforms) {
     if (existing.name == uniform.name && existing.stage == uniform.stage) {
-      return InternValue(existing.name, existing.type, existing.precision,
-                         IRValueKind::Uniform);
+      return InternValue(existing.name, existing.type, existing.precision, IRValueKind::Uniform);
     }
   }
   uniform.binding = uniform.stage == ShaderStage::Vertex ? 0 : 1;
-  const auto layout = LayoutOf(uniform.type);
+  const auto layout = Std140LayoutOf(uniform.type);
   auto& cursor = uniform.stage == ShaderStage::Vertex ? vertexUniformCursor : fragmentUniformCursor;
   if (layout.size != 0) {
-    uniform.offset = AlignUp(cursor, layout.alignment);
+    uniform.offset = Std140AlignUp(cursor, layout.alignment);
     uniform.arrayStride = layout.arrayStride;
     uniform.size = uniform.count > 1 ? layout.arrayStride * uniform.count : layout.size;
     cursor = uniform.offset + uniform.size;
@@ -204,7 +162,7 @@ ValueID ProgramIRBuilder::AddUniform(UniformIR uniform) {
     ir.interface.bindings.push_back(binding);
   }
   auto& block = EnsureUniformBlock(uniform.stage, uniform.binding);
-  block.size = AlignUp(cursor, 16);
+  block.size = Std140AlignUp(cursor, 16);
   ir.interface.uniforms.push_back(std::move(uniform));
   return id;
 }

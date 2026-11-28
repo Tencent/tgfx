@@ -66,8 +66,9 @@ class Uniform {
 
   /**
    * Creates a uniform variable with the specified name, type, and element count. An array uniform
-   * is created when count is greater than 1. Array uniforms must use a format whose element size is
-   * 16 bytes (e.g. Float4), because the std140 layout aligns every array element to 16 bytes.
+   * is created when count is greater than 1. The std140 layout stores each array element at the
+   * format's array stride (16 bytes for scalars and vectors, the matrix stride otherwise), so an
+   * upload of a packed T[] only matches when sizeof(T) equals that stride.
    */
   Uniform(std::string name, UniformFormat format, uint32_t count = 1)
       : _name(std::move(name)), _format(format), _count(count) {
@@ -100,11 +101,6 @@ class Uniform {
   uint32_t count() const {
     return _count;
   }
-
-  /**
-   * Returns the total size of the uniform variable in bytes.
-   */
-  size_t size() const;
 
  private:
   std::string _name = {};
