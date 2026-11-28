@@ -125,6 +125,7 @@ class ProgramBuilder {
   void emitFSOutputSwizzle();
 
   friend class FragmentShaderBuilder;
+  friend class ProgramAssembler;
   friend class ShaderBuilder;
   friend class ProcessorGuard;
 };

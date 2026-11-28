@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalProgramBuilder.h"
+#include "gpu/ProgramAssembler.h"
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -93,51 +94,30 @@ bool MetalProgramBuilder::checkSamplerCounts() {
 
 std::shared_ptr<Program> MetalProgramBuilder::finalize() {
   fragmentShaderBuilder()->declareCustomOutputColor();
-  for (const auto& attribute : getProgramInfo()->getVertexAttributes()) {
-    programIRBuilder().AddAttribute(
-        {attribute.name(), ShaderVar(attribute).type(), Precision::High, 0});
+  ProgramAssembler assembler(this);
+  std::string vertexBody = {};
+  std::string fragmentBody = {};
+  std::string libraryText = {};
+  if (!assembler.assemble(MSL_Language, &vertexBody, &fragmentBody, &libraryText)) {
+    return nullptr;
   }
-  for (const auto& attribute : getProgramInfo()->getInstanceAttributes()) {
-    programIRBuilder().AddAttribute(
-        {attribute.name(), ShaderVar(attribute).type(), Precision::High, 0});
-  }
-  for (const auto& varying : _varyingHandler.getVaryings()) {
-    programIRBuilder().AddVarying(
-        {varying.name(), varying.type(), Precision::High, 0, varying.isFlat()});
-  }
-  for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Vertex)) {
-    programIRBuilder().AddUniform({uniform.name(), ShaderVar(uniform).type(), Precision::Default,
-                                   ShaderStage::Vertex, uniform.count()});
-  }
-  for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Fragment)) {
-    programIRBuilder().AddUniform({uniform.name(), ShaderVar(uniform).type(), Precision::Default,
-                                   ShaderStage::Fragment, uniform.count()});
-  }
-  for (const auto& sampler : _uniformHandler.getSamplers()) {
-    programIRBuilder().AddSampler({sampler.name(), ShaderVar(sampler).type(), 0});
-  }
-  finalizeShaders();
-  std::string validationError;
-  // The processors emit their bodies into the ProgramIR; only the text escape hatch still fills
-  // the typed description, so the two routes validate different graphs.
-      if (!ValidateProgramIR(programIRBuilder().IR(), &validationError)) {
-      LOGE("MetalProgramBuilder: %s", validationError.c_str());
-      return nullptr;
+  bool writesPosition = false;
+  for (const auto& statement : programIRBuilder().IR().vertexStatements) {
+    if (statement.kind == IRStatementKind::StoreOutput &&
+        statement.dst.base < programIRBuilder().IR().values.size() &&
+        programIRBuilder().IR().values[statement.dst.base].debugName == "gl_Position") {
+      writesPosition = true;
+      break;
     }
-    bool writesPosition = false;
-    for (const auto& statement : programIRBuilder().IR().vertexStatements) {
-      if (statement.kind == IRStatementKind::StoreOutput &&
-          statement.dst.base < programIRBuilder().IR().values.size() &&
-          programIRBuilder().IR().values[statement.dst.base].debugName == "gl_Position") {
-        writesPosition = true;
-        break;
-      }
-    }
-    if (!writesPosition) {
-      LOGE("MetalProgramBuilder: the vertex stage never writes the clip-space position");
-      return nullptr;
-    }
-  
+  }
+  if (!writesPosition) {
+    LOGE("MetalProgramBuilder: the vertex stage never writes the clip-space position");
+    return nullptr;
+  }
+  _vertexBuilder.setCodeText(vertexBody);
+  _fragBuilder.setCodeText(fragmentBody);
+  const bool readsDestinationColor = IRReadsStageColor(programIRBuilder().IR());
+
   MslCallSite callSite = {};
   for (const auto& sampler : programIRBuilder().IR().interface.samplers) {
     callSite.samplerNames.insert(sampler.name);
@@ -159,49 +139,6 @@ std::shared_ptr<Program> MetalProgramBuilder::finalize() {
     }
     listStart = comma + 1;
   }
-  bool readsDestinationColor = false;
-      // The IR route prints the same bodies the GL path prints, spelled in MSL: the shared operator
-    // functions are pulled per stage, because each stage compiles on its own in Metal.
-    auto& ir = programIRBuilder().IR();
-    ProgramBodyPrinter::Uniquify(ir);
-    for (const auto& expr : ir.exprs) {
-      const char* symbol = nullptr;
-      if (expr.kind == IRExprKind::TextureSample) {
-        symbol = expr.samplerType == SLType::Texture2DRectSampler
-                     ? "tgfxTextureSampleRect"
-                     : (expr.samplerType == SLType::TextureExternalSampler
-                            ? "tgfxTextureSampleExternal"
-                            : "tgfxTextureSample");
-      } else if (expr.kind == IRExprKind::Call) {
-        const auto* desc = FindOperator(expr.op);
-        if (desc == nullptr || desc->glslSymbol == nullptr || desc->includes.empty()) {
-          continue;
-        }
-        symbol = desc->glslSymbol;
-      }
-      if (symbol == nullptr) {
-        continue;
-      }
-      _vertexBuilder.appendFunction(symbol);
-      _fragBuilder.appendFunction(symbol);
-    }
-    const auto vertexBody = MSLPrinter::PrintVertexBodyFromIR(ir);
-    auto fragmentBody = MSLPrinter::PrintFragmentBodyFromIR(ir);
-    if (vertexBody.empty() || fragmentBody.empty()) {
-      LOGE("MetalProgramBuilder: the stage bodies cannot be printed from the IR");
-      return nullptr;
-    }
-    // Alpha-only targets read the fragment's alpha channel, the same epilogue the GL route
-    // appends before the stage returns its color.
-    const auto swizzle = getProgramInfo()->getOutputSwizzle();
-    if (swizzle != Swizzle::RGBA()) {
-      fragmentBody += std::string(CUSTOM_COLOR_OUTPUT_NAME) + " = " + CUSTOM_COLOR_OUTPUT_NAME +
-                      "." + swizzle.c_str() + ";\n";
-    }
-    _vertexBuilder.setCodeText(vertexBody);
-    _fragBuilder.setCodeText(fragmentBody);
-    readsDestinationColor = IRReadsStageColor(ir);
-  
   const auto vertexText = MSLPrinter::PrintStage(*this, ShaderStage::Vertex, programIRBuilder().IR().interface,
                                                  _vertexBuilder, callSite);
   const auto fragmentText = MSLPrinter::PrintStage(*this, ShaderStage::Fragment,

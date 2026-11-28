@@ -22,6 +22,7 @@
 #include "GLSLPrinter.h"
 #include "core/utils/Log.h"
 #include "gpu/UniformData.h"
+#include "gpu/ProgramAssembler.h"
 #include "gpu/ir/ProgramIRValidation.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/GPU.h"
@@ -222,114 +223,36 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
 
 std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   fragmentShaderBuilder()->declareCustomOutputColor();
-  for (const auto& attribute : getProgramInfo()->getVertexAttributes()) {
-    programIRBuilder().AddAttribute(
-        {attribute.name(), ShaderVar(attribute).type(), Precision::High, 0});
-  }
-  for (const auto& attribute : getProgramInfo()->getInstanceAttributes()) {
-    programIRBuilder().AddAttribute(
-        {attribute.name(), ShaderVar(attribute).type(), Precision::High, 0});
-  }
-  for (const auto& varying : _varyingHandler.getVaryings()) {
-    programIRBuilder().AddVarying(
-        {varying.name(), varying.type(), Precision::High, 0, varying.isFlat()});
-  }
-  for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Vertex)) {
-    programIRBuilder().AddUniform({uniform.name(), ShaderVar(uniform).type(), Precision::Default,
-                                   ShaderStage::Vertex, uniform.count()});
-  }
-  for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Fragment)) {
-    programIRBuilder().AddUniform({uniform.name(), ShaderVar(uniform).type(), Precision::Default,
-                                   ShaderStage::Fragment, uniform.count()});
-  }
-  for (const auto& sampler : _uniformHandler.getSamplers()) {
-    programIRBuilder().AddSampler({sampler.name(), ShaderVar(sampler).type(), 0});
-  }
-  finalizeShaders();
-  std::string validationError;
-  if (!ValidateProgramIR(programIRBuilder().IR(), &validationError)) {
-    LOGE("GLSLProgramBuilder: %s", validationError.c_str());
+  ProgramAssembler assembler(this);
+  std::string vertexBody = {};
+  std::string fragmentBody = {};
+  std::string libraryText = {};
+  if (!assembler.assemble(GLSL_Language, &vertexBody, &fragmentBody, &libraryText)) {
     return nullptr;
   }
-  // The IR printer is the route: the main bodies come straight from the ProgramIR statements.
-  // A failed print fails the program build loudly (no text fallback): the uncovered processor
-  // form is the work item, not something to route around. TGFX_TEXT_PRINTER keeps the recorded
-  // text route alive as a debugging escape hatch while the migration finishes.
-    // Names become print-only here: one pass rewrites every renameable value name so that a
-    // printed reference and a printed definition can only match when they are the same value.
-    // Emitters that minted colliding (or missing) names stop silently connecting through them.
-    GLSLPrinter::UniquifyValueNames(programIRBuilder().IR());
-    // The printed body calls the operator functions by name, but nothing on the IR route pulls
-    // their sources. Walk the calls and pull each referenced function; the library pull is
-    // deduplicated and carries each function's own dependencies.
-    for (const auto& expr : programIRBuilder().IR().exprs) {
-      if (expr.kind == IRExprKind::TextureSample) {
-        // The printed texture read goes through the shared reader function; the rect and external
-        // samplers have their own.
-        const char* reader = "tgfxTextureSample";
-        if (expr.samplerType == SLType::Texture2DRectSampler) {
-          reader = "tgfxTextureSampleRect";
-        } else if (expr.samplerType == SLType::TextureExternalSampler) {
-          reader = "tgfxTextureSampleExternal";
-        }
-        _fragBuilder.appendFunction(reader);
+  // A varying the fragment body reads must be written by the printed vertex body, or the link
+  // stage rejects the program.
+  {
+    std::set<std::string> writtenVaryings = {};
+    for (const auto& statement : programIRBuilder().IR().vertexStatements) {
+      if (statement.kind == IRStatementKind::StoreVarying &&
+          statement.dst.base < programIRBuilder().IR().values.size()) {
+        writtenVaryings.insert(programIRBuilder().IR().values[statement.dst.base].debugName);
+      }
+    }
+    for (const auto& varying : programIRBuilder().IR().interface.varyings) {
+      if (fragmentBody.find(varying.name) == std::string::npos) {
         continue;
       }
-      if (expr.kind != IRExprKind::Call) {
-        continue;
-      }
-      const auto* desc = FindOperator(expr.op);
-      if (desc == nullptr || desc->glslSymbol == nullptr) {
-        continue;
-      }
-      // A builtin wrapper (clamp) has no library source: pulling it would only log a miss.
-      if (desc->includes.empty()) {
-        continue;
-      }
-      _fragBuilder.appendFunction(desc->glslSymbol);
-    }
-    auto fragmentBody = GLSLPrinter::PrintFragmentBodyFromIR(programIRBuilder().IR());
-    if (fragmentBody.empty()) {
-      LOGE("GLSLProgramBuilder: the fragment body cannot be printed from the IR");
-      return nullptr;
-    }
-    // A varying the fragment body reads must be written by the printed vertex body, or the link
-    // stage rejects the program.
-    {
-      std::set<std::string> writtenVaryings = {};
-      for (const auto& statement : programIRBuilder().IR().vertexStatements) {
-        if (statement.kind == IRStatementKind::StoreVarying &&
-            statement.dst.base < programIRBuilder().IR().values.size()) {
-          writtenVaryings.insert(programIRBuilder().IR().values[statement.dst.base].debugName);
-        }
-      }
-      for (const auto& varying : programIRBuilder().IR().interface.varyings) {
-        if (fragmentBody.find(varying.name) == std::string::npos) {
-          continue;
-        }
-        if (writtenVaryings.count(varying.name) == 0) {
-          LOGE("GLSLProgramBuilder: the varying '%s' has no vertex-side IR writer",
-               varying.name.c_str());
-          return nullptr;
-        }
+      if (writtenVaryings.count(varying.name) == 0) {
+        LOGE("GLSLProgramBuilder: the varying '%s' has no vertex-side IR writer",
+             varying.name.c_str());
+        return nullptr;
       }
     }
-    const auto swizzle = programInfo->getOutputSwizzle();
-    if (swizzle != Swizzle::RGBA()) {
-      // The epilogue belongs inside main: swizzle the output before the closing brace.
-      fragmentBody += std::string(CUSTOM_COLOR_OUTPUT_NAME) + " = " + CUSTOM_COLOR_OUTPUT_NAME +
-                      "." + swizzle.c_str() + ";\n";
-    }
-    fragmentBody += "}\n";
-    _fragBuilder.setCodeText(fragmentBody);
-
-    auto vertexBody = GLSLPrinter::PrintVertexBodyFromIR(programIRBuilder().IR());
-    if (vertexBody.empty()) {
-      LOGE("GLSLProgramBuilder: the vertex body cannot be printed from the IR");
-      return nullptr;
-    }
-    vertexBody += "}\n";
-    _vertexBuilder.setCodeText(vertexBody);
+  }
+  _vertexBuilder.setCodeText(vertexBody);
+  _fragBuilder.setCodeText(fragmentBody);
   const auto vertexText =
       GLSLPrinter::PrintStage(*this, ShaderStage::Vertex, programIRBuilder().IR().interface, _vertexBuilder);
   const auto fragmentText =
