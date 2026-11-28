@@ -20,6 +20,7 @@
 
 #include "FragmentShaderBuilder.h"
 #include "ProgramInfo.h"
+#include "UniformData.h"
 #include "UniformHandler.h"
 #include "VaryingHandler.h"
 #include "VertexShaderBuilder.h"
@@ -61,6 +62,15 @@ class ProgramBuilder {
    * Generates a name for a variable. The generated string will be mangled to be processor-specific.
    */
   std::string nameVariable(const std::string& name) const;
+
+  /// Registers one uniform into the program IR, the single place its offset is assigned. Called
+  /// by UniformHandler::addUniform right after the name is mangled, so the entry order matches
+  /// the declaration order the printers walk.
+  ValueID registerUniform(const std::string& baseName, const std::string& name,
+                          UniformFormat format, ShaderStage stage, uint32_t count);
+
+  /// Whether the stage declares a uniform block (one per stage; more than one is rejected).
+  bool hasUniformBlock(ShaderStage stage) const;
 
   virtual UniformHandler* uniformHandler() = 0;
 

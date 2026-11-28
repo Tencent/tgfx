@@ -43,14 +43,6 @@ bool ProgramAssembler::registerInterface() {
   for (const auto& varying : varyingHandler->getVaryings()) {
     ir.AddVarying({varying.name(), varying.type(), Precision::High, 0, varying.isFlat()});
   }
-  for (const auto& uniform : uniformHandler->getUniforms(ShaderStage::Vertex)) {
-    ir.AddUniform({uniform.name(), ShaderVar(uniform).type(), Precision::Default,
-                   ShaderStage::Vertex, uniform.count()});
-  }
-  for (const auto& uniform : uniformHandler->getUniforms(ShaderStage::Fragment)) {
-    ir.AddUniform({uniform.name(), ShaderVar(uniform).type(), Precision::Default,
-                   ShaderStage::Fragment, uniform.count()});
-  }
   for (const auto& sampler : uniformHandler->getSamplers()) {
     ir.AddSampler({sampler.name(), ShaderVar(sampler).type(), 0});
   }

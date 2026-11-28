@@ -18,11 +18,12 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
 #include "gpu/SamplerHandle.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/Swizzle.h"
 #include "gpu/Uniform.h"
-#include "gpu/UniformData.h"
 #include "tgfx/gpu/ShaderStage.h"
 #include "tgfx/gpu/Texture.h"
 
@@ -51,14 +52,6 @@ class UniformHandler {
   }
 
   /**
-   * Returns the uniforms visible in the given stage, in declaration order. The bytecode route
-   * derives its std140 member table from this list.
-   */
-  const std::vector<Uniform>& getUniforms(ShaderStage stage) const {
-    return stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms;
-  }
-
-  /**
    * Adds a sampler to the current program.
    */
   SamplerHandle addSampler(std::shared_ptr<Texture> texture, const std::string& name);
@@ -78,8 +71,6 @@ class UniformHandler {
  private:
   // This is not owned by the class
   ProgramBuilder* programBuilder = nullptr;
-  std::vector<Uniform> vertexUniforms = {};
-  std::vector<Uniform> fragmentUniforms = {};
   std::vector<Uniform> samplers = {};
   std::vector<Swizzle> samplerSwizzles = {};
 };

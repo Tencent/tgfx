@@ -150,7 +150,7 @@ std::shared_ptr<Program> MetalProgramBuilder::finalize() {
   vertexModule.code = vertexText;
   vertexModule.stage = ShaderStage::Vertex;
   vertexModule.format = ShaderCodeFormat::MSL;
-  if (!_uniformHandler.getUniforms(ShaderStage::Vertex).empty()) {
+  if (hasUniformBlock(ShaderStage::Vertex)) {
     vertexModule.uniformSlots[VertexUniformBlockName] = 0;
   }
   auto vertexShader = gpu->createShaderModule(vertexModule);
@@ -161,7 +161,7 @@ std::shared_ptr<Program> MetalProgramBuilder::finalize() {
   fragmentModule.code = fragmentText;
   fragmentModule.stage = ShaderStage::Fragment;
   fragmentModule.format = ShaderCodeFormat::MSL;
-  if (!_uniformHandler.getUniforms(ShaderStage::Fragment).empty()) {
+  if (hasUniformBlock(ShaderStage::Fragment)) {
     fragmentModule.uniformSlots[FragmentUniformBlockName] = 0;
   }
   auto fragmentShader = gpu->createShaderModule(fragmentModule);

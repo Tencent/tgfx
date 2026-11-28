@@ -41,6 +41,9 @@ enum class Precision : uint8_t {
   High,
 };
 
+/// The owner of a uniform that no processor registered (RTAdjust and other program-level values).
+inline constexpr uint32_t NO_UNIFORM_OWNER = 0xFFFFFFFFu;
+
 enum class TiledReadFlag : uint32_t {
   None = 0,
   StrictSubset = 1 << 0,
@@ -204,10 +207,14 @@ struct UniformIR {
   ShaderStage stage = ShaderStage::Fragment;
   uint32_t count = 1;
   uint32_t binding = 0;
-  /// std140 offsets and sizes, matching the CPU-side UniformData layout.
+  /// std140 offsets and sizes, assigned once by ProgramIRBuilder::AddUniform.
   uint32_t offset = 0;
   uint32_t size = 0;
   uint32_t arrayStride = 0;
+  /// The upload key (the processor's base name without the mangled suffix) and the processor
+  /// index that owns it; NO_UNIFORM_OWNER for program-level uniforms such as RTAdjust.
+  std::string baseName = {};
+  uint32_t owner = NO_UNIFORM_OWNER;
 };
 
 struct UniformBlockIR {

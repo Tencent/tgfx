@@ -18,6 +18,7 @@
 
 #include "ProgramBuilder.h"
 #include "core/utils/Log.h"
+#include "gpu/UniformLayout.h"
 #include "gpu/ir/ProgramIRValidation.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XferProcessor.h"
@@ -43,6 +44,32 @@ ProgramBuilder::ProgramBuilder(Context* context, const ProgramInfo* programInfo)
 
 std::unique_ptr<UniformData> ProgramBuilder::makeUniformData(ShaderStage stage) {
   return UniformData::Make(programIR.IR().interface, stage);
+}
+
+ValueID ProgramBuilder::registerUniform(const std::string& baseName, const std::string& name,
+                                        UniformFormat format, ShaderStage stage, uint32_t count) {
+  const auto processor = currentProcessors.empty() ? nullptr : currentProcessors.back();
+  const int index = processor == nullptr ? -1 : programInfo->getProcessorIndex(processor);
+  UniformIR uniform = {};
+  uniform.name = name;
+  uniform.type = SLTypeOf(format);
+  uniform.stage = stage;
+  uniform.count = count;
+  // The registration precedes every expression that reads the value, so this precision is the one
+  // the value keeps (InternValue deduplicates by name and never lowers it).
+  uniform.precision = Precision::High;
+  uniform.baseName = baseName;
+  uniform.owner = index < 0 ? NO_UNIFORM_OWNER : static_cast<uint32_t>(index);
+  return programIR.AddUniform(std::move(uniform));
+}
+
+bool ProgramBuilder::hasUniformBlock(ShaderStage stage) const {
+  for (const auto& block : programIR.IR().interface.uniformBlocks) {
+    if (block.stage == stage) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool ProgramBuilder::emitAndInstallProcessors() {

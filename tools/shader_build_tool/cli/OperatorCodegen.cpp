@@ -510,6 +510,10 @@ void AppendEnsureUniformsImpl(const OperatorSignature& signature, std::string* t
     *text += UniformFormatNameOf(param.type);
     *text += ", ";
     *text += stage;
+    if (param.role == OperatorParamRole::UniformArray) {
+      *text += ", ";
+      *text += std::to_string(param.arrayCount);
+    }
     *text += ");\n";
     *text += "  ir->InternValue(textNames->";
     *text += param.name;

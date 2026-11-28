@@ -142,6 +142,9 @@ ValueID ProgramIRBuilder::AddUniform(UniformIR uniform) {
       return InternValue(existing.name, existing.type, existing.precision, IRValueKind::Uniform);
     }
   }
+  if (uniform.baseName.empty()) {
+    uniform.baseName = uniform.name;
+  }
   uniform.binding = uniform.stage == ShaderStage::Vertex ? 0 : 1;
   const auto layout = Std140LayoutOf(uniform.type);
   auto& cursor = uniform.stage == ShaderStage::Vertex ? vertexUniformCursor : fragmentUniformCursor;

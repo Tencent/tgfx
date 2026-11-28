@@ -99,14 +99,6 @@ std::shared_ptr<Program> WebGPUProgramBuilder::finalize() {
     programIRBuilder().AddVarying(
         {varying.name(), varying.type(), Precision::High, 0, varying.isFlat()});
   }
-  for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Vertex)) {
-    programIRBuilder().AddUniform({uniform.name(), ShaderVar(uniform).type(), Precision::Default,
-                                   ShaderStage::Vertex, uniform.count()});
-  }
-  for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Fragment)) {
-    programIRBuilder().AddUniform({uniform.name(), ShaderVar(uniform).type(), Precision::Default,
-                                   ShaderStage::Fragment, uniform.count()});
-  }
   for (const auto& sampler : _uniformHandler.getSamplers()) {
     programIRBuilder().AddSampler({sampler.name(), ShaderVar(sampler).type(), 0});
   }
