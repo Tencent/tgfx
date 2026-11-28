@@ -134,17 +134,92 @@ std::string ProgramInfo::getMangledSuffix(const Processor* processor) const {
   return "_P" + std::to_string(processorIndex);
 }
 
-void ProgramInfo::updateUniformDataSuffix(UniformData* vertexUniformData,
-                                          UniformData* fragmentUniformData,
-                                          const Processor* processor) const {
-  auto suffix = getMangledSuffix(processor);
+void ProgramInfo::applyUniformOwner(UniformData* vertexUniformData,
+                                    UniformData* fragmentUniformData,
+                                    const Processor* processor) const {
+  const int index = processor != nullptr ? getProcessorIndex(processor) : -1;
+  const uint32_t owner = index < 0 ? NO_UNIFORM_OWNER : static_cast<uint32_t>(index);
   if (vertexUniformData != nullptr) {
-    vertexUniformData->nameSuffix = suffix;
+    vertexUniformData->setOwner(owner);
   }
-
   if (fragmentUniformData != nullptr) {
-    fragmentUniformData->nameSuffix = suffix;
+    fragmentUniformData->setOwner(owner);
   }
+}
+
+void ProgramInfo::writeUniformData(UniformData* vertexUniformData,
+                                   UniformData* fragmentUniformData) const {
+  auto array = GetRTAdjustArray(renderTarget);
+  if (vertexUniformData != nullptr) {
+    vertexUniformData->setData(RTAdjustName, array);
+  }
+  applyUniformOwner(vertexUniformData, fragmentUniformData, geometryProcessor);
+
+  FragmentProcessor::CoordTransformIter coordTransformIter(this);
+  geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
+
+  for (auto& fragmentProcessor : fragmentProcessors) {
+    FragmentProcessor::Iter iter(fragmentProcessor);
+    const FragmentProcessor* fp = iter.next();
+    while (fp) {
+      applyUniformOwner(vertexUniformData, fragmentUniformData, fp);
+      fp->setData(vertexUniformData, fragmentUniformData);
+      fp = iter.next();
+    }
+  }
+  const auto processor = getXferProcessor();
+  applyUniformOwner(vertexUniformData, fragmentUniformData, processor);
+  processor->setData(vertexUniformData, fragmentUniformData);
+  applyUniformOwner(vertexUniformData, fragmentUniformData, nullptr);
+}
+
+bool ProgramInfo::validateUniformUpload(const Program* program) const {
+  auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
+  auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
+  std::vector<uint8_t> vertexBytes(vertexUniformData != nullptr ? vertexUniformData->size() : 0);
+  std::vector<uint8_t> fragmentBytes(fragmentUniformData != nullptr ? fragmentUniformData->size() : 0);
+  if (vertexUniformData != nullptr) {
+    vertexUniformData->setBuffer(vertexBytes.data());
+  }
+  if (fragmentUniformData != nullptr) {
+    fragmentUniformData->setBuffer(fragmentBytes.data());
+  }
+  writeUniformData(vertexUniformData, fragmentUniformData);
+  const bool failed = (vertexUniformData != nullptr && vertexUniformData->hasUploadError()) ||
+                      (fragmentUniformData != nullptr && fragmentUniformData->hasUploadError());
+  const size_t unwritten =
+      (vertexUniformData != nullptr ? vertexUniformData->unwrittenCount() : 0) +
+      (fragmentUniformData != nullptr ? fragmentUniformData->unwrittenCount() : 0);
+  if (vertexUniformData != nullptr) {
+    vertexUniformData->setBuffer(nullptr);
+  }
+  if (fragmentUniformData != nullptr) {
+    fragmentUniformData->setBuffer(nullptr);
+  }
+  if (failed) {
+    LOGE("ProgramInfo::getProgram() the uniform upload does not match the program");
+    return false;
+  }
+  if (unwritten > 0) {
+    std::string names = {};
+    const auto append = [&names](const std::vector<std::string>& list) {
+      for (const auto& name : list) {
+        if (!names.empty()) {
+          names += ",";
+        }
+        names += name;
+      }
+    };
+    if (vertexUniformData != nullptr) {
+      append(vertexUniformData->unwrittenNames());
+    }
+    if (fragmentUniformData != nullptr) {
+      append(fragmentUniformData->unwrittenNames());
+    }
+    LOGE("ProgramInfo::getProgram() %zu uniforms are declared but never written: %s", unwritten,
+         names.c_str());
+  }
+  return true;
 }
 
 std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
@@ -253,6 +328,12 @@ std::shared_ptr<Program> ProgramInfo::getProgram() {
         LOGE("ProgramInfo::getProgram() Failed to create the program!");
         return nullptr;
       }
+      // One upload against scratch memory proves the processor tree and the IR agree before the
+      // program is cached: a name that does not resolve fails here instead of silently dropping
+      // values on every draw.
+      if (!validateUniformUpload(program.get())) {
+        return nullptr;
+      }
       context->globalCache()->addProgram(programKey, program);
     }
     return program;
@@ -341,8 +422,8 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   DEBUG_ASSERT(renderTarget != nullptr);
   if (geometryProcessor != nullptr) {
     // The JIT route: the program carries no route writer, so the processor tree itself walks the
-    // uniform data (each processor's names suffixed by its index) and the samplers follow the
-    // tree's pre-order.
+    // uniform data (each processor writes under its own owner) and the samplers follow the tree's
+    // pre-order.
     size_t vertexOffset = 0;
     size_t fragmentOffset = 0;
     auto uniformBuffer = getUniformBuffer(program, &vertexOffset, &fragmentOffset);
@@ -350,28 +431,7 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
     auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
     auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
 
-    auto array = GetRTAdjustArray(renderTarget);
-    if (vertexUniformData != nullptr) {
-      vertexUniformData->setData(RTAdjustName, array);
-    }
-    updateUniformDataSuffix(vertexUniformData, fragmentUniformData, geometryProcessor);
-
-    FragmentProcessor::CoordTransformIter coordTransformIter(this);
-    geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
-
-    for (auto& fragmentProcessor : fragmentProcessors) {
-      FragmentProcessor::Iter iter(fragmentProcessor);
-      const FragmentProcessor* fp = iter.next();
-      while (fp) {
-        updateUniformDataSuffix(vertexUniformData, fragmentUniformData, fp);
-        fp->setData(vertexUniformData, fragmentUniformData);
-        fp = iter.next();
-      }
-    }
-    const auto processor = getXferProcessor();
-    updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
-    processor->setData(vertexUniformData, fragmentUniformData);
-    updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
+    writeUniformData(vertexUniformData, fragmentUniformData);
 
     bindUniformBufferAndUnloadToGPU(program, std::move(uniformBuffer), renderPass, vertexOffset,
                                     fragmentOffset);

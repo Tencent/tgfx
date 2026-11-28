@@ -23,6 +23,8 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
+#include "gpu/ir/ProgramIR.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Matrix.h"
@@ -33,9 +35,10 @@ namespace tgfx {
 struct InterfaceIR;
 
 /**
- * One stage's uniform block: the byte size of the block and the field table the uploads address.
- * The layout is read from the program IR, the single place the offsets are assigned; a write names
- * the uniform by its base name and copies the value into the field's offset.
+ * One stage's uniform block: the byte size of the block and the member table the uploads address.
+ * The layout is read from the program IR, the single place the offsets are assigned. A write names
+ * the uniform by its base name and is resolved against the owner the upload is currently writing
+ * for, so two processors that declare the same base name cannot land in each other's slot.
  */
 class UniformData {
  public:
@@ -107,22 +110,40 @@ class UniformData {
     return bufferSize;
   }
 
+  /// Sets the owner the following writes resolve against: the index of the processor whose
+  /// uniforms are being written, or NO_UNIFORM_OWNER for the program-level values (RTAdjust).
+  void setOwner(uint32_t newOwner);
+
+  /// Whether a write missed its member or overflowed it. The program build fails on either.
+  bool hasUploadError() const;
+
+  /// The number of declared members no write has reached yet.
+  size_t unwrittenCount() const;
+
+  /// The declared names (mangled) no write has reached yet, for diagnostics.
+  std::vector<std::string> unwrittenNames() const;
+
  private:
   struct Field {
+    std::string name = {};
+    uint32_t owner = NO_UNIFORM_OWNER;
     size_t offset = 0;
     size_t size = 0;
+    mutable bool written = false;
   };
 
   UniformData() = default;
 
   uint8_t* _buffer = nullptr;
   size_t bufferSize = 0;
-  std::string nameSuffix = "";
-  std::unordered_map<std::string, Field> fieldMap = {};
+  uint32_t owner = NO_UNIFORM_OWNER;
+  std::unordered_map<std::string, std::vector<Field>> byBaseName = {};
+  mutable bool uploadError = false;
 
-  void onSetData(const std::string& name, const void* data, size_t size) const;
+  void onSetData(const std::string& baseName, const void* data, size_t size) const;
 
-  const Field* findField(const std::string& key) const;
+  /// The member named by the base name and owned by the current owner, or null.
+  const Field* findField(const std::string& baseName) const;
 
   friend class ProgramInfo;
   friend class UniformHandler;

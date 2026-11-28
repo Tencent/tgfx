@@ -47,7 +47,9 @@ std::unique_ptr<UniformData> UniformData::Make(const InterfaceIR& interface, Sha
       continue;
     }
     DEBUG_ASSERT(uniform.offset + uniform.size <= block->size);
-    data->fieldMap[uniform.name] = {uniform.offset, uniform.size};
+    // Several processors may declare the same base name; the owner tells their entries apart.
+    data->byBaseName[uniform.baseName].push_back(
+        {uniform.name, uniform.owner, uniform.offset, uniform.size});
   }
   return data;
 }
@@ -56,33 +58,76 @@ void UniformData::setBuffer(void* buffer) {
   _buffer = static_cast<uint8_t*>(buffer);
 }
 
-void UniformData::onSetData(const std::string& name, const void* data, size_t size) const {
+void UniformData::setOwner(uint32_t newOwner) {
+  owner = newOwner;
+}
+
+bool UniformData::hasUploadError() const {
+  return uploadError;
+}
+
+size_t UniformData::unwrittenCount() const {
+  size_t count = 0;
+  for (const auto& [baseName, fields] : byBaseName) {
+    for (const auto& field : fields) {
+      if (!field.written) {
+        ++count;
+      }
+    }
+  }
+  return count;
+}
+
+std::vector<std::string> UniformData::unwrittenNames() const {
+  std::vector<std::string> names = {};
+  for (const auto& [baseName, fields] : byBaseName) {
+    for (const auto& field : fields) {
+      if (!field.written) {
+        names.push_back(field.name);
+      }
+    }
+  }
+  return names;
+}
+
+void UniformData::onSetData(const std::string& baseName, const void* data, size_t size) const {
   DEBUG_ASSERT(_buffer != nullptr);
 
-  const auto& key = name + nameSuffix;
-  auto field = findField(key);
-
+  const auto* field = findField(baseName);
   if (field == nullptr) {
     std::string known;
-    for (const auto& [fieldKey, entry] : fieldMap) {
+    for (const auto& [name, fields] : byBaseName) {
       if (!known.empty()) {
         known += ",";
       }
-      known += fieldKey;
+      known += name;
     }
-    LOGE("UniformData::onSetData() uniform '%s' (suffix '%s') not found! known: %s", name.c_str(),
-         nameSuffix.c_str(), known.c_str());
+    LOGE("UniformData::onSetData() uniform '%s' has no member owned by %u! known: %s",
+         baseName.c_str(), owner, known.c_str());
+    uploadError = true;
     return;
   }
-  DEBUG_ASSERT(field->size == size);
-
+  if (size > field->size) {
+    // The old path asserted in Debug and memcpy'd past the block in Release; a hard error here is
+    // the only safe behavior, because the destination is a mapped UBO.
+    LOGE("UniformData::onSetData() uniform '%s' wrote %zu bytes into %zu", baseName.c_str(), size,
+         field->size);
+    uploadError = true;
+    return;
+  }
   memcpy(_buffer + field->offset, data, size);
+  field->written = true;
 }
 
-const UniformData::Field* UniformData::findField(const std::string& key) const {
-  const auto& iter = fieldMap.find(key);
-  if (iter != fieldMap.end()) {
-    return &iter->second;
+const UniformData::Field* UniformData::findField(const std::string& baseName) const {
+  const auto iter = byBaseName.find(baseName);
+  if (iter == byBaseName.end()) {
+    return nullptr;
+  }
+  for (const auto& field : iter->second) {
+    if (field.owner == owner) {
+      return &field;
+    }
   }
   return nullptr;
 }

@@ -234,8 +234,16 @@ class ProgramInfo {
 
   std::vector<SamplerInfo> getSamplers() const;
 
-  void updateUniformDataSuffix(UniformData* vertexUniformData, UniformData* fragmentUniformData,
-                               const Processor* processor) const;
+  /// Points both blocks at the processor whose uniforms are about to be written.
+  void applyUniformOwner(UniformData* vertexUniformData, UniformData* fragmentUniformData,
+                         const Processor* processor) const;
+
+  /// Writes every processor's uniforms into the blocks (pure CPU; no GPU state involved).
+  void writeUniformData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const;
+
+  /// Builds the blocks on scratch memory and runs one upload: a name that does not resolve or a
+  /// write that outgrows its member fails the program build; a member no write reaches is logged.
+  bool validateUniformUpload(const Program* program) const;
 
   // The diagnostics-only signature (see setEffectSignature).
   std::string effectSignature = {};

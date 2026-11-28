@@ -111,10 +111,14 @@ void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformDat
   float baseFreq[2] = {paintingData->baseFrequencyX, paintingData->baseFrequencyY};
   fragmentUniformData->setData("baseFrequency", baseFreq);
 
+  // The kernel always reads the member, and the uniform buffer is pooled and reused, so a skipped
+  // write would expose the previous draw's bytes. Zero is the no-stitching value the shader's step
+  // term expects.
+  float stitchDataValues[2] = {0.0f, 0.0f};
   if (stitchTiles) {
-    float stitchDataValues[2] = {static_cast<float>(paintingData->stitchWidth),
-                                 static_cast<float>(paintingData->stitchHeight)};
-    fragmentUniformData->setData("stitchData", stitchDataValues);
+    stitchDataValues[0] = static_cast<float>(paintingData->stitchWidth);
+    stitchDataValues[1] = static_cast<float>(paintingData->stitchHeight);
   }
+  fragmentUniformData->setData("stitchData", stitchDataValues);
 }
 }  // namespace tgfx
