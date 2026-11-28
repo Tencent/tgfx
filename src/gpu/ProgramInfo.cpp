@@ -176,8 +176,10 @@ void ProgramInfo::writeUniformData(UniformData* vertexUniformData,
 bool ProgramInfo::validateUniformUpload(const Program* program) const {
   auto vertexUniformData = program->getUniformData(ShaderStage::Vertex);
   auto fragmentUniformData = program->getUniformData(ShaderStage::Fragment);
-  std::vector<uint8_t> vertexBytes(vertexUniformData != nullptr ? vertexUniformData->size() : 0);
-  std::vector<uint8_t> fragmentBytes(fragmentUniformData != nullptr ? fragmentUniformData->size() : 0);
+  const size_t vertexSize = vertexUniformData != nullptr ? vertexUniformData->size() : 0;
+  const size_t fragmentSize = fragmentUniformData != nullptr ? fragmentUniformData->size() : 0;
+  std::vector<uint8_t> vertexBytes(vertexSize);
+  std::vector<uint8_t> fragmentBytes(fragmentSize);
   if (vertexUniformData != nullptr) {
     vertexUniformData->setBuffer(vertexBytes.data());
   }
