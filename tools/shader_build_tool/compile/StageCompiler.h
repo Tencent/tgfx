@@ -21,9 +21,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
-#include <tuple>
 #include <vector>
-#include "compile/ReflectionExtractor.h"
 #include "compile/ShaderCompiler.h"
 #include "compile/StageCache.h"
 
@@ -31,16 +29,16 @@ namespace tgfx {
 
 // The compile sublayer of the tool. StageCompiler owns every cache of compiled stages for one
 // build and is the only place that calls the compiler primitives below, so a stage is compiled
-// exactly once per run however many backends consume it:
+// exactly once per run however many consumers it has:
 //
-//                  cli / emit
-//                      |
-//              StageCompiler (this layer)
-//            /       |        \            \
-//   ShaderCompiler  StageCache  ReflectionExtractor  (the vendors sit below ShaderCompiler)
+//                  cli
+//                   |
+//           StageCompiler (this layer)
+//            /              \
+//   ShaderCompiler        StageCache  (the vendors sit below ShaderCompiler)
 //
-// The persistent cache and the reflection extractor are injected, never reached through global
-// state, so every part of the layer can be tested on its own.
+// The persistent cache is injected, never reached through global state, so every part of the
+// layer can be tested on its own.
 
 /// A compiled SPIR-V stage: spirv holds the module words on success, error names the failure.
 struct SpirvStage {
@@ -130,16 +128,6 @@ class StageCompiler {
   std::vector<uint8_t> compileDxbc(const std::string& hlsl, ShaderStageType stage,
                                    std::string* error);
 
-  /// Extracts the reflection of one variant, shared across backend passes like the compiles
-  /// above: the same (family, vert, frag) reflects the same two SPIR-V modules every time. The
-  /// specDialect flag reflects the constant_id-dialect module of the same variant instead, under
-  /// its own cache key.
-  const ReflectionResult& extractReflection(const std::string& shaderName, uint32_t vertIndex,
-                                            uint32_t fragIndex,
-                                            const std::vector<uint32_t>& vertSpirv,
-                                            const std::vector<uint32_t>& fragSpirv,
-                                            Diagnostics* diagnostics, bool specDialect = false);
-
  private:
   struct BlobStage {
     bool success = false;
@@ -153,7 +141,6 @@ class StageCompiler {
   std::map<std::string, TextStage> wgslCache;
   std::map<std::string, TextStage> mslCache;
   std::map<std::string, TextStage> hlslCache;
-  std::map<std::tuple<std::string, uint32_t, uint32_t, bool>, ReflectionResult> reflectionCache;
 };
 
 }  // namespace tgfx

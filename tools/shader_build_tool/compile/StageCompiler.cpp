@@ -161,22 +161,4 @@ const TextStage& StageCompiler::translateHLSL(const std::vector<uint32_t>& spirv
   return it->second;
 }
 
-const ReflectionResult& StageCompiler::extractReflection(const std::string& shaderName,
-                                                         uint32_t vertIndex, uint32_t fragIndex,
-                                                         const std::vector<uint32_t>& vertSpirv,
-                                                         const std::vector<uint32_t>& fragSpirv,
-                                                         Diagnostics* diagnostics,
-                                                         bool specDialect) {
-  // The spec dialect reflects the same variant through a different module, so it caches under
-  // its own key: the layout check the build performs compares the two side by side.
-  auto key = std::make_tuple(shaderName, vertIndex, fragIndex, specDialect);
-  auto it = reflectionCache.find(key);
-  if (it == reflectionCache.end()) {
-    it = reflectionCache
-             .emplace(std::move(key), ExtractReflection(vertSpirv, fragSpirv, diagnostics))
-             .first;
-  }
-  return it->second;
-}
-
 }  // namespace tgfx

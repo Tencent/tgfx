@@ -86,7 +86,8 @@ TEST(ShaderLibraryMslTest, WritesAMslSectionBesideTheGlslSection) {
   StageCache cache;
   StageCompiler compiler(&cache);
   std::string error;
-  ASSERT_TRUE(WriteShaderLibraryBundle(RealShaderDir, bundlePath, &compiler, &error)) << error;
+  ASSERT_TRUE(WriteShaderLibraryBundle(RealShaderDir, bundlePath, &compiler, false, false, &error))
+      << error;
 
   std::ifstream file(bundlePath, std::ios::binary);
   ASSERT_TRUE(file.is_open());
@@ -117,7 +118,8 @@ TEST(ShaderLibraryMslTest, TheSupportEntryCarriesNoFunctionText) {
   StageCache cache;
   StageCompiler compiler(&cache);
   std::string error;
-  ASSERT_TRUE(WriteShaderLibraryBundle(RealShaderDir, bundlePath, &compiler, &error)) << error;
+  ASSERT_TRUE(WriteShaderLibraryBundle(RealShaderDir, bundlePath, &compiler, false, false, &error))
+      << error;
 
   std::ifstream file(bundlePath, std::ios::binary);
   ASSERT_TRUE(file.is_open());

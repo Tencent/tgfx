@@ -118,15 +118,14 @@ std::string NameOf(const std::string& path) {
 const std::set<std::string>& AllowedRuntimeHeaders() {
   static const std::set<std::string> allowed = {
       // contract layer
-      "gpu/shaders/contract/ShaderBundleContract.h", "gpu/shaders/contract/ChainISA.h",
-      "gpu/shaders/contract/ChainOps.h", "gpu/shaders/contract/SpecContract.h",
-      "gpu/shaders/contract/ShaderLibraryBundleFormat.h", "gpu/Uniform.h",
-      "gpu/shaders/contract/FragmentLibrary.h", "gpu/shaders/contract/OpTable.h",
-      "gpu/shaders/KernelContract.h",
+      "gpu/shaders/contract/ShaderBundleContract.h",
+      "gpu/shaders/contract/ShaderLibraryBundleFormat.h",
+      "gpu/ShaderBindingLayout.h",
       // declaration layer
       // the operator table the composed SPIR-V pool is generated from
       "gpu/ir/OperatorManifest.h",
-      // the fragment-stage declaration language (the emitter walks these tables)
+      // the shader type vocabulary the generated glue spells
+      "gpu/SLType.h",
   };
   return allowed;
 }
@@ -135,12 +134,7 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
 const std::vector<std::string>& ContractHeaders() {
   static const std::vector<std::string> headers = {
       "gpu/shaders/contract/ShaderBundleContract.h",
-      "gpu/shaders/contract/ChainISA.h",
-      "gpu/shaders/contract/ChainOps.h",
-      "gpu/shaders/contract/SpecContract.h",
       "gpu/shaders/contract/ShaderLibraryBundleFormat.h",
-      "gpu/Uniform.h",
-      "gpu/shaders/KernelContract.h",
       // The binding and naming constants the tool and the runtime share; it lives at the src/gpu
       // top level because it survives the contract directory's retirement.
       "gpu/ShaderBindingLayout.h",
@@ -357,23 +351,6 @@ TEST(LayeringTest, TheToolModulesFormNoIncludeCycle) {
   }
 }
 
-TEST(LayeringTest, TheAnalysesDoNotDependOnTheProductsTheyFeed) {
-  // Reflection and the cache read compiler output or a payload; they must not know about the
-  // bundle files built from it, or the dependency turns around. The data structures that travel
-  // between the stages are declared in BundleWriter.h, which is why that one is allowed to be
-  // included.
-  auto graph = ToolModuleGraph();
-  const std::vector<std::string> analyses = {"ReflectionExtractor", "StageCache"};
-  const std::vector<std::string> products = {"ContractChecks"};
-  for (const auto& analysis : analyses) {
-    ASSERT_EQ(graph.count(analysis), 1u) << analysis;
-    for (const auto& product : products) {
-      EXPECT_EQ(graph[analysis].count(product), 0u)
-          << analysis << " depends on " << product << ", which is built from its output";
-    }
-  }
-}
-
 TEST(LayeringTest, TheCacheKnowsNothingOfShaders) {
   // The stage cache is a content addressed store: it hashes bytes and keeps bytes. Anything it
   // knew about shaders would be something its key might forget to cover.
@@ -402,18 +379,6 @@ TEST(LayeringTest, CoreModulesDependOnNothing) {
   }
 }
 
-TEST(LayeringTest, TheWriterDependsOnNoOtherModuleOfTheTool) {
-  // BundleWriter writes the bundle file; the data structures it serializes travel through
-  // core/Types.h (the bottom of the tool) and the output helper sits beneath it. Anything else
-  // and the writer has grown a dependency of its own.
-  auto graph = ToolModuleGraph();
-  ASSERT_EQ(graph.count("BundleWriter"), 1u);
-  const std::set<std::string> allowed = {"DiagnosticCodes", "Diagnostics", "OutputFile", "Types"};
-  for (const auto& dependency : graph["BundleWriter"]) {
-    EXPECT_EQ(allowed.count(dependency), 1u) << "BundleWriter depends on " << dependency;
-  }
-}
-
 TEST(LayeringTest, MainIsTheOnlyModuleNothingElseIncludes) {
   auto graph = ToolModuleGraph();
   for (const auto& entry : graph) {
@@ -423,11 +388,11 @@ TEST(LayeringTest, MainIsTheOnlyModuleNothingElseIncludes) {
 
 TEST(LayeringTest, TheStageCompilerDependsOnlyOnTheCompilePrimitives) {
   // StageCompiler owns the caches and is the only caller of the compiler primitives, so its
-  // dependencies stop at the primitives, the persistent cache and the reflection extractor —
-  // anything else and the compile layer has grown a side door.
+  // dependencies stop at the primitives and the persistent cache — anything else and the compile
+  // layer has grown a side door.
   auto graph = ToolModuleGraph();
   ASSERT_EQ(graph.count("StageCompiler"), 1u);
-  const std::set<std::string> allowed = {"ShaderCompiler", "StageCache", "ReflectionExtractor"};
+  const std::set<std::string> allowed = {"ShaderCompiler", "StageCache"};
   for (const auto& dependency : graph["StageCompiler"]) {
     EXPECT_EQ(allowed.count(dependency), 1u)
         << "StageCompiler depends on " << dependency << ", which is not part of the compile layer";
@@ -451,19 +416,13 @@ std::string SublayerOf(const std::string& path) {
 TEST(LayeringTest, TheSublayersDependOnlyWhereTheArchitectureAllows) {
   // The direction map of the tool's sublayers:
   //
-  //   cli ─▶ compile, emit, verify, output, root   (the command line drives everything)
-  //   emit ─▶ compile, core                      (a dialect is translated through the compiler)
+  //   cli ─▶ compile, root   (the command line drives everything)
   //   compile ─▶ core
-  //   verify ─▶ core, output                     (the checks read shared data structures; the
-  //                                               bundle verifier reads the manifest the writer
-  //                                               left and recomputes its source digest)
-  //   output ─▶ core, compile                    (the writers consume the shared data structures;
-  //                                               the manifest's source digest includes the Metal
-  //                                               compiler fingerprint — a compile-layer fact)
   //
-  // Everything else is forbidden: verify never compiles, output never reaches into the stages
-  // that produce what it writes, and a sublayer never reaches up into cli. The
-  // tool root holds main.cpp alone — the command line — and its includes are unchecked.
+  // Everything else is forbidden: a sublayer never reaches up into cli. The tool root holds
+  // main.cpp alone — the command line — and its includes are unchecked. The emit, verify and
+  // output directories retired with the variant bundles: the library bundle is written by the
+  // cli through the compile layer, which has no sublayers of its own.
   auto allowed = [](const std::string& from, const std::string& to) {
     if (from == to || to.empty() || from.empty()) {
       return true;
@@ -543,9 +502,9 @@ TEST(LayeringTest, TheIncludeScannerReadsRealIncludesOnly) {
 // ---- Printing is the cli's job -------------------------------------------------------------
 
 TEST(LayeringTest, NoSublayerPrints) {
-  // A sublayer reports diagnostics (core/Diagnostics.h) and the cli renders them; nothing else
-  // writes to the console. No exceptions remain: every check, cache and verifier reports
-  // records, and the two commands render them.
+  // The command line owns the console: it prints the usage, the errors and the progress. Every
+  // other module returns an error string or a result and stays silent, so a library consumer of
+  // the tool's modules never gets a stray std::cerr.
   size_t checked = 0;
   for (const auto& file : FilesIn(ToolDir(), {".cpp"})) {
     auto relative = file.substr(ToolDir().size() + 1);
@@ -557,12 +516,12 @@ TEST(LayeringTest, NoSublayerPrints) {
     buffer << source.rdbuf();
     const auto text = buffer.str();
     EXPECT_EQ(text.find("std::cout"), std::string::npos)
-        << relative << " prints to stdout; report a diagnostic and let the cli render it";
+        << relative << " prints to stdout; return the error and let the cli render it";
     EXPECT_EQ(text.find("std::cerr"), std::string::npos)
-        << relative << " prints to stderr; report a diagnostic and let the cli render it";
+        << relative << " prints to stderr; return the error and let the cli render it";
     checked++;
   }
-  EXPECT_GT(checked, 10u) << "the scan did not reach the sublayers";
+  EXPECT_GT(checked, 4u) << "the scan did not reach the sublayers";
 }
 
 }  // namespace tgfx

@@ -18,11 +18,10 @@
 
 #pragma once
 
-#include <optional>
+#include <cstdint>
 #include <string>
 #include <vector>
 #include "gpu/SLType.h"
-#include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
 
@@ -34,43 +33,19 @@ SLType SLTypeFromName(const std::string& glslType);
 /// The parsed command line of a build run.
 struct BuildOptions {
   std::string shaderDir;
-  std::string outDir;
-  /// When set, the tool only scans the fn/ directory and writes the shader library bundle the
-  /// runtime embeds (no variant bundles are built).
+  /// The library bundle the tool writes (--library-bundle). The tool has no other product: the
+  /// variant bundles retired with the ahead-of-time route.
   std::string libraryBundlePath;
   /// The languages the library bundle carries (--library-languages, comma separated). "glsl" is
   /// always written; "msl" adds the Metal section, which needs the compiler to translate.
   std::string libraryLanguages = "glsl";
-  std::vector<ShaderProfile> backends;
-  bool compress = false;
-  // Persistent stage cache. Defaults to <out-dir>/stage_cache; --no-cache keeps it memory-only.
-  std::string cacheDir;
-  bool noCache = false;
-  /// The stage cache's size cap (--cache-max-mb, 2GiB by default): the open-time eviction brings
-  /// the current identity's entries down to 80% of it.
-  uint64_t cacheMaxBytes = 2048ull << 20;
-  // The platform the Metal bundle is compiled for (see SetMetalTarget).
+  // The platform the Metal section's compile flags target (see SetMetalTarget).
   std::string metalSdk = "macosx";
-  /// What a d3d12 bundle stores: dxbc (bytecode compiled here, the default) or hlsl (source the
-  /// backend compiles). Requesting dxbc on a host without D3DCompiler fails the build rather than
-  /// quietly producing the other form.
-  std::string d3d12ShaderFormat = "dxbc";
   std::string metalMinOS;
-  /// Where the stamp manifest lands (the build's bundle_stamp): the tool's identity plus every
-  /// written bundle's digest, so a later --verify can prove the artifacts on disk are the ones
-  /// this tool produced.
-  std::string stampPath;
-  /// Verify a stamp manifest and exit: every recorded bundle must exist, match its digest, and
-  /// have been produced by the running tool.
-  std::string verifyPath;
-};
-
-/// One bundle recorded in the stamp manifest.
-struct StampFileEntry {
-  /// The backend tag the bundle carries (its filename's middle segment).
-  std::string backend;
-  /// The bundle's path on disk.
-  std::string path;
+  /// What a d3d12 section stores: dxbc (bytecode compiled here, the default) or hlsl (source the
+  /// backend compiles). Requesting dxbc on a host without D3DCompiler fails the build that needs
+  /// the bytecode, not every unrelated build.
+  std::string d3d12ShaderFormat = "dxbc";
 };
 
 /// The role one operator parameter plays when the generated glue emits a call.
@@ -119,28 +94,14 @@ struct OperatorSignature {
 /// ambiguity (a sampler marked /*@in*/, an in-array, an unknown type, a duplicate op name) fails
 /// with an error naming the function.
 bool CollectOperatorSignatures(const std::string& shaderDir,
-                                std::vector<OperatorSignature>* signatures, std::string* error);
+                               std::vector<OperatorSignature>* signatures, std::string* error);
 
 /// Generates the typed C++ glue (GeneratedOperators.h/.cpp) from the collected signatures: the
 /// operator id enum sorted by name, the description table, and one <Op>Uniforms struct per
-/// operator. The Emit half of the glue lands when the operator id enum merges into the runtime
-/// manifest. The output is deterministic: unchanged input rewrites identical bytes.
+/// operator. The output is deterministic: unchanged input rewrites identical bytes.
 bool WriteGeneratedOperators(const std::vector<OperatorSignature>& signatures,
                              const std::string& outHeader, const std::string& outSource,
                              std::string* error);
-
-/// Writes the stamp manifest: the generating tool's identity, a schema line, and one row per
-/// bundle with its SHA-256 and size. Atomic (a temp file renamed into place), so a failed write
-/// never leaves a half stamp behind.
-bool WriteStampManifest(const std::string& stampPath, const std::string& toolIdentity,
-                        const std::vector<StampFileEntry>& entries, std::string* error);
-
-/// Reads a stamp manifest and re-checks everything it records: the bundles must exist with their
-/// recorded sizes and digests, and the manifest must have been written by the running tool. Every
-/// failure message ends with the same fix (delete the stamp and rebuild), so a stale or tampered
-/// artifact is one command away from regeneration.
-bool VerifyStampManifest(const std::string& stampPath, const std::string& toolIdentity,
-                         std::string* error);
 
 /// The usage text, one entry per option ParseArgs accepts. Returned rather than printed so a test
 /// can assert the documented options and the parser agree (see test/shader_tool/CliTest.cpp).
@@ -149,8 +110,7 @@ std::string UsageText();
 /// Writes UsageText() to stderr.
 void PrintUsage();
 
-/// Parses argv into options. Prints the usage and returns false on an unknown option or an
-/// unknown backend tag.
+/// Parses argv into options. Prints the usage and returns false on an unknown option.
 bool ParseArgs(int argc, char** argv, BuildOptions* options);
 
 /**
@@ -160,15 +120,9 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options);
  * translates every function to MSL and appends the MSL section, so a Metal build assembles its
  * shaders from the same per-function pieces. withSpirv appends the SPIR-V section: one linkable
  * module per operator, the payload the Vulkan stitching route links against its printed main.
- * The chain operator registry derived from the same scan lands beside the bundle.
  */
 bool WriteShaderLibraryBundle(const std::string& shaderDir, const std::string& outPath,
                               StageCompiler* compiler, bool withWgsl, bool withSpirv,
                               std::string* error);
-
-/// Runs the build: loads the sources, plans and compiles every family's variants through the
-/// emitters, runs the contract rules, and writes the bundles and the reports. Returns the process
-/// exit code.
-int RunBuildCommand(const BuildOptions& options);
 
 }  // namespace tgfx

@@ -62,9 +62,6 @@ std::vector<std::string> DocumentedOptions(const std::string& usage) {
 // one, everything else takes a placeholder. A flag ignores the placeholder and then fails on it as
 // an unknown argument, which is what the caller's second attempt without a value covers.
 std::string SampleValue(const std::string& name) {
-  if (name == "--backends") {
-    return "opengl";
-  }
   if (name == "--d3d12-shader-format") {
     return "dxbc";
   }
@@ -115,8 +112,8 @@ TEST(CliTest, EveryDocumentedOptionParses) {
 TEST(CliTest, TheBuildOptionsAreDocumented) {
   const auto usage = UsageText();
   EXPECT_NE(usage.find("--shader-dir"), std::string::npos);
-  EXPECT_NE(usage.find("--out-dir"), std::string::npos);
-  EXPECT_NE(usage.find("--backends"), std::string::npos);
+  EXPECT_NE(usage.find("--library-bundle"), std::string::npos);
+  EXPECT_NE(usage.find("--library-languages"), std::string::npos);
 }
 
 }  // namespace tgfx

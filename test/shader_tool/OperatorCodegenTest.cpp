@@ -211,7 +211,7 @@ TEST_F(OperatorCodegenTest, GeneratesEnumTableAndUniforms) {
             std::string::npos);
   EXPECT_NE(source.find("const auto inputModeValue = ir->CreateIntConstant(inputMode);"),
             std::string::npos);
-  EXPECT_NE(source.find("const auto krValue = ir->InternValue(kr, SLType::Float, "
+  EXPECT_NE(source.find("const auto krValue = ir->InternValue(textNames->kr, SLType::Float, "
                         "Precision::High, IRValueKind::Uniform);"),
             std::string::npos);
   EXPECT_NE(source.find("return ir->CreateCall(OperatorID::Luma, SLType::Float4, "
@@ -220,7 +220,6 @@ TEST_F(OperatorCodegenTest, GeneratesEnumTableAndUniforms) {
   EXPECT_NE(source.find("return ir->CreateCall(OperatorID::ConstColor, SLType::Float4, "
                         "{constColorValue, inputColor, inputModeValue});"),
             std::string::npos);
-  EXPECT_NE(source.find("textNames->kr = kr;"), std::string::npos);
 }
 
 TEST_F(OperatorCodegenTest, GeneratesAnEmptyTableWithoutAnnotations) {

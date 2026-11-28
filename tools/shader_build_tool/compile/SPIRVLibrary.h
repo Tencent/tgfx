@@ -21,8 +21,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "compile/OperatorABI.h"
 #include "gpu/SLType.h"
-#include "gpu/shaders/contract/OpTable.h"
 
 namespace tgfx {
 
@@ -93,7 +93,7 @@ std::vector<uint32_t> ImportSPIRVFunction(const std::vector<uint32_t>& words,
  * table's vocabulary. The build compares the result with the table row, so a signature drift
  * between the GLSL source and the table fails the build instead of the runtime link.
  */
-std::vector<OpTable::Param> ReflectFunctionSignature(const std::vector<uint32_t>& words,
+std::vector<OperatorABIType> ReflectFunctionSignature(const std::vector<uint32_t>& words,
                                                      const char* functionName, std::string* error);
 
 }  // namespace tgfx

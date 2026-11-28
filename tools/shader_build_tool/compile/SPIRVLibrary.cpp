@@ -537,7 +537,7 @@ std::vector<uint32_t> ImportSPIRVFunction(const std::vector<uint32_t>& words,
   return out;
 }
 
-std::vector<OpTable::Param> ReflectFunctionSignature(const std::vector<uint32_t>& words,
+std::vector<OperatorABIType> ReflectFunctionSignature(const std::vector<uint32_t>& words,
                                                      const char* functionName, std::string* error) {
   if (error == nullptr) {
     return {};
@@ -587,7 +587,7 @@ std::vector<OpTable::Param> ReflectFunctionSignature(const std::vector<uint32_t>
     *error = "the exported function's type is missing";
     return {};
   }
-  std::vector<OpTable::Param> reflected = {};
+  std::vector<OperatorABIType> reflected = {};
   // operands[0] is the type's own id, [1] the return type, the rest the parameters (pointers).
   for (size_t index = 2; index < functionType->second.operands.size(); ++index) {
     uint32_t typeId = functionType->second.operands[index];
@@ -602,10 +602,10 @@ std::vector<OpTable::Param> ReflectFunctionSignature(const std::vector<uint32_t>
     }
     switch (type->second.opcode) {
       case kOpTypeFloat:
-        reflected.push_back(OpTable::Param::Float);
+        reflected.push_back(OperatorABIType::Float);
         break;
       case kOpTypeInt:
-        reflected.push_back(OpTable::Param::Int);
+        reflected.push_back(OperatorABIType::Int);
         break;
       case kOpTypeVector: {
         const uint32_t component = type->second.operands[1];
@@ -618,15 +618,15 @@ std::vector<OpTable::Param> ReflectFunctionSignature(const std::vector<uint32_t>
             *error = "an unsupported integer vector parameter";
             return {};
           }
-          reflected.push_back(OpTable::Param::IVec4);
+          reflected.push_back(OperatorABIType::IVec4);
           break;
         }
         if (count == 2) {
-          reflected.push_back(OpTable::Param::Vec2);
+          reflected.push_back(OperatorABIType::Vec2);
         } else if (count == 3) {
-          reflected.push_back(OpTable::Param::Vec3);
+          reflected.push_back(OperatorABIType::Vec3);
         } else if (count == 4) {
-          reflected.push_back(OpTable::Param::Vec4);
+          reflected.push_back(OperatorABIType::Vec4);
         } else {
           *error = "an unsupported vector parameter";
           return {};
@@ -644,7 +644,7 @@ std::vector<OpTable::Param> ReflectFunctionSignature(const std::vector<uint32_t>
           const bool isFloat =
               componentType != types.end() && componentType->second.opcode == kOpTypeFloat;
           if (isFloat && componentCount == 4) {
-            reflected.push_back(OpTable::Param::Vec4Array8);
+            reflected.push_back(OperatorABIType::Vec4Array8);
             break;
           }
         }
@@ -655,9 +655,9 @@ std::vector<OpTable::Param> ReflectFunctionSignature(const std::vector<uint32_t>
         const uint32_t column = type->second.operands[1];
         const uint32_t count = type->second.operands[2];
         if (count == 3) {
-          reflected.push_back(OpTable::Param::Mat3);
+          reflected.push_back(OperatorABIType::Mat3);
         } else if (count == 4) {
-          reflected.push_back(OpTable::Param::Mat4);
+          reflected.push_back(OperatorABIType::Mat4);
         } else {
           *error = "an unsupported matrix parameter";
           return {};
@@ -667,7 +667,7 @@ std::vector<OpTable::Param> ReflectFunctionSignature(const std::vector<uint32_t>
       }
       case kOpTypeSampledImage:
       case kOpTypeImage:
-        reflected.push_back(OpTable::Param::SampledImage);
+        reflected.push_back(OperatorABIType::SampledImage);
         break;
       default:
         *error = "an unsupported parameter type";

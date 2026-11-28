@@ -1022,7 +1022,6 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     # links. Packaging may keep only the sections its platform needs; every stage the runtime
     # builds is assembled from this file.
     set(TGFX_SHADER_LIBRARY_BUNDLE "${TGFX_SHADER_BUNDLE_DIR}/shader_library.bundle")
-    set(TGFX_SHADER_LIBRARY_REGISTRY "${TGFX_SHADER_BUNDLE_DIR}/ChainOpRegistry.inc")
     # The Metal backend assembles its shaders from the MSL section the tool translates, so a build
     # that enables Metal carries both sections; a GL-only build keeps the GLSL section alone.
     set(TGFX_SHADER_LIBRARY_LANGUAGES "glsl")
@@ -1038,8 +1037,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     endif ()
     add_custom_command(
             OUTPUT ${TGFX_SHADER_LIBRARY_BUNDLE}
-            BYPRODUCTS ${TGFX_SHADER_LIBRARY_REGISTRY}
-                       ${TGFX_SHADER_BUNDLE_DIR}/GeneratedOperators.h
+            BYPRODUCTS ${TGFX_SHADER_BUNDLE_DIR}/GeneratedOperators.h
                        ${TGFX_SHADER_BUNDLE_DIR}/GeneratedOperators.cpp
             COMMAND ${TGFX_SHADER_TOOL_COMMAND}
                     --shader-dir ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/glsl

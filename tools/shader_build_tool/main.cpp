@@ -16,15 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-// The thin command line of the tool: parse the arguments, pin the Metal target, and hand the
-// run to one of the three commands. Everything the commands do lives in the sublayers:
+// The thin command line of the tool: parse the arguments, pin the compiler targets, and hand the
+// run to the one command the tool has — writing the shader library bundle the runtime embeds.
 //
-//   main ─▶ cli (BuildCommand, ReportWriter)
-//             ├─▶ plan        the variants a build must emit
-//             ├─▶ compile     the compiler primitives and the stage caches
-//             ├─▶ emit        the per-backend storage forms
-//             ├─▶ verify      the contract rule registries
-//             └─▶ core        the shared diagnostics
+//   main ─▶ cli (BuildCommand, FunctionCatalog, OperatorCodegen)
+//             ├─▶ compile     the compiler primitives, the stage caches and the SPIR-V library
+//             ├─▶ verify      the source-level checks the bundle build gates on
+//             └─▶ core        the shared sources and diagnostics helpers
 //
 // main.cpp is the only file that knows argv exists; no command or sublayer ever sees it again.
 
@@ -42,20 +40,10 @@ int main(int argc, char** argv) {
     // rejected": scripts can tell a usage mistake from a real build failure.
     return 2;
   }
-  if (!options.libraryBundlePath.empty()) {
-    std::string bundleError;
-    const bool withMSL = options.libraryLanguages.find("msl") != std::string::npos;
-    const bool withWgsl = options.libraryLanguages.find("wgsl") != std::string::npos;
-    const bool withSpirv = options.libraryLanguages.find("spirv") != std::string::npos;
-    tgfx::StageCache stageCache;
-    tgfx::StageCompiler stageCompiler(&stageCache);
-    if (!tgfx::WriteShaderLibraryBundle(options.shaderDir, options.libraryBundlePath,
-                                        (withMSL || withWgsl) ? &stageCompiler : nullptr, withWgsl,
-                                        withSpirv, &bundleError)) {
-      std::cerr << "ERROR: " << bundleError << "\n";
-      return 1;
-    }
-    return 0;
+  if (options.shaderDir.empty() || options.libraryBundlePath.empty()) {
+    std::cerr << "ERROR: --shader-dir and --library-bundle are required\n";
+    tgfx::PrintUsage();
+    return 2;
   }
   std::string targetError;
   if (!tgfx::SetMetalTarget(options.metalSdk, options.metalMinOS, &targetError)) {
@@ -66,5 +54,17 @@ int main(int argc, char** argv) {
     std::cerr << "ERROR: " << targetError << "\n";
     return 2;
   }
-  return tgfx::RunBuildCommand(options);
+  std::string bundleError;
+  const bool withMSL = options.libraryLanguages.find("msl") != std::string::npos;
+  const bool withWgsl = options.libraryLanguages.find("wgsl") != std::string::npos;
+  const bool withSpirv = options.libraryLanguages.find("spirv") != std::string::npos;
+  tgfx::StageCache stageCache;
+  tgfx::StageCompiler stageCompiler(&stageCache);
+  if (!tgfx::WriteShaderLibraryBundle(options.shaderDir, options.libraryBundlePath,
+                                      (withMSL || withWgsl) ? &stageCompiler : nullptr, withWgsl,
+                                      withSpirv, &bundleError)) {
+    std::cerr << "ERROR: " << bundleError << "\n";
+    return 1;
+  }
+  return 0;
 }
