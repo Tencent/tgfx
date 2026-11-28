@@ -162,6 +162,15 @@ bool ValidateStatement(const ProgramIR& program, const IRStatement& statement, s
 }
 
 bool ValidateInterface(const InterfaceIR& interface, std::string* error) {
+  // Half-typed attributes are rejected here instead of at print time: no printer can spell a
+  // half vertex attribute, and a silent drop would lose the draw without a trace.
+  for (const auto& attribute : interface.attributes) {
+    if (attribute.type == SLType::Half || attribute.type == SLType::Half2 ||
+        attribute.type == SLType::Half3 || attribute.type == SLType::Half4) {
+      *error = "attribute '" + attribute.name + "' uses a Half type the printers cannot spell";
+      return false;
+    }
+  }
   for (size_t i = 0; i < interface.uniformBlocks.size(); ++i) {
     const auto& block = interface.uniformBlocks[i];
     if (block.size % 16 != 0) {

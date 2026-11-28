@@ -298,11 +298,6 @@ class FragmentProcessor : public Processor {
    * will be in its own block ({}) and so locally scoped names will not collide across stages.
    */
   /// True when this processor only knows how to emit GLSL text (no IR branch yet); the program
-  /// builder routes its block through the IR's verbatim statement instead of dropping the draw.
-  virtual bool emitsTextOnly() const {
-    return false;
-  }
-
   virtual void emitCode(EmitArgs& args) const = 0;
 
   /**

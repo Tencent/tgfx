@@ -69,7 +69,6 @@ VulkanProgramBuilder::VulkanProgramBuilder(Context* context, const ProgramInfo* 
       _vertexBuilder(this), _fragBuilder(this) {
   // The bytecode route never spells shader text: the calls land in the record list instead.
   _fragBuilder.setCallRecorder(&fragmentCalls);
-  _fragBuilder.setSourceRecorder(&fragmentSources);
   _vertexBuilder.setVertexRecorder(&vertexCalls);
 }
 

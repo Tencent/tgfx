@@ -65,12 +65,25 @@ ValueRef ShaderBuilder::internValue(const std::string& name, SLType type, ValueO
 }
 
 void ShaderBuilder::codeAppendf(const char* format, ...) {
-  char buffer[ShaderBufferSize];
+  char buffer[ShaderBufferSize] = {};
   va_list args;
   va_start(args, format);
-  auto length = vsnprintf(buffer, ShaderBufferSize, format, args);
+  const auto length = vsnprintf(buffer, ShaderBufferSize, format, args);
   va_end(args);
-  codeAppend(std::string(buffer, static_cast<size_t>(length)));
+  if (length <= 0) {
+    return;
+  }
+  if (static_cast<size_t>(length) < ShaderBufferSize) {
+    codeAppend(std::string(buffer, static_cast<size_t>(length)));
+    return;
+  }
+  // vsnprintf reports the length it needed; the stack buffer only holds the truncated prefix.
+  std::string expanded(static_cast<size_t>(length) + 1, '\0');
+  va_start(args, format);
+  vsnprintf(expanded.data(), expanded.size(), format, args);
+  va_end(args);
+  expanded.resize(static_cast<size_t>(length));
+  codeAppend(expanded);
 }
 
 void ShaderBuilder::codeAppend(const std::string& str) {

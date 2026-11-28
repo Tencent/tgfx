@@ -84,7 +84,6 @@ class VulkanProgramBuilder : public ProgramBuilder {
   /// The structured vertex writes the geometry's emit made, in emission order.
   std::vector<VertexCallRecord> vertexCalls = {};
   /// The stage-output writes the geometry and the xfer made, in emission order.
-  std::vector<FragmentSourceRecord> fragmentSources = {};
 
   friend class ProgramBuilder;
 };

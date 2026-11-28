@@ -187,21 +187,7 @@ std::pair<std::string, ValueID> ProgramBuilder::emitAndInstallFragProc(
                                    subsetVarName, &coords, &textureSamplers, {}, &programIR,
                                    inputValue, outputValue, &samplerValues, isCoverage);
 
-  if (processor->emitsTextOnly()) {
-    // A processor without an IR branch: capture the block's GLSL text and carry it as one
-    // verbatim IR statement, so the draw keeps a program instead of being dropped.
-    const size_t mark = fragmentShaderBuilder()->codeSize();
-    processor->emitCode(args);
-    const auto rawText = fragmentShaderBuilder()->codeSlice(mark);
-    fragmentShaderBuilder()->truncateCode(mark);
-    if (!rawText.empty()) {
-      programIR.AppendRawText("  vec4 " + output + ";\n" + rawText, output);
-    }
-    fragmentShaderBuilder()->codeAppend("}");
-    return {output, outputValue};
-  }
   processor->emitCode(args);
-  fragmentShaderBuilder()->codeAppend("}");
   return {output, outputValue};
 }
 

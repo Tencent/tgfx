@@ -41,24 +41,10 @@ void FragmentShaderBuilder::declareCustomOutputColor() {
 std::string FragmentShaderBuilder::clampToSubsets(const std::string& coordName,
                                                   const std::string& extraSubset,
                                                   const std::string& subset) {
-  if (fragmentProgramRecorder == nullptr) {
-    return ShaderBuilder::clampToSubsets(coordName, extraSubset, subset);
-  }
   if (extraSubset.empty() && subset.empty()) {
     return coordName;
   }
-  auto entry = appendFunction("tgfxClampSubset");
-  if (entry.empty()) {
-    return coordName;
-  }
   const std::string out = "clampedCoord" + std::to_string(clampedCoordIndex++);
-  aliasValue(out, coordName, "highp vec2");
-  if (!extraSubset.empty()) {
-    appendCall(out, entry, {out, extraSubset});
-  }
-  if (!subset.empty()) {
-    appendCall(out, entry, {out, subset});
-  }
   recordClampSubsetsIR(coordName, extraSubset, subset, out);
   return out;
 }
@@ -73,203 +59,36 @@ TextureReadResult FragmentShaderBuilder::readTexture(
   }
   auto uniformHandler = programBuilder->uniformHandler();
   auto sampler = uniformHandler->getSamplerVariable(handle);
-  const char* reader = TextureReaderName(sampler.type());
-  const bool carriesSubset = sampler.type() == SLType::Texture2DSampler;
-  // The read records the selection whatever the reader: the 2D function takes it as a code
-  // argument, the rect and external readers apply it as the result's suffix.
   const int swizzleCode = ReadSwizzleCode(uniformHandler->getSamplerSwizzle(handle));
-  auto entry = reader == nullptr ? std::string() : appendFunction(reader);
   const std::string temp = "tgfxRead" + std::to_string(tempCallIndex++);
   const bool clampInside = !strictSubset.empty() || !drawSubset.empty();
-  // The 2D reader carries one subset clamp as an argument, so a single clamp rides the call. Two
-  // clamps, or a reader that takes none (rect/external) or a channel swizzle the function does not
-  // carry, keep the clamp at the call site: dropping it would sample outside the source rect.
-  const bool twoClamps = !strictSubset.empty() && !drawSubset.empty();
-  if (!entry.empty() && carriesSubset && swizzleCode >= 0 && !twoClamps) {
-    codeAppendf("vec4 %s;", temp.c_str());
-    const std::string subset =
-        clampInside ? (drawSubset.empty() ? strictSubset : drawSubset) : std::string("vec4(0.0)");
-    const std::string clampOn = clampInside ? "1" : "0";
-    appendCall(temp, entry,
-               {sampler.name(), coordName, subset, clampOn, std::to_string(swizzleCode)});
-    if (recorded != nullptr) {
-      *recorded = true;
-    }
-    TextureReadResult result = {temp, INVALID_VALUE_ID};
-    if (irBuilder != nullptr && samplerValue != INVALID_VALUE_ID && coordType != SLType::Void) {
-      auto coordKind = IRValueKind::Local;
-      for (const auto& varying : irBuilder->IR().interface.varyings) {
-        if (varying.name == coordName) {
-          coordKind = IRValueKind::Varying;
-          break;
-        }
-      }
-      const auto coordValue =
-          irBuilder->InternValue(coordName, coordType, Precision::High, coordKind);
-      if (coordValue != INVALID_VALUE_ID) {
-        result.value = irBuilder->CreateTextureSample(
-            samplerValue, coordValue, SLType::Float4, temp, sampler.type(), swizzleCode,
-            clampInside, strictSubsetValue, drawSubsetValue, coverageSample);
-      }
-    }
+  TextureReadResult result = {temp, INVALID_VALUE_ID};
+  if (irBuilder == nullptr || samplerValue == INVALID_VALUE_ID || coordType == SLType::Void) {
     return result;
   }
-  const auto finalCoord = clampToSubsets(coordName, strictSubset, drawSubset);
-  aliasValue(temp, textureLookupExpression(handle, finalCoord), "vec4");
-  TextureReadResult result = {temp, INVALID_VALUE_ID};
-  if (irBuilder != nullptr && samplerValue != INVALID_VALUE_ID && coordType != SLType::Void) {
-    auto coordKind = IRValueKind::Local;
-    for (const auto& varying : irBuilder->IR().interface.varyings) {
-      if (varying.name == finalCoord) {
-        coordKind = IRValueKind::Varying;
-        break;
-      }
+  // Only the 2D reader carries the subsets as arguments; the rect and external readers apply them
+  // as a coordinate clamp, so the clamped value has to exist in the IR before the sample reads it.
+  const bool carriesSubset = sampler.type() == SLType::Texture2DSampler;
+  const std::string sampleCoord =
+      carriesSubset ? coordName : clampToSubsets(coordName, strictSubset, drawSubset);
+  auto coordKind = IRValueKind::Local;
+  for (const auto& varying : irBuilder->IR().interface.varyings) {
+    if (varying.name == sampleCoord) {
+      coordKind = IRValueKind::Varying;
+      break;
     }
-    const auto coordValue =
-        irBuilder->InternValue(finalCoord, coordType, Precision::High, coordKind);
-    if (coordValue != INVALID_VALUE_ID) {
-      result.value = irBuilder->CreateTextureSample(
-          samplerValue, coordValue, SLType::Float4, temp, sampler.type(), swizzleCode, clampInside,
-          strictSubsetValue, drawSubsetValue, coverageSample);
-    }
+  }
+  const auto coordValue =
+      irBuilder->InternValue(sampleCoord, coordType, Precision::High, coordKind);
+  if (coordValue != INVALID_VALUE_ID) {
+    result.value = irBuilder->CreateTextureSample(
+        samplerValue, coordValue, SLType::Float4, temp, sampler.type(), swizzleCode, clampInside,
+        strictSubsetValue, drawSubsetValue, coverageSample);
+  }
+  if (recorded != nullptr) {
+    *recorded = result.value != INVALID_VALUE_ID;
   }
   return result;
-}
-
-void FragmentShaderBuilder::recordStageRoot(const std::string& outputVar) {
-  if (sourceRecorder != nullptr) {
-    FragmentSourceRecord record = {};
-    record.kind = FragmentSourceRecord::Kind::Root;
-    record.dst = outputVar;
-    record.order = nextEmitOrder();
-    sourceRecorder->push_back(std::move(record));
-  }
-  FragmentInstruction instruction = {};
-  instruction.kind = FragmentInstructionKind::Root;
-  instruction.output = outputVar;
-  recordFragmentInstruction(std::move(instruction));
-}
-
-void FragmentShaderBuilder::aliasValue(const std::string& dstName, const std::string& srcName,
-                                       const std::string& declaration) {
-  if (sourceRecorder != nullptr) {
-    FragmentSourceRecord record = {};
-    record.kind = FragmentSourceRecord::Kind::Alias;
-    record.dst = dstName;
-    record.src = srcName;
-    record.declaration = declaration;
-    record.order = nextEmitOrder();
-    sourceRecorder->push_back(std::move(record));
-  }
-  const size_t start = codeTextSize();
-  setRawCaptureEnabled(false);
-  if (!declaration.empty()) {
-    codeAppendf("%s ", declaration.c_str());
-  }
-  codeAppendf("%s = %s;", dstName.c_str(), srcName.c_str());
-  setRawCaptureEnabled(true);
-  FragmentInstruction instruction = {};
-  instruction.kind = FragmentInstructionKind::Alias;
-  instruction.output = dstName;
-  instruction.src = srcName;
-  instruction.declaration = declaration;
-  instruction.text = codeTextFrom(start);
-  recordFragmentInstruction(std::move(instruction));
-}
-
-void FragmentShaderBuilder::copyValue(const std::string& dstName, const std::string& srcName) {
-  if (sourceRecorder != nullptr) {
-    FragmentSourceRecord record = {};
-    record.kind = FragmentSourceRecord::Kind::Alias;
-    record.dst = dstName;
-    record.src = srcName;
-    record.order = nextEmitOrder();
-    sourceRecorder->push_back(std::move(record));
-  }
-  const size_t start = codeTextSize();
-  setRawCaptureEnabled(false);
-  codeAppendf("%s = %s;", dstName.c_str(), srcName.c_str());
-  setRawCaptureEnabled(true);
-  FragmentInstruction instruction = {};
-  instruction.kind = FragmentInstructionKind::Alias;
-  instruction.output = dstName;
-  instruction.src = srcName;
-  instruction.text = codeTextFrom(start);
-  recordFragmentInstruction(std::move(instruction));
-}
-
-void FragmentShaderBuilder::storeColor(const std::string& outputVar, const std::string& srcName) {
-  if (sourceRecorder != nullptr) {
-    FragmentSourceRecord record = {};
-    record.kind = FragmentSourceRecord::Kind::Color;
-    record.dst = outputVar;
-    record.src = srcName;
-    record.order = nextEmitOrder();
-    sourceRecorder->push_back(std::move(record));
-  }
-  const size_t start = codeTextSize();
-  setRawCaptureEnabled(false);
-  codeAppendf("%s = %s;", outputVar.c_str(), srcName.c_str());
-  setRawCaptureEnabled(true);
-  FragmentInstruction instruction = {};
-  instruction.kind = FragmentInstructionKind::StoreColor;
-  instruction.output = outputVar;
-  instruction.src = srcName;
-  instruction.text = codeTextFrom(start);
-  recordFragmentInstruction(std::move(instruction));
-}
-
-void FragmentShaderBuilder::storeCoverage(const std::string& outputVar, const std::string& srcName,
-                                          bool splat) {
-  if (sourceRecorder != nullptr) {
-    FragmentSourceRecord record = {};
-    record.kind = FragmentSourceRecord::Kind::Coverage;
-    record.dst = outputVar;
-    record.src = srcName;
-    record.splat = splat;
-    record.order = nextEmitOrder();
-    sourceRecorder->push_back(std::move(record));
-  }
-  const size_t start = codeTextSize();
-  setRawCaptureEnabled(false);
-  if (splat) {
-    codeAppendf("%s = vec4(%s);", outputVar.c_str(), srcName.c_str());
-  } else {
-    codeAppendf("%s = %s;", outputVar.c_str(), srcName.c_str());
-  }
-  setRawCaptureEnabled(true);
-  FragmentInstruction instruction = {};
-  instruction.kind = FragmentInstructionKind::StoreCoverage;
-  instruction.output = outputVar;
-  instruction.src = srcName;
-  instruction.splat = splat;
-  instruction.text = codeTextFrom(start);
-  recordFragmentInstruction(std::move(instruction));
-}
-
-void FragmentShaderBuilder::combineColorWithCoverage(const std::string& outputVar,
-                                                     const std::string& colorVar,
-                                                     const std::string& coverageVar) {
-  if (sourceRecorder != nullptr) {
-    FragmentSourceRecord record = {};
-    record.kind = FragmentSourceRecord::Kind::Combine;
-    record.dst = outputVar;
-    record.src = colorVar;
-    record.operand = coverageVar;
-    record.order = nextEmitOrder();
-    sourceRecorder->push_back(std::move(record));
-  }
-  const size_t start = codeTextSize();
-  setRawCaptureEnabled(false);
-  codeAppendf("%s = %s * %s;", outputVar.c_str(), colorVar.c_str(), coverageVar.c_str());
-  setRawCaptureEnabled(true);
-  FragmentInstruction instruction = {};
-  instruction.kind = FragmentInstructionKind::Combine;
-  instruction.output = outputVar;
-  instruction.src = colorVar;
-  instruction.operand = coverageVar;
-  instruction.text = codeTextFrom(start);
-  recordFragmentInstruction(std::move(instruction));
 }
 
 void FragmentShaderBuilder::onBeforeChildProcEmitCode(const FragmentProcessor* child) const {
@@ -291,19 +110,6 @@ std::string FragmentShaderBuilder::emitPerspTextCoord(const CoordValue& coordVar
   }
   if (coordVar.type() == SLType::Float3) {
     const std::string perspCoordName = "persp_" + coordVar.name();
-    if (sourceRecorder != nullptr) {
-      FragmentSourceRecord record = {};
-      record.kind = FragmentSourceRecord::Kind::Project;
-      record.dst = perspCoordName;
-      record.src = coordVar.name();
-      record.order = nextEmitOrder();
-      sourceRecorder->push_back(std::move(record));
-    }
-    const size_t start = codeTextSize();
-    setRawCaptureEnabled(false);
-    codeAppendf("highp vec2 %s = %s.xy / %s.z;", perspCoordName.c_str(), coordVar.name().c_str(),
-                coordVar.name().c_str());
-    setRawCaptureEnabled(true);
     // The IR definition of the projection: without it a sampler that consumes this coordinate
     // registers an undefined value (the class of unresolved-name failures).
     {
@@ -326,7 +132,6 @@ std::string FragmentShaderBuilder::emitPerspTextCoord(const CoordValue& coordVar
     instruction.output = perspCoordName;
     instruction.src = coordVar.name();
     instruction.varying = coordVar.varying;
-    instruction.text = codeTextFrom(start);
     recordFragmentInstruction(std::move(instruction));
     return perspCoordName;
   }

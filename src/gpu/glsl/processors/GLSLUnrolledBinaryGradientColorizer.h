@@ -38,10 +38,6 @@ namespace tgfx {
  */
 class GLSLUnrolledBinaryGradientColorizer : public UnrolledBinaryGradientColorizer {
  public:
-  bool emitsTextOnly() const override {
-    return true;
-  }
-
   GLSLUnrolledBinaryGradientColorizer(int intervalCount, Color* scales, Color* biases,
                                       Rect thresholds1_7, Rect thresholds9_13);
 
