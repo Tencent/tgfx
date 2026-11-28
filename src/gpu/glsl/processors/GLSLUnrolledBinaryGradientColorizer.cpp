@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLUnrolledBinaryGradientColorizer.h"
+#include "GeneratedOperators.h"
 #include <cstdarg>
 #include <cstdio>
 #include "core/utils/MathExtra.h"
@@ -25,40 +26,10 @@ namespace {
 
 /// Appends the printf-style text the cascade is built from. The text becomes one RawText IR
 /// statement, so the body printer never sees this processor as source code.
-void AppendFormatted(std::string* out, const char* format, ...) {
-  char buffer[1024] = {};
-  va_list arguments;
-  va_start(arguments, format);
-  auto length = vsnprintf(buffer, sizeof(buffer), format, arguments);
-  va_end(arguments);
-  if (length > 0) {
-    out->append(buffer, static_cast<size_t>(length));
-  }
-}
-
 }  // namespace
 
 namespace tgfx {
-struct UnrolledBinaryUniformName {
-  std::string scale0_1;
-  std::string scale2_3;
-  std::string scale4_5;
-  std::string scale6_7;
-  std::string scale8_9;
-  std::string scale10_11;
-  std::string scale12_13;
-  std::string scale14_15;
-  std::string bias0_1;
-  std::string bias2_3;
-  std::string bias4_5;
-  std::string bias6_7;
-  std::string bias8_9;
-  std::string bias10_11;
-  std::string bias12_13;
-  std::string bias14_15;
-  std::string thresholds1_7;
-  std::string thresholds9_13;
-};
+;
 
 static constexpr int MaxIntervals = 8;
 
@@ -139,146 +110,42 @@ std::string AddUniform(UniformHandler* uniformHandler, const std::string& name, 
   return "";
 }
 
-void AppendCode1(std::string* out, int intervalCount,
-                 const UnrolledBinaryUniformName& name) {
-  if (intervalCount >= 2) {
-    *out += "// thresholds1_7.y is mid-point for intervals (0,3) and (4,7)\n";
-    AppendFormatted(out, "if (t < %s.y) {", name.thresholds1_7.c_str());
-  }
-  *out += "// thresholds1_7.x is mid-point for intervals (0,1) and (2,3)\n";
-  AppendFormatted(out, "if (t < %s.x) {", name.thresholds1_7.c_str());
-  AppendFormatted(out, "scale = %s;", name.scale0_1.c_str());
-  AppendFormatted(out, "bias = %s;", name.bias0_1.c_str());
-  if (intervalCount > 1) {
-    *out += "} else {";
-    AppendFormatted(out, "scale = %s;",
-                             name.scale2_3.empty() ? "vec4(0.0)" : name.scale2_3.c_str());
-    AppendFormatted(out, "bias = %s;",
-                             name.bias2_3.empty() ? "vec4(0.0)" : name.bias2_3.c_str());
-  }
-  *out += "}";
-  if (intervalCount > 2) {
-    *out += "} else {";
-  }
-  if (intervalCount >= 3) {
-    *out += "// thresholds1_7.z is mid-point for intervals (4,5) and (6,7)\n";
-    AppendFormatted(out, "if (t < %s.z) {", name.thresholds1_7.c_str());
-    AppendFormatted(out, "scale = %s;",
-                             name.scale4_5.empty() ? "vec4(0.0)" : name.scale4_5.c_str());
-    AppendFormatted(out, "bias = %s;",
-                             name.bias4_5.empty() ? "vec4(0.0)" : name.bias4_5.c_str());
-  }
-  if (intervalCount > 3) {
-    *out += "} else {";
-    AppendFormatted(out, "scale = %s;",
-                             name.scale6_7.empty() ? "vec4(0.0)" : name.scale6_7.c_str());
-    AppendFormatted(out, "bias = %s;",
-                             name.bias6_7.empty() ? "vec4(0.0)" : name.bias6_7.c_str());
-  }
-  if (intervalCount >= 3) {
-    *out += "}";
-  }
-  if (intervalCount >= 2) {
-    *out += "}";
-  }
-}
-
-void AppendCode2(std::string* out, int intervalCount,
-                 const UnrolledBinaryUniformName& name) {
-  if (intervalCount >= 6) {
-    *out += "// thresholds9_13.y is mid-point for intervals (8,11) and (12,15)\n";
-    AppendFormatted(out, "if (t < %s.y) {", name.thresholds9_13.c_str());
-  }
-  if (intervalCount >= 5) {
-    *out += "// thresholds9_13.x is mid-point for intervals (8,9) and (10,11)\n";
-    AppendFormatted(out, "if (t < %s.x) {", name.thresholds9_13.c_str());
-    AppendFormatted(out, "scale = %s;",
-                             name.scale8_9.empty() ? "vec4(0.0)" : name.scale8_9.c_str());
-    AppendFormatted(out, "bias = %s;",
-                             name.bias8_9.empty() ? "vec4(0.0)" : name.bias8_9.c_str());
-  }
-  if (intervalCount > 5) {
-    *out += "} else {";
-    AppendFormatted(out, "scale = %s;",
-                             name.scale10_11.empty() ? "vec4(0.0)" : name.scale10_11.c_str());
-    AppendFormatted(out, "bias = %s;",
-                             name.bias10_11.empty() ? "vec4(0.0)" : name.bias10_11.c_str());
-  }
-
-  if (intervalCount >= 5) {
-    *out += "}";
-  }
-  if (intervalCount > 6) {
-    *out += "} else {";
-  }
-  if (intervalCount >= 7) {
-    *out += "// thresholds9_13.z is mid-point for intervals (12,13) and (14,15)\n";
-    AppendFormatted(out, "if (t < %s.z) {", name.thresholds9_13.c_str());
-    AppendFormatted(out, "scale = %s;",
-                             name.scale12_13.empty() ? "vec4(0.0)" : name.scale12_13.c_str());
-    AppendFormatted(out, "bias = %s;",
-                             name.bias12_13.empty() ? "vec4(0.0)" : name.bias12_13.c_str());
-  }
-  if (intervalCount > 7) {
-    *out += "} else {";
-    AppendFormatted(out, "scale = %s;",
-                             name.scale14_15.empty() ? "vec4(0.0)" : name.scale14_15.c_str());
-    AppendFormatted(out, "bias = %s;",
-                             name.bias14_15.empty() ? "vec4(0.0)" : name.bias14_15.c_str());
-  }
-  if (intervalCount >= 7) {
-    *out += "}";
-  }
-  if (intervalCount >= 6) {
-    *out += "}";
-  }
-}
-
 void GLSLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) const {
-  std::string cascade = {};
-  auto uniformHandler = args.uniformHandler;
-  UnrolledBinaryUniformName uniformNames = {};
-  uniformNames.scale0_1 = AddUniform(uniformHandler, "scale0_1", intervalCount, 0);
-  uniformNames.scale2_3 = AddUniform(uniformHandler, "scale2_3", intervalCount, 1);
-  uniformNames.scale4_5 = AddUniform(uniformHandler, "scale4_5", intervalCount, 2);
-  uniformNames.scale6_7 = AddUniform(uniformHandler, "scale6_7", intervalCount, 3);
-  uniformNames.scale8_9 = AddUniform(uniformHandler, "scale8_9", intervalCount, 4);
-  uniformNames.scale10_11 = AddUniform(uniformHandler, "scale10_11", intervalCount, 5);
-  uniformNames.scale12_13 = AddUniform(uniformHandler, "scale12_13", intervalCount, 6);
-  uniformNames.scale14_15 = AddUniform(uniformHandler, "scale14_15", intervalCount, 7);
-  uniformNames.bias0_1 = AddUniform(uniformHandler, "bias0_1", intervalCount, 0);
-  uniformNames.bias2_3 = AddUniform(uniformHandler, "bias2_3", intervalCount, 1);
-  uniformNames.bias4_5 = AddUniform(uniformHandler, "bias4_5", intervalCount, 2);
-  uniformNames.bias6_7 = AddUniform(uniformHandler, "bias6_7", intervalCount, 3);
-  uniformNames.bias8_9 = AddUniform(uniformHandler, "bias8_9", intervalCount, 4);
-  uniformNames.bias10_11 = AddUniform(uniformHandler, "bias10_11", intervalCount, 5);
-  uniformNames.bias12_13 = AddUniform(uniformHandler, "bias12_13", intervalCount, 6);
-  uniformNames.bias14_15 = AddUniform(uniformHandler, "bias14_15", intervalCount, 7);
-  uniformNames.thresholds1_7 = args.uniformHandler->addUniform(
-      "thresholds1_7", UniformFormat::Float4, ShaderStage::Fragment);
-  uniformNames.thresholds9_13 = args.uniformHandler->addUniform(
-      "thresholds9_13", UniformFormat::Float4, ShaderStage::Fragment);
-
-  AppendFormatted(&cascade, "float t = %s.x;", args.inputColor.c_str());
-  cascade += "vec4 scale, bias;";
-  AppendFormatted(&cascade, "// interval count: %d\n", intervalCount);
-
-  if (intervalCount >= 4) {
-    cascade += "// thresholds1_7.w is mid-point for intervals (0,7) and (8,15)\n";
-    AppendFormatted(&cascade, "if (t < %s.w) {", uniformNames.thresholds1_7.c_str());
+  if (args.irBuilder == nullptr || args.inputValue == INVALID_VALUE_ID ||
+      args.outputValue == INVALID_VALUE_ID) {
+    return;
   }
-  AppendCode1(&cascade, intervalCount, uniformNames);
-  if (intervalCount > 4) {
-    cascade += "} else {";
-  }
-  AppendCode2(&cascade, intervalCount, uniformNames);
-  if (intervalCount >= 4) {
-    cascade += "}";
-  }
-
-  AppendFormatted(&cascade, "%s = vec4(t * scale + bias);", args.outputColor.c_str());
-  args.irBuilder->AppendRawText("  vec4 " + args.outputColor + ";\n" + cascade,
-                                args.outputColor);
+  auto* ir = args.irBuilder;
+  auto* uniformHandler = args.uniformHandler;
+  auto uniformValue = [&](const std::string& name) -> ValueID {
+    if (name.empty()) {
+      const auto zero = ir->CreateConstant(0.0f);
+      return ir->CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
+    }
+    return ir->InternValue(name, SLType::Float4, Precision::High, IRValueKind::Uniform);
+  };
+  const auto thresholds1_7 = AddUniform(uniformHandler, "thresholds1_7", intervalCount, -1);
+  const auto thresholds9_13 = AddUniform(uniformHandler, "thresholds9_13", intervalCount, -1);
+  const auto result = UnrolledBinaryGradientOp::Emit(
+      ir, uniformHandler, nullptr, args.inputValue, intervalCount,
+      uniformValue(AddUniform(uniformHandler, "scale0_1", intervalCount, 0)),
+      uniformValue(AddUniform(uniformHandler, "scale2_3", intervalCount, 1)),
+      uniformValue(AddUniform(uniformHandler, "scale4_5", intervalCount, 2)),
+      uniformValue(AddUniform(uniformHandler, "scale6_7", intervalCount, 3)),
+      uniformValue(AddUniform(uniformHandler, "scale8_9", intervalCount, 4)),
+      uniformValue(AddUniform(uniformHandler, "scale10_11", intervalCount, 5)),
+      uniformValue(AddUniform(uniformHandler, "scale12_13", intervalCount, 6)),
+      uniformValue(AddUniform(uniformHandler, "scale14_15", intervalCount, 7)),
+      uniformValue(AddUniform(uniformHandler, "bias0_1", intervalCount, 0)),
+      uniformValue(AddUniform(uniformHandler, "bias2_3", intervalCount, 1)),
+      uniformValue(AddUniform(uniformHandler, "bias4_5", intervalCount, 2)),
+      uniformValue(AddUniform(uniformHandler, "bias6_7", intervalCount, 3)),
+      uniformValue(AddUniform(uniformHandler, "bias8_9", intervalCount, 4)),
+      uniformValue(AddUniform(uniformHandler, "bias10_11", intervalCount, 5)),
+      uniformValue(AddUniform(uniformHandler, "bias12_13", intervalCount, 6)),
+      uniformValue(AddUniform(uniformHandler, "bias14_15", intervalCount, 7)),
+      uniformValue(thresholds1_7), uniformValue(thresholds9_13));
+  ir->StoreOutput(args.outputValue, result);
 }
 
 void SetUniformData(UniformData* uniformData, const std::string& name, int intervalCount, int limit,

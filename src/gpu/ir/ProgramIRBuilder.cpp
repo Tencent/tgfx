@@ -376,15 +376,6 @@ void ProgramIRBuilder::StoreOutput(ValueID dst, ValueID src) {
       .push_back(std::move(statement));
 }
 
-void ProgramIRBuilder::AppendRawText(std::string code, std::string declaredName) {
-  IRStatement statement = {};
-  statement.kind = IRStatementKind::RawText;
-  statement.rawText = std::move(code);
-  statement.rawDeclaredName = std::move(declaredName);
-  (currentStage == ShaderStage::Vertex ? ir.vertexStatements : ir.statements)
-      .push_back(std::move(statement));
-}
-
 void ProgramIRBuilder::CreateDiscard(ValueID condition) {
   IRStatement statement = {};
   statement.kind = IRStatementKind::Discard;

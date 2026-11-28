@@ -220,16 +220,6 @@ std::string ProgramBodyPrinter::PrintFragment(const ProgramIR& program,
       out += "  }\n";
       continue;
     }
-    if (statement.kind == IRStatementKind::RawText) {
-      if (!statement.rawDeclaredName.empty()) {
-        declared.insert(statement.rawDeclaredName);
-      }
-      out += statement.rawText;
-      if (!out.empty() && out.back() != '\n') {
-        out += "\n";
-      }
-      continue;
-    }
     if (statement.kind == IRStatementKind::Discard) {
       std::string condition = {};
       if (!GLSLOperatorEmitter::EmitValue(program, statement.src, &condition, &error, traits.language)) {
