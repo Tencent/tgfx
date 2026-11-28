@@ -114,7 +114,7 @@ TEST(SPIRVShaderBuilderTest, EmitsSwizzleAndBinary) {
 
 TEST(SPIRVShaderBuilderTest, EmitsBuiltinFragCoord) {
   ProgramIRBuilder program = {};
-  const auto fragCoord = program.CreateBuiltin("gl_FragCoord", SLType::Float4);
+  const auto fragCoord = program.CreateBuiltin(IRBuiltin::FragCoord, SLType::Float4);
   const auto xy = program.CreateSwizzle(fragCoord, SLType::Float2, "xy");
   const auto zero = program.CreateConstant(0.0f);
   const auto output = program.CreateConstruct(SLType::Float4, {xy, zero, zero});

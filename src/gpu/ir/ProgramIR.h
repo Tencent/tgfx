@@ -87,6 +87,12 @@ enum class IRBinaryOp : uint8_t {
   Max,
 };
 
+/// The builtin symbols the IR reads. An enum keeps arbitrary strings out of the graph: a printer
+/// spells each entry for its language, and a new builtin is one enumerated case.
+enum class IRBuiltin : uint8_t {
+  FragCoord = 0,
+};
+
 enum class IRExprKind : uint8_t {
   ConstantFloat,
   ConstantInt,
@@ -112,7 +118,7 @@ struct IRExpr {
   OperatorID op = INVALID_OPERATOR_ID;
   IRBinaryOp binaryOp = IRBinaryOp::Add;
   std::string swizzle = {};
-  std::string builtin = {};
+  IRBuiltin builtin = IRBuiltin::FragCoord;
   SLType samplerType = SLType::Void;
   int32_t samplerSwizzleCode = -1;
   bool coverageSample = false;

@@ -68,7 +68,7 @@ class ProgramIRBuilder {
   ValueID CreateCall(OperatorID op, SLType type, const std::vector<ValueID>& args,
                      std::string debugName = {});
 
-  ValueID CreateBuiltin(const std::string& builtin, SLType type);
+  ValueID CreateBuiltin(IRBuiltin builtin, SLType type);
 
   ValueID CreateTextureSample(ValueID sampler, ValueID coordinate, SLType type,
                               std::string debugName = {}, SLType samplerType = SLType::Void,

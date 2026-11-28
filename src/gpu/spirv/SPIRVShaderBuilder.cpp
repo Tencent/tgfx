@@ -923,7 +923,7 @@ uint32_t SPIRVShaderBuilder::EmitExpr(const ProgramIR& program, const IRExpr& ex
       return id;
     }
     case IRExprKind::Builtin: {
-      if (stage != ShaderStage::Fragment || expr.builtin != "gl_FragCoord") {
+      if (stage != ShaderStage::Fragment || expr.builtin != IRBuiltin::FragCoord) {
         Fail(error, "the builtin read is not supported by the SPIR-V builder yet");
         return 0;
       }

@@ -105,10 +105,6 @@ bool ValidateExpr(const ProgramIR& program, const IRExpr& expr, std::string* err
       return false;
     }
   }
-  if (expr.kind == IRExprKind::Builtin && expr.builtin.empty()) {
-    *error = "a builtin read needs a name";
-    return false;
-  }
   return true;
 }
 

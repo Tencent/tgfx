@@ -209,11 +209,11 @@ TEST(ProgramIRTest, RejectsDuplicateSamplerBindings) {
 
 TEST(ProgramIRTest, RecordsBuiltinReads) {
   ProgramIRBuilder builder = {};
-  const auto fragCoord = builder.CreateBuiltin("gl_FragCoord", SLType::Float4);
+  const auto fragCoord = builder.CreateBuiltin(IRBuiltin::FragCoord, SLType::Float4);
   ASSERT_NE(fragCoord, INVALID_VALUE_ID);
   ASSERT_EQ(builder.IR().exprs.size(), 1u);
   EXPECT_EQ(builder.IR().exprs[0].kind, IRExprKind::Builtin);
-  EXPECT_EQ(builder.IR().exprs[0].builtin, "gl_FragCoord");
+  EXPECT_EQ(builder.IR().exprs[0].builtin, IRBuiltin::FragCoord);
   EXPECT_EQ(builder.IR().values[fragCoord].debugName, "gl_FragCoord");
 
   std::string error;
@@ -224,7 +224,7 @@ TEST(ProgramIRTest, RecordsDeviceSpaceRead) {
   ProgramIRBuilder builder = {};
   const auto matrix =
       builder.CreateValue(SLType::Float3x3, Precision::High, IRValueKind::Uniform, "matrix");
-  const auto fragCoord = builder.CreateBuiltin("gl_FragCoord", SLType::Float4);
+  const auto fragCoord = builder.CreateBuiltin(IRBuiltin::FragCoord, SLType::Float4);
   const auto xy = builder.CreateSwizzle(fragCoord, SLType::Float2, "xy");
   const auto coord =
       builder.CreateCall(OperatorID::DeviceCoord, SLType::Float2, {matrix, xy}, "deviceCoord");

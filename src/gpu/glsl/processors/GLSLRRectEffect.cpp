@@ -65,7 +65,7 @@ void GLSLRRectEffect::emitCode(EmitArgs& args) const {
   }
   RRectCoverageOp::UniformNames names = {};
   const auto fragCoordValue =
-      args.irBuilder->CreateBuiltin("gl_FragCoord", SLType::Float4);
+      args.irBuilder->CreateBuiltin(IRBuiltin::FragCoord, SLType::Float4);
   const auto fragCoordXY =
       args.irBuilder->CreateSwizzle(fragCoordValue, SLType::Float2, "xy");
   const auto result = RRectCoverageOp::Emit(args.irBuilder, args.uniformHandler, &names,

@@ -83,7 +83,7 @@ void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
           ir->InternValue(upperLeftName, SLType::Float2, Precision::High, IRValueKind::Uniform);
       const auto coordScale =
           ir->InternValue(coordScaleName, SLType::Float2, Precision::High, IRValueKind::Uniform);
-      const auto fragCoord = ir->CreateBuiltin("gl_FragCoord", SLType::Float4);
+      const auto fragCoord = ir->CreateBuiltin(IRBuiltin::FragCoord, SLType::Float4);
       const auto fragXY = ir->CreateSwizzle(fragCoord, SLType::Float2, "xy");
       const auto shifted = ir->CreateBinary(IRBinaryOp::Sub, SLType::Float2, fragXY, upperLeft);
       const auto dstCoord = ir->CreateBinary(IRBinaryOp::Mul, SLType::Float2, shifted, coordScale);

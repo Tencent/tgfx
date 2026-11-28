@@ -318,12 +318,24 @@ ValueID ProgramIRBuilder::CreateCall(OperatorID op, SLType type, const std::vect
   return AddExpr(std::move(expr), debugName);
 }
 
-ValueID ProgramIRBuilder::CreateBuiltin(const std::string& builtin, SLType type) {
+namespace {
+/// The spelling the IR value and the text printers carry for one builtin. The per-language
+/// spelling table arrives with the backend traits; for now every text language uses the GL name.
+const char* BuiltinSpelling(IRBuiltin builtin) {
+  switch (builtin) {
+    case IRBuiltin::FragCoord:
+      return "gl_FragCoord";
+  }
+  return "";
+}
+}  // namespace
+
+ValueID ProgramIRBuilder::CreateBuiltin(IRBuiltin builtin, SLType type) {
   IRExpr expr = {};
   expr.kind = IRExprKind::Builtin;
   expr.type = type;
   expr.builtin = builtin;
-  return AddExpr(std::move(expr), builtin);
+  return AddExpr(std::move(expr), BuiltinSpelling(builtin));
 }
 
 ValueID ProgramIRBuilder::CreateTextureSample(ValueID sampler, ValueID coordinate, SLType type,

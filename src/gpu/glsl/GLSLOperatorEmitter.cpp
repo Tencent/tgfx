@@ -258,7 +258,7 @@ bool EmitExpression(const ProgramIR& program, ValueID id, std::string* expressio
       return true;
     }
     case IRExprKind::Builtin:
-      *expression = expr.builtin;
+      *expression = expr.builtin == IRBuiltin::FragCoord ? "gl_FragCoord" : "";
       return true;
     case IRExprKind::ConstantFloat:
     case IRExprKind::ConstantInt:

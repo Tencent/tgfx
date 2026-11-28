@@ -63,7 +63,7 @@ void GLSLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
     }
     const auto matrixValue = args.irBuilder->InternValue(deviceCoordMatrixName, SLType::Float3x3,
                                                          Precision::High, IRValueKind::Uniform);
-    const auto fragCoordValue = args.irBuilder->CreateBuiltin("gl_FragCoord", SLType::Float4);
+    const auto fragCoordValue = args.irBuilder->CreateBuiltin(IRBuiltin::FragCoord, SLType::Float4);
     const auto xyValue = args.irBuilder->CreateSwizzle(fragCoordValue, SLType::Float2, "xy");
     const auto deviceCoordValue = args.irBuilder->CreateCall(
         OperatorID::DeviceCoord, SLType::Float2, {matrixValue, xyValue}, "deviceCoord");
