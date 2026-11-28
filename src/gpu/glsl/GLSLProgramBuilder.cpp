@@ -340,7 +340,7 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
           writtenVaryings.insert(programIRBuilder().IR().values[statement.dst.base].debugName);
         }
       }
-      for (const auto& varying : programIRBuilder().IR().interface.varyings) {
+      for (const auto& varying : description.interface.varyings) {
         if (fragmentBody.find(varying.name) == std::string::npos) {
           continue;
         }

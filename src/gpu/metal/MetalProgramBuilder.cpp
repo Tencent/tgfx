@@ -248,7 +248,8 @@ std::shared_ptr<Program> MetalProgramBuilder::finalize() {
   const auto vertexText = MSLPrinter::PrintStage(*this, ShaderStage::Vertex, description.interface,
                                                  _vertexBuilder, callSite);
   const auto fragmentText = MSLPrinter::PrintStage(*this, ShaderStage::Fragment,
-                                                   description.interface, _fragBuilder, callSite,
+                                                   description.interface, _fragBuilder,
+                                                   callSite,
                                                    readsDestinationColor);
   if (const char* dumpDir = std::getenv("TGFX_DUMP_PROGRAM")) {
     static std::atomic<int> dumpIndex{0};

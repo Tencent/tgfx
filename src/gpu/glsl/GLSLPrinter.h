@@ -20,24 +20,21 @@
 
 #include <string>
 #include "gpu/ir/ProgramIR.h"
+#include "gpu/ir/ProgramDescription.h"
 #include "gpu/shaders/contract/ShaderLibraryBundleFormat.h"
 #include <vector>
-#include "gpu/ir/ProgramDescription.h"
+#include "gpu/ir/ProgramIR.h"
 #include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {
 class ProgramBuilder;
 class ShaderBuilder;
 
-/// The single GLSL printer for a stage. It prints the interface declarations from the typed
-/// description, appends the recorded function section, and prints the main body from the stage
-/// records. The result is the complete shader text sent to the driver.
+/// The single GLSL printer for a stage. It prints the interface declarations from the ProgramIR
+/// interface, appends the operator function section, and prints the main body from the IR
+/// statements. The result is the complete shader text sent to the driver.
 class GLSLPrinter {
  public:
-  static std::string PrintVertexProgram(const std::vector<VertexCall>& calls);
-
-  static std::string PrintFragmentProgram(const FragmentProgram& program);
-
   /// Prints the fragment main body straight from the ProgramIR statements (the IR printer
   /// route): one declaration or assignment per statement, expressions through the operator
   /// emitter. Returns an empty string when a statement cannot be printed yet, so the caller can

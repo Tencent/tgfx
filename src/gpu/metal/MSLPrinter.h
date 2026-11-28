@@ -19,11 +19,12 @@
 #pragma once
 
 #include "gpu/ir/ProgramIR.h"
+#include "gpu/ir/ProgramDescription.h"
 
 #include <set>
 #include <string>
 #include <vector>
-#include "gpu/ir/ProgramDescription.h"
+#include "gpu/ir/ProgramIR.h"
 #include "tgfx/gpu/ShaderStage.h"
 
 namespace tgfx {

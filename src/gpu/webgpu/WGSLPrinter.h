@@ -20,6 +20,7 @@
 
 #include <set>
 #include <string>
+#include "gpu/ir/ProgramIR.h"
 #include "gpu/ir/ProgramDescription.h"
 
 namespace tgfx {
