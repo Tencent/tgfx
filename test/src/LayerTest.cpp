@@ -8469,8 +8469,8 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryContourFallbackIgnoresUnusedFontGlyphs) {
     auto isolated = makeLayer(false, shadow);
     auto pooled = makeLayer(true, shadow);
     TGFX_PRIVATE_ACCESS(
-        DrawArgs args; auto isolatedSource = isolated->getLayerStyleSource(args, Matrix::I());
-        auto pooledSource = pooled->getLayerStyleSource(args, Matrix::I());
+        DrawArgs args; auto isolatedSource = isolated->getLayerStyleSource(args, Matrix::I(), 1.0f);
+        auto pooledSource = pooled->getLayerStyleSource(args, Matrix::I(), 1.0f);
         ASSERT_TRUE(isolatedSource != nullptr && pooledSource != nullptr);
         auto isolatedContour = isolatedSource->groups[0]->contour;
         auto pooledContour = pooledSource->groups[0]->contour;
@@ -8501,8 +8501,8 @@ TGFX_TEST_PRIVATE(LayerTest, TightGeometryKeepsSharedContentExtent) {
 
   TGFX_PRIVATE_ACCESS(
       DrawArgs args; auto shadowLayer = makeLayer(false); auto mixedLayer = makeLayer(true);
-      auto shadowSource = shadowLayer->getLayerStyleSource(args, Matrix::I());
-      auto mixedSource = mixedLayer->getLayerStyleSource(args, Matrix::I());
+      auto shadowSource = shadowLayer->getLayerStyleSource(args, Matrix::I(), 1.0f);
+      auto mixedSource = mixedLayer->getLayerStyleSource(args, Matrix::I(), 1.0f);
       ASSERT_TRUE(shadowSource != nullptr && mixedSource != nullptr);
       ASSERT_TRUE(shadowSource->groups[0] != nullptr && mixedSource->groups[0] != nullptr);
       auto shadowContent = shadowSource->groups[0]->content;
@@ -8537,8 +8537,8 @@ TGFX_TEST_PRIVATE(LayerTest, TightContourPropagatesThroughMaskedChildren) {
 
   TGFX_PRIVATE_ACCESS(
       DrawArgs args; auto isolated = makeLayer(false); auto pooled = makeLayer(true);
-      auto isolatedSource = isolated->getLayerStyleSource(args, Matrix::I());
-      auto pooledSource = pooled->getLayerStyleSource(args, Matrix::I());
+      auto isolatedSource = isolated->getLayerStyleSource(args, Matrix::I(), 1.0f);
+      auto pooledSource = pooled->getLayerStyleSource(args, Matrix::I(), 1.0f);
       ASSERT_TRUE(isolatedSource != nullptr && pooledSource != nullptr);
       ASSERT_TRUE(isolatedSource->groups[0] != nullptr && pooledSource->groups[0] != nullptr);
       auto isolatedContour = isolatedSource->groups[0]->contour;
@@ -8585,7 +8585,7 @@ TGFX_TEST_PRIVATE(LayerTest, InvertedMaskDoesNotCullDisjointGlassContour) {
       auto panel = makePanel(maskType, pooled, true);
       TGFX_PRIVATE_ACCESS(auto bounds = panel.parent->computeBounds(Matrix3D::I(), false, true);
                           ASSERT_FALSE(bounds.isEmpty()); DrawArgs args;
-                          auto source = panel.parent->getLayerStyleSource(args, Matrix::I());
+                          auto source = panel.parent->getLayerStyleSource(args, Matrix::I(), 1.0f);
                           ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
                           auto contour = source->groups[0]->contour;
                           ASSERT_TRUE(contour != nullptr); ASSERT_TRUE(contour->image() != nullptr);
@@ -8657,8 +8657,8 @@ TGFX_TEST_PRIVATE(LayerTest, GeometrySourceUsesFiniteBoundsForUnboundedFill) {
       ASSERT_TRUE(geometryPicture != nullptr); EXPECT_TRUE(geometryPicture->hasUnboundedFill());
       auto geometrySource = layer->getGeometryImage(args, 1.0f);
       ASSERT_TRUE(geometrySource != nullptr); ASSERT_TRUE(geometrySource->image() != nullptr);
-      auto source = layer->getLayerStyleSource(args, Matrix::I()); ASSERT_TRUE(source != nullptr);
-      ASSERT_TRUE(source->groups[0] != nullptr);
+      auto source = layer->getLayerStyleSource(args, Matrix::I(), 1.0f);
+      ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
       ASSERT_TRUE(source->groups[0]->geometry != nullptr);
       auto geometry = source->groups[0]->geometry->image(); ASSERT_TRUE(geometry != nullptr);
       EXPECT_EQ(geometry->width(), 300); EXPECT_EQ(geometry->height(), 200);
