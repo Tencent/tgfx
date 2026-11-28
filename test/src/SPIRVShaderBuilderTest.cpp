@@ -210,7 +210,7 @@ TEST(SPIRVShaderBuilderTest, EmitsUniformBlockLoad) {
 
 TEST(SPIRVShaderBuilderTest, EmitsUniformArrayLoad) {
   ProgramIRBuilder program = {};
-  const auto kernel = program.AddUniformArray(
+  const auto kernel = program.AddUniform(
       {"Kernel", SLType::Float4, Precision::High, ShaderStage::Fragment, 17});
 
   SPIRVShaderBuilder builder(ShaderStage::Fragment);

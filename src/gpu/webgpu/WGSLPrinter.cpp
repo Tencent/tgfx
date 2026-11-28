@@ -32,7 +32,7 @@ const char* WgslType(SLType type) {
   return name != nullptr ? name : "vec4<f32>";
 }
 
-bool HasUniforms(const InterfaceDesc& interface, ShaderStage stage) {
+bool HasUniforms(const InterfaceIR& interface, ShaderStage stage) {
   for (const auto& uniform : interface.uniforms) {
     if (uniform.stage == stage) {
       return true;
@@ -64,7 +64,7 @@ void ReplaceWord(std::string* text, const char* from, const char* to) {
 }
 
 void AppendUniformStruct(std::string* out, const char* blockName, ShaderStage stage,
-                         const InterfaceDesc& interface) {
+                         const InterfaceIR& interface) {
   if (!HasUniforms(interface, stage)) {
     return;
   }
@@ -89,7 +89,7 @@ void AppendUniformStruct(std::string* out, const char* blockName, ShaderStage st
   *out += "};\n\n";
 }
 
-void AppendSamplers(std::string* out, const InterfaceDesc& interface) {
+void AppendSamplers(std::string* out, const InterfaceIR& interface) {
   for (size_t index = 0; index < interface.samplers.size(); ++index) {
     const auto& sampler = interface.samplers[index];
     const std::string group = std::to_string(TEXTURE_DESCRIPTOR_SET);
@@ -117,7 +117,7 @@ void AppendVaryingField(std::string* out, const VaryingDesc& varying, size_t ind
 
 }  // namespace
 
-std::string WGSLPrinter::PrintVertex(const InterfaceDesc& interface, const std::string& functions,
+std::string WGSLPrinter::PrintVertex(const InterfaceIR& interface, const std::string& functions,
                                      const std::string& body, const WgslCallSite& callSite) {
   (void)callSite;
   std::string out = {};
@@ -178,7 +178,7 @@ std::string WGSLPrinter::PrintVertex(const InterfaceDesc& interface, const std::
   return out;
 }
 
-std::string WGSLPrinter::PrintFragment(const InterfaceDesc& interface,
+std::string WGSLPrinter::PrintFragment(const InterfaceIR& interface,
                                        const std::string& functions, const std::string& body,
                                        const WgslCallSite& callSite) {
   (void)callSite;

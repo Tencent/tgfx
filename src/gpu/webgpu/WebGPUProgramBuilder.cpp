@@ -27,7 +27,6 @@
 #include "gpu/ir/OperatorManifest.h"
 #include "gpu/ir/ProgramBodyPrinter.h"
 #include "gpu/ir/ProgramIRValidation.h"
-#include "gpu/ir/ProgramValidation.h"
 #include "gpu/shaders/ShaderLibraryBundle.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -59,10 +58,6 @@ std::shared_ptr<Program> WebGPUProgramBuilder::Create(Context* context,
 WebGPUProgramBuilder::WebGPUProgramBuilder(Context* context, const ProgramInfo* programInfo)
     : ProgramBuilder(context, programInfo), _varyingHandler(this), _uniformHandler(this),
       _vertexBuilder(this), _fragBuilder(this) {
-  _vertexBuilder.setVertexRecorder(&description.vertexCalls);
-  _vertexBuilder.setValueTable(&description.values);
-  _fragBuilder.setFragmentRecorder(&description.fragment);
-  _fragBuilder.setValueTable(&description.values);
   _vertexBuilder.setLibraryLanguage(ShaderLibraryLanguage::WGSL);
   _fragBuilder.setLibraryLanguage(ShaderLibraryLanguage::WGSL);
 }
@@ -93,52 +88,27 @@ bool WebGPUProgramBuilder::checkSamplerCounts() {
 std::shared_ptr<Program> WebGPUProgramBuilder::finalize() {
   fragmentShaderBuilder()->declareCustomOutputColor();
   for (const auto& attribute : getProgramInfo()->getVertexAttributes()) {
-    const auto type = ShaderVar(attribute).type();
-    description.interface.attributes.push_back({attribute.name(), type});
-    description.values.Intern(attribute.name(), type, ValueOrigin::Attribute);
+    programIRBuilder().AddAttribute(
+        {attribute.name(), ShaderVar(attribute).type(), Precision::High, 0});
   }
   for (const auto& attribute : getProgramInfo()->getInstanceAttributes()) {
-    const auto type = ShaderVar(attribute).type();
-    description.interface.attributes.push_back({attribute.name(), type});
-    description.values.Intern(attribute.name(), type, ValueOrigin::Attribute);
+    programIRBuilder().AddAttribute(
+        {attribute.name(), ShaderVar(attribute).type(), Precision::High, 0});
   }
   for (const auto& varying : _varyingHandler.getVaryings()) {
-    description.interface.varyings.push_back(
-        {varying.name(), varying.type(), varying.id(), 0, false, varying.isFlat()});
-    description.values.Intern(varying.name(), varying.type(), ValueOrigin::Varying);
+    programIRBuilder().AddVarying(
+        {varying.name(), varying.type(), Precision::High, 0, varying.isFlat()});
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Vertex)) {
-    description.interface.uniforms.push_back(
-        {uniform.name(), ShaderVar(uniform).type(), ShaderStage::Vertex, uniform.count()});
-    description.values.Intern(uniform.name(), ShaderVar(uniform).type(), ValueOrigin::Uniform);
+    programIRBuilder().AddUniform({uniform.name(), ShaderVar(uniform).type(), Precision::Default,
+                                   ShaderStage::Vertex, uniform.count()});
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Fragment)) {
-    description.interface.uniforms.push_back(
-        {uniform.name(), ShaderVar(uniform).type(), ShaderStage::Fragment, uniform.count()});
-    description.values.Intern(uniform.name(), ShaderVar(uniform).type(), ValueOrigin::Uniform);
+    programIRBuilder().AddUniform({uniform.name(), ShaderVar(uniform).type(), Precision::Default,
+                                   ShaderStage::Fragment, uniform.count()});
   }
   for (const auto& sampler : _uniformHandler.getSamplers()) {
-    description.interface.samplers.push_back({sampler.name(), ShaderVar(sampler).type()});
-    description.values.Intern(sampler.name(), ShaderVar(sampler).type(), ValueOrigin::Sampler);
-  }
-  for (const auto& attribute : description.interface.attributes) {
-    programIRBuilder().AddAttribute({attribute.name, attribute.type, Precision::High, 0});
-  }
-  for (const auto& varying : description.interface.varyings) {
-    programIRBuilder().AddVarying(
-        {varying.name, varying.type, Precision::High, varying.location, varying.flat});
-  }
-  for (const auto& uniform : description.interface.uniforms) {
-    if (uniform.count > 1) {
-      programIRBuilder().AddUniformArray(
-          {uniform.name, uniform.type, Precision::Default, uniform.stage, uniform.count});
-    } else {
-      programIRBuilder().AddUniform(
-          {uniform.name, uniform.type, Precision::Default, uniform.stage, uniform.count});
-    }
-  }
-  for (const auto& sampler : description.interface.samplers) {
-    programIRBuilder().AddSampler({sampler.name, sampler.type, 0});
+    programIRBuilder().AddSampler({sampler.name(), ShaderVar(sampler).type(), 0});
   }
   finalizeShaders();
 
@@ -167,7 +137,7 @@ std::shared_ptr<Program> WebGPUProgramBuilder::finalize() {
   }
 
   WgslCallSite callSite = {};
-  for (const auto& sampler : description.interface.samplers) {
+  for (const auto& sampler : programIRBuilder().IR().interface.samplers) {
     callSite.samplerNames.insert(sampler.name);
   }
   std::set<std::string> emittedFunctions = {};
@@ -189,9 +159,9 @@ std::shared_ptr<Program> WebGPUProgramBuilder::finalize() {
                                                 &emittedFunctions, &libraryText);
     }
   }
-  auto vertexText = WGSLPrinter::PrintVertex(description.interface, libraryText, vertexBody, callSite);
+  auto vertexText = WGSLPrinter::PrintVertex(programIRBuilder().IR().interface, libraryText, vertexBody, callSite);
   auto fragmentText =
-      WGSLPrinter::PrintFragment(description.interface, libraryText, fragmentBody, callSite);
+      WGSLPrinter::PrintFragment(programIRBuilder().IR().interface, libraryText, fragmentBody, callSite);
 
   auto gpu = context->gpu();
   ShaderModuleDescriptor vertexModule = {};

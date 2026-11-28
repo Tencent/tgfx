@@ -142,16 +142,16 @@ TEST(ProgramIRTest, LaysOutUniformsWithStd140) {
 
 TEST(ProgramIRTest, LaysOutUniformArraysWithStd140) {
   ProgramIRBuilder builder = {};
-  const auto id = builder.AddUniformArray(
+  const auto id = builder.AddUniform(
       {"Kernel", SLType::Float4, Precision::High, ShaderStage::Fragment, 17});
   ASSERT_NE(id, INVALID_VALUE_ID);
-  ASSERT_EQ(builder.Interface().uniformArrays.size(), 1u);
-  const auto& array = builder.Interface().uniformArrays[0];
-  EXPECT_EQ(array.elementType, SLType::Float4);
-  EXPECT_EQ(array.count, 17u);
-  EXPECT_EQ(array.offset, 0u);
-  EXPECT_EQ(array.stride, 16u);
-  EXPECT_EQ(array.size, 272u);
+  ASSERT_EQ(builder.Interface().uniforms.size(), 1u);
+  const auto& uniform = builder.Interface().uniforms[0];
+  EXPECT_EQ(uniform.type, SLType::Float4);
+  EXPECT_EQ(uniform.count, 17u);
+  EXPECT_EQ(uniform.offset, 0u);
+  EXPECT_EQ(uniform.arrayStride, 16u);
+  EXPECT_EQ(uniform.size, 272u);
   ASSERT_EQ(builder.Interface().uniformBlocks.size(), 1u);
   EXPECT_EQ(builder.Interface().uniformBlocks[0].size, 272u);
 
@@ -161,14 +161,14 @@ TEST(ProgramIRTest, LaysOutUniformArraysWithStd140) {
 
 TEST(ProgramIRTest, RejectsUniformArrayOutsideBlock) {
   ProgramIR program = {};
-  UniformArrayIR array = {};
-  array.name = "Kernel";
-  array.elementType = SLType::Float4;
-  array.stage = ShaderStage::Fragment;
-  array.count = 17;
-  array.stride = 16;
-  array.size = 272;
-  program.interface.uniformArrays.push_back(array);
+  UniformIR uniform = {};
+  uniform.name = "Kernel";
+  uniform.type = SLType::Float4;
+  uniform.stage = ShaderStage::Fragment;
+  uniform.count = 17;
+  uniform.arrayStride = 16;
+  uniform.size = 272;
+  program.interface.uniforms.push_back(uniform);
 
   std::string error;
   EXPECT_FALSE(ValidateProgramIR(program, &error));

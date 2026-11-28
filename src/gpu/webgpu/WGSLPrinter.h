@@ -38,10 +38,10 @@ struct WgslCallSite {
  */
 class WGSLPrinter {
  public:
-  static std::string PrintVertex(const InterfaceDesc& interface, const std::string& functions,
+  static std::string PrintVertex(const InterfaceIR& interface, const std::string& functions,
                                  const std::string& body, const WgslCallSite& callSite);
 
-  static std::string PrintFragment(const InterfaceDesc& interface, const std::string& functions,
+  static std::string PrintFragment(const InterfaceIR& interface, const std::string& functions,
                                    const std::string& body, const WgslCallSite& callSite);
 };
 

@@ -209,68 +209,6 @@ std::string RewriteBody(const std::string& text, const MslCallSite& callSite) {
   return out;
 }
 
-void AppendTransformPoint(std::string* out, const VertexCall& call) {
-  if (call.hasPerspective) {
-    *out += Indent;
-    *out += "float3 " + call.dst.name + "Temp = " + call.operand.name + " * float3(" +
-            call.src.name + ", 1.0);\n";
-    *out += Indent;
-    *out += "float2 " + call.dst.name + " = " + call.dst.name + "Temp.xy / " + call.dst.name +
-            "Temp.z;\n";
-    return;
-  }
-  *out += Indent;
-  *out += "float2 " + call.dst.name + " = (" + call.operand.name + " * float3(" + call.src.name +
-          ", 1.0)).xy;\n";
-}
-
-std::string PrefixOf(const FragmentInstruction& instruction) {
-  const size_t first = instruction.text.find_first_not_of(" \t");
-  if (first == std::string::npos) {
-    return Indent;
-  }
-  return instruction.text.substr(0, first);
-}
-
-void AppendCall(std::string* out, const FragmentInstruction& instruction,
-                const MslCallSite& callSite) {
-  *out += PrefixOf(instruction);
-  if (instruction.declaresResult) {
-    *out += instruction.resultType + " ";
-  }
-  *out += instruction.output + " = ";
-  if (!instruction.wrapType.empty()) {
-    *out += instruction.wrapType + "(";
-  }
-  std::string function = instruction.function;
-  if (callSite.samplerFunctions.count(function) != 0) {
-    function += "Impl";
-  }
-  *out += function + "(";
-  for (size_t index = 0; index < instruction.args.size(); ++index) {
-    if (index > 0) {
-      *out += ", ";
-    }
-    std::string argument = instruction.args[index];
-    if (instruction.function.find("applyPorterDuffXP") != std::string::npos) {
-      // The destination read runs in GLSL device coordinates (origin bottom-left); the Metal
-      // fragment position starts at the top-left corner.
-      ReplaceWord(&argument, "in.position.xy",
-                  "float2(in.position.x, tgfx_FragHeight - in.position.y)");
-    }
-    if (callSite.samplerNames.count(argument) != 0) {
-      *out += argument + "_t, " + argument + "_s";
-    } else {
-      *out += argument;
-    }
-  }
-  *out += ")";
-  if (!instruction.wrapType.empty()) {
-    *out += ")";
-  }
-  *out += ";\n";
-}
-
 void AppendSection(std::string* out, const std::string& section) {
   if (section.empty()) {
     return;
@@ -289,128 +227,14 @@ std::string MSLPrinter::PrintFragmentBodyFromIR(const ProgramIR& program) {
   return ProgramBodyPrinter::PrintFragment(program, ProgramBodyPrinter::MSLTraits());
 }
 
-std::string MSLPrinter::PrintVertexProgram(const std::vector<VertexCall>& calls,
-                                           const MslCallSite& /*callSite*/) {
-  std::string out = {};
-  for (const auto& call : calls) {
-    switch (call.kind) {
-      case VertexCallKind::StoreVarying:
-        out += Indent;
-        out += call.dst.name + " = " + call.src.name + ";\n";
-        break;
-      case VertexCallKind::TransformPoint:
-        AppendTransformPoint(&out, call);
-        break;
-      case VertexCallKind::TransformVarying:
-        out += Indent;
-        if (call.hasPerspective) {
-          out +=
-              call.dst.name + " = " + call.operand.name + " * float3(" + call.src.name + ", 1);\n";
-        } else {
-          out += call.dst.name + " = (" + call.operand.name + " * float3(" + call.src.name +
-                 ", 1)).xy;\n";
-        }
-        break;
-      case VertexCallKind::TransformPointAdd:
-        out += Indent;
-        out += "float2 " + call.dst.name + " = (" + call.operand.name + " * float3(" +
-               call.src.name + ", 1.0)).xy + " + call.extra.name + ";\n";
-        break;
-      case VertexCallKind::MultiplyVec2:
-        out += Indent;
-        if (call.declaresResult) {
-          out += "float2 " + call.dst.name + " = ";
-        } else {
-          out += call.dst.name + " = ";
-        }
-        out += call.src.name + " * " + call.operand.name + ";\n";
-        break;
-      case VertexCallKind::SwizzleVec2:
-        out += Indent;
-        out += "float2 " + call.dst.name + " = " + call.src.name + "." + call.extra.name + ";\n";
-        break;
-      case VertexCallKind::ComposeVec4:
-        out += Indent;
-        out += "float4 " + call.dst.name + " = float4(" + call.src.name + ", " + call.operand.name +
-               ");\n";
-        break;
-      case VertexCallKind::NormalizeRect:
-        out += Indent;
-        out += call.src.name + " = float4(min(" + call.src.name + ".xy, " + call.src.name +
-               ".zw), max(" + call.src.name + ".xy, " + call.src.name + ".zw));\n";
-        break;
-      case VertexCallKind::StorePosition:
-        // Metal's clip-space y points the opposite way from the RTAdjust mapping the GL path
-        // feeds (the device-space origin is top-left), so the final NDC y is negated.
-        out += Indent;
-        out += "float2 tgfxPosition = " + call.src.name + ".xy * " + RTAdjustName + ".xz + " +
-               RTAdjustName + ".yw;\n";
-        out += Indent;
-        out += "out.position = float4(tgfxPosition.x, -tgfxPosition.y, 0, 1);\n";
-        break;
-    }
-  }
-  return out;
-}
-
-std::string MSLPrinter::PrintFragmentProgram(const FragmentProgram& program,
-                                             const MslCallSite& callSite) {
-  std::string out = {};
-  for (const auto& instruction : program.instructions) {
-    switch (instruction.kind) {
-      case FragmentInstructionKind::RawText:
-        out += instruction.text;
-        break;
-      case FragmentInstructionKind::Call:
-        AppendCall(&out, instruction, callSite);
-        break;
-      case FragmentInstructionKind::Alias:
-        out += PrefixOf(instruction);
-        if (!instruction.declaration.empty()) {
-          out += instruction.declaration + " ";
-        }
-        out += instruction.output + " = " + instruction.src + ";\n";
-        break;
-      case FragmentInstructionKind::StoreColor:
-        out += PrefixOf(instruction);
-        out += instruction.output + " = " + instruction.src + ";\n";
-        break;
-      case FragmentInstructionKind::StoreCoverage:
-        out += PrefixOf(instruction);
-        out += instruction.output + " = ";
-        if (instruction.splat) {
-          out += "float4(" + instruction.src + ")";
-        } else {
-          out += instruction.src;
-        }
-        out += ";\n";
-        break;
-      case FragmentInstructionKind::Combine:
-        out += PrefixOf(instruction);
-        out += instruction.output + " = " + instruction.src + " * " + instruction.operand + ";\n";
-        break;
-      case FragmentInstructionKind::ReadVarying:
-        break;
-      case FragmentInstructionKind::Project:
-        out += PrefixOf(instruction);
-        out += "float2 " + instruction.output + " = " + instruction.src + ".xy / " +
-               instruction.src + ".z;\n";
-        break;
-      case FragmentInstructionKind::Root:
-        break;
-    }
-  }
-  return out;
-}
-
 std::string MSLPrinter::PrintStage(const ProgramBuilder& programBuilder, ShaderStage stage,
-                                   const InterfaceDesc& interface, const ShaderBuilder& builder,
+                                   const InterfaceIR& interface, const ShaderBuilder& builder,
                                    const MslCallSite& callSite, bool readsDestinationColor) {
   (void)programBuilder;
   std::vector<UniformDesc> uniforms = {};
   for (const auto& uniform : interface.uniforms) {
     if (uniform.stage == stage) {
-      uniforms.push_back(uniform);
+      uniforms.push_back({uniform.name, uniform.type, uniform.stage, uniform.count});
     }
   }
   const bool isVertex = stage == ShaderStage::Vertex;

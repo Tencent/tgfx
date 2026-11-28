@@ -23,7 +23,6 @@
 #include "core/utils/Log.h"
 #include "gpu/ir/ProgramBodyPrinter.h"
 #include "gpu/ir/ProgramIRValidation.h"
-#include "gpu/ir/ProgramValidation.h"
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/metal/MSLPrinter.h"
 #include "gpu/shaders/ShaderLibraryBundle.h"
@@ -65,10 +64,6 @@ std::shared_ptr<Program> MetalProgramBuilder::Create(Context* context,
 MetalProgramBuilder::MetalProgramBuilder(Context* context, const ProgramInfo* programInfo)
     : ProgramBuilder(context, programInfo), _varyingHandler(this), _uniformHandler(this),
       _vertexBuilder(this), _fragBuilder(this) {
-  _vertexBuilder.setVertexRecorder(&description.vertexCalls);
-  _vertexBuilder.setValueTable(&description.values);
-  _fragBuilder.setFragmentRecorder(&description.fragment);
-  _fragBuilder.setValueTable(&description.values);
   _vertexBuilder.setLibraryLanguage(ShaderLibraryLanguage::MSL);
   _fragBuilder.setLibraryLanguage(ShaderLibraryLanguage::MSL);
 }
@@ -99,67 +94,33 @@ bool MetalProgramBuilder::checkSamplerCounts() {
 std::shared_ptr<Program> MetalProgramBuilder::finalize() {
   fragmentShaderBuilder()->declareCustomOutputColor();
   for (const auto& attribute : getProgramInfo()->getVertexAttributes()) {
-    const auto type = ShaderVar(attribute).type();
-    description.interface.attributes.push_back({attribute.name(), type});
-    description.values.Intern(attribute.name(), type, ValueOrigin::Attribute);
+    programIRBuilder().AddAttribute(
+        {attribute.name(), ShaderVar(attribute).type(), Precision::High, 0});
   }
   for (const auto& attribute : getProgramInfo()->getInstanceAttributes()) {
-    const auto type = ShaderVar(attribute).type();
-    description.interface.attributes.push_back({attribute.name(), type});
-    description.values.Intern(attribute.name(), type, ValueOrigin::Attribute);
+    programIRBuilder().AddAttribute(
+        {attribute.name(), ShaderVar(attribute).type(), Precision::High, 0});
   }
   for (const auto& varying : _varyingHandler.getVaryings()) {
-    description.interface.varyings.push_back(
-        {varying.name(), varying.type(), varying.id(), 0, false, varying.isFlat()});
-    description.values.Intern(varying.name(), varying.type(), ValueOrigin::Varying);
+    programIRBuilder().AddVarying(
+        {varying.name(), varying.type(), Precision::High, 0, varying.isFlat()});
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Vertex)) {
-    description.interface.uniforms.push_back(
-        {uniform.name(), ShaderVar(uniform).type(), ShaderStage::Vertex, uniform.count()});
-    description.values.Intern(uniform.name(), ShaderVar(uniform).type(), ValueOrigin::Uniform);
+    programIRBuilder().AddUniform({uniform.name(), ShaderVar(uniform).type(), Precision::Default,
+                                   ShaderStage::Vertex, uniform.count()});
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Fragment)) {
-    description.interface.uniforms.push_back(
-        {uniform.name(), ShaderVar(uniform).type(), ShaderStage::Fragment, uniform.count()});
-    description.values.Intern(uniform.name(), ShaderVar(uniform).type(), ValueOrigin::Uniform);
+    programIRBuilder().AddUniform({uniform.name(), ShaderVar(uniform).type(), Precision::Default,
+                                   ShaderStage::Fragment, uniform.count()});
   }
   for (const auto& sampler : _uniformHandler.getSamplers()) {
-    description.interface.samplers.push_back({sampler.name(), ShaderVar(sampler).type()});
-    description.values.Intern(sampler.name(), ShaderVar(sampler).type(), ValueOrigin::Sampler);
-  }
-  // The IR route prints the bodies from ProgramIR, so its interface has to carry the same names the
-  // description does: the printer resolves every identifier against it.
-  for (const auto& attribute : description.interface.attributes) {
-    programIRBuilder().AddAttribute({attribute.name, attribute.type, Precision::High, 0});
-  }
-  for (const auto& varying : description.interface.varyings) {
-    programIRBuilder().AddVarying(
-        {varying.name, varying.type, Precision::High, varying.location, varying.flat});
-  }
-  for (const auto& uniform : description.interface.uniforms) {
-    if (uniform.count > 1) {
-      programIRBuilder().AddUniformArray(
-          {uniform.name, uniform.type, Precision::Default, uniform.stage, uniform.count});
-    } else {
-      programIRBuilder().AddUniform(
-          {uniform.name, uniform.type, Precision::Default, uniform.stage, uniform.count});
-    }
-  }
-  for (const auto& sampler : description.interface.samplers) {
-    programIRBuilder().AddSampler({sampler.name, sampler.type, 0});
+    programIRBuilder().AddSampler({sampler.name(), ShaderVar(sampler).type(), 0});
   }
   finalizeShaders();
   std::string validationError;
   // The processors emit their bodies into the ProgramIR; only the text escape hatch still fills
   // the typed description, so the two routes validate different graphs.
-  const bool textRoute = std::getenv("TGFX_TEXT_PRINTER") != nullptr;
-  if (textRoute) {
-    if (!ValidateProgramDescription(&description, &validationError)) {
-      LOGE("MetalProgramBuilder: %s", validationError.c_str());
-      return nullptr;
-    }
-  } else {
-    if (!ValidateProgramIR(programIRBuilder().IR(), &validationError)) {
+      if (!ValidateProgramIR(programIRBuilder().IR(), &validationError)) {
       LOGE("MetalProgramBuilder: %s", validationError.c_str());
       return nullptr;
     }
@@ -176,9 +137,9 @@ std::shared_ptr<Program> MetalProgramBuilder::finalize() {
       LOGE("MetalProgramBuilder: the vertex stage never writes the clip-space position");
       return nullptr;
     }
-  }
+  
   MslCallSite callSite = {};
-  for (const auto& sampler : description.interface.samplers) {
+  for (const auto& sampler : programIRBuilder().IR().interface.samplers) {
     callSite.samplerNames.insert(sampler.name);
   }
   std::set<std::string> listEmitted = {};
@@ -199,11 +160,7 @@ std::shared_ptr<Program> MetalProgramBuilder::finalize() {
     listStart = comma + 1;
   }
   bool readsDestinationColor = false;
-  if (textRoute) {
-    _vertexBuilder.setCodeText(MSLPrinter::PrintVertexProgram(description.vertexCalls, callSite));
-    _fragBuilder.setCodeText(MSLPrinter::PrintFragmentProgram(description.fragment, callSite));
-  } else {
-    // The IR route prints the same bodies the GL path prints, spelled in MSL: the shared operator
+      // The IR route prints the same bodies the GL path prints, spelled in MSL: the shared operator
     // functions are pulled per stage, because each stage compiles on its own in Metal.
     auto& ir = programIRBuilder().IR();
     ProgramBodyPrinter::Uniquify(ir);
@@ -244,26 +201,13 @@ std::shared_ptr<Program> MetalProgramBuilder::finalize() {
     _vertexBuilder.setCodeText(vertexBody);
     _fragBuilder.setCodeText(fragmentBody);
     readsDestinationColor = IRReadsStageColor(ir);
-  }
-  const auto vertexText = MSLPrinter::PrintStage(*this, ShaderStage::Vertex, description.interface,
+  
+  const auto vertexText = MSLPrinter::PrintStage(*this, ShaderStage::Vertex, programIRBuilder().IR().interface,
                                                  _vertexBuilder, callSite);
   const auto fragmentText = MSLPrinter::PrintStage(*this, ShaderStage::Fragment,
-                                                   description.interface, _fragBuilder,
+                                                   programIRBuilder().IR().interface, _fragBuilder,
                                                    callSite,
                                                    readsDestinationColor);
-  if (const char* dumpDir = std::getenv("TGFX_DUMP_PROGRAM")) {
-    static std::atomic<int> dumpIndex{0};
-    const int index = dumpIndex.fetch_add(1);
-    const std::string base = std::string(dumpDir) + "/msl_program_" + std::to_string(index);
-    if (auto* file = fopen((base + ".vert").c_str(), "wb")) {
-      fwrite(vertexText.data(), 1, vertexText.size(), file);
-      fclose(file);
-    }
-    if (auto* file = fopen((base + ".frag").c_str(), "wb")) {
-      fwrite(fragmentText.data(), 1, fragmentText.size(), file);
-      fclose(file);
-    }
-  }
   auto gpu = context->gpu();
   ShaderModuleDescriptor vertexModule = {};
   vertexModule.code = vertexText;

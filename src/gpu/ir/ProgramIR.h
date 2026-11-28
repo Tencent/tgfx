@@ -211,17 +211,7 @@ struct UniformBlockIR {
   std::string name = {};
 };
 
-struct UniformArrayIR {
-  std::string name = {};
-  SLType elementType = SLType::Void;
-  Precision precision = Precision::Default;
-  ShaderStage stage = ShaderStage::Fragment;
-  uint32_t count = 0;
-  uint32_t binding = 0;
-  uint32_t offset = 0;
-  uint32_t stride = 0;
-  uint32_t size = 0;
-};
+;
 
 struct SamplerIR {
   std::string name = {};
@@ -233,7 +223,6 @@ struct InterfaceIR {
   std::vector<AttributeIR> attributes = {};
   std::vector<VaryingIR> varyings = {};
   std::vector<UniformIR> uniforms = {};
-  std::vector<UniformArrayIR> uniformArrays = {};
   std::vector<UniformBlockIR> uniformBlocks = {};
   std::vector<SamplerIR> samplers = {};
   std::vector<ResourceBinding> bindings = {};

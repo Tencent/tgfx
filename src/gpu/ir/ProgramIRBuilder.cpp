@@ -178,6 +178,12 @@ UniformBlockIR& ProgramIRBuilder::EnsureUniformBlock(ShaderStage stage, uint32_t
 }
 
 ValueID ProgramIRBuilder::AddUniform(UniformIR uniform) {
+  for (const auto& existing : ir.interface.uniforms) {
+    if (existing.name == uniform.name && existing.stage == uniform.stage) {
+      return InternValue(existing.name, existing.type, existing.precision,
+                         IRValueKind::Uniform);
+    }
+  }
   uniform.binding = uniform.stage == ShaderStage::Vertex ? 0 : 1;
   const auto layout = LayoutOf(uniform.type);
   auto& cursor = uniform.stage == ShaderStage::Vertex ? vertexUniformCursor : fragmentUniformCursor;
@@ -200,40 +206,6 @@ ValueID ProgramIRBuilder::AddUniform(UniformIR uniform) {
   auto& block = EnsureUniformBlock(uniform.stage, uniform.binding);
   block.size = AlignUp(cursor, 16);
   ir.interface.uniforms.push_back(std::move(uniform));
-  return id;
-}
-
-ValueID ProgramIRBuilder::AddUniformArray(UniformArrayIR array) {
-  for (const auto& existing : ir.interface.uniformArrays) {
-    if (existing.name == array.name) {
-      return InternValue(existing.name, existing.elementType, existing.precision,
-                         IRValueKind::UniformArray);
-    }
-  }
-  array.binding = array.stage == ShaderStage::Vertex ? 0 : 1;
-  const auto layout = LayoutOf(array.elementType);
-  auto& cursor = array.stage == ShaderStage::Vertex ? vertexUniformCursor : fragmentUniformCursor;
-  if (layout.size == 0 || array.count == 0) {
-    return INVALID_VALUE_ID;
-  }
-  array.offset = AlignUp(cursor, layout.alignment);
-  array.stride = layout.arrayStride;
-  array.size = array.stride * array.count;
-  cursor = array.offset + array.size;
-  const auto id =
-      InternValue(array.name, array.elementType, array.precision, IRValueKind::UniformArray);
-  if (!HasUniformBinding(array.stage)) {
-    ResourceBinding binding = {};
-    binding.kind = BindingKind::UniformBuffer;
-    binding.binding = array.binding;
-    binding.stage = array.stage;
-    binding.type = SLType::Void;
-    binding.precision = Precision::Default;
-    ir.interface.bindings.push_back(binding);
-  }
-  auto& block = EnsureUniformBlock(array.stage, array.binding);
-  block.size = AlignUp(cursor, 16);
-  ir.interface.uniformArrays.push_back(std::move(array));
   return id;
 }
 

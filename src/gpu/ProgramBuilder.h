@@ -44,11 +44,6 @@ class ProgramBuilder {
     return programInfo;
   }
 
-  /// The typed interface when the backend builds one; null keeps the legacy handler declarations.
-  virtual const InterfaceDesc* programInterface() const {
-    return nullptr;
-  }
-
   virtual std::string getShaderVarDeclarations(const ShaderVar& var, ShaderStage stage) const = 0;
 
   virtual std::string getUniformBlockDeclaration(ShaderStage stage,

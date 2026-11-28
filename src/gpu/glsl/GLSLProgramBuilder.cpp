@@ -145,10 +145,6 @@ std::shared_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
 GLSLProgramBuilder::GLSLProgramBuilder(Context* context, const ProgramInfo* programInfo)
     : ProgramBuilder(context, programInfo), _varyingHandler(this), _uniformHandler(this),
       _vertexBuilder(this), _fragBuilder(this) {
-  _vertexBuilder.setVertexRecorder(&description.vertexCalls);
-  _vertexBuilder.setValueTable(&description.values);
-  _fragBuilder.setFragmentRecorder(&description.fragment);
-  _fragBuilder.setValueTable(&description.values);
 }
 
 std::string GLSLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
@@ -227,60 +223,27 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
 std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   fragmentShaderBuilder()->declareCustomOutputColor();
   for (const auto& attribute : getProgramInfo()->getVertexAttributes()) {
-    const auto type = ShaderVar(attribute).type();
-    description.interface.attributes.push_back({attribute.name(), type});
-    description.values.Intern(attribute.name(), type, ValueOrigin::Attribute);
+    programIRBuilder().AddAttribute(
+        {attribute.name(), ShaderVar(attribute).type(), Precision::High, 0});
   }
   for (const auto& attribute : getProgramInfo()->getInstanceAttributes()) {
-    const auto type = ShaderVar(attribute).type();
-    description.interface.attributes.push_back({attribute.name(), type});
-    description.values.Intern(attribute.name(), type, ValueOrigin::Attribute);
+    programIRBuilder().AddAttribute(
+        {attribute.name(), ShaderVar(attribute).type(), Precision::High, 0});
   }
   for (const auto& varying : _varyingHandler.getVaryings()) {
-    description.interface.varyings.push_back(
-        {varying.name(), varying.type(), varying.id(), 0, false, varying.isFlat()});
-    description.values.Intern(varying.name(), varying.type(), ValueOrigin::Varying);
+    programIRBuilder().AddVarying(
+        {varying.name(), varying.type(), Precision::High, 0, varying.isFlat()});
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Vertex)) {
-    const auto type = ShaderVar(uniform).type();
-    description.interface.uniforms.push_back(
-        {uniform.name(), type, ShaderStage::Vertex, uniform.count()});
-    description.values.Intern(uniform.name(), type, ValueOrigin::Uniform);
-    if (uniform.count() > 1) {
-      programIRBuilder().AddUniformArray(
-          {uniform.name(), type, Precision::Default, ShaderStage::Vertex, uniform.count()});
-    } else {
-      programIRBuilder().AddUniform(
-          {uniform.name(), type, Precision::Default, ShaderStage::Vertex, uniform.count()});
-    }
+    programIRBuilder().AddUniform({uniform.name(), ShaderVar(uniform).type(), Precision::Default,
+                                   ShaderStage::Vertex, uniform.count()});
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Fragment)) {
-    const auto type = ShaderVar(uniform).type();
-    description.interface.uniforms.push_back(
-        {uniform.name(), type, ShaderStage::Fragment, uniform.count()});
-    description.values.Intern(uniform.name(), type, ValueOrigin::Uniform);
-    if (uniform.count() > 1) {
-      programIRBuilder().AddUniformArray(
-          {uniform.name(), type, Precision::Default, ShaderStage::Fragment, uniform.count()});
-    } else {
-      programIRBuilder().AddUniform(
-          {uniform.name(), type, Precision::Default, ShaderStage::Fragment, uniform.count()});
-    }
+    programIRBuilder().AddUniform({uniform.name(), ShaderVar(uniform).type(), Precision::Default,
+                                   ShaderStage::Fragment, uniform.count()});
   }
   for (const auto& sampler : _uniformHandler.getSamplers()) {
-    const auto type = ShaderVar(sampler).type();
-    description.interface.samplers.push_back({sampler.name(), type});
-    description.values.Intern(sampler.name(), type, ValueOrigin::Sampler);
-  }
-  for (const auto& attribute : description.interface.attributes) {
-    programIRBuilder().AddAttribute({attribute.name, attribute.type, Precision::High, 0});
-  }
-  for (const auto& varying : description.interface.varyings) {
-    programIRBuilder().AddVarying(
-        {varying.name, varying.type, Precision::High, varying.location, varying.flat});
-  }
-  for (const auto& sampler : description.interface.samplers) {
-    programIRBuilder().AddSampler({sampler.name, sampler.type, 0});
+    programIRBuilder().AddSampler({sampler.name(), ShaderVar(sampler).type(), 0});
   }
   finalizeShaders();
   std::string validationError;
@@ -340,7 +303,7 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
           writtenVaryings.insert(programIRBuilder().IR().values[statement.dst.base].debugName);
         }
       }
-      for (const auto& varying : description.interface.varyings) {
+      for (const auto& varying : programIRBuilder().IR().interface.varyings) {
         if (fragmentBody.find(varying.name) == std::string::npos) {
           continue;
         }
@@ -368,9 +331,9 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     vertexBody += "}\n";
     _vertexBuilder.setCodeText(vertexBody);
   const auto vertexText =
-      GLSLPrinter::PrintStage(*this, ShaderStage::Vertex, description.interface, _vertexBuilder);
+      GLSLPrinter::PrintStage(*this, ShaderStage::Vertex, programIRBuilder().IR().interface, _vertexBuilder);
   const auto fragmentText =
-      GLSLPrinter::PrintStage(*this, ShaderStage::Fragment, description.interface, _fragBuilder);
+      GLSLPrinter::PrintStage(*this, ShaderStage::Fragment, programIRBuilder().IR().interface, _fragBuilder);
   auto gpu = context->gpu();
   ShaderModuleDescriptor vertexModule = {};
   vertexModule.code = vertexText;

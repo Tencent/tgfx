@@ -106,12 +106,7 @@ struct SamplerDesc {
 /// The stage interface the emitter declared: attributes, varyings, uniforms and samplers, in
 /// declaration order. The GL printer reads the same handlers for now; the description is the
 /// single place later backends will read.
-struct InterfaceDesc {
-  std::vector<AttributeDesc> attributes = {};
-  std::vector<VaryingDesc> varyings = {};
-  std::vector<UniformDesc> uniforms = {};
-  std::vector<SamplerDesc> samplers = {};
-};
+;
 
 enum class FragmentInstructionKind : uint8_t {
   /// A statement chunk the existing FP emission produced; replayed verbatim.
@@ -170,11 +165,6 @@ struct FragmentProgram {
 
 /// One program's typed description. The vertex stage and interface are structured; the fragment
 /// stage carries the recorded instructions above.
-struct ProgramDescription {
-  InterfaceDesc interface = {};
-  std::vector<VertexCall> vertexCalls = {};
-  FragmentProgram fragment = {};
-  ValueTable values = {};
-};
+;
 
 }  // namespace tgfx

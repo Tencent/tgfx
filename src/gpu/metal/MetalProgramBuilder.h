@@ -50,10 +50,6 @@ class MetalProgramBuilder : public ProgramBuilder {
   std::string getUniformBlockDeclaration(ShaderStage stage,
                                          const std::vector<UniformDesc>& uniforms) const override;
 
-  const InterfaceDesc* programInterface() const override {
-    return &description.interface;
-  }
-
  private:
   MetalProgramBuilder(Context* context, const ProgramInfo* programInfo);
 
@@ -83,7 +79,6 @@ class MetalProgramBuilder : public ProgramBuilder {
 
   VaryingHandler _varyingHandler;
   UniformHandler _uniformHandler;
-  ProgramDescription description = {};
   GLSLVertexShaderBuilder _vertexBuilder;
   GLSLFragmentShaderBuilder _fragBuilder;
 

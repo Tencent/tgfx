@@ -193,6 +193,11 @@ bool ValidateInterface(const InterfaceIR& interface, std::string* error) {
     }
   }
   for (const auto& uniform : interface.uniforms) {
+    if (uniform.count > 1 && (uniform.arrayStride == 0 || uniform.arrayStride % 16 != 0 ||
+                              uniform.size != uniform.arrayStride * uniform.count)) {
+      *error = "uniform array '" + uniform.name + "' has invalid std140 layout";
+      return false;
+    }
     const UniformBlockIR* block = nullptr;
     for (const auto& candidate : interface.uniformBlocks) {
       if (candidate.stage == uniform.stage) {
@@ -206,31 +211,6 @@ bool ValidateInterface(const InterfaceIR& interface, std::string* error) {
     }
     if (uniform.offset + uniform.size > block->size) {
       *error = "uniform '" + uniform.name + "' exceeds its uniform block";
-      return false;
-    }
-  }
-  for (const auto& array : interface.uniformArrays) {
-    if (array.name.empty() || array.elementType == SLType::Void || array.count == 0) {
-      *error = "a uniform array has invalid metadata";
-      return false;
-    }
-    if (array.stride == 0 || array.stride % 16 != 0 || array.size != array.stride * array.count) {
-      *error = "uniform array '" + array.name + "' has invalid std140 layout";
-      return false;
-    }
-    const UniformBlockIR* block = nullptr;
-    for (const auto& candidate : interface.uniformBlocks) {
-      if (candidate.stage == array.stage) {
-        block = &candidate;
-        break;
-      }
-    }
-    if (block == nullptr) {
-      *error = "uniform array '" + array.name + "' has no uniform block";
-      return false;
-    }
-    if (array.offset + array.size > block->size) {
-      *error = "uniform array '" + array.name + "' exceeds its uniform block";
       return false;
     }
   }

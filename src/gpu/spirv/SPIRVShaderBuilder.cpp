@@ -509,17 +509,11 @@ bool SPIRVShaderBuilder::EnsureUniformBlock(const ProgramIR& program, std::strin
   struct BlockMember {
     uint32_t offset = 0;
     const UniformIR* uniform = nullptr;
-    const UniformArrayIR* array = nullptr;
   };
   std::vector<BlockMember> members = {};
   for (const auto& uniform : program.interface.uniforms) {
     if (uniform.stage == stage) {
-      members.push_back({uniform.offset, &uniform, nullptr});
-    }
-  }
-  for (const auto& array : program.interface.uniformArrays) {
-    if (array.stage == stage) {
-      members.push_back({array.offset, nullptr, &array});
+      members.push_back({uniform.offset, &uniform});
     }
   }
   if (members.empty()) {
@@ -533,21 +527,20 @@ bool SPIRVShaderBuilder::EnsureUniformBlock(const ProgramIR& program, std::strin
   for (size_t index = 0; index < members.size(); ++index) {
     const auto& member = members[index];
     uint32_t typeId = 0;
-    if (member.uniform != nullptr) {
+    if (member.uniform->count > 1) {
+      typeId = ArrayTypeId(member.uniform->type, member.uniform->count,
+                           member.uniform->arrayStride, true, error);
+      if (typeId == 0) {
+        return false;
+      }
+      uniformArrayTypeIds[member.uniform->name] = typeId;
+    } else {
       typeId = TypeId(member.uniform->type, error);
       if (typeId == 0) {
         return false;
       }
-      uniformMemberIndices[member.uniform->name] = static_cast<uint32_t>(index);
-    } else {
-      typeId = ArrayTypeId(member.array->elementType, member.array->count, member.array->stride,
-                           true, error);
-      if (typeId == 0) {
-        return false;
-      }
-      uniformArrayTypeIds[member.array->name] = typeId;
-      uniformMemberIndices[member.array->name] = static_cast<uint32_t>(index);
     }
+    uniformMemberIndices[member.uniform->name] = static_cast<uint32_t>(index);
     memberTypes.push_back(typeId);
   }
 
@@ -573,8 +566,7 @@ bool SPIRVShaderBuilder::EnsureUniformBlock(const ProgramIR& program, std::strin
               {uniformBlockVariableId, spirv::kDecorationBinding, block->binding});
   for (size_t index = 0; index < members.size(); ++index) {
     const auto& member = members[index];
-    const uint32_t offset =
-        member.uniform != nullptr ? member.uniform->offset : member.array->offset;
+    const uint32_t offset = member.uniform->offset;
     writer.Inst(spirv::kOpMemberDecorate, {uniformBlockTypeId, static_cast<uint32_t>(index),
                                            spirv::kDecorationOffset, offset});
     if (member.uniform != nullptr &&
@@ -627,9 +619,9 @@ uint32_t SPIRVShaderBuilder::EmitUniformArrayValue(const ProgramIR& program, con
     Fail(error, "the uniform array has no member in the SPIR-V block");
     return 0;
   }
-  const UniformArrayIR* array = nullptr;
-  for (const auto& candidate : program.interface.uniformArrays) {
-    if (candidate.name == value.debugName && candidate.stage == stage) {
+  const UniformIR* array = nullptr;
+  for (const auto& candidate : program.interface.uniforms) {
+    if (candidate.name == value.debugName && candidate.stage == stage && candidate.count > 1) {
       array = &candidate;
       break;
     }

@@ -51,7 +51,7 @@ class GLSLPrinter {
   static std::string PrintVertexBodyFromIR(const ProgramIR& program);
 
   static std::string PrintStage(const ProgramBuilder& programBuilder, ShaderStage stage,
-                                const InterfaceDesc& interface, const ShaderBuilder& builder);
+                                const InterfaceIR& interface, const ShaderBuilder& builder);
 };
 
 }  // namespace tgfx

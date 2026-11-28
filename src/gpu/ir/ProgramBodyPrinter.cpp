@@ -141,12 +141,6 @@ bool ResolvesIdentifier(const std::string& name, const ProgramIR& program,
       return true;
     }
   }
-  // Uniform arrays are registered apart from the scalar block members.
-  for (const auto& array : program.interface.uniformArrays) {
-    if (array.name == name) {
-      return true;
-    }
-  }
   for (const auto& sampler : program.interface.samplers) {
     if (sampler.name == name) {
       return true;

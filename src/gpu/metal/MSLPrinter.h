@@ -47,12 +47,6 @@ struct MslCallSite {
 
 class MSLPrinter {
  public:
-  static std::string PrintVertexProgram(const std::vector<VertexCall>& calls,
-                                        const MslCallSite& callSite);
-
-  static std::string PrintFragmentProgram(const FragmentProgram& program,
-                                          const MslCallSite& callSite);
-
   /// Prints the stage bodies straight from the ProgramIR statements, spelled in MSL. The stage
   /// shell (structs, uniform block, prologue and epilogue) still comes from PrintStage.
   static std::string PrintVertexBodyFromIR(const ProgramIR& program);
@@ -60,7 +54,7 @@ class MSLPrinter {
   static std::string PrintFragmentBodyFromIR(const ProgramIR& program);
 
   static std::string PrintStage(const ProgramBuilder& programBuilder, ShaderStage stage,
-                                const InterfaceDesc& interface, const ShaderBuilder& builder,
+                                const InterfaceIR& interface, const ShaderBuilder& builder,
                                 const MslCallSite& callSite, bool readsDestinationColor = false);
 };
 

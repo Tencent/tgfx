@@ -96,23 +96,13 @@ std::shared_ptr<Program> VulkanProgramBuilder::buildIRProgram() {
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Vertex)) {
     const auto type = ShaderVar(uniform).type();
-    if (uniform.count() > 1) {
-      programIRBuilder().AddUniformArray(
-          {uniform.name(), type, Precision::Default, ShaderStage::Vertex, uniform.count()});
-    } else {
-      programIRBuilder().AddUniform(
-          {uniform.name(), type, Precision::Default, ShaderStage::Vertex, uniform.count()});
-    }
+    programIRBuilder().AddUniform(
+        {uniform.name(), type, Precision::Default, ShaderStage::Vertex, uniform.count()});
   }
   for (const auto& uniform : _uniformHandler.getUniforms(ShaderStage::Fragment)) {
     const auto type = ShaderVar(uniform).type();
-    if (uniform.count() > 1) {
-      programIRBuilder().AddUniformArray(
-          {uniform.name(), type, Precision::Default, ShaderStage::Fragment, uniform.count()});
-    } else {
-      programIRBuilder().AddUniform(
-          {uniform.name(), type, Precision::Default, ShaderStage::Fragment, uniform.count()});
-    }
+    programIRBuilder().AddUniform(
+        {uniform.name(), type, Precision::Default, ShaderStage::Fragment, uniform.count()});
   }
   for (const auto& sampler : _uniformHandler.getSamplers()) {
     programIRBuilder().AddSampler({sampler.name(), ShaderVar(sampler).type(), 0});
