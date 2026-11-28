@@ -25,9 +25,9 @@
 #include "gpu/ir/ProgramBodyPrinter.h"
 #include "gpu/ir/ProgramIRValidation.h"
 #include "gpu/FragmentShaderBuilder.h"
+#include "gpu/ShaderBindingLayout.h"
 #include "gpu/metal/MSLPrinter.h"
 #include "gpu/shaders/ShaderLibraryBundle.h"
-#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {

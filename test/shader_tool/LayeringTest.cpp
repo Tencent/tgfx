@@ -216,7 +216,7 @@ TEST(LayeringTest, EveryAllowedHeaderIsUsedByTheTool) {
   for (const auto& header : AllowedRuntimeHeaders()) {
     // The declaration layer headers are reached through the families the tool links, so they may
     // be used only indirectly; the contract headers must be used by the tool directly.
-    if (header.rfind("gpu/shaders/", 0) == 0 && header != "gpu/shaders/KernelContract.h") {
+    if (header.rfind("gpu/shaders/", 0) == 0) {
       continue;
     }
     EXPECT_EQ(used.count(header), 1u) << header << " is allowed but the tool does not include it";

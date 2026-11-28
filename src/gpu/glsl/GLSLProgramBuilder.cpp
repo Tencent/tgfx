@@ -21,10 +21,10 @@
 #include <string>
 #include "GLSLPrinter.h"
 #include "core/utils/Log.h"
+#include "gpu/ShaderBindingLayout.h"
 #include "gpu/UniformData.h"
 #include "gpu/ProgramAssembler.h"
 #include "gpu/ir/ProgramIRValidation.h"
-#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/GPU.h"
 #if defined(TGFX_USE_VULKAN)
 #include "gpu/vulkan/VulkanProgramBuilder.h"

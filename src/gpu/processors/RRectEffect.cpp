@@ -18,7 +18,6 @@
 
 #include "RRectEffect.h"
 #include "core/utils/Log.h"
-#include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
 

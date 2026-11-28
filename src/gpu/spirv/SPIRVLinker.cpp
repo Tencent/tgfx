@@ -28,9 +28,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <unordered_map>
-#include "gpu/shaders/contract/ChainISA.h"
-#include "gpu/shaders/contract/OpTable.h"
-#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/spirv/SPIRVWriter.h"
 #include "spirv-tools/libspirv.hpp"
 #include "spirv-tools/linker.hpp"

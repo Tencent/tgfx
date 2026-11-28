@@ -857,19 +857,12 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     set(TGFX_SHADER_TOOL_FROM_HOST ON)
   endif ()
   if (NOT CMAKE_CROSSCOMPILING)
-    file(GLOB_RECURSE TGFX_SHADER_DECL_FILES CONFIGURE_DEPENDS
-            src/gpu/shaders/contract/FragmentLibrary.cpp
-            src/gpu/shaders/contract/UniformAllocation.cpp)
-    add_library(tgfx_shader_declarations STATIC ${TGFX_SHADER_DECL_FILES})
-    set_target_properties(tgfx_shader_declarations PROPERTIES PREFIX "")
-    target_compile_options(tgfx_shader_declarations PRIVATE ${TGFX_COMPILE_OPTIONS})
     # The include root exposed to the tool is `src` — every shared header spells its path as
     # gpu/... or core/utils/..., and an include path is a directory root, so the per-header
     # boundary (contract layer plus declaration layer only) is what ShaderBuildToolTest's
     # LayeringTest enforces, not this list. The runtime's public API root (`include`, the tgfx/...
     # headers) is deliberately not exposed: the tool has no business with it.
-    target_include_directories(tgfx_shader_declarations PUBLIC src)
-
+    #
     # The tool is two targets so its parts can be unit tested without running a process:
     #   shader_build_tool_core  every source of the tool except main.cpp, as a static library
     #   shader_build_tool       main.cpp only: the command line that drives the library
@@ -880,8 +873,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     list(REMOVE_ITEM SHADER_TOOL_FILES
             ${CMAKE_CURRENT_SOURCE_DIR}/tools/shader_build_tool/main.cpp)
     add_library(shader_build_tool_core STATIC ${SHADER_TOOL_FILES})
-    target_link_libraries(shader_build_tool_core PUBLIC tgfx_shader_declarations)
-    target_include_directories(shader_build_tool_core PUBLIC tools/shader_build_tool)
+    target_include_directories(shader_build_tool_core PUBLIC src tools/shader_build_tool)
     target_include_directories(shader_build_tool_core SYSTEM PUBLIC
             third_party/shaderc/libshaderc/include
             third_party/SPIRV-Cross)

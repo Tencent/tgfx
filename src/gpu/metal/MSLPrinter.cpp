@@ -23,12 +23,12 @@
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/SLType.h"
+#include "gpu/ShaderBindingLayout.h"
 #include "gpu/ShaderBuilder.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/VertexShaderBuilder.h"
 #include "gpu/ir/ProgramBodyPrinter.h"
 #include "gpu/shaders/ShaderLibraryBundle.h"
-#include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
 namespace {
