@@ -207,11 +207,6 @@ void FragmentProcessor::internalEmitChild(
     // same-named twin the registry never sees.
     irChildOutputValue = args.irBuilder->InternValue(outputColor, SLType::Float4,
                                                      Precision::High, IRValueKind::Local);
-    if (std::getenv("TGFX_IR_DIAG") != nullptr) {
-      fprintf(stderr, "CHILDPROBE child='%s' outName='%s' interned=%u\n",
-               childProcessor(childIndex)->name().c_str(), outputColor.c_str(),
-               irChildOutputValue);
-    }
   }
   EmitArgs childArgs(fragBuilder, args.uniformHandler, outputColor,
                      inputName.empty() ? "vec4(1.0)" : inputName, args.inputSubset, &coordVars,

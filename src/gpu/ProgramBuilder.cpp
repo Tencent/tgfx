@@ -220,30 +220,6 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
 
   std::string inputColor = !colorIn.empty() ? colorIn : "vec4(1.0)";
   std::string inputCoverage = !coverageIn.empty() ? coverageIn : "vec4(1.0)";
-  auto findIRValue = [&](const std::string& name) {
-    for (const auto& value : programIRBuilder().IR().values) {
-      if (value.debugName == name) {
-        return value.id;
-      }
-    }
-    return INVALID_VALUE_ID;
-  };
-  auto resolveInput = [&](const std::string& name) {
-    const auto existing = findIRValue(name);
-    if (existing != INVALID_VALUE_ID) {
-      return existing;
-    }
-    if (name == "vec4(1.0)" || name == "1.0") {
-      const auto one = programIRBuilder().CreateConstant(1.0f);
-      return programIRBuilder().CreateConstruct(SLType::Float4, {one, one, one, one});
-    }
-    if (name == "vec4(0.0)" || name == "0.0") {
-      const auto zero = programIRBuilder().CreateConstant(0.0f);
-      return programIRBuilder().CreateConstruct(SLType::Float4, {zero, zero, zero, zero});
-    }
-    return programIRBuilder().InternValue(name, SLType::Float4, Precision::High,
-                                          IRValueKind::Local);
-  };
   // The id protocol: the chain tails come from the registry, not from a name search. A chain
   // that never emitted (a GP-only program) reads the literal constants, matching the text
   // route's defaults.
@@ -257,17 +233,10 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
     const auto one = programIRBuilder().CreateConstant(1.0f);
     return programIRBuilder().CreateConstruct(SLType::Float4, {one, one, one, one});
   };
-  if (std::getenv("TGFX_IR_DIAG") != nullptr) {
-    fprintf(stderr, "IDPROBE xfer color=%u coverage=%u geoColor=%u geoCoverage=%u\n",
-            colorChainValue, coverageChainValue, geoColorValue, geoCoverageValue);
-  }
   const auto inputColorValue = chainValue(colorChainValue, geoColorValue);
   const auto inputCoverageValue =
       chainValue(coverageChainValue, geoCoverageValue != INVALID_VALUE_ID ? geoCoverageValue
                                                                           : INVALID_VALUE_ID);
-  (void)resolveInput;
-  (void)chainValue;
-  (void)resolveInput;
   const auto outputValue = programIRBuilder().CreateValue(SLType::Float4, Precision::High,
                                                           IRValueKind::Local, "fragmentOutput");
   XferProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), inputColor, inputCoverage,

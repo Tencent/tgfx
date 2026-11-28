@@ -17,16 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLProgramBuilder.h"
-#include <atomic>
-#include <cstdio>
-#include <cstdlib>
 #include <set>
 #include <string>
 #include "GLSLPrinter.h"
 #include "core/utils/Log.h"
 #include "gpu/UniformData.h"
 #include "gpu/ir/ProgramIRValidation.h"
-#include "gpu/ir/ProgramValidation.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/GPU.h"
 #if defined(TGFX_USE_VULKAN)
@@ -283,10 +279,6 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     programIRBuilder().AddVarying(
         {varying.name, varying.type, Precision::High, varying.location, varying.flat});
   }
-  for (const auto& uniform : description.interface.uniforms) {
-    programIRBuilder().AddUniform(
-        {uniform.name, uniform.type, Precision::Default, uniform.stage, uniform.count});
-  }
   for (const auto& sampler : description.interface.samplers) {
     programIRBuilder().AddSampler({sampler.name, sampler.type, 0});
   }
@@ -296,22 +288,10 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     LOGE("GLSLProgramBuilder: %s", validationError.c_str());
     return nullptr;
   }
-  // The description checks guard the text route's recorded bodies; the IR route has its own
-  // ValidateProgramIR pass above, and once the processors' text blocks are gone the records are
-  // empty by design.
-  if (std::getenv("TGFX_TEXT_PRINTER") != nullptr &&
-      !ValidateProgramDescription(&description, &validationError)) {
-    LOGE("GLSLProgramBuilder: %s", validationError.c_str());
-    return nullptr;
-  }
   // The IR printer is the route: the main bodies come straight from the ProgramIR statements.
   // A failed print fails the program build loudly (no text fallback): the uncovered processor
   // form is the work item, not something to route around. TGFX_TEXT_PRINTER keeps the recorded
   // text route alive as a debugging escape hatch while the migration finishes.
-  if (std::getenv("TGFX_TEXT_PRINTER") != nullptr) {
-    _vertexBuilder.setCodeText(GLSLPrinter::PrintVertexProgram(description.vertexCalls));
-    _fragBuilder.setCodeText(GLSLPrinter::PrintFragmentProgram(description.fragment));
-  } else {
     // Names become print-only here: one pass rewrites every renameable value name so that a
     // printed reference and a printed definition can only match when they are the same value.
     // Emitters that minted colliding (or missing) names stop silently connecting through them.
@@ -387,26 +367,10 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
     }
     vertexBody += "}\n";
     _vertexBuilder.setCodeText(vertexBody);
-  }
   const auto vertexText =
       GLSLPrinter::PrintStage(*this, ShaderStage::Vertex, description.interface, _vertexBuilder);
   const auto fragmentText =
       GLSLPrinter::PrintStage(*this, ShaderStage::Fragment, description.interface, _fragBuilder);
-  // Diagnostic dump of the emitted stage texts (TGFX_DUMP_PROGRAM=dir): the FP-tree route's
-  // shader is otherwise only visible to the driver. Static counter, one file per program.
-  if (const char* dumpDir = std::getenv("TGFX_DUMP_PROGRAM")) {
-    static std::atomic<int> dumpIndex{0};
-    const int index = dumpIndex.fetch_add(1);
-    const std::string base = std::string(dumpDir) + "/fp_program_" + std::to_string(index);
-    if (auto* file = fopen((base + ".vert").c_str(), "wb")) {
-      fwrite(vertexText.data(), 1, vertexText.size(), file);
-      fclose(file);
-    }
-    if (auto* file = fopen((base + ".frag").c_str(), "wb")) {
-      fwrite(fragmentText.data(), 1, fragmentText.size(), file);
-      fclose(file);
-    }
-  }
   auto gpu = context->gpu();
   ShaderModuleDescriptor vertexModule = {};
   vertexModule.code = vertexText;
